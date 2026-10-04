@@ -8,6 +8,7 @@
 
 pub mod coverage;
 pub mod generate;
+pub mod import;
 pub mod model;
 pub mod targets;
 pub mod validate;

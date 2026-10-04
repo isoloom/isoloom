@@ -1,0 +1,40 @@
+# A small shop as people write it in Compose: the importer's test fixture. It mixes what an
+# Isoloom spec expresses (networks, ports, limits, inputs, readiness) with what it doesn't
+# (published ports, a volume, a one-shot job, a profile-only tester).
+name: Shop_Demo
+services:
+  web:
+    image: nginx:1.27-alpine
+    ports: ["8080:80"]
+    environment:
+      API_TOKEN: ${API_TOKEN}
+      MODE: production
+    depends_on:
+      cache: { condition: service_healthy }
+      seed: { condition: service_completed_successfully }
+    networks:
+      front: { ipv4_address: 172.30.1.10 }
+      back: {}
+    deploy: { resources: { limits: { cpus: "0.5", memory: 256M } } }
+  cache:
+    image: redis:7-alpine
+    expose: ["6379"]
+    networks: [back]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"] }
+    volumes: ["cache-data:/data"]
+  seed:
+    image: redis:7-alpine
+    command: redis-cli -h cache set greeting hello
+    depends_on: { cache: { condition: service_healthy } }
+    networks: [back]
+  tester:
+    image: curlimages/curl:8.11.1
+    profiles: [test]
+networks:
+  front:
+    ipam: { config: [{ subnet: 172.30.1.0/24 }] }
+  back:
+    internal: true
+    ipam: { config: [{ subnet: 10.31.2.0/24 }] }
+volumes:
+  cache-data: {}

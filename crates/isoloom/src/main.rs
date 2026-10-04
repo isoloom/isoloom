@@ -58,6 +58,9 @@ enum Command {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
+    /// Draft an isoloom.yml from files you already have.
+    #[command(subcommand)]
+    Import(Import),
     /// Show which features of each output format (Compose, Vagrant) a spec can produce.
     Coverage {
         /// Every feature, not only the gaps.
@@ -68,6 +71,28 @@ enum Command {
         markdown: bool,
     },
 }
+
+#[derive(Subcommand)]
+enum Import {
+    /// From a Compose file: what it says that the format can express goes into the draft;
+    /// the rest is listed, with why.
+    Compose {
+        /// The Compose file (default: compose.yaml, compose.yml, docker-compose.yaml or
+        /// docker-compose.yml in the current folder).
+        file: Option<PathBuf>,
+        /// Where to write isoloom.yml (default: next to the Compose file).
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Replace an existing isoloom.yml.
+        #[arg(long)]
+        force: bool,
+        /// Print the draft instead of writing it.
+        #[arg(long)]
+        stdout: bool,
+    },
+}
+
+const COMPOSE_FILES: &[&str] = &["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
 
 fn main() -> ExitCode {
     match run(Cli::parse()) {
@@ -185,6 +210,61 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             } else {
                 ExitCode::SUCCESS
             })
+        }
+        Command::Import(Import::Compose { file, out, force, stdout }) => {
+            let file = match file {
+                Some(f) => f,
+                None => COMPOSE_FILES
+                    .iter()
+                    .map(PathBuf::from)
+                    .find(|p| p.is_file())
+                    .ok_or("no compose.yaml or docker-compose.yml here; pass the file")?,
+            };
+            let text = std::fs::read_to_string(&file).map_err(|e| format!("can't read {}: {e}", file.display()))?;
+            let folder = file.canonicalize()?.parent().map(PathBuf::from).unwrap_or_default();
+            let fallback = folder.file_name().and_then(|n| n.to_str()).unwrap_or("env").to_string();
+            let source = file.file_name().and_then(|n| n.to_str()).unwrap_or("compose.yaml");
+            let draft = core::import::compose::draft(&text, &fallback, source)?;
+
+            if stdout {
+                print!("{}", draft.yaml);
+            } else {
+                let dir = out.unwrap_or(folder);
+                let target = dir.join("isoloom.yml");
+                if (target.exists() || dir.join("isoloom.yaml").exists()) && !force {
+                    return Err(format!("{} already has a spec; use --force to replace it, or --stdout", dir.display()).into());
+                }
+                std::fs::write(&target, &draft.yaml)?;
+                println!("✓ wrote {}", target.display());
+            }
+
+            // The notes, by kind, most important first; stderr when the draft goes to stdout.
+            let mut report = String::new();
+            for kind in core::import::NoteKind::ALL {
+                let notes: Vec<_> = draft.notes.iter().filter(|n| n.kind == kind).collect();
+                if notes.is_empty() {
+                    continue;
+                }
+                report.push_str(&format!("\n{} ({})\n", kind.title(), notes.len()));
+                for n in notes {
+                    report.push_str(&format!("  {}: {}\n", n.at, n.text));
+                }
+            }
+            let problems = core::parse(&draft.yaml).map(|s| core::validate(&s)).map_err(|e| e.to_string())?;
+            if problems.is_empty() {
+                report.push_str("\n✓ the draft is valid\n");
+            } else {
+                report.push_str("\nThe draft needs fixing before it validates:\n");
+                for p in &problems {
+                    report.push_str(&format!("  {p}\n"));
+                }
+            }
+            if stdout {
+                eprint!("{report}")
+            } else {
+                print!("{report}")
+            }
+            Ok(ExitCode::SUCCESS)
         }
         Command::Coverage { markdown, all } => {
             use core::coverage::{Support, formats, markdown as md};

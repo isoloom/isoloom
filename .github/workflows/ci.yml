@@ -49,3 +49,28 @@ jobs:
       - name: Stop
         if: always()
         run: docker compose -f .isoloom/docker/compose.yml --profile check down -v
+
+  # A Compose file, imported, generated and started: the draft runs.
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Import, generate
+        run: |
+          mkdir -p /tmp/shop && cp crates/isoloom-core/tests/fixtures/compose-shop/docker-compose.yml /tmp/shop/
+          cargo run -q -- import compose /tmp/shop/docker-compose.yml
+          cargo run -q -- generate /tmp/shop --target docker
+      - name: Start
+        working-directory: /tmp/shop
+        run: API_TOKEN=t0k docker compose -f .isoloom/docker/compose.yml up -d --wait --wait-timeout 180
+      - name: Behaves like the original
+        working-directory: /tmp/shop
+        run: |
+          docker compose -f .isoloom/docker/compose.yml exec -T cache wget -qO- http://web/ | grep -q "Welcome to nginx"
+          test "$(docker compose -f .isoloom/docker/compose.yml exec -T web printenv API_TOKEN)" = t0k
+      - name: Stop
+        if: always()
+        working-directory: /tmp/shop
+        run: docker compose -f .isoloom/docker/compose.yml down -v
