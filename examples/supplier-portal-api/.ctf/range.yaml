@@ -1,0 +1,36 @@
+# The Supplier portal API lab: one lab, two implementations per machine (containers or
+# native VMs), so it runs on every target.
+version: 1
+name: supplier-portal-api
+
+networks:
+  lab: { cidr: 10.20.0.0/24 }
+
+inputs: [CTF_API_URL, CTF_LAUNCH_TOKEN]
+
+machines:
+  database:
+    networks: { lab: 32 }
+    services: [{ port: 3207, name: mysql }]
+    inputs: [CTF_API_URL, CTF_LAUNCH_TOKEN]
+    resources: { cpus: 1, memory_mb: 1024 }
+    docker:
+      image: mysql:8.0
+      init: [build/database/init]
+    vm:
+      os: debian-12
+      provision: [provision/database.sh]
+
+  web:
+    networks: { lab: 31 }
+    services: [{ port: 3206, name: portal, http: true }]
+    depends_on: [database]
+    resources: { cpus: 1, memory_mb: 1024 }
+    docker:
+      build: build/web
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
+
+checks:
+  - build/check/check.sh

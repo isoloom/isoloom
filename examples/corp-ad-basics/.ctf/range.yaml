@@ -1,0 +1,40 @@
+# A small Active Directory domain: VM targets only (Windows has no container form).
+version: 1
+name: corp-ad-basics
+
+networks:
+  dmz: { cidr: 10.40.10.0/24 }
+  corp: { cidr: 10.40.20.0/24 }
+  access: { cidr: 10.40.99.0/24 }
+
+reach:
+  - { from: access, to: dmz }
+  - { from: dmz, to: corp }
+
+machines:
+  dc01:
+    networks: { corp: 5 }
+    services: [{ port: 53 }, { port: 88 }, { port: 389 }, { port: 445 }]
+    resources: { cpus: 2, memory_mb: 4096, disk_gb: 60 }
+    vm:
+      os: windows-server-2022
+      provision: [provision/ad-domain.yml]
+  ws01:
+    networks: { corp: 21 }
+    depends_on: [dc01]
+    resources: { cpus: 2, memory_mb: 4096, disk_gb: 60 }
+    vm:
+      os: windows-11
+      provision: [provision/ad-join.yml, provision/ws01.yml]
+  web01:
+    networks: { dmz: 10, corp: 10 }
+    services: [{ port: 80 }]
+    docker: { build: build/web01 }
+    vm: { os: debian-12, provision: [provision/web01.yml] }
+  user:
+    access: true
+    networks: { access: 10 }
+
+checks:
+  - checks/domain-up.sh
+  - checks/web01-reaches-dc01.sh

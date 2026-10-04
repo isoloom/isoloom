@@ -1,0 +1,38 @@
+# A segmented network: a gateway in the DMZ, an app and a database behind it, and the
+# user's machine that only sees the DMZ.
+version: 1
+name: pivot-dmz
+
+networks:
+  dmz: { cidr: 10.30.10.0/24 }
+  internal: { cidr: 10.30.20.0/24, internet: false }
+  access: { cidr: 10.30.99.0/24 }
+
+reach:
+  - { from: access, to: dmz }
+  - { from: dmz, to: internal, ports: [8080, 5432] }
+
+machines:
+  gateway:
+    networks: { dmz: 10, internal: 10 }
+    services: [{ port: 80 }, { port: 22 }]
+    docker: { build: build/gateway }
+    vm: { os: debian-12, provision: [provision/gateway.yml] }
+  app:
+    networks: { internal: 20 }
+    services: [{ port: 8080 }]
+    docker: { build: build/app }
+    vm: { os: debian-12, provision: [provision/app.yml] }
+  db:
+    networks: { internal: 30 }
+    services: [{ port: 5432 }]
+    docker: { image: "postgres:16" }
+    vm: { os: debian-12, provision: [provision/db.yml] }
+  user:
+    access: true
+    networks: { access: 10 }
+    vm: { os: kali }
+
+checks:
+  - checks/dmz-reachable.sh
+  - checks/internal-not-reachable-from-access.sh

@@ -1,0 +1,13 @@
+[package]
+name = "isoform-core"
+description = "The isoform format: parse and validate an environment spec, and derive the targets it can run on."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_yaml_ng.workspace = true
+indexmap.workspace = true
