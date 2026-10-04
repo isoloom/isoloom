@@ -1,0 +1,12 @@
+# Settings of https://raw.githubusercontent.com/naveenrajm7/vagrant_utm/v0.1.6/lib/vagrant_utm/config.rb
+check_guest_additions
+cpus
+customizations
+customize
+directory_share_mode
+functional_9pfs
+icon
+memory
+name
+notes
+wait_time

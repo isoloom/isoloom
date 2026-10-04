@@ -1,9 +1,11 @@
 //! Coverage: everything each output format can do, and whether Isoloom produces it.
 //!
-//! The rule for what belongs in the format: **every kind of target can do it** (containers,
-//! local VMs, Proxmox, cloud VMs), containers being the most limited. A feature only some
-//! targets can do stays out, unless it only narrows where an environment runs (Windows makes
-//! it VM-only). 100% coverage means every portable feature is produced.
+//! The rule for what belongs in the format: **the VM targets can do it** (local VMs, Proxmox,
+//! cloud VMs). Containers are the lightweight option, used when they can produce the same
+//! machine; a feature they can't produce makes an environment VM-only (like Windows) rather
+//! than staying out of the format. Container mechanics (capabilities, cgroups...) aren't
+//! machine features: Isoloom sets them itself. 100% coverage means every portable feature is
+//! produced.
 //!
 //! The source of truth for `isoloom coverage`, docs/COVERAGE.md and the website; the tests
 //! keep the tables in step with the formats' own definitions and with the generators. The
@@ -32,7 +34,7 @@ pub enum Support {
     InImage { note: &'static str },
     /// Every target can do it: the format should gain it.
     Planned { note: &'static str },
-    /// Some targets can't do it (containers most often), so it stays out of the format.
+    /// Some VM targets can't do it (cloud VMs most often), so it stays out of the format.
     NotPortable { why: &'static str },
     /// The format's own tooling: no effect on how the environment behaves.
     Tooling { note: &'static str },
@@ -208,7 +210,7 @@ fn section(key: &str) -> (&'static str, &str) {
 pub fn markdown() -> String {
     let formats = formats();
     let mut md = String::from(
-        "# Coverage\n\nEverything each format can do, and whether Isoloom produces it from a spec.\n\n**What belongs in the format:** a feature every kind of target can do (containers, local VMs,\nProxmox, cloud VMs). Containers are the most limited, so they set the bar. A feature only some\ntargets can do stays out, unless it only narrows where an environment runs: Windows makes it\nVM-only. **100% coverage** means every portable feature is produced.\n\n",
+        "# Coverage\n\nEverything each format can do, and whether Isoloom produces it from a spec.\n\n**What belongs in the format:** a machine feature the VM targets can do (local VMs, Proxmox,\ncloud VMs). Containers are the lightweight option, used when they can produce the same machine:\na feature they can't makes an environment VM-only (like Windows) instead of staying out.\nContainer mechanics (capabilities, cgroups) aren't machine features: Isoloom sets them itself.\n**100% coverage** means every portable feature is produced.\n\n",
     );
     md.push_str("| Format | Coverage | Portable features | Done | Partly | To do |\n| --- | ---: | ---: | ---: | ---: | ---: |\n");
     for f in &formats {

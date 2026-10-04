@@ -2,20 +2,23 @@
 
 Everything each format can do, and whether Isoloom produces it from a spec.
 
-**What belongs in the format:** a feature every kind of target can do (containers, local VMs,
-Proxmox, cloud VMs). Containers are the most limited, so they set the bar. A feature only some
-targets can do stays out, unless it only narrows where an environment runs: Windows makes it
-VM-only. **100% coverage** means every portable feature is produced.
+**What belongs in the format:** a machine feature the VM targets can do (local VMs, Proxmox,
+cloud VMs). Containers are the lightweight option, used when they can produce the same machine:
+a feature they can't makes an environment VM-only (like Windows) instead of staying out.
+Container mechanics (capabilities, cgroups) aren't machine features: Isoloom sets them itself.
+**100% coverage** means every portable feature is produced.
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 65% | 54 | 32 | 7 | 15 |
+| [Docker Compose](#docker-compose) | 64% | 55 | 32 | 7 | 16 |
 | [Vagrant](#vagrant) | 64% | 35 | 22 | 1 | 12 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 5 | 5 | 0 | 0 |
-| [Vagrant: libvirt](#vagrant-libvirt) | 20% | 10 | 2 | 0 | 8 |
+| [Vagrant: libvirt](#vagrant-libvirt) | 10% | 19 | 2 | 0 | 17 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 25% | 4 | 1 | 0 | 3 |
+| [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
+| [Vagrant: QEMU](#vagrant-qemu) | 14% | 14 | 2 | 0 | 12 |
 | [Terraform: Proxmox](#terraform-proxmox) | 6% | 16 | 1 | 0 | 15 |
 
 Done includes features produced another way, or set in the image. The lists come from the
@@ -25,7 +28,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-65% of 54 portable features (32 done, 7 partly, 15 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+64% of 55 portable features (32 done, 7 partly, 16 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -51,9 +54,9 @@ when a table disagrees with what Isoloom really generates.
 | `blkio_config` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `build` | Yes | Yes | From `machines.*.docker.build` |
 | `cap_add` | Yes | Partly | From `networks.*.gateway`; not yet: nothing more: capabilities only exist for containers (root on a VM has them all) |
-| `cap_drop` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
-| `cgroup` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
-| `cgroup_parent` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `cap_drop` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
+| `cgroup` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
+| `cgroup_parent` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `command` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 | `configs` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 | `container_name` | Yes | Another way | Via the machine's name |
@@ -70,7 +73,7 @@ when a table disagrees with what Isoloom really generates.
 | `depends_on` | Yes | Yes | From `machines.*.depends_on` |
 | `deploy` | Yes | Partly | From `machines.*.resources`; not yet: replicas (see `scale`) |
 | `develop` | n/a | No | Compose tooling, not the environment's behavior |
-| `device_cgroup_rules` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `device_cgroup_rules` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `devices` | No | No | Host devices: hosting services and cloud VMs have none to pass |
 | `dns` | Yes | Not yet | DNS servers for a network or a machine |
 | `dns_opt` | Yes | Not yet | With DNS |
@@ -88,7 +91,7 @@ when a table disagrees with what Isoloom really generates.
 | `healthcheck` | Yes | Yes | From `machines.*.services` (a probe of every port) |
 | `hostname` | Yes | Yes | From the machine's name |
 | `image` | Yes | Yes | From `machines.*.docker.image` |
-| `init` | No | No | Container-only: a VM always runs its own init |
+| `init` | n/a | No | Container mechanics: a VM always runs its own init |
 | `ipc` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `isolation` | No | No | Windows containers only |
 | `label_file` | n/a | No | Compose tooling, not the environment's behavior |
@@ -99,35 +102,35 @@ when a table disagrees with what Isoloom really generates.
 | `mem_limit` | Yes | Another way | Via machines.*.resources.memory_mb, written as deploy.resources.limits |
 | `mem_reservation` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `mem_swappiness` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
-| `memswap_limit` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `memswap_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `models` | n/a | No | Compose tooling, not the environment's behavior |
 | `network_mode` | Yes | Partly | Isoloom's own sidecars and check runner; not yet: nothing more: sharing another machine's network isn't possible between VMs |
 | `networks` | Yes | Yes | From `machines.*.networks` (fixed addresses) |
-| `oom_kill_disable` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
-| `oom_score_adj` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `oom_kill_disable` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
+| `oom_score_adj` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `pid` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
-| `pids_limit` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `pids_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `platform` | Yes | Not yet | A CPU architecture (amd64, arm64): images, boxes and instance types all have one |
 | `ports` | Yes | Not yet | Publishing a service outside the environment: Docker ports, Vagrant forwarded ports, a port forward on the Proxmox router, a public IP in the cloud |
 | `post_start` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
 | `pre_start` | Yes | Another way | Via machines.*.depends_on and docker.init |
 | `pre_stop` | n/a | No | Compose tooling, not the environment's behavior |
-| `privileged` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `privileged` | Yes | Not yet | What it's for, as a machine feature: running containers or VMs inside, loading kernel modules (Isoloom then makes the container privileged) |
 | `profiles` | Yes | Yes | From `checks` (a `check` profile) |
 | `provider` | n/a | No | Compose tooling, not the environment's behavior |
 | `pull_policy` | n/a | No | Compose tooling, not the environment's behavior |
 | `pull_refresh_after` | n/a | No | Compose tooling, not the environment's behavior |
 | `read_only` | Yes | Not yet | A read-only root filesystem (VMs can mount it read-only too) |
 | `restart` | Yes | Yes | Always unless-stopped: machines stay up like VMs |
-| `runtime` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `runtime` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `scale` | Yes | Not yet | Several identical machines (replicas), each with its own address |
 | `secrets` | Yes | Another way | Via machines.*.inputs |
-| `security_opt` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `security_opt` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `shm_size` | Yes | Not yet | The size of /dev/shm (a mount option on VMs) |
 | `stdin_open` | n/a | No | Compose tooling, not the environment's behavior |
 | `stop_grace_period` | n/a | No | Compose tooling, not the environment's behavior |
 | `stop_signal` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
-| `storage_opt` | No | No | A container-runtime setting: a VM has no container around its processes to configure |
+| `storage_opt` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `sysctls` | Yes | Partly | From `networks.*.gateway`; not yet: a machine's own network sysctls (net.*): containers only allow those, VMs allow them too |
 | `tmpfs` | Yes | Not yet | Memory-backed mounts (tmpfs works on VMs too) |
 | `tty` | n/a | No | Compose tooling, not the environment's behavior |
@@ -333,15 +336,15 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: libvirt
 
-20% of 10 portable features (2 done, 0 partly, 8 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
+10% of 19 portable features (2 done, 0 partly, 17 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
 
 ### Settings
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `autostart` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `boot` | No | No | Containers share the host's kernel: they can't boot their own |
-| `boot_order` | No | No | Containers share the host's kernel: they can't boot their own |
+| `boot` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `boot_order` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `cdroms` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `channel` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `channels` | No | No | Display, input and host devices: containers and cloud VMs have none |
@@ -352,7 +355,7 @@ when a table disagrees with what Isoloom really generates.
 | `clock_timer` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `clock_timers` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `clock_timezone` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `cmd_line` | No | No | Containers share the host's kernel: they can't boot their own |
+| `cmd_line` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `connect_via_ssh` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `cpu_affinity` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `cpu_fallback` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
@@ -375,7 +378,7 @@ when a table disagrees with what Isoloom really generates.
 | `disk_driver_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `disks` | Yes | Not yet | Machines.*.resources.disk_gb |
 | `driver` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `dtb` | No | No | Containers share the host's kernel: they can't boot their own |
+| `dtb` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `emulator_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `features` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `features_hyperv` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
@@ -392,15 +395,15 @@ when a table disagrees with what Isoloom really generates.
 | `host_device_exclude_prefixes` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `hyperv_feature` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `id_ssh_key_file` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `initrd` | No | No | Containers share the host's kernel: they can't boot their own |
+| `initrd` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `input` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `inputs` | No | No | Display, input and host devices: containers and cloud VMs have none |
-| `kernel` | No | No | Containers share the host's kernel: they can't boot their own |
+| `kernel` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `keymap` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `kvm_hidden` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `launchsecurity` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `launchsecurity_data` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `loader` | No | No | Containers share the host's kernel: they can't boot their own |
+| `loader` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `machine_arch` | Yes | Not yet | A CPU architecture field (amd64, arm64) |
 | `machine_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `machine_virtual_size` | Yes | Not yet | Machines.*.resources.disk_gb |
@@ -429,12 +432,12 @@ when a table disagrees with what Isoloom really generates.
 | `memtune` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `memtunes` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `mgmt_attach` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `nested` | No | No | Containers can't run VMs |
+| `nested` | Yes | Not yet | Nested virtualization: running VMs inside (makes an environment VM-only) |
 | `nic_adapter_count` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `nic_model_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `nodeset` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `numa_nodes` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `nvram` | No | No | Containers share the host's kernel: they can't boot their own |
+| `nvram` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `password` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `pci` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `pcis` | No | No | Display, input and host devices: containers and cloud VMs have none |
@@ -510,6 +513,70 @@ when a table disagrees with what Isoloom really generates.
 | `vlan_id` | Yes | Another way | Via `config.vm.network private_network`, the same on every provider |
 | `vm_integration_services` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `vmname` | Yes | Not yet | With Hyper-V hosts |
+
+## Vagrant: UTM
+
+75% of 4 portable features (3 done, 0 partly, 1 to do; 12 features in all). From vagrant_utm 0.1.6 (its config class), for Apple Silicon Macs.
+
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `check_guest_additions` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `cpus` | Yes | Yes | From `machines.*.resources` |
+| `customizations` | No | No | Raw commands for one hypervisor: no other target understands them |
+| `customize` | No | No | Raw commands for one hypervisor: no other target understands them |
+| `directory_share_mode` | n/a | No | Shared folders are off: the project is copied into each VM |
+| `functional_9pfs` | n/a | No | Shared folders are off: the project is copied into each VM |
+| `icon` | n/a | No | How UTM shows the VM |
+| `memory` | Yes | Yes | From `machines.*.resources` |
+| `name` | Yes | Yes | The environment and machine names, as the VM's display name |
+| `notes` | n/a | No | How UTM shows the VM |
+| `wait_time` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `private_network` | Yes | Not yet | Not verified: vagrant_utm doesn't document `config.vm.network private_network` |
+
+## Vagrant: QEMU
+
+14% of 14 portable features (2 done, 0 partly, 12 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
+
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `advanced_network` | Yes | Not yet | Private networks: QEMU gives a machine one private network (`advanced_network`), and needs vmnet or socket_vmnet on the Mac |
+| `arch` | Yes | Not yet | A CPU architecture field (amd64, arm64) |
+| `control_port` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `cpu` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `debug_port` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `default_qemu_dir` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `disk_resize` | Yes | Not yet | Machines.*.resources.disk_gb |
+| `drive_interface` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `extra_drive_args` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `extra_image_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `extra_netdev_args` | Yes | Not yet | With private networks on QEMU |
+| `extra_qemu_args` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `firmware_format` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `graceful_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `homebrew_prefix` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `image_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `machine` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `mcast_addr` | Yes | Not yet | With private networks on QEMU |
+| `memory` | Yes | Yes | From `machines.*.resources` |
+| `net_device` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `net_mode` | Yes | Not yet | Private networks: QEMU gives a machine one private network (`advanced_network`), and needs vmnet or socket_vmnet on the Mac |
+| `no_daemonize` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `other_default` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `qemu_bin` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `qemu_dir` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `smp` | Yes | Yes | From `machines.*.resources.cpus` |
+| `socket_opts` | Yes | Not yet | With private networks on QEMU |
+| `socket_vmnet_client` | Yes | Not yet | With private networks on QEMU |
+| `socket_vmnet_socket` | Yes | Not yet | With private networks on QEMU |
+| `ssh_auto_correct` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `ssh_host` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `ssh_port` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `tap_device` | Yes | Not yet | With private networks on QEMU |
+| `vmnet_interface` | Yes | Not yet | With private networks on QEMU |
 
 ## Terraform: Proxmox
 

@@ -15,6 +15,9 @@ SOURCES = {
     "vmware_desktop": "https://raw.githubusercontent.com/hashicorp/vagrant-vmware-desktop/desktop-v3.0.5/lib/vagrant-vmware-desktop/config.rb",
     "parallels": "https://raw.githubusercontent.com/Parallels/vagrant-parallels/v2.4.7/lib/vagrant-parallels/config.rb",
     "libvirt": "https://raw.githubusercontent.com/vagrant-libvirt/vagrant-libvirt/0.12.2/lib/vagrant-libvirt/config.rb",
+    # Apple Silicon Macs (besides VMware Fusion and Parallels above).
+    "utm": "https://raw.githubusercontent.com/naveenrajm7/vagrant_utm/v0.1.6/lib/vagrant_utm/config.rb",
+    "qemu": "https://raw.githubusercontent.com/ppggff/vagrant-qemu/v0.6.3/lib/vagrant-qemu/config.rb",
 }
 # Methods of the config classes that aren't settings.
 NOT_SETTINGS = {"merge", "validate", "finalize!", "to_s", "get_provider_config", "get_provider_overrides"}

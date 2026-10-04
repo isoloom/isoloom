@@ -109,6 +109,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
             rb(&label)
         );
+        // Apple Silicon Macs: UTM and QEMU (besides VMware Fusion and Parallels above).
+        let _ = writeln!(
+            out,
+            "    m.vm.provider \"utm\" do |v|\n      v.name = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
+            rb(&label)
+        );
+        let _ = writeln!(
+            out,
+            "    m.vm.provider \"qemu\" do |v|\n      v.smp = \"cpus={cpus}\"\n      v.memory = \"{mem}M\"\n    end"
+        );
         match libvirt_box {
             Some(b) => {
                 let _ = writeln!(

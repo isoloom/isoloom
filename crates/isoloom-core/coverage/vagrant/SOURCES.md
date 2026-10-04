@@ -13,3 +13,5 @@ unclassified settings fail the coverage tests.
 | vmware_desktop.txt | hashicorp/vagrant-vmware-desktop `lib/vagrant-vmware-desktop/config.rb` | desktop-v3.0.5 |
 | parallels.txt | Parallels/vagrant-parallels `lib/vagrant-parallels/config.rb` | v2.4.7 |
 | libvirt.txt | vagrant-libvirt/vagrant-libvirt `lib/vagrant-libvirt/config.rb` | 0.12.2 |
+| utm.txt | naveenrajm7/vagrant_utm `lib/vagrant_utm/config.rb` | v0.1.6 |
+| qemu.txt | ppggff/vagrant-qemu `lib/vagrant-qemu/config.rb` | v0.6.3 |

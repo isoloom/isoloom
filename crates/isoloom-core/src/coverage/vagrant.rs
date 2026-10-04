@@ -11,6 +11,8 @@ const HYPERV: &str = include_str!("../../coverage/vagrant/hyperv.txt");
 const VMWARE: &str = include_str!("../../coverage/vagrant/vmware_desktop.txt");
 const PARALLELS: &str = include_str!("../../coverage/vagrant/parallels.txt");
 const LIBVIRT: &str = include_str!("../../coverage/vagrant/libvirt.txt");
+const UTM: &str = include_str!("../../coverage/vagrant/utm.txt");
+const QEMU: &str = include_str!("../../coverage/vagrant/qemu.txt");
 
 /// The setting names in one extracted list (comment lines skipped).
 pub fn names(list: &str) -> Vec<&str> {
@@ -38,8 +40,8 @@ const NO_SHARED_FOLDERS: Support = Tooling {
 const PRIVATE_NETWORKS: Support = Equivalent {
     via: "`config.vm.network private_network`, the same on every provider",
 };
-const IMAGE_BOOTS: Support = NotPortable {
-    why: "containers share the host's kernel: they can't boot their own",
+const IMAGE_BOOTS: Support = Planned {
+    note: "custom images with their own kernel and boot (makes an environment VM-only)",
 };
 const LINKED_CLONE: Support = Tooling {
     note: "faster starts from one image: no change in behavior",
@@ -67,6 +69,18 @@ pub fn formats() -> Vec<Format> {
         provider("Vagrant: Parallels", "parallels", PARALLELS, parallels),
         provider("Vagrant: libvirt", "libvirt", LIBVIRT, libvirt),
         provider("Vagrant: Hyper-V", "hyperv", HYPERV, hyperv),
+        {
+            let mut f = provider("Vagrant: UTM", "utm", UTM, utm);
+            // Every Isoloom network is a private network; UTM's plugin doesn't say it supports them.
+            f.rows.push((
+                "provider utm: private_network".to_string(),
+                Planned {
+                    note: "not verified: vagrant_utm doesn't document `config.vm.network private_network`",
+                },
+            ));
+            f
+        },
+        provider("Vagrant: QEMU", "qemu", QEMU, qemu),
     ]
 }
 
@@ -78,6 +92,8 @@ fn provider(name: &'static str, id: &'static str, list: &'static str, classify: 
             "vmware_desktop" => "vagrant-vmware-desktop 3.0.5 (its config class)",
             "parallels" => "vagrant-parallels 2.4.7 (its config class)",
             "libvirt" => "vagrant-libvirt 0.12.2 (its config class)",
+            "utm" => "vagrant_utm 0.1.6 (its config class), for Apple Silicon Macs",
+            "qemu" => "vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs",
             _ => "Vagrant 2.4.9 (the provider's config class)",
         },
         rows: names(list)
@@ -319,13 +335,47 @@ fn hyperv(s: &str) -> Option<Support> {
     })
 }
 
+fn utm(s: &str) -> Option<Support> {
+    Some(match s {
+        "cpus" | "memory" => RESOURCES,
+        "name" => VM_NAME,
+        "customize" | "customizations" => PROVIDER_SPECIFIC,
+        "directory_share_mode" | "functional_9pfs" => NO_SHARED_FOLDERS,
+        "icon" | "notes" => Tooling { note: "how UTM shows the VM" },
+        "check_guest_additions" | "wait_time" => TOOLING,
+        _ => return None,
+    })
+}
+
+fn qemu(s: &str) -> Option<Support> {
+    Some(match s {
+        "memory" => RESOURCES,
+        "smp" => Emitted {
+            from: "machines.*.resources.cpus",
+        },
+        "arch" => ARCH,
+        "disk_resize" => DISK,
+        "advanced_network" | "net_mode" => Planned {
+            note: "private networks: QEMU gives a machine one private network (`advanced_network`), and needs vmnet or socket_vmnet on the Mac",
+        },
+        "socket_opts" | "socket_vmnet_client" | "socket_vmnet_socket" | "vmnet_interface" | "tap_device" | "mcast_addr" | "extra_netdev_args" => Planned {
+            note: "with private networks on QEMU",
+        },
+        "machine" | "cpu" | "net_device" | "drive_interface" | "extra_drive_args" | "extra_image_opts" | "extra_qemu_args" => HOST_TUNING,
+        "firmware_format" => IMAGE_BOOTS,
+        "image_path" | "qemu_bin" | "qemu_dir" | "default_qemu_dir" | "homebrew_prefix" => USER_SETUP,
+        "control_port" | "debug_port" | "ssh_host" | "ssh_port" | "ssh_auto_correct" | "no_daemonize" | "other_default" | "graceful_timeout" => TOOLING,
+        _ => return None,
+    })
+}
+
 fn libvirt(s: &str) -> Option<Support> {
     Some(match s {
         "cpus" | "memory" => RESOURCES,
         "machine_arch" => ARCH,
         "machine_virtual_size" | "storage" | "disks" => DISK,
-        "nested" => NotPortable {
-            why: "containers can't run VMs",
+        "nested" => Planned {
+            note: "nested virtualization: running VMs inside (makes an environment VM-only)",
         },
         "tpm_model" | "tpm_type" | "tpm_path" | "tpm_version" => WINDOWS,
         "boot" | "boot_order" | "kernel" | "cmd_line" | "initrd" | "dtb" | "loader" | "nvram" => IMAGE_BOOTS,

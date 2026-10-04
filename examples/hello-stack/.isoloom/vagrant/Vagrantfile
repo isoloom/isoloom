@@ -30,6 +30,15 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
+    m.vm.provider "utm" do |v|
+      v.name = "hello-stack · cache"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.vm.provider "qemu" do |v|
+      v.smp = "cpus=1"
+      v.memory = "1024M"
+    end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
       v.cpus = 1
@@ -95,6 +104,15 @@ Vagrant.configure("2") do |config|
       v.name = "hello-stack · web"
       v.cpus = 1
       v.memory = 1024
+    end
+    m.vm.provider "utm" do |v|
+      v.name = "hello-stack · web"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.vm.provider "qemu" do |v|
+      v.smp = "cpus=1"
+      v.memory = "1024M"
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"

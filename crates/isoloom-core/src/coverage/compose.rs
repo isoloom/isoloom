@@ -1,6 +1,6 @@
 //! Every key of the Compose file format (compose-spec, vendored in `coverage/compose-spec.json`)
-//! and whether an Isoloom spec produces it. The rule: a key's behavior belongs in the format
-//! when every kind of target can produce it (see [`super`]).
+//! and whether an Isoloom spec produces it. The rule: a machine feature belongs in the format
+//! when the VM targets can produce it; containers produce what they can (see [`super`]).
 
 use super::{Format, Support, Support::*};
 
@@ -16,8 +16,8 @@ const LEGACY: Support = Tooling {
 const CLOUD_SIZES: Support = NotPortable {
     why: "cloud VMs only choose a size: no CPU or memory scheduling knobs",
 };
-const NO_CONTAINER_ON_VMS: Support = NotPortable {
-    why: "a container-runtime setting: a VM has no container around its processes to configure",
+const NO_CONTAINER_ON_VMS: Support = Tooling {
+    note: "container mechanics: a VM has none; Isoloom sets them itself when a machine needs them",
 };
 const SHARED_NAMESPACE: Support = NotPortable {
     why: "shares a kernel namespace with the host or another machine: separate VMs can't",
@@ -184,8 +184,8 @@ fn rows() -> Vec<(String, Support)> {
         ),
         (
             "services.*.init",
-            NotPortable {
-                why: "container-only: a VM always runs its own init",
+            Tooling {
+                note: "container mechanics: a VM always runs its own init",
             },
         ),
         ("services.*.ipc", SHARED_NAMESPACE),
@@ -262,7 +262,12 @@ fn rows() -> Vec<(String, Support)> {
             },
         ),
         ("services.*.pre_stop", TOOLING),
-        ("services.*.privileged", NO_CONTAINER_ON_VMS),
+        (
+            "services.*.privileged",
+            Planned {
+                note: "what it's for, as a machine feature: running containers or VMs inside, loading kernel modules (Isoloom then makes the container privileged)",
+            },
+        ),
         (
             "services.*.profiles",
             Emitted {
