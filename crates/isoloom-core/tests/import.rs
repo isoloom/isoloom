@@ -62,7 +62,7 @@ fn everything_else_is_a_note_with_its_reason() {
     assert!(has(&d, NoteKind::InImage, "services.web.environment", "MODE=production"));
     assert!(has(&d, NoteKind::NotYet, "services.cache.volumes", "cache-data:/data"));
     assert!(has(&d, NoteKind::NotYet, "volumes", "persistent or shared data"));
-    assert!(has(&d, NoteKind::ByDesign, "services.web.ports", "not published on the host"));
+    assert!(has(&d, NoteKind::NotYet, "services.web.ports", "isn't in the format yet"));
     assert!(has(&d, NoteKind::Equivalent, "services.cache.healthcheck", "probes every service port"));
 }
 

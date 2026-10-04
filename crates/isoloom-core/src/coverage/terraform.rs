@@ -13,19 +13,19 @@ const LEGACY: &str = "proxmox_virtual_environment_";
 const GENERATOR: Support = Planned {
     note: "with the Proxmox generator",
 };
-const SERVER_ADMIN: Support = ByDesign {
-    why: "administers the Proxmox server itself, not an environment on it",
+const SERVER_ADMIN: Support = NotPortable {
+    why: "administers the Proxmox server itself: no other target has a server to administer",
 };
-const HOST_NETWORK: Support = ByDesign {
-    why: "changes the server's own network; an environment gets its own SDN networks",
+const HOST_NETWORK: Support = NotPortable {
+    why: "changes the server's own network: no other target has one to change",
 };
-const MULTI_NODE: Support = Open {
-    note: "multi-node clusters (a simple zone covers one node)",
+const MULTI_NODE: Support = Tooling {
+    note: "how a cluster spreads networks over its nodes: no change in behavior",
 };
-const LXC: Support = Open {
+const LXC: Support = Planned {
     note: "LXC containers: a way to run `docker:` machines on Proxmox",
 };
-const FIREWALL: Support = Open {
+const FIREWALL: Support = Planned {
     note: "the Proxmox firewall: reach rules enforced outside the VMs, besides the router",
 };
 
@@ -59,8 +59,8 @@ fn proxmox(r: &str) -> Option<Support> {
         "cloned_vm" => Planned {
             note: "linked clones: faster starts from one image (no change in behavior)",
         },
-        "sdn_subnet" => ByDesign {
-            why: "a subnet's gateway lives on the host bridge, which would route between networks; the router VM holds it",
+        "sdn_subnet" => Equivalent {
+            via: "the router VM, which holds each network's router address (a subnet would put it on the host bridge, which routes between networks)",
         },
         "vm2" => Tooling {
             note: "an older, experimental VM resource",

@@ -141,12 +141,12 @@ fn verdict(path: &str) -> Option<(NoteKind, String)> {
         Support::Partial { gap, .. } => return Some((NoteKind::NotYet, gap.to_string())),
         Support::Equivalent { .. } => NoteKind::Equivalent,
         Support::InImage { .. } => NoteKind::InImage,
-        Support::Planned { .. } | Support::Open { .. } => NoteKind::NotYet,
-        Support::ByDesign { .. } => NoteKind::ByDesign,
+        Support::Planned { .. } => NoteKind::NotYet,
+        Support::NotPortable { .. } => NoteKind::ByDesign,
         Support::Tooling { .. } => NoteKind::Tooling,
         Support::Unclassified => NoteKind::NotYet,
     };
-    Some((kind, s.reason()))
+    Some((kind, s.note()))
 }
 
 fn note(notes: &mut Vec<Note>, at: String, kind: NoteKind, text: String) {
@@ -458,8 +458,8 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
                             note(
                                 &mut notes,
                                 kat,
-                                NoteKind::ByDesign,
-                                "not published on the host: the environment is reached from its own networks; the container ports became services".into(),
+                                NoteKind::NotYet,
+                                "publishing a port outside the environment isn't in the format yet; the container ports became services".into(),
                             );
                         }
                     }

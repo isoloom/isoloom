@@ -54,7 +54,7 @@ impl NoteKind {
             NoteKind::InImage => "Belongs in the image",
             NoteKind::NotYet => "Not expressible yet",
             NoteKind::Equivalent => "Same effect another way",
-            NoteKind::ByDesign => "Left out by design",
+            NoteKind::ByDesign => "Left out: not every target can do it",
             NoteKind::Written => "Written by Isoloom when it generates",
             NoteKind::Tooling => "Compose tooling, nothing to carry over",
         }

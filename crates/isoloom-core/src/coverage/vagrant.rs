@@ -23,26 +23,26 @@ const TOOLING: Support = Tooling {
 const USER_SETUP: Support = Tooling {
     note: "the user's own setup (how Vagrant reaches the hypervisor, where it stores things)",
 };
-const HOST_TUNING: Support = ByDesign {
-    why: "hypervisor tuning: no meaning for the same machine as a container or on another provider",
+const HOST_TUNING: Support = NotPortable {
+    why: "hypervisor tuning: containers and cloud VMs have no such knob",
 };
-const DEVICES: Support = ByDesign {
-    why: "display, input and host devices: an environment is reached over its networks",
+const DEVICES: Support = NotPortable {
+    why: "display, input and host devices: containers and cloud VMs have none",
 };
-const PROVIDER_SPECIFIC: Support = ByDesign {
-    why: "provider-specific commands: the same machine must behave the same on every provider",
+const PROVIDER_SPECIFIC: Support = NotPortable {
+    why: "raw commands for one hypervisor: no other target understands them",
 };
 const NO_SHARED_FOLDERS: Support = Tooling {
     note: "shared folders are off: the project is copied into each VM",
 };
-const PRIVATE_NETWORKS: Support = ByDesign {
-    why: "networks come from `config.vm.network private_network`, the same on every provider",
+const PRIVATE_NETWORKS: Support = Equivalent {
+    via: "`config.vm.network private_network`, the same on every provider",
 };
-const IMAGE_BOOTS: Support = ByDesign {
-    why: "machines boot from their image",
+const IMAGE_BOOTS: Support = NotPortable {
+    why: "containers share the host's kernel: they can't boot their own",
 };
-const LINKED_CLONE: Support = Planned {
-    note: "faster starts from one image (no change in behavior)",
+const LINKED_CLONE: Support = Tooling {
+    note: "faster starts from one image: no change in behavior",
 };
 const DISK: Support = Planned {
     note: "machines.*.resources.disk_gb",
@@ -50,7 +50,9 @@ const DISK: Support = Planned {
 const ARCH: Support = Planned {
     note: "a CPU architecture field (amd64, arm64)",
 };
-const WINDOWS: Support = Planned { note: "with Windows guests" };
+const WINDOWS: Support = Planned {
+    note: "with Windows guests (which make an environment VM-only)",
+};
 const HYPERV_HOSTS: Support = Planned { note: "with Hyper-V hosts" };
 const RESOURCES: Support = Emitted { from: "machines.*.resources" };
 const VM_NAME: Support = Emitted {
@@ -99,14 +101,14 @@ fn core() -> Format {
         ),
         (
             "config.vm.network forwarded_port",
-            ByDesign {
-                why: "would expose the environment on the user's machine",
+            Planned {
+                note: "publishing a service outside the environment (Compose `ports`)",
             },
         ),
         (
             "config.vm.network public_network",
-            ByDesign {
-                why: "would put the environment on the user's LAN",
+            Planned {
+                note: "a network bridged to the outside (Compose `external`, a host bridge, a VPC)",
             },
         ),
         (
@@ -129,8 +131,8 @@ fn core() -> Format {
         ),
         (
             "config.vm.provision ansible",
-            ByDesign {
-                why: "Ansible runs inside the VM, never on the user's machine",
+            Equivalent {
+                via: "ansible_local: the same playbooks, run inside the VM",
             },
         ),
         (
@@ -159,20 +161,20 @@ fn core() -> Format {
         ),
         (
             "config.vm.provision docker",
-            ByDesign {
-                why: "VMs run their services natively; containers come from `docker:`",
+            Equivalent {
+                via: "`docker:` (containers come from the Compose output; VMs run services natively)",
             },
         ),
         (
             "config.vm.provision podman",
-            ByDesign {
-                why: "VMs run their services natively; containers come from `docker:`",
+            Equivalent {
+                via: "`docker:` (containers come from the Compose output; VMs run services natively)",
             },
         ),
         (
             "config.vm.provision container",
-            ByDesign {
-                why: "VMs run their services natively; containers come from `docker:`",
+            Equivalent {
+                via: "`docker:` (containers come from the Compose output; VMs run services natively)",
             },
         ),
         ("config.ssh", TOOLING),
@@ -219,18 +221,18 @@ fn machine(s: &str) -> Option<Support> {
         "box_version" => Planned {
             note: "pinning images to a version",
         },
-        "box_url" | "box_server_url" => Open {
-            note: "custom images: would need a field under `vm:`",
+        "box_url" | "box_server_url" => Planned {
+            note: "custom images (a box URL, a Proxmox template, a cloud image)",
         },
         "communicator" | "guest" => WINDOWS,
         "cloud_init" | "cloud_init_configs" | "cloud_init_first_boot_only" => Equivalent {
             via: "provisioning steps run any setup",
         },
-        "base_mac" | "base_address" => ByDesign {
-            why: "addresses are fixed at the IP level, the same on every target",
+        "base_mac" | "base_address" => NotPortable {
+            why: "cloud VMs get their MAC and addresses from the provider",
         },
-        "usable_port_range" => ByDesign {
-            why: "would expose the environment on the user's machine",
+        "usable_port_range" => Tooling {
+            note: "how Vagrant picks host ports for forwarded ports",
         },
         "provisioners" => Tooling {
             note: "Vagrant's own list behind `provision`",
@@ -275,8 +277,8 @@ fn vmware(s: &str) -> Option<Support> {
         "linked_clone" => LINKED_CLONE,
         "network_adapter" | "network_adapters" => PRIVATE_NETWORKS,
         "nat_device" => HOST_TUNING,
-        "base_mac" | "base_address" => ByDesign {
-            why: "addresses are fixed at the IP level, the same on every target",
+        "base_mac" | "base_address" => NotPortable {
+            why: "cloud VMs get their MAC and addresses from the provider",
         },
         "functional_hgfs" | "unmount_default_hgfs" | "shared_folder_special_char" => NO_SHARED_FOLDERS,
         "gui" => DEVICES,
@@ -305,7 +307,10 @@ fn hyperv(s: &str) -> Option<Support> {
         "cpus" | "memory" | "vmname" => HYPERV_HOSTS,
         "linked_clone" | "differencing_disk" => LINKED_CLONE,
         "maxmemory" | "enable_virtualization_extensions" => HOST_TUNING,
-        "vlan_id" | "mac" => PRIVATE_NETWORKS,
+        "vlan_id" => PRIVATE_NETWORKS,
+        "mac" => NotPortable {
+            why: "cloud VMs get their MAC address from the provider",
+        },
         "enable_enhanced_session_mode" => DEVICES,
         "auto_start_action" | "auto_stop_action" | "enable_checkpoints" | "enable_automatic_checkpoints" | "ip_address_timeout" | "vm_integration_services" => {
             TOOLING
@@ -319,8 +324,8 @@ fn libvirt(s: &str) -> Option<Support> {
         "cpus" | "memory" => RESOURCES,
         "machine_arch" => ARCH,
         "machine_virtual_size" | "storage" | "disks" => DISK,
-        "nested" => Open {
-            note: "nested virtualization: would need a field under `vm:`",
+        "nested" => NotPortable {
+            why: "containers can't run VMs",
         },
         "tpm_model" | "tpm_type" | "tpm_path" | "tpm_version" => WINDOWS,
         "boot" | "boot_order" | "kernel" | "cmd_line" | "initrd" | "dtb" | "loader" | "nvram" => IMAGE_BOOTS,
