@@ -43,6 +43,7 @@ fn what_the_format_expresses_is_carried_over() {
     assert_eq!(web.depends_on, ["cache"]);
     assert_eq!(web.docker.as_ref().unwrap().image.as_deref(), Some("nginx:1.27-alpine"));
     assert_eq!(spec.machines["cache"].services[0].port, 6379, "expose becomes a service");
+    assert_eq!(spec.machines["cache"].volumes["cache-data"], "/data", "a named volume carries over");
 }
 
 #[test]
@@ -60,8 +61,7 @@ fn everything_else_is_a_note_with_its_reason() {
     let d = shop();
     assert!(has(&d, NoteKind::Changed, "networks.front.ipam", "re-addressed to 10.88.1.0/24"));
     assert!(has(&d, NoteKind::InImage, "services.web.environment", "MODE=production"));
-    assert!(has(&d, NoteKind::NotYet, "services.cache.volumes", "cache-data:/data"));
-    assert!(has(&d, NoteKind::NotYet, "volumes", "persistent or shared data"));
+    assert!(!d.notes.iter().any(|n| n.at.contains("volumes")), "named volumes carry over: {:?}", d.notes);
     assert!(has(&d, NoteKind::NotYet, "services.web.ports", "isn't in the format yet"));
     assert!(has(&d, NoteKind::Equivalent, "services.cache.healthcheck", "probes every service port"));
 }
@@ -80,4 +80,20 @@ fn renames_point_at_the_settings_that_still_use_the_old_name() {
 fn not_a_compose_file_is_an_error() {
     assert!(draft("just text", "x", "f").is_err());
     assert!(draft("services: {}\n", "x", "f").is_err());
+}
+
+#[test]
+fn volumes_shared_between_services_are_noted() {
+    let compose = "services:\n  a:\n    image: x\n    volumes: [\"shared:/data\", \"./conf:/etc/x:ro\", \"/cache\"]\n  b:\n    image: x\n    volumes: [{ type: volume, source: shared, target: /in }]\nvolumes: { shared: {} }\n";
+    let d = draft(compose, "x", "compose.yaml").unwrap();
+    let spec = parse(&d.yaml).unwrap();
+    assert_eq!(validate(&spec), vec![]);
+    assert_eq!(
+        spec.machines["a"].volumes.get("cache").map(String::as_str),
+        Some("/cache"),
+        "anonymous volume kept"
+    );
+    assert!(!spec.machines["a"].volumes.contains_key("shared"));
+    assert!(has(&d, NoteKind::NotYet, "services.a.volumes", "shared:/data"));
+    assert!(has(&d, NoteKind::InImage, "services.a.volumes", "./conf:/etc/x:ro"));
 }

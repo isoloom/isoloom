@@ -11,6 +11,7 @@ machines:
   cache:
     networks: { app: 20 }
     services: [{ port: 6379, name: redis }]
+    volumes: { data: /data }
     docker:
       image: "redis:7-alpine"
       init: [build/cache/seed.sh]

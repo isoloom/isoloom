@@ -22,9 +22,6 @@ const NO_CONTAINER_ON_VMS: Support = NotPortable {
 const SHARED_NAMESPACE: Support = NotPortable {
     why: "shares a kernel namespace with the host or another machine: separate VMs can't",
 };
-const VOLUMES: Support = Planned {
-    note: "persistent or shared data: Docker volumes, VM disks or shares",
-};
 
 pub fn format() -> Format {
     Format {
@@ -43,7 +40,7 @@ fn rows() -> Vec<(String, Support)> {
         ("include", TOOLING),
         ("services", Emitted { from: "machines" }),
         ("networks", Emitted { from: "networks" }),
-        ("volumes", VOLUMES),
+        ("volumes", Emitted { from: "machines.*.volumes" }),
         (
             "secrets",
             Equivalent {
@@ -338,8 +335,8 @@ fn rows() -> Vec<(String, Support)> {
         (
             "services.*.volumes",
             Partial {
-                from: "(read-only mounts of init and check scripts)",
-                gap: "persistent or shared data",
+                from: "machines.*.volumes (and read-only mounts of init and check scripts)",
+                gap: "data shared between machines",
             },
         ),
         (

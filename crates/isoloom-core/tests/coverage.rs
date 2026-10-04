@@ -29,6 +29,7 @@ machines:
     inputs: [TOKEN]
     resources: { cpus: 1, memory_mb: 512, disk_gb: 10 }
     depends_on: []
+    volumes: { data: /data }
     access: false
     docker: { image: a, init: [x.sh] }
     vm: { os: debian-12, provision: [x.sh] }

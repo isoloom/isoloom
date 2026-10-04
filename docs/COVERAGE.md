@@ -9,7 +9,7 @@ VM-only. **100% coverage** means every portable feature is produced.
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 63% | 54 | 31 | 7 | 16 |
+| [Docker Compose](#docker-compose) | 65% | 54 | 32 | 7 | 15 |
 | [Vagrant](#vagrant) | 64% | 35 | 22 | 1 | 12 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -25,7 +25,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-63% of 54 portable features (31 done, 7 partly, 16 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+65% of 54 portable features (32 done, 7 partly, 15 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 | `include` | n/a | No | Compose tooling, not the environment's behavior |
 | `services` | Yes | Yes | From `machines` |
 | `networks` | Yes | Yes | From `networks` |
-| `volumes` | Yes | Not yet | Persistent or shared data: Docker volumes, VM disks or shares |
+| `volumes` | Yes | Yes | From `machines.*.volumes` |
 | `secrets` | Yes | Another way | Via inputs (values given at launch, never baked into images) |
 | `configs` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 | `models` | n/a | No | Compose tooling, not the environment's behavior |
@@ -136,7 +136,7 @@ when a table disagrees with what Isoloom really generates.
 | `user` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 | `userns_mode` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `uts` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
-| `volumes` | Yes | Partly | Read-only mounts of init and check scripts; not yet: persistent or shared data |
+| `volumes` | Yes | Partly | From `machines.*.volumes` (and read-only mounts of init and check scripts); not yet: data shared between machines |
 | `volumes_from` | Yes | Not yet | With volumes (data shared between machines) |
 | `working_dir` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 

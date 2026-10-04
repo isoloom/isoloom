@@ -234,6 +234,21 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 add(&nat, format!("address .{octet} is already used by `{other}`"));
             }
         }
+        let mut paths = BTreeSet::new();
+        for (v, path) in &m.volumes {
+            let vat = format!("{at}.volumes.{v}");
+            if !kebab(v) {
+                add(&vat, "volume names are kebab-case: lowercase letters, digits and dashes".into());
+            }
+            if !path.starts_with('/') || path == "/" || path.split('/').any(|s| s == "..") {
+                add(
+                    &vat,
+                    format!("`{path}` isn't an absolute path inside the machine, like /var/lib/postgresql/data"),
+                );
+            } else if !paths.insert(path.trim_end_matches('/')) {
+                add(&vat, format!("`{path}` is already a volume of this machine"));
+            }
+        }
         let mut ports = BTreeSet::new();
         for (i, s) in m.services.iter().enumerate() {
             if s.port == 0 {

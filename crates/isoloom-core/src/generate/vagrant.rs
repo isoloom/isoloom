@@ -163,6 +163,17 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             );
         }
 
+        // volumes: the VM's own disk already keeps data across restarts; the paths exist
+        // before provisioning, as a Docker volume's mount point would.
+        if !m.volumes.is_empty() {
+            let dirs: Vec<&str> = m.volumes.values().map(String::as_str).collect();
+            let _ = writeln!(
+                out,
+                "    m.vm.provision \"shell\", name: \"volumes\", inline: {}",
+                rb(&format!("mkdir -p {}", dirs.join(" ")))
+            );
+        }
+
         // depends_on: wait until each dependency answers on its service ports.
         for dep in &m.depends_on {
             let ports: Vec<u16> = spec.machines[dep].services.iter().map(|svc| svc.port).collect();

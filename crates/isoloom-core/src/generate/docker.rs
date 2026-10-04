@@ -15,6 +15,9 @@
 //!   machines that list them.
 //! - Checks run in a `check` profile: `docker compose --profile check run --rm isoloom-check`.
 //!
+//! - `volumes:` become named volumes: they survive re-creating a container, and go with
+//!   `docker compose down -v`.
+//!
 //! Nothing is published on the host: the environment is reached from its own networks.
 
 use serde_yaml_ng::{Mapping, Value};
@@ -135,6 +138,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         if let Some(env) = environment(m) {
             svc.insert(s("environment"), env);
+        }
+        if !m.volumes.is_empty() {
+            let mounts = m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", volume_name(name, v)))).collect();
+            svc.insert(s("volumes"), Value::Sequence(mounts));
         }
         if !m.services.is_empty() {
             svc.insert(
@@ -291,10 +298,22 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         networks.insert(s(net.as_str()), Value::Mapping(v));
     }
 
+    let mut volumes = Mapping::new();
+    for (name, m) in &spec.machines {
+        if m.docker.is_some() {
+            for v in m.volumes.keys() {
+                volumes.insert(s(volume_name(name, v)), Value::Mapping(Mapping::new()));
+            }
+        }
+    }
+
     let mut root = Mapping::new();
     root.insert(s("name"), s(spec.name.as_str()));
     root.insert(s("services"), Value::Mapping(services));
     root.insert(s("networks"), Value::Mapping(networks));
+    if !volumes.is_empty() {
+        root.insert(s("volumes"), Value::Mapping(volumes));
+    }
     let yaml = serde_yaml_ng::to_string(&Value::Mapping(root)).expect("a compose mapping serializes");
 
     let usage = "# Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait\n# Checks: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check\n# Stop:   docker compose -f .isoloom/docker/compose.yml down -v\n";
@@ -302,6 +321,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
         contents: format!("{}{usage}\n{yaml}", header("#")),
     }])
+}
+
+/// A machine's volume, named for Compose (scoped to the environment by Compose itself).
+fn volume_name(machine: &str, volume: &str) -> String {
+    format!("{machine}-{volume}")
 }
 
 /// Stands in for an access machine the runner supplies, so checks run from its side.

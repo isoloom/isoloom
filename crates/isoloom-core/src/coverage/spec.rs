@@ -223,6 +223,11 @@ pub fn table() -> Vec<Row> {
             done("boots after its dependencies, then waits until they answer", "hello-stack"),
         ),
         common(
+            "machines.*.volumes",
+            done("a named volume per path", "hello-stack"),
+            done("the VM's own disk keeps the data; the path is created", "hello-stack"),
+        ),
+        common(
             "machines.*.access",
             done("checks run from its network namespace (a stand-in when the runner supplies it)", "segmented"),
             Status::Partial {
@@ -273,7 +278,7 @@ pub fn table() -> Vec<Row> {
 }
 
 /// Where in the spec names are chosen by the author (map keys become `*`).
-const NAMED: &[&str] = &["networks", "machines", "machines.*.networks"];
+const NAMED: &[&str] = &["networks", "machines", "machines.*.networks", "machines.*.volumes"];
 
 /// The field paths present in a spec document (`machines.*.docker.image`, `reach[].ports`).
 /// A map of plain values under author-chosen names (`machines.*.networks`) counts as one field.

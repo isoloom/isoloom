@@ -169,3 +169,13 @@ fn machines_behind_a_gateway_start_after_it() {
     let looped = "version: 1\nname: t\nnetworks:\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }\nmachines:\n  fw: { networks: { dmz: 1 }, depends_on: [web], docker: { image: a } }\n  web: { networks: { dmz: 10 }, services: [{ port: 80 }], docker: { image: a } }\n";
     assert!(problems(looped).iter().any(|p| p.contains("cycle: fw -> web -> fw")));
 }
+
+#[test]
+fn volumes_are_absolute_paths_named_in_kebab_case() {
+    let p = problems(&format!(
+        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, volumes: {{ data: /data, Bad: /x, rel: data/x, twice: /data/ }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m.starts_with("machines.a.volumes.Bad: volume names are kebab-case")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("`data/x` isn't an absolute path")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("`/data/` is already a volume")), "{p:?}");
+}

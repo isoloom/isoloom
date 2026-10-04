@@ -73,6 +73,10 @@ pub struct Machine {
     /// Machines that must be ready (their services answering) before this one starts.
     #[serde(default)]
     pub depends_on: Vec<String>,
+    /// Data that survives restarts and re-creation of the machine, until the environment is
+    /// destroyed: a name -> an absolute path in the machine.
+    #[serde(default)]
+    pub volumes: IndexMap<String, String>,
     /// The machine the user lands on. It may have no implementation: the runner supplies it.
     #[serde(default)]
     pub access: bool,

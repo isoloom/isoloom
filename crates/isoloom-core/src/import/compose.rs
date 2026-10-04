@@ -33,6 +33,7 @@ struct Machine {
     cpus: Option<u32>,
     memory_mb: Option<u32>,
     depends_on: Vec<String>,
+    volumes: Vec<(String, String)>,
     image: Option<String>,
     build: Option<String>,
 }
@@ -153,6 +154,43 @@ fn note(notes: &mut Vec<Note>, at: String, kind: NoteKind, text: String) {
     notes.push(Note { at, kind, text });
 }
 
+enum VolumeMount {
+    /// A named volume.
+    Named(String),
+    /// A path from the host (the project folder, most often).
+    Bind,
+    /// A volume with no name, at a path.
+    Anonymous,
+}
+
+/// A service's volume entry (`name:/path[:ro]`, `./dir:/path`, `/path`, or the long syntax)
+/// and the path in the container.
+fn volume_mount(item: &Value) -> Option<(VolumeMount, String)> {
+    match item {
+        Value::String(spec) => {
+            let parts: Vec<&str> = spec.split(':').collect();
+            match parts.as_slice() {
+                [path] => Some((VolumeMount::Anonymous, path.to_string())),
+                [source, path, ..] if source.starts_with('.') || source.starts_with('/') || source.starts_with('~') => {
+                    Some((VolumeMount::Bind, path.to_string()))
+                }
+                [source, path, ..] => Some((VolumeMount::Named(source.to_string()), path.to_string())),
+                [] => None,
+            }
+        }
+        Value::Mapping(m) => {
+            let target = m.get("target").and_then(str_of)?;
+            match (m.get("type").and_then(str_of).as_deref(), m.get("source").and_then(str_of)) {
+                (Some("volume"), Some(source)) => Some((VolumeMount::Named(source), target)),
+                (Some("volume"), None) => Some((VolumeMount::Anonymous, target)),
+                (Some("bind"), Some(_)) => Some((VolumeMount::Bind, target)),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
 /// A Compose value on one line, for notes.
 fn flat(v: &Value) -> String {
     match v {
@@ -182,7 +220,7 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
     let name = root.get("name").and_then(str_of).map(|n| label(&n)).unwrap_or_else(|| label(fallback_name));
     for (k, _) in root {
         let k = k.as_str().unwrap_or_default();
-        if matches!(k, "name" | "services" | "networks") || k.starts_with("x-") {
+        if matches!(k, "name" | "services" | "networks" | "volumes") || k.starts_with("x-") {
             continue;
         }
         if let Some((kind, text)) = verdict(k) {
@@ -271,6 +309,16 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         }
     }
 
+    // Named volumes used by more than one service: shared data, not expressible yet.
+    let mut volume_users: IndexMap<String, usize> = IndexMap::new();
+    for svc in services.values() {
+        for item in svc.get("volumes").and_then(Value::as_sequence).into_iter().flatten() {
+            if let Some((VolumeMount::Named(n), _)) = volume_mount(item) {
+                *volume_users.entry(n).or_default() += 1;
+            }
+        }
+    }
+
     // Services.
     let names: IndexMap<String, String> = services.keys().filter_map(|k| k.as_str()).map(|k| (k.to_string(), label(k))).collect();
     let mut machines: Vec<Machine> = Vec::new();
@@ -310,6 +358,7 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
             cpus: None,
             memory_mb: None,
             depends_on: Vec::new(),
+            volumes: Vec::new(),
             image: None,
             build: None,
         };
@@ -547,29 +596,35 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
                     format!("set it in the image (CMD / ENTRYPOINT): {}", flat(v)),
                 ),
                 "volumes" => {
-                    let (mounts, data): (Vec<String>, Vec<String>) = v
-                        .as_sequence()
-                        .into_iter()
-                        .flatten()
-                        .map(flat)
-                        .partition(|m| m.starts_with('.') || m.starts_with('/'));
-                    if !mounts.is_empty() {
+                    let mut binds = Vec::new();
+                    let mut shared = Vec::new();
+                    for item in v.as_sequence().into_iter().flatten() {
+                        match volume_mount(item) {
+                            Some((VolumeMount::Bind, _)) | None => binds.push(flat(item)),
+                            Some((VolumeMount::Named(n), path)) if volume_users.get(&n).copied().unwrap_or(0) > 1 => shared.push(format!("{n}:{path}")),
+                            Some((VolumeMount::Named(n), path)) => m.volumes.push((label(&n), path)),
+                            Some((VolumeMount::Anonymous, path)) => {
+                                m.volumes.push((label(path.trim_start_matches('/')), path));
+                            }
+                        }
+                    }
+                    if !binds.is_empty() {
                         note(
                             &mut notes,
                             kat.clone(),
                             NoteKind::InImage,
                             format!(
                                 "project files mounted in: copy them into the image, or run scripts as `docker.init` jobs: {}",
-                                mounts.join(", ")
+                                binds.join(", ")
                             ),
                         );
                     }
-                    if !data.is_empty() {
+                    if !shared.is_empty() {
                         note(
                             &mut notes,
                             kat,
                             NoteKind::NotYet,
-                            format!("persistent or shared data (no concept in the format yet): {}", data.join(", ")),
+                            format!("data shared between machines (not in the format yet): {}", shared.join(", ")),
                         );
                     }
                 }
@@ -667,6 +722,10 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         }
         if !m.depends_on.is_empty() {
             let _ = writeln!(y, "    depends_on: [{}]", m.depends_on.join(", "));
+        }
+        if !m.volumes.is_empty() {
+            let vols = m.volumes.iter().map(|(n, p)| format!("{n}: {p}")).collect::<Vec<_>>().join(", ");
+            let _ = writeln!(y, "    volumes: {{ {vols} }}");
         }
         match (&m.build, &m.image) {
             (Some(b), _) => {
