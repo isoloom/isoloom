@@ -58,6 +58,12 @@ enum Command {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
+    /// Show what each output (Compose, Vagrant, Terraform, Ludus) does with every spec field.
+    Coverage {
+        /// The full table as Markdown, with what each output does per field.
+        #[arg(long)]
+        markdown: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -176,6 +182,33 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             } else {
                 ExitCode::SUCCESS
             })
+        }
+        Command::Coverage { markdown } => {
+            use core::coverage::{Output, markdown as md, score, table};
+            if markdown {
+                print!("{}", md());
+                return Ok(ExitCode::SUCCESS);
+            }
+            let rows = table();
+            let width = rows.iter().map(|r| r.path.len()).max().unwrap_or(0);
+            print!("{:width$}", "");
+            for o in Output::ALL {
+                print!("  {:>9}", o.label());
+            }
+            println!();
+            for r in &rows {
+                print!("{:width$}", r.path);
+                for o in Output::ALL {
+                    print!("  {:>9}", r.status(o).symbol());
+                }
+                println!();
+            }
+            println!();
+            for o in Output::ALL {
+                println!("{:>9}: {}", o.label(), score(&rows, o));
+            }
+            println!("\n✓ done · ◐ partial · n/a: means nothing there · info: descriptive · core: read by isoloom");
+            Ok(ExitCode::SUCCESS)
         }
         Command::Check { dir } => {
             let spec = core::load(&dir)?;

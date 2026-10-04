@@ -84,3 +84,6 @@ of the environment (an edge firewall) as its `gateway`; it routes that network w
 rules instead of Isoloom's router. `examples/hello-stack`, `examples/segmented` and
 `examples/edge-firewall` run for real in CI with their checks. Not yet: Windows and appliance
 images (OPNsense), Proxmox and cloud generators, release binaries.
+
+What each output does with every field of the spec: [docs/COVERAGE.md](docs/COVERAGE.md)
+(`isoloom coverage`). Tests fail when a field has no row or a claim isn't exercised by an example.

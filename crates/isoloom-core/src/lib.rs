@@ -3,8 +3,10 @@
 //! VMs on this machine, a Proxmox server, or the cloud.
 //!
 //! This crate is the format itself: parse, validate, derive the targets a spec can run on,
-//! and add up what it needs. The `isoloom` binary and other tools build on it; the generators (Docker Compose, Vagrant, Proxmox...) come next.
+//! and add up what it needs; generate each target's files (Docker Compose, Vagrant); and
+//! track what each output does with every field ([`coverage`]).
 
+pub mod coverage;
 pub mod generate;
 pub mod model;
 pub mod targets;
