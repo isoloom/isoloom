@@ -5,12 +5,14 @@
 //! This crate is the format itself: parse, validate, derive the targets a spec can run on,
 //! and add up what it needs. The `isoloom` binary and other tools build on it; the generators (Docker Compose, Vagrant, Proxmox...) come next.
 
+pub mod generate;
 pub mod model;
 pub mod targets;
 pub mod validate;
 
 use std::path::{Path, PathBuf};
 
+pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all};
 pub use model::{KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target};
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};

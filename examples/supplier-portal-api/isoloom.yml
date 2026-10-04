@@ -16,7 +16,7 @@ machines:
     resources: { cpus: 1, memory_mb: 1024 }
     docker:
       image: mysql:8.0
-      init: [build/database/init]
+      init: [build/database/seed.sh]
     vm:
       os: debian-12
       provision: [provision/database.sh]

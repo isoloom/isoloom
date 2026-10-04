@@ -1,0 +1,27 @@
+# A web server and a cache, as containers or as native VMs, with the same behavior:
+# the page answers on web:80, and the cache holds the greeting seeded at start.
+version: 1
+name: hello-stack
+
+networks:
+  app: { cidr: 10.60.0.0/24 }
+
+machines:
+  cache:
+    networks: { app: 20 }
+    services: [{ port: 6379, name: redis }]
+    docker:
+      image: "redis:7-alpine"
+      init: [build/cache/seed.sh]
+    vm: { os: debian-12, provision: [provision/cache.sh] }
+
+  web:
+    networks: { app: 10 }
+    services: [{ port: 80, http: true }]
+    depends_on: [cache]
+    docker: { build: build/web }
+    vm: { os: debian-12, provision: [provision/web.sh] }
+
+checks:
+  - checks/web-answers.sh
+  - checks/cache-seeded.sh

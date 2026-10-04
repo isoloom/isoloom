@@ -45,8 +45,16 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Write each target's files (not available yet).
+    /// Write each target's files under .isoloom/ (all possible targets, or one with --target).
     Generate {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// Only this target (docker, vagrant).
+        #[arg(long)]
+        target: Option<String>,
+    },
+    /// Fail when the generated files under .isoloom/ don't match the spec (for CI).
+    Check {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
@@ -128,9 +136,69 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        Command::Generate { .. } => {
-            eprintln!("`isoloom generate` isn't available yet: the Docker Compose and Vagrant generators are next.");
-            Ok(ExitCode::from(2))
+        Command::Generate { dir, target } => {
+            let spec = core::load(&dir)?;
+            let problems = core::validate(&spec);
+            if !problems.is_empty() {
+                for p in &problems {
+                    eprintln!("✗ {p}");
+                }
+                eprintln!("fix the spec first (`isoloom validate`)");
+                return Ok(ExitCode::FAILURE);
+            }
+            let (files, skipped) = match &target {
+                Some(id) => {
+                    let t = core::Target::ALL
+                        .into_iter()
+                        .find(|t| t.id() == id)
+                        .ok_or_else(|| format!("unknown target `{id}`"))?;
+                    match core::generate(&spec, t) {
+                        Ok(f) => (f, vec![]),
+                        Err(e) => (vec![], vec![e]),
+                    }
+                }
+                None => core::generate_all(&spec),
+            };
+            for f in &files {
+                let path = dir.join(&f.path);
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::write(&path, &f.contents)?;
+                println!("✓ {}", f.path);
+            }
+            for e in &skipped {
+                println!("· {e}");
+            }
+            // Asking for one target that can't be generated is an error; skipping some of "all" isn't.
+            Ok(if target.is_some() && files.is_empty() {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            })
+        }
+        Command::Check { dir } => {
+            let spec = core::load(&dir)?;
+            let (files, _) = core::generate_all(&spec);
+            let mut stale = 0;
+            for f in &files {
+                match std::fs::read_to_string(dir.join(&f.path)) {
+                    Ok(current) if current == f.contents => println!("✓ {}", f.path),
+                    Ok(_) => {
+                        println!("✗ {} is out of date", f.path);
+                        stale += 1;
+                    }
+                    Err(_) => {
+                        println!("✗ {} is missing", f.path);
+                        stale += 1;
+                    }
+                }
+            }
+            if stale > 0 {
+                println!("run `isoloom generate` and commit the result");
+                return Ok(ExitCode::FAILURE);
+            }
+            Ok(ExitCode::SUCCESS)
         }
     }
 }

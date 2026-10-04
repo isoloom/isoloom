@@ -52,10 +52,19 @@ checks: [build/check/check.sh]   # black-box checks, run against every target
 isoloom validate [DIR]    # mistakes, with the exact field and what to do (--json)
 isoloom targets [DIR]     # where it can run, and why not elsewhere
 isoloom resources [DIR]   # machines, CPUs, memory, disk
-isoloom generate [DIR]    # each target's files (coming next)
+isoloom generate [DIR]    # each target's files under .isoloom/ (--target docker|vagrant)
+isoloom check [DIR]       # fails when .isoloom/ doesn't match the spec (for CI)
 ```
 
-`DIR` holds `isoloom.yml`.
+`DIR` holds `isoloom.yml` (`isoloom.yaml` also works).
+
+Run what it generates:
+
+```
+docker compose -f .isoloom/docker/compose.yml up -d --wait          # containers
+docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
+cd .isoloom/vagrant && vagrant up                                    # one VM per machine
+```
 
 ## Layout
 
@@ -67,5 +76,7 @@ isoloom generate [DIR]    # each target's files (coming next)
 
 ## Status
 
-v0.1: format, validation, target derivation. Next: Docker Compose and Vagrant generators, then
-Proxmox, a CI action, and release binaries (macOS, Linux, Windows).
+v0.2: the format, validation, target derivation, and generators for **Docker Compose** and
+**Vagrant** (VirtualBox, VMware, Parallels, libvirt). `examples/hello-stack` runs for real in CI
+with its checks. Not yet: `reach` rules between networks (they need a router), Windows images,
+Proxmox and cloud generators, release binaries.
