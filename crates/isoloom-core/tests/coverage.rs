@@ -224,3 +224,13 @@ fn every_feature_is_classified() {
         }
     }
 }
+
+#[test]
+fn every_cloud_resource_named_exists_in_its_provider() {
+    for c in isoloom_core::coverage::terraform::CLOUDS {
+        let all = vagrant::names(c.list);
+        for r in c.environment.iter().chain(c.windows) {
+            assert!(all.contains(r), "{}: `{r}` isn't a resource type of {}", c.name, c.source);
+        }
+    }
+}

@@ -20,3 +20,9 @@ print("\n".join(sorted(p["resource_schemas"])))
   echo "$1: $(grep -vc '^#' "$OUT/$1.txt") resource types"
 }
 extract proxmox bpg/proxmox 0.115.0
+extract aws hashicorp/aws 6.67.0
+extract azure hashicorp/azurerm 5.8.0
+extract google hashicorp/google 8.5.0
+extract digitalocean digitalocean/digitalocean 2.103.0
+extract linode linode/linode 4.7.0
+extract oci oracle/oci 9.8.0

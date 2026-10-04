@@ -100,6 +100,7 @@ fn provider(name: &'static str, id: &'static str, list: &'static str, classify: 
             .into_iter()
             .map(|s| (format!("provider {id}: {s}"), classify(s).unwrap_or(Unclassified)))
             .collect(),
+        collapse_not_portable: false,
     }
 }
 
@@ -205,6 +206,7 @@ fn core() -> Format {
         file: ".isoloom/vagrant/Vagrantfile",
         source: "Vagrant 2.4.9 (config.vm, network types, provisioners)",
         rows,
+        collapse_not_portable: false,
     }
 }
 

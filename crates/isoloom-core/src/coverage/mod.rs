@@ -126,6 +126,9 @@ pub struct Format {
     /// Where the feature list comes from.
     pub source: &'static str,
     pub rows: Vec<(String, Support)>,
+    /// On the page, list the features that aren't "not portable" and count the rest in one line
+    /// (a cloud's hundreds of managed services).
+    pub collapse_not_portable: bool,
 }
 
 /// Toward 100%: the portable features, and how many are done, partly done, or to do.
@@ -231,13 +234,28 @@ pub fn markdown() -> String {
     for f in &formats {
         let _ = write!(md, "\n## {}\n\n{}. From {}.\n", f.name, capitalize(&f.summary()), f.source);
         let mut current = "";
-        for (key, s) in &f.rows {
+        let collapsed = f
+            .rows
+            .iter()
+            .filter(|(_, s)| f.collapse_not_portable && matches!(s, Support::NotPortable { .. }))
+            .count();
+        for (key, s) in f
+            .rows
+            .iter()
+            .filter(|(_, s)| !(f.collapse_not_portable && matches!(s, Support::NotPortable { .. })))
+        {
             let (title, name) = section(key);
             if title != current {
                 let _ = write!(md, "\n### {title}\n\n| Key | Every target | Implemented | Notes |\n| --- | --- | --- | --- |\n");
                 current = title;
             }
             let _ = writeln!(md, "| `{name}` | {} | {} | {} |", s.portable(), s.implemented(), capitalize(&s.note()));
+        }
+        if collapsed > 0 {
+            let _ = writeln!(
+                md,
+                "\nAnd {collapsed} other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them."
+            );
         }
     }
     md

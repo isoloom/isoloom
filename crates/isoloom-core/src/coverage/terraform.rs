@@ -8,6 +8,178 @@ use super::vagrant::names;
 use super::{Format, Support, Support::*};
 
 const PROXMOX: &str = include_str!("../../coverage/terraform/proxmox.txt");
+const AWS: &str = include_str!("../../coverage/terraform/aws.txt");
+const AZURE: &str = include_str!("../../coverage/terraform/azure.txt");
+const GOOGLE: &str = include_str!("../../coverage/terraform/google.txt");
+const DIGITALOCEAN: &str = include_str!("../../coverage/terraform/digitalocean.txt");
+const LINODE: &str = include_str!("../../coverage/terraform/linode.txt");
+const OCI: &str = include_str!("../../coverage/terraform/oci.txt");
+
+/// A cloud provider: the resource types an environment needs (one VM per machine on its own
+/// networks), and its Windows VM types. Every other type is one of that cloud's managed
+/// services, which no other VM target has.
+pub struct Cloud {
+    pub name: &'static str,
+    pub source: &'static str,
+    pub list: &'static str,
+    pub environment: &'static [&'static str],
+    pub windows: &'static [&'static str],
+}
+
+pub const CLOUDS: &[Cloud] = &[
+    Cloud {
+        name: "Terraform: AWS",
+        source: "hashicorp/aws 6.67.0 (its resource types)",
+        list: AWS,
+        environment: &[
+            "aws_instance",
+            "aws_vpc",
+            "aws_subnet",
+            "aws_internet_gateway",
+            "aws_nat_gateway",
+            "aws_eip",
+            "aws_eip_association",
+            "aws_route_table",
+            "aws_route_table_association",
+            "aws_route",
+            "aws_security_group",
+            "aws_vpc_security_group_ingress_rule",
+            "aws_vpc_security_group_egress_rule",
+            "aws_network_interface",
+            "aws_network_interface_attachment",
+            "aws_key_pair",
+            "aws_ebs_volume",
+            "aws_volume_attachment",
+        ],
+        windows: &[],
+    },
+    Cloud {
+        name: "Terraform: Azure",
+        source: "hashicorp/azurerm 5.8.0 (its resource types)",
+        list: AZURE,
+        environment: &[
+            "azurerm_resource_group",
+            "azurerm_linux_virtual_machine",
+            "azurerm_virtual_network",
+            "azurerm_subnet",
+            "azurerm_network_interface",
+            "azurerm_network_security_group",
+            "azurerm_network_security_rule",
+            "azurerm_subnet_network_security_group_association",
+            "azurerm_public_ip",
+            "azurerm_nat_gateway",
+            "azurerm_subnet_nat_gateway_association",
+            "azurerm_route_table",
+            "azurerm_route",
+            "azurerm_subnet_route_table_association",
+            "azurerm_managed_disk",
+            "azurerm_virtual_machine_data_disk_attachment",
+        ],
+        windows: &["azurerm_windows_virtual_machine"],
+    },
+    Cloud {
+        name: "Terraform: Google Cloud",
+        source: "hashicorp/google 8.5.0 (its resource types)",
+        list: GOOGLE,
+        environment: &[
+            "google_compute_instance",
+            "google_compute_network",
+            "google_compute_subnetwork",
+            "google_compute_firewall",
+            "google_compute_address",
+            "google_compute_route",
+            "google_compute_router",
+            "google_compute_router_nat",
+            "google_compute_disk",
+            "google_compute_attached_disk",
+        ],
+        windows: &[],
+    },
+    Cloud {
+        name: "Terraform: DigitalOcean",
+        source: "digitalocean/digitalocean 2.103.0 (its resource types)",
+        list: DIGITALOCEAN,
+        environment: &[
+            "digitalocean_droplet",
+            "digitalocean_vpc",
+            "digitalocean_firewall",
+            "digitalocean_ssh_key",
+            "digitalocean_reserved_ip",
+            "digitalocean_reserved_ip_assignment",
+            "digitalocean_volume",
+            "digitalocean_volume_attachment",
+        ],
+        windows: &[],
+    },
+    Cloud {
+        name: "Terraform: Linode",
+        source: "linode/linode 4.7.0 (its resource types)",
+        list: LINODE,
+        environment: &[
+            "linode_instance",
+            "linode_instance_config",
+            "linode_instance_disk",
+            "linode_instance_ip",
+            "linode_vpc",
+            "linode_vpc_subnet",
+            "linode_firewall",
+            "linode_sshkey",
+            "linode_volume",
+        ],
+        windows: &[],
+    },
+    Cloud {
+        name: "Terraform: Oracle Cloud",
+        source: "oracle/oci 9.8.0 (its resource types)",
+        list: OCI,
+        environment: &[
+            "oci_core_instance",
+            "oci_core_vcn",
+            "oci_core_subnet",
+            "oci_core_internet_gateway",
+            "oci_core_nat_gateway",
+            "oci_core_route_table",
+            "oci_core_security_list",
+            "oci_core_network_security_group",
+            "oci_core_network_security_group_security_rule",
+            "oci_core_public_ip",
+            "oci_core_vnic_attachment",
+            "oci_core_volume",
+            "oci_core_volume_attachment",
+        ],
+        windows: &[],
+    },
+];
+
+fn cloud(c: &Cloud) -> Format {
+    let managed = NotPortable {
+        why: "one of this cloud's managed services: no other VM target has it",
+    };
+    let rows = names(c.list)
+        .into_iter()
+        .map(|r| {
+            let s = if c.environment.contains(&r) {
+                Planned {
+                    note: "with the cloud generator (one VM per machine)",
+                }
+            } else if c.windows.contains(&r) {
+                Planned {
+                    note: "with Windows guests (which make an environment VM-only)",
+                }
+            } else {
+                managed
+            };
+            (format!("resource {r}"), s)
+        })
+        .collect();
+    Format {
+        name: c.name,
+        file: ".isoloom/cloud/ (planned)",
+        source: c.source,
+        rows,
+        collapse_not_portable: true,
+    }
+}
 const LEGACY: &str = "proxmox_virtual_environment_";
 
 const GENERATOR: Support = Planned {
@@ -45,12 +217,15 @@ pub fn formats() -> Vec<Format> {
             (format!("resource {r}"), s)
         })
         .collect();
-    vec![Format {
+    let mut all = vec![Format {
         name: "Terraform: Proxmox",
         file: ".isoloom/proxmox/ (planned)",
         source: "bpg/proxmox 0.115.0 (its resource types)",
         rows,
-    }]
+        collapse_not_portable: false,
+    }];
+    all.extend(CLOUDS.iter().map(cloud));
+    all
 }
 
 fn proxmox(r: &str) -> Option<Support> {

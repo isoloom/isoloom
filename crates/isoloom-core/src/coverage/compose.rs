@@ -29,6 +29,7 @@ pub fn format() -> Format {
         file: ".isoloom/docker/compose.yml",
         source: "the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json)",
         rows: rows(),
+        collapse_not_portable: false,
     }
 }
 
