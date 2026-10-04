@@ -41,6 +41,39 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh provision/cache.sh"
+    m.vm.provision "shell", name: "no internet", inline: <<~'SH'
+      export DEBIAN_FRONTEND=noninteractive
+      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      IF=$(ip route show default | awk '{print $5; exit}')
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/egress.nft <<NFT
+      table inet isoloom-egress
+      delete table inet isoloom-egress
+      table inet isoloom-egress {
+        chain output {
+          type filter hook output priority 0; policy accept;
+          oifname "$IF" ct state new drop
+        }
+      }
+      NFT
+      cat > /etc/systemd/system/isoloom-egress.service <<'UNIT'
+      [Unit]
+      Description=No new connections out through the NAT interface
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/sbin/nft -f /etc/isoloom/egress.nft
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+      systemctl daemon-reload
+      systemctl enable isoloom-egress.service
+      systemctl restart isoloom-egress.service
+    SH
   end
 
   config.vm.define "web" do |m|
@@ -74,5 +107,38 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh provision/web.sh"
+    m.vm.provision "shell", name: "no internet", inline: <<~'SH'
+      export DEBIAN_FRONTEND=noninteractive
+      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      IF=$(ip route show default | awk '{print $5; exit}')
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/egress.nft <<NFT
+      table inet isoloom-egress
+      delete table inet isoloom-egress
+      table inet isoloom-egress {
+        chain output {
+          type filter hook output priority 0; policy accept;
+          oifname "$IF" ct state new drop
+        }
+      }
+      NFT
+      cat > /etc/systemd/system/isoloom-egress.service <<'UNIT'
+      [Unit]
+      Description=No new connections out through the NAT interface
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/sbin/nft -f /etc/isoloom/egress.nft
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+      systemctl daemon-reload
+      systemctl enable isoloom-egress.service
+      systemctl restart isoloom-egress.service
+    SH
   end
 end

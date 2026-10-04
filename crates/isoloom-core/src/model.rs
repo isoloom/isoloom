@@ -149,26 +149,23 @@ pub enum Target {
     Proxmox,
     /// One cloud VM per machine.
     CloudVm,
-    /// Export for players who run Ludus.
-    Ludus,
 }
 
 impl Target {
-    pub const ALL: [Target; 7] = [
+    pub const ALL: [Target; 6] = [
         Target::Docker,
         Target::Hosted,
         Target::CloudDocker,
         Target::Vagrant,
         Target::Proxmox,
         Target::CloudVm,
-        Target::Ludus,
     ];
 
     /// The implementation every machine needs for this target.
     pub fn needs(self) -> Shape {
         match self {
             Target::Docker | Target::Hosted | Target::CloudDocker => Shape::Docker,
-            Target::Vagrant | Target::Proxmox | Target::CloudVm | Target::Ludus => Shape::Vm,
+            Target::Vagrant | Target::Proxmox | Target::CloudVm => Shape::Vm,
         }
     }
 
@@ -180,7 +177,6 @@ impl Target {
             Target::Vagrant => "vagrant",
             Target::Proxmox => "proxmox",
             Target::CloudVm => "cloud-vm",
-            Target::Ludus => "ludus",
         }
     }
 }

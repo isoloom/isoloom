@@ -83,3 +83,114 @@ fn docs_coverage_is_up_to_date() {
         "docs/COVERAGE.md is stale; run `cargo run -q -- coverage --markdown > docs/COVERAGE.md`"
     );
 }
+
+// From the formats' side.
+
+use isoloom_core::coverage::{Support, compose, vagrant};
+
+/// Every committed output of a generator, across the examples.
+fn outputs(file: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(examples()).unwrap() {
+        let p = entry.unwrap().path().join(file);
+        if let Ok(text) = std::fs::read_to_string(p) {
+            found.push(text);
+        }
+    }
+    assert!(!found.is_empty(), "no example has {file}");
+    found
+}
+
+/// The property names a schema node allows, following `$ref` and `allOf`/`anyOf`/`oneOf`.
+fn schema_keys(defs: &serde_json::Value, node: &serde_json::Value) -> BTreeSet<String> {
+    let mut keys: BTreeSet<String> = node["properties"].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
+    if let Some(r) = node["$ref"].as_str() {
+        keys.extend(schema_keys(defs, &defs[r.rsplit('/').next().unwrap()]));
+    }
+    for combinator in ["allOf", "anyOf", "oneOf"] {
+        for sub in node[combinator].as_array().into_iter().flatten() {
+            keys.extend(schema_keys(defs, sub));
+        }
+    }
+    keys
+}
+
+#[test]
+fn compose_rows_are_exactly_the_schema_keys() {
+    let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("coverage/compose-spec.json")).unwrap();
+    let schema: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let defs = &schema["$defs"];
+    let mut expected: BTreeSet<String> = schema_keys(defs, &schema);
+    for (prefix, def) in [("services.*.", "service"), ("networks.*.", "network"), ("volumes.*.", "volume")] {
+        expected.extend(schema_keys(defs, &defs[def]).into_iter().map(|k| format!("{prefix}{k}")));
+    }
+    let rows: BTreeSet<String> = compose::format().rows.iter().map(|(k, _)| k.to_string()).collect();
+    let missing: Vec<_> = expected.difference(&rows).collect();
+    let extra: Vec<_> = rows.difference(&expected).collect();
+    assert!(missing.is_empty(), "Compose keys with no coverage row: {missing:?}");
+    assert!(extra.is_empty(), "coverage rows that aren't Compose keys: {extra:?}");
+}
+
+/// Checks a format's rows against what the generator really writes: every key written has a
+/// row marked as written, and every row marked as written is written by some example.
+fn written_matches(rows: &[(&'static str, Support)], written: BTreeSet<String>, format: &str) {
+    for key in &written {
+        let row = rows.iter().find(|(k, _)| k == key);
+        assert!(row.is_some(), "{format}: Isoloom writes `{key}`, which has no coverage row");
+        assert!(
+            row.unwrap().1.written(),
+            "{format}: Isoloom writes `{key}`, but its row says {}",
+            row.unwrap().1.kind()
+        );
+    }
+    for (key, s) in rows {
+        if s.written() {
+            assert!(written.contains(*key), "{format}: `{key}` is marked as written, but no example's output has it");
+        }
+    }
+}
+
+#[test]
+fn compose_written_keys_match_the_generated_files() {
+    let mut written = BTreeSet::new();
+    for text in outputs(".isoloom/docker/compose.yml") {
+        let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text).unwrap();
+        for (k, v) in doc.as_mapping().unwrap() {
+            let k = k.as_str().unwrap();
+            written.insert(k.to_string());
+            if let ("services" | "networks" | "volumes", Some(items)) = (k, v.as_mapping()) {
+                for item in items.values() {
+                    for key in item.as_mapping().into_iter().flat_map(|m| m.keys()) {
+                        written.insert(format!("{k}.*.{}", key.as_str().unwrap()));
+                    }
+                }
+            }
+        }
+    }
+    written_matches(&compose::format().rows, written, "Compose");
+}
+
+#[test]
+fn vagrant_written_settings_match_the_generated_files() {
+    let mut written = BTreeSet::new();
+    for text in outputs(".isoloom/vagrant/Vagrantfile") {
+        for line in text.lines() {
+            let line = line.trim_start();
+            // `config.vm.x`, `m.vm.x`, `o.vm.x`: a machine setting; network, provision and
+            // provider settings also name their type.
+            let Some(rest) = ["config.vm.", "m.vm.", "o.vm."].iter().find_map(|p| line.strip_prefix(p)) else {
+                continue;
+            };
+            let name: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+            let key = match name.as_str() {
+                "network" | "provision" | "provider" => {
+                    let kind = rest.split('"').nth(1).unwrap_or_default();
+                    format!("config.vm.{name} {kind}")
+                }
+                _ => format!("config.vm.{name}"),
+            };
+            written.insert(key);
+        }
+    }
+    written_matches(&vagrant::format().rows, written, "Vagrant");
+}

@@ -58,9 +58,12 @@ enum Command {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
-    /// Show what each output (Compose, Vagrant, Terraform, Ludus) does with every spec field.
+    /// Show which features of each output format (Compose, Vagrant) a spec can produce.
     Coverage {
-        /// The full table as Markdown, with what each output does per field.
+        /// Every feature, not only the gaps.
+        #[arg(long)]
+        all: bool,
+        /// The full coverage page as Markdown (both directions).
         #[arg(long)]
         markdown: bool,
     },
@@ -183,31 +186,33 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 ExitCode::SUCCESS
             })
         }
-        Command::Coverage { markdown } => {
-            use core::coverage::{Output, markdown as md, score, table};
+        Command::Coverage { markdown, all } => {
+            use core::coverage::{Support, formats, markdown as md};
             if markdown {
                 print!("{}", md());
                 return Ok(ExitCode::SUCCESS);
             }
-            let rows = table();
-            let width = rows.iter().map(|r| r.path.len()).max().unwrap_or(0);
-            print!("{:width$}", "");
-            for o in Output::ALL {
-                print!("  {:>9}", o.label());
-            }
-            println!();
-            for r in &rows {
-                print!("{:width$}", r.path);
-                for o in Output::ALL {
-                    print!("  {:>9}", r.status(o).symbol());
+            for f in formats() {
+                println!("{} ({}): {}", f.name, f.file, f.summary());
+                let counts: Vec<String> = Support::KINDS.iter().map(|k| format!("{} {k}", f.count(k))).collect();
+                println!("  {}", counts.join(" · "));
+                let shown: Vec<_> = f
+                    .rows
+                    .iter()
+                    .filter(|(_, s)| all || matches!(s, Support::Planned { .. } | Support::Open { .. }))
+                    .collect();
+                if !all && !shown.is_empty() {
+                    println!("  gaps (planned, open):");
+                }
+                let width = shown.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+                for (key, s) in shown {
+                    println!("    {key:width$}  {:>7}  {}", s.symbol(), s.note());
                 }
                 println!();
             }
-            println!();
-            for o in Output::ALL {
-                println!("{:>9}: {}", o.label(), score(&rows, o));
+            if !all {
+                println!("Every feature: isoloom coverage --all · as Markdown: isoloom coverage --markdown");
             }
-            println!("\n✓ done · ◐ partial · n/a: means nothing there · info: descriptive · core: read by isoloom");
             Ok(ExitCode::SUCCESS)
         }
         Command::Check { dir } => {

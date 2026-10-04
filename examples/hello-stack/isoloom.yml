@@ -1,10 +1,11 @@
 # A web server and a cache, as containers or as native VMs, with the same behavior:
-# the page answers on web:80, and the cache holds the greeting seeded at start.
+# the page answers on web:80, the cache holds the greeting seeded at start, and nothing
+# reaches the internet.
 version: 1
 name: hello-stack
 
 networks:
-  app: { cidr: 10.60.0.0/24 }
+  app: { cidr: 10.60.0.0/24, internet: false }
 
 machines:
   cache:
@@ -25,3 +26,4 @@ machines:
 checks:
   - checks/web-answers.sh
   - checks/cache-seeded.sh
+  - checks/no-internet.sh

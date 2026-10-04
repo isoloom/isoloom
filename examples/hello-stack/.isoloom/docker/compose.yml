@@ -62,10 +62,11 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - echo '== checks/web-answers.sh' && sh /isoloom/checks/01-web-answers.sh && echo '== checks/cache-seeded.sh' && sh /isoloom/checks/02-cache-seeded.sh
+    - echo '== checks/web-answers.sh' && sh /isoloom/checks/01-web-answers.sh && echo '== checks/cache-seeded.sh' && sh /isoloom/checks/02-cache-seeded.sh && echo '== checks/no-internet.sh' && sh /isoloom/checks/03-no-internet.sh
     volumes:
     - ../../checks/web-answers.sh:/isoloom/checks/01-web-answers.sh:ro
     - ../../checks/cache-seeded.sh:/isoloom/checks/02-cache-seeded.sh:ro
+    - ../../checks/no-internet.sh:/isoloom/checks/03-no-internet.sh:ro
     networks:
       app: null
     depends_on:
@@ -81,3 +82,4 @@ networks:
       config:
       - subnet: 10.60.0.0/24
         gateway: 10.60.0.1
+    internal: true
