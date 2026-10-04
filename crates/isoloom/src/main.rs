@@ -21,7 +21,7 @@ struct Cli {
 enum Command {
     /// Check the spec for mistakes (and that every path it mentions exists).
     Validate {
-        /// The project folder (holding isoloom.yaml).
+        /// The project folder (holding isoloom.yml).
         #[arg(default_value = ".")]
         dir: PathBuf,
         /// Don't check that files mentioned by the spec exist.

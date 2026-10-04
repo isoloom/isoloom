@@ -6,7 +6,7 @@ cloud. Like a loom weaving one pattern into the same cloth every time, each targ
 **the same external behavior** from the same spec, its own way.
 
 ```yaml
-# isoloom.yaml
+# isoloom.yml
 version: 1
 name: supplier-portal-api
 
@@ -46,7 +46,7 @@ isoloom resources [DIR]   # machines, CPUs, memory, disk
 isoloom generate [DIR]    # each target's files (coming next)
 ```
 
-`DIR` holds `isoloom.yaml`.
+`DIR` holds `isoloom.yml`.
 
 ## Layout
 

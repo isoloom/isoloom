@@ -15,12 +15,14 @@ pub use model::{KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Sp
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};
 
-/// The spec file, at the root of a project.
-pub const SPEC_FILE: &str = "isoloom.yaml";
+/// The spec file names, at the root of a project: `isoloom.yml` (canonical) or `isoloom.yaml`.
+pub const SPEC_FILES: &[&str] = &["isoloom.yml", "isoloom.yaml"];
 
 #[derive(Debug)]
 pub enum LoadError {
     NotFound(PathBuf),
+    /// Both `isoloom.yml` and `isoloom.yaml` exist: which one is meant is ambiguous.
+    Ambiguous(PathBuf),
     Read(PathBuf, std::io::Error),
     Parse(String),
 }
@@ -28,7 +30,8 @@ pub enum LoadError {
 impl std::fmt::Display for LoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LoadError::NotFound(d) => write!(f, "no {SPEC_FILE} in {}", d.display()),
+            LoadError::NotFound(d) => write!(f, "no isoloom.yml in {}", d.display()),
+            LoadError::Ambiguous(d) => write!(f, "both isoloom.yml and isoloom.yaml exist in {}; keep one", d.display()),
             LoadError::Read(p, e) => write!(f, "can't read {}: {e}", p.display()),
             LoadError::Parse(e) => write!(f, "{e}"),
         }
@@ -42,14 +45,19 @@ pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
     serde_yaml_ng::from_str(yaml).map_err(|e| LoadError::Parse(e.to_string()))
 }
 
-/// The spec file in `dir`, if there is one.
-pub fn find(dir: &Path) -> Option<PathBuf> {
-    Some(dir.join(SPEC_FILE)).filter(|p| p.is_file())
+/// The spec file in `dir`: `isoloom.yml` or `isoloom.yaml`, never both.
+pub fn find(dir: &Path) -> Result<PathBuf, LoadError> {
+    let found: Vec<PathBuf> = SPEC_FILES.iter().map(|f| dir.join(f)).filter(|p| p.is_file()).collect();
+    match found.as_slice() {
+        [one] => Ok(one.clone()),
+        [] => Err(LoadError::NotFound(dir.to_path_buf())),
+        _ => Err(LoadError::Ambiguous(dir.to_path_buf())),
+    }
 }
 
-/// Reads `isoloom.yaml` in `dir`.
+/// Reads the spec in `dir` (see [`find`]).
 pub fn load(dir: &Path) -> Result<Spec, LoadError> {
-    let path = find(dir).ok_or_else(|| LoadError::NotFound(dir.to_path_buf()))?;
+    let path = find(dir)?;
     let text = std::fs::read_to_string(&path).map_err(|e| LoadError::Read(path, e))?;
     parse(&text)
 }

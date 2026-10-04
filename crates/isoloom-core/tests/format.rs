@@ -1,5 +1,5 @@
-//! The format against the paper exercise (cyber-project doc/architecture/LAB-RANGE-FORMAT.md):
-//! the three example labs parse, validate, and get exactly the targets its matrix predicts.
+//! The format against its three examples: they parse, validate, and get exactly the
+//! targets their shapes allow.
 
 use std::path::Path;
 
@@ -109,4 +109,16 @@ fn a_machine_needs_an_implementation_unless_it_is_the_access_machine() {
         "{p:?}"
     );
     assert!(!p.iter().any(|m| m.starts_with("machines.u")), "{p:?}");
+}
+
+#[test]
+fn spec_file_is_isoloom_yml_or_yaml_but_not_both() {
+    let dir = std::env::temp_dir().join(format!("isoloom-find-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    assert!(matches!(isoloom_core::find(&dir), Err(isoloom_core::LoadError::NotFound(_))));
+    std::fs::write(dir.join("isoloom.yaml"), "x").unwrap();
+    assert!(isoloom_core::find(&dir).unwrap().ends_with("isoloom.yaml"));
+    std::fs::write(dir.join("isoloom.yml"), "x").unwrap();
+    assert!(matches!(isoloom_core::find(&dir), Err(isoloom_core::LoadError::Ambiguous(_))));
+    std::fs::remove_dir_all(dir).unwrap();
 }
