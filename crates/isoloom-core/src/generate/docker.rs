@@ -1,7 +1,10 @@
 //! The `docker` target: one Compose file at `.isoloom/docker/compose.yml`.
 //!
-//! - Each network becomes a Compose network with its subnet (gateway `.1`); `internet:
-//!   false` makes it `internal`.
+//! - Each network becomes a Compose network with its subnet (Docker at `.1`, or at the last
+//!   address when a machine is the network's gateway); `internet: false` makes it `internal`
+//!   when nothing routes between networks.
+//! - A machine that is a network's gateway gets forwarding and `NET_ADMIN`; the machines
+//!   behind it route everything through it (in a sidecar, once it answers).
 //! - Each machine becomes a service with its fixed address on every network; services find
 //!   each other by name (Compose DNS).
 //! - Machines with services get a healthcheck (TCP probe), so `depends_on` waits for them
@@ -98,16 +101,16 @@ fn file_name(path: &str) -> &str {
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     common_unsupported(spec, Target::Docker)?;
-    let routed = router::needed(spec);
+    let routed = router::routed(spec);
 
     let mut services = Mapping::new();
-    if routed {
+    if router::needed(spec) {
         services.insert(s(router::NAME), router_service(spec));
     }
 
-    // Machines that get a network sidecar (routes via the router, and no default route when
-    // all their networks are offline), so dependents can wait for it.
-    let needs_routes = |m: &Machine| routed && (!router::routes(spec, m).is_empty() || offline(spec, m));
+    // Machines that get a network sidecar (routes via the router or gateways, the default
+    // route through a gateway, no default route when offline), so dependents can wait for it.
+    let needs_routes = |name: &str, m: &Machine| routed && !route_commands(spec, name, m).is_empty();
 
     for (name, m) in &spec.machines {
         // The access machine may have no implementation: the runner supplies it.
@@ -120,6 +123,13 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         svc.insert(s("image"), s(image.clone()));
         svc.insert(s("hostname"), s(name.as_str()));
         svc.insert(s("networks"), networks_of(m, spec, true));
+        if router::is_gateway(spec, name) {
+            // It routes: forwarding on, and the right to set its own firewall rules.
+            svc.insert(s("cap_add"), list([s("NET_ADMIN")]));
+            let mut sysctls = Mapping::new();
+            sysctls.insert(s("net.ipv4.ip_forward"), s("1"));
+            svc.insert(s("sysctls"), Value::Mapping(sysctls));
+        }
         if let Some(hosts) = extra_hosts(spec, name) {
             svc.insert(s("extra_hosts"), hosts);
         }
@@ -145,7 +155,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             for init in init_names(dep, dm) {
                 deps.insert(s(init), map([("condition", s("service_completed_successfully"))]));
             }
-            if needs_routes(dm) {
+            if needs_routes(dep, dm) {
                 deps.insert(s(format!("{dep}-routes")), map([("condition", s("service_healthy"))]));
             }
         }
@@ -167,8 +177,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         svc.insert(s("restart"), s("unless-stopped"));
         services.insert(s(name.as_str()), Value::Mapping(svc));
 
-        if needs_routes(m) {
-            services.insert(s(format!("{name}-routes")), routes_sidecar(spec, name, m));
+        if needs_routes(name, m) {
+            services.insert(s(format!("{name}-routes")), routes_sidecar(spec, name, name, m));
         }
 
         // One-shot init jobs, in order, each after the previous one. They share the machine's
@@ -186,7 +196,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             }
             let mut deps = Mapping::new();
             deps.insert(s(name.as_str()), map([("condition", s("service_healthy"))]));
-            if needs_routes(m) {
+            if needs_routes(name, m) {
                 deps.insert(s(format!("{name}-routes")), map([("condition", s("service_healthy"))]));
             }
             if let Some(p) = &previous {
@@ -220,7 +230,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             for init in init_names(name, m) {
                 deps.insert(s(init), map([("condition", s("service_completed_successfully"))]));
             }
-            if needs_routes(m) {
+            if needs_routes(name, m) {
                 deps.insert(s(format!("{name}-routes")), map([("condition", s("service_healthy"))]));
             }
         }
@@ -236,8 +246,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 } else {
                     services.insert(s(STAND_IN), stand_in(spec, name, m));
                     deps.insert(s(STAND_IN), map([("condition", s("service_started"))]));
-                    if needs_routes(m) {
-                        let mut sidecar = routes_sidecar(spec, STAND_IN, m);
+                    if needs_routes(name, m) {
+                        let mut sidecar = routes_sidecar(spec, STAND_IN, name, m);
                         if let Value::Mapping(map) = &mut sidecar {
                             // Like the stand-in, only started with the check profile.
                             map.insert(s("profiles"), list([s("check")]));
@@ -265,15 +275,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 
     let mut networks = Mapping::new();
     for (net, n) in &spec.networks {
-        let gateway = super::gateway(spec, net);
+        let gateway = super::host_address(spec, net);
         let mut v = Mapping::new();
         v.insert(
             s("ipam"),
             map([("config", list([map([("subnet", s(n.cidr.as_str())), ("gateway", s(gateway.to_string()))])]))]),
         );
-        // Without a router, `internet: false` is Docker's internal network. With one, Docker's
-        // internal-network firewall would drop the traffic the router forwards, so offline
-        // machines lose their default route instead (in their sidecar).
+        // Without routing, `internet: false` is Docker's internal network. With a router or a
+        // gateway, Docker's internal-network firewall would drop forwarded traffic, so offline
+        // machines lose their default route instead (in their sidecar). A network with a
+        // gateway is never internal: its gateway decides what leaves it.
         if !n.internet && !routed {
             v.insert(s("internal"), Value::Bool(true));
         }
@@ -314,7 +325,7 @@ fn extra_hosts(spec: &Spec, name: &str) -> Option<Value> {
 /// The router: on every network at its last address, forwarding with the `reach` rules.
 fn router_service(spec: &Spec) -> Value {
     let mut nets = Mapping::new();
-    for net in spec.networks.keys() {
+    for net in router::networks(spec) {
         nets.insert(s(net.as_str()), map([("ipv4_address", s(router::address(spec, net).to_string()))]));
     }
     let mut r = Mapping::new();
@@ -350,27 +361,53 @@ fn router_service(spec: &Spec) -> Value {
     Value::Mapping(r)
 }
 
-/// A one-shot container in `host`'s network namespace that adds its routes via the router.
-fn routes_sidecar(spec: &Spec, host: &str, m: &Machine) -> Value {
+/// The commands a machine's sidecar runs: routes via the router and gateways, the default
+/// route through its gateway (or, for a gateway, out through Docker on a network with
+/// internet), and no default route when the machine is offline.
+fn route_commands(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
+    let mut cmds = router::route_commands(spec, name, m, true);
+    if let Some(out) = own_default(spec, name, m) {
+        cmds.push(format!("ip route replace default via {out}"));
+    }
+    if offline(spec, name, m) {
+        cmds.push("(ip route del default 2>/dev/null || true)".into());
+    }
+    cmds
+}
+
+/// A gateway's way out: Docker's address on its first network with internet that the
+/// router (or nothing) routes, so Docker doesn't pick one of the networks it serves.
+fn own_default(spec: &Spec, name: &str, m: &Machine) -> Option<std::net::Ipv4Addr> {
+    if !router::is_gateway(spec, name) || router::default_gateway(spec, name, m).is_some() {
+        return None;
+    }
+    m.networks
+        .keys()
+        .find(|n| router::plain(spec, n) && spec.networks[*n].internet)
+        .map(|n| super::host_address(spec, n))
+}
+
+/// A container in `host`'s network namespace that sets the routes of machine `name`.
+fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     let mut r = Mapping::new();
     r.insert(s("image"), s(UTILITY_IMAGE));
     r.insert(s("network_mode"), s(format!("service:{host}")));
     r.insert(s("cap_add"), list([s("NET_ADMIN")]));
     // Sets the routes, then stays (idle) so the healthcheck can confirm them and `up --wait`
     // treats it as running rather than exited.
-    let mut cmds = router::route_commands(spec, m);
-    if offline(spec, m) {
-        cmds.push("(ip route del default 2>/dev/null || true)".into());
-    }
+    let cmds = route_commands(spec, name, m);
     r.insert(
         s("entrypoint"),
         list([s("/bin/sh"), s("-c"), s(format!("{} && exec sleep infinity", cmds.join(" && ")))]),
     );
     let mut ready = Vec::new();
-    if let Some((first, _)) = router::routes(spec, m).first() {
+    if let Some((first, _)) = router::routes(spec, name, m).first() {
         ready.push(format!("ip route show {first} | grep -q via"));
     }
-    if offline(spec, m) {
+    if let Some(gw) = router::default_gateway(spec, name, m).or_else(|| own_default(spec, name, m)) {
+        ready.push(format!("ip route | grep -q '^default via {gw} '"));
+    }
+    if offline(spec, name, m) {
         ready.push("! ip route | grep -q '^default'".into());
     }
     r.insert(
@@ -384,7 +421,21 @@ fn routes_sidecar(spec: &Spec, host: &str, m: &Machine) -> Value {
     );
     let mut deps = Mapping::new();
     deps.insert(s(host), map([("condition", s("service_started"))]));
-    deps.insert(s(router::NAME), map([("condition", s("service_healthy"))]));
+    if router::needed(spec) && m.networks.keys().any(|n| router::plain(spec, n)) {
+        deps.insert(s(router::NAME), map([("condition", s("service_healthy"))]));
+    }
+    // The gateways it routes through, ready (answering, so their rules are loaded).
+    for gw in crate::validate::starts_after(spec, name, m) {
+        if m.depends_on.iter().any(|d| d == gw) || !router::is_gateway(spec, gw) || spec.machines[gw].docker.is_none() {
+            continue;
+        }
+        let ready = if spec.machines[gw].services.is_empty() {
+            "service_started"
+        } else {
+            "service_healthy"
+        };
+        deps.insert(s(gw), map([("condition", s(ready))]));
+    }
     r.insert(s("depends_on"), Value::Mapping(deps));
     r.insert(s("restart"), s("unless-stopped"));
     Value::Mapping(r)
@@ -404,7 +455,8 @@ fn stand_in(spec: &Spec, name: &str, m: &Machine) -> Value {
     Value::Mapping(a)
 }
 
-/// A machine is offline when none of its networks reaches the internet.
-fn offline(spec: &Spec, m: &Machine) -> bool {
-    !m.networks.keys().any(|n| spec.networks[n].internet)
+/// A machine is offline when none of its networks reaches the internet and no gateway
+/// decides for it.
+fn offline(spec: &Spec, name: &str, m: &Machine) -> bool {
+    !m.networks.keys().any(|n| spec.networks[n].internet) && router::default_gateway(spec, name, m).is_none()
 }

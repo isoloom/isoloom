@@ -25,7 +25,7 @@ jobs:
           for e in examples/*/; do cargo run -q -- validate "$e" --skip-files; cargo run -q -- targets "$e"; done
       - name: Generated files are up to date
         run: |
-          for e in examples/hello-stack examples/supplier-portal-api examples/segmented examples/pivot-dmz; do cargo run -q -- check "$e"; done
+          for e in examples/hello-stack examples/supplier-portal-api examples/segmented examples/pivot-dmz examples/edge-firewall; do cargo run -q -- check "$e"; done
 
   # The generated Compose files, run for real: everything answers, and the checks pass.
   docker:
@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [hello-stack, segmented]
+        example: [hello-stack, segmented, edge-firewall]
     defaults:
       run:
         working-directory: examples/${{ matrix.example }}

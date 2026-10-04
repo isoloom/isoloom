@@ -87,6 +87,17 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.61.10.10 web' '10.61.99.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/routes.sh <<'ROUTES'
+      #!/bin/sh
+      # Routes to the other isoloom networks.
+      ip route replace 10.61.10.0/24 via 10.61.20.254 2>/dev/null || true
+      ip route replace 10.61.99.0/24 via 10.61.20.254 2>/dev/null || true
+      ROUTES
+      chmod +x /etc/isoloom/routes.sh
+      for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do
+        if [ -d "$d" ]; then ln -sf /etc/isoloom/routes.sh "$d/zz-isoloom-routes"; fi
+      done
       cat > /etc/systemd/system/isoloom-routes.service <<'UNIT'
       [Unit]
       Description=Routes to the other isoloom networks
@@ -96,7 +107,7 @@ Vagrant.configure("2") do |config|
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      ExecStart=/bin/sh -c 'ip route replace 10.61.10.0/24 via 10.61.20.254 && ip route replace 10.61.99.0/24 via 10.61.20.254'
+      ExecStart=/etc/isoloom/routes.sh
 
       [Install]
       WantedBy=multi-user.target
@@ -112,10 +123,12 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh provision/cache.sh"
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
       export DEBIAN_FRONTEND=noninteractive
-      apt-get install -y -qq nftables >/dev/null
+      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
-      cat > /etc/nftables.conf <<NFT
-      flush ruleset
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/egress.nft <<NFT
+      table inet isoloom-egress
+      delete table inet isoloom-egress
       table inet isoloom-egress {
         chain output {
           type filter hook output priority 0; policy accept;
@@ -123,8 +136,23 @@ Vagrant.configure("2") do |config|
         }
       }
       NFT
-      systemctl enable nftables
-      nft -f /etc/nftables.conf
+      cat > /etc/systemd/system/isoloom-egress.service <<'UNIT'
+      [Unit]
+      Description=No new connections out through the NAT interface
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/sbin/nft -f /etc/isoloom/egress.nft
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+      systemctl daemon-reload
+      systemctl enable isoloom-egress.service
+      systemctl restart isoloom-egress.service
     SH
   end
 
@@ -154,6 +182,17 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.61.20.20 cache' '10.61.99.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/routes.sh <<'ROUTES'
+      #!/bin/sh
+      # Routes to the other isoloom networks.
+      ip route replace 10.61.20.0/24 via 10.61.10.254 2>/dev/null || true
+      ip route replace 10.61.99.0/24 via 10.61.10.254 2>/dev/null || true
+      ROUTES
+      chmod +x /etc/isoloom/routes.sh
+      for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do
+        if [ -d "$d" ]; then ln -sf /etc/isoloom/routes.sh "$d/zz-isoloom-routes"; fi
+      done
       cat > /etc/systemd/system/isoloom-routes.service <<'UNIT'
       [Unit]
       Description=Routes to the other isoloom networks
@@ -163,7 +202,7 @@ Vagrant.configure("2") do |config|
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      ExecStart=/bin/sh -c 'ip route replace 10.61.20.0/24 via 10.61.10.254 && ip route replace 10.61.99.0/24 via 10.61.10.254'
+      ExecStart=/etc/isoloom/routes.sh
 
       [Install]
       WantedBy=multi-user.target
@@ -206,6 +245,17 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.61.20.20 cache' '10.61.10.10 web'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/routes.sh <<'ROUTES'
+      #!/bin/sh
+      # Routes to the other isoloom networks.
+      ip route replace 10.61.10.0/24 via 10.61.99.254 2>/dev/null || true
+      ip route replace 10.61.20.0/24 via 10.61.99.254 2>/dev/null || true
+      ROUTES
+      chmod +x /etc/isoloom/routes.sh
+      for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do
+        if [ -d "$d" ]; then ln -sf /etc/isoloom/routes.sh "$d/zz-isoloom-routes"; fi
+      done
       cat > /etc/systemd/system/isoloom-routes.service <<'UNIT'
       [Unit]
       Description=Routes to the other isoloom networks
@@ -215,7 +265,7 @@ Vagrant.configure("2") do |config|
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      ExecStart=/bin/sh -c 'ip route replace 10.61.10.0/24 via 10.61.99.254 && ip route replace 10.61.20.0/24 via 10.61.99.254'
+      ExecStart=/etc/isoloom/routes.sh
 
       [Install]
       WantedBy=multi-user.target

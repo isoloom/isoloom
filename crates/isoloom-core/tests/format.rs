@@ -128,3 +128,44 @@ fn the_last_address_is_reserved_for_the_router() {
     let p = problems(&format!("{BASE}machines:\n  a: {{ networks: {{ lab: 254 }}, docker: {{ image: x }} }}\n"));
     assert!(p.iter().any(|m| m.starts_with("machines.a.networks.lab: 254 isn't a usable address")), "{p:?}");
 }
+
+#[test]
+fn edge_firewall_validates() {
+    let r = example("edge-firewall");
+    assert_eq!(validate(&r), vec![]);
+    assert_eq!(ids(derive(&r)), ALL);
+}
+
+#[test]
+fn a_gateway_is_a_machine_on_the_network_at_the_gateway_address() {
+    let base = |nets: &str, fw: &str| {
+        format!(
+            "version: 1\nname: t\nnetworks:\n{nets}\nmachines:\n  fw: {{ networks: {fw}, docker: {{ image: a }} }}\n  web: {{ networks: {{ dmz: 10 }}, docker: {{ image: a }} }}\n"
+        )
+    };
+    let ok = base("  out: { cidr: 10.1.0.0/24 }\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }", "{ out: 2, dmz: 1 }");
+    assert_eq!(problems(&ok), Vec::<String>::new());
+
+    let unknown = base("  dmz: { cidr: 10.1.1.0/24, gateway: nope }", "{ dmz: 2 }");
+    assert!(
+        problems(&unknown)
+            .iter()
+            .any(|p| p.starts_with("networks.dmz.gateway: no machine named `nope`"))
+    );
+
+    let detached = base("  out: { cidr: 10.1.0.0/24 }\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }", "{ out: 2 }");
+    assert!(problems(&detached).iter().any(|p| p.contains("attach `fw` to `dmz` at the gateway address")));
+
+    let wrong_octet = base("  dmz: { cidr: 10.1.1.0/24, gateway: fw }", "{ dmz: 5 }");
+    assert!(problems(&wrong_octet).iter().any(|p| p.contains("takes the gateway address: use 1")));
+
+    // Only the gateway may take .1.
+    let squatter = "version: 1\nname: t\nnetworks:\n  a: { cidr: 10.1.0.0/24 }\nmachines:\n  m: { networks: { a: 1 }, docker: { image: a } }\n";
+    assert!(problems(squatter).iter().any(|p| p.contains("isn't a usable address")));
+}
+
+#[test]
+fn machines_behind_a_gateway_start_after_it() {
+    let looped = "version: 1\nname: t\nnetworks:\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }\nmachines:\n  fw: { networks: { dmz: 1 }, depends_on: [web], docker: { image: a } }\n  web: { networks: { dmz: 10 }, services: [{ port: 80 }], docker: { image: a } }\n";
+    assert!(problems(looped).iter().any(|p| p.contains("cycle: fw -> web -> fw")));
+}

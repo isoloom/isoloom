@@ -36,6 +36,12 @@ pub struct Network {
     /// Whether machines on it may reach the internet (default true).
     #[serde(default = "yes")]
     pub internet: bool,
+    /// A machine of the environment that routes this network (an edge firewall): it takes the
+    /// gateway address, and its own configuration decides what crosses it. Isoloom adds no
+    /// router of its own here, so `reach` and `internet` on this network become expected
+    /// behavior for the checks to verify.
+    #[serde(default)]
+    pub gateway: Option<String>,
 }
 
 fn yes() -> bool {

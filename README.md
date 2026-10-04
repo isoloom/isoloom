@@ -76,9 +76,11 @@ cd .isoloom/vagrant && vagrant up                                    # one VM pe
 
 ## Status
 
-v0.3: the format, validation, target derivation, and generators for **Docker Compose** and
+v0.4: the format, validation, target derivation, and generators for **Docker Compose** and
 **Vagrant** (VirtualBox, VMware, Parallels, libvirt), with **routers**: `reach` rules between
 networks are enforced by a router machine (nftables) on both targets, `internet: false` works on
-both, and `depends_on` waits for services to answer. `examples/hello-stack` and
-`examples/segmented` run for real in CI with their checks. Not yet: gateways (a machine of the
-environment as router), Windows images, Proxmox and cloud generators, release binaries.
+both, and `depends_on` waits for services to answer. **Gateways**: a network can name a machine
+of the environment (an edge firewall) as its `gateway`; it routes that network with its own
+rules instead of Isoloom's router. `examples/hello-stack`, `examples/segmented` and
+`examples/edge-firewall` run for real in CI with their checks. Not yet: Windows and appliance
+images (OPNsense), Proxmox and cloud generators, release binaries.

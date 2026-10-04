@@ -70,6 +70,16 @@ impl Cidr {
         (addr >= first && addr <= last).then(|| Ipv4Addr::from(addr))
     }
 
+    /// The gateway's address: the first usable address of the block (e.g. .1 in a /24).
+    pub fn gateway(self) -> Ipv4Addr {
+        Ipv4Addr::from(self.base + 1)
+    }
+
+    /// The gateway's last octet (1 in a /24, 9 in 10.0.0.8/29).
+    pub fn gateway_octet(self) -> u8 {
+        ((self.base + 1) & 0xff) as u8
+    }
+
     /// The router's address: the last usable address of the block (e.g. .254 in a /24).
     pub fn router(self) -> Ipv4Addr {
         Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 2)
@@ -140,6 +150,22 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     }
     let cidr_of: HashMap<&str, Cidr> = cidrs.iter().map(|(n, c)| (n.as_str(), *c)).collect();
 
+    for (name, net) in &spec.networks {
+        let Some(gw) = &net.gateway else { continue };
+        let at = format!("networks.{name}.gateway");
+        match spec.machines.get(gw) {
+            None => add(&at, format!("no machine named `{gw}`")),
+            Some(m) if !m.networks.contains_key(name) => {
+                let octet = cidr_of.get(name.as_str()).map(|c| c.gateway_octet()).unwrap_or(1);
+                add(
+                    &at,
+                    format!("attach `{gw}` to `{name}` at the gateway address: `networks: {{ {name}: {octet} }}`"),
+                );
+            }
+            Some(_) => {}
+        }
+    }
+
     for (i, r) in spec.reach.iter().enumerate() {
         for (field, net) in [("from", &r.from), ("to", &r.to)] {
             if !spec.networks.contains_key(net) {
@@ -186,7 +212,17 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 add(&nat, format!("no network named `{net}`"));
                 continue;
             };
-            if c.host(*octet).is_none() {
+            let is_gateway = spec.networks[net].gateway.as_deref() == Some(name.as_str());
+            if is_gateway {
+                if *octet != c.gateway_octet() {
+                    add(
+                        &nat,
+                        format!("`{name}` is this network's gateway, so it takes the gateway address: use {}", c.gateway_octet()),
+                    );
+                } else {
+                    taken.insert((net.clone(), *octet), name.clone());
+                }
+            } else if c.host(*octet).is_none() {
                 add(
                     &nat,
                     format!(
@@ -251,7 +287,12 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         }
     }
     if let Some(cycle) = dependency_cycle(spec) {
-        add("machines", format!("depends_on forms a cycle: {}", cycle.join(" -> ")));
+        let hint = if spec.networks.values().any(|n| n.gateway.is_some()) {
+            " (machines on a gateway's network also start after it)"
+        } else {
+            ""
+        };
+        add("machines", format!("depends_on forms a cycle: {}{hint}", cycle.join(" -> ")));
     }
 
     // Targets: requested ones must be possible.
@@ -296,7 +337,7 @@ fn dependency_cycle(spec: &Spec) -> Option<Vec<String>> {
             return None;
         }
         stack.push(n);
-        for dep in spec.machines.get(n).map(|m| m.depends_on.as_slice()).unwrap_or_default() {
+        for dep in spec.machines.get(n).map(|m| starts_after(spec, n, m)).unwrap_or_default() {
             if spec.machines.contains_key(dep)
                 && let Some(c) = visit(spec, dep, stack, done)
             {
@@ -309,6 +350,20 @@ fn dependency_cycle(spec: &Spec) -> Option<Vec<String>> {
     }
     let mut done = BTreeSet::new();
     spec.machines.keys().find_map(|n| visit(spec, n, &mut Vec::new(), &mut done))
+}
+
+/// The machines a machine starts after: its `depends_on`, then the gateways of its networks.
+pub fn starts_after<'a>(spec: &'a Spec, name: &str, m: &'a crate::model::Machine) -> Vec<&'a str> {
+    let mut after: Vec<&str> = m.depends_on.iter().map(String::as_str).collect();
+    for net in m.networks.keys() {
+        if let Some(gw) = spec.networks.get(net).and_then(|n| n.gateway.as_deref())
+            && gw != name
+            && !after.contains(&gw)
+        {
+            after.push(gw);
+        }
+    }
+    after
 }
 
 /// Checks that every path the spec mentions exists in the project folder.

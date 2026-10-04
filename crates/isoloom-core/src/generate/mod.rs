@@ -88,7 +88,9 @@ fn header(comment: &str) -> String {
 /// A machine's address on a network (validated specs only).
 fn address(spec: &Spec, network: &str, octet: u8) -> Ipv4Addr {
     let cidr = Cidr::parse(&spec.networks[network].cidr).expect("validated cidr");
-    cidr.host(octet).expect("validated address")
+    cidr.host(octet)
+        .or_else(|| (octet == cidr.gateway_octet()).then(|| cidr.gateway()))
+        .expect("validated address")
 }
 
 /// Dotted netmask of a network.
@@ -110,7 +112,7 @@ fn start_order(spec: &Spec) -> Vec<&str> {
         if order.contains(&name) {
             return;
         }
-        for dep in &spec.machines[name].depends_on {
+        for dep in crate::validate::starts_after(spec, name, &spec.machines[name]) {
             visit(spec, dep, order);
         }
         order.push(name);
@@ -135,8 +137,13 @@ fn address_for(spec: &Spec, from: &str, to: &str) -> Ipv4Addr {
     address(spec, net, *octet)
 }
 
-/// A network's gateway address: `.1` of its block (reserved for it on every target).
-fn gateway(spec: &Spec, network: &str) -> Ipv4Addr {
+/// The host's own address on a network (Docker's bridge): the gateway address, unless a
+/// machine is the network's gateway; then the router's address, unused on such networks.
+fn host_address(spec: &Spec, network: &str) -> Ipv4Addr {
     let cidr = Cidr::parse(&spec.networks[network].cidr).expect("validated cidr");
-    Ipv4Addr::from(cidr.base + 1)
+    if spec.networks[network].gateway.is_some() {
+        cidr.router()
+    } else {
+        cidr.gateway()
+    }
 }

@@ -143,20 +143,24 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             );
         }
 
-        // Routes to the other networks through the router, as a boot-time service.
-        if router::needed(spec) {
-            let cmds = router::route_commands(spec, m);
-            if !cmds.is_empty() {
-                let unit = format!(
-                    "cat > /etc/systemd/system/isoloom-routes.service <<'UNIT'\n[Unit]\nDescription=Routes to the other isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/sh -c '{}'\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-routes.service\nsystemctl restart isoloom-routes.service\n",
-                    cmds.join(" && ")
-                );
-                let _ = writeln!(
-                    out,
-                    "    m.vm.provision \"shell\", name: \"routes\", inline: <<~'SH'\n{}    SH",
-                    indent(&unit, 6)
-                );
-            }
+        // Routes to the other networks through the router and gateways, as a boot-time
+        // service. The default route through a gateway comes after provisioning (below).
+        let cmds = router::route_commands(spec, name, m, false);
+        if !cmds.is_empty() {
+            let _ = writeln!(
+                out,
+                "    m.vm.provision \"shell\", name: \"routes\", inline: <<~'SH'\n{}    SH",
+                indent(&routes_unit(&cmds), 6)
+            );
+        }
+
+        // A gateway forwards between its networks; its own provisioning sets the rules.
+        if router::is_gateway(spec, name) {
+            let _ = writeln!(
+                out,
+                "    m.vm.provision \"shell\", name: \"forwarding\", inline: {}",
+                rb("echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf && sysctl -q -p /etc/sysctl.d/90-isoloom.conf")
+            );
         }
 
         // depends_on: wait until each dependency answers on its service ports.
@@ -206,15 +210,24 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             }
         }
 
-        // `internet: false`: once provisioned, no new connections out through the NAT interface
-        // (Vagrant's SSH keeps working: it comes in, and replies are allowed).
+        // Once provisioned, no new connections out through the NAT interface when the machine
+        // is offline, or when a gateway decides for it (Vagrant's SSH keeps working: it comes
+        // in, and replies are allowed). Then the default route through the gateway.
         let online = m.networks.keys().any(|n| spec.networks[n].internet);
-        if !online {
-            let script = "export DEBIAN_FRONTEND=noninteractive\napt-get install -y -qq nftables >/dev/null\nIF=$(ip route show default | awk '{print $5; exit}')\ncat > /etc/nftables.conf <<NFT\nflush ruleset\ntable inet isoloom-egress {\n  chain output {\n    type filter hook output priority 0; policy accept;\n    oifname \"$IF\" ct state new drop\n  }\n}\nNFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n";
+        let gateway = router::default_gateway(spec, name, m);
+        if !online || gateway.is_some() {
             let _ = writeln!(
                 out,
-                "    m.vm.provision \"shell\", name: \"no internet\", inline: <<~'SH'\n{}    SH",
-                indent(script, 6)
+                "    m.vm.provision \"shell\", name: {}, inline: <<~'SH'\n{}    SH",
+                rb(if gateway.is_some() { "through the gateway" } else { "no internet" }),
+                indent(&egress(gateway.is_some()), 6)
+            );
+        }
+        if gateway.is_some() {
+            let _ = writeln!(
+                out,
+                "    m.vm.provision \"shell\", name: \"default route\", inline: <<~'SH'\n{}    SH",
+                indent(&routes_unit(&router::route_commands(spec, name, m, true)), 6)
             );
         }
         out.push_str("  end\n");
@@ -225,6 +238,34 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
         contents: out,
     }])
+}
+
+/// Blocks new outgoing connections on the NAT interface (the default route's), in its own
+/// nftables table loaded at boot, leaving the machine's other rules alone. Behind a gateway,
+/// name lookups to the NAT side's resolver stay allowed (the traffic goes through the gateway).
+fn egress(allow_dns: bool) -> String {
+    let (dns_var, dns_rule) = if allow_dns {
+        (
+            "DNS=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)\n",
+            "    ip daddr $DNS meta l4proto { tcp, udp } th dport 53 accept\n",
+        )
+    } else {
+        ("", "")
+    };
+    format!(
+        "export DEBIAN_FRONTEND=noninteractive\ncommand -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null\nIF=$(ip route show default | awk '{{print $5; exit}}')\n{dns_var}mkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.nft <<NFT\ntable inet isoloom-egress\ndelete table inet isoloom-egress\ntable inet isoloom-egress {{\n  chain output {{\n    type filter hook output priority 0; policy accept;\n{dns_rule}    oifname \"$IF\" ct state new drop\n  }}\n}}\nNFT\ncat > /etc/systemd/system/isoloom-egress.service <<'UNIT'\n[Unit]\nDescription=No new connections out through the NAT interface\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/sbin/nft -f /etc/isoloom/egress.nft\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\n"
+    )
+}
+
+/// A script that installs routes as a boot-time service (and applies them now). The routes
+/// live in /etc/isoloom/routes.sh, also run whenever an interface comes up (ifupdown,
+/// networkd-dispatcher): bringing an interface down drops its routes, and Vagrant
+/// reconfigures interfaces after every boot.
+fn routes_unit(cmds: &[String]) -> String {
+    let lines: String = cmds.iter().map(|c| format!("{c} 2>/dev/null || true\n")).collect();
+    format!(
+        "mkdir -p /etc/isoloom\ncat > /etc/isoloom/routes.sh <<'ROUTES'\n#!/bin/sh\n# Routes to the other isoloom networks.\n{lines}ROUTES\nchmod +x /etc/isoloom/routes.sh\nfor d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do\n  if [ -d \"$d\" ]; then ln -sf /etc/isoloom/routes.sh \"$d/zz-isoloom-routes\"; fi\ndone\ncat > /etc/systemd/system/isoloom-routes.service <<'UNIT'\n[Unit]\nDescription=Routes to the other isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/routes.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-routes.service\nsystemctl restart isoloom-routes.service\n"
+    )
 }
 
 /// Indents every line of a script for a Ruby squiggly heredoc.
@@ -241,7 +282,7 @@ fn router_vm(spec: &Spec, out: &mut String) {
     let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(router::NAME));
     let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
     let _ = writeln!(out, "    m.vm.hostname = {}", rb(router::NAME));
-    for net in spec.networks.keys() {
+    for net in router::networks(spec) {
         let netname = format!("isoloom-{}-{net}", spec.name);
         let _ = writeln!(
             out,

@@ -32,6 +32,7 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("supplier-portal-api");
     assert_committed("segmented");
     assert_committed("pivot-dmz");
+    assert_committed("edge-firewall");
 }
 
 #[test]
@@ -110,4 +111,40 @@ fn unsupported_features_are_refused_with_the_reason() {
         "Windows has no local image yet"
     );
     assert_eq!(generate(&ad, Target::Proxmox), Err(GenerateError::NoGenerator(Target::Proxmox)));
+}
+
+#[test]
+fn a_gateway_routes_its_networks_instead_of_the_router() {
+    let (_, spec) = example("edge-firewall");
+    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    assert!(!compose.contains("isoloom-router"), "no router: the firewall routes");
+    // The firewall takes .1; Docker's bridge moves to the last address on its networks.
+    assert!(compose.contains("ipv4_address: 10.70.10.1"));
+    assert!(compose.contains("gateway: 10.70.10.254"));
+    assert!(compose.contains("gateway: 10.70.0.1"));
+    assert!(compose.contains("net.ipv4.ip_forward: '1'"));
+    // Machines behind it send everything through it, once it answers.
+    assert!(compose.contains("ip route replace default via 10.70.10.1"));
+    assert!(compose.contains("ip route replace 10.70.10.0/24 via 10.70.0.2"));
+    let web_routes = compose.split("\n  web-routes:").nth(1).unwrap().split("\n  cache:").next().unwrap();
+    assert!(web_routes.contains("fw:\n        condition: service_healthy"));
+    // Its own rules decide: no Docker-internal network, no route deletion.
+    assert!(!compose.contains("internal: true"));
+    assert!(!compose.contains("ip route del default"));
+}
+
+#[test]
+fn vagrant_moves_machines_behind_their_gateway_after_provisioning() {
+    let (_, spec) = example("edge-firewall");
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    let fw = vf.find("config.vm.define \"fw\"").unwrap();
+    let web = vf.find("config.vm.define \"web\"").unwrap();
+    assert!(fw < web, "the gateway starts first");
+    assert!(vf.contains("name: \"forwarding\""));
+    let web_block = &vf[web..vf.find("config.vm.define \"cache\"").unwrap()];
+    let provision = web_block.find("provision/web.sh").unwrap();
+    let behind = web_block.find("name: \"through the gateway\"").unwrap();
+    let default = web_block.find("ip route replace default via 10.70.10.1").unwrap();
+    assert!(provision < behind && behind < default, "installs first, then moves behind the firewall");
+    assert!(web_block.contains("th dport 53 accept"), "name lookups still work behind a gateway");
 }

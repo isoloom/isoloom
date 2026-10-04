@@ -11,73 +11,24 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
 
-  config.vm.define "isoloom-router" do |m|
+  config.vm.define "fw" do |m|
     m.vm.box = "bento/debian-12"
-    m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.30.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-dmz", libvirt__network_name: "isoloom-pivot-dmz-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.30.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.30.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-access", libvirt__network_name: "isoloom-pivot-dmz-access", libvirt__dhcp_enabled: false
+    m.vm.hostname = "fw"
+    m.vm.network "private_network", ip: "10.70.0.2", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-outside", libvirt__network_name: "isoloom-edge-firewall-outside", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.1", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-dmz", libvirt__network_name: "isoloom-edge-firewall-dmz", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.1", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-lan", libvirt__network_name: "isoloom-edge-firewall-lan", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "pivot-dmz · router"
-      v.cpus = 1
-      v.memory = 512
-    end
-    m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "pivot-dmz · router"
-      v.vmx["numvcpus"] = "1"
-      v.vmx["memsize"] = "512"
-    end
-    m.vm.provider "parallels" do |v|
-      v.name = "pivot-dmz · router"
-      v.cpus = 1
-      v.memory = 512
-    end
-    m.vm.provider "libvirt" do |v, o|
-      o.vm.box = "generic/debian12"
-      v.cpus = 1
-      v.memory = 512
-    end
-    m.vm.provision "shell", name: "router", inline: <<~'SH'
-      set -e
-      export DEBIAN_FRONTEND=noninteractive
-      apt-get update -qq
-      apt-get install -y -qq nftables >/dev/null
-      echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf
-      sysctl -q -p /etc/sysctl.d/90-isoloom.conf
-      cat > /etc/nftables.conf <<'NFT'
-      flush ruleset
-      table inet isoloom {
-        chain forward {
-          type filter hook forward priority 0; policy drop;
-          ct state established,related accept
-          ip saddr 10.30.99.0/24 ip daddr 10.30.10.0/24 accept
-          ip saddr 10.30.10.0/24 ip daddr 10.30.20.0/24 meta l4proto { tcp, udp } th dport { 8080, 5432 } accept
-          ip saddr 10.30.10.0/24 ip daddr 10.30.20.0/24 icmp type echo-request accept
-        }
-      }
-      NFT
-      systemctl enable nftables
-      nft -f /etc/nftables.conf
-    SH
-  end
-
-  config.vm.define "gateway" do |m|
-    m.vm.box = "bento/debian-12"
-    m.vm.hostname = "gateway"
-    m.vm.network "private_network", ip: "10.30.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-dmz", libvirt__network_name: "isoloom-pivot-dmz-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.30.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
-      v.name = "pivot-dmz · gateway"
+      v.name = "edge-firewall · fw"
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "pivot-dmz · gateway"
+      v.vmx["displayName"] = "edge-firewall · fw"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "pivot-dmz · gateway"
+      v.name = "edge-firewall · fw"
       v.cpus = 1
       v.memory = 1024
     end
@@ -86,13 +37,46 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.30.20.20 app' '10.30.20.30 db' '10.30.99.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.10.10 web' '10.70.20.20 cache' '10.70.0.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "forwarding", inline: "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf && sysctl -q -p /etc/sysctl.d/90-isoloom.conf"
+    PROJECT.each do |entry|
+      m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
+    end
+    m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
+    m.vm.provision "shell", name: "provision/fw.sh", inline: "cd /opt/isoloom && sh provision/fw.sh"
+  end
+
+  config.vm.define "web" do |m|
+    m.vm.box = "bento/debian-12"
+    m.vm.hostname = "web"
+    m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-dmz", libvirt__network_name: "isoloom-edge-firewall-dmz", libvirt__dhcp_enabled: false
+    m.vm.provider "virtualbox" do |v|
+      v.name = "edge-firewall · web"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.vm.provider "vmware_desktop" do |v|
+      v.vmx["displayName"] = "edge-firewall · web"
+      v.vmx["numvcpus"] = "1"
+      v.vmx["memsize"] = "1024"
+    end
+    m.vm.provider "parallels" do |v|
+      v.name = "edge-firewall · web"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.vm.provider "libvirt" do |v, o|
+      o.vm.box = "generic/debian12"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.10.1 fw' '10.70.20.20 cache' '10.70.0.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/routes.sh <<'ROUTES'
       #!/bin/sh
       # Routes to the other isoloom networks.
-      ip route replace 10.30.99.0/24 via 10.30.10.254 2>/dev/null || true
+      ip route replace 10.70.20.0/24 via 10.70.10.1 2>/dev/null || true
       ROUTES
       chmod +x /etc/isoloom/routes.sh
       for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do
@@ -120,83 +104,12 @@ Vagrant.configure("2") do |config|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
-    m.vm.provision "shell", name: "ansible", inline: "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)"
-    m.vm.provision "ansible_local" do |a|
-      a.provisioning_path = "/opt/isoloom"
-      a.playbook = "provision/gateway.yml"
-      a.install = false
-    end
-  end
-
-  config.vm.define "app" do |m|
-    m.vm.box = "bento/debian-12"
-    m.vm.hostname = "app"
-    m.vm.network "private_network", ip: "10.30.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
-      v.name = "pivot-dmz · app"
-      v.cpus = 1
-      v.memory = 1024
-    end
-    m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "pivot-dmz · app"
-      v.vmx["numvcpus"] = "1"
-      v.vmx["memsize"] = "1024"
-    end
-    m.vm.provider "parallels" do |v|
-      v.name = "pivot-dmz · app"
-      v.cpus = 1
-      v.memory = 1024
-    end
-    m.vm.provider "libvirt" do |v, o|
-      o.vm.box = "generic/debian12"
-      v.cpus = 1
-      v.memory = 1024
-    end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.30.20.10 gateway' '10.30.20.30 db' '10.30.99.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
-    m.vm.provision "shell", name: "routes", inline: <<~'SH'
-      mkdir -p /etc/isoloom
-      cat > /etc/isoloom/routes.sh <<'ROUTES'
-      #!/bin/sh
-      # Routes to the other isoloom networks.
-      ip route replace 10.30.10.0/24 via 10.30.20.254 2>/dev/null || true
-      ip route replace 10.30.99.0/24 via 10.30.20.254 2>/dev/null || true
-      ROUTES
-      chmod +x /etc/isoloom/routes.sh
-      for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do
-        if [ -d "$d" ]; then ln -sf /etc/isoloom/routes.sh "$d/zz-isoloom-routes"; fi
-      done
-      cat > /etc/systemd/system/isoloom-routes.service <<'UNIT'
-      [Unit]
-      Description=Routes to the other isoloom networks
-      After=network-online.target
-      Wants=network-online.target
-
-      [Service]
-      Type=oneshot
-      RemainAfterExit=yes
-      ExecStart=/etc/isoloom/routes.sh
-
-      [Install]
-      WantedBy=multi-user.target
-      UNIT
-      systemctl daemon-reload
-      systemctl enable isoloom-routes.service
-      systemctl restart isoloom-routes.service
-    SH
-    PROJECT.each do |entry|
-      m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
-    end
-    m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
-    m.vm.provision "shell", name: "ansible", inline: "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)"
-    m.vm.provision "ansible_local" do |a|
-      a.provisioning_path = "/opt/isoloom"
-      a.playbook = "provision/app.yml"
-      a.install = false
-    end
-    m.vm.provision "shell", name: "no internet", inline: <<~'SH'
+    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh provision/web.sh"
+    m.vm.provision "shell", name: "through the gateway", inline: <<~'SH'
       export DEBIAN_FRONTEND=noninteractive
       command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
+      DNS=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.nft <<NFT
       table inet isoloom-egress
@@ -204,6 +117,7 @@ Vagrant.configure("2") do |config|
       table inet isoloom-egress {
         chain output {
           type filter hook output priority 0; policy accept;
+          ip daddr $DNS meta l4proto { tcp, udp } th dport 53 accept
           oifname "$IF" ct state new drop
         }
       }
@@ -226,24 +140,54 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-egress.service
       systemctl restart isoloom-egress.service
     SH
+    m.vm.provision "shell", name: "default route", inline: <<~'SH'
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/routes.sh <<'ROUTES'
+      #!/bin/sh
+      # Routes to the other isoloom networks.
+      ip route replace 10.70.20.0/24 via 10.70.10.1 2>/dev/null || true
+      ip route replace default via 10.70.10.1 2>/dev/null || true
+      ROUTES
+      chmod +x /etc/isoloom/routes.sh
+      for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do
+        if [ -d "$d" ]; then ln -sf /etc/isoloom/routes.sh "$d/zz-isoloom-routes"; fi
+      done
+      cat > /etc/systemd/system/isoloom-routes.service <<'UNIT'
+      [Unit]
+      Description=Routes to the other isoloom networks
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/etc/isoloom/routes.sh
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+      systemctl daemon-reload
+      systemctl enable isoloom-routes.service
+      systemctl restart isoloom-routes.service
+    SH
   end
 
-  config.vm.define "db" do |m|
+  config.vm.define "cache" do |m|
     m.vm.box = "bento/debian-12"
-    m.vm.hostname = "db"
-    m.vm.network "private_network", ip: "10.30.20.30", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
+    m.vm.hostname = "cache"
+    m.vm.network "private_network", ip: "10.70.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-lan", libvirt__network_name: "isoloom-edge-firewall-lan", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "pivot-dmz · db"
+      v.name = "edge-firewall · cache"
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "pivot-dmz · db"
+      v.vmx["displayName"] = "edge-firewall · cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "pivot-dmz · db"
+      v.name = "edge-firewall · cache"
       v.cpus = 1
       v.memory = 1024
     end
@@ -252,14 +196,13 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.30.20.10 gateway' '10.30.20.20 app' '10.30.99.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.20.1 fw' '10.70.10.10 web' '10.70.0.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/routes.sh <<'ROUTES'
       #!/bin/sh
       # Routes to the other isoloom networks.
-      ip route replace 10.30.10.0/24 via 10.30.20.254 2>/dev/null || true
-      ip route replace 10.30.99.0/24 via 10.30.20.254 2>/dev/null || true
+      ip route replace 10.70.10.0/24 via 10.70.20.1 2>/dev/null || true
       ROUTES
       chmod +x /etc/isoloom/routes.sh
       for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do
@@ -287,16 +230,12 @@ Vagrant.configure("2") do |config|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
-    m.vm.provision "shell", name: "ansible", inline: "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)"
-    m.vm.provision "ansible_local" do |a|
-      a.provisioning_path = "/opt/isoloom"
-      a.playbook = "provision/db.yml"
-      a.install = false
-    end
-    m.vm.provision "shell", name: "no internet", inline: <<~'SH'
+    m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh provision/cache.sh"
+    m.vm.provision "shell", name: "through the gateway", inline: <<~'SH'
       export DEBIAN_FRONTEND=noninteractive
       command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
+      DNS=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.nft <<NFT
       table inet isoloom-egress
@@ -304,6 +243,7 @@ Vagrant.configure("2") do |config|
       table inet isoloom-egress {
         chain output {
           type filter hook output priority 0; policy accept;
+          ip daddr $DNS meta l4proto { tcp, udp } th dport 53 accept
           oifname "$IF" ct state new drop
         }
       }
@@ -325,40 +265,71 @@ Vagrant.configure("2") do |config|
       systemctl daemon-reload
       systemctl enable isoloom-egress.service
       systemctl restart isoloom-egress.service
+    SH
+    m.vm.provision "shell", name: "default route", inline: <<~'SH'
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/routes.sh <<'ROUTES'
+      #!/bin/sh
+      # Routes to the other isoloom networks.
+      ip route replace 10.70.10.0/24 via 10.70.20.1 2>/dev/null || true
+      ip route replace default via 10.70.20.1 2>/dev/null || true
+      ROUTES
+      chmod +x /etc/isoloom/routes.sh
+      for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do
+        if [ -d "$d" ]; then ln -sf /etc/isoloom/routes.sh "$d/zz-isoloom-routes"; fi
+      done
+      cat > /etc/systemd/system/isoloom-routes.service <<'UNIT'
+      [Unit]
+      Description=Routes to the other isoloom networks
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/etc/isoloom/routes.sh
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+      systemctl daemon-reload
+      systemctl enable isoloom-routes.service
+      systemctl restart isoloom-routes.service
     SH
   end
 
   config.vm.define "user" do |m|
-    m.vm.box = "kalilinux/rolling"
+    m.vm.box = "bento/debian-12"
     m.vm.hostname = "user"
-    m.vm.network "private_network", ip: "10.30.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-access", libvirt__network_name: "isoloom-pivot-dmz-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-outside", libvirt__network_name: "isoloom-edge-firewall-outside", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "pivot-dmz · user"
+      v.name = "edge-firewall · user"
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "pivot-dmz · user"
+      v.vmx["displayName"] = "edge-firewall · user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "pivot-dmz · user"
+      v.name = "edge-firewall · user"
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "libvirt" do |v|
+    m.vm.provider "libvirt" do |v, o|
+      o.vm.box = "generic/debian12"
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.30.10.10 gateway' '10.30.20.20 app' '10.30.20.30 db'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.0.2 fw' '10.70.10.10 web' '10.70.20.20 cache'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/routes.sh <<'ROUTES'
       #!/bin/sh
       # Routes to the other isoloom networks.
-      ip route replace 10.30.10.0/24 via 10.30.99.254 2>/dev/null || true
-      ip route replace 10.30.20.0/24 via 10.30.99.254 2>/dev/null || true
+      ip route replace 10.70.10.0/24 via 10.70.0.2 2>/dev/null || true
+      ip route replace 10.70.20.0/24 via 10.70.0.2 2>/dev/null || true
       ROUTES
       chmod +x /etc/isoloom/routes.sh
       for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do

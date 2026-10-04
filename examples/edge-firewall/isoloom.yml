@@ -1,0 +1,42 @@
+# An edge firewall that belongs to the environment: `fw` routes the DMZ and the LAN, and its
+# own rules (build/fw/rules.nft) decide what crosses. Isoloom adds no router of its own; `reach`
+# describes what the firewall should allow, and the checks verify it.
+version: 1
+name: edge-firewall
+
+networks:
+  outside: { cidr: 10.70.0.0/24 }
+  dmz:     { cidr: 10.70.10.0/24, gateway: fw }
+  lan:     { cidr: 10.70.20.0/24, gateway: fw, internet: false }
+
+reach:
+  - { from: outside, to: dmz, ports: [80] }
+  - { from: dmz, to: lan, ports: [6379] }
+
+machines:
+  fw:
+    networks: { outside: 2, dmz: 1, lan: 1 }
+    services: [{ port: 8080, name: status, http: true }]
+    docker: { build: build/fw }
+    vm: { os: debian-12, provision: [provision/fw.sh] }
+
+  web:
+    networks: { dmz: 10 }
+    services: [{ port: 80, http: true }]
+    docker: { build: build/web }
+    vm: { os: debian-12, provision: [provision/web.sh] }
+
+  cache:
+    networks: { lan: 20 }
+    services: [{ port: 6379, name: redis }]
+    docker: { image: "redis:7-alpine" }
+    vm: { os: debian-12, provision: [provision/cache.sh] }
+
+  user:
+    access: true
+    networks: { outside: 10 }
+    vm: { os: debian-12 }
+
+checks:
+  - checks/web-through-firewall.sh
+  - checks/lan-blocked.sh
