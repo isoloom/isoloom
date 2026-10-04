@@ -1,6 +1,6 @@
 [package]
-name = "isoform-core"
-description = "The isoform format: parse and validate an environment spec, and derive the targets it can run on."
+name = "isoloom-core"
+description = "The isoloom format: parse and validate an environment spec, and derive the targets it can run on."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

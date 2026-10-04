@@ -1,5 +1,5 @@
 [package]
-name = "isoform"
+name = "isoloom"
 description = "Describe an environment once (machines, networks, services), run it anywhere: Docker, local VMs, Proxmox, cloud."
 version.workspace = true
 edition.workspace = true
@@ -8,10 +8,10 @@ repository.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "isoform"
+name = "isoloom"
 path = "src/main.rs"
 
 [dependencies]
-isoform-core.workspace = true
+isoloom-core.workspace = true
 clap.workspace = true
 serde_json.workspace = true

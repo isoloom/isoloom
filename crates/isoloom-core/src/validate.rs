@@ -97,7 +97,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     let mut add = |at: &str, message: String| p.push(Problem { at: at.to_string(), message });
 
     if spec.version != 1 {
-        add("version", format!("unsupported version {}; this isoform reads version 1", spec.version));
+        add("version", format!("unsupported version {}; this isoloom reads version 1", spec.version));
     }
     if !kebab(&spec.name) {
         add("name", "use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)".into());

@@ -1,12 +1,12 @@
-# Isoform
+# Isoloom
 
 Describe an environment once (its machines, networks, who reaches whom, the services they
 expose) and run it anywhere: containers on your machine, local VMs, a Proxmox server, or the
-cloud. Each target produces **the same external behavior** its own way, like isoforms of a
-protein: different forms, same function.
+cloud. Like a loom weaving one pattern into the same cloth every time, each target produces
+**the same external behavior** from the same spec, its own way.
 
 ```yaml
-# isoform.yaml
+# isoloom.yaml
 version: 1
 name: supplier-portal-api
 
@@ -40,19 +40,19 @@ checks: [build/check/check.sh]   # black-box checks, run against every target
 ## Commands
 
 ```
-isoform validate [DIR]    # mistakes, with the exact field and what to do (--json)
-isoform targets [DIR]     # where it can run, and why not elsewhere
-isoform resources [DIR]   # machines, CPUs, memory, disk
-isoform generate [DIR]    # each target's files (coming next)
+isoloom validate [DIR]    # mistakes, with the exact field and what to do (--json)
+isoloom targets [DIR]     # where it can run, and why not elsewhere
+isoloom resources [DIR]   # machines, CPUs, memory, disk
+isoloom generate [DIR]    # each target's files (coming next)
 ```
 
-`DIR` holds `isoform.yaml` (or `.ctf/range.yaml` for Cyber CTF labs).
+`DIR` holds `isoloom.yaml` (or `.ctf/range.yaml` for Cyber CTF labs).
 
 ## Layout
 
-- `crates/isoform-core`: the format as a library (parse, validate, derive targets, generators).
+- `crates/isoloom-core`: the format as a library (parse, validate, derive targets, generators).
   Tools embed it directly, e.g. the Cyber CTF launcher.
-- `crates/isoform`: the command line.
+- `crates/isoloom`: the command line.
 - `examples/`: three environments used as tests (a two-machine app, a segmented network, an
   Active Directory domain).
 

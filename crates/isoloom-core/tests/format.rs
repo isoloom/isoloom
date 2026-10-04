@@ -3,9 +3,9 @@
 
 use std::path::Path;
 
-use isoform_core::{Target, derive, effective, load, parse, totals, validate};
+use isoloom_core::{Target, derive, effective, load, parse, totals, validate};
 
-fn example(name: &str) -> isoform_core::Spec {
+fn example(name: &str) -> isoloom_core::Spec {
     load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples").join(name)).expect("example parses")
 }
 

@@ -1,4 +1,4 @@
-//! The isoform format, version 1: what an environment looks like from outside (machines,
+//! The isoloom format, version 1: what an environment looks like from outside (machines,
 //! networks, who reaches whom, the services that answer) and, per machine, how each kind of
 //! target produces it (`docker:` and/or `vm:`). Background: Cyber CTF's
 //! doc/architecture/LAB-RANGE-FORMAT.md.

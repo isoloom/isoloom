@@ -1,9 +1,9 @@
-//! Isoform: describe an environment once (machines, networks, the services they expose),
+//! Isoloom: describe an environment once (machines, networks, the services they expose),
 //! run it anywhere. Each target produces the same external behavior its own way: containers,
 //! VMs on this machine, a Proxmox server, or the cloud.
 //!
 //! This crate is the format itself: parse, validate, derive the targets a spec can run on,
-//! and add up what it needs. The `isoform` binary and other tools (e.g. the Cyber CTF
+//! and add up what it needs. The `isoloom` binary and other tools (e.g. the Cyber CTF
 //! launcher) build on it; the generators (Docker Compose, Vagrant, Proxmox...) come next.
 
 pub mod model;
@@ -16,9 +16,9 @@ pub use model::{KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Sp
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};
 
-/// Where a project keeps its spec, relative to its folder, in lookup order: `isoform.yaml`,
+/// Where a project keeps its spec, relative to its folder, in lookup order: `isoloom.yaml`,
 /// or `.ctf/range.yaml` (Cyber CTF labs).
-pub const SPEC_FILES: &[&str] = &["isoform.yaml", ".ctf/range.yaml"];
+pub const SPEC_FILES: &[&str] = &["isoloom.yaml", ".ctf/range.yaml"];
 
 #[derive(Debug)]
 pub enum LoadError {

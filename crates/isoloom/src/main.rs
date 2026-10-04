@@ -1,14 +1,14 @@
-//! `isoform`: describe an environment once, run it anywhere.
+//! `isoloom`: describe an environment once, run it anywhere.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use isoform_core as core;
+use isoloom_core as core;
 
 #[derive(Parser)]
 #[command(
-    name = "isoform",
+    name = "isoloom",
     version,
     about = "Describe an environment once (machines, networks, services), run it anywhere: Docker, local VMs, Proxmox, cloud."
 )]
@@ -21,7 +21,7 @@ struct Cli {
 enum Command {
     /// Check the spec for mistakes (and that every path it mentions exists).
     Validate {
-        /// The project folder (holding isoform.yaml or .ctf/range.yaml).
+        /// The project folder (holding isoloom.yaml or .ctf/range.yaml).
         #[arg(default_value = ".")]
         dir: PathBuf,
         /// Don't check that files mentioned by the spec exist.
@@ -129,7 +129,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Generate { .. } => {
-            eprintln!("`isoform generate` isn't available yet: the Docker Compose and Vagrant generators are next.");
+            eprintln!("`isoloom generate` isn't available yet: the Docker Compose and Vagrant generators are next.");
             Ok(ExitCode::from(2))
         }
     }
