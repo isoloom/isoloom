@@ -16,7 +16,7 @@
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, common_unsupported, header};
+use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, router};
 use crate::model::{Machine, Spec, Target};
 
 const DIR: &str = "docker";
@@ -98,8 +98,17 @@ fn file_name(path: &str) -> &str {
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     common_unsupported(spec, Target::Docker)?;
+    let routed = router::needed(spec);
 
     let mut services = Mapping::new();
+    if routed {
+        services.insert(s(router::NAME), router_service(spec));
+    }
+
+    // Machines that get a network sidecar (routes via the router, and no default route when
+    // all their networks are offline), so dependents can wait for it.
+    let needs_routes = |m: &Machine| routed && (!router::routes(spec, m).is_empty() || offline(spec, m));
+
     for (name, m) in &spec.machines {
         // The access machine may have no implementation: the runner supplies it.
         let Some(d) = &m.docker else { continue };
@@ -111,6 +120,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         svc.insert(s("image"), s(image.clone()));
         svc.insert(s("hostname"), s(name.as_str()));
         svc.insert(s("networks"), networks_of(m, spec, true));
+        if let Some(hosts) = extra_hosts(spec, name) {
+            svc.insert(s("extra_hosts"), hosts);
+        }
         if let Some(env) = environment(m) {
             svc.insert(s("environment"), env);
         }
@@ -133,6 +145,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             for init in init_names(dep, dm) {
                 deps.insert(s(init), map([("condition", s("service_completed_successfully"))]));
             }
+            if needs_routes(dm) {
+                deps.insert(s(format!("{dep}-routes")), map([("condition", s("service_healthy"))]));
+            }
         }
         if !deps.is_empty() {
             svc.insert(s("depends_on"), Value::Mapping(deps));
@@ -152,7 +167,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         svc.insert(s("restart"), s("unless-stopped"));
         services.insert(s(name.as_str()), Value::Mapping(svc));
 
-        // One-shot init jobs, in order, each after the previous one.
+        if needs_routes(m) {
+            services.insert(s(format!("{name}-routes")), routes_sidecar(spec, name, m));
+        }
+
+        // One-shot init jobs, in order, each after the previous one. They share the machine's
+        // network namespace: same addresses, names and routes.
         let mut previous: Option<String> = None;
         for (job, script) in init_names(name, m).into_iter().zip(&d.init) {
             let mut j = Mapping::new();
@@ -160,12 +180,15 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             let mounted = format!("/isoloom/init/{}", file_name(script));
             j.insert(s("entrypoint"), list([s("/bin/sh"), s(mounted.clone())]));
             j.insert(s("volumes"), list([s(format!("{ROOT}/{script}:{mounted}:ro"))]));
-            j.insert(s("networks"), networks_of(m, spec, false));
+            j.insert(s("network_mode"), s(format!("service:{name}")));
             if let Some(env) = environment(m) {
                 j.insert(s("environment"), env);
             }
             let mut deps = Mapping::new();
             deps.insert(s(name.as_str()), map([("condition", s("service_healthy"))]));
+            if needs_routes(m) {
+                deps.insert(s(format!("{name}-routes")), map([("condition", s("service_healthy"))]));
+            }
             if let Some(p) = &previous {
                 deps.insert(s(p.as_str()), map([("condition", s("service_completed_successfully"))]));
             }
@@ -176,7 +199,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
     }
 
-    // The check runner: every check script, in order, on every network.
+    // The check runner stands where a user would: in the access machine's network namespace
+    // (a stand-in when the runner supplies the access machine), else on every network.
     if !spec.checks.is_empty() {
         let mut volumes = Vec::new();
         let mut run = Vec::new();
@@ -185,19 +209,19 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             volumes.push(s(format!("{ROOT}/{c}:{mounted}:ro")));
             run.push(format!("echo '== {c}' && sh {mounted}"));
         }
-        let mut nets = Mapping::new();
-        for net in spec.networks.keys() {
-            nets.insert(s(net.as_str()), Value::Null);
-        }
         let mut deps = Mapping::new();
         for (name, m) in &spec.machines {
-            if m.docker.is_some() && !m.services.is_empty() {
+            if m.docker.is_none() {
+                continue;
+            }
+            if !m.services.is_empty() {
                 deps.insert(s(name.as_str()), map([("condition", s("service_healthy"))]));
             }
-            if m.docker.is_some() {
-                for init in init_names(name, m) {
-                    deps.insert(s(init), map([("condition", s("service_completed_successfully"))]));
-                }
+            for init in init_names(name, m) {
+                deps.insert(s(init), map([("condition", s("service_completed_successfully"))]));
+            }
+            if needs_routes(m) {
+                deps.insert(s(format!("{name}-routes")), map([("condition", s("service_healthy"))]));
             }
         }
         let mut c = Mapping::new();
@@ -205,7 +229,34 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         c.insert(s("profiles"), list([s("check")]));
         c.insert(s("entrypoint"), list([s("/bin/sh"), s("-c"), s(run.join(" && "))]));
         c.insert(s("volumes"), Value::Sequence(volumes));
-        c.insert(s("networks"), Value::Mapping(nets));
+        match spec.machines.iter().find(|(_, m)| m.access) {
+            Some((name, m)) => {
+                let host = if m.docker.is_some() {
+                    name.clone()
+                } else {
+                    services.insert(s(STAND_IN), stand_in(spec, name, m));
+                    deps.insert(s(STAND_IN), map([("condition", s("service_started"))]));
+                    if needs_routes(m) {
+                        let mut sidecar = routes_sidecar(spec, STAND_IN, m);
+                        if let Value::Mapping(map) = &mut sidecar {
+                            // Like the stand-in, only started with the check profile.
+                            map.insert(s("profiles"), list([s("check")]));
+                        }
+                        services.insert(s(format!("{STAND_IN}-routes")), sidecar);
+                        deps.insert(s(format!("{STAND_IN}-routes")), map([("condition", s("service_healthy"))]));
+                    }
+                    STAND_IN.to_string()
+                };
+                c.insert(s("network_mode"), s(format!("service:{host}")));
+            }
+            None => {
+                let mut nets = Mapping::new();
+                for net in spec.networks.keys() {
+                    nets.insert(s(net.as_str()), Value::Null);
+                }
+                c.insert(s("networks"), Value::Mapping(nets));
+            }
+        }
         if !deps.is_empty() {
             c.insert(s("depends_on"), Value::Mapping(deps));
         }
@@ -220,7 +271,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             s("ipam"),
             map([("config", list([map([("subnet", s(n.cidr.as_str())), ("gateway", s(gateway.to_string()))])]))]),
         );
-        if !n.internet {
+        // Without a router, `internet: false` is Docker's internal network. With one, Docker's
+        // internal-network firewall would drop the traffic the router forwards, so offline
+        // machines lose their default route instead (in their sidecar).
+        if !n.internet && !routed {
             v.insert(s("internal"), Value::Bool(true));
         }
         networks.insert(s(net.as_str()), Value::Mapping(v));
@@ -237,4 +291,120 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
         contents: format!("{}{usage}\n{yaml}", header("#")),
     }])
+}
+
+/// Stands in for an access machine the runner supplies, so checks run from its side.
+const STAND_IN: &str = "isoloom-access";
+/// A small image with busybox `ip`, for the router, route sidecars and the stand-in.
+const UTILITY_IMAGE: &str = "alpine:3.20";
+
+/// Names of machines that share no network with `name` (Compose DNS only resolves
+/// machines on shared networks); they're reached through the router.
+fn extra_hosts(spec: &Spec, name: &str) -> Option<Value> {
+    let m = &spec.machines[name];
+    let hosts: Vec<Value> = spec
+        .machines
+        .iter()
+        .filter(|(o, om)| o.as_str() != name && !om.networks.keys().any(|n| m.networks.contains_key(n)))
+        .map(|(o, _)| s(format!("{o}:{}", address_for(spec, name, o))))
+        .collect();
+    (!hosts.is_empty()).then_some(Value::Sequence(hosts))
+}
+
+/// The router: on every network at its last address, forwarding with the `reach` rules.
+fn router_service(spec: &Spec) -> Value {
+    let mut nets = Mapping::new();
+    for net in spec.networks.keys() {
+        nets.insert(s(net.as_str()), map([("ipv4_address", s(router::address(spec, net).to_string()))]));
+    }
+    let mut r = Mapping::new();
+    r.insert(s("image"), s(UTILITY_IMAGE));
+    r.insert(s("hostname"), s(router::NAME));
+    r.insert(s("cap_add"), list([s("NET_ADMIN")]));
+    let mut sysctls = Mapping::new();
+    sysctls.insert(s("net.ipv4.ip_forward"), s("1"));
+    r.insert(s("sysctls"), Value::Mapping(sysctls));
+    r.insert(s("networks"), Value::Mapping(nets));
+    let mut env = Mapping::new();
+    env.insert(s("RULES"), s(router::nftables(spec)));
+    r.insert(s("environment"), Value::Mapping(env));
+    // `$$` keeps Compose from interpolating the shell variable.
+    r.insert(
+        s("entrypoint"),
+        list([
+            s("/bin/sh"),
+            s("-c"),
+            s("apk add --no-cache nftables >/dev/null && printf '%s' \"$$RULES\" | nft -f - && exec sleep infinity"),
+        ]),
+    );
+    r.insert(
+        s("healthcheck"),
+        map([
+            ("test", list([s("CMD-SHELL"), s("nft list table inet isoloom >/dev/null 2>&1")])),
+            ("interval", s("3s")),
+            ("timeout", s("3s")),
+            ("retries", Value::Number(60.into())),
+        ]),
+    );
+    r.insert(s("restart"), s("unless-stopped"));
+    Value::Mapping(r)
+}
+
+/// A one-shot container in `host`'s network namespace that adds its routes via the router.
+fn routes_sidecar(spec: &Spec, host: &str, m: &Machine) -> Value {
+    let mut r = Mapping::new();
+    r.insert(s("image"), s(UTILITY_IMAGE));
+    r.insert(s("network_mode"), s(format!("service:{host}")));
+    r.insert(s("cap_add"), list([s("NET_ADMIN")]));
+    // Sets the routes, then stays (idle) so the healthcheck can confirm them and `up --wait`
+    // treats it as running rather than exited.
+    let mut cmds = router::route_commands(spec, m);
+    if offline(spec, m) {
+        cmds.push("(ip route del default 2>/dev/null || true)".into());
+    }
+    r.insert(
+        s("entrypoint"),
+        list([s("/bin/sh"), s("-c"), s(format!("{} && exec sleep infinity", cmds.join(" && ")))]),
+    );
+    let mut ready = Vec::new();
+    if let Some((first, _)) = router::routes(spec, m).first() {
+        ready.push(format!("ip route show {first} | grep -q via"));
+    }
+    if offline(spec, m) {
+        ready.push("! ip route | grep -q '^default'".into());
+    }
+    r.insert(
+        s("healthcheck"),
+        map([
+            ("test", list([s("CMD-SHELL"), s(ready.join(" && "))])),
+            ("interval", s("2s")),
+            ("timeout", s("2s")),
+            ("retries", Value::Number(30.into())),
+        ]),
+    );
+    let mut deps = Mapping::new();
+    deps.insert(s(host), map([("condition", s("service_started"))]));
+    deps.insert(s(router::NAME), map([("condition", s("service_healthy"))]));
+    r.insert(s("depends_on"), Value::Mapping(deps));
+    r.insert(s("restart"), s("unless-stopped"));
+    Value::Mapping(r)
+}
+
+/// An idle container at the access machine's addresses, for the check runner to stand in.
+fn stand_in(spec: &Spec, name: &str, m: &Machine) -> Value {
+    let mut a = Mapping::new();
+    a.insert(s("image"), s(UTILITY_IMAGE));
+    a.insert(s("hostname"), s(name));
+    a.insert(s("networks"), networks_of(m, spec, true));
+    if let Some(hosts) = extra_hosts(spec, name) {
+        a.insert(s("extra_hosts"), hosts);
+    }
+    a.insert(s("entrypoint"), list([s("sleep"), s("infinity")]));
+    a.insert(s("profiles"), list([s("check")]));
+    Value::Mapping(a)
+}
+
+/// A machine is offline when none of its networks reaches the internet.
+fn offline(spec: &Spec, m: &Machine) -> bool {
+    !m.networks.keys().any(|n| spec.networks[n].internet)
 }

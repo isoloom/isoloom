@@ -36,8 +36,7 @@ services:
     - /isoloom/init/seed.sh
     volumes:
     - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro
-    networks:
-      lab: null
+    network_mode: service:database
     environment:
       API_URL: ${API_URL:-}
       LAUNCH_TOKEN: ${LAUNCH_TOKEN:-}

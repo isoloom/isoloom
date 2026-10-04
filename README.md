@@ -76,7 +76,9 @@ cd .isoloom/vagrant && vagrant up                                    # one VM pe
 
 ## Status
 
-v0.2: the format, validation, target derivation, and generators for **Docker Compose** and
-**Vagrant** (VirtualBox, VMware, Parallels, libvirt). `examples/hello-stack` runs for real in CI
-with its checks. Not yet: `reach` rules between networks (they need a router), Windows images,
-Proxmox and cloud generators, release binaries.
+v0.3: the format, validation, target derivation, and generators for **Docker Compose** and
+**Vagrant** (VirtualBox, VMware, Parallels, libvirt), with **routers**: `reach` rules between
+networks are enforced by a router machine (nftables) on both targets, `internet: false` works on
+both, and `depends_on` waits for services to answer. `examples/hello-stack` and
+`examples/segmented` run for real in CI with their checks. Not yet: gateways (a machine of the
+environment as router), Windows images, Proxmox and cloud generators, release binaries.

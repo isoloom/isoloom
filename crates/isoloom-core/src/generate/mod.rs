@@ -3,6 +3,7 @@
 //! compare with what's committed. Output lives under `.isoloom/<target>/` in the project.
 
 mod docker;
+mod router;
 mod vagrant;
 
 use std::fmt;
@@ -96,15 +97,9 @@ fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
     Ipv4Addr::from(if cidr.len == 0 { 0 } else { u32::MAX << (32 - cidr.len) })
 }
 
-/// Features no generator supports yet, shared by both: reachability between networks
-/// needs a router machine that isn't built yet.
-fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> {
-    if !spec.reach.is_empty() {
-        return Err(GenerateError::Unsupported {
-            target,
-            what: "`reach` rules need a router between networks, which this generator doesn't build yet; remove them or wait for router support".into(),
-        });
-    }
+/// Features no generator supports yet, shared by both (none today: kept as the place to
+/// refuse a spec feature before a generator learns it).
+fn common_unsupported(_spec: &Spec, _target: Target) -> Result<(), GenerateError> {
     Ok(())
 }
 

@@ -68,6 +68,7 @@ Vagrant.configure("2") do |config|
       v.memory = 1024
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.60.0.20 cache'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "wait for cache", inline: "i=0; until (bash -c '</dev/tcp/cache/6379' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 300 ]; then echo \"cache didn't answer within 300s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\""
     PROJECT.each do |entry|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
     end

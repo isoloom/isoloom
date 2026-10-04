@@ -28,8 +28,7 @@ services:
     - /isoloom/init/seed.sh
     volumes:
     - ../../build/cache/seed.sh:/isoloom/init/seed.sh:ro
-    networks:
-      app: null
+    network_mode: service:cache
     depends_on:
       cache:
         condition: service_healthy

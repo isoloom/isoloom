@@ -30,6 +30,8 @@ fn assert_committed(name: &str) {
 fn committed_outputs_are_up_to_date() {
     assert_committed("hello-stack");
     assert_committed("supplier-portal-api");
+    assert_committed("segmented");
+    assert_committed("pivot-dmz");
 }
 
 #[test]
@@ -66,11 +68,46 @@ fn vagrant_orders_machines_and_names_them() {
 }
 
 #[test]
+fn reach_rules_add_a_router_with_matching_rules() {
+    let (_, spec) = example("segmented");
+    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    assert!(compose.contains("isoloom-router:"));
+    assert!(compose.contains("ipv4_address: 10.61.20.254"), "router at the last address");
+    assert!(compose.contains("ip saddr 10.61.99.0/24 ip daddr 10.61.10.0/24 accept"));
+    assert!(compose.contains("th dport { 6379 }"));
+    assert!(compose.contains("policy drop"));
+    // Routes via the router, in the machine's own network namespace.
+    assert!(compose.contains("network_mode: service:web"));
+    assert!(compose.contains("ip route replace 10.61.20.0/24 via 10.61.10.254"));
+    // Offline machines lose their default route; no Docker-internal network with a router.
+    assert!(compose.contains("ip route del default"));
+    assert!(!compose.contains("internal: true"));
+    // Names across networks, and checks from the access side.
+    assert!(compose.contains("cache:10.61.20.20"));
+    assert!(compose.contains("network_mode: service:isoloom-access"));
+}
+
+#[test]
+fn vagrant_router_waits_and_offline_blocks() {
+    let (_, spec) = example("segmented");
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    let router = vf.find("config.vm.define \"isoloom-router\"").unwrap();
+    let cache = vf.find("config.vm.define \"cache\"").unwrap();
+    let web = vf.find("config.vm.define \"web\"").unwrap();
+    assert!(router < cache && cache < web);
+    assert!(vf.contains("name: \"wait for cache\""));
+    assert!(vf.contains("</dev/tcp/cache/6379"));
+    assert!(vf.contains("name: \"no internet\""));
+    assert!(vf.contains("isoloom-routes.service"));
+}
+
+#[test]
 fn unsupported_features_are_refused_with_the_reason() {
-    let (_, pivot) = example("pivot-dmz");
-    assert!(matches!(generate(&pivot, Target::Docker), Err(GenerateError::Unsupported { .. })));
     let (_, ad) = example("corp-ad-basics");
     assert_eq!(generate(&ad, Target::Docker), Err(GenerateError::NotPossible(Target::Docker)));
-    assert!(matches!(generate(&ad, Target::Vagrant), Err(GenerateError::Unsupported { .. })));
+    assert!(
+        matches!(generate(&ad, Target::Vagrant), Err(GenerateError::Unsupported { .. })),
+        "Windows has no local image yet"
+    );
     assert_eq!(generate(&ad, Target::Proxmox), Err(GenerateError::NoGenerator(Target::Proxmox)));
 }

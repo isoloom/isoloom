@@ -25,24 +25,27 @@ jobs:
           for e in examples/*/; do cargo run -q -- validate "$e" --skip-files; cargo run -q -- targets "$e"; done
       - name: Generated files are up to date
         run: |
-          for e in examples/hello-stack examples/supplier-portal-api; do cargo run -q -- check "$e"; done
+          for e in examples/hello-stack examples/supplier-portal-api examples/segmented examples/pivot-dmz; do cargo run -q -- check "$e"; done
 
-  # The generated Compose file, run for real: everything answers, and the checks pass.
+  # The generated Compose files, run for real: everything answers, and the checks pass.
   docker:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [hello-stack, segmented]
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.example }}
     steps:
       - uses: actions/checkout@v4
-      - name: Start hello-stack
-        working-directory: examples/hello-stack
+      - name: Start
         run: docker compose -f .isoloom/docker/compose.yml up -d --wait --wait-timeout 300
       - name: Checks
-        working-directory: examples/hello-stack
         run: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
       - name: Logs
         if: failure()
-        working-directory: examples/hello-stack
-        run: docker compose -f .isoloom/docker/compose.yml logs --no-color
+        run: docker compose -f .isoloom/docker/compose.yml --profile check logs --no-color
       - name: Stop
         if: always()
-        working-directory: examples/hello-stack
-        run: docker compose -f .isoloom/docker/compose.yml down -v
+        run: docker compose -f .isoloom/docker/compose.yml --profile check down -v

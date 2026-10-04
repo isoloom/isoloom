@@ -57,7 +57,7 @@ impl Cidr {
     }
 
     /// The address with this last octet, if it is a usable host address in the block.
-    /// `.1` is reserved for the spec's gateway/router on every target.
+    /// Reserved on every target: `.1` (gateway) and the last usable address (router).
     pub fn host(self, last_octet: u8) -> Option<Ipv4Addr> {
         if self.len < 24 || self.len > 29 {
             return None;
@@ -66,8 +66,13 @@ impl Cidr {
         let offset = u32::from(last_octet) & 0xff;
         let addr = (self.base & !0xff) | offset;
         let first = self.base + 2; // .0 network, .1 gateway
-        let last = self.base + size - 2; // broadcast excluded
+        let last = self.base + size - 3; // the router (last usable) and broadcast excluded
         (addr >= first && addr <= last).then(|| Ipv4Addr::from(addr))
+    }
+
+    /// The router's address: the last usable address of the block (e.g. .254 in a /24).
+    pub fn router(self) -> Ipv4Addr {
+        Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 2)
     }
 }
 
@@ -185,7 +190,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 add(
                     &nat,
                     format!(
-                        "{octet} isn't a usable address in {} (.0, .1 = gateway and the broadcast address are reserved)",
+                        "{octet} isn't a usable address in {} (reserved: .0, .1 for the gateway, the last address for the router, and the broadcast address)",
                         spec.networks[net].cidr
                     ),
                 );

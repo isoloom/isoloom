@@ -13,7 +13,7 @@
 
 use std::fmt::Write;
 
-use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, netmask, start_order};
+use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, netmask, router, start_order};
 use crate::model::{Spec, Target};
 
 const DIR: &str = "vagrant";
@@ -36,11 +36,6 @@ fn boxes(os: &str) -> Option<(&'static str, Option<&'static str>)> {
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     common_unsupported(spec, Target::Vagrant)?;
     let unsupported = |what: String| GenerateError::Unsupported { target: Target::Vagrant, what };
-    if let Some((net, _)) = spec.networks.iter().find(|(_, n)| !n.internet) {
-        return Err(unsupported(format!(
-            "network `{net}` has `internet: false`, which needs a router to enforce on VMs; not built yet"
-        )));
-    }
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
         if boxes(&vm.os).is_none() {
@@ -73,6 +68,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("\nVagrant.configure(\"2\") do |config|\n");
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n");
     out.push_str("  config.vm.boot_timeout = 600\n");
+    if router::needed(spec) {
+        router_vm(spec, &mut out);
+    }
 
     for name in start_order(spec) {
         let m = &spec.machines[name];
@@ -145,42 +143,79 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             );
         }
 
-        if vm.provision.is_empty() {
-            out.push_str("  end\n");
-            continue;
-        }
-        out.push_str("    PROJECT.each do |entry|\n      m.vm.provision \"file\", source: File.join(ROOT, entry), destination: \"/tmp/isoloom-project/#{entry}\"\n    end\n");
-        out.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
-        let env = if m.inputs.is_empty() {
-            String::new()
-        } else {
-            format!(", env: INPUTS.slice({})", m.inputs.iter().map(|i| rb(i)).collect::<Vec<_>>().join(", "))
-        };
-        let mut ansible_ready = false;
-        for step in &vm.provision {
-            if step.ends_with(".sh") {
-                let _ = writeln!(
-                    out,
-                    "    m.vm.provision \"shell\", name: {}, inline: {}{env}",
-                    rb(step),
-                    rb(&format!("cd /opt/isoloom && sh {step}"))
+        // Routes to the other networks through the router, as a boot-time service.
+        if router::needed(spec) {
+            let cmds = router::route_commands(spec, m);
+            if !cmds.is_empty() {
+                let unit = format!(
+                    "cat > /etc/systemd/system/isoloom-routes.service <<'UNIT'\n[Unit]\nDescription=Routes to the other isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/sh -c '{}'\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-routes.service\nsystemctl restart isoloom-routes.service\n",
+                    cmds.join(" && ")
                 );
-            } else {
-                if !ansible_ready {
-                    out.push_str("    m.vm.provision \"shell\", name: \"ansible\", inline: \"command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)\"\n");
-                    ansible_ready = true;
-                }
-                let vars = if m.inputs.is_empty() {
-                    String::new()
-                } else {
-                    "\n      a.extra_vars = INPUTS.slice(".to_string() + &m.inputs.iter().map(|i| rb(i)).collect::<Vec<_>>().join(", ") + ")"
-                };
                 let _ = writeln!(
                     out,
-                    "    m.vm.provision \"ansible_local\" do |a|\n      a.provisioning_path = \"/opt/isoloom\"\n      a.playbook = {}\n      a.install = false{vars}\n    end",
-                    rb(step)
+                    "    m.vm.provision \"shell\", name: \"routes\", inline: <<~'SH'\n{}    SH",
+                    indent(&unit, 6)
                 );
             }
+        }
+
+        // depends_on: wait until each dependency answers on its service ports.
+        for dep in &m.depends_on {
+            let ports: Vec<u16> = spec.machines[dep].services.iter().map(|svc| svc.port).collect();
+            let _ = writeln!(
+                out,
+                "    m.vm.provision \"shell\", name: {}, inline: {}",
+                rb(&format!("wait for {dep}")),
+                rb(&router::wait_for(dep, &ports, 300))
+            );
+        }
+
+        if !vm.provision.is_empty() {
+            out.push_str("    PROJECT.each do |entry|\n      m.vm.provision \"file\", source: File.join(ROOT, entry), destination: \"/tmp/isoloom-project/#{entry}\"\n    end\n");
+            out.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
+            let env = if m.inputs.is_empty() {
+                String::new()
+            } else {
+                format!(", env: INPUTS.slice({})", m.inputs.iter().map(|i| rb(i)).collect::<Vec<_>>().join(", "))
+            };
+            let mut ansible_ready = false;
+            for step in &vm.provision {
+                if step.ends_with(".sh") {
+                    let _ = writeln!(
+                        out,
+                        "    m.vm.provision \"shell\", name: {}, inline: {}{env}",
+                        rb(step),
+                        rb(&format!("cd /opt/isoloom && sh {step}"))
+                    );
+                } else {
+                    if !ansible_ready {
+                        out.push_str("    m.vm.provision \"shell\", name: \"ansible\", inline: \"command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)\"\n");
+                        ansible_ready = true;
+                    }
+                    let vars = if m.inputs.is_empty() {
+                        String::new()
+                    } else {
+                        "\n      a.extra_vars = INPUTS.slice(".to_string() + &m.inputs.iter().map(|i| rb(i)).collect::<Vec<_>>().join(", ") + ")"
+                    };
+                    let _ = writeln!(
+                        out,
+                        "    m.vm.provision \"ansible_local\" do |a|\n      a.provisioning_path = \"/opt/isoloom\"\n      a.playbook = {}\n      a.install = false{vars}\n    end",
+                        rb(step)
+                    );
+                }
+            }
+        }
+
+        // `internet: false`: once provisioned, no new connections out through the NAT interface
+        // (Vagrant's SSH keeps working: it comes in, and replies are allowed).
+        let online = m.networks.keys().any(|n| spec.networks[n].internet);
+        if !online {
+            let script = "export DEBIAN_FRONTEND=noninteractive\napt-get install -y -qq nftables >/dev/null\nIF=$(ip route show default | awk '{print $5; exit}')\ncat > /etc/nftables.conf <<NFT\nflush ruleset\ntable inet isoloom-egress {\n  chain output {\n    type filter hook output priority 0; policy accept;\n    oifname \"$IF\" ct state new drop\n  }\n}\nNFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n";
+            let _ = writeln!(
+                out,
+                "    m.vm.provision \"shell\", name: \"no internet\", inline: <<~'SH'\n{}    SH",
+                indent(script, 6)
+            );
         }
         out.push_str("  end\n");
     }
@@ -190,4 +225,61 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
         contents: out,
     }])
+}
+
+/// Indents every line of a script for a Ruby squiggly heredoc.
+fn indent(script: &str, spaces: usize) -> String {
+    let pad = " ".repeat(spaces);
+    script
+        .lines()
+        .map(|l| if l.is_empty() { "\n".to_string() } else { format!("{pad}{l}\n") })
+        .collect()
+}
+
+/// The router VM: on every network at its last address, forwarding with the `reach` rules.
+fn router_vm(spec: &Spec, out: &mut String) {
+    let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(router::NAME));
+    let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
+    let _ = writeln!(out, "    m.vm.hostname = {}", rb(router::NAME));
+    for net in spec.networks.keys() {
+        let netname = format!("isoloom-{}-{net}", spec.name);
+        let _ = writeln!(
+            out,
+            "    m.vm.network \"private_network\", ip: {}, netmask: {}, virtualbox__intnet: {}, libvirt__network_name: {}, libvirt__dhcp_enabled: false",
+            rb(&router::address(spec, net).to_string()),
+            rb(&netmask(spec, net).to_string()),
+            rb(&netname),
+            rb(&netname),
+        );
+    }
+    let label = format!("{} · router", spec.name);
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 512\n    end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"vmware_desktop\" do |v|\n      v.vmx[\"displayName\"] = {}\n      v.vmx[\"numvcpus\"] = \"1\"\n      v.vmx[\"memsize\"] = \"512\"\n    end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 512\n    end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 512\n    end"
+    );
+    let script = format!(
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n",
+        router::nftables(spec)
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provision \"shell\", name: \"router\", inline: <<~'SH'\n{}    SH",
+        indent(&script, 6)
+    );
+    out.push_str("  end\n");
 }

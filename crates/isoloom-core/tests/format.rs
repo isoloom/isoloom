@@ -122,3 +122,9 @@ fn spec_file_is_isoloom_yml_or_yaml_but_not_both() {
     assert!(matches!(isoloom_core::find(&dir), Err(isoloom_core::LoadError::Ambiguous(_))));
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn the_last_address_is_reserved_for_the_router() {
+    let p = problems(&format!("{BASE}machines:\n  a: {{ networks: {{ lab: 254 }}, docker: {{ image: x }} }}\n"));
+    assert!(p.iter().any(|m| m.starts_with("machines.a.networks.lab: 254 isn't a usable address")), "{p:?}");
+}
