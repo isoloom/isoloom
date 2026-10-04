@@ -1,7 +1,6 @@
 //! The isoloom format, version 1: what an environment looks like from outside (machines,
 //! networks, who reaches whom, the services that answer) and, per machine, how each kind of
-//! target produces it (`docker:` and/or `vm:`). Background: Cyber CTF's
-//! doc/architecture/LAB-RANGE-FORMAT.md.
+//! target produces it (`docker:` and/or `vm:`).
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -134,7 +133,7 @@ pub const KNOWN_OS: &[&str] = &["debian-12", "ubuntu-24.04", "kali", "windows-se
 pub enum Target {
     /// Containers on the player's Docker.
     Docker,
-    /// A hosting service runs the Docker shape for the user (e.g. Cyber CTF hosted labs).
+    /// A hosting service runs the Docker shape for the user.
     Hosted,
     /// Docker on one cloud VM.
     CloudDocker,

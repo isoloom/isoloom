@@ -3,8 +3,7 @@
 //! VMs on this machine, a Proxmox server, or the cloud.
 //!
 //! This crate is the format itself: parse, validate, derive the targets a spec can run on,
-//! and add up what it needs. The `isoloom` binary and other tools (e.g. the Cyber CTF
-//! launcher) build on it; the generators (Docker Compose, Vagrant, Proxmox...) come next.
+//! and add up what it needs. The `isoloom` binary and other tools build on it; the generators (Docker Compose, Vagrant, Proxmox...) come next.
 
 pub mod model;
 pub mod targets;
@@ -16,9 +15,8 @@ pub use model::{KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Sp
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};
 
-/// Where a project keeps its spec, relative to its folder, in lookup order: `isoloom.yaml`,
-/// or `.ctf/range.yaml` (Cyber CTF labs).
-pub const SPEC_FILES: &[&str] = &["isoloom.yaml", ".ctf/range.yaml"];
+/// The spec file, at the root of a project.
+pub const SPEC_FILE: &str = "isoloom.yaml";
 
 #[derive(Debug)]
 pub enum LoadError {
@@ -30,7 +28,7 @@ pub enum LoadError {
 impl std::fmt::Display for LoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LoadError::NotFound(d) => write!(f, "no {} in {}", SPEC_FILES.join(" or "), d.display()),
+            LoadError::NotFound(d) => write!(f, "no {SPEC_FILE} in {}", d.display()),
             LoadError::Read(p, e) => write!(f, "can't read {}: {e}", p.display()),
             LoadError::Parse(e) => write!(f, "{e}"),
         }
@@ -46,10 +44,10 @@ pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
 
 /// The spec file in `dir`, if there is one.
 pub fn find(dir: &Path) -> Option<PathBuf> {
-    SPEC_FILES.iter().map(|f| dir.join(f)).find(|p| p.is_file())
+    Some(dir.join(SPEC_FILE)).filter(|p| p.is_file())
 }
 
-/// Reads the spec in `dir` (see [`SPEC_FILES`]).
+/// Reads `isoloom.yaml` in `dir`.
 pub fn load(dir: &Path) -> Result<Spec, LoadError> {
     let path = find(dir).ok_or_else(|| LoadError::NotFound(dir.to_path_buf()))?;
     let text = std::fs::read_to_string(&path).map_err(|e| LoadError::Read(path, e))?;

@@ -6,7 +6,7 @@ members = ["crates/isoloom-core", "crates/isoloom"]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
-repository = "https://github.com/Cyber-Courses/Isoloom"
+repository = "https://github.com/isoloom/isoloom"
 publish = false
 
 [workspace.dependencies]

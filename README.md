@@ -46,12 +46,12 @@ isoloom resources [DIR]   # machines, CPUs, memory, disk
 isoloom generate [DIR]    # each target's files (coming next)
 ```
 
-`DIR` holds `isoloom.yaml` (or `.ctf/range.yaml` for Cyber CTF labs).
+`DIR` holds `isoloom.yaml`.
 
 ## Layout
 
 - `crates/isoloom-core`: the format as a library (parse, validate, derive targets, generators).
-  Tools embed it directly, e.g. the Cyber CTF launcher.
+  Other Rust tools can embed it directly.
 - `crates/isoloom`: the command line.
 - `examples/`: three environments used as tests (a two-machine app, a segmented network, an
   Active Directory domain).

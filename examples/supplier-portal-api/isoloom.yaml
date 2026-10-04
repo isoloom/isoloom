@@ -6,13 +6,13 @@ name: supplier-portal-api
 networks:
   lab: { cidr: 10.20.0.0/24 }
 
-inputs: [CTF_API_URL, CTF_LAUNCH_TOKEN]
+inputs: [API_URL, LAUNCH_TOKEN]
 
 machines:
   database:
     networks: { lab: 32 }
     services: [{ port: 3207, name: mysql }]
-    inputs: [CTF_API_URL, CTF_LAUNCH_TOKEN]
+    inputs: [API_URL, LAUNCH_TOKEN]
     resources: { cpus: 1, memory_mb: 1024 }
     docker:
       image: mysql:8.0
