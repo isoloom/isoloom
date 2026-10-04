@@ -86,7 +86,7 @@ fn docs_coverage_is_up_to_date() {
 
 // From the formats' side.
 
-use isoloom_core::coverage::{Support, compose, vagrant};
+use isoloom_core::coverage::{Support, compose, formats, vagrant};
 
 /// Every committed output of a generator, across the examples.
 fn outputs(file: &str) -> Vec<String> {
@@ -133,7 +133,7 @@ fn compose_rows_are_exactly_the_schema_keys() {
 
 /// Checks a format's rows against what the generator really writes: every key written has a
 /// row marked as written, and every row marked as written is written by some example.
-fn written_matches(rows: &[(&'static str, Support)], written: BTreeSet<String>, format: &str) {
+fn written_matches(rows: &[(String, Support)], written: BTreeSet<String>, format: &str) {
     for key in &written {
         let row = rows.iter().find(|(k, _)| k == key);
         assert!(row.is_some(), "{format}: Isoloom writes `{key}`, which has no coverage row");
@@ -145,7 +145,7 @@ fn written_matches(rows: &[(&'static str, Support)], written: BTreeSet<String>, 
     }
     for (key, s) in rows {
         if s.written() {
-            assert!(written.contains(*key), "{format}: `{key}` is marked as written, but no example's output has it");
+            assert!(written.contains(key), "{format}: `{key}` is marked as written, but no example's output has it");
         }
     }
 }
@@ -174,23 +174,52 @@ fn compose_written_keys_match_the_generated_files() {
 fn vagrant_written_settings_match_the_generated_files() {
     let mut written = BTreeSet::new();
     for text in outputs(".isoloom/vagrant/Vagrantfile") {
+        let mut provider: Option<String> = None;
         for line in text.lines() {
             let line = line.trim_start();
+            // Inside `m.vm.provider "x" do |v|`: every `v.setting` is that provider's.
+            if let Some(p) = &provider {
+                if line == "end" {
+                    provider = None;
+                } else if let Some(rest) = line.strip_prefix("v.") {
+                    let name: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+                    written.insert(format!("provider {p}: {name}"));
+                }
+            }
             // `config.vm.x`, `m.vm.x`, `o.vm.x`: a machine setting; network, provision and
             // provider settings also name their type.
             let Some(rest) = ["config.vm.", "m.vm.", "o.vm."].iter().find_map(|p| line.strip_prefix(p)) else {
                 continue;
             };
             let name: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-            let key = match name.as_str() {
-                "network" | "provision" | "provider" => {
-                    let kind = rest.split('"').nth(1).unwrap_or_default();
-                    format!("config.vm.{name} {kind}")
+            let kind = rest.split('"').nth(1).unwrap_or_default();
+            match name.as_str() {
+                "network" | "provision" => {
+                    written.insert(format!("config.vm.{name} {kind}"));
+                    written.insert(format!("config.vm.{name}"));
                 }
-                _ => format!("config.vm.{name}"),
-            };
-            written.insert(key);
+                "provider" => {
+                    written.insert("config.vm.provider".to_string());
+                    provider = Some(kind.to_string());
+                }
+                _ => {
+                    written.insert(format!("config.vm.{name}"));
+                }
+            }
         }
     }
-    written_matches(&vagrant::format().rows, written, "Vagrant");
+    let rows: Vec<(String, Support)> = vagrant::formats().into_iter().flat_map(|f| f.rows).collect();
+    written_matches(&rows, written, "Vagrant");
+}
+
+#[test]
+fn every_feature_is_classified() {
+    for f in formats() {
+        let unclassified: Vec<_> = f.rows.iter().filter(|(_, s)| *s == Support::Unclassified).map(|(k, _)| k.as_str()).collect();
+        assert!(unclassified.is_empty(), "{}: classify these in coverage/: {unclassified:?}", f.name);
+        let mut keys = BTreeSet::new();
+        for (k, _) in &f.rows {
+            assert!(keys.insert(k), "{}: `{k}` is listed twice", f.name);
+        }
+    }
 }

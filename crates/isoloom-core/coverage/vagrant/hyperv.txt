@@ -1,0 +1,17 @@
+# Settings of https://raw.githubusercontent.com/hashicorp/vagrant/v2.4.9/plugins/providers/hyperv/config.rb
+auto_start_action
+auto_stop_action
+cpus
+differencing_disk
+enable_automatic_checkpoints
+enable_checkpoints
+enable_enhanced_session_mode
+enable_virtualization_extensions
+ip_address_timeout
+linked_clone
+mac
+maxmemory
+memory
+vlan_id
+vm_integration_services
+vmname

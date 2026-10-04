@@ -1,0 +1,16 @@
+# Settings of https://raw.githubusercontent.com/hashicorp/vagrant/v2.4.9/plugins/providers/virtualbox/config.rb
+auto_nat_dns_proxy
+check_guest_additions
+cpus
+customizations
+customize
+default_nic_type
+destroy_unused_network_interfaces
+functional_vboxsf
+gui
+linked_clone
+linked_clone_snapshot
+memory
+name
+network_adapter
+network_adapters

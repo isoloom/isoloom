@@ -63,7 +63,7 @@ enum Command {
     Import(Import),
     /// Show which features of each output format (Compose, Vagrant) a spec can produce.
     Coverage {
-        /// Every feature, not only the gaps.
+        /// Every feature, with how Isoloom produces it or why not.
         #[arg(long)]
         all: bool,
         /// The full coverage page as Markdown (both directions).
@@ -267,31 +267,23 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Coverage { markdown, all } => {
-            use core::coverage::{Support, formats, markdown as md};
+            use core::coverage::{formats, markdown as md};
             if markdown {
                 print!("{}", md());
                 return Ok(ExitCode::SUCCESS);
             }
             for f in formats() {
-                println!("{} ({}): {}", f.name, f.file, f.summary());
-                let counts: Vec<String> = Support::KINDS.iter().map(|k| format!("{} {k}", f.count(k))).collect();
-                println!("  {}", counts.join(" · "));
-                let shown: Vec<_> = f
-                    .rows
-                    .iter()
-                    .filter(|(_, s)| all || matches!(s, Support::Planned { .. } | Support::Open { .. }))
-                    .collect();
-                if !all && !shown.is_empty() {
-                    println!("  gaps (planned, open):");
+                println!("{}: {}", f.name, f.summary());
+                if all {
+                    let width = f.rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+                    for (key, s) in &f.rows {
+                        println!("  {key:width$}  {:<6}  {}", s.implemented(), s.note());
+                    }
+                    println!();
                 }
-                let width = shown.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
-                for (key, s) in shown {
-                    println!("    {key:width$}  {:>7}  {}", s.symbol(), s.note());
-                }
-                println!();
             }
             if !all {
-                println!("Every feature: isoloom coverage --all · as Markdown: isoloom coverage --markdown");
+                println!("\nEvery feature, with how or why not: isoloom coverage --all · as Markdown: --markdown");
             }
             Ok(ExitCode::SUCCESS)
         }

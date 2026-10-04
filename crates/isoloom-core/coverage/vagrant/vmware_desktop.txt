@@ -1,0 +1,25 @@
+# Settings of https://raw.githubusercontent.com/hashicorp/vagrant-vmware-desktop/desktop-v3.0.5/lib/vagrant-vmware-desktop/config.rb
+allowlist_verified
+base_address
+base_mac
+clone_directory
+cpus
+enable_vmrun_ip_lookup
+force_vmware_license
+functional_hgfs
+gui
+linked_clone
+memory
+nat_device
+network_adapter
+network_adapters
+port_forward_network_pause
+shared_folder_special_char
+ssh_info_public
+unmount_default_hgfs
+utility_certificate_path
+utility_host
+utility_port
+verify_vmnet
+vmx
+whitelist_verified

@@ -144,8 +144,9 @@ fn verdict(path: &str) -> Option<(NoteKind, String)> {
         Support::Planned { .. } | Support::Open { .. } => NoteKind::NotYet,
         Support::ByDesign { .. } => NoteKind::ByDesign,
         Support::Tooling { .. } => NoteKind::Tooling,
+        Support::Unclassified => NoteKind::NotYet,
     };
-    Some((kind, s.note()))
+    Some((kind, s.reason()))
 }
 
 fn note(notes: &mut Vec<Note>, at: String, kind: NoteKind, text: String) {

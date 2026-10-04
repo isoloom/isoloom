@@ -89,6 +89,7 @@ Already have a Compose file? `isoloom import compose` drafts the `isoloom.yml` f
 format expresses goes into the draft, and every other key is listed with why (belongs in the
 image, not expressible yet, by design).
 
-Coverage: every feature of the Compose format (all 118 keys of its schema) and of Vagrant, and
-whether a spec can produce it: [docs/COVERAGE.md](docs/COVERAGE.md) (`isoloom coverage`). Tests
-fail when the schema has a key with no row, or when the table and the generated files disagree.
+Coverage: everything each format can do (every key of the Compose schema, every setting of
+Vagrant and each provider plugin, every resource type of the Terraform Proxmox provider) and
+whether Isoloom produces it: [docs/COVERAGE.md](docs/COVERAGE.md) (`isoloom coverage`). Tests fail
+on an unclassified entry, or when the tables disagree with the generated files.

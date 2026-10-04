@@ -28,8 +28,8 @@ pub fn format() -> Format {
     }
 }
 
-fn rows() -> Vec<(&'static str, Support)> {
-    vec![
+fn rows() -> Vec<(String, Support)> {
+    let rows: Vec<(&str, Support)> = vec![
         // Top level.
         ("version", ByDesign { why: "obsolete in Compose" }),
         ("name", Emitted { from: "name" }),
@@ -349,5 +349,6 @@ fn rows() -> Vec<(&'static str, Support)> {
                 why: "names are scoped to the environment by Compose",
             },
         ),
-    ]
+    ];
+    rows.into_iter().map(|(k, s)| (k.to_string(), s)).collect()
 }

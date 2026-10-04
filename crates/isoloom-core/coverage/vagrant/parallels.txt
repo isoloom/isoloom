@@ -1,0 +1,16 @@
+# Settings of https://raw.githubusercontent.com/Parallels/vagrant-parallels/v2.4.7/lib/vagrant-parallels/config.rb
+check_guest_tools
+cpus
+customizations
+customize
+destroy_unused_network_interfaces
+functional_psf
+linked_clone
+linked_clone_snapshot
+memory
+name
+network_adapter
+network_adapters
+optimize_power_consumption
+regen_src_uuid
+update_guest_tools
