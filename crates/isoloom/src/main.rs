@@ -69,6 +69,9 @@ enum Command {
         /// The full coverage page as Markdown (both directions).
         #[arg(long)]
         markdown: bool,
+        /// Every format, its score and every feature, as JSON (for the website).
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -266,10 +269,48 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        Command::Coverage { markdown, all } => {
-            use core::coverage::{formats, markdown as md};
+        Command::Coverage { markdown, all, json } => {
+            use core::coverage::{anchor, capitalize, formats, markdown as md, section};
             if markdown {
                 print!("{}", md());
+                return Ok(ExitCode::SUCCESS);
+            }
+            if json {
+                let out: Vec<serde_json::Value> = formats()
+                    .iter()
+                    .map(|f| {
+                        let score = f.score();
+                        let mut sections: Vec<serde_json::Value> = Vec::new();
+                        let mut collapsed = 0;
+                        for (key, s) in &f.rows {
+                            if f.collapse_not_portable && matches!(s, core::coverage::Support::NotPortable { .. }) {
+                                collapsed += 1;
+                                continue;
+                            }
+                            let (title, name) = section(key);
+                            if sections.last().and_then(|x| x["title"].as_str()) != Some(title) {
+                                sections.push(serde_json::json!({ "title": title, "rows": [] }));
+                            }
+                            let row = serde_json::json!({
+                                "key": name,
+                                "every_target": s.portable(),
+                                "implemented": s.implemented(),
+                                "note": capitalize(&s.note()),
+                            });
+                            sections.last_mut().unwrap()["rows"].as_array_mut().unwrap().push(row);
+                        }
+                        serde_json::json!({
+                            "name": f.name,
+                            "anchor": anchor(f.name),
+                            "source": f.source,
+                            "features": f.rows.len(),
+                            "score": { "percent": score.percent(), "portable": score.portable, "done": score.done, "partly": score.partly, "to_do": score.to_do },
+                            "collapsed_not_portable": collapsed,
+                            "sections": sections,
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&out)?);
                 return Ok(ExitCode::SUCCESS);
             }
             for f in formats() {

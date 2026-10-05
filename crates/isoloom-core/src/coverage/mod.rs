@@ -185,7 +185,7 @@ pub fn formats() -> Vec<Format> {
 }
 
 /// A feature's section in the reference table, and its name within it.
-fn section(key: &str) -> (&'static str, &str) {
+pub fn section(key: &str) -> (&'static str, &str) {
     if let Some(rest) = key.strip_prefix("resource ") {
         return ("Resource types", rest);
     }
@@ -262,7 +262,7 @@ pub fn markdown() -> String {
 }
 
 /// A heading's anchor, as the site generates them ("Vagrant: VirtualBox" -> "vagrant-virtualbox").
-fn anchor(title: &str) -> String {
+pub fn anchor(title: &str) -> String {
     let mut out = String::new();
     for c in title.to_lowercase().chars() {
         if c.is_alphanumeric() {
@@ -274,7 +274,7 @@ fn anchor(title: &str) -> String {
     out
 }
 
-fn capitalize(s: &str) -> String {
+pub fn capitalize(s: &str) -> String {
     let mut c = s.chars();
     match c.next() {
         Some(first) => first.to_uppercase().collect::<String>() + c.as_str(),
