@@ -431,7 +431,7 @@ pub fn draft(files: &[(String, String)], fallback_name: &str, source: &str) -> R
             Some(crate::coverage::Support::NotPortable { why }) => (NoteKind::ByDesign, why.to_string()),
             Some(crate::coverage::Support::Tooling { note }) => (NoteKind::Tooling, note.to_string()),
             // Networks, firewalls, addresses, disks: what Isoloom builds itself on that cloud.
-            Some(crate::coverage::Support::Planned { .. }) => (
+            Some(crate::coverage::Support::Planned { .. } | crate::coverage::Support::Emitted { .. } | crate::coverage::Support::Partial { .. }) => (
                 NoteKind::Equivalent,
                 "part of what Isoloom builds itself for the environment (networks, firewalls, addresses, disks)".into(),
             ),
