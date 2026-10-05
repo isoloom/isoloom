@@ -20,7 +20,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
 | [Vagrant: QEMU](#vagrant-qemu) | 14% | 14 | 2 | 0 | 12 |
 | [Vagrant: ESXi](#vagrant-esxi) | 0% | 14 | 0 | 0 | 14 |
-| [Terraform: Proxmox](#terraform-proxmox) | 6% | 16 | 1 | 0 | 15 |
+| [Terraform: Proxmox](#terraform-proxmox) | 43% | 16 | 7 | 0 | 9 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 0% | 18 | 0 | 0 | 18 |
 | [Terraform: Azure](#terraform-azure) | 0% | 17 | 0 | 0 | 17 |
@@ -650,7 +650,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Terraform: Proxmox
 
-6% of 16 portable features (1 done, 0 partly, 15 to do; 116 features in all). From bpg/proxmox 0.115.0 (its resource types).
+43% of 16 portable features (7 done, 0 partly, 9 to do; 116 features in all). From bpg/proxmox 0.115.0 (its resource types).
 
 ### Resource types
 
@@ -666,7 +666,7 @@ when a table disagrees with what Isoloom really generates.
 | `proxmox_ceph_pool` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_cloned_vm` | Yes | Not yet | Linked clones: faster starts from one image (no change in behavior) |
 | `proxmox_cluster_options` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_download_file` | Yes | Not yet | With the Proxmox generator |
+| `proxmox_download_file` | Yes | Yes | From `machines.*.vm.os` (cloud images) |
 | `proxmox_hagroup` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_hardware_mapping_dir` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_hardware_mapping_pci` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
@@ -687,17 +687,17 @@ when a table disagrees with what Isoloom really generates.
 | `proxmox_realm_openid` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_realm_sync` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_replication` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_sdn_applier` | Yes | Not yet | With the Proxmox generator |
+| `proxmox_sdn_applier` | Yes | Yes | From `networks` |
 | `proxmox_sdn_controller_evpn` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_fabric_node_openfabric` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_fabric_node_ospf` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_fabric_openfabric` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_fabric_ospf` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_subnet` | Yes | Another way | Via the router VM, which holds each network's router address (a subnet would put it on the host bridge, which routes between networks) |
-| `proxmox_sdn_vnet` | Yes | Not yet | With the Proxmox generator |
+| `proxmox_sdn_vnet` | Yes | Yes | From `networks` |
 | `proxmox_sdn_zone_evpn` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_zone_qinq` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
-| `proxmox_sdn_zone_simple` | Yes | Not yet | With the Proxmox generator |
+| `proxmox_sdn_zone_simple` | Yes | Yes | From `networks` |
 | `proxmox_sdn_zone_vlan` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_zone_vxlan` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_storage_cifs` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
@@ -722,7 +722,7 @@ when a table disagrees with what Isoloom really generates.
 | `proxmox_virtual_environment_container` | Yes | Not yet | LXC containers: a way to run `docker:` machines on Proxmox |
 | `proxmox_virtual_environment_dns` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_download_file` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_file` | Yes | Not yet | With the Proxmox generator |
+| `proxmox_virtual_environment_file` | Yes | Yes | Cloud-init for each VM |
 | `proxmox_virtual_environment_firewall_alias` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
 | `proxmox_virtual_environment_firewall_ipset` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
 | `proxmox_virtual_environment_firewall_options` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
@@ -769,9 +769,9 @@ when a table disagrees with what Isoloom really generates.
 | `proxmox_virtual_environment_time` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_user` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_user_token` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_vm` | n/a | No | Older name of the resource without `virtual_environment_` |
+| `proxmox_virtual_environment_vm` | Yes | Yes | From `machines` (and the router) |
 | `proxmox_virtual_environment_vm2` | n/a | No | An older, experimental VM resource |
-| `proxmox_vm` | Yes | Not yet | With the Proxmox generator |
+| `proxmox_vm` | n/a | No | An experimental VM resource; Isoloom uses proxmox_virtual_environment_vm |
 
 ## Terraform: ESXi
 

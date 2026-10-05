@@ -120,6 +120,50 @@ fn all(s: Status) -> [Status; 3] {
 
 /// The coverage table, in spec-reference order.
 pub fn table() -> Vec<Row> {
+    let mut rows = base_table();
+    // What the Proxmox generator produces (Terraform), each proven by an example.
+    let proxmox: &[(&str, Status)] = &[
+        ("name", done("tags and VM names (with the slot)", "segmented")),
+        ("networks.*.cidr", done("an SDN VNet per network in the environment's own zone", "segmented")),
+        (
+            "networks.*.internet",
+            done("new connections leaving the environment blocked once provisioned", "segmented"),
+        ),
+        ("reach[].from", done("a router VM filtering with nftables", "segmented")),
+        ("reach[].to", done("the router's rules", "segmented")),
+        ("reach[].ports", done("the router's rules, per port", "segmented")),
+        (
+            "machines.*.networks",
+            done("a NIC per network with its fixed address (cloud-init), the router as gateway", "segmented"),
+        ),
+        (
+            "machines.*.services[].port",
+            done("machines depending on it wait until it answers", "segmented"),
+        ),
+        ("machines.*.resources.cpus", done("the VM's cores", "segmented")),
+        ("machines.*.resources.memory_mb", done("the VM's memory", "segmented")),
+        ("machines.*.resources.disk_gb", done("the VM's disk size", "segmented")),
+        ("machines.*.depends_on", done("waits until its dependencies answer (cloud-init)", "segmented")),
+        (
+            "machines.*.vm.os",
+            Status::Partial {
+                how: "cloud images for debian-12 and ubuntu-24.04",
+                gap: "Kali and Windows",
+                proof: "segmented",
+            },
+        ),
+        ("machines.*.vm.provision", done("cloud-init writes the project and runs the steps", "segmented")),
+        ("machines.*.volumes", done("the VM's own disk keeps the data; the path is created", "segmented")),
+    ];
+    for (path, status) in proxmox {
+        if let Some(r) = rows.iter_mut().find(|r| r.path == *path) {
+            r.outputs[2] = *status;
+        }
+    }
+    rows
+}
+
+fn base_table() -> Vec<Row> {
     let row = |path, compose, vagrant, terraform| Row {
         path,
         outputs: [compose, vagrant, terraform],

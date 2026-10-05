@@ -210,6 +210,10 @@ pub fn formats() -> Vec<Format> {
             // Older names of resources that also exist under the short name.
             let current = r.strip_prefix(LEGACY).map(|s| format!("proxmox_{s}"));
             let s = match current {
+                // The stable VM resource keeps its long name; the short `proxmox_vm` is experimental.
+                _ if *r == "proxmox_virtual_environment_vm" => Emitted {
+                    from: "machines (and the router)",
+                },
                 Some(c) if all.contains(&c.as_str()) => Tooling {
                     note: "older name of the resource without `virtual_environment_`",
                 },
@@ -232,7 +236,17 @@ pub fn formats() -> Vec<Format> {
 
 fn proxmox(r: &str) -> Option<Support> {
     Some(match r {
-        "vm" | "download_file" | "file" | "sdn_zone_simple" | "sdn_vnet" | "sdn_applier" | "pool" | "pool_membership" => GENERATOR,
+        "vm" => Tooling {
+            note: "an experimental VM resource; Isoloom uses proxmox_virtual_environment_vm",
+        },
+        "download_file" => Emitted {
+            from: "machines.*.vm.os (cloud images)",
+        },
+        "file" => Emitted {
+            from: "(cloud-init for each VM)",
+        },
+        "sdn_zone_simple" | "sdn_vnet" | "sdn_applier" => Emitted { from: "networks" },
+        "pool" | "pool_membership" => GENERATOR,
         "cloned_vm" => Planned {
             note: "linked clones: faster starts from one image (no change in behavior)",
         },

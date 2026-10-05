@@ -3,6 +3,7 @@
 //! compare with what's committed. Output lives under `.isoloom/<target>/` in the project.
 
 mod docker;
+mod proxmox;
 mod router;
 mod vagrant;
 
@@ -48,7 +49,7 @@ impl fmt::Display for GenerateError {
 impl std::error::Error for GenerateError {}
 
 /// Targets that have a generator today.
-pub const GENERATED_TARGETS: &[Target] = &[Target::Docker, Target::Vagrant];
+pub const GENERATED_TARGETS: &[Target] = &[Target::Docker, Target::Vagrant, Target::Proxmox];
 
 /// The files for one target.
 pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
@@ -58,6 +59,7 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
     match target {
         Target::Docker => docker::generate(&on_docker(spec), spec),
         Target::Vagrant => vagrant::generate(spec),
+        Target::Proxmox => proxmox::generate(spec),
         other => Err(GenerateError::NoGenerator(other)),
     }
 }

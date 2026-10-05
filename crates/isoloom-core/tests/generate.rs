@@ -113,7 +113,11 @@ fn unsupported_features_are_refused_with_the_reason() {
         matches!(generate(&ad, Target::Vagrant), Err(GenerateError::Unsupported { .. })),
         "Windows has no local image yet"
     );
-    assert_eq!(generate(&ad, Target::Proxmox), Err(GenerateError::NoGenerator(Target::Proxmox)));
+    assert!(
+        matches!(generate(&ad, Target::Proxmox), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("windows-server-2022")),
+        "no Windows image on Proxmox yet"
+    );
+    assert_eq!(generate(&ad, Target::CloudVm), Err(GenerateError::NoGenerator(Target::CloudVm)));
 }
 
 #[test]
