@@ -276,9 +276,20 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 indent(&routes_unit(&router::route_commands(spec, name, m, true)), 6)
             );
         }
+        // The access machine runs the script checks on demand, from where a user stands.
+        if access_vm(spec) == Some(name) {
+            let scripts: Vec<String> = spec.checks.iter().filter(|c| c.ends_with(".sh")).map(|c| rb(c)).collect();
+            if !scripts.is_empty() {
+                let _ = writeln!(
+                    out,
+                    "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: \"failed=0\\n\" + [{}].map {{ |c| \"echo '== #{{c}}'\\n(\\n\" + File.read(File.join(ROOT, c)) + \"\\n) || failed=1\\n\" }}.join + \"exit $failed\\n\"",
+                    scripts.join(", ")
+                );
+            }
+        }
         out.push_str("  end\n");
     }
-    if !spec.provision.is_empty() {
+    if needs_controller(spec) {
         controller_vm(spec, &mut out);
     }
     out.push_str("end\n");
@@ -480,15 +491,33 @@ fn controller_vm(spec: &Spec, out: &mut String) {
         out,
         "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 1024\n    end"
     );
+    // Every machine by name, at its address on its first network (the controller is on all).
+    let hosts: Vec<String> = spec
+        .machines
+        .iter()
+        .filter_map(|(n, m)| m.networks.first().map(|(net, o)| format!("'{} {n}'", address(spec, net, *o))))
+        .collect();
+    if !hosts.is_empty() {
+        let _ = writeln!(
+            out,
+            "    m.vm.provision \"shell\", name: \"hosts\", inline: {}",
+            rb(&format!("for l in {}; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done", hosts.join(" ")))
+        );
+    }
     out.push_str(
         "    PROJECT.each do |entry|\n      m.vm.provision \"file\", source: File.join(ROOT, entry), destination: \"/tmp/isoloom-project/#{entry}\"\n    end\n",
     );
     out.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
     let script = format!(
-        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq python3-venv sshpass >/dev/null\n[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\n[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
         inventory(spec)
     );
-    let mut script = script;
+    let _ = writeln!(
+        out,
+        "    m.vm.provision \"shell\", name: \"controller\", inline: <<~'SH'\n{}    SH",
+        indent(&script, 6)
+    );
+    let mut script = String::from("set -e\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\n");
     for step in &spec.provision {
         let dir = step.ansible.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
         let file = step.ansible.rsplit('/').next().unwrap_or(&step.ansible);
@@ -507,12 +536,64 @@ fn controller_vm(spec: &Spec, out: &mut String) {
             "cd /opt/isoloom/{dir}\n{requirements}ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars} {file}\n"
         ));
     }
-    let _ = writeln!(
-        out,
-        "    m.vm.provision \"shell\", name: \"ansible\", inline: <<~'SH'\n{}    SH",
-        indent(&script, 6)
-    );
+    if !spec.provision.is_empty() {
+        let _ = writeln!(
+            out,
+            "    m.vm.provision \"shell\", name: \"ansible\", inline: <<~'SH'\n{}    SH",
+            indent(&script, 6)
+        );
+    }
+    // Standing in for a user on offline networks, the controller goes offline too once it's
+    // done installing (its checks would otherwise see its own NAT internet).
+    if access_vm(spec).is_none() && !spec.checks.is_empty() && !spec.networks.values().any(|n| n.internet) {
+        let _ = writeln!(
+            out,
+            "    m.vm.provision \"shell\", name: \"no internet\", inline: <<~'SH'\n{}    SH",
+            indent(&egress(false), 6)
+        );
+    }
+    // Checks, run on demand (`vagrant provision --provision-with checks`): Ansible ones here,
+    // and the scripts too when no access machine stands where a user would.
+    let mut checks = String::from("export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\nfailed=0\n");
+    let mut any = false;
+    for c in &spec.checks {
+        if c.ends_with(".yml") || c.ends_with(".yaml") {
+            let dir = c.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
+            let file = c.rsplit('/').next().unwrap_or(c);
+            checks.push_str(&format!(
+                "echo '== {c}'\n(cd /opt/isoloom/{dir} && ansible-playbook -i /etc/isoloom/inventory.ini {file}) || failed=1\n"
+            ));
+            any = true;
+        } else if access_vm(spec).is_none() {
+            checks.push_str(&format!("echo '== {c}'\n(cd /opt/isoloom && sh {c}) || failed=1\n"));
+            any = true;
+        }
+    }
+    if any {
+        checks.push_str("exit $failed\n");
+        let _ = writeln!(
+            out,
+            "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: <<~'SH'\n{}    SH",
+            indent(&checks, 6)
+        );
+    }
     out.push_str("  end\n");
+}
+
+/// The access machine, when it's a Linux VM: script checks run there, where a user stands.
+fn access_vm(spec: &Spec) -> Option<&str> {
+    spec.machines
+        .iter()
+        .find(|(_, m)| m.access && m.vm.as_ref().is_some_and(|v| !images::is_windows(&v.os)))
+        .map(|(n, _)| n.as_str())
+}
+
+/// Whether the environment gets a controller: for `provision:`, Ansible checks, or script checks
+/// when no access machine can run them.
+fn needs_controller(spec: &Spec) -> bool {
+    !spec.provision.is_empty()
+        || spec.checks.iter().any(|c| c.ends_with(".yml") || c.ends_with(".yaml"))
+        || (!spec.checks.is_empty() && access_vm(spec).is_none())
 }
 
 /// The inventory Isoloom writes: every VM machine at its address on its first network, with its

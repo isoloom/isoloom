@@ -301,5 +301,6 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-routes.service
       systemctl restart isoloom-routes.service
     SH
+    m.vm.provision "shell", name: "checks", run: "never", inline: "failed=0\n" + ["checks/web-reachable.sh", "checks/cache-blocked.sh"].map { |c| "echo '== #{c}'\n(\n" + File.read(File.join(ROOT, c)) + "\n) || failed=1\n" }.join + "exit $failed\n"
   end
 end

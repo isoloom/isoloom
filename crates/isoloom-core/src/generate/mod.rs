@@ -110,6 +110,12 @@ fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> 
             what: "environment-level provisioning (`provision:`) runs on VM targets for now".into(),
         });
     }
+    if target == Target::Docker && spec.checks.iter().any(|c| c.ends_with(".yml") || c.ends_with(".yaml")) {
+        return Err(GenerateError::Unsupported {
+            target,
+            what: "Ansible checks (.yml) run on VM targets for now".into(),
+        });
+    }
     Ok(())
 }
 

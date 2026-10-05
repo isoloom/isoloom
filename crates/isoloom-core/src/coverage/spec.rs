@@ -310,7 +310,10 @@ pub fn table() -> Vec<Row> {
         common(
             "checks",
             done("a `check` profile running them from the access side", "hello-stack"),
-            planned("with the check runner on VMs"),
+            done(
+                "on demand (`vagrant provision --provision-with checks`): scripts from the access machine or the controller, Ansible checks from the controller",
+                "hello-stack",
+            ),
         ),
         Row {
             path: "targets",
