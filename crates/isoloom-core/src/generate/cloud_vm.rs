@@ -281,7 +281,11 @@ resource "aws_vpc" "env" {{
         );
 
         // Its set-up, over SSH: names, volumes, waits, the project, its steps.
-        let mut cmds: Vec<String> = vec!["cloud-init status --wait >/dev/null 2>&1 || true".into()];
+        let mut cmds: Vec<String> = vec![
+            "set -e".into(),
+            "cloud-init status --wait >/dev/null 2>&1 || true".into(),
+            "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
+        ];
         let hosts: Vec<String> = spec
             .machines
             .iter()
@@ -342,7 +346,7 @@ resource "aws_vpc" "env" {{
             .map(|d| format!("terraform_data.{}", res(d)))
             .collect();
         let mut prov = format!(
-            "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [aws_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = aws_instance.{id}.public_ip\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"file\" {{\n    source      = \"${{local.root}}/\"\n    destination = \"/opt/isoloom\"\n  }}\n"
+            "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [aws_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = aws_instance.{id}.public_ip\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \\\"${{local.root}}\\\" .\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
         );
         if !m.inputs.is_empty() {
             let lines: Vec<String> = m

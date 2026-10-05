@@ -159,13 +159,18 @@ resource "terraform_data" "store" {
   provisioner "remote-exec" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-store.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+  }
   provisioner "file" {
-    source      = "${local.root}/"
-    destination = "/opt/isoloom"
+    source      = "${path.module}/.isoloom-project-store.tgz"
+    destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "remote-exec" {
     inline = [
+      "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "printf '%s\\n' '192.168.62.10 app' | sudo tee -a /etc/hosts >/dev/null",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/store.sh'",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
@@ -228,13 +233,18 @@ resource "terraform_data" "app" {
   provisioner "remote-exec" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-app.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+  }
   provisioner "file" {
-    source      = "${local.root}/"
-    destination = "/opt/isoloom"
+    source      = "${path.module}/.isoloom-project-app.tgz"
+    destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "remote-exec" {
     inline = [
+      "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "printf '%s\\n' '192.168.62.20 store' | sudo tee -a /etc/hosts >/dev/null",
       "sh -c 'i=0; until (bash -c '\\''</dev/tcp/store/6379'\\'' 2>/dev/null || nc -z -w 2 store 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"store didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"store answers\"'",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/app.sh'",

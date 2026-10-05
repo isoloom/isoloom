@@ -159,13 +159,18 @@ resource "terraform_data" "cache" {
   provisioner "remote-exec" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-cache.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+  }
   provisioner "file" {
-    source      = "${local.root}/"
-    destination = "/opt/isoloom"
+    source      = "${path.module}/.isoloom-project-cache.tgz"
+    destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "remote-exec" {
     inline = [
+      "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "printf '%s\\n' '10.60.0.10 web' | sudo tee -a /etc/hosts >/dev/null",
       "sudo mkdir -p /data",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/cache.sh'",
@@ -236,13 +241,18 @@ resource "terraform_data" "web" {
   provisioner "remote-exec" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+  }
   provisioner "file" {
-    source      = "${local.root}/"
-    destination = "/opt/isoloom"
+    source      = "${path.module}/.isoloom-project-web.tgz"
+    destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "remote-exec" {
     inline = [
+      "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "printf '%s\\n' '10.60.0.20 cache' | sudo tee -a /etc/hosts >/dev/null",
       "sh -c 'i=0; until (bash -c '\\''</dev/tcp/cache/6379'\\'' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"cache didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\"'",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",

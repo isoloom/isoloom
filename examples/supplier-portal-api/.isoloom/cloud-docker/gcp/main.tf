@@ -157,9 +157,13 @@ resource "terraform_data" "environment" {
       "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom",
     ]
   }
+  # The project as an archive: a plain copy drops the executable bits (entrypoint scripts).
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project.tgz -C \"${local.root}\" ."
+  }
   provisioner "file" {
-    source      = "${local.root}/"
-    destination = "/opt/isoloom"
+    source      = "${path.module}/.isoloom-project.tgz"
+    destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "file" {
     content     = join("\n", [for k, v in var.inputs : "${k}=${jsonencode(v)}"])
@@ -167,6 +171,8 @@ resource "terraform_data" "environment" {
   }
   provisioner "remote-exec" {
     inline = [
+      "set -e",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
       "cd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",

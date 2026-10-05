@@ -165,9 +165,12 @@ resource "terraform_data" "database" {
   provisioner "remote-exec" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-database.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+  }
   provisioner "file" {
-    source      = "${local.root}/"
-    destination = "/opt/isoloom"
+    source      = "${path.module}/.isoloom-project-database.tgz"
+    destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "file" {
     content     = join("\n", ["API_URL=${jsonencode(lookup(var.inputs, "API_URL", ""))}", "LAUNCH_TOKEN=${jsonencode(lookup(var.inputs, "LAUNCH_TOKEN", ""))}"])
@@ -175,7 +178,9 @@ resource "terraform_data" "database" {
   }
   provisioner "remote-exec" {
     inline = [
+      "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "printf '%s\\n' '10.20.0.31 web' | sudo tee -a /etc/hosts >/dev/null",
       "cd /opt/isoloom && sudo -E sh -c 'set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
@@ -243,13 +248,18 @@ resource "terraform_data" "web" {
   provisioner "remote-exec" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+  }
   provisioner "file" {
-    source      = "${local.root}/"
-    destination = "/opt/isoloom"
+    source      = "${path.module}/.isoloom-project-web.tgz"
+    destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "remote-exec" {
     inline = [
+      "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "printf '%s\\n' '10.20.0.32 database' | sudo tee -a /etc/hosts >/dev/null",
       "sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
