@@ -65,6 +65,31 @@ enum Command {
         #[arg(long, value_name = "FILE")]
         images: Option<PathBuf>,
     },
+    /// Generate a target's files, then bring the environment up with the right tool
+    /// (docker compose, vagrant, kubectl, or terraform).
+    Run {
+        /// The target to run (docker, vagrant, docker-vm, hybrid, kubernetes, proxmox,
+        /// cloud-docker, cloud-vm). Omitted, the single derived target, or an error listing them.
+        target: Option<String>,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// For `cloud-docker`, which cloud's module to apply (aws, azure, gcp, digitalocean,
+        /// linode, oci).
+        #[arg(long)]
+        cloud: Option<String>,
+        /// Your own image table (YAML), as for `generate`.
+        #[arg(long, value_name = "FILE")]
+        images: Option<PathBuf>,
+    },
+    /// Tear down what `run` started for a target (the inverse tool: compose down, vagrant
+    /// destroy, kubectl delete, or terraform destroy).
+    Down {
+        target: Option<String>,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        #[arg(long)]
+        cloud: Option<String>,
+    },
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
     Schema,
     /// Draft an isoloom.yml from files you already have.
@@ -264,10 +289,12 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                     println!("✓ {}", t.id());
                 } else {
                     let lacking = core::targets::missing(&spec, t.needs());
-                    let why = if lacking.is_empty() {
-                        "left out by `targets:`".to_string()
-                    } else {
+                    let why = if !lacking.is_empty() {
                         format!("needs `{}:` on {}", t.needs().key(), lacking.join(", "))
+                    } else if t == core::Target::Hybrid && !core::targets::mixed(&spec) {
+                        "only when some machines are containers and others are VMs".to_string()
+                    } else {
+                        "left out by `targets:`".to_string()
                     };
                     println!("✗ {} ({why})", t.id());
                 }
@@ -335,6 +362,8 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 ExitCode::SUCCESS
             })
         }
+        Command::Run { target, dir, cloud, images } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), images.as_deref(), false),
+        Command::Down { target, dir, cloud } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), None, true),
         Command::Schema => {
             println!("{}", serde_json::to_string_pretty(&core::schema::schema())?);
             Ok(ExitCode::SUCCESS)
@@ -465,6 +494,122 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
     }
+}
+
+/// `isoloom run`/`down`: pick the target, generate its files, then bring it up (or tear it down)
+/// with the tool that owns that output. `down` is the same dispatch with the inverse command.
+fn run_cmd(
+    dir: &std::path::Path,
+    target: Option<&str>,
+    cloud: Option<&str>,
+    images: Option<&std::path::Path>,
+    down: bool,
+) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let spec = core::load(dir)?;
+    // Absolute, so the paths we hand to docker/vagrant/terraform don't depend on their working
+    // directory (compose runs from `dir`, terraform and vagrant from the module folder).
+    let dir = &std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    let problems = core::validate(&spec);
+    if !problems.is_empty() {
+        for p in &problems {
+            eprintln!("✗ {p}");
+        }
+        return Err("fix the spec first (`isoloom validate`)".into());
+    }
+    let spec = with_images(spec, images)?;
+
+    // Pick the target: the one named, or the only possibility, else ask.
+    let possible = core::effective(&spec);
+    let t = match target {
+        Some(id) => core::Target::ALL.into_iter().find(|t| t.id() == id).ok_or_else(|| format!("unknown target `{id}`"))?,
+        None => match possible.as_slice() {
+            [one] => *one,
+            [] => return Err("this spec has no runnable target; see `isoloom targets`".into()),
+            many => {
+                let ids: Vec<&str> = many.iter().map(|t| t.id()).collect();
+                return Err(format!("several targets are possible ({}); pass one, e.g. `isoloom run {}`", ids.join(", "), ids[0]).into());
+            }
+        },
+    };
+    if !possible.contains(&t) {
+        return Err(format!("this spec can't run on `{}`; see `isoloom targets`", t.id()).into());
+    }
+
+    // Generate just this target's files (so a run is always against the current spec).
+    let files = core::generate(&spec, t).map_err(|e| format!("can't generate `{}`: {e}", t.id()))?;
+    for f in &files {
+        let path = dir.join(&f.path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&path, &f.contents)?;
+    }
+
+    let (program, args, wd) = bring_up(dir, t, cloud, down)?;
+    eprintln!("{} {} ({})", if down { "Tearing down" } else { "Running" }, t.id(), wd.display());
+    let status = std::process::Command::new(&program).args(&args).current_dir(&wd).status();
+    match status {
+        Ok(s) if s.success() => Ok(ExitCode::SUCCESS),
+        Ok(s) => Err(format!("{program} exited with {s}").into()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(format!("`{program}` isn't installed").into()),
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
+/// The command (and its working directory) that brings a target up or tears it down.
+fn bring_up(
+    dir: &std::path::Path,
+    t: core::Target,
+    cloud: Option<&str>,
+    down: bool,
+) -> Result<(String, Vec<String>, PathBuf), Box<dyn std::error::Error>> {
+    let s = |x: &str| x.to_string();
+    let out = dir.join(core::OUTPUT_DIR);
+    Ok(match t {
+        core::Target::Docker | core::Target::Hosted => {
+            let f = out.join("docker/compose.yml");
+            let args = if down {
+                vec![s("compose"), s("-f"), f.display().to_string(), s("down"), s("-v")]
+            } else {
+                vec![s("compose"), s("-f"), f.display().to_string(), s("up"), s("-d"), s("--build"), s("--wait")]
+            };
+            (s("docker"), args, dir.to_path_buf())
+        }
+        core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid => {
+            let sub = match t {
+                core::Target::Vagrant => "vagrant",
+                core::Target::DockerVm => "docker-vm",
+                _ => "hybrid",
+            };
+            let args = if down { vec![s("destroy"), s("-f")] } else { vec![s("up")] };
+            (s("vagrant"), args, out.join(sub))
+        }
+        core::Target::Kubernetes => {
+            // kustomize build, piped to kubectl; a shell keeps it one command.
+            let kdir = out.join("kubernetes");
+            let build = format!("kubectl kustomize --load-restrictor LoadRestrictionsNone {}", kdir.display());
+            let verb = if down { "delete --ignore-not-found=true" } else { "apply" };
+            (s("sh"), vec![s("-c"), format!("{build} | kubectl {verb} -f -")], dir.to_path_buf())
+        }
+        core::Target::Proxmox => tf_run(down, out.join("proxmox")),
+        core::Target::CloudVm => tf_run(down, out.join("cloud-vm/aws")),
+        core::Target::CloudDocker => {
+            let cloud = cloud.ok_or("`cloud-docker` needs --cloud (aws, azure, gcp, digitalocean, linode, oci)")?;
+            tf_run(down, out.join("cloud-docker").join(cloud))
+        }
+    })
+}
+
+/// Terraform brings a module up with init then apply, and down with destroy. `run` shells out
+/// once, so init+apply go through a short shell; the cloud's own credentials come from the
+/// environment, as Terraform expects.
+fn tf_run(down: bool, module: PathBuf) -> (String, Vec<String>, PathBuf) {
+    let script = if down {
+        "terraform init -input=false && terraform destroy -auto-approve".to_string()
+    } else {
+        "terraform init -input=false && terraform apply -auto-approve".to_string()
+    };
+    ("sh".to_string(), vec!["-c".to_string(), script], module)
 }
 
 /// The spec with the user's image table applied, when one is given.
