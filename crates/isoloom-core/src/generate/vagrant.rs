@@ -87,6 +87,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let _ = writeln!(out, "    m.vm.hostname = {}", rb(name));
         if windows {
             // The box's own account, over WinRM (Windows has no SSH by default).
+            // The box forwards RDP to every interface of the host: off (publish a service to
+            // reach one, on the loopback).
+            out.push_str("    m.vm.network \"forwarded_port\", guest: 3389, host: 3389, id: \"rdp\", disabled: true\n");
             out.push_str("    m.vm.guest = :windows\n    m.vm.communicator = \"winrm\"\n    m.winrm.username = \"vagrant\"\n    m.winrm.password = \"vagrant\"\n    m.winrm.transport = :plaintext\n    m.winrm.basic_auth_only = true\n    m.winrm.retry_limit = 30\n    m.winrm.retry_delay = 10\n");
         }
         for (net, octet) in &m.networks {

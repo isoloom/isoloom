@@ -110,3 +110,46 @@ fn published_ports_read_every_compose_form() {
     assert_eq!((svc(443), svc(80), svc(9000), svc(5432)), (Some(8443), Some(8080), None, Some(15432)));
     assert!(has(&d, NoteKind::Changed, "services.a.ports", "no fixed host port for 9000"));
 }
+
+// Vagrant: from what a Vagrantfile set when it ran (recorded by the CLI's vagrant_record.rb).
+
+fn recorded(name: &str) -> serde_json::Value {
+    let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/vagrant-classic").join(name);
+    serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()
+}
+
+#[test]
+fn a_vagrantfile_with_a_loop_becomes_a_valid_spec() {
+    let d = isoloom_core::import::vagrant::draft(&recorded("recorded.json"), "classic", "Vagrantfile").unwrap();
+    let spec = parse(&d.yaml).expect("the draft parses");
+    assert_eq!(validate(&spec), vec![], "{}", d.yaml);
+    assert_eq!(spec.networks["lab"].cidr, "192.168.33.0/24");
+    let web = &spec.machines["web"];
+    assert_eq!(web.networks["lab"], 10);
+    assert_eq!((web.services[0].port, web.services[0].publish), (80, Some(8080)));
+    assert_eq!(web.resources.unwrap().memory_mb, Some(1024));
+    assert_eq!(spec.machines["db"].resources.unwrap().memory_mb, Some(2048));
+    let vm = web.vm.as_ref().unwrap();
+    assert_eq!(vm.image.as_ref().unwrap().vagrant.as_deref(), Some("ubuntu/jammy64"), "an unknown box is kept");
+    assert_eq!(vm.provision, ["site.yml", "provision/web.sh"], "global provisioners run first");
+    assert!(has(&d, NoteKind::InImage, "define web.vm.provision", "inline script"));
+}
+
+#[test]
+fn importing_an_isoloom_vagrantfile_gives_back_the_environment() {
+    let d = isoloom_core::import::vagrant::draft(&recorded("segmented-recorded.json"), "segmented", "Vagrantfile").unwrap();
+    let spec = parse(&d.yaml).unwrap();
+    let original = isoloom_core::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/segmented")).unwrap();
+    let cidrs = |s: &isoloom_core::Spec| {
+        let mut v: Vec<String> = s.networks.values().map(|n| n.cidr.clone()).collect();
+        v.sort();
+        v
+    };
+    assert_eq!(cidrs(&spec), cidrs(&original));
+    for name in ["cache", "web", "user"] {
+        assert!(spec.machines.contains_key(name), "{name} comes back");
+    }
+    assert!(!spec.machines.contains_key("isoloom-router"), "Isoloom's own router isn't a machine");
+    assert_eq!(spec.machines["web"].vm.as_ref().unwrap().os, "debian-12");
+    assert!(spec.machines["web"].vm.as_ref().unwrap().image.is_none(), "a built-in box needs no override");
+}

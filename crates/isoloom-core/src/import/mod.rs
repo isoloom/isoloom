@@ -2,6 +2,7 @@
 //! import also returns notes for what the source said that the draft doesn't.
 
 pub mod compose;
+pub mod vagrant;
 
 /// A drafted `isoloom.yml` and the notes on it.
 #[derive(Debug, Clone)]

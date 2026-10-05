@@ -81,6 +81,21 @@ enum Command {
 enum Import {
     /// From a Compose file: what it says that the format can express goes into the draft;
     /// the rest is listed, with why.
+    /// From a Vagrantfile: it runs against a stand-in `Vagrant` module (nothing is created), and
+    /// the settings it makes become the draft; the rest is listed, with why.
+    Vagrant {
+        /// The Vagrantfile (default: ./Vagrantfile).
+        file: Option<PathBuf>,
+        /// Where to write isoloom.yml (default: next to the Vagrantfile).
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Replace an existing isoloom.yml.
+        #[arg(long)]
+        force: bool,
+        /// Print the draft instead of writing it.
+        #[arg(long)]
+        stdout: bool,
+    },
     Compose {
         /// The Compose file (default: compose.yaml, compose.yml, docker-compose.yaml or
         /// docker-compose.yml in the current folder).
@@ -98,6 +113,87 @@ enum Import {
 }
 
 const COMPOSE_FILES: &[&str] = &["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
+
+/// The folder a source file is in, a name for the environment (the folder's), and how the
+/// draft's header names the file.
+fn source_of(file: &std::path::Path) -> Result<(PathBuf, String, String), Box<dyn std::error::Error>> {
+    let folder = file.canonicalize()?.parent().map(PathBuf::from).unwrap_or_default();
+    let fallback = folder.file_name().and_then(|n| n.to_str()).unwrap_or("env").to_string();
+    let source = file.file_name().and_then(|n| n.to_str()).unwrap_or("the source").to_string();
+    Ok((folder, fallback, source))
+}
+
+/// Writes a draft (or prints it), then its notes by kind and whether it validates.
+fn write_draft(draft: &core::import::Draft, folder: PathBuf, out: Option<PathBuf>, force: bool, stdout: bool) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    if stdout {
+        print!("{}", draft.yaml);
+    } else {
+        let dir = out.unwrap_or(folder);
+        let target = dir.join("isoloom.yml");
+        if (target.exists() || dir.join("isoloom.yaml").exists()) && !force {
+            return Err(format!("{} already has a spec; use --force to replace it, or --stdout", dir.display()).into());
+        }
+        std::fs::write(&target, &draft.yaml)?;
+        println!("✓ wrote {}", target.display());
+    }
+    let mut report = String::new();
+    for kind in core::import::NoteKind::ALL {
+        let notes: Vec<_> = draft.notes.iter().filter(|n| n.kind == kind).collect();
+        if notes.is_empty() {
+            continue;
+        }
+        report.push_str(&format!("\n{} ({})\n", kind.title(), notes.len()));
+        for n in notes {
+            report.push_str(&format!("  {}: {}\n", n.at, n.text));
+        }
+    }
+    let problems = core::parse(&draft.yaml).map(|s| core::validate(&s)).map_err(|e| e.to_string())?;
+    if problems.is_empty() {
+        report.push_str("\n✓ the draft is valid\n");
+    } else {
+        report.push_str("\nThe draft needs fixing before it validates:\n");
+        for p in &problems {
+            report.push_str(&format!("  {p}\n"));
+        }
+    }
+    if stdout {
+        eprint!("{report}")
+    } else {
+        print!("{report}")
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Runs a Vagrantfile against a stand-in `Vagrant` module (in Vagrant's own Ruby when it's
+/// installed) and returns every setting it made, as JSON. Nothing is created or started.
+fn record_vagrantfile(file: &std::path::Path) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    const RECORDER: &str = include_str!("vagrant_record.rb");
+    let script = std::env::temp_dir().join(format!("isoloom-vagrant-record-{}.rb", std::process::id()));
+    std::fs::write(&script, RECORDER)?;
+    let rubies = [
+        "/opt/vagrant/embedded/bin/ruby",
+        "C:\\HashiCorp\\Vagrant\\embedded\\mingw64\\bin\\ruby.exe",
+        "ruby",
+    ];
+    let mut last = String::from("no Ruby found (Vagrant's own, or `ruby` on the PATH)");
+    for ruby in rubies {
+        match std::process::Command::new(ruby).arg(&script).arg(file).output() {
+            Ok(out) if out.status.success() => {
+                let _ = std::fs::remove_file(&script);
+                return Ok(serde_json::from_slice(&out.stdout)?);
+            }
+            Ok(out) => {
+                last = format!(
+                    "the Vagrantfile failed to run: {}",
+                    String::from_utf8_lossy(&out.stderr).lines().next().unwrap_or("")
+                )
+            }
+            Err(_) => continue,
+        }
+    }
+    let _ = std::fs::remove_file(&script);
+    Err(last.into())
+}
 
 fn main() -> ExitCode {
     match run(Cli::parse()) {
@@ -230,50 +326,19 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                     .ok_or("no compose.yaml or docker-compose.yml here; pass the file")?,
             };
             let text = std::fs::read_to_string(&file).map_err(|e| format!("can't read {}: {e}", file.display()))?;
-            let folder = file.canonicalize()?.parent().map(PathBuf::from).unwrap_or_default();
-            let fallback = folder.file_name().and_then(|n| n.to_str()).unwrap_or("env").to_string();
-            let source = file.file_name().and_then(|n| n.to_str()).unwrap_or("compose.yaml");
-            let draft = core::import::compose::draft(&text, &fallback, source)?;
-
-            if stdout {
-                print!("{}", draft.yaml);
-            } else {
-                let dir = out.unwrap_or(folder);
-                let target = dir.join("isoloom.yml");
-                if (target.exists() || dir.join("isoloom.yaml").exists()) && !force {
-                    return Err(format!("{} already has a spec; use --force to replace it, or --stdout", dir.display()).into());
-                }
-                std::fs::write(&target, &draft.yaml)?;
-                println!("✓ wrote {}", target.display());
+            let (folder, fallback, source) = source_of(&file)?;
+            let draft = core::import::compose::draft(&text, &fallback, &source)?;
+            write_draft(&draft, folder, out, force, stdout)
+        }
+        Command::Import(Import::Vagrant { file, out, force, stdout }) => {
+            let file = file.unwrap_or_else(|| PathBuf::from("Vagrantfile"));
+            if !file.is_file() {
+                return Err(format!("no {} here; pass the Vagrantfile", file.display()).into());
             }
-
-            // The notes, by kind, most important first; stderr when the draft goes to stdout.
-            let mut report = String::new();
-            for kind in core::import::NoteKind::ALL {
-                let notes: Vec<_> = draft.notes.iter().filter(|n| n.kind == kind).collect();
-                if notes.is_empty() {
-                    continue;
-                }
-                report.push_str(&format!("\n{} ({})\n", kind.title(), notes.len()));
-                for n in notes {
-                    report.push_str(&format!("  {}: {}\n", n.at, n.text));
-                }
-            }
-            let problems = core::parse(&draft.yaml).map(|s| core::validate(&s)).map_err(|e| e.to_string())?;
-            if problems.is_empty() {
-                report.push_str("\n✓ the draft is valid\n");
-            } else {
-                report.push_str("\nThe draft needs fixing before it validates:\n");
-                for p in &problems {
-                    report.push_str(&format!("  {p}\n"));
-                }
-            }
-            if stdout {
-                eprint!("{report}")
-            } else {
-                print!("{report}")
-            }
-            Ok(ExitCode::SUCCESS)
+            let recorded = record_vagrantfile(&file)?;
+            let (folder, fallback, source) = source_of(&file)?;
+            let draft = core::import::vagrant::draft(&recorded, &fallback, &source)?;
+            write_draft(&draft, folder, out, force, stdout)
         }
         Command::Coverage { markdown, all, json } => {
             use core::coverage::{anchor, capitalize, formats, markdown as md, section};
