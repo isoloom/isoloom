@@ -21,6 +21,8 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
+    labels:
+      isoloom.service.redis: tcp:6379
     restart: unless-stopped
   app:
     image: nginx:1.27-alpine
@@ -39,6 +41,8 @@ services:
     depends_on:
       store:
         condition: service_healthy
+    labels:
+      isoloom.service.80: http:80
     restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1

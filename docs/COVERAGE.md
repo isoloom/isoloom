@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 65% | 55 | 32 | 8 | 15 |
+| [Docker Compose](#docker-compose) | 66% | 56 | 33 | 8 | 15 |
 | [Vagrant](#vagrant) | 75% | 35 | 25 | 3 | 7 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-65% of 55 portable features (32 done, 8 partly, 15 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+66% of 56 portable features (33 done, 8 partly, 15 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -103,7 +103,7 @@ when a table disagrees with what Isoloom really generates.
 | `ipc` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `isolation` | No | No | Windows containers only |
 | `label_file` | n/a | No | Compose tooling, not the environment's behavior |
-| `labels` | n/a | No | Compose tooling, not the environment's behavior |
+| `labels` | Yes | Yes | From `machines.*.services` (isoloom.service.<name>, for tools reading the containers) |
 | `links` | n/a | No | Legacy; replaced by networks |
 | `logging` | n/a | No | Where the runner collects logs |
 | `mac_address` | No | No | Cloud VMs get their MAC address from the provider |

@@ -197,7 +197,12 @@ fn rows() -> Vec<(String, Support)> {
             },
         ),
         ("services.*.label_file", TOOLING),
-        ("services.*.labels", TOOLING),
+        (
+            "services.*.labels",
+            Emitted {
+                from: "machines.*.services (isoloom.service.<name>, for tools reading the containers)",
+            },
+        ),
         ("services.*.links", LEGACY),
         (
             "services.*.logging",

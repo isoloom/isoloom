@@ -193,6 +193,17 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                 svc.insert(s("deploy"), map([("resources", map([("limits", Value::Mapping(limits))]))]));
             }
         }
+        // What the machine serves, for tools reading the running containers (dashboards,
+        // launchers): `isoloom.service.<name>: "<http|tcp>:<port>"`.
+        if !m.services.is_empty() {
+            let mut labels = Mapping::new();
+            for sv in &m.services {
+                let key = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+                let kind = if sv.http { "http" } else { "tcp" };
+                labels.insert(s(format!("isoloom.service.{key}")), s(format!("{kind}:{}", sv.port)));
+            }
+            svc.insert(s("labels"), Value::Mapping(labels));
+        }
         svc.insert(s("restart"), s("unless-stopped"));
         services.insert(s(name.as_str()), Value::Mapping(svc));
 

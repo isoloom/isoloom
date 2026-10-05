@@ -28,6 +28,8 @@ services:
         limits:
           cpus: '1'
           memory: 1024M
+    labels:
+      isoloom.service.mysql: tcp:3207
     restart: unless-stopped
   database-init-1:
     image: mysql:8.0
@@ -72,6 +74,8 @@ services:
         limits:
           cpus: '1'
           memory: 1024M
+    labels:
+      isoloom.service.portal: http:3206
     restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1

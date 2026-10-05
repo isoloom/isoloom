@@ -387,9 +387,7 @@ fn vmware_esxi(s: &str) -> Option<Support> {
         note: "with the ESXi provider block (not verified on an ESXi host yet)",
     };
     Some(match s {
-        "guest_numvcpus" | "guest_memsize" => Emitted {
-            from: "machines.*.resources",
-        },
+        "guest_numvcpus" | "guest_memsize" => Emitted { from: "machines.*.resources" },
         "guest_name" => Emitted {
             from: "the environment and machine names",
         },
@@ -416,12 +414,7 @@ fn vmware_esxi(s: &str) -> Option<Support> {
         | "guest_custom_vmx_settings"
         | "guest_disk_type"
         | "vm_disk_type" => HOST_TUNING,
-        "encoded_esxi_password"
-        | "esxi_private_keys"
-        | "vm_disk_store"
-        | "esxi_resource_pool"
-        | "resource_pool"
-        | "local_private_keys" => USER_SETUP,
+        "encoded_esxi_password" | "esxi_private_keys" | "vm_disk_store" | "esxi_resource_pool" | "resource_pool" | "local_private_keys" => USER_SETUP,
         "clone_from_vm" => LINKED_CLONE,
         s if s.starts_with("supported_") => Tooling {
             note: "the plugin's own list of accepted values",

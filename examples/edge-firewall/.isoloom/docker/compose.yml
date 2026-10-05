@@ -30,6 +30,8 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
+    labels:
+      isoloom.service.status: http:8080
     restart: unless-stopped
   fw-routes:
     image: alpine:3.20
@@ -70,6 +72,8 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
+    labels:
+      isoloom.service.80: http:80
     restart: unless-stopped
   web-routes:
     image: alpine:3.20
@@ -110,6 +114,8 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
+    labels:
+      isoloom.service.redis: tcp:6379
     restart: unless-stopped
   cache-routes:
     image: alpine:3.20
