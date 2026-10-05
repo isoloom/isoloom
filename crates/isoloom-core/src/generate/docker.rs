@@ -15,7 +15,9 @@
 //!   machines that list them.
 //! - Checks run in a `check` profile: `docker compose --profile check run --rm isoloom-check`.
 //!
-//! - A service's `publish` port is published on the host's loopback (127.0.0.1) only.
+//! - A service's `publish` port is published on the host's loopback (127.0.0.1) only, unless
+//!   ISOLOOM_PUBLISH_ADDRESS says otherwise (inside the docker-vm target's VM, which is itself
+//!   only forwarded from the host's loopback).
 //! - `volumes:` become named volumes: they survive re-creating a container, and go with
 //!   `docker compose down -v`.
 //!
@@ -144,7 +146,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         let ports: Vec<Value> = m
             .services
             .iter()
-            .filter_map(|svc| svc.publish.map(|p| s(format!("127.0.0.1:{p}:{}", svc.port))))
+            .filter_map(|svc| svc.publish.map(|p| s(format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{p}:{}", svc.port))))
             .collect();
         if !ports.is_empty() {
             svc.insert(s("ports"), Value::Sequence(ports));

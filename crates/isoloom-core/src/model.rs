@@ -205,6 +205,8 @@ pub enum Target {
     Docker,
     /// A hosting service runs the Docker shape for the user.
     Hosted,
+    /// Docker on one VM: on this machine, an ESXi host or a Proxmox server.
+    DockerVm,
     /// Docker on one cloud VM.
     CloudDocker,
     /// One local VM per machine (Vagrant).
@@ -216,9 +218,10 @@ pub enum Target {
 }
 
 impl Target {
-    pub const ALL: [Target; 6] = [
+    pub const ALL: [Target; 7] = [
         Target::Docker,
         Target::Hosted,
+        Target::DockerVm,
         Target::CloudDocker,
         Target::Vagrant,
         Target::Proxmox,
@@ -228,7 +231,7 @@ impl Target {
     /// The implementation every machine needs for this target.
     pub fn needs(self) -> Shape {
         match self {
-            Target::Docker | Target::Hosted | Target::CloudDocker => Shape::Docker,
+            Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker => Shape::Docker,
             Target::Vagrant | Target::Proxmox | Target::CloudVm => Shape::Vm,
         }
     }
@@ -237,6 +240,7 @@ impl Target {
         match self {
             Target::Docker => "docker",
             Target::Hosted => "hosted",
+            Target::DockerVm => "docker-vm",
             Target::CloudDocker => "cloud-docker",
             Target::Vagrant => "vagrant",
             Target::Proxmox => "proxmox",

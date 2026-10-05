@@ -13,7 +13,7 @@ fn ids(targets: Vec<Target>) -> Vec<&'static str> {
     targets.into_iter().map(Target::id).collect()
 }
 
-const ALL: [&str; 6] = ["docker", "hosted", "cloud-docker", "vagrant", "proxmox", "cloud-vm"];
+const ALL: [&str; 7] = ["docker", "hosted", "docker-vm", "cloud-docker", "vagrant", "proxmox", "cloud-vm"];
 const VM_ONLY: [&str; 3] = ["vagrant", "proxmox", "cloud-vm"];
 
 #[test]

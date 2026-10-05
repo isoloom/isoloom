@@ -3,6 +3,7 @@
 //! compare with what's committed. Output lives under `.isoloom/<target>/` in the project.
 
 mod docker;
+mod docker_vm;
 mod proxmox;
 mod router;
 mod vagrant;
@@ -49,7 +50,7 @@ impl fmt::Display for GenerateError {
 impl std::error::Error for GenerateError {}
 
 /// Targets that have a generator today.
-pub const GENERATED_TARGETS: &[Target] = &[Target::Docker, Target::Vagrant, Target::Proxmox];
+pub const GENERATED_TARGETS: &[Target] = &[Target::Docker, Target::DockerVm, Target::Vagrant, Target::Proxmox];
 
 /// The files for one target.
 pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
@@ -58,6 +59,12 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
     }
     match target {
         Target::Docker => docker::generate(&on_docker(spec), spec),
+        // Docker on one VM runs the Compose file: both are generated.
+        Target::DockerVm => {
+            let mut files = docker::generate(&on_docker(spec), spec)?;
+            files.extend(docker_vm::generate(spec)?);
+            Ok(files)
+        }
         Target::Vagrant => vagrant::generate(spec),
         Target::Proxmox => proxmox::generate(spec),
         other => Err(GenerateError::NoGenerator(other)),
@@ -75,7 +82,14 @@ pub fn generate_all(spec: &Spec) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
             continue;
         }
         match generate(spec, target) {
-            Ok(mut f) => files.append(&mut f),
+            Ok(f) => {
+                // Outputs share files (docker-vm runs the Compose file): each once.
+                for file in f {
+                    if !files.iter().any(|x: &GeneratedFile| x.path == file.path) {
+                        files.push(file);
+                    }
+                }
+            }
             Err(e) => skipped.push(e),
         }
     }
