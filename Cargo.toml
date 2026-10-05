@@ -17,3 +17,4 @@ serde_yaml_ng = "0.10"
 indexmap = { version = "2", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 schemars = { version = "1", features = ["indexmap2"] }
+hcl-rs = "0.19"

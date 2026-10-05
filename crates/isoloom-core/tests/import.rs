@@ -153,3 +153,41 @@ fn importing_an_isoloom_vagrantfile_gives_back_the_environment() {
     assert_eq!(spec.machines["web"].vm.as_ref().unwrap().os, "debian-12");
     assert!(spec.machines["web"].vm.as_ref().unwrap().image.is_none(), "a built-in box needs no override");
 }
+
+// Terraform: read statically.
+
+fn tf_files(dir: &str) -> Vec<(String, String)> {
+    let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(dir);
+    let mut v: Vec<(String, String)> = std::fs::read_dir(d)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "tf"))
+        .map(|p| (p.file_name().unwrap().to_string_lossy().to_string(), std::fs::read_to_string(&p).unwrap()))
+        .collect();
+    v.sort();
+    v
+}
+
+#[test]
+fn terraform_for_each_machines_through_their_network_interfaces() {
+    let d = isoloom_core::import::terraform::draft(&tf_files("terraform-aws"), "aws-lab", "main.tf").unwrap();
+    let spec = parse(&d.yaml).expect("the draft parses");
+    assert_eq!(spec.networks["lab-private"].cidr, "192.168.56.0/24", "the subnet, through a local");
+    assert_eq!(spec.machines["dc01"].networks["lab-private"], 10, "the address on its network interface");
+    assert_eq!(spec.machines["srv02"].networks["lab-private"], 22);
+    assert_eq!(spec.machines["srv02"].resources.unwrap().memory_mb, Some(8192), "t3.large");
+    assert_eq!(spec.machines["dc01"].vm.as_ref().unwrap().os, "windows-server-2019");
+    assert!(has(&d, NoteKind::ByDesign, "resource aws_s3_bucket", "managed services"));
+    assert!(has(&d, NoteKind::Equivalent, "resource aws_vpc", "builds itself"));
+}
+
+#[test]
+fn not_terraform_is_an_error() {
+    let bad = vec![("main.tf".to_string(), "resource \"x\" {".to_string())];
+    assert!(isoloom_core::import::terraform::draft(&bad, "x", "main.tf").is_err());
+    let none = vec![("main.tf".to_string(), "resource \"aws_s3_bucket\" \"b\" {}\n".to_string())];
+    assert!(
+        isoloom_core::import::terraform::draft(&none, "x", "main.tf").is_err(),
+        "no VM: nothing to draft"
+    );
+}

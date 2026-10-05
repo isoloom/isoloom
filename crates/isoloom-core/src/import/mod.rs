@@ -2,6 +2,7 @@
 //! import also returns notes for what the source said that the draft doesn't.
 
 pub mod compose;
+pub mod terraform;
 pub mod vagrant;
 
 /// A drafted `isoloom.yml` and the notes on it.
@@ -57,7 +58,7 @@ impl NoteKind {
             NoteKind::Equivalent => "Same effect another way",
             NoteKind::ByDesign => "Left out: not every target can do it",
             NoteKind::Written => "Written by Isoloom when it generates",
-            NoteKind::Tooling => "Compose tooling, nothing to carry over",
+            NoteKind::Tooling => "Tooling, nothing to carry over",
         }
     }
 }

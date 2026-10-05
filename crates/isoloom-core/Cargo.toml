@@ -12,6 +12,7 @@ serde.workspace = true
 serde_yaml_ng.workspace = true
 indexmap.workspace = true
 schemars.workspace = true
+hcl-rs.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]

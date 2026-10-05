@@ -81,6 +81,21 @@ enum Command {
 enum Import {
     /// From a Compose file: what it says that the format can express goes into the draft;
     /// the rest is listed, with why.
+    /// From Terraform: the `.tf` files of a folder, read statically (variables, locals,
+    /// for_each and count evaluated); VMs and subnets become the draft, the rest is listed.
+    Terraform {
+        /// The folder with the .tf files (default: the current folder).
+        dir: Option<PathBuf>,
+        /// Where to write isoloom.yml (default: that folder).
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Replace an existing isoloom.yml.
+        #[arg(long)]
+        force: bool,
+        /// Print the draft instead of writing it.
+        #[arg(long)]
+        stdout: bool,
+    },
     /// From a Vagrantfile: it runs against a stand-in `Vagrant` module (nothing is created), and
     /// the settings it makes become the draft; the rest is listed, with why.
     Vagrant {
@@ -328,6 +343,25 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             let text = std::fs::read_to_string(&file).map_err(|e| format!("can't read {}: {e}", file.display()))?;
             let (folder, fallback, source) = source_of(&file)?;
             let draft = core::import::compose::draft(&text, &fallback, &source)?;
+            write_draft(&draft, folder, out, force, stdout)
+        }
+        Command::Import(Import::Terraform { dir, out, force, stdout }) => {
+            let dir = dir.unwrap_or_else(|| PathBuf::from("."));
+            let mut files = Vec::new();
+            for e in std::fs::read_dir(&dir).map_err(|e| format!("can't read {}: {e}", dir.display()))? {
+                let p = e?.path();
+                if p.extension().and_then(|x| x.to_str()) == Some("tf") {
+                    files.push((p.file_name().unwrap().to_string_lossy().to_string(), std::fs::read_to_string(&p)?));
+                }
+            }
+            files.sort();
+            if files.is_empty() {
+                return Err(format!("no .tf files in {}", dir.display()).into());
+            }
+            let folder = dir.canonicalize()?;
+            let fallback = folder.file_name().and_then(|n| n.to_str()).unwrap_or("env").to_string();
+            let source = format!("{} (.tf files)", folder.file_name().and_then(|n| n.to_str()).unwrap_or("."));
+            let draft = core::import::terraform::draft(&files, &fallback, &source)?;
             write_draft(&draft, folder, out, force, stdout)
         }
         Command::Import(Import::Vagrant { file, out, force, stdout }) => {
