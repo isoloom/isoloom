@@ -15,7 +15,18 @@ terraform {
 }
 
 variable "project" {
-  type = string
+  type        = string
+  default     = ""
+  description = "An existing project; or leave empty and give billing_account for a project of its own"
+}
+variable "billing_account" {
+  type        = string
+  default     = ""
+  description = "With no project: create one for this environment, billed here, deleted with it"
+}
+variable "org_id" {
+  type    = string
+  default = ""
 }
 variable "region" {
   type    = string
@@ -27,8 +38,25 @@ variable "machine_type" {
 }
 
 provider "google" {
-  project = var.project
-  region  = var.region
+  region = var.region
+}
+
+# A project of its own when none is given: everything goes when the environment is destroyed.
+resource "google_project" "env" {
+  count               = var.project == "" ? 1 : 0
+  name                = "isoloom-segmented"
+  project_id          = "isoloom-${terraform_data.id.output}"
+  billing_account     = var.billing_account
+  org_id              = var.org_id == "" ? null : var.org_id
+  deletion_policy     = "DELETE"
+  auto_create_network = false
+}
+
+resource "google_project_service" "compute" {
+  count              = var.project == "" ? 1 : 0
+  project            = google_project.env[0].project_id
+  service            = "compute.googleapis.com"
+  disable_on_destroy = false
 }
 
 resource "terraform_data" "id" {
@@ -39,16 +67,19 @@ resource "terraform_data" "id" {
 }
 
 locals {
-  name = "isoloom-segmented-${terraform_data.id.output}"
-  root = abspath("${path.module}/../../..")
+  name    = "isoloom-segmented-${terraform_data.id.output}"
+  root    = abspath("${path.module}/../../..")
+  project = var.project != "" ? var.project : google_project_service.compute[0].project
 }
 
 resource "google_compute_network" "env" {
+  project                 = local.project
   name                    = local.name
   auto_create_subnetworks = false
 }
 
 resource "google_compute_subnetwork" "env" {
+  project       = local.project
   name          = local.name
   network       = google_compute_network.env.id
   ip_cidr_range = "10.42.1.0/24"
@@ -56,6 +87,7 @@ resource "google_compute_subnetwork" "env" {
 }
 
 resource "google_compute_firewall" "env" {
+  project       = local.project
   name          = local.name
   network       = google_compute_network.env.id
   source_ranges = [var.allowed_cidr]
@@ -66,6 +98,7 @@ resource "google_compute_firewall" "env" {
 }
 
 resource "google_compute_instance" "env" {
+  project      = local.project
   name         = local.name
   machine_type = var.machine_type
   zone         = "${var.region}-a"

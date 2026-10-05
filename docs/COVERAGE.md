@@ -19,7 +19,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 25% | 4 | 1 | 0 | 3 |
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
 | [Vagrant: QEMU](#vagrant-qemu) | 14% | 14 | 2 | 0 | 12 |
-| [Vagrant: ESXi](#vagrant-esxi) | 0% | 14 | 0 | 0 | 14 |
+| [Vagrant: ESXi](#vagrant-esxi) | 47% | 19 | 9 | 0 | 10 |
 | [Terraform: Proxmox](#terraform-proxmox) | 43% | 16 | 7 | 0 | 9 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 44% | 18 | 8 | 0 | 10 |
@@ -588,7 +588,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: ESXi
 
-0% of 14 portable features (0 done, 0 partly, 14 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
+47% of 19 portable features (9 done, 0 partly, 10 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
 
 ### Settings
 
@@ -599,25 +599,25 @@ when a table disagrees with what Isoloom really generates.
 | `custom_vmx_settings` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `debug` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `encoded_esxi_password` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `esxi_disk_store` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `esxi_hostname` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `esxi_hostport` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `esxi_password` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `esxi_disk_store` | Yes | Yes | From the ESXI_* environment variables (the host is the user's) |
+| `esxi_hostname` | Yes | Yes | From the ESXI_* environment variables (the host is the user's) |
+| `esxi_hostport` | Yes | Yes | From the ESXI_* environment variables (the host is the user's) |
+| `esxi_password` | Yes | Yes | From the ESXI_* environment variables (the host is the user's) |
 | `esxi_private_keys` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `esxi_resource_pool` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `esxi_username` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `esxi_virtual_network` | Yes | Not yet | Private networks: one ESXi port group per network |
+| `esxi_username` | Yes | Yes | From the ESXI_* environment variables (the host is the user's) |
+| `esxi_virtual_network` | Yes | Yes | From networks: a port group per network, from ESXI_VIRTUAL_NETWORK |
 | `guest_autostart` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_boot_disk_size` | Yes | Not yet | Machines.*.resources.disk_gb |
 | `guest_custom_vmx_settings` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_disk_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_guestos` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
 | `guest_mac_address` | No | No | Cloud VMs get their MAC address from the provider |
-| `guest_memsize` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
-| `guest_name` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
+| `guest_memsize` | Yes | Yes | From `machines.*.resources` |
+| `guest_name` | Yes | Yes | From the environment and machine names |
 | `guest_name_prefix` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
 | `guest_nic_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `guest_numvcpus` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
+| `guest_numvcpus` | Yes | Yes | From `machines.*.resources` |
 | `guest_snapshot_includememory` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_snapshot_quiesced` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_storage` | Yes | Not yet | Machines.*.resources.disk_gb |
@@ -641,7 +641,7 @@ when a table disagrees with what Isoloom really generates.
 | `supported_guest_guestos` | n/a | No | The plugin's own list of accepted values |
 | `supported_guest_nic_types` | n/a | No | The plugin's own list of accepted values |
 | `supported_guest_virtualhw_versions` | n/a | No | The plugin's own list of accepted values |
-| `virtual_network` | Yes | Not yet | Private networks: one ESXi port group per network |
+| `virtual_network` | Yes | Not yet | The plugin's older name for esxi_virtual_network |
 | `virtualhw_version` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `vm_disk_store` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `vm_disk_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |

@@ -6,6 +6,13 @@
 ROOT = File.expand_path("../..", __dir__)
 # Copied into each VM: the project, without version control or generated files.
 PROJECT = Dir.children(ROOT).reject { |e| [".git", ".isoloom", ".vagrant"].include?(e) }.sort
+# ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
+# management network first, then one per network, in order (dmz, internal, access); a missing one reuses the last.
+ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
+LAB_NETWORKS = ["dmz", "internal", "access"]
+def esxi_networks(nets)
+  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+end
 
 Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
@@ -36,6 +43,17 @@ Vagrant.configure("2") do |config|
       o.vm.box = "generic/debian12"
       v.cpus = 1
       v.memory = 512
+    end
+    m.vm.provider "vmware_esxi" do |v|
+      v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
+      v.esxi_hostport = ENV.fetch("ESXI_HOSTPORT", "22").to_i
+      v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
+      v.esxi_password = "env:ESXI_PASSWORD"
+      v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
+      v.esxi_virtual_network = esxi_networks(["dmz", "internal", "access"])
+      v.guest_name = "pivot-dmz-router"
+      v.guest_numvcpus = 1
+      v.guest_memsize = 512
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -89,6 +107,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "qemu" do |v|
       v.smp = "cpus=1"
       v.memory = "1024M"
+    end
+    m.vm.provider "vmware_esxi" do |v|
+      v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
+      v.esxi_hostport = ENV.fetch("ESXI_HOSTPORT", "22").to_i
+      v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
+      v.esxi_password = "env:ESXI_PASSWORD"
+      v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
+      v.esxi_virtual_network = esxi_networks(["dmz", "internal"])
+      v.guest_name = "pivot-dmz-gateway"
+      v.guest_numvcpus = 1
+      v.guest_memsize = 1024
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
@@ -164,6 +193,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "qemu" do |v|
       v.smp = "cpus=1"
       v.memory = "1024M"
+    end
+    m.vm.provider "vmware_esxi" do |v|
+      v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
+      v.esxi_hostport = ENV.fetch("ESXI_HOSTPORT", "22").to_i
+      v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
+      v.esxi_password = "env:ESXI_PASSWORD"
+      v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
+      v.esxi_virtual_network = esxi_networks(["internal"])
+      v.guest_name = "pivot-dmz-app"
+      v.guest_numvcpus = 1
+      v.guest_memsize = 1024
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
@@ -274,6 +314,17 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
     end
+    m.vm.provider "vmware_esxi" do |v|
+      v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
+      v.esxi_hostport = ENV.fetch("ESXI_HOSTPORT", "22").to_i
+      v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
+      v.esxi_password = "env:ESXI_PASSWORD"
+      v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
+      v.esxi_virtual_network = esxi_networks(["internal"])
+      v.guest_name = "pivot-dmz-db"
+      v.guest_numvcpus = 1
+      v.guest_memsize = 1024
+    end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
       v.cpus = 1
@@ -382,6 +433,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "qemu" do |v|
       v.smp = "cpus=1"
       v.memory = "1024M"
+    end
+    m.vm.provider "vmware_esxi" do |v|
+      v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
+      v.esxi_hostport = ENV.fetch("ESXI_HOSTPORT", "22").to_i
+      v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
+      v.esxi_password = "env:ESXI_PASSWORD"
+      v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
+      v.esxi_virtual_network = esxi_networks(["access"])
+      v.guest_name = "pivot-dmz-user"
+      v.guest_numvcpus = 1
+      v.guest_memsize = 1024
     end
     m.vm.provider "libvirt" do |v|
       v.cpus = 1

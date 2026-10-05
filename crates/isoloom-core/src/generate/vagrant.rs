@@ -62,6 +62,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         out.push_str("}\n");
     }
+    let lab_nets = spec.networks.keys().map(|n| rb(n)).collect::<Vec<_>>().join(", ");
+    let _ = writeln!(
+        out,
+        "# ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the\n# management network first, then one per network, in order ({}); a missing one reuses the last.\nESXI_NETWORKS = ENV.fetch(\"ESXI_VIRTUAL_NETWORK\", \"VM Network\").split(\",\").map(&:strip)\nLAB_NETWORKS = [{lab_nets}]\ndef esxi_networks(nets)\n  [ESXI_NETWORKS[0]] + nets.map {{ |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }}\nend",
+        spec.networks.keys().cloned().collect::<Vec<_>>().join(", ")
+    );
     out.push_str("\nVagrant.configure(\"2\") do |config|\n");
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n");
     out.push_str("  config.vm.boot_timeout = 600\n");
@@ -138,6 +144,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             out,
             "    m.vm.provider \"qemu\" do |v|\n      v.smp = \"cpus={cpus}\"\n      v.memory = \"{mem}M\"\n    end"
         );
+        let nets: Vec<&str> = m.networks.keys().map(String::as_str).collect();
+        esxi(&mut out, &format!("{}-{name}", spec.name), cpus, mem, &nets);
         match libvirt_box {
             Some(b) => {
                 let _ = writeln!(
@@ -337,6 +345,16 @@ fn indent(script: &str, spaces: usize) -> String {
         .collect()
 }
 
+/// The vagrant-vmware-esxi provider block: the host from ESXI_* variables, a port group per NIC.
+fn esxi(out: &mut String, guest: &str, cpus: u32, mem: u32, nets: &[&str]) {
+    let nets = nets.iter().map(|n| rb(n)).collect::<Vec<_>>().join(", ");
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"vmware_esxi\" do |v|\n      v.esxi_hostname = ENV.fetch(\"ESXI_HOSTNAME\", \"\")\n      v.esxi_hostport = ENV.fetch(\"ESXI_HOSTPORT\", \"22\").to_i\n      v.esxi_username = ENV.fetch(\"ESXI_USERNAME\", \"root\")\n      v.esxi_password = \"env:ESXI_PASSWORD\"\n      v.esxi_disk_store = ENV[\"ESXI_DATASTORE\"] if ENV[\"ESXI_DATASTORE\"]\n      v.esxi_virtual_network = esxi_networks([{nets}])\n      v.guest_name = {}\n      v.guest_numvcpus = {cpus}\n      v.guest_memsize = {mem}\n    end",
+        rb(guest)
+    );
+}
+
 /// The router VM: on every network at its last address, forwarding with the `reach` rules.
 fn router_vm(spec: &Spec, out: &mut String) {
     let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(router::NAME));
@@ -373,6 +391,8 @@ fn router_vm(spec: &Spec, out: &mut String) {
         out,
         "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 512\n    end"
     );
+    let router_nets: Vec<&str> = router::networks(spec).map(String::as_str).collect();
+    esxi(out, &format!("{}-router", spec.name), 1, 512, &router_nets);
     let script = format!(
         "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n",
         router::nftables(spec)
@@ -491,6 +511,8 @@ fn controller_vm(spec: &Spec, out: &mut String) {
         out,
         "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 1024\n    end"
     );
+    let all: Vec<&str> = spec.networks.keys().map(String::as_str).collect();
+    esxi(out, &format!("{}-controller", spec.name), 1, 1024, &all);
     // Every machine by name, at its address on its first network (the controller is on all).
     let hosts: Vec<String> = spec
         .machines

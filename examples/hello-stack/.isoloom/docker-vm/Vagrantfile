@@ -36,9 +36,11 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "vmware_esxi" do |v|
     v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
+    v.esxi_hostport = ENV.fetch("ESXI_HOSTPORT", "22").to_i
     v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
+    v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
     v.guest_name = "hello-stack-docker"
     v.guest_numvcpus = 2
     v.guest_memsize = 2048

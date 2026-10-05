@@ -387,9 +387,21 @@ fn vmware_esxi(s: &str) -> Option<Support> {
         note: "with the ESXi provider block (not verified on an ESXi host yet)",
     };
     Some(match s {
-        "guest_numvcpus" | "numvcpus" | "guest_memsize" | "memsize" | "guest_name" | "vmname" | "guest_name_prefix" | "vmname_prefix" => ESXI,
-        "esxi_virtual_network" | "virtual_network" => Planned {
-            note: "private networks: one ESXi port group per network",
+        "guest_numvcpus" | "guest_memsize" => Emitted {
+            from: "machines.*.resources",
+        },
+        "guest_name" => Emitted {
+            from: "the environment and machine names",
+        },
+        "numvcpus" | "memsize" | "vmname" | "guest_name_prefix" | "vmname_prefix" => ESXI,
+        "esxi_virtual_network" => Emitted {
+            from: "networks: a port group per network, from ESXI_VIRTUAL_NETWORK",
+        },
+        "virtual_network" => Planned {
+            note: "the plugin's older name for esxi_virtual_network",
+        },
+        "esxi_hostname" | "esxi_hostport" | "esxi_username" | "esxi_password" | "esxi_disk_store" => Emitted {
+            from: "the ESXI_* environment variables (the host is the user's)",
         },
         "guest_boot_disk_size" | "guest_storage" => DISK,
         "guest_guestos" | "guestos" => WINDOWS,
@@ -404,13 +416,8 @@ fn vmware_esxi(s: &str) -> Option<Support> {
         | "guest_custom_vmx_settings"
         | "guest_disk_type"
         | "vm_disk_type" => HOST_TUNING,
-        "esxi_hostname"
-        | "esxi_hostport"
-        | "esxi_username"
-        | "esxi_password"
-        | "encoded_esxi_password"
+        "encoded_esxi_password"
         | "esxi_private_keys"
-        | "esxi_disk_store"
         | "vm_disk_store"
         | "esxi_resource_pool"
         | "resource_pool"
