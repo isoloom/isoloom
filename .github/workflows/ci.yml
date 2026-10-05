@@ -68,6 +68,14 @@ jobs:
       - uses: helm/kind-action@v1
         with:
           cluster_name: isoloom
+          config: .github/kind-calico.yaml
+          wait: 0s
+      - name: Calico (enforces NetworkPolicies, egress included)
+        working-directory: .
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml
+          kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
       - name: Build and load the project's images
         run: |
           grep -E '^#   docker build -t ' .isoloom/kubernetes/environment.yaml | sed 's/^#   //' | while read -r cmd; do
