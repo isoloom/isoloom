@@ -14,7 +14,9 @@
 //!   stands: the `checks` output gives the machine and the commands.
 //! - A machine on several networks gets a network interface on each (source/destination
 //!   check off, so replies leave from the right one) and an Elastic IP on the first.
-//! - Not yet: Windows, environment-level `provision:`.
+//! - Environment-level `provision:`: a Debian controller on every network (at the controller
+//!   address) runs the playbooks over SSH with a key of its own, once every machine is set up.
+//! - Not yet: Windows.
 
 use std::fmt::Write;
 
@@ -59,9 +61,6 @@ fn family(c: Cidr) -> u8 {
 }
 
 fn unsupported(spec: &Spec) -> Option<String> {
-    if !spec.provision.is_empty() {
-        return Some("environment-level provisioning (`provision:`) in the cloud comes later".into());
-    }
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine in the cloud come later".into());
     }
@@ -109,7 +108,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     aws = {{
       source  = "hashicorp/aws"
       version = "~> 6.0"
-    }}
+    }}{tls}
   }}
 }}
 
@@ -133,7 +132,12 @@ variable "auto_stop_minutes" {{
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
 }}
-"#
+"#,
+        tls = if spec.provision.is_empty() {
+            ""
+        } else {
+            "\n    tls = {\n      source  = \"hashicorp/tls\"\n      version = \"~> 4.0\"\n    }"
+        },
     );
     if !spec.inputs.is_empty() {
         tf.push_str(
@@ -201,6 +205,10 @@ resource "aws_vpc" "env" {{
 
     // AMIs, once per OS.
     let mut oses: Vec<&str> = spec.machines.values().filter_map(|m| m.vm.as_ref()).map(|v| v.os.as_str()).collect();
+    if !spec.provision.is_empty() {
+        oses.push(CONTROLLER_OS);
+        tf.push_str("\n# The controller's own key: it runs the playbooks over SSH on every machine.\nresource \"tls_private_key\" \"controller\" {\n  algorithm = \"ED25519\"\n}\n");
+    }
     oses.sort();
     oses.dedup();
     for os in &oses {
@@ -334,6 +342,12 @@ resource "aws_vpc" "env" {{
             "cloud-init status --wait >/dev/null 2>&1 || true".into(),
             "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
         ];
+        if !spec.provision.is_empty() {
+            cmds.push(format!(
+                "mkdir -p ~/.ssh && echo '{}' >> ~/.ssh/authorized_keys",
+                tf_expr("trimspace(tls_private_key.controller.public_key_openssh)")
+            ));
+        }
         // Its other interfaces, found by MAC address, at their addresses.
         for (n, o) in m.networks.iter().skip(1) {
             let c = cidr(spec, n);
@@ -437,6 +451,10 @@ resource "aws_vpc" "env" {{
         }
     }
 
+    if !spec.provision.is_empty() {
+        controller(spec, &mut tf, &lab);
+    }
+
     // Outputs: every machine's address, and one to start from (the access machine, else the
     // first), with its SSH user and ready marker, as the other cloud outputs give.
     let first = access_ip.unwrap_or_else(|| "null".into());
@@ -468,6 +486,125 @@ resource "aws_vpc" "env" {{
 fn aligned(entries: &[(String, String)]) -> String {
     let w = entries.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
     entries.iter().map(|(k, v)| format!("    {k:<w$} = {v}")).collect::<Vec<_>>().join("\n")
+}
+
+const CONTROLLER_OS: &str = "debian-12";
+
+/// The controller: a Debian instance with an interface on every network at the controller
+/// address, which runs the environment's playbooks once every machine is set up.
+fn controller(spec: &Spec, tf: &mut String, lab: &str) {
+    let nets: Vec<&String> = spec.networks.keys().collect();
+    let _ = lab;
+    let mut sg = String::from(
+        "\n# The controller (Ansible): every network may reach it, and SSH from allowed_cidr.\nresource \"aws_security_group\" \"isoloom_controller\" {\n  name   = \"${local.name}-controller\"\n  vpc_id = aws_vpc.env.id\n",
+    );
+    for n in &nets {
+        let _ = write!(
+            sg,
+            "  ingress {{\n    description = \"{n}\"\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"{}\"]\n  }}\n",
+            spec.networks[n.as_str()].cidr
+        );
+    }
+    sg.push_str("  ingress {\n    description = \"SSH from allowed_cidr\"\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }\n  egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n");
+    tf.push_str(&sg);
+    for n in &nets {
+        let _ = writeln!(
+            tf,
+            "\nresource \"aws_network_interface\" \"isoloom_controller_{nid}\" {{\n  subnet_id         = aws_subnet.{nid}.id\n  private_ips       = [\"{a}\"]\n  security_groups   = [aws_security_group.isoloom_controller.id]\n  source_dest_check = false\n}}",
+            nid = res(n),
+            a = cidr(spec, n).controller(),
+        );
+    }
+    let first = res(nets[0]);
+    let _ = writeln!(
+        tf,
+        "\nresource \"aws_instance\" \"isoloom_controller\" {{\n  ami           = data.aws_ami.{os}.id\n  instance_type = \"t3.small\"\n  key_name      = aws_key_pair.env.key_name\n  user_data     = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  primary_network_interface {{\n    network_interface_id = aws_network_interface.isoloom_controller_{first}.id\n  }}\n  tags = {{ Name = \"${{local.name}}-controller\" }}\n}}\n\nresource \"aws_eip\" \"isoloom_controller\" {{\n  network_interface = aws_network_interface.isoloom_controller_{first}.id\n  depends_on        = [aws_internet_gateway.env]\n}}",
+        os = res(CONTROLLER_OS),
+    );
+    for (i, n) in nets.iter().enumerate().skip(1) {
+        let _ = writeln!(
+            tf,
+            "\nresource \"aws_network_interface_attachment\" \"isoloom_controller_{nid}\" {{\n  instance_id          = aws_instance.isoloom_controller.id\n  network_interface_id = aws_network_interface.isoloom_controller_{nid}.id\n  device_index         = {i}\n}}",
+            nid = res(n),
+        );
+    }
+    // Its set-up: interfaces, names, the project, its key, Ansible, the inventory, the playbooks.
+    let mut cmds: Vec<String> = vec![
+        "set -e".into(),
+        "cloud-init status --wait >/dev/null 2>&1 || true".into(),
+        "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
+    ];
+    for n in nets.iter().skip(1) {
+        let c = cidr(spec, n);
+        cmds.push(format!(
+            "IF=$(ip -o link | grep -i \"{mac}\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")",
+            mac = tf_expr(&format!("lower(aws_network_interface.isoloom_controller_{}.mac_address)", res(n))),
+            a = c.controller(),
+            len = c.len,
+        ));
+    }
+    let hosts: Vec<String> = spec
+        .machines
+        .iter()
+        .filter_map(|(o, om)| om.networks.first().map(|(n, oc)| format!("'{} {o}'", address(spec, n, *oc))))
+        .collect();
+    if !hosts.is_empty() {
+        cmds.push(format!("printf '%s\\n' {} | sudo tee -a /etc/hosts >/dev/null", hosts.join(" ")));
+    }
+    cmds.push(
+        "sudo mkdir -p /etc/isoloom && sudo install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && rm -f /tmp/isoloom-controller-key".into(),
+    );
+    cmds.push("sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null".into());
+    cmds.push(
+        "[ -x /opt/ansible/bin/ansible-playbook ] || { sudo python3 -m venv /opt/ansible && sudo /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17'; }"
+            .into(),
+    );
+    cmds.push(format!(
+        "printf '%s' {} | sudo tee /etc/isoloom/inventory.ini >/dev/null",
+        sh_quote(&inventory(spec))
+    ));
+    cmds.push(format!("sudo sh -c {}", sh_quote(&super::vagrant::ansible_runs(spec))));
+    cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
+    let deps: Vec<String> = spec
+        .machines
+        .iter()
+        .filter(|(_, m)| m.vm.is_some())
+        .map(|(n, _)| format!("terraform_data.{}", res(n)))
+        .collect();
+    let _ = writeln!(
+        tf,
+        "\nresource \"terraform_data\" \"isoloom_controller\" {{\n  triggers_replace = [aws_instance.isoloom_controller.id]\n  connection {{\n    type        = \"ssh\"\n    host        = aws_eip.isoloom_controller.public_ip\n    user        = \"admin\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-controller.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \\\"${{local.root}}\\\" .\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-controller.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n  provisioner \"file\" {{\n    content     = tls_private_key.controller.private_key_openssh\n    destination = \"/tmp/isoloom-controller-key\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n  depends_on = [{}]\n}}",
+        cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n"),
+        deps.join(", "),
+    );
+}
+
+/// The controller's inventory: every machine at its address, with its SSH user and the
+/// controller's key; the spec's groups.
+fn inventory(spec: &Spec) -> String {
+    let mut inv = String::from("[linux]\n");
+    for (name, m) in &spec.machines {
+        let Some(vm) = &m.vm else { continue };
+        let Some((net, octet)) = m.networks.first() else { continue };
+        let user = image(&vm.os).map(|i| i.2).unwrap_or("admin");
+        let _ = writeln!(inv, "{name} ansible_host={} ansible_user={user}", address(spec, net, *octet));
+    }
+    inv.push_str("\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n");
+    let mut groups: indexmap::IndexMap<&str, Vec<&str>> = indexmap::IndexMap::new();
+    for step in &spec.provision {
+        for (g, members) in &step.groups {
+            let e = groups.entry(g.as_str()).or_default();
+            for mbr in members {
+                if !e.contains(&mbr.as_str()) {
+                    e.push(mbr);
+                }
+            }
+        }
+    }
+    for (g, members) in groups {
+        let _ = write!(inv, "\n[{g}]\n{}\n", members.join("\n"));
+    }
+    inv
 }
 
 /// A Terraform expression inside a set-up command: kept through `hcl`'s escaping (which turns

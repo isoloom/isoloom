@@ -340,3 +340,17 @@ fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() {
     assert!(tf.contains("\\\"${lower(aws_network_interface.gateway_internal.mac_address)}\\\""), "{tf}");
     assert!(!tf.contains("$${lower("));
 }
+
+#[test]
+fn cloud_vm_runs_the_environments_playbooks_from_a_controller() {
+    let (_, spec) = example("ansible-pair");
+    let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
+    // A key of its own, authorized on every machine; the controller at the controller address.
+    assert!(tf.contains("resource \"tls_private_key\" \"controller\""));
+    assert!(tf.contains("${trimspace(tls_private_key.controller.public_key_openssh)}"), "{tf}");
+    assert!(tf.contains("private_ips       = [\"10.63.0.253\"]"));
+    // After every machine is set up, it runs the playbook with the groups and vars.
+    assert!(tf.contains("depends_on = [terraform_data.web, terraform_data.cache]") || tf.contains("depends_on = [terraform_data.cache, terraform_data.web]"));
+    assert!(tf.contains("ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini"));
+    assert!(tf.contains("[webservers]"));
+}
