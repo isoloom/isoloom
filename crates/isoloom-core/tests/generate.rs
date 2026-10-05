@@ -336,4 +336,7 @@ fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() {
     assert!(tf.contains("source_dest_check = false"));
     assert!(tf.contains("resource \"aws_network_interface_attachment\" \"gateway_internal\""));
     assert!(tf.contains("resource \"aws_eip\" \"gateway\""));
+    // The set-up finds the extra interface by its MAC address: interpolated, not a literal.
+    assert!(tf.contains("\\\"${lower(aws_network_interface.gateway_internal.mac_address)}\\\""), "{tf}");
+    assert!(!tf.contains("$${lower("));
 }

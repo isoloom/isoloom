@@ -338,8 +338,8 @@ resource "aws_vpc" "env" {{
         for (n, o) in m.networks.iter().skip(1) {
             let c = cidr(spec, n);
             cmds.push(format!(
-                "IF=$(ip -o link | grep -i \"${{lower(aws_network_interface.{id}_{nid}.mac_address)}}\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")",
-                nid = res(n),
+                "IF=$(ip -o link | grep -i \"{mac}\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")",
+                mac = tf_expr(&format!("lower(aws_network_interface.{id}_{}.mac_address)", res(n))),
                 a = address(spec, n, *o),
                 len = c.len,
             ));
@@ -422,7 +422,7 @@ resource "aws_vpc" "env" {{
         let _ = write!(
             prov,
             "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
-            cmds.iter().map(|c| format!("      {}", hcl(c))).collect::<Vec<_>>().join(",\n")
+            cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
         );
         if !deps.is_empty() {
             let _ = writeln!(prov, "  depends_on = [{}]", deps.join(", "));
@@ -468,6 +468,17 @@ resource "aws_vpc" "env" {{
 fn aligned(entries: &[(String, String)]) -> String {
     let w = entries.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
     entries.iter().map(|(k, v)| format!("    {k:<w$} = {v}")).collect::<Vec<_>>().join("\n")
+}
+
+/// A Terraform expression inside a set-up command: kept through `hcl`'s escaping (which turns
+/// `${` into a literal) and turned into `${expr}` by `hcl_cmd`.
+fn tf_expr(expr: &str) -> String {
+    format!("\u{1}{expr}\u{2}")
+}
+
+/// A set-up command as an HCL string, its `tf` expressions interpolated.
+fn hcl_cmd(c: &str) -> String {
+    hcl(c).replace('\u{1}', "${").replace('\u{2}', "}")
 }
 
 /// A single-quoted shell word.

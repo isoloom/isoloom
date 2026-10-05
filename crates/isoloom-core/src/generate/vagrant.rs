@@ -547,25 +547,7 @@ fn controller_vm(spec: &Spec, out: &mut String) {
         "    m.vm.provision \"shell\", name: \"controller\", inline: <<~'SH'\n{}    SH",
         indent(&script, 6)
     );
-    let mut script = String::from("set -e\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\n");
-    for step in &spec.provision {
-        let dir = step.ansible.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
-        let file = step.ansible.rsplit('/').next().unwrap_or(&step.ansible);
-        let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect();
-        // As JSON: `-e k=v` splits values on spaces.
-        let vars = if step.vars.is_empty() {
-            String::new()
-        } else {
-            format!(" -e {}", shell_quote(&serde_json::to_string(&step.vars).expect("strings serialize")))
-        };
-        let requirements = match &step.requirements {
-            Some(r) => format!("ansible-galaxy install -r /opt/isoloom/{r}\n"),
-            None => "[ ! -f requirements.yml ] || ansible-galaxy install -r requirements.yml\n".into(),
-        };
-        script.push_str(&format!(
-            "cd /opt/isoloom/{dir}\n{requirements}ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars} {file}\n"
-        ));
-    }
+    let script = ansible_runs(spec);
     if !spec.provision.is_empty() {
         let _ = writeln!(
             out,
@@ -656,6 +638,32 @@ fn inventory(spec: &Spec) -> String {
         inv.push_str(&format!("\n[{g}]\n{}\n", members.join("\n")));
     }
     inv
+}
+
+/// The controller's script running the environment's playbooks (`provision:`), in order, with
+/// the inventory at /etc/isoloom/inventory.ini plus each step's own files. Shared with the
+/// cloud output.
+pub(super) fn ansible_runs(spec: &Spec) -> String {
+    let mut script = String::from("set -e\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\n");
+    for step in &spec.provision {
+        let dir = step.ansible.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
+        let file = step.ansible.rsplit('/').next().unwrap_or(&step.ansible);
+        let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect();
+        // As JSON: `-e k=v` splits values on spaces.
+        let vars = if step.vars.is_empty() {
+            String::new()
+        } else {
+            format!(" -e {}", shell_quote(&serde_json::to_string(&step.vars).expect("strings serialize")))
+        };
+        let requirements = match &step.requirements {
+            Some(r) => format!("ansible-galaxy install -r /opt/isoloom/{r}\n"),
+            None => "[ ! -f requirements.yml ] || ansible-galaxy install -r requirements.yml\n".into(),
+        };
+        script.push_str(&format!(
+            "cd /opt/isoloom/{dir}\n{requirements}ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars} {file}\n"
+        ));
+    }
+    script
 }
 
 /// A single-quoted shell word.
