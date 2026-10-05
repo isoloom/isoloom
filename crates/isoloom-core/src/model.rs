@@ -122,6 +122,14 @@ pub struct Machine {
     /// its declared `volumes`. Applies to containers; a VM's root stays writable.
     #[serde(default)]
     pub read_only: bool,
+    /// Memory-backed (tmpfs) mount paths inside the machine, for scratch space that never
+    /// touches disk (e.g. `/tmp`, `/run`). A VM sets these up in its own provisioning (fstab).
+    #[serde(default)]
+    pub tmpfs: Vec<String>,
+    /// The size of `/dev/shm` (shared memory), e.g. `256m` or `1g`, for workloads that need more
+    /// than the small default (browsers, some databases). A VM sizes it in its own provisioning.
+    #[serde(default)]
+    pub shm_size: Option<String>,
     #[serde(default)]
     pub services: Vec<Service>,
     /// The spec inputs this machine receives (only these).

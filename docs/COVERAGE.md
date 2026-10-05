@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 71% | 56 | 36 | 8 | 12 |
+| [Docker Compose](#docker-compose) | 75% | 56 | 38 | 8 | 10 |
 | [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-71% of 56 portable features (36 done, 8 partly, 12 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+75% of 56 portable features (38 done, 8 partly, 10 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -134,13 +134,13 @@ when a table disagrees with what Isoloom really generates.
 | `scale` | Yes | Not yet | Several identical machines (replicas), each with its own address |
 | `secrets` | Yes | Another way | Via machines.*.inputs |
 | `security_opt` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `shm_size` | Yes | Not yet | The size of /dev/shm (a mount option on VMs) |
+| `shm_size` | Yes | Yes | From `machines.*.shm_size` (and a Memory emptyDir on Kubernetes) |
 | `stdin_open` | n/a | No | Compose tooling, not the environment's behavior |
 | `stop_grace_period` | n/a | No | Compose tooling, not the environment's behavior |
 | `stop_signal` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 | `storage_opt` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `sysctls` | Yes | Partly | From `networks.*.gateway`; not yet: a machine's own network sysctls (net.*): containers only allow those, VMs allow them too |
-| `tmpfs` | Yes | Not yet | Memory-backed mounts (tmpfs works on VMs too) |
+| `tmpfs` | Yes | Yes | From `machines.*.tmpfs` (and Memory emptyDirs on Kubernetes) |
 | `tty` | n/a | No | Compose tooling, not the environment's behavior |
 | `ulimits` | Yes | Not yet | Process limits (limits.conf or systemd on VMs) |
 | `use_api_socket` | No | No | Hands the host's Docker to a machine: VMs and the cloud have none |

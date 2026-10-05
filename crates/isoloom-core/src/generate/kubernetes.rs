@@ -220,11 +220,18 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 c.insert(s("resources"), map([("limits", Value::Mapping(limits))]));
             }
         }
-        let mounts: Vec<Value> = m
+        let mut mounts: Vec<Value> = m
             .volumes
             .iter()
             .map(|(v, path)| map([("name", s(format!("vol-{v}"))), ("mountPath", s(path.as_str()))]))
             .collect();
+        // Memory-backed mounts (tmpfs) and a sized /dev/shm, as emptyDirs of medium Memory.
+        for (i, path) in m.tmpfs.iter().enumerate() {
+            mounts.push(map([("name", s(format!("tmpfs-{i}"))), ("mountPath", s(path.as_str()))]));
+        }
+        if m.shm_size.is_some() {
+            mounts.push(map([("name", s("dshm")), ("mountPath", s("/dev/shm"))]));
+        }
         if !mounts.is_empty() {
             c.insert(s("volumeMounts"), Value::Sequence(mounts.clone()));
         }
@@ -293,6 +300,15 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             volumes.push(map([
                 ("name", s("scripts")),
                 ("configMap", map([("name", s(SCRIPTS)), ("defaultMode", Value::from(0o755))])),
+            ]));
+        }
+        for (i, _) in m.tmpfs.iter().enumerate() {
+            volumes.push(map([("name", s(format!("tmpfs-{i}"))), ("emptyDir", map([("medium", s("Memory"))]))]));
+        }
+        if let Some(shm) = &m.shm_size {
+            volumes.push(map([
+                ("name", s("dshm")),
+                ("emptyDir", map([("medium", s("Memory")), ("sizeLimit", s(shm.as_str()))])),
             ]));
         }
         if !volumes.is_empty() {

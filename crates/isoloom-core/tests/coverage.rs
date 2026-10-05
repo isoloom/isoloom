@@ -30,6 +30,8 @@ machines:
     arch: amd64
     privileged: true
     read_only: true
+    tmpfs: [/tmp, /run]
+    shm_size: 256m
     resources: { cpus: 1, memory_mb: 512, disk_gb: 10 }
     depends_on: []
     volumes: { data: /data }

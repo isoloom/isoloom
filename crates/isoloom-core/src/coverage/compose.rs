@@ -306,8 +306,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.security_opt", NO_CONTAINER_ON_VMS),
         (
             "services.*.shm_size",
-            Planned {
-                note: "the size of /dev/shm (a mount option on VMs)",
+            Emitted {
+                from: "machines.*.shm_size (and a Memory emptyDir on Kubernetes)",
             },
         ),
         ("services.*.stdin_open", TOOLING),
@@ -323,8 +323,8 @@ fn rows() -> Vec<(String, Support)> {
         ),
         (
             "services.*.tmpfs",
-            Planned {
-                note: "memory-backed mounts (tmpfs works on VMs too)",
+            Emitted {
+                from: "machines.*.tmpfs (and Memory emptyDirs on Kubernetes)",
             },
         ),
         ("services.*.tty", TOOLING),

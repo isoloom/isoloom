@@ -44,8 +44,26 @@ spec:
             - (nc -z 127.0.0.1 80 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/80' 2>/dev/null)
           periodSeconds: 5
           failureThreshold: 60
+        volumeMounts:
+        - name: tmpfs-0
+          mountPath: /run
+        - name: tmpfs-1
+          mountPath: /var/cache/nginx
+        - name: dshm
+          mountPath: /dev/shm
       nodeSelector:
         kubernetes.io/arch: arm64
+      volumes:
+      - name: tmpfs-0
+        emptyDir:
+          medium: Memory
+      - name: tmpfs-1
+        emptyDir:
+          medium: Memory
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 128m
 ---
 apiVersion: v1
 kind: Service

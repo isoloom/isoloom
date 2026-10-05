@@ -276,6 +276,16 @@ fn base_table() -> Vec<Row> {
             na("a VM's root filesystem stays writable; use `volumes` for data that must persist"),
         ),
         common(
+            "machines.*.tmpfs",
+            done("memory-backed mounts on the container (and Memory emptyDirs on Kubernetes)", "arm-lab"),
+            na("a VM mounts tmpfs in its own provisioning (fstab)"),
+        ),
+        common(
+            "machines.*.shm_size",
+            done("the size of /dev/shm on the container (and a Memory emptyDir on Kubernetes)", "arm-lab"),
+            na("a VM sizes /dev/shm in its own provisioning"),
+        ),
+        common(
             "machines.*.resources.cpus",
             done("a CPU limit", "supplier-portal-api"),
             done("the VM's CPUs on every provider", "supplier-portal-api"),

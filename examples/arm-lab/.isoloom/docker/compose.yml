@@ -11,6 +11,10 @@ services:
     platform: linux/arm64
     privileged: true
     read_only: true
+    shm_size: 128m
+    tmpfs:
+    - /run
+    - /var/cache/nginx
     hostname: web
     networks:
       lab:
