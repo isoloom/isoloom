@@ -22,7 +22,8 @@ fn the_draft_is_a_valid_spec() {
     let spec = parse(&d.yaml).expect("the draft parses");
     assert_eq!(validate(&spec), vec![], "{}", d.yaml);
     assert_eq!(spec.name, "shop-demo");
-    assert!(d.yaml.starts_with("# Drafted by `isoloom import compose` from docker-compose.yml."));
+    assert!(d.yaml.starts_with(isoloom_core::schema::MODELINE));
+    assert!(d.yaml.contains("# Drafted by `isoloom import compose` from docker-compose.yml."));
 }
 
 #[test]

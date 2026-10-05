@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # Three networks and a router: the user lands on `access`, may reach the web server on
 # `front`, and nothing on `back`; only `front` may reach the cache, and only on 6379.
 version: 1

@@ -749,6 +749,7 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
 
     // The draft.
     let mut y = String::new();
+    let _ = writeln!(y, "{}", crate::schema::MODELINE);
     let _ = writeln!(y, "# Drafted by `isoloom import compose` from {source}. Review it with the notes the");
     y.push_str("# import printed: what Compose said that this file doesn't (yet), and why.\n");
     y.push_str("# Next: add `vm:` to each machine for the VM targets, and `checks` that prove the behavior.\n");

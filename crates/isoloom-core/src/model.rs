@@ -3,10 +3,11 @@
 //! target produces it (`docker:` and/or `vm:`).
 
 use indexmap::IndexMap;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// An environment spec. Field order in the file is kept (machines start in the order written).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Spec {
     pub version: u32,
@@ -28,7 +29,7 @@ pub struct Spec {
     pub targets: Option<Vec<Target>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
     /// An IPv4 block inside 10.0.0.0/8, e.g. 10.20.0.0/24.
@@ -48,7 +49,7 @@ fn yes() -> bool {
     true
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Reach {
     pub from: String,
@@ -58,7 +59,7 @@ pub struct Reach {
     pub ports: Vec<u16>,
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Machine {
     /// Network name -> last octet of the machine's address on it.
@@ -88,7 +89,7 @@ pub struct Machine {
     pub vm: Option<VmImpl>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Service {
     pub port: u16,
@@ -102,7 +103,7 @@ pub struct Service {
     pub publish: Option<u16>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Resources {
     #[serde(default)]
@@ -113,7 +114,7 @@ pub struct Resources {
     pub disk_gb: Option<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DockerImpl {
     /// A published image (exactly one of `image` and `build`).
@@ -127,7 +128,7 @@ pub struct DockerImpl {
     pub init: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VmImpl {
     /// An OS name from [`KNOWN_OS`]; each target maps it to an image.
@@ -142,7 +143,7 @@ pub struct VmImpl {
 pub const KNOWN_OS: &[&str] = &["debian-12", "ubuntu-24.04", "kali", "windows-server-2022", "windows-11"];
 
 /// Where an environment can run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Target {
     /// Containers on the player's Docker.

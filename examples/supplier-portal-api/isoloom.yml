@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # The Supplier portal API lab: one lab, two implementations per machine (containers or
 # native VMs), so it runs on every target.
 version: 1

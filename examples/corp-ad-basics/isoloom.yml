@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # A small Active Directory domain: VM targets only (Windows has no container form).
 version: 1
 name: corp-ad-basics

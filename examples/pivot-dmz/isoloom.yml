@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # A segmented network: a gateway in the DMZ, an app and a database behind it, and the
 # user's machine that only sees the DMZ.
 version: 1

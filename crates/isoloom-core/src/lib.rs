@@ -10,6 +10,7 @@ pub mod coverage;
 pub mod generate;
 pub mod import;
 pub mod model;
+pub mod schema;
 pub mod targets;
 pub mod validate;
 

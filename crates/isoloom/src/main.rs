@@ -58,6 +58,8 @@ enum Command {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
+    /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
+    Schema,
     /// Draft an isoloom.yml from files you already have.
     #[command(subcommand)]
     Import(Import),
@@ -213,6 +215,10 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             } else {
                 ExitCode::SUCCESS
             })
+        }
+        Command::Schema => {
+            println!("{}", serde_json::to_string_pretty(&core::schema::schema())?);
+            Ok(ExitCode::SUCCESS)
         }
         Command::Import(Import::Compose { file, out, force, stdout }) => {
             let file = match file {
