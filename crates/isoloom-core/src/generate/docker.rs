@@ -219,7 +219,10 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             j.insert(s("image"), s(image.clone()));
             let mounted = format!("/isoloom/init/{}", file_name(script));
             j.insert(s("entrypoint"), list([s("/bin/sh"), s(mounted.clone())]));
-            j.insert(s("volumes"), list([s(format!("{ROOT}/{script}:{mounted}:ro"))]));
+            // The job runs "in" the machine: its volumes too, as a VM's steps see its disk.
+            let mut mounts = vec![s(format!("{ROOT}/{script}:{mounted}:ro"))];
+            mounts.extend(m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", volume_name(name, v)))));
+            j.insert(s("volumes"), Value::Sequence(mounts));
             j.insert(s("network_mode"), s(format!("service:{name}")));
             if let Some(env) = environment(m) {
                 j.insert(s("environment"), env);

@@ -52,6 +52,7 @@ services:
     - /isoloom/init/seed.sh
     volumes:
     - ../../build/cache/seed.sh:/isoloom/init/seed.sh:ro
+    - cache-data:/data
     network_mode: service:cache
     depends_on:
       cache:
