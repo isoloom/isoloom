@@ -25,7 +25,7 @@ inputs: [TOKEN]
 machines:
   fw:
     networks: { out: 2, dmz: 1 }
-    services: [{ port: 80, name: web, http: true }]
+    services: [{ port: 80, name: web, http: true, publish: 8080 }]
     inputs: [TOKEN]
     resources: { cpus: 1, memory_mb: 512, disk_gb: 10 }
     depends_on: []

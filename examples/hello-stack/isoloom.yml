@@ -19,7 +19,7 @@ machines:
 
   web:
     networks: { app: 10 }
-    services: [{ port: 80, http: true }]
+    services: [{ port: 80, http: true, publish: 8080 }]
     depends_on: [cache]
     docker: { build: build/web }
     vm: { os: debian-12, provision: [provision/web.sh] }

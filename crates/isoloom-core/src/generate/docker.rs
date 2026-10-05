@@ -15,6 +15,7 @@
 //!   machines that list them.
 //! - Checks run in a `check` profile: `docker compose --profile check run --rm isoloom-check`.
 //!
+//! - A service's `publish` port is published on the host's loopback (127.0.0.1) only.
 //! - `volumes:` become named volumes: they survive re-creating a container, and go with
 //!   `docker compose down -v`.
 //!
@@ -104,7 +105,6 @@ fn file_name(path: &str) -> &str {
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     common_unsupported(spec, Target::Docker)?;
-    let routed = router::routed(spec);
 
     let mut services = Mapping::new();
     if router::needed(spec) {
@@ -113,7 +113,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 
     // Machines that get a network sidecar (routes via the router or gateways, the default
     // route through a gateway, no default route when offline), so dependents can wait for it.
-    let needs_routes = |name: &str, m: &Machine| routed && !route_commands(spec, name, m).is_empty();
+    let needs_routes = |name: &str, m: &Machine| !route_commands(spec, name, m).is_empty();
 
     for (name, m) in &spec.machines {
         // The access machine may have no implementation: the runner supplies it.
@@ -138,6 +138,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         if let Some(env) = environment(m) {
             svc.insert(s("environment"), env);
+        }
+        let ports: Vec<Value> = m
+            .services
+            .iter()
+            .filter_map(|svc| svc.publish.map(|p| s(format!("127.0.0.1:{p}:{}", svc.port))))
+            .collect();
+        if !ports.is_empty() {
+            svc.insert(s("ports"), Value::Sequence(ports));
         }
         if !m.volumes.is_empty() {
             let mounts = m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", volume_name(name, v)))).collect();
@@ -272,6 +280,17 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                     nets.insert(s(net.as_str()), Value::Null);
                 }
                 c.insert(s("networks"), Value::Mapping(nets));
+                // Standing on offline networks that aren't Docker-internal, the runner drops its
+                // default route like the machines do (root, to change its own routes).
+                let offline = !spec.networks.values().any(|n| n.internet) && spec.networks.keys().any(|n| !internal(spec, n));
+                if offline {
+                    c.insert(s("user"), s("0"));
+                    c.insert(s("cap_add"), list([s("NET_ADMIN")]));
+                    c.insert(
+                        s("entrypoint"),
+                        list([s("/bin/sh"), s("-c"), s(format!("ip route del default 2>/dev/null; {}", run.join(" && ")))]),
+                    );
+                }
             }
         }
         if !deps.is_empty() {
@@ -291,8 +310,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         // Without routing, `internet: false` is Docker's internal network. With a router or a
         // gateway, Docker's internal-network firewall would drop forwarded traffic, so offline
         // machines lose their default route instead (in their sidecar). A network with a
-        // gateway is never internal: its gateway decides what leaves it.
-        if !n.internet && !routed {
+        // gateway is never internal: its gateway decides what leaves it. Nor is a network a
+        // machine publishes a port from (Docker can't publish from internal networks).
+        if internal(spec, net) {
             v.insert(s("internal"), Value::Bool(true));
         }
         networks.insert(s(net.as_str()), Value::Mapping(v));
@@ -393,10 +413,21 @@ fn route_commands(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
     if let Some(out) = own_default(spec, name, m) {
         cmds.push(format!("ip route replace default via {out}"));
     }
-    if offline(spec, name, m) {
+    if offline(spec, name, m) && m.networks.keys().any(|n| !internal(spec, n)) {
         cmds.push("(ip route del default 2>/dev/null || true)".into());
     }
     cmds
+}
+
+/// Whether a network is Docker's internal network: offline, nothing routes, and no machine
+/// on it publishes a port. Otherwise its offline machines lose their default route instead.
+fn internal(spec: &Spec, network: &str) -> bool {
+    let n = &spec.networks[network];
+    let publishes = spec
+        .machines
+        .values()
+        .any(|m| m.docker.is_some() && m.networks.contains_key(network) && m.services.iter().any(|svc| svc.publish.is_some()));
+    !n.internet && !router::routed(spec) && !publishes
 }
 
 /// A gateway's way out: Docker's address on its first network with internet that the
@@ -431,7 +462,7 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     if let Some(gw) = router::default_gateway(spec, name, m).or_else(|| own_default(spec, name, m)) {
         ready.push(format!("ip route | grep -q '^default via {gw} '"));
     }
-    if offline(spec, name, m) {
+    if offline(spec, name, m) && m.networks.keys().any(|n| !internal(spec, n)) {
         ready.push("! ip route | grep -q '^default'".into());
     }
     r.insert(

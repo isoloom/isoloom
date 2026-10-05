@@ -246,8 +246,8 @@ fn rows() -> Vec<(String, Support)> {
         ),
         (
             "services.*.ports",
-            Planned {
-                note: "publishing a service outside the environment: Docker ports, Vagrant forwarded ports, a port forward on the Proxmox router, a public IP in the cloud",
+            Emitted {
+                from: "machines.*.services[].publish (on the host's loopback)",
             },
         ),
         (
@@ -335,7 +335,13 @@ fn rows() -> Vec<(String, Support)> {
                 why: "hands the host's Docker to a machine: VMs and the cloud have none",
             },
         ),
-        ("services.*.user", IMAGE),
+        (
+            "services.*.user",
+            Partial {
+                from: "(Isoloom's check runner, as root to drop its default route on offline networks)",
+                gap: "a machine's own user: set it in its image",
+            },
+        ),
         ("services.*.userns_mode", SHARED_NAMESPACE),
         ("services.*.uts", SHARED_NAMESPACE),
         (

@@ -96,6 +96,10 @@ pub struct Service {
     pub name: Option<String>,
     #[serde(default)]
     pub http: bool,
+    /// Reachable from the user's machine on this port (loopback only), besides the
+    /// environment's own networks.
+    #[serde(default)]
+    pub publish: Option<u16>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

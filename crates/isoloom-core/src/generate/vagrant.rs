@@ -94,6 +94,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 rb(&netname),
             );
         }
+        // Published services: forwarded from the host's loopback only.
+        for svc in &m.services {
+            if let Some(host) = svc.publish {
+                let _ = writeln!(
+                    out,
+                    "    m.vm.network \"forwarded_port\", guest: {}, host: {host}, host_ip: \"127.0.0.1\"",
+                    svc.port
+                );
+            }
+        }
         let _ = writeln!(
             out,
             "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",

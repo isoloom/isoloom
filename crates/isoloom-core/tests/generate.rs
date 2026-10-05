@@ -33,6 +33,7 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("segmented");
     assert_committed("pivot-dmz");
     assert_committed("edge-firewall");
+    assert_committed("air-gapped");
 }
 
 #[test]

@@ -191,6 +191,11 @@ pub fn table() -> Vec<Row> {
                 note: "names the service for people and runners",
             }),
         },
+        common(
+            "machines.*.services[].publish",
+            done("a published port, on the host's loopback", "supplier-portal-api"),
+            done("a forwarded port, on the host's loopback", "supplier-portal-api"),
+        ),
         Row {
             path: "machines.*.services[].http",
             outputs: all(Status::Descriptive {

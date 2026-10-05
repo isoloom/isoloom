@@ -36,6 +36,7 @@ fn what_the_format_expresses_is_carried_over() {
     // The fixed address's last octet survives re-addressing.
     assert_eq!(web.networks["front"], 10);
     assert_eq!(web.services.iter().map(|s| s.port).collect::<Vec<_>>(), [80]);
+    assert_eq!(web.services[0].publish, Some(8080), "the host port carries over");
     assert_eq!(web.inputs, ["API_TOKEN"]);
     assert_eq!(spec.inputs, ["API_TOKEN"]);
     let r = web.resources.unwrap();
@@ -62,7 +63,7 @@ fn everything_else_is_a_note_with_its_reason() {
     assert!(has(&d, NoteKind::Changed, "networks.front.ipam", "re-addressed to 10.88.1.0/24"));
     assert!(has(&d, NoteKind::InImage, "services.web.environment", "MODE=production"));
     assert!(!d.notes.iter().any(|n| n.at.contains("volumes")), "named volumes carry over: {:?}", d.notes);
-    assert!(has(&d, NoteKind::NotYet, "services.web.ports", "isn't in the format yet"));
+    assert!(has(&d, NoteKind::Changed, "services.web.ports", "loopback"));
     assert!(has(&d, NoteKind::Equivalent, "services.cache.healthcheck", "probes every service port"));
 }
 
@@ -96,4 +97,15 @@ fn volumes_shared_between_services_are_noted() {
     assert!(!spec.machines["a"].volumes.contains_key("shared"));
     assert!(has(&d, NoteKind::NotYet, "services.a.volumes", "shared:/data"));
     assert!(has(&d, NoteKind::InImage, "services.a.volumes", "./conf:/etc/x:ro"));
+}
+
+#[test]
+fn published_ports_read_every_compose_form() {
+    let compose =
+        "services:\n  a:\n    image: x\n    ports: [\"127.0.0.1:8443:443\", \"${WEB_PORT:-8080}:80\", \"9000\", { target: 5432, published: 15432 }]\n";
+    let d = draft(compose, "x", "compose.yaml").unwrap();
+    let spec = parse(&d.yaml).unwrap();
+    let svc = |p: u16| spec.machines["a"].services.iter().find(|s| s.port == p).unwrap().publish;
+    assert_eq!((svc(443), svc(80), svc(9000), svc(5432)), (Some(8443), Some(8080), None, Some(15432)));
+    assert!(has(&d, NoteKind::Changed, "services.a.ports", "no fixed host port for 9000"));
 }

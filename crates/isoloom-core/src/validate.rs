@@ -194,6 +194,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         add("machines", "declare at least one machine".into());
     }
     let mut taken: HashMap<(String, u8), String> = HashMap::new();
+    let mut published: HashMap<u16, String> = HashMap::new();
     let access: Vec<&String> = spec.machines.iter().filter(|(_, m)| m.access).map(|(n, _)| n).collect();
     if access.len() > 1 {
         add("machines", format!("only one machine can be the access machine (found {})", access.len()));
@@ -255,6 +256,15 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 add(&format!("{at}.services[{i}].port"), "port 0 isn't a port".into());
             } else if !ports.insert(s.port) {
                 add(&format!("{at}.services[{i}].port"), format!("port {} is listed twice", s.port));
+            }
+            match s.publish {
+                Some(0) => add(&format!("{at}.services[{i}].publish"), "port 0 isn't a port".into()),
+                Some(p) => {
+                    if let Some(other) = published.insert(p, name.clone()) {
+                        add(&format!("{at}.services[{i}].publish"), format!("port {p} is already published by `{other}`"));
+                    }
+                }
+                None => {}
             }
         }
         for (i, input) in m.inputs.iter().enumerate() {

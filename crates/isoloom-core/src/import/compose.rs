@@ -29,6 +29,8 @@ struct Machine {
     name: String,
     networks: Vec<(String, u8)>,
     ports: BTreeSet<u16>,
+    /// Container port -> host port it's published on.
+    publish: IndexMap<u16, u16>,
     inputs: BTreeSet<String>,
     cpus: Option<u32>,
     memory_mb: Option<u32>,
@@ -117,6 +119,58 @@ fn container_ports(v: &Value) -> Result<Vec<u16>, String> {
         }
     }
     Ok(out)
+}
+
+/// Container port -> host port, for `ports` entries with a fixed host port (`8080:80`,
+/// `127.0.0.1:8080:80`, `${WEB_PORT:-8080}:80`, `{ target: 80, published: 8080 }`); entries
+/// with none (`80`, a variable without a default, a range) come back as text.
+fn published_ports(v: &Value) -> (Vec<(u16, u16)>, Vec<String>) {
+    let mut found = Vec::new();
+    let mut unknown = Vec::new();
+    // `${NAME:-8080}` -> 8080; a plain number as is.
+    let host_port = |h: &str| -> Option<u16> {
+        let h = h.trim();
+        match h.strip_prefix("${").and_then(|x| x.strip_suffix('}')) {
+            Some(var) => var.split_once(":-").and_then(|(_, d)| d.parse().ok()),
+            None => h.parse().ok(),
+        }
+    };
+    for item in v.as_sequence().into_iter().flatten() {
+        let (container, host) = match item {
+            Value::Mapping(m) => (
+                m.get("target").and_then(str_of).and_then(|t| t.parse::<u16>().ok()),
+                m.get("published").and_then(str_of).and_then(|p| host_port(&p)),
+            ),
+            other => {
+                let spec = str_of(other).unwrap_or_default();
+                let spec = spec.split('/').next().unwrap_or_default().to_string();
+                // Split on ':' outside `${...}`.
+                let mut parts = Vec::new();
+                let (mut depth, mut cur) = (0, String::new());
+                for ch in spec.chars() {
+                    match ch {
+                        '{' => depth += 1,
+                        '}' => depth -= 1,
+                        ':' if depth == 0 => {
+                            parts.push(std::mem::take(&mut cur));
+                            continue;
+                        }
+                        _ => {}
+                    }
+                    cur.push(ch);
+                }
+                parts.push(cur);
+                let container = parts.last().and_then(|c| c.parse::<u16>().ok());
+                let host = (parts.len() >= 2).then(|| host_port(&parts[parts.len() - 2])).flatten();
+                (container, host)
+            }
+        };
+        match (container, host) {
+            (Some(c), Some(h)) if h > 0 => found.push((c, h)),
+            _ => unknown.push(flat(item)),
+        }
+    }
+    (found, unknown)
 }
 
 /// Memory like `512m`, `1g`, `1.5G`, `268435456` in MB.
@@ -354,6 +408,7 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
             name: names[svc_name].clone(),
             networks: Vec::new(),
             ports: BTreeSet::new(),
+            publish: IndexMap::new(),
             inputs: BTreeSet::new(),
             cpus: None,
             memory_mb: None,
@@ -504,12 +559,26 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
                     Ok(ports) => {
                         m.ports.extend(ports);
                         if k == "ports" {
-                            note(
-                                &mut notes,
-                                kat,
-                                NoteKind::NotYet,
-                                "publishing a port outside the environment isn't in the format yet; the container ports became services".into(),
-                            );
+                            let (published, unknown) = published_ports(v);
+                            for (container, host) in published {
+                                m.publish.insert(container, host);
+                            }
+                            if !m.publish.is_empty() {
+                                note(
+                                    &mut notes,
+                                    kat.clone(),
+                                    NoteKind::Changed,
+                                    "published on the host's loopback (127.0.0.1) only; Compose publishes on every interface unless told otherwise".into(),
+                                );
+                            }
+                            if !unknown.is_empty() {
+                                note(
+                                    &mut notes,
+                                    kat,
+                                    NoteKind::Changed,
+                                    format!("no fixed host port for {}: add `publish:` to the service by hand", unknown.join(", ")),
+                                );
+                            }
                         }
                     }
                     Err(bad) => note(
@@ -704,7 +773,15 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         let nets = m.networks.iter().map(|(n, o)| format!("{n}: {o}")).collect::<Vec<_>>().join(", ");
         let _ = writeln!(y, "    networks: {{ {nets} }}");
         if !m.ports.is_empty() {
-            let ports = m.ports.iter().map(|p| format!("{{ port: {p} }}")).collect::<Vec<_>>().join(", ");
+            let ports = m
+                .ports
+                .iter()
+                .map(|p| match m.publish.get(p) {
+                    Some(h) => format!("{{ port: {p}, publish: {h} }}"),
+                    None => format!("{{ port: {p} }}"),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
             let _ = writeln!(y, "    services: [{ports}]");
         }
         if !m.inputs.is_empty() {

@@ -10,8 +10,8 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 64% | 55 | 32 | 7 | 16 |
-| [Vagrant](#vagrant) | 64% | 35 | 22 | 1 | 12 |
+| [Docker Compose](#docker-compose) | 65% | 55 | 32 | 8 | 15 |
+| [Vagrant](#vagrant) | 67% | 35 | 23 | 1 | 11 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 5 | 5 | 0 | 0 |
@@ -34,7 +34,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-64% of 55 portable features (32 done, 7 partly, 16 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+65% of 55 portable features (32 done, 8 partly, 15 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -117,7 +117,7 @@ when a table disagrees with what Isoloom really generates.
 | `pid` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `pids_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `platform` | Yes | Not yet | A CPU architecture (amd64, arm64): images, boxes and instance types all have one |
-| `ports` | Yes | Not yet | Publishing a service outside the environment: Docker ports, Vagrant forwarded ports, a port forward on the Proxmox router, a public IP in the cloud |
+| `ports` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback) |
 | `post_start` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
 | `pre_start` | Yes | Another way | Via machines.*.depends_on and docker.init |
 | `pre_stop` | n/a | No | Compose tooling, not the environment's behavior |
@@ -142,7 +142,7 @@ when a table disagrees with what Isoloom really generates.
 | `tty` | n/a | No | Compose tooling, not the environment's behavior |
 | `ulimits` | Yes | Not yet | Process limits (limits.conf or systemd on VMs) |
 | `use_api_socket` | No | No | Hands the host's Docker to a machine: VMs and the cloud have none |
-| `user` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
+| `user` | Yes | Partly | Isoloom's check runner, as root to drop its default route on offline networks; not yet: a machine's own user: set it in its image |
 | `userns_mode` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `uts` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `volumes` | Yes | Partly | From `machines.*.volumes` (and read-only mounts of init and check scripts); not yet: data shared between machines |
@@ -176,7 +176,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant
 
-64% of 35 portable features (22 done, 1 partly, 12 to do; 61 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
+67% of 35 portable features (23 done, 1 partly, 11 to do; 61 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
 
 ### Machine settings (config.vm)
 
@@ -230,7 +230,7 @@ when a table disagrees with what Isoloom really generates.
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `private_network` | Yes | Yes | From `networks and machines.*.networks` |
-| `forwarded_port` | Yes | Not yet | Publishing a service outside the environment (Compose `ports`) |
+| `forwarded_port` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback) |
 | `public_network` | Yes | Not yet | A network bridged to the outside (Compose `external`, a host bridge, a VPC) |
 
 ### Provisioners

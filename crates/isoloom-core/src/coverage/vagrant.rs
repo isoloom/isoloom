@@ -118,8 +118,8 @@ fn core() -> Format {
         ),
         (
             "config.vm.network forwarded_port",
-            Planned {
-                note: "publishing a service outside the environment (Compose `ports`)",
+            Emitted {
+                from: "machines.*.services[].publish (on the host's loopback)",
             },
         ),
         (
