@@ -153,8 +153,8 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh provision/web.sh"
     m.vm.provision "shell", name: "through the gateway", inline: <<~'SH'
-      export DEBIAN_FRONTEND=noninteractive
-      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || pkg nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
       DNS=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
       mkdir -p /etc/isoloom
@@ -299,8 +299,8 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh provision/cache.sh"
     m.vm.provision "shell", name: "through the gateway", inline: <<~'SH'
-      export DEBIAN_FRONTEND=noninteractive
-      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || pkg nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
       DNS=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
       mkdir -p /etc/isoloom

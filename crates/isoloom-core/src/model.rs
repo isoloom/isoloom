@@ -195,7 +195,25 @@ pub struct Provision {
 
 /// OS names a `vm:` may use. Each target maps them to its own images (e.g. Windows from an
 /// evaluation ISO locally, a license-included image in the cloud).
-pub const KNOWN_OS: &[&str] = &["debian-12", "ubuntu-24.04", "kali", "windows-server-2019", "windows-server-2022", "windows-11"];
+pub const KNOWN_OS: &[&str] = &[
+    "debian-11",
+    "debian-12",
+    "debian-13",
+    "ubuntu-20.04",
+    "ubuntu-22.04",
+    "ubuntu-24.04",
+    "rocky-9",
+    "almalinux-9",
+    "centos-7",
+    "fedora-42",
+    "kali",
+    "windows-10",
+    "windows-11",
+    "windows-server-2016",
+    "windows-server-2019",
+    "windows-server-2022",
+    "windows-server-2025",
+];
 
 /// Where an environment can run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]

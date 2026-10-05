@@ -69,8 +69,8 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "provision/store.sh", inline: "cd /opt/isoloom && sh provision/store.sh"
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
-      export DEBIAN_FRONTEND=noninteractive
-      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || pkg nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.nft <<NFT
@@ -155,8 +155,8 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "provision/app.sh", inline: "cd /opt/isoloom && sh provision/app.sh"
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
-      export DEBIAN_FRONTEND=noninteractive
-      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || pkg nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.nft <<NFT
@@ -262,8 +262,8 @@ Vagrant.configure("2") do |config|
       INV
     SH
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
-      export DEBIAN_FRONTEND=noninteractive
-      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || pkg nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.nft <<NFT

@@ -247,7 +247,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                     );
                 } else {
                     if !ansible_ready {
-                        out.push_str("    m.vm.provision \"shell\", name: \"ansible\", inline: \"command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)\"\n");
+                        out.push_str(&format!("    m.vm.provision \"shell\", name: \"ansible\", inline: <<~'SH'\n      {PKG}\n      command -v ansible-playbook >/dev/null || pkg ansible-core\n    SH\n"));
                         ansible_ready = true;
                     }
                     let vars = if m.inputs.is_empty() {
@@ -312,6 +312,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 /// nftables table loaded at boot, leaving the machine's other rules alone. Behind a gateway,
 /// name lookups to the NAT side's resolver stay allowed (the traffic goes through the gateway).
 fn egress(allow_dns: bool) -> String {
+    let pkg = PKG;
     let (dns_var, dns_rule) = if allow_dns {
         (
             "DNS=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)\n",
@@ -321,7 +322,7 @@ fn egress(allow_dns: bool) -> String {
         ("", "")
     };
     format!(
-        "export DEBIAN_FRONTEND=noninteractive\ncommand -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null\nIF=$(ip route show default | awk '{{print $5; exit}}')\n{dns_var}mkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.nft <<NFT\ntable inet isoloom-egress\ndelete table inet isoloom-egress\ntable inet isoloom-egress {{\n  chain output {{\n    type filter hook output priority 0; policy accept;\n{dns_rule}    oifname \"$IF\" ct state new drop\n  }}\n}}\nNFT\ncat > /etc/systemd/system/isoloom-egress.service <<'UNIT'\n[Unit]\nDescription=No new connections out through the NAT interface\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/sbin/nft -f /etc/isoloom/egress.nft\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\n"
+        "{pkg}\ncommand -v nft >/dev/null || pkg nftables >/dev/null\nIF=$(ip route show default | awk '{{print $5; exit}}')\n{dns_var}mkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.nft <<NFT\ntable inet isoloom-egress\ndelete table inet isoloom-egress\ntable inet isoloom-egress {{\n  chain output {{\n    type filter hook output priority 0; policy accept;\n{dns_rule}    oifname \"$IF\" ct state new drop\n  }}\n}}\nNFT\ncat > /etc/systemd/system/isoloom-egress.service <<'UNIT'\n[Unit]\nDescription=No new connections out through the NAT interface\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/sbin/nft -f /etc/isoloom/egress.nft\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\n"
     )
 }
 
@@ -344,6 +345,10 @@ fn indent(script: &str, spaces: usize) -> String {
         .map(|l| if l.is_empty() { "\n".to_string() } else { format!("{pad}{l}\n") })
         .collect()
 }
+
+/// Installs packages with the machine's own package manager (Debian and Ubuntu, or the
+/// RHEL family: Rocky, AlmaLinux, CentOS, Fedora).
+const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }";
 
 /// The vagrant-vmware-esxi provider block: the host from ESXI_* variables, a port group per NIC.
 fn esxi(out: &mut String, guest: &str, cpus: u32, mem: u32, nets: &[&str]) {

@@ -24,8 +24,15 @@ const DIR: &str = "proxmox";
 /// Cloud images by OS name (Linux for now).
 fn image_url(os: &str) -> Option<&'static str> {
     Some(match os {
+        "debian-11" => "https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-genericcloud-amd64.qcow2",
         "debian-12" => "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2",
+        "debian-13" => "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2",
+        "ubuntu-20.04" => "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img",
+        "ubuntu-22.04" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
         "ubuntu-24.04" => "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img",
+        "rocky-9" => "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2",
+        "almalinux-9" => "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2",
+        "centos-7" => "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2",
         _ => return None,
     })
 }
@@ -57,7 +64,7 @@ fn unsupported(spec: &Spec) -> Option<String> {
         let Some(vm) = &m.vm else { continue };
         if images::is_windows(&vm.os) || image_url(&vm.os).is_none() {
             return Some(format!(
-                "machine `{name}`: no Proxmox image for `{}` yet (Linux: debian-12, ubuntu-24.04)",
+                "machine `{name}`: no Proxmox image for `{}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7)",
                 vm.os
             ));
         }
@@ -436,4 +443,18 @@ resource "proxmox_sdn_zone_simple" "env" {
 /// A Terraform resource name from a machine, network or OS name.
 fn res(s: &str) -> String {
     s.replace(['-', '.'], "_")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::image_url;
+    use crate::images::is_windows;
+    use crate::model::KNOWN_OS;
+
+    #[test]
+    fn every_linux_os_has_a_cloud_image_but_kali_and_fedora() {
+        for os in KNOWN_OS.iter().filter(|o| !is_windows(o) && !["kali", "fedora-42"].contains(o)) {
+            assert!(image_url(os).is_some(), "no Proxmox cloud image for `{os}`");
+        }
+    }
 }

@@ -158,7 +158,10 @@ Vagrant.configure("2") do |config|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
-    m.vm.provision "shell", name: "ansible", inline: "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)"
+    m.vm.provision "shell", name: "ansible", inline: <<~'SH'
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v ansible-playbook >/dev/null || pkg ansible-core
+    SH
     m.vm.provision "ansible_local" do |a|
       a.provisioning_path = "/opt/isoloom"
       a.playbook = "provision/gateway.yml"
@@ -245,15 +248,18 @@ Vagrant.configure("2") do |config|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
-    m.vm.provision "shell", name: "ansible", inline: "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)"
+    m.vm.provision "shell", name: "ansible", inline: <<~'SH'
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v ansible-playbook >/dev/null || pkg ansible-core
+    SH
     m.vm.provision "ansible_local" do |a|
       a.provisioning_path = "/opt/isoloom"
       a.playbook = "provision/app.yml"
       a.install = false
     end
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
-      export DEBIAN_FRONTEND=noninteractive
-      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || pkg nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.nft <<NFT
@@ -365,15 +371,18 @@ Vagrant.configure("2") do |config|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
-    m.vm.provision "shell", name: "ansible", inline: "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)"
+    m.vm.provision "shell", name: "ansible", inline: <<~'SH'
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v ansible-playbook >/dev/null || pkg ansible-core
+    SH
     m.vm.provision "ansible_local" do |a|
       a.provisioning_path = "/opt/isoloom"
       a.playbook = "provision/db.yml"
       a.install = false
     end
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
-      export DEBIAN_FRONTEND=noninteractive
-      command -v nft >/dev/null || apt-get install -y -qq nftables >/dev/null
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || pkg nftables >/dev/null
       IF=$(ip route show default | awk '{print $5; exit}')
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.nft <<NFT
