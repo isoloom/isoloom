@@ -286,6 +286,21 @@ fn base_table() -> Vec<Row> {
             na("a VM sizes /dev/shm in its own provisioning"),
         ),
         common(
+            "machines.*.dns.servers",
+            done("`dns` on the container (and the Kubernetes dnsConfig nameservers)", "arm-lab"),
+            na("a VM sets its resolver in its own provisioning (resolv.conf)"),
+        ),
+        common(
+            "machines.*.dns.search",
+            done("`dns_search` on the container (and the Kubernetes dnsConfig searches)", "arm-lab"),
+            na("a VM sets its search domains in its own provisioning"),
+        ),
+        common(
+            "machines.*.dns.domain",
+            done("`domainname` on the container", "arm-lab"),
+            na("a VM sets its domain in its own provisioning"),
+        ),
+        common(
             "machines.*.resources.cpus",
             done("a CPU limit", "supplier-portal-api"),
             done("the VM's CPUs on every provider", "supplier-portal-api"),

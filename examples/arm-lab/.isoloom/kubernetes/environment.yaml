@@ -53,6 +53,12 @@ spec:
           mountPath: /dev/shm
       nodeSelector:
         kubernetes.io/arch: arm64
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+        - 10.60.0.2
+        searches:
+        - arm.lab
       volumes:
       - name: tmpfs-0
         emptyDir:

@@ -130,6 +130,11 @@ pub struct Machine {
     /// than the small default (browsers, some databases). A VM sizes it in its own provisioning.
     #[serde(default)]
     pub shm_size: Option<String>,
+    /// How the machine resolves names: which DNS servers to use, search domains, and its own
+    /// domain. Useful to point a Linux box at the lab's domain controller. A VM sets its resolver
+    /// in its own provisioning (resolv.conf).
+    #[serde(default)]
+    pub dns: Option<Dns>,
     #[serde(default)]
     pub services: Vec<Service>,
     /// The spec inputs this machine receives (only these).
@@ -224,6 +229,21 @@ pub enum Winrm {
     Plaintext,
     /// HTTPS on 5986, NTLM (certificate not verified).
     Ssl,
+}
+
+/// How a machine resolves names.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Dns {
+    /// DNS server addresses, in order (e.g. the lab's domain controller).
+    #[serde(default)]
+    pub servers: Vec<String>,
+    /// Search domains appended to bare names.
+    #[serde(default)]
+    pub search: Vec<String>,
+    /// The machine's own domain name.
+    #[serde(default)]
+    pub domain: Option<String>,
 }
 
 /// A machine's own image, per target, instead of the built-in one for its OS.

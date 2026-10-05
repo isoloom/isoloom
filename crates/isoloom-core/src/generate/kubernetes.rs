@@ -286,6 +286,20 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         pod.insert(s("containers"), Value::Sequence(containers));
         // Schedule the pod on a node of the machine's architecture.
         pod.insert(s("nodeSelector"), map([("kubernetes.io/arch", s(m.arch.id()))]));
+        // Custom resolver (e.g. the lab's domain controller): servers and search domains.
+        if let Some(dns) = &m.dns
+            && (!dns.servers.is_empty() || !dns.search.is_empty())
+        {
+            pod.insert(s("dnsPolicy"), s("None"));
+            let mut cfg = Mapping::new();
+            if !dns.servers.is_empty() {
+                cfg.insert(s("nameservers"), list(dns.servers.iter().map(|d| s(d.as_str()))));
+            }
+            if !dns.search.is_empty() {
+                cfg.insert(s("searches"), list(dns.search.iter().map(|d| s(d.as_str()))));
+            }
+            pod.insert(s("dnsConfig"), Value::Mapping(cfg));
+        }
         let mut volumes: Vec<Value> = m
             .volumes
             .keys()

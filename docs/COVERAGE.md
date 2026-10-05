@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 75% | 56 | 38 | 8 | 10 |
+| [Docker Compose](#docker-compose) | 82% | 56 | 42 | 8 | 6 |
 | [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-75% of 56 portable features (38 done, 8 partly, 10 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+82% of 56 portable features (42 done, 8 partly, 6 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -83,10 +83,10 @@ when a table disagrees with what Isoloom really generates.
 | `develop` | n/a | No | Compose tooling, not the environment's behavior |
 | `device_cgroup_rules` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `devices` | No | No | Host devices: hosting services and cloud VMs have none to pass |
-| `dns` | Yes | Not yet | DNS servers for a network or a machine |
-| `dns_opt` | Yes | Not yet | With DNS |
-| `dns_search` | Yes | Not yet | With DNS (search domains) |
-| `domainname` | Yes | Not yet | With DNS (a domain for the environment) |
+| `dns` | Yes | Yes | From `machines.*.dns.servers` (and the Kubernetes dnsConfig) |
+| `dns_opt` | Yes | In the image | Resolver options (resolv.conf) belong to the machine's provisioning |
+| `dns_search` | Yes | Yes | From `machines.*.dns.search` (and the Kubernetes dnsConfig) |
+| `domainname` | Yes | Yes | From `machines.*.dns.domain` |
 | `entrypoint` | Yes | Partly | Isoloom's own containers and init jobs; not yet: a machine's own: set it in its image |
 | `env_file` | Yes | Another way | Via inputs |
 | `environment` | Yes | Partly | From `machines.*.inputs`; not yet: fixed values: set them in the image or the provisioning |

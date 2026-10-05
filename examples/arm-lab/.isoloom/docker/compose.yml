@@ -15,6 +15,11 @@ services:
     tmpfs:
     - /run
     - /var/cache/nginx
+    dns:
+    - 10.60.0.2
+    dns_search:
+    - arm.lab
+    domainname: arm.lab
     hostname: web
     networks:
       lab:

@@ -142,6 +142,17 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         if !m.tmpfs.is_empty() {
             svc.insert(s("tmpfs"), list(m.tmpfs.iter().map(|p| s(p.as_str()))));
         }
+        if let Some(dns) = &m.dns {
+            if !dns.servers.is_empty() {
+                svc.insert(s("dns"), list(dns.servers.iter().map(|d| s(d.as_str()))));
+            }
+            if !dns.search.is_empty() {
+                svc.insert(s("dns_search"), list(dns.search.iter().map(|d| s(d.as_str()))));
+            }
+            if let Some(domain) = &dns.domain {
+                svc.insert(s("domainname"), s(domain.as_str()));
+            }
+        }
         // A stock image the runner supplies for the user to work from: kept running idle
         // (its own command may be a shell that exits at once).
         if m.supplied {

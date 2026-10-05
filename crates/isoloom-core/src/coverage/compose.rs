@@ -117,23 +117,23 @@ fn rows() -> Vec<(String, Support)> {
         ),
         (
             "services.*.dns",
-            Planned {
-                note: "DNS servers for a network or a machine",
+            Emitted {
+                from: "machines.*.dns.servers (and the Kubernetes dnsConfig)",
             },
         ),
-        ("services.*.dns_opt", Planned { note: "with DNS" }),
+        (
+            "services.*.dns_opt",
+            InImage {
+                note: "resolver options (resolv.conf) belong to the machine's provisioning",
+            },
+        ),
         (
             "services.*.dns_search",
-            Planned {
-                note: "with DNS (search domains)",
+            Emitted {
+                from: "machines.*.dns.search (and the Kubernetes dnsConfig)",
             },
         ),
-        (
-            "services.*.domainname",
-            Planned {
-                note: "with DNS (a domain for the environment)",
-            },
-        ),
+        ("services.*.domainname", Emitted { from: "machines.*.dns.domain" }),
         (
             "services.*.entrypoint",
             Partial {
