@@ -301,7 +301,7 @@ fn kubernetes_turns_networks_and_reach_into_network_policies() {
     assert!(env.contains("kind: PersistentVolumeClaim"));
     // Checks: a Job on the access machine's networks.
     let job = contents(&files, ".isoloom/kubernetes/checks/job.yaml");
-    assert!(job.contains("net.isoloom.com/access: on"), "{job}");
+    assert!(job.contains("net.isoloom.com/access: member"), "{job}");
     let k = contents(&files, ".isoloom/kubernetes/kustomization.yaml");
     assert!(k.contains("checks__web-reachable.sh=../../checks/web-reachable.sh"), "{k}");
 }
@@ -312,5 +312,7 @@ fn kubernetes_publishes_and_keeps_offline_machines_inside() {
     let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
     assert!(env.contains("type: LoadBalancer") && env.contains("port: 8080"), "{env}");
     assert!(env.contains("name: offline-"));
+    // The checks stand on those offline networks: offline too.
+    assert!(env.contains("name: offline-isoloom-check"));
     assert!(env.contains("policyTypes:\n    - Egress") || env.contains("policyTypes:\n  - Egress"));
 }

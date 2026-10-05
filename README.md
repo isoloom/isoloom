@@ -46,13 +46,29 @@ checks: [build/check/check.sh]   # black-box checks, run against every target
 - **Generic.** Nothing is specific to one use: launch-time values reach machines through
   `inputs:`, and `access: true` marks the machine a user lands on.
 
+## Install
+
+```
+curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/install.sh | sh
+```
+
+Release binaries for macOS, Linux (x86_64, arm64) and Windows are on the
+[releases page](https://github.com/isoloom/isoloom/releases). In GitHub Actions:
+
+```yaml
+- uses: isoloom/isoloom@v0.6.0
+- run: isoloom check
+```
+
+From source: `cargo install --git https://github.com/isoloom/isoloom isoloom`.
+
 ## Commands
 
 ```
 isoloom validate [DIR]    # mistakes, with the exact field and what to do (--json)
 isoloom targets [DIR]     # where it can run, and why not elsewhere
 isoloom resources [DIR]   # machines, CPUs, memory, disk
-isoloom generate [DIR]    # each target's files under .isoloom/ (--target docker|vagrant)
+isoloom generate [DIR]    # each target's files under .isoloom/ (--target, --images FILE)
 isoloom check [DIR]       # fails when .isoloom/ doesn't match the spec (for CI)
 ```
 
@@ -64,6 +80,7 @@ Run what it generates:
 docker compose -f .isoloom/docker/compose.yml up -d --wait          # containers
 docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
 cd .isoloom/vagrant && vagrant up                                    # one VM per machine
+kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -
 ```
 
 ## Layout
@@ -76,14 +93,18 @@ cd .isoloom/vagrant && vagrant up                                    # one VM pe
 
 ## Status
 
-v0.5: the format, validation, target derivation, and generators for **Docker Compose** and
-**Vagrant** (VirtualBox, VMware, Parallels, libvirt), with **routers**: `reach` rules between
-networks are enforced by a router machine (nftables) on both targets, `internet: false` works on
-both, and `depends_on` waits for services to answer. **Gateways**: a network can name a machine
-of the environment (an edge firewall) as its `gateway`; it routes that network with its own
-rules instead of Isoloom's router. `examples/hello-stack`, `examples/segmented` and
-`examples/edge-firewall` run for real in CI with their checks. Not yet: Windows and appliance
-images (OPNsense), Proxmox and cloud generators, release binaries.
+v0.6. Generators: **Docker Compose**, **Kubernetes** (manifests, NetworkPolicies for networks
+and `reach`), **Vagrant** (VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, ESXi),
+**Docker on one VM** (Vagrant, Proxmox), **Proxmox** (one VM per Linux machine, its own SDN
+network and router) and **Docker on one cloud VM** (AWS, Azure, Google Cloud, DigitalOcean,
+Linode, Oracle). Routers enforce `reach` between networks; a network can name its own
+`gateway` (an edge firewall); `internet: false`, published ports, volumes, inputs, Windows VMs
+(WinRM, PowerShell steps), environment-level Ansible from a controller, and checks on every
+target. Your own image table (`--images`) sets OS images and supplies the access machine.
+
+Run for real in CI: Docker (hello-stack, air-gapped, segmented, edge-firewall), Kubernetes on kind
+(hello-stack, segmented). Run by hand: VirtualBox (several examples, Windows Server 2019).
+Generated and validated only: Proxmox, the clouds, ESXi.
 
 Already have a Compose file? `isoloom import compose` drafts the `isoloom.yml` from it: what the
 format expresses goes into the draft, and every other key is listed with why (belongs in the

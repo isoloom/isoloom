@@ -27,7 +27,7 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: cache
-        net.isoloom.com/app: on
+        net.isoloom.com/app: member
     spec:
       hostname: cache
       containers:
@@ -129,7 +129,7 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: web
-        net.isoloom.com/app: on
+        net.isoloom.com/app: member
     spec:
       hostname: web
       initContainers:
@@ -233,9 +233,32 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/app: on
+      net.isoloom.com/app: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/app: on
+          net.isoloom.com/app: member
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: offline-isoloom-check
+spec:
+  podSelector:
+    matchLabels:
+      isoloom.com/check: runner
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP

@@ -28,7 +28,7 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: database
-        net.isoloom.com/lab: on
+        net.isoloom.com/lab: member
     spec:
       hostname: database
       containers:
@@ -118,7 +118,7 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: web
-        net.isoloom.com/lab: on
+        net.isoloom.com/lab: member
     spec:
       hostname: web
       initContainers:
@@ -203,9 +203,9 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/lab: on
+      net.isoloom.com/lab: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/lab: on
+          net.isoloom.com/lab: member

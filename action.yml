@@ -1,0 +1,33 @@
+name: Set up Isoloom
+description: Installs the isoloom CLI (a release binary) and puts it on the PATH.
+branding:
+  icon: layers
+  color: orange
+inputs:
+  version:
+    description: A release tag (e.g. v0.6.0), or latest.
+    default: latest
+runs:
+  using: composite
+  steps:
+    - name: Install isoloom (macOS, Linux)
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        ISOLOOM_VERSION: ${{ inputs.version }}
+        ISOLOOM_INSTALL_DIR: ${{ runner.temp }}/isoloom-bin
+      run: |
+        sh "${{ github.action_path }}/install.sh"
+        echo "$ISOLOOM_INSTALL_DIR" >> "$GITHUB_PATH"
+    - name: Install isoloom (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $v = "${{ inputs.version }}"
+        $asset = "isoloom-x86_64-pc-windows-msvc.zip"
+        $url = if ($v -eq "latest") { "https://github.com/isoloom/isoloom/releases/latest/download/$asset" } else { "https://github.com/isoloom/isoloom/releases/download/$v/$asset" }
+        $dir = Join-Path "${{ runner.temp }}" "isoloom-bin"
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        Invoke-WebRequest $url -OutFile (Join-Path $dir $asset)
+        Expand-Archive -Force (Join-Path $dir $asset) $dir
+        $dir | Out-File -Append -Encoding utf8 $env:GITHUB_PATH

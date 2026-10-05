@@ -39,6 +39,54 @@ fn net_label(net: &str) -> String {
 }
 
 const MACHINE_LABEL: &str = "isoloom.com/machine";
+const CHECK_LABEL: &str = "isoloom.com/check";
+
+/// The check pods' labels: where they stand, and that they're the checks.
+fn check_labels(nets: &[&String]) -> Value {
+    let mut l = pod_labels(None, nets);
+    if let Value::Mapping(m) = &mut l {
+        m.insert(s(CHECK_LABEL), s("runner"));
+    }
+    l
+}
+
+/// An egress policy for the pods `selector` matches: other pods of the environment, and DNS.
+fn offline_policy(name: &str, selector: Value) -> Value {
+    doc(
+        "NetworkPolicy",
+        "networking.k8s.io/v1",
+        name,
+        vec![(
+            "spec",
+            map([
+                ("podSelector", map([("matchLabels", selector)])),
+                ("policyTypes", list([s("Egress")])),
+                (
+                    "egress",
+                    list([
+                        map([("to", list([map([("podSelector", Value::Mapping(Mapping::new()))])]))]),
+                        map([
+                            (
+                                "to",
+                                list([map([(
+                                    "namespaceSelector",
+                                    map([("matchLabels", labels(&[("kubernetes.io/metadata.name".into(), "kube-system")]))]),
+                                )])]),
+                            ),
+                            (
+                                "ports",
+                                list([
+                                    map([("port", Value::from(53)), ("protocol", s("UDP"))]),
+                                    map([("port", Value::from(53)), ("protocol", s("TCP"))]),
+                                ]),
+                            ),
+                        ]),
+                    ]),
+                ),
+            ]),
+        )],
+    )
+}
 
 /// A ConfigMap key for a project file (keys allow letters, digits, `-`, `_` and `.`).
 fn key(path: &str) -> String {
@@ -71,7 +119,7 @@ fn pod_labels(machine: Option<&str>, nets: &[&String]) -> Value {
         pairs.push((MACHINE_LABEL.to_string(), m));
     }
     for n in nets {
-        pairs.push((net_label(n), "on"));
+        pairs.push((net_label(n), "member"));
     }
     labels(&pairs)
 }
@@ -339,39 +387,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         // Offline: nothing new out of the environment (DNS stays).
         if offline(spec, name, m) {
-            docs.push(doc(
-                "NetworkPolicy",
-                "networking.k8s.io/v1",
+            docs.push(offline_policy(
                 &format!("offline-{name}"),
-                vec![(
-                    "spec",
-                    map([
-                        ("podSelector", map([("matchLabels", labels(&[(MACHINE_LABEL.to_string(), name.as_str())]))])),
-                        ("policyTypes", list([s("Egress")])),
-                        (
-                            "egress",
-                            list([
-                                map([("to", list([map([("podSelector", Value::Mapping(Mapping::new()))])]))]),
-                                map([
-                                    (
-                                        "to",
-                                        list([map([(
-                                            "namespaceSelector",
-                                            map([("matchLabels", labels(&[("kubernetes.io/metadata.name".into(), "kube-system")]))]),
-                                        )])]),
-                                    ),
-                                    (
-                                        "ports",
-                                        list([
-                                            map([("port", Value::from(53)), ("protocol", s("UDP"))]),
-                                            map([("port", Value::from(53)), ("protocol", s("TCP"))]),
-                                        ]),
-                                    ),
-                                ]),
-                            ]),
-                        ),
-                    ]),
-                )],
+                labels(&[(MACHINE_LABEL.to_string(), name.as_str())]),
             ));
         }
     }
@@ -387,7 +405,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         )],
     ));
     for net in spec.networks.keys() {
-        let sel = map([("matchLabels", labels(&[(net_label(net), "on")]))]);
+        let sel = map([("matchLabels", labels(&[(net_label(net), "member")]))]);
         docs.push(doc(
             "NetworkPolicy",
             "networking.k8s.io/v1",
@@ -405,7 +423,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let mut rule = Mapping::new();
         rule.insert(
             s("from"),
-            list([map([("podSelector", map([("matchLabels", labels(&[(net_label(&r.from), "on")]))]))])]),
+            list([map([("podSelector", map([("matchLabels", labels(&[(net_label(&r.from), "member")]))]))])]),
         );
         if !r.ports.is_empty() {
             rule.insert(
@@ -425,7 +443,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             vec![(
                 "spec",
                 map([
-                    ("podSelector", map([("matchLabels", labels(&[(net_label(&r.to), "on")]))])),
+                    ("podSelector", map([("matchLabels", labels(&[(net_label(&r.to), "member")]))])),
                     ("ingress", list([Value::Mapping(rule)])),
                 ]),
             )],
@@ -439,6 +457,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             Some(a) => a.networks.keys().collect(),
             None => spec.networks.keys().collect(),
         };
+        // Standing on offline networks, the checks are offline too (as a machine there would be).
+        if !access_nets.is_empty() && access_nets.iter().all(|n| !spec.networks[n.as_str()].internet) {
+            docs.push(offline_policy("offline-isoloom-check", labels(&[(CHECK_LABEL.to_string(), "runner")])));
+        }
         let mut run = Vec::new();
         for c in &spec.checks {
             scripts.push(c.clone());
@@ -455,7 +477,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                     (
                         "template",
                         map([
-                            ("metadata", map([("labels", pod_labels(None, &access_nets))])),
+                            ("metadata", map([("labels", check_labels(&access_nets))])),
                             (
                                 "spec",
                                 map([

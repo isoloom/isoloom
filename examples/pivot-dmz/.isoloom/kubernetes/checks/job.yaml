@@ -13,7 +13,8 @@ spec:
   template:
     metadata:
       labels:
-        net.isoloom.com/access: on
+        net.isoloom.com/access: member
+        isoloom.com/check: runner
     spec:
       restartPolicy: Never
       containers:

@@ -27,7 +27,7 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: cache
-        net.isoloom.com/back: on
+        net.isoloom.com/back: member
     spec:
       hostname: cache
       containers:
@@ -117,7 +117,7 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: web
-        net.isoloom.com/front: on
+        net.isoloom.com/front: member
     spec:
       hostname: web
       initContainers:
@@ -170,12 +170,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/front: on
+      net.isoloom.com/front: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/front: on
+          net.isoloom.com/front: member
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -184,12 +184,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/back: on
+      net.isoloom.com/back: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/back: on
+          net.isoloom.com/back: member
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -198,12 +198,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/access: on
+      net.isoloom.com/access: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/access: on
+          net.isoloom.com/access: member
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -212,12 +212,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/front: on
+      net.isoloom.com/front: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/access: on
+          net.isoloom.com/access: member
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -226,12 +226,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/back: on
+      net.isoloom.com/back: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/front: on
+          net.isoloom.com/front: member
     ports:
     - port: 6379
       protocol: TCP

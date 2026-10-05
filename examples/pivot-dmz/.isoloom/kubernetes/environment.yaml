@@ -28,8 +28,8 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: gateway
-        net.isoloom.com/dmz: on
-        net.isoloom.com/internal: on
+        net.isoloom.com/dmz: member
+        net.isoloom.com/internal: member
     spec:
       hostname: gateway
       containers:
@@ -78,7 +78,7 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: app
-        net.isoloom.com/internal: on
+        net.isoloom.com/internal: member
     spec:
       hostname: app
       containers:
@@ -146,7 +146,7 @@ spec:
     metadata:
       labels:
         isoloom.com/machine: db
-        net.isoloom.com/internal: on
+        net.isoloom.com/internal: member
     spec:
       hostname: db
       containers:
@@ -215,12 +215,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/dmz: on
+      net.isoloom.com/dmz: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/dmz: on
+          net.isoloom.com/dmz: member
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -229,12 +229,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/internal: on
+      net.isoloom.com/internal: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/internal: on
+          net.isoloom.com/internal: member
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -243,12 +243,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/access: on
+      net.isoloom.com/access: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/access: on
+          net.isoloom.com/access: member
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -257,12 +257,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/dmz: on
+      net.isoloom.com/dmz: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/access: on
+          net.isoloom.com/access: member
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -271,12 +271,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      net.isoloom.com/internal: on
+      net.isoloom.com/internal: member
   ingress:
   - from:
     - podSelector:
         matchLabels:
-          net.isoloom.com/dmz: on
+          net.isoloom.com/dmz: member
     ports:
     - port: 8080
       protocol: TCP
