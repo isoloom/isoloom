@@ -16,6 +16,9 @@ pub const MODELINE: &str = "# yaml-language-server: $schema=https://www.isoloom.
 /// that types alone don't say (name patterns, known OS names, address formats).
 pub fn schema() -> Value {
     let mut s = serde_json::to_value(schemars::schema_for!(Spec)).expect("a schema serializes");
+    // Optional fields come out as "this, or null". A spec never writes null, and editors report
+    // a typo inside such a field as one vague "anyOf" error: keep only the real type.
+    drop_null(&mut s);
     s["$id"] = json!(SCHEMA_URL);
     s["title"] = json!("isoloom.yml");
     s["description"] = json!("An Isoloom environment spec, version 1: https://www.isoloom.com/en/docs/spec-reference");
@@ -54,4 +57,39 @@ pub fn schema() -> Value {
         json!({ "type": "string", "pattern": "^/" }),
     );
     s
+}
+
+/// Replaces `anyOf: [X, {type: null}]` with X and `type: [T, "null"]` with T, everywhere.
+fn drop_null(v: &mut Value) {
+    match v {
+        Value::Object(map) => {
+            if let Some(Value::Array(any)) = map.get("anyOf")
+                && any.len() == 2
+                && any.iter().any(|b| b.get("type") == Some(&json!("null")))
+            {
+                let keep = any.iter().find(|b| b.get("type") != Some(&json!("null"))).cloned().expect("two branches");
+                map.remove("anyOf");
+                if let Value::Object(k) = keep {
+                    for (key, val) in k {
+                        map.entry(key).or_insert(val);
+                    }
+                }
+            }
+            if let Some(Value::Array(types)) = map.get("type")
+                && types.len() == 2
+                && types.contains(&json!("null"))
+            {
+                let t = types.iter().find(|t| **t != json!("null")).cloned().expect("two types");
+                map.insert("type".into(), t);
+            }
+            if map.get("default") == Some(&Value::Null) {
+                map.remove("default");
+            }
+            for val in map.values_mut() {
+                drop_null(val);
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(drop_null),
+        _ => {}
+    }
 }
