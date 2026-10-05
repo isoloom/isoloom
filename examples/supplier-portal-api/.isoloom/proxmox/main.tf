@@ -85,6 +85,12 @@ variable "ssh_public_key" {
   default     = ""
   description = "Installed for the user `isoloom` on every VM"
 }
+variable "inputs" {
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+  description = "Values given at launch"
+}
 
 provider "proxmox" {
   endpoint  = var.proxmox_endpoint
@@ -131,26 +137,14 @@ resource "proxmox_sdn_zone_simple" "env" {
   nodes = [var.node]
 }
 
-# Network `front`: 10.61.10.0/24
-resource "proxmox_sdn_vnet" "front" {
+# Network `lab`: 10.20.0.0/24
+resource "proxmox_sdn_vnet" "lab" {
   id   = "i${var.slot}n0"
   zone = proxmox_sdn_zone_simple.env.id
 }
 
-# Network `back`: 10.61.20.0/24
-resource "proxmox_sdn_vnet" "back" {
-  id   = "i${var.slot}n1"
-  zone = proxmox_sdn_zone_simple.env.id
-}
-
-# Network `access`: 10.61.99.0/24
-resource "proxmox_sdn_vnet" "access" {
-  id   = "i${var.slot}n2"
-  zone = proxmox_sdn_zone_simple.env.id
-}
-
 resource "proxmox_sdn_applier" "env" {
-  depends_on = [proxmox_sdn_vnet.front, proxmox_sdn_vnet.back, proxmox_sdn_vnet.access]
+  depends_on = [proxmox_sdn_vnet.lab]
 }
 
 resource "proxmox_download_file" "debian_12" {
@@ -176,11 +170,9 @@ resource "proxmox_virtual_environment_file" "router" {
       packages = ["nftables", "qemu-guest-agent"]
       write_files = [
         { path = "/etc/systemd/network/10-wan.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:00:00:00", var.slot)}", "", "[Network]", "DHCP=yes"]) },
-        { path = "/etc/nftables.conf", content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.61.99.0/24 ip daddr 10.61.10.0/24 accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 meta l4proto { tcp, udp } th dport { 6379 } accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 icmp type echo-request accept\n    ip saddr { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } masquerade\n  }\n}\n" },
+        { path = "/etc/nftables.conf", content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.20.0.31 tcp dport 3206 ct status dnat accept\n    ip saddr { 10.20.0.0/24 } ip daddr != { 10.20.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.20.0.0/24 } tcp dport 3206 dnat ip to 10.20.0.31:3206\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.20.0.0/24 } ip daddr != { 10.20.0.0/24 } masquerade\n  }\n}\n" },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
-        { path = "/etc/systemd/network/20-front.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}", "", "[Network]", "Address=10.61.10.254/24", "ConfigureWithoutCarrier=yes"]) },
-        { path = "/etc/systemd/network/20-back.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 1)}", "", "[Network]", "Address=10.61.20.254/24", "ConfigureWithoutCarrier=yes"]) },
-        { path = "/etc/systemd/network/20-access.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 2)}", "", "[Network]", "Address=10.61.99.254/24", "ConfigureWithoutCarrier=yes"]) }
+        { path = "/etc/systemd/network/20-lab.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}", "", "[Network]", "Address=10.20.0.254/24", "ConfigureWithoutCarrier=yes"]) }
       ]
       runcmd = [
         ["sysctl", "-p", "/etc/sysctl.d/90-isoloom.conf"],
@@ -197,7 +189,7 @@ resource "proxmox_virtual_environment_file" "router" {
 resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
-  tags      = ["isoloom", "segmented"]
+  tags      = ["isoloom", "supplier-portal-api"]
   on_boot   = false
   # Its uplink address (DHCP), for the published ports.
   agent {
@@ -221,16 +213,8 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
     mac_address = upper(format("02:15:%02x:00:00:00", var.slot))
   }
   network_device {
-    bridge      = proxmox_sdn_vnet.front.id
+    bridge      = proxmox_sdn_vnet.lab.id
     mac_address = upper(format("02:15:%02x:01:%02x:00", var.slot, 0))
-  }
-  network_device {
-    bridge      = proxmox_sdn_vnet.back.id
-    mac_address = upper(format("02:15:%02x:01:%02x:00", var.slot, 1))
-  }
-  network_device {
-    bridge      = proxmox_sdn_vnet.access.id
-    mac_address = upper(format("02:15:%02x:01:%02x:00", var.slot, 2))
   }
   initialization {
     datastore_id      = var.datastore
@@ -248,33 +232,31 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   depends_on = [proxmox_sdn_applier.env]
 }
 
-# Machine `cache`.
-resource "proxmox_virtual_environment_file" "cache" {
+# Machine `database`.
+resource "proxmox_virtual_environment_file" "database" {
   node_name    = var.node
   datastore_id = var.snippets_datastore
   content_type = "snippets"
   source_raw {
-    file_name = "iso${var.slot}-cache.yaml"
+    file_name = "iso${var.slot}-database.yaml"
     data = "#cloud-config\n${yamlencode({
-      hostname    = "cache"
+      hostname    = "database"
       users       = local.users
       packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = local.project_files
+      write_files = concat(local.project_files, [{ path = "/etc/isoloom/inputs.env", permissions = "0600", content = join("\n", ["API_URL=${lookup(var.inputs, "API_URL", "")}", "LAUNCH_TOKEN=${lookup(var.inputs, "LAUNCH_TOKEN", "")}"]) }])
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.61.10.10 web' '10.61.99.10 user' >> /etc/hosts"],
-        ["sh", "-c", "mkdir -p /data"],
-        ["sh", "-c", "cd /opt/isoloom && sh provision/cache.sh"],
-        ["sh", "-c", "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"],
+        ["sh", "-c", "printf '%s\\n' '10.20.0.31 web' >> /etc/hosts"],
+        ["sh", "-c", "cd /opt/isoloom && set -a; . /etc/isoloom/inputs.env; set +a; sh provision/database.sh"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
   }
 }
 
-resource "proxmox_virtual_environment_vm" "cache" {
-  name      = "iso${var.slot}-cache"
+resource "proxmox_virtual_environment_vm" "database" {
+  name      = "iso${var.slot}-database"
   node_name = var.node
-  tags      = ["isoloom", "segmented"]
+  tags      = ["isoloom", "supplier-portal-api"]
   on_boot   = false
   cpu {
     cores = 1
@@ -287,21 +269,21 @@ resource "proxmox_virtual_environment_vm" "cache" {
     datastore_id = var.datastore
     file_id      = proxmox_download_file.debian_12.id
     interface    = "virtio0"
-    size         = 10
+    size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.back.id
+    bridge = proxmox_sdn_vnet.lab.id
   }
   initialization {
     datastore_id      = var.datastore
-    user_data_file_id = proxmox_virtual_environment_file.cache.id
+    user_data_file_id = proxmox_virtual_environment_file.database.id
     dns {
       servers = ["1.1.1.1"]
     }
     ip_config {
       ipv4 {
-        address = "10.61.20.20/24"
-        gateway = "10.61.20.254"
+        address = "10.20.0.32/24"
+        gateway = "10.20.0.254"
       }
     }
   }
@@ -325,8 +307,8 @@ resource "proxmox_virtual_environment_file" "web" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.61.20.20 cache' '10.61.99.10 user' >> /etc/hosts"],
-        ["sh", "-c", "i=0; until (bash -c '</dev/tcp/cache/6379' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 600 ]; then echo \"cache didn't answer within 600s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\""],
+        ["sh", "-c", "printf '%s\\n' '10.20.0.32 database' >> /etc/hosts"],
+        ["sh", "-c", "i=0; until (bash -c '</dev/tcp/database/3207' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 600 ]; then echo \"database didn't answer within 600s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\""],
         ["sh", "-c", "cd /opt/isoloom && sh provision/web.sh"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
@@ -337,7 +319,7 @@ resource "proxmox_virtual_environment_file" "web" {
 resource "proxmox_virtual_environment_vm" "web" {
   name      = "iso${var.slot}-web"
   node_name = var.node
-  tags      = ["isoloom", "segmented"]
+  tags      = ["isoloom", "supplier-portal-api"]
   on_boot   = false
   cpu {
     cores = 1
@@ -353,7 +335,7 @@ resource "proxmox_virtual_environment_vm" "web" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.front.id
+    bridge = proxmox_sdn_vnet.lab.id
   }
   initialization {
     datastore_id      = var.datastore
@@ -363,8 +345,8 @@ resource "proxmox_virtual_environment_vm" "web" {
     }
     ip_config {
       ipv4 {
-        address = "10.61.10.10/24"
-        gateway = "10.61.10.254"
+        address = "10.20.0.31/24"
+        gateway = "10.20.0.254"
       }
     }
   }
@@ -372,74 +354,20 @@ resource "proxmox_virtual_environment_vm" "web" {
     type = "l26"
   }
   serial_device {}
-  depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.cache]
-}
-
-# Machine `user`.
-resource "proxmox_virtual_environment_file" "user" {
-  node_name    = var.node
-  datastore_id = var.snippets_datastore
-  content_type = "snippets"
-  source_raw {
-    file_name = "iso${var.slot}-user.yaml"
-    data = "#cloud-config\n${yamlencode({
-      hostname    = "user"
-      users       = local.users
-      packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = []
-      runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.61.20.20 cache' '10.61.10.10 web' >> /etc/hosts"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
-      ]
-    })}"
-  }
-}
-
-resource "proxmox_virtual_environment_vm" "user" {
-  name      = "iso${var.slot}-user"
-  node_name = var.node
-  tags      = ["isoloom", "segmented"]
-  on_boot   = false
-  cpu {
-    cores = 1
-    type  = "host"
-  }
-  memory {
-    dedicated = 1024
-  }
-  disk {
-    datastore_id = var.datastore
-    file_id      = proxmox_download_file.debian_12.id
-    interface    = "virtio0"
-    size         = 20
-  }
-  network_device {
-    bridge = proxmox_sdn_vnet.access.id
-  }
-  initialization {
-    datastore_id      = var.datastore
-    user_data_file_id = proxmox_virtual_environment_file.user.id
-    dns {
-      servers = ["1.1.1.1"]
-    }
-    ip_config {
-      ipv4 {
-        address = "10.61.99.10/24"
-        gateway = "10.61.99.254"
-      }
-    }
-  }
-  operating_system {
-    type = "l26"
-  }
-  serial_device {}
-  depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+  depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.database]
 }
 
 locals {
-  router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.61.10.254", "10.61.20.254", "10.61.99.254"], a)][0]
+  router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.20.0.254"], a)][0]
 }
 
 output "address" {
   value = local.router_address
+}
+
+# Published services, from the router's uplink address.
+output "published" {
+  value = {
+    "web/portal" = "${local.router_address}:3206"
+  }
 }

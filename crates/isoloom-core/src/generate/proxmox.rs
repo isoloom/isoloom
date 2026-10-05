@@ -68,14 +68,7 @@ fn unsupported(spec: &Spec) -> Option<String> {
                 vm.os
             ));
         }
-        if m.services.iter().any(|s| s.publish.is_some()) {
-            return Some(format!(
-                "machine `{name}`: published ports on Proxmox (a port forward on the router) come later"
-            ));
-        }
-        if vm.image.is_some() {
-            return Some(format!("machine `{name}`: `vm.image` has no Proxmox entry yet"));
-        }
+        // `vm.image` names Vagrant boxes only: Proxmox keeps the OS name's cloud image.
     }
     None
 }
@@ -175,7 +168,9 @@ variable "ssh_public_key" {
 "#,
     );
     if !spec.inputs.is_empty() {
-        tf.push_str("variable \"inputs\" {\n  type      = map(string)\n  default   = {}\n  sensitive = true\n  description = \"Values given at launch\"\n}\n");
+        tf.push_str(
+            "variable \"inputs\" {\n  type        = map(string)\n  default     = {}\n  sensitive   = true\n  description = \"Values given at launch\"\n}\n",
+        );
     }
     tf.push_str(
         r#"
@@ -276,11 +271,18 @@ resource "proxmox_sdn_zone_simple" "env" {
             let _ = writeln!(nft, "    ip saddr {from} ip daddr {to} icmp type echo-request accept");
         }
     }
+    // Published services: forwarded from the router's uplink address (anything not from the lab).
+    let published = published(spec);
+    let mut dnat = String::new();
+    for (_, _, addr, port, host) in &published {
+        let _ = writeln!(nft, "    ip daddr {addr} tcp dport {port} ct status dnat accept");
+        let _ = writeln!(dnat, "    ip saddr != {lab} tcp dport {host} dnat ip to {addr}:{port}");
+    }
     // The internet, for every network (machines install their software); offline machines block
     // it themselves once provisioned, as on local VMs.
     let _ = writeln!(
         nft,
-        "    ip saddr {lab} ip daddr != {lab} accept\n  }}\n  chain postrouting {{\n    type nat hook postrouting priority 100;\n    ip saddr {lab} ip daddr != {lab} masquerade\n  }}\n}}"
+        "    ip saddr {lab} ip daddr != {lab} accept\n  }}\n  chain prerouting {{\n    type nat hook prerouting priority -100;\n{dnat}  }}\n  chain postrouting {{\n    type nat hook postrouting priority 100;\n    ip saddr {lab} ip daddr != {lab} masquerade\n  }}\n}}"
     );
     let mut write_files = vec![
         "{ path = \"/etc/systemd/network/10-wan.network\", content = join(\"\\n\", [\"[Match]\", \"MACAddress=${format(\"02:15:%02x:00:00:00\", var.slot)}\", \"\", \"[Network]\", \"DHCP=yes\"]) }".to_string(),
@@ -297,7 +299,7 @@ resource "proxmox_sdn_zone_simple" "env" {
     }
     let _ = writeln!(
         tf,
-        "\n# The router: forwards between networks with the reach rules, and to the internet.\nresource \"proxmox_virtual_environment_file\" \"router\" {{\n  node_name    = var.node\n  datastore_id = var.snippets_datastore\n  content_type = \"snippets\"\n  source_raw {{\n    file_name = \"iso${{var.slot}}-router.yaml\"\n    data = \"#cloud-config\\n${{yamlencode({{\n      hostname = \"isoloom-router\"\n      users    = local.users\n      packages = [\"nftables\"]\n      write_files = [\n        {}\n      ]\n      runcmd = [\n        [\"sysctl\", \"-p\", \"/etc/sysctl.d/90-isoloom.conf\"],\n        [\"systemctl\", \"enable\", \"systemd-networkd\"],\n        [\"systemctl\", \"restart\", \"systemd-networkd\"],\n        [\"systemctl\", \"enable\", \"--now\", \"nftables\"],\n        [\"nft\", \"-f\", \"/etc/nftables.conf\"],\n      ]\n    }})}}\"\n  }}\n}}",
+        "\n# The router: forwards between networks with the reach rules, and to the internet.\nresource \"proxmox_virtual_environment_file\" \"router\" {{\n  node_name    = var.node\n  datastore_id = var.snippets_datastore\n  content_type = \"snippets\"\n  source_raw {{\n    file_name = \"iso${{var.slot}}-router.yaml\"\n    data = \"#cloud-config\\n${{yamlencode({{\n      hostname = \"isoloom-router\"\n      users    = local.users\n      packages = [\"nftables\", \"qemu-guest-agent\"]\n      write_files = [\n        {}\n      ]\n      runcmd = [\n        [\"sysctl\", \"-p\", \"/etc/sysctl.d/90-isoloom.conf\"],\n        [\"systemctl\", \"enable\", \"systemd-networkd\"],\n        [\"systemctl\", \"restart\", \"systemd-networkd\"],\n        [\"systemctl\", \"enable\", \"--now\", \"nftables\"],\n        [\"nft\", \"-f\", \"/etc/nftables.conf\"],\n        [\"systemctl\", \"enable\", \"--now\", \"qemu-guest-agent\"],\n      ]\n    }})}}\"\n  }}\n}}",
         write_files.join(",\n        ")
     );
     let mut router_nets =
@@ -311,7 +313,7 @@ resource "proxmox_sdn_zone_simple" "env" {
     }
     let _ = writeln!(
         tf,
-        "\nresource \"proxmox_virtual_environment_vm\" \"isoloom_router\" {{\n  name      = \"iso${{var.slot}}-router\"\n  node_name = var.node\n  tags      = [\"isoloom\", \"{env}\"]\n  on_boot   = false\n  cpu {{\n    cores = 1\n    type  = \"host\"\n  }}\n  memory {{\n    dedicated = 512\n  }}\n  disk {{\n    datastore_id = var.datastore\n    file_id      = proxmox_download_file.{img}.id\n    interface    = \"virtio0\"\n    size         = 8\n  }}\n{router_nets}  initialization {{\n    datastore_id      = var.datastore\n    user_data_file_id = proxmox_virtual_environment_file.router.id\n    ip_config {{\n      ipv4 {{\n        address = \"dhcp\"\n      }}\n    }}\n  }}\n  operating_system {{\n    type = \"l26\"\n  }}\n  serial_device {{}}\n  depends_on = [proxmox_sdn_applier.env]\n}}",
+        "\nresource \"proxmox_virtual_environment_vm\" \"isoloom_router\" {{\n  name      = \"iso${{var.slot}}-router\"\n  node_name = var.node\n  tags      = [\"isoloom\", \"{env}\"]\n  on_boot   = false\n  # Its uplink address (DHCP), for the published ports.\n  agent {{\n    enabled = true\n  }}\n  cpu {{\n    cores = 1\n    type  = \"host\"\n  }}\n  memory {{\n    dedicated = 512\n  }}\n  disk {{\n    datastore_id = var.datastore\n    file_id      = proxmox_download_file.{img}.id\n    interface    = \"virtio0\"\n    size         = 8\n  }}\n{router_nets}  initialization {{\n    datastore_id      = var.datastore\n    user_data_file_id = proxmox_virtual_environment_file.router.id\n    ip_config {{\n      ipv4 {{\n        address = \"dhcp\"\n      }}\n    }}\n  }}\n  operating_system {{\n    type = \"l26\"\n  }}\n  serial_device {{}}\n  depends_on = [proxmox_sdn_applier.env]\n}}",
         env = spec.name,
         img = res("debian-12"),
     );
@@ -377,11 +379,7 @@ resource "proxmox_sdn_zone_simple" "env" {
             files.push("local.project_files".to_string());
         }
         if !m.inputs.is_empty() {
-            let lines: Vec<String> = m
-                .inputs
-                .iter()
-                .map(|i| format!("\"{i}=${{lookup(var.inputs, \\\"{i}\\\", \\\"\\\")}}\""))
-                .collect();
+            let lines: Vec<String> = m.inputs.iter().map(|i| format!("\"{i}=${{lookup(var.inputs, \"{i}\", \"\")}}\"")).collect();
             files.push(format!(
                 "[{{ path = \"/etc/isoloom/inputs.env\", permissions = \"0600\", content = join(\"\\n\", [{}]) }}]",
                 lines.join(", ")
@@ -434,6 +432,22 @@ resource "proxmox_sdn_zone_simple" "env" {
         );
     }
 
+    // Where the environment is reached from outside: the router's uplink address (the guest
+    // agent reports it), and each published service there.
+    let lab_addrs: Vec<String> = nets.iter().map(|n| format!("\"{}\"", router::address(spec, n))).collect();
+    let _ = writeln!(
+        tf,
+        "\nlocals {{\n  router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != \"127.0.0.1\" && !contains([{}], a)][0]\n}}\n\noutput \"address\" {{\n  value = local.router_address\n}}",
+        lab_addrs.join(", ")
+    );
+    if !published.is_empty() {
+        tf.push_str("\n# Published services, from the router's uplink address.\noutput \"published\" {\n  value = {\n");
+        for (machine, service, _, _, host) in &published {
+            let _ = writeln!(tf, "    \"{machine}/{service}\" = \"${{local.router_address}}:{host}\"");
+        }
+        tf.push_str("  }\n}\n");
+    }
+
     Ok(vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/main.tf"),
         contents: tf,
@@ -443,6 +457,21 @@ resource "proxmox_sdn_zone_simple" "env" {
 /// A Terraform resource name from a machine, network or OS name.
 fn res(s: &str) -> String {
     s.replace(['-', '.'], "_")
+}
+
+/// Published services: (machine, service name, machine address, port, published port).
+fn published(spec: &Spec) -> Vec<(String, String, std::net::Ipv4Addr, u16, u16)> {
+    let mut out = Vec::new();
+    for (name, m) in &spec.machines {
+        let Some((net, octet)) = m.networks.first() else { continue };
+        for sv in &m.services {
+            if let Some(host) = sv.publish {
+                let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+                out.push((name.clone(), label, super::address(spec, net, *octet), sv.port, host));
+            }
+        }
+    }
+    out
 }
 
 #[cfg(test)]

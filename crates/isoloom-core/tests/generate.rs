@@ -271,3 +271,15 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
     assert!(vagrant.contains("\"spec/box\"") && !vagrant.contains("other/box"));
     assert!(isoloom_core::images::Table::parse("bogus: 1\n").is_err());
 }
+
+#[test]
+fn proxmox_forwards_published_ports_from_the_router() {
+    let (_, spec) = example("hello-stack");
+    let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
+    // From anything outside the lab to the machine, and the forward allowed through.
+    assert!(tf.contains("tcp dport 8080 dnat ip to 10.60.0.10:"), "{tf}");
+    assert!(tf.contains("ct status dnat accept"));
+    // Where to connect: the router's uplink address, from the guest agent.
+    assert!(tf.contains("output \"published\""));
+    assert!(tf.contains("\"web/") && tf.contains(":8080\""));
+}

@@ -161,10 +161,10 @@ resource "proxmox_virtual_environment_file" "router" {
     data = "#cloud-config\n${yamlencode({
       hostname = "isoloom-router"
       users    = local.users
-      packages = ["nftables"]
+      packages = ["nftables", "qemu-guest-agent"]
       write_files = [
         { path = "/etc/systemd/network/10-wan.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:00:00:00", var.slot)}", "", "[Network]", "DHCP=yes"]) },
-        { path = "/etc/nftables.conf", content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr { 192.168.62.0/24 } ip daddr != { 192.168.62.0/24 } accept\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 192.168.62.0/24 } ip daddr != { 192.168.62.0/24 } masquerade\n  }\n}\n" },
+        { path = "/etc/nftables.conf", content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr { 192.168.62.0/24 } ip daddr != { 192.168.62.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 192.168.62.0/24 } ip daddr != { 192.168.62.0/24 } masquerade\n  }\n}\n" },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
         { path = "/etc/systemd/network/20-lab.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}", "", "[Network]", "Address=192.168.62.254/24", "ConfigureWithoutCarrier=yes"]) }
       ]
@@ -174,6 +174,7 @@ resource "proxmox_virtual_environment_file" "router" {
         ["systemctl", "restart", "systemd-networkd"],
         ["systemctl", "enable", "--now", "nftables"],
         ["nft", "-f", "/etc/nftables.conf"],
+        ["systemctl", "enable", "--now", "qemu-guest-agent"],
       ]
     })}"
   }
@@ -184,6 +185,10 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   node_name = var.node
   tags      = ["isoloom", "air-gapped"]
   on_boot   = false
+  # Its uplink address (DHCP), for the published ports.
+  agent {
+    enabled = true
+  }
   cpu {
     cores = 1
     type  = "host"
@@ -346,4 +351,12 @@ resource "proxmox_virtual_environment_vm" "app" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.store]
+}
+
+locals {
+  router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["192.168.62.254"], a)][0]
+}
+
+output "address" {
+  value = local.router_address
 }
