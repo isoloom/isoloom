@@ -21,11 +21,11 @@ variable "subscription_id" {
 }
 variable "region" {
   type    = string
-  default = "francecentral"
+  default = "swedencentral"
 }
 variable "size" {
   type    = string
-  default = "Standard_B2s"
+  default = "Standard_D2als_v6"
 }
 
 provider "azurerm" {

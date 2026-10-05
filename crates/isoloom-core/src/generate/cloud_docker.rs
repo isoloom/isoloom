@@ -151,7 +151,7 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
     };
     let (sizes, user, host, id) = match cloud {
         "azure" => (
-            size("Standard_B2s", "Standard_B2ms", "Standard_D4s_v5"),
+            size("Standard_D2als_v6", "Standard_D2as_v6", "Standard_D4as_v6"),
             "isoloom",
             "azurerm_public_ip.env.ip_address",
             "azurerm_linux_virtual_machine.env.id",
@@ -256,7 +256,7 @@ variable "subscription_id" {
 }
 variable "region" {
   type    = string
-  default = "francecentral"
+  default = "swedencentral"
 }
 variable "size" {
   type    = string
