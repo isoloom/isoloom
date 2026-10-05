@@ -181,8 +181,15 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         c.insert(s("name"), s(name.as_str()));
         c.insert(s("image"), s(image.clone()));
         c.insert(s("imagePullPolicy"), s("IfNotPresent"));
-        if m.privileged {
-            c.insert(s("securityContext"), map([("privileged", Value::Bool(true))]));
+        if m.privileged || m.read_only {
+            let mut sec = Mapping::new();
+            if m.privileged {
+                sec.insert(s("privileged"), Value::Bool(true));
+            }
+            if m.read_only {
+                sec.insert(s("readOnlyRootFilesystem"), Value::Bool(true));
+            }
+            c.insert(s("securityContext"), Value::Mapping(sec));
         }
         if m.supplied {
             c.insert(s("command"), list([s("sleep"), s("infinity")]));

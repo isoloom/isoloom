@@ -118,6 +118,10 @@ pub struct Machine {
     /// raw devices). A container runs privileged; a VM already has it (its workload is root).
     #[serde(default)]
     pub privileged: bool,
+    /// The machine's root filesystem is read-only (hardening): nothing can be written outside
+    /// its declared `volumes`. Applies to containers; a VM's root stays writable.
+    #[serde(default)]
+    pub read_only: bool,
     #[serde(default)]
     pub services: Vec<Service>,
     /// The spec inputs this machine receives (only these).

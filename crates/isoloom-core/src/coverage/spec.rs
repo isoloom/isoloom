@@ -271,6 +271,11 @@ fn base_table() -> Vec<Row> {
             na("a VM already has kernel access: its workload runs as root"),
         ),
         common(
+            "machines.*.read_only",
+            done("a read-only root filesystem on the container (and a Kubernetes securityContext)", "arm-lab"),
+            na("a VM's root filesystem stays writable; use `volumes` for data that must persist"),
+        ),
+        common(
             "machines.*.resources.cpus",
             done("a CPU limit", "supplier-portal-api"),
             done("the VM's CPUs on every provider", "supplier-portal-api"),

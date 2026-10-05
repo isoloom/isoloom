@@ -285,8 +285,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.pull_refresh_after", TOOLING),
         (
             "services.*.read_only",
-            Planned {
-                note: "a read-only root filesystem (VMs can mount it read-only too)",
+            Emitted {
+                from: "machines.*.read_only (a read-only root filesystem; `volumes` stay writable)",
             },
         ),
         (

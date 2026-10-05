@@ -29,6 +29,7 @@ machines:
     inputs: [TOKEN]
     arch: amd64
     privileged: true
+    read_only: true
     resources: { cpus: 1, memory_mb: 512, disk_gb: 10 }
     depends_on: []
     volumes: { data: /data }

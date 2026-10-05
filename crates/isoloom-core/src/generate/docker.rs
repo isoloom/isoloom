@@ -133,6 +133,9 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         if m.privileged {
             svc.insert(s("privileged"), Value::Bool(true));
         }
+        if m.read_only {
+            svc.insert(s("read_only"), Value::Bool(true));
+        }
         // A stock image the runner supplies for the user to work from: kept running idle
         // (its own command may be a shell that exits at once).
         if m.supplied {

@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 69% | 56 | 35 | 8 | 13 |
+| [Docker Compose](#docker-compose) | 71% | 56 | 36 | 8 | 12 |
 | [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-69% of 56 portable features (35 done, 8 partly, 13 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+71% of 56 portable features (36 done, 8 partly, 12 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -128,7 +128,7 @@ when a table disagrees with what Isoloom really generates.
 | `provider` | n/a | No | Compose tooling, not the environment's behavior |
 | `pull_policy` | n/a | No | Compose tooling, not the environment's behavior |
 | `pull_refresh_after` | n/a | No | Compose tooling, not the environment's behavior |
-| `read_only` | Yes | Not yet | A read-only root filesystem (VMs can mount it read-only too) |
+| `read_only` | Yes | Yes | From `machines.*.read_only` (a read-only root filesystem; `volumes` stay writable) |
 | `restart` | Yes | Yes | Always unless-stopped: machines stay up like VMs |
 | `runtime` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `scale` | Yes | Not yet | Several identical machines (replicas), each with its own address |
