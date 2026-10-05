@@ -70,7 +70,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     );
     out.push_str("\nVagrant.configure(\"2\") do |config|\n");
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n");
-    out.push_str("  config.vm.boot_timeout = 600\n");
+    out.push_str("  config.vm.boot_timeout = 900\n");
     if router::needed(spec) {
         router_vm(spec, &mut out);
     }

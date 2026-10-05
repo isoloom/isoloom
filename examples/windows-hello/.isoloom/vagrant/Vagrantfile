@@ -16,7 +16,7 @@ end
 
 Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
-  config.vm.boot_timeout = 600
+  config.vm.boot_timeout = 900
 
   config.vm.define "web01" do |m|
     m.vm.box = "StefanScherer/windows_2019"
