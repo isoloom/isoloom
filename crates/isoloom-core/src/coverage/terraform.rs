@@ -25,6 +25,8 @@ pub struct Cloud {
     pub list: &'static str,
     pub environment: &'static [&'static str],
     pub windows: &'static [&'static str],
+    /// What the cloud-docker generator writes today.
+    pub generated: &'static [&'static str],
 }
 
 pub const CLOUDS: &[Cloud] = &[
@@ -53,6 +55,16 @@ pub const CLOUDS: &[Cloud] = &[
             "aws_volume_attachment",
         ],
         windows: &[],
+        generated: &[
+            "aws_vpc",
+            "aws_subnet",
+            "aws_internet_gateway",
+            "aws_route_table",
+            "aws_route_table_association",
+            "aws_security_group",
+            "aws_instance",
+            "aws_key_pair",
+        ],
     },
     Cloud {
         name: "Terraform: Azure",
@@ -77,6 +89,7 @@ pub const CLOUDS: &[Cloud] = &[
             "azurerm_virtual_machine_data_disk_attachment",
         ],
         windows: &["azurerm_windows_virtual_machine"],
+        generated: &[],
     },
     Cloud {
         name: "Terraform: Google Cloud",
@@ -95,6 +108,7 @@ pub const CLOUDS: &[Cloud] = &[
             "google_compute_attached_disk",
         ],
         windows: &[],
+        generated: &[],
     },
     Cloud {
         name: "Terraform: DigitalOcean",
@@ -111,6 +125,7 @@ pub const CLOUDS: &[Cloud] = &[
             "digitalocean_volume_attachment",
         ],
         windows: &[],
+        generated: &[],
     },
     Cloud {
         name: "Terraform: Linode",
@@ -128,6 +143,7 @@ pub const CLOUDS: &[Cloud] = &[
             "linode_volume",
         ],
         windows: &[],
+        generated: &[],
     },
     Cloud {
         name: "Terraform: Oracle Cloud",
@@ -149,6 +165,7 @@ pub const CLOUDS: &[Cloud] = &[
             "oci_core_volume_attachment",
         ],
         windows: &[],
+        generated: &[],
     },
 ];
 
@@ -159,7 +176,11 @@ fn cloud(c: &Cloud) -> Format {
     let rows = names(c.list)
         .into_iter()
         .map(|r| {
-            let s = if c.environment.contains(&r) {
+            let s = if c.generated.contains(&r) {
+                Emitted {
+                    from: "the cloud-docker target (one VM running the Compose file)",
+                }
+            } else if c.environment.contains(&r) {
                 Planned {
                     note: "with the cloud generator (one VM per machine)",
                 }

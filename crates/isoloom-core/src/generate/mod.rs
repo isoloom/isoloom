@@ -2,6 +2,7 @@
 //! of the spec (no file system access), so `isoloom check` can regenerate in memory and
 //! compare with what's committed. Output lives under `.isoloom/<target>/` in the project.
 
+mod cloud_docker;
 mod docker;
 mod docker_vm;
 mod proxmox;
@@ -50,7 +51,14 @@ impl fmt::Display for GenerateError {
 impl std::error::Error for GenerateError {}
 
 /// Targets that have a generator today.
-pub const GENERATED_TARGETS: &[Target] = &[Target::Docker, Target::DockerVm, Target::Vagrant, Target::Proxmox];
+pub const GENERATED_TARGETS: &[Target] = &[
+    Target::Docker,
+    Target::Hosted,
+    Target::DockerVm,
+    Target::CloudDocker,
+    Target::Vagrant,
+    Target::Proxmox,
+];
 
 /// The files for one target.
 pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
@@ -58,8 +66,14 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
         return Err(GenerateError::NotPossible(target));
     }
     match target {
-        Target::Docker => docker::generate(&on_docker(spec), spec),
+        // A hosting service runs the same Compose file.
+        Target::Docker | Target::Hosted => docker::generate(&on_docker(spec), spec),
         // Docker on one VM runs the Compose file: both are generated.
+        Target::CloudDocker => {
+            let mut files = docker::generate(&on_docker(spec), spec)?;
+            files.extend(cloud_docker::generate(spec)?);
+            Ok(files)
+        }
         Target::DockerVm => {
             let mut files = docker::generate(&on_docker(spec), spec)?;
             files.extend(docker_vm::generate(spec)?);
