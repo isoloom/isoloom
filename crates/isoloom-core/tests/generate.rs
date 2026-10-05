@@ -34,6 +34,8 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("pivot-dmz");
     assert_committed("edge-firewall");
     assert_committed("air-gapped");
+    assert_committed("windows-hello");
+    assert_committed("ansible-pair");
 }
 
 #[test]
@@ -179,5 +181,35 @@ fn a_network_can_name_its_docker_block() {
     for bad in ["10.77.0.0/25", "172.20.0.0/24"] {
         let p = isoloom_core::validate(&isoloom_core::parse(&base.replace("DOCKER", bad)).unwrap());
         assert!(p.iter().any(|x| x.at == "networks.corp.docker.cidr"), "{bad}: {p:?}");
+    }
+}
+
+#[test]
+fn windows_machines_use_winrm_and_powershell() {
+    let spec = isoloom_core::parse(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    services: [{ port: 389 }]\n    vm:\n      os: windows-server-2019\n      provision: [provision/dc.ps1]\n  web:\n    networks: { lab: 20 }\n    depends_on: [dc01]\n    vm:\n      os: windows-server-2019\n      image: { vagrant: example/win2019, vagrant_version: '1.0' }\n      provision: [provision/web.ps1]\n",
+    )
+    .unwrap();
+    assert_eq!(isoloom_core::validate(&spec), vec![]);
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    let dc = &vf[vf.find("config.vm.define \"dc01\"").unwrap()..vf.find("config.vm.define \"web\"").unwrap()];
+    assert!(dc.contains("m.vm.box = \"StefanScherer/windows_2019\""));
+    assert!(dc.contains("m.vm.box_version = \"2021.05.15\""));
+    assert!(dc.contains("m.vm.communicator = \"winrm\""));
+    assert!(dc.contains("drivers\\\\etc\\\\hosts"), "the Windows hosts file: {dc}");
+    assert!(dc.contains("path: File.join(ROOT, \"provision/dc.ps1\")"));
+    let web = &vf[vf.find("config.vm.define \"web\"").unwrap()..];
+    assert!(web.contains("m.vm.box = \"example/win2019\""), "the spec's image wins");
+    assert!(web.contains("m.vm.box_version = \"1.0\""));
+    assert!(web.contains("Test-NetConnection dc01 -Port $p"));
+}
+
+#[test]
+fn windows_refuses_what_it_cant_do_yet() {
+    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  NAME:\n    networks: { lab: 10 }\n    vm: { os: windows-server-2019, provision: [STEP] }\n";
+    for (name, step, why) in [("dc01", "setup.yml", "PowerShell scripts"), ("averyveryverylongname", "a.ps1", "15 characters")] {
+        let spec = isoloom_core::parse(&base.replace("NAME", name).replace("STEP", step)).unwrap();
+        let err = generate(&spec, Target::Vagrant).unwrap_err().to_string();
+        assert!(err.contains(why), "{name}: {err}");
     }
 }

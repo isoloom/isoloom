@@ -11,7 +11,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [Docker Compose](#docker-compose) | 65% | 55 | 32 | 8 | 15 |
-| [Vagrant](#vagrant) | 67% | 35 | 23 | 1 | 11 |
+| [Vagrant](#vagrant) | 75% | 35 | 25 | 3 | 7 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 5 | 5 | 0 | 0 |
@@ -178,7 +178,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant
 
-67% of 35 portable features (23 done, 1 partly, 11 to do; 61 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
+75% of 35 portable features (25 done, 3 partly, 7 to do; 61 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
 
 ### Machine settings (config.vm)
 
@@ -190,7 +190,7 @@ when a table disagrees with what Isoloom really generates.
 | `base_address` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `base_mac` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `boot_timeout` | Yes | Yes | Fixed: 10 minutes |
-| `box` | Yes | Partly | From `machines.*.vm.os`; not yet: Linux images only; Windows comes later |
+| `box` | Yes | Partly | From `machines.*.vm.os, or machines.*.vm.image.vagrant`; not yet: built-in Windows Server 2022 and Windows 11 boxes |
 | `box_architecture` | Yes | Not yet | A CPU architecture field (amd64, arm64) |
 | `box_check_update` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `box_download_ca_cert` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
@@ -205,17 +205,17 @@ when a table disagrees with what Isoloom really generates.
 | `box_extra_download_options` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `box_server_url` | Yes | Not yet | Custom images (a box URL, a Proxmox template, a cloud image) |
 | `box_url` | Yes | Not yet | Custom images (a box URL, a Proxmox template, a cloud image) |
-| `box_version` | Yes | Not yet | Pinning images to a version |
+| `box_version` | Yes | Yes | From `machines.*.vm.image.vagrant_version, or a built-in pin` |
 | `clone` | n/a | No | Starts from another Vagrant machine; machines start from their image |
 | `cloud_init` | Yes | Another way | Via provisioning steps run any setup |
 | `cloud_init_configs` | Yes | Another way | Via provisioning steps run any setup |
 | `cloud_init_first_boot_only` | Yes | Another way | Via provisioning steps run any setup |
-| `communicator` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
+| `communicator` | Yes | Partly | From `vm.os` (Windows: WinRM); not yet: Windows Server 2022 and Windows 11 boxes |
 | `define` | Yes | Yes | From `machines` |
 | `disk` | Yes | Not yet | Machines.*.resources.disk_gb |
 | `disks` | Yes | Not yet | Machines.*.resources.disk_gb |
 | `graceful_halt_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `guest` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
+| `guest` | Yes | Partly | From `vm.os` (Windows: WinRM); not yet: Windows Server 2022 and Windows 11 boxes |
 | `host_name` | n/a | No | Old name of `hostname` |
 | `hostname` | Yes | Yes | From the machine's name |
 | `ignore_box_vagrantfile` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -256,7 +256,7 @@ when a table disagrees with what Isoloom really generates.
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `config.ssh` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `config.winrm` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
+| `config.winrm` | Yes | Yes | From `vm.os` (the Windows box's own account, over WinRM) |
 | `config.winssh` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
 | `config.trigger` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `config.vagrant` | n/a | No | Vagrant tooling, not the environment's behavior |

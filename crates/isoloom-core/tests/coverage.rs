@@ -32,7 +32,8 @@ machines:
     volumes: { data: /data }
     access: false
     docker: { image: a, init: [x.sh] }
-    vm: { os: debian-12, provision: [x.sh] }
+    vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1" } }
+provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, requirements: req.yml }]
 checks: [c.sh]
 targets: [docker]
 "#;
@@ -189,6 +190,10 @@ fn vagrant_written_settings_match_the_generated_files() {
             }
             // `config.vm.x`, `m.vm.x`, `o.vm.x`: a machine setting; network, provision and
             // provider settings also name their type.
+            if line.starts_with("m.winrm.") || line.starts_with("config.winrm.") {
+                written.insert("config.winrm".to_string());
+                continue;
+            }
             let Some(rest) = ["config.vm.", "m.vm.", "o.vm."].iter().find_map(|p| line.strip_prefix(p)) else {
                 continue;
             };

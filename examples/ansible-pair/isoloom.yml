@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Two machines configured together by one Ansible playbook, the way multi-machine setups usually
+# are: Isoloom writes the inventory (addresses, connections) and runs the playbook from a
+# controller on the environment's network once both machines are up. VM targets only.
+version: 1
+name: ansible-pair
+
+networks:
+  lab: { cidr: 10.63.0.0/24 }
+
+machines:
+  web:
+    networks: { lab: 10 }
+    services: [{ port: 80, http: true }]
+    vm:
+      os: debian-12
+
+  cache:
+    networks: { lab: 20 }
+    services: [{ port: 6379, name: redis }]
+    vm:
+      os: debian-12
+
+provision:
+  - ansible: ansible/site.yml
+    inventory: [ansible/groups.ini]
+    requirements: ansible/requirements.yml
+    groups:
+      webservers: [web]
+      caches: [cache]
+    vars:
+      greeting: hello from ansible
+
+checks:
+  - checks/web-answers.sh

@@ -1,0 +1,3 @@
+# Collections the playbook uses (installed on the controller first).
+collections:
+  - name: ansible.posix

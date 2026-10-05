@@ -276,7 +276,37 @@ pub fn table() -> Vec<Row> {
                 proof: "hello-stack",
             },
         ),
+        vm_field(
+            "machines.*.vm.image.vagrant",
+            done("the machine's own Vagrant box instead of the built-in one", "windows-hello"),
+        ),
+        vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
         vm_field("machines.*.vm.provision", done("`.sh` steps, and Ansible run inside the VM", "hello-stack")),
+        common(
+            "provision[].ansible",
+            planned("environment-level provisioning on containers (a controller container)"),
+            done("run from a controller VM on every network, once every machine is up", "ansible-pair"),
+        ),
+        common(
+            "provision[].inventory",
+            planned("with environment-level provisioning on containers"),
+            done("more inventory files, next to the one Isoloom writes", "ansible-pair"),
+        ),
+        common(
+            "provision[].groups",
+            planned("with environment-level provisioning on containers"),
+            done("groups in the inventory Isoloom writes", "ansible-pair"),
+        ),
+        common(
+            "provision[].vars",
+            planned("with environment-level provisioning on containers"),
+            done("extra variables (`-e`)", "ansible-pair"),
+        ),
+        common(
+            "provision[].requirements",
+            planned("with environment-level provisioning on containers"),
+            done("Galaxy collections and roles installed first", "ansible-pair"),
+        ),
         common(
             "checks",
             done("a `check` profile running them from the access side", "hello-stack"),
@@ -292,7 +322,14 @@ pub fn table() -> Vec<Row> {
 }
 
 /// Where in the spec names are chosen by the author (map keys become `*`).
-const NAMED: &[&str] = &["networks", "machines", "machines.*.networks", "machines.*.volumes"];
+const NAMED: &[&str] = &[
+    "networks",
+    "machines",
+    "machines.*.networks",
+    "machines.*.volumes",
+    "provision[].groups",
+    "provision[].vars",
+];
 
 /// The field paths present in a spec document (`machines.*.docker.image`, `reach[].ports`).
 /// A map of plain values under author-chosen names (`machines.*.networks`) counts as one field.
@@ -300,7 +337,7 @@ pub fn paths(doc: &Value) -> Vec<String> {
     fn walk(v: &Value, at: &str, out: &mut Vec<String>) {
         match v {
             Value::Mapping(m) if NAMED.contains(&at) => {
-                if m.values().all(|c| !matches!(c, Value::Mapping(_) | Value::Sequence(_))) {
+                if m.values().all(|c| !matches!(c, Value::Mapping(_))) {
                     out.push(at.to_string());
                 } else {
                     for c in m.values() {

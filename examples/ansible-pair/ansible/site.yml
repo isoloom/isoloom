@@ -1,0 +1,20 @@
+# One playbook for the whole environment: each group gets its role.
+- hosts: caches
+  tasks:
+    - name: Redis
+      ansible.builtin.apt: { name: redis-server, update_cache: true }
+    - name: Listen on the environment's network
+      ansible.builtin.lineinfile: { path: /etc/redis/redis.conf, regexp: "^bind ", line: "bind 0.0.0.0" }
+    - name: No protected mode
+      ansible.builtin.lineinfile: { path: /etc/redis/redis.conf, regexp: "^protected-mode ", line: "protected-mode no" }
+    - name: Restart
+      ansible.builtin.service: { name: redis-server, state: restarted }
+
+- hosts: webservers
+  tasks:
+    - name: nginx
+      ansible.builtin.apt: { name: nginx, update_cache: true }
+    - name: A page that knows the cache
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        content: "<h1>{{ site_title }}</h1><p>{{ greeting }}, cache at {{ hostvars['cache'].ansible_host }}</p>\n"

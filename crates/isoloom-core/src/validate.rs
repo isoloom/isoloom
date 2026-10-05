@@ -57,7 +57,7 @@ impl Cidr {
     }
 
     /// The address with this last octet, if it is a usable host address in the block.
-    /// Reserved on every target: `.1` (gateway) and the last usable address (router).
+    /// Reserved on every target: `.1` (gateway) and the two last usable addresses (controller, router).
     pub fn host(self, last_octet: u8) -> Option<Ipv4Addr> {
         if self.len < 24 || self.len > 29 {
             return None;
@@ -66,7 +66,7 @@ impl Cidr {
         let offset = u32::from(last_octet) & 0xff;
         let addr = (self.base & !0xff) | offset;
         let first = self.base + 2; // .0 network, .1 gateway
-        let last = self.base + size - 3; // the router (last usable) and broadcast excluded
+        let last = self.base + size - 4; // the controller, the router (last usable) and broadcast excluded
         (addr >= first && addr <= last).then(|| Ipv4Addr::from(addr))
     }
 
@@ -78,6 +78,12 @@ impl Cidr {
     /// The gateway's last octet (1 in a /24, 9 in 10.0.0.8/29).
     pub fn gateway_octet(self) -> u8 {
         ((self.base + 1) & 0xff) as u8
+    }
+
+    /// The controller's address: the second-to-last usable one (e.g. .253 in a /24), where
+    /// environment-level provisioning runs from.
+    pub fn controller(self) -> Ipv4Addr {
+        Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 3)
     }
 
     /// The router's address: the last usable address of the block (e.g. .254 in a /24).
@@ -247,7 +253,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 add(
                     &nat,
                     format!(
-                        "{octet} isn't a usable address in {} (reserved: .0, .1 for the gateway, the last address for the router, and the broadcast address)",
+                        "{octet} isn't a usable address in {} (reserved: .0, .1 for the gateway, the two last addresses for the controller and the router, and the broadcast address)",
                         spec.networks[net].cidr
                     ),
                 );
@@ -326,8 +332,11 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             if !KNOWN_OS.contains(&v.os.as_str()) {
                 add(&format!("{at}.vm.os"), format!("unknown OS `{}`; use one of: {}", v.os, KNOWN_OS.join(", ")));
             }
-            if v.provision.is_empty() && !m.access {
-                add(&format!("{at}.vm.provision"), "list the steps that install the machine's services".into());
+            if v.provision.is_empty() && !m.access && spec.provision.is_empty() {
+                add(
+                    &format!("{at}.vm.provision"),
+                    "list the steps that install the machine's services (or provision the environment with `provision:`)".into(),
+                );
             }
         }
     }
@@ -338,6 +347,23 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             ""
         };
         add("machines", format!("depends_on forms a cycle: {}{hint}", cycle.join(" -> ")));
+    }
+
+    // Environment-level provisioning: its groups name machines that have a VM form.
+    for (i, step) in spec.provision.iter().enumerate() {
+        if !(step.ansible.ends_with(".yml") || step.ansible.ends_with(".yaml")) {
+            add(&format!("provision[{i}].ansible"), "an Ansible playbook: a .yml or .yaml file".into());
+        }
+        for (group, members) in &step.groups {
+            if matches!(group.as_str(), "all" | "linux" | "windows") {
+                add(&format!("provision[{i}].groups.{group}"), "Isoloom fills this group itself".into());
+            }
+            for (j, member) in members.iter().enumerate() {
+                if !spec.machines.contains_key(member) {
+                    add(&format!("provision[{i}].groups.{group}[{j}]"), format!("no machine named `{member}`"));
+                }
+            }
+        }
     }
 
     // Targets: requested ones must be possible.
@@ -454,6 +480,15 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
             for (i, s) in v.provision.iter().enumerate() {
                 check(format!("machines.{name}.vm.provision[{i}]"), s);
             }
+        }
+    }
+    for (i, step) in spec.provision.iter().enumerate() {
+        check(format!("provision[{i}].ansible"), &step.ansible);
+        for (j, inv) in step.inventory.iter().enumerate() {
+            check(format!("provision[{i}].inventory[{j}]"), inv);
+        }
+        if let Some(r) = &step.requirements {
+            check(format!("provision[{i}].requirements"), r);
         }
     }
     for (i, c) in spec.checks.iter().enumerate() {

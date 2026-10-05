@@ -14,7 +14,10 @@
 use std::fmt::Write;
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, netmask, router, start_order};
-use crate::model::{Spec, Target};
+use indexmap::IndexMap;
+
+use crate::images;
+use crate::model::{Machine, Spec, Target, VmImpl};
 
 const DIR: &str = "vagrant";
 
@@ -23,26 +26,20 @@ fn rb(s: &str) -> String {
     format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace("#{", "\\#{"))
 }
 
-/// The Vagrant box for an OS name (and the libvirt one when it differs).
-fn boxes(os: &str) -> Option<(&'static str, Option<&'static str>)> {
-    match os {
-        "debian-12" => Some(("bento/debian-12", Some("generic/debian12"))),
-        "ubuntu-24.04" => Some(("bento/ubuntu-24.04", None)),
-        "kali" => Some(("kalilinux/rolling", None)),
-        _ => None,
-    }
-}
-
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     common_unsupported(spec, Target::Vagrant)?;
     let unsupported = |what: String| GenerateError::Unsupported { target: Target::Vagrant, what };
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
-        if boxes(&vm.os).is_none() {
+        if images::vagrant(vm).is_none() {
             return Err(unsupported(format!(
-                "machine `{name}`: no image for `{}` on local VMs yet (Windows images come later)",
+                "machine `{name}`: no Vagrant box for `{}` yet; give one with `vm.image.vagrant`",
                 vm.os
             )));
+        }
+        if images::is_windows(&vm.os) {
+            windows_supported(spec, name, m).map_err(unsupported)?;
+            continue;
         }
         for step in &vm.provision {
             if !(step.ends_with(".sh") || step.ends_with(".yml") || step.ends_with(".yaml")) {
@@ -75,14 +72,23 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     for name in start_order(spec) {
         let m = &spec.machines[name];
         let Some(vm) = &m.vm else { continue };
-        let (vbox, libvirt_box) = boxes(&vm.os).expect("checked above");
+        let image = images::vagrant(vm).expect("checked above");
+        let (vbox, libvirt_box) = (image.name.as_str(), image.libvirt.as_deref());
+        let windows = images::is_windows(&vm.os);
         let cpus = m.resources.and_then(|r| r.cpus).unwrap_or(crate::DEFAULT_CPUS);
         let mem = m.resources.and_then(|r| r.memory_mb).unwrap_or(crate::DEFAULT_MEMORY_MB);
         let label = format!("{} · {name}", spec.name);
 
         let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(name));
         let _ = writeln!(out, "    m.vm.box = {}", rb(vbox));
+        if let Some(v) = &image.version {
+            let _ = writeln!(out, "    m.vm.box_version = {}", rb(v));
+        }
         let _ = writeln!(out, "    m.vm.hostname = {}", rb(name));
+        if windows {
+            // The box's own account, over WinRM (Windows has no SSH by default).
+            out.push_str("    m.vm.guest = :windows\n    m.vm.communicator = \"winrm\"\n    m.winrm.username = \"vagrant\"\n    m.winrm.password = \"vagrant\"\n    m.winrm.transport = :plaintext\n    m.winrm.basic_auth_only = true\n    m.winrm.retry_limit = 30\n    m.winrm.retry_delay = 10\n");
+        }
         for (net, octet) in &m.networks {
             let netname = format!("isoloom-{}-{net}", spec.name);
             let _ = writeln!(
@@ -143,6 +149,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                     "    m.vm.provider \"libvirt\" do |v|\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
                 );
             }
+        }
+
+        if windows {
+            windows_steps(spec, name, m, vm, &mut out);
+            out.push_str("  end\n");
+            continue;
         }
 
         // The other machines by name.
@@ -263,6 +275,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         out.push_str("  end\n");
     }
+    if !spec.provision.is_empty() {
+        controller_vm(spec, &mut out);
+    }
     out.push_str("end\n");
 
     Ok(vec![GeneratedFile {
@@ -354,4 +369,182 @@ fn router_vm(spec: &Spec, out: &mut String) {
         indent(&script, 6)
     );
     out.push_str("  end\n");
+}
+
+/// What a Windows machine can't have on Vagrant yet, as the reason.
+fn windows_supported(spec: &Spec, name: &str, m: &Machine) -> Result<(), String> {
+    let vm = m.vm.as_ref().expect("a vm");
+    if name.len() > 15 {
+        return Err(format!("machine `{name}`: Windows computer names are at most 15 characters"));
+    }
+    if let Some(step) = vm.provision.iter().find(|s| !s.ends_with(".ps1")) {
+        return Err(format!(
+            "machine `{name}`: Windows provisioning steps are PowerShell scripts (.ps1); `{step}` isn't (Ansible runs from outside Windows: environment-level provisioning comes next)"
+        ));
+    }
+    if !router::route_commands(spec, name, m, true).is_empty() || router::is_gateway(spec, name) {
+        return Err(format!("machine `{name}`: routes between networks on Windows come later"));
+    }
+    if m.networks.keys().any(|n| !spec.networks[n].internet) {
+        return Err(format!("machine `{name}`: `internet: false` on Windows comes later"));
+    }
+    if !m.volumes.is_empty() {
+        return Err(format!("machine `{name}`: volumes on Windows come later"));
+    }
+    Ok(())
+}
+
+/// A Windows machine's steps, in PowerShell: the other machines' names, waiting for its
+/// dependencies, the project in C:\\isoloom, then its own `.ps1` steps.
+fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut String) {
+    let hosts: Vec<String> = spec
+        .machines
+        .keys()
+        .filter(|o| o.as_str() != name)
+        .map(|o| format!("'{} {o}'", address_for(spec, name, o)))
+        .collect();
+    if !hosts.is_empty() {
+        let script = format!(
+            "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @({})) {{ if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) {{ Add-Content -Path $h -Value $l }} }}",
+            hosts.join(", ")
+        );
+        let _ = writeln!(out, "    m.vm.provision \"shell\", name: \"hosts\", inline: {}", rb(&script));
+    }
+    for dep in &m.depends_on {
+        let ports: Vec<String> = spec.machines[dep].services.iter().map(|svc| svc.port.to_string()).collect();
+        let script = format!(
+            "$t = (Get-Date).AddSeconds(300); foreach ($p in @({ports})) {{ while (-not (Test-NetConnection {dep} -Port $p -WarningAction SilentlyContinue).TcpTestSucceeded) {{ if ((Get-Date) -gt $t) {{ throw \"{dep} didn't answer on $p\" }}; Start-Sleep 5 }} }}; \"{dep} answers\"",
+            ports = ports.join(", ")
+        );
+        let _ = writeln!(
+            out,
+            "    m.vm.provision \"shell\", name: {}, inline: {}",
+            rb(&format!("wait for {dep}")),
+            rb(&script)
+        );
+    }
+    // Each step is uploaded and run on its own: copying the project over WinRM is slow.
+    let env = if m.inputs.is_empty() {
+        String::new()
+    } else {
+        format!(", env: INPUTS.slice({})", m.inputs.iter().map(|i| rb(i)).collect::<Vec<_>>().join(", "))
+    };
+    for step in &vm.provision {
+        let _ = writeln!(
+            out,
+            "    m.vm.provision \"shell\", name: {}, path: File.join(ROOT, {}){env}",
+            rb(step),
+            rb(step)
+        );
+    }
+}
+
+/// The controller: a Debian VM on every network at its controller address, started after every
+/// machine. It writes the inventory and runs the environment-level Ansible playbooks.
+fn controller_vm(spec: &Spec, out: &mut String) {
+    let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
+    let _ = writeln!(out, "\n  config.vm.define \"isoloom-controller\" do |m|");
+    let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
+    let _ = writeln!(out, "    m.vm.hostname = \"isoloom-controller\"");
+    for net in spec.networks.keys() {
+        let netname = format!("isoloom-{}-{net}", spec.name);
+        let _ = writeln!(
+            out,
+            "    m.vm.network \"private_network\", ip: {}, netmask: {}, virtualbox__intnet: {}, libvirt__network_name: {}, libvirt__dhcp_enabled: false",
+            rb(&cidr(net).controller().to_string()),
+            rb(&netmask(spec, net).to_string()),
+            rb(&netname),
+            rb(&netname),
+        );
+    }
+    let label = format!("{} · controller", spec.name);
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 1024\n    end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"vmware_desktop\" do |v|\n      v.vmx[\"displayName\"] = {}\n      v.vmx[\"numvcpus\"] = \"1\"\n      v.vmx[\"memsize\"] = \"1024\"\n    end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 1024\n    end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 1024\n    end"
+    );
+    out.push_str(
+        "    PROJECT.each do |entry|\n      m.vm.provision \"file\", source: File.join(ROOT, entry), destination: \"/tmp/isoloom-project/#{entry}\"\n    end\n",
+    );
+    out.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
+    let script = format!(
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq python3-venv sshpass >/dev/null\n[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
+        inventory(spec)
+    );
+    let mut script = script;
+    for step in &spec.provision {
+        let dir = step.ansible.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
+        let file = step.ansible.rsplit('/').next().unwrap_or(&step.ansible);
+        let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect();
+        // As JSON: `-e k=v` splits values on spaces.
+        let vars = if step.vars.is_empty() {
+            String::new()
+        } else {
+            format!(" -e {}", shell_quote(&serde_json::to_string(&step.vars).expect("strings serialize")))
+        };
+        let requirements = match &step.requirements {
+            Some(r) => format!("ansible-galaxy install -r /opt/isoloom/{r}\n"),
+            None => "[ ! -f requirements.yml ] || ansible-galaxy install -r requirements.yml\n".into(),
+        };
+        script.push_str(&format!(
+            "cd /opt/isoloom/{dir}\n{requirements}ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars} {file}\n"
+        ));
+    }
+    let _ = writeln!(
+        out,
+        "    m.vm.provision \"shell\", name: \"ansible\", inline: <<~'SH'\n{}    SH",
+        indent(&script, 6)
+    );
+    out.push_str("  end\n");
+}
+
+/// The inventory Isoloom writes: every VM machine at its address on its first network, with its
+/// connection (SSH on Linux, WinRM on Windows, the boxes' own account), and the spec's groups.
+fn inventory(spec: &Spec) -> String {
+    let mut linux = Vec::new();
+    let mut windows = Vec::new();
+    for (name, m) in &spec.machines {
+        let Some(vm) = &m.vm else { continue };
+        let Some((net, octet)) = m.networks.first() else { continue };
+        let line = format!("{name} ansible_host={}", address(spec, net, *octet));
+        if images::is_windows(&vm.os) { windows.push(line) } else { linux.push(line) }
+    }
+    let mut inv = String::new();
+    inv.push_str(&format!("[linux]\n{}\n\n[windows]\n{}\n\n", linux.join("\n"), windows.join("\n")));
+    inv.push_str("[linux:vars]\nansible_user=vagrant\nansible_password=vagrant\nansible_become=true\n\n");
+    inv.push_str("[windows:vars]\nansible_user=vagrant\nansible_password=vagrant\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n");
+    let mut groups: IndexMap<&str, Vec<&str>> = IndexMap::new();
+    for step in &spec.provision {
+        for (g, members) in &step.groups {
+            let e = groups.entry(g.as_str()).or_default();
+            for mbr in members {
+                if !e.contains(&mbr.as_str()) {
+                    e.push(mbr);
+                }
+            }
+        }
+    }
+    for (g, members) in groups {
+        inv.push_str(&format!("\n[{g}]\n{}\n", members.join("\n")));
+    }
+    inv
+}
+
+/// A single-quoted shell word.
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
 }

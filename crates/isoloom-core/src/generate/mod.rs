@@ -103,7 +103,13 @@ fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
 
 /// Features no generator supports yet, shared by both (none today: kept as the place to
 /// refuse a spec feature before a generator learns it).
-fn common_unsupported(_spec: &Spec, _target: Target) -> Result<(), GenerateError> {
+fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> {
+    if target == Target::Docker && !spec.provision.is_empty() {
+        return Err(GenerateError::Unsupported {
+            target,
+            what: "environment-level provisioning (`provision:`) runs on VM targets for now".into(),
+        });
+    }
     Ok(())
 }
 

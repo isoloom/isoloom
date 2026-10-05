@@ -21,6 +21,10 @@ pub struct Spec {
     #[serde(default)]
     pub inputs: Vec<String>,
     pub machines: IndexMap<String, Machine>,
+    /// Provisioning across machines, once every machine is up: Ansible playbooks run from a
+    /// controller on the environment's networks, with an inventory Isoloom writes.
+    #[serde(default)]
+    pub provision: Vec<Provision>,
     /// Black-box checks (scripts) run on the environment's networks; they prove the behavior on every target.
     #[serde(default)]
     pub checks: Vec<String>,
@@ -146,14 +150,52 @@ pub struct DockerImpl {
 pub struct VmImpl {
     /// An OS name from [`KNOWN_OS`]; each target maps it to an image.
     pub os: String,
-    /// Steps run inside the VM, in order (any tool: shell, Ansible...).
+    /// Steps run inside the VM, in order: `.sh` on Linux (and Ansible playbooks, `.yml`),
+    /// `.ps1` on Windows.
     #[serde(default)]
     pub provision: Vec<String>,
+    /// The image to use instead of the built-in one for `os`, per target.
+    #[serde(default)]
+    pub image: Option<VmImage>,
+}
+
+/// A machine's own image, per target, instead of the built-in one for its OS.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VmImage {
+    /// A Vagrant box name (e.g. `StefanScherer/windows_2019`).
+    #[serde(default)]
+    pub vagrant: Option<String>,
+    /// The box version to pin.
+    #[serde(default)]
+    pub vagrant_version: Option<String>,
+}
+
+/// One environment-level provisioning step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Provision {
+    /// An Ansible playbook in the project, run against the whole environment.
+    pub ansible: String,
+    /// More inventory files in the project (groups, variables), next to the one Isoloom writes
+    /// (every machine's address and connection, in the `linux` or `windows` group).
+    #[serde(default)]
+    pub inventory: Vec<String>,
+    /// Inventory groups: a name -> the machines in it.
+    #[serde(default)]
+    pub groups: IndexMap<String, Vec<String>>,
+    /// Extra variables for the playbook.
+    #[serde(default)]
+    pub vars: IndexMap<String, String>,
+    /// The Ansible Galaxy requirements to install first (collections, roles); by default
+    /// `requirements.yml` next to the playbook, when there is one.
+    #[serde(default)]
+    pub requirements: Option<String>,
 }
 
 /// OS names a `vm:` may use. Each target maps them to its own images (e.g. Windows from an
 /// evaluation ISO locally, a license-included image in the cloud).
-pub const KNOWN_OS: &[&str] = &["debian-12", "ubuntu-24.04", "kali", "windows-server-2022", "windows-11"];
+pub const KNOWN_OS: &[&str] = &["debian-12", "ubuntu-24.04", "kali", "windows-server-2019", "windows-server-2022", "windows-11"];
 
 /// Where an environment can run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]

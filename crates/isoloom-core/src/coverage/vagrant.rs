@@ -198,7 +198,12 @@ fn core() -> Format {
             },
         ),
         ("config.ssh", TOOLING),
-        ("config.winrm", WINDOWS),
+        (
+            "config.winrm",
+            Emitted {
+                from: "vm.os (the Windows box's own account, over WinRM)",
+            },
+        ),
         ("config.winssh", WINDOWS),
         ("config.trigger", TOOLING),
         ("config.vagrant", TOOLING),
@@ -217,8 +222,8 @@ fn machine(s: &str) -> Option<Support> {
     Some(match s {
         "define" => Emitted { from: "machines" },
         "box" => Partial {
-            from: "machines.*.vm.os",
-            gap: "Linux images only; Windows comes later",
+            from: "machines.*.vm.os, or machines.*.vm.image.vagrant",
+            gap: "built-in Windows Server 2022 and Windows 11 boxes",
         },
         "hostname" => Emitted { from: "the machine's name" },
         "host_name" => Tooling {
@@ -239,13 +244,16 @@ fn machine(s: &str) -> Option<Support> {
         },
         "disk" | "disks" => DISK,
         "box_architecture" => ARCH,
-        "box_version" => Planned {
-            note: "pinning images to a version",
+        "box_version" => Emitted {
+            from: "machines.*.vm.image.vagrant_version, or a built-in pin",
         },
         "box_url" | "box_server_url" => Planned {
             note: "custom images (a box URL, a Proxmox template, a cloud image)",
         },
-        "communicator" | "guest" => WINDOWS,
+        "communicator" | "guest" => Partial {
+            from: "vm.os (Windows: WinRM)",
+            gap: "Windows Server 2022 and Windows 11 boxes",
+        },
         "cloud_init" | "cloud_init_configs" | "cloud_init_first_boot_only" => Equivalent {
             via: "provisioning steps run any setup",
         },
