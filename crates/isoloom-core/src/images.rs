@@ -30,6 +30,9 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "kali" => b("kalilinux/rolling", None, None),
         // The box GOAD uses (VirtualBox, VMware, Hyper-V), pinned to its known-good version.
         "windows-server-2019" => b("StefanScherer/windows_2019", Some("2021.05.15"), None),
+        // Pinned so a rebuilt box can't change an environment under it.
+        "windows-server-2022" => b("gusztavvargadr/windows-server-2022-standard", Some("2607.0.0"), None),
+        "windows-11" => b("gusztavvargadr/windows-11", Some("2607.1.0"), None),
         _ => return None,
     })
 }
