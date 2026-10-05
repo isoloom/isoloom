@@ -325,6 +325,13 @@ fn base_table() -> Vec<Row> {
             done("the machine's own Vagrant box instead of the built-in one", "windows-hello"),
         ),
         vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
+        vm_field(
+            "machines.*.vm.image.winrm",
+            done(
+                "how the Windows box answers WinRM: `plaintext` (HTTP 5985, the default) or `ssl` (HTTPS 5986)",
+                "windows-hello",
+            ),
+        ),
         vm_field("machines.*.vm.provision", done("`.sh` steps, and Ansible run inside the VM", "hello-stack")),
         common(
             "provision[].ansible",

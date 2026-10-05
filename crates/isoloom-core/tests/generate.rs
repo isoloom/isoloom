@@ -293,6 +293,7 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
             vm.image = Some(isoloom_core::model::VmImage {
                 vagrant: Some("spec/box".into()),
                 vagrant_version: None,
+                winrm: None,
             });
         }
     }

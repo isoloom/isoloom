@@ -18,6 +18,7 @@ machines:
       image:
         vagrant: StefanScherer/windows_2019
         vagrant_version: "2021.05.15"
+        winrm: plaintext
       provision: [provision/iis.ps1]
 
 checks:

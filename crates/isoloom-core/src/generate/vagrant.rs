@@ -96,7 +96,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             // The box forwards RDP to every interface of the host: off (publish a service to
             // reach one, on the loopback).
             out.push_str("    m.vm.network \"forwarded_port\", guest: 3389, host: 3389, id: \"rdp\", disabled: true\n");
-            out.push_str("    m.vm.guest = :windows\n    m.vm.communicator = \"winrm\"\n    m.winrm.username = \"vagrant\"\n    m.winrm.password = \"vagrant\"\n    m.winrm.transport = :plaintext\n    m.winrm.basic_auth_only = true\n    m.winrm.retry_limit = 30\n    m.winrm.retry_delay = 10\n");
+            out.push_str(
+                "    m.vm.guest = :windows\n    m.vm.communicator = \"winrm\"\n    m.winrm.username = \"vagrant\"\n    m.winrm.password = \"vagrant\"\n",
+            );
+            match images::winrm(vm) {
+                crate::model::Winrm::Ssl => out.push_str("    m.winrm.transport = :ssl\n    m.winrm.ssl_peer_verification = false\n"),
+                crate::model::Winrm::Plaintext => out.push_str("    m.winrm.transport = :plaintext\n    m.winrm.basic_auth_only = true\n"),
+            }
+            out.push_str("    m.winrm.retry_limit = 30\n    m.winrm.retry_delay = 10\n");
         }
         for (net, octet) in &m.networks {
             let netname = format!("isoloom-{}-{net}", spec.name);
@@ -616,13 +623,22 @@ fn inventory(spec: &Spec) -> String {
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
         let Some((net, octet)) = m.networks.first() else { continue };
-        let line = format!("{name} ansible_host={}", address(spec, net, *octet));
-        if images::is_windows(&vm.os) { windows.push(line) } else { linux.push(line) }
+        let mut line = format!("{name} ansible_host={}", address(spec, net, *octet));
+        if images::is_windows(&vm.os) {
+            // WinRM transport per host, so a lab can mix plain-HTTP and HTTPS Windows boxes.
+            line.push_str(match images::winrm(vm) {
+                crate::model::Winrm::Ssl => " ansible_port=5986 ansible_winrm_scheme=https ansible_winrm_transport=ntlm",
+                crate::model::Winrm::Plaintext => " ansible_port=5985 ansible_winrm_scheme=http ansible_winrm_transport=basic",
+            });
+            windows.push(line)
+        } else {
+            linux.push(line)
+        }
     }
     let mut inv = String::new();
     inv.push_str(&format!("[linux]\n{}\n\n[windows]\n{}\n\n", linux.join("\n"), windows.join("\n")));
     inv.push_str("[linux:vars]\nansible_user=vagrant\nansible_password=vagrant\nansible_become=true\n\n");
-    inv.push_str("[windows:vars]\nansible_user=vagrant\nansible_password=vagrant\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n");
+    inv.push_str("[windows:vars]\nansible_user=vagrant\nansible_password=vagrant\nansible_connection=winrm\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n");
     let mut groups: IndexMap<&str, Vec<&str>> = IndexMap::new();
     for step in &spec.provision {
         for (g, members) in &step.groups {

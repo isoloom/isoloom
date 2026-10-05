@@ -127,7 +127,7 @@ Vagrant.configure("2") do |config|
 
 
       [windows]
-      web01 ansible_host=192.168.57.10
+      web01 ansible_host=192.168.57.10 ansible_port=5985 ansible_winrm_scheme=http ansible_winrm_transport=basic
 
       [linux:vars]
       ansible_user=vagrant
@@ -138,9 +138,6 @@ Vagrant.configure("2") do |config|
       ansible_user=vagrant
       ansible_password=vagrant
       ansible_connection=winrm
-      ansible_port=5985
-      ansible_winrm_scheme=http
-      ansible_winrm_transport=basic
       ansible_winrm_server_cert_validation=ignore
       ansible_winrm_operation_timeout_sec=400
       ansible_winrm_read_timeout_sec=500

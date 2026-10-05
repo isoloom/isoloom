@@ -521,7 +521,10 @@ fn run_cmd(
     // Pick the target: the one named, or the only possibility, else ask.
     let possible = core::effective(&spec);
     let t = match target {
-        Some(id) => core::Target::ALL.into_iter().find(|t| t.id() == id).ok_or_else(|| format!("unknown target `{id}`"))?,
+        Some(id) => core::Target::ALL
+            .into_iter()
+            .find(|t| t.id() == id)
+            .ok_or_else(|| format!("unknown target `{id}`"))?,
         None => match possible.as_slice() {
             [one] => *one,
             [] => return Err("this spec has no runnable target; see `isoloom targets`".into()),
@@ -557,12 +560,7 @@ fn run_cmd(
 }
 
 /// The command (and its working directory) that brings a target up or tears it down.
-fn bring_up(
-    dir: &std::path::Path,
-    t: core::Target,
-    cloud: Option<&str>,
-    down: bool,
-) -> Result<(String, Vec<String>, PathBuf), Box<dyn std::error::Error>> {
+fn bring_up(dir: &std::path::Path, t: core::Target, cloud: Option<&str>, down: bool) -> Result<(String, Vec<String>, PathBuf), Box<dyn std::error::Error>> {
     let s = |x: &str| x.to_string();
     let out = dir.join(core::OUTPUT_DIR);
     Ok(match t {

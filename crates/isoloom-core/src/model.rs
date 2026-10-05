@@ -164,6 +164,19 @@ pub struct VmImpl {
     pub image: Option<VmImage>,
 }
 
+/// How a Windows box answers WinRM. Most boxes (StefanScherer, gusztavvargadr) use plain HTTP
+/// on 5985 with basic auth; some (GOAD's Windows Server 2025 box) only listen on HTTPS 5986.
+/// Isoloom can't tell from the box name, so a non-default box declares it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Winrm {
+    /// HTTP on 5985, basic auth (the default for the common Windows boxes).
+    #[default]
+    Plaintext,
+    /// HTTPS on 5986, NTLM (certificate not verified).
+    Ssl,
+}
+
 /// A machine's own image, per target, instead of the built-in one for its OS.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -174,6 +187,9 @@ pub struct VmImage {
     /// The box version to pin.
     #[serde(default)]
     pub vagrant_version: Option<String>,
+    /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
+    #[serde(default)]
+    pub winrm: Option<Winrm>,
 }
 
 /// One environment-level provisioning step.

@@ -127,6 +127,12 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
     })
 }
 
+/// How a machine's Windows box answers WinRM: what its image declares, else plain HTTP (every
+/// built-in Windows box uses plain HTTP today).
+pub fn winrm(vm: &VmImpl) -> crate::model::Winrm {
+    vm.image.as_ref().and_then(|i| i.winrm).unwrap_or_default()
+}
+
 /// The Vagrant box for a machine: the spec's `vm.image.vagrant` when set, else the built-in one.
 pub fn vagrant(vm: &VmImpl) -> Option<VagrantBox> {
     match vm.image.as_ref().and_then(|i| i.vagrant.clone()) {
