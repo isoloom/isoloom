@@ -221,9 +221,8 @@ fn core() -> Format {
 fn machine(s: &str) -> Option<Support> {
     Some(match s {
         "define" => Emitted { from: "machines" },
-        "box" => Partial {
-            from: "machines.*.vm.os, or machines.*.vm.image.vagrant",
-            gap: "built-in Windows Server 2022 and Windows 11 boxes",
+        "box" => Emitted {
+            from: "machines.*.vm.os (built-in boxes for every OS name), or machines.*.vm.image.vagrant",
         },
         "hostname" => Emitted { from: "the machine's name" },
         "host_name" => Tooling {
@@ -250,9 +249,8 @@ fn machine(s: &str) -> Option<Support> {
         "box_url" | "box_server_url" => Planned {
             note: "custom images (a box URL, a Proxmox template, a cloud image)",
         },
-        "communicator" | "guest" => Partial {
-            from: "vm.os (Windows: WinRM)",
-            gap: "Windows Server 2022 and Windows 11 boxes",
+        "communicator" | "guest" => Emitted {
+            from: "vm.os (Windows uses WinRM, plain HTTP or SSL per the box's `image.winrm`)",
         },
         "cloud_init" | "cloud_init_configs" | "cloud_init_first_boot_only" => Equivalent {
             via: "provisioning steps run any setup",
