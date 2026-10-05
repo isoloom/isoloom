@@ -45,6 +45,7 @@ services:
     restart: unless-stopped
   cache:
     image: redis:7-alpine
+    platform: linux/amd64
     hostname: cache
     networks:
       back:
@@ -96,6 +97,7 @@ services:
     build:
       context: ../../build/web
     image: isoloom/segmented-web
+    platform: linux/amd64
     hostname: web
     networks:
       front:

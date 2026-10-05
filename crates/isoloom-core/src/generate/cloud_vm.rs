@@ -69,6 +69,9 @@ fn family(c: Cidr) -> u8 {
 }
 
 fn unsupported(spec: &Spec) -> Option<String> {
+    if let Some(name) = super::arm64_machine(spec) {
+        return Some(format!("machine `{name}`: arm64 on AWS comes later (Graviton instances and arm64 AMIs)"));
+    }
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine in the cloud come later".into());
     }

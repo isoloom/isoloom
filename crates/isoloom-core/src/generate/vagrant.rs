@@ -90,6 +90,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         if let Some(v) = &image.version {
             let _ = writeln!(out, "    m.vm.box_version = {}", rb(v));
         }
+        let _ = writeln!(out, "    m.vm.box_architecture = {}", rb(m.arch.id()));
         let _ = writeln!(out, "    m.vm.hostname = {}", rb(name));
         if windows {
             // The box's own account, over WinRM (Windows has no SSH by default).

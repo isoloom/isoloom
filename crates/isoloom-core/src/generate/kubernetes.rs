@@ -267,6 +267,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             pod.insert(s("initContainers"), Value::Sequence(waits));
         }
         pod.insert(s("containers"), Value::Sequence(containers));
+        // Schedule the pod on a node of the machine's architecture.
+        pod.insert(s("nodeSelector"), map([("kubernetes.io/arch", s(m.arch.id()))]));
         let mut volumes: Vec<Value> = m
             .volumes
             .keys()

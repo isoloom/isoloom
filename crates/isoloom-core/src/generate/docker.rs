@@ -128,6 +128,8 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             svc.insert(s("build"), map([("context", s(format!("{ROOT}/{build}")))]));
         }
         svc.insert(s("image"), s(image.clone()));
+        // Pin the architecture so the machine runs the same on an x86-64 or an ARM host.
+        svc.insert(s("platform"), s(m.arch.docker_platform()));
         // A stock image the runner supplies for the user to work from: kept running idle
         // (its own command may be a shell that exits at once).
         if m.supplied {

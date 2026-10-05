@@ -242,7 +242,7 @@ fn machine(s: &str) -> Option<Support> {
             from: "machines.*.resources (see each provider below)",
         },
         "disk" | "disks" => DISK,
-        "box_architecture" => ARCH,
+        "box_architecture" => Emitted { from: "machines.*.arch" },
         "box_version" => Emitted {
             from: "machines.*.vm.image.vagrant_version, or a built-in pin",
         },

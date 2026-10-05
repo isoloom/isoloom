@@ -9,6 +9,7 @@ name: air-gapped
 services:
   store:
     image: redis:7-alpine
+    platform: linux/amd64
     hostname: store
     networks:
       lab:
@@ -26,6 +27,7 @@ services:
     restart: unless-stopped
   app:
     image: nginx:1.27-alpine
+    platform: linux/amd64
     hostname: app
     networks:
       lab:

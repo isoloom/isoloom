@@ -261,6 +261,11 @@ fn base_table() -> Vec<Row> {
             done("environment of that machine's provisioning only", "supplier-portal-api"),
         ),
         common(
+            "machines.*.arch",
+            done("`platform` on the container and a node selector on Kubernetes (amd64/arm64)", "arm-lab"),
+            done("`box_architecture` on the VM", "segmented"),
+        ),
+        common(
             "machines.*.resources.cpus",
             done("a CPU limit", "supplier-portal-api"),
             done("the VM's CPUs on every provider", "supplier-portal-api"),

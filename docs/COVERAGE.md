@@ -10,8 +10,8 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 66% | 56 | 33 | 8 | 15 |
-| [Vagrant](#vagrant) | 80% | 35 | 28 | 0 | 7 |
+| [Docker Compose](#docker-compose) | 67% | 56 | 34 | 8 | 14 |
+| [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 5 | 5 | 0 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-66% of 56 portable features (33 done, 8 partly, 15 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+67% of 56 portable features (34 done, 8 partly, 14 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -118,7 +118,7 @@ when a table disagrees with what Isoloom really generates.
 | `oom_score_adj` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `pid` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `pids_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `platform` | Yes | Not yet | A CPU architecture (amd64, arm64): images, boxes and instance types all have one |
+| `platform` | Yes | Yes | From `machines.*.arch` (pinned on every container, so the machine runs the same on an x86-64 or an ARM host) |
 | `ports` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback) |
 | `post_start` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
 | `pre_start` | Yes | Another way | Via machines.*.depends_on and docker.init |
@@ -178,7 +178,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant
 
-80% of 35 portable features (28 done, 0 partly, 7 to do; 61 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
+82% of 35 portable features (29 done, 0 partly, 6 to do; 61 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
 
 ### Machine settings (config.vm)
 
@@ -191,7 +191,7 @@ when a table disagrees with what Isoloom really generates.
 | `base_mac` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `boot_timeout` | Yes | Yes | Fixed: 10 minutes |
 | `box` | Yes | Yes | From `machines.*.vm.os` (built-in boxes for every OS name), or machines.*.vm.image.vagrant |
-| `box_architecture` | Yes | Not yet | A CPU architecture field (amd64, arm64) |
+| `box_architecture` | Yes | Yes | From `machines.*.arch` |
 | `box_check_update` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `box_download_ca_cert` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `box_download_ca_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |

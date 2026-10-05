@@ -218,7 +218,10 @@ fn record_vagrantfile(file: &std::path::Path) -> Result<serde_json::Value, Box<d
     // A private per-run directory, created exclusively (fails if it already exists), so a
     // local attacker can't pre-place a symlink at a guessable path and have us clobber a
     // victim file or run a swapped script.
-    let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
     let dir = std::env::temp_dir().join(format!("isoloom-vagrant-{}-{nonce:x}", std::process::id()));
     std::fs::create_dir(&dir)?;
     let script = dir.join("record.rb");

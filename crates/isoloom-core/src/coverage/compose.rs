@@ -245,8 +245,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.pids_limit", NO_CONTAINER_ON_VMS),
         (
             "services.*.platform",
-            Planned {
-                note: "a CPU architecture (amd64, arm64): images, boxes and instance types all have one",
+            Emitted {
+                from: "machines.*.arch (pinned on every container, so the machine runs the same on an x86-64 or an ARM host)",
             },
         ),
         (

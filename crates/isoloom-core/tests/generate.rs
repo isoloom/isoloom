@@ -37,6 +37,7 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("windows-hello");
     assert_committed("ansible-pair");
     assert_committed("mixed-office");
+    assert_committed("arm-lab");
 }
 
 #[test]
@@ -264,7 +265,7 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() {
     let compose = contents(&generate(&applied, Target::Docker).unwrap(), ".isoloom/docker/compose.yml");
     // The access machine is a real container now (kept running idle), not the check stand-in.
     assert!(
-        compose.contains("  user:\n    image: kalilinux/kali-rolling\n    entrypoint:\n    - sleep\n    - infinity\n"),
+        compose.contains("  user:\n    image: kalilinux/kali-rolling\n    platform: linux/amd64\n    entrypoint:\n    - sleep\n    - infinity\n"),
         "{compose}"
     );
     assert!(!compose.contains("isoloom-access"));

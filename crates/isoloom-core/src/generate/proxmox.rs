@@ -54,6 +54,9 @@ fn cidr(spec: &Spec, net: &str) -> Cidr {
 
 /// What this generator can't produce yet, as the reason.
 fn unsupported(spec: &Spec) -> Option<String> {
+    if let Some(name) = super::arm64_machine(spec) {
+        return Some(format!("machine `{name}`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts)"));
+    }
     if !spec.provision.is_empty() {
         return Some("environment-level provisioning (`provision:`) on Proxmox comes later".into());
     }

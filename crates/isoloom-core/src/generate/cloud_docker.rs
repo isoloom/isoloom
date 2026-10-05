@@ -12,7 +12,7 @@
 use std::fmt::Write;
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
-use crate::model::Spec;
+use crate::model::{Spec, Target};
 
 /// The published ports of the machines that have a container form.
 fn published(spec: &Spec) -> Vec<u16> {
@@ -48,6 +48,12 @@ pub(super) fn memory_mb(spec: &Spec) -> u32 {
 }
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
+    if let Some(name) = super::arm64_machine(spec) {
+        return Err(GenerateError::Unsupported {
+            target: Target::CloudDocker,
+            what: format!("machine `{name}`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"),
+        });
+    }
     Ok(vec![
         aws(spec),
         other(spec, "azure", AZURE),

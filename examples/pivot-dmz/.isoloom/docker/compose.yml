@@ -47,6 +47,7 @@ services:
     build:
       context: ../../build/gateway
     image: isoloom/pivot-dmz-gateway
+    platform: linux/amd64
     hostname: gateway
     networks:
       dmz:
@@ -93,6 +94,7 @@ services:
     build:
       context: ../../build/app
     image: isoloom/pivot-dmz-app
+    platform: linux/amd64
     hostname: app
     networks:
       internal:
@@ -134,6 +136,7 @@ services:
     restart: unless-stopped
   db:
     image: postgres:16
+    platform: linux/amd64
     hostname: db
     networks:
       internal:

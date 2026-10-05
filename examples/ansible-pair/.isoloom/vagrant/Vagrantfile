@@ -20,6 +20,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
+    m.vm.box_architecture = "amd64"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.63.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
@@ -67,6 +68,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "cache" do |m|
     m.vm.box = "bento/debian-12"
+    m.vm.box_architecture = "amd64"
     m.vm.hostname = "cache"
     m.vm.network "private_network", ip: "10.63.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|

@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# One ARM64 web container. `arch: arm64` pins the machine's CPU architecture: the Compose
+# `platform`, the Vagrant box architecture and the Kubernetes node selector all follow it, so the
+# lab runs the same on an Apple Silicon or a Graviton host. The cloud targets (x86-64 only, for
+# now) refuse an arm64 machine rather than run it on the wrong architecture.
+version: 1
+name: arm-lab
+
+networks:
+  lab: { cidr: 10.60.0.0/24 }
+
+machines:
+  web:
+    networks: { lab: 10 }
+    arch: arm64
+    services: [{ port: 80, http: true, publish: 8085 }]
+    docker: { image: nginx:1.27 }
+
+checks:
+  - checks/web-answers.sh

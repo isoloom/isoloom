@@ -76,11 +76,44 @@ pub struct Reach {
     pub ports: Vec<u16>,
 }
 
+/// A machine's CPU architecture. Every target has one: a container platform, a box
+/// architecture, a cloud instance family. Defaults to x86-64.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Arch {
+    /// x86-64 (amd64), the default.
+    #[default]
+    Amd64,
+    /// 64-bit ARM (aarch64).
+    Arm64,
+}
+
+impl Arch {
+    /// The container platform value (`linux/amd64`, `linux/arm64`).
+    pub fn docker_platform(self) -> &'static str {
+        match self {
+            Arch::Amd64 => "linux/amd64",
+            Arch::Arm64 => "linux/arm64",
+        }
+    }
+
+    /// The name Vagrant, Kubernetes and most tools use (`amd64`, `arm64`).
+    pub fn id(self) -> &'static str {
+        match self {
+            Arch::Amd64 => "amd64",
+            Arch::Arm64 => "arm64",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Machine {
     /// Network name -> last octet of the machine's address on it.
     pub networks: IndexMap<String, u8>,
+    /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
+    #[serde(default)]
+    pub arch: Arch,
     #[serde(default)]
     pub services: Vec<Service>,
     /// The spec inputs this machine receives (only these).

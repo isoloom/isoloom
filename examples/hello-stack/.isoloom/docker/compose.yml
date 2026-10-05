@@ -8,6 +8,7 @@ name: hello-stack
 services:
   cache:
     image: redis:7-alpine
+    platform: linux/amd64
     hostname: cache
     networks:
       app:
@@ -64,6 +65,7 @@ services:
     build:
       context: ../../build/web
     image: isoloom/hello-stack-web
+    platform: linux/amd64
     hostname: web
     networks:
       app:

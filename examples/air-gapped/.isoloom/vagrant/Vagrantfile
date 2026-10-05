@@ -20,6 +20,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "store" do |m|
     m.vm.box = "bento/debian-12"
+    m.vm.box_architecture = "amd64"
     m.vm.hostname = "store"
     m.vm.network "private_network", ip: "192.168.62.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
@@ -105,6 +106,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "app" do |m|
     m.vm.box = "bento/debian-12"
+    m.vm.box_architecture = "amd64"
     m.vm.hostname = "app"
     m.vm.network "private_network", ip: "192.168.62.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|

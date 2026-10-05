@@ -8,6 +8,7 @@ name: supplier-portal-api
 services:
   database:
     image: mysql:8.0
+    platform: linux/amd64
     hostname: database
     networks:
       lab:
@@ -50,6 +51,7 @@ services:
     build:
       context: ../../build/web
     image: isoloom/supplier-portal-api-web
+    platform: linux/amd64
     hostname: web
     networks:
       lab:

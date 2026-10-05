@@ -16,6 +16,7 @@ reach:
 machines:
   cache:
     networks: { back: 20 }
+    arch: amd64
     services: [{ port: 6379, name: redis }]
     resources: { cpus: 1, memory_mb: 1024, disk_gb: 10 }
     volumes: { data: /data }
