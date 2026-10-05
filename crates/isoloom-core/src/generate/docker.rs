@@ -128,6 +128,11 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             svc.insert(s("build"), map([("context", s(format!("{ROOT}/{build}")))]));
         }
         svc.insert(s("image"), s(image.clone()));
+        // A stock image the runner supplies for the user to work from: kept running idle
+        // (its own command may be a shell that exits at once).
+        if m.supplied {
+            svc.insert(s("entrypoint"), list([s("sleep"), s("infinity")]));
+        }
         svc.insert(s("hostname"), s(name.as_str()));
         svc.insert(s("networks"), networks_of(m, spec, true));
         if router::is_gateway(spec, name) {

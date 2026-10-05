@@ -52,11 +52,18 @@ enum Command {
         /// Only this target (docker, vagrant).
         #[arg(long)]
         target: Option<String>,
+        /// Your own image table (YAML): OS images, and the access machine when the spec leaves
+        /// it to the runner. See https://www.isoloom.com/en/docs/images
+        #[arg(long, value_name = "FILE")]
+        images: Option<PathBuf>,
     },
     /// Fail when the generated files under .isoloom/ don't match the spec (for CI).
     Check {
         #[arg(default_value = ".")]
         dir: PathBuf,
+        /// The image table the files were generated with (see `generate --images`).
+        #[arg(long, value_name = "FILE")]
+        images: Option<PathBuf>,
     },
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
     Schema,
@@ -286,7 +293,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        Command::Generate { dir, target } => {
+        Command::Generate { dir, target, images } => {
             let spec = core::load(&dir)?;
             let problems = core::validate(&spec);
             if !problems.is_empty() {
@@ -296,6 +303,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 eprintln!("fix the spec first (`isoloom validate`)");
                 return Ok(ExitCode::FAILURE);
             }
+            let spec = with_images(spec, images.as_deref())?;
             let (files, skipped) = match &target {
                 Some(id) => {
                     let t = core::Target::ALL
@@ -433,8 +441,8 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        Command::Check { dir } => {
-            let spec = core::load(&dir)?;
+        Command::Check { dir, images } => {
+            let spec = with_images(core::load(&dir)?, images.as_deref())?;
             let (files, _) = core::generate_all(&spec);
             let mut stale = 0;
             for f in &files {
@@ -457,4 +465,12 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
     }
+}
+
+/// The spec with the user's image table applied, when one is given.
+fn with_images(spec: core::Spec, file: Option<&std::path::Path>) -> Result<core::Spec, Box<dyn std::error::Error>> {
+    let Some(file) = file else { return Ok(spec) };
+    let text = std::fs::read_to_string(file).map_err(|e| format!("can't read {}: {e}", file.display()))?;
+    let table = core::images::Table::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
+    Ok(table.apply(&spec))
 }

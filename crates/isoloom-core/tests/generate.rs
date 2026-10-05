@@ -217,3 +217,57 @@ fn windows_refuses_what_it_cant_do_yet() {
         assert!(err.contains(why), "{name}: {err}");
     }
 }
+
+fn contents(files: &[isoloom_core::GeneratedFile], path: &str) -> String {
+    files
+        .iter()
+        .find(|f| f.path == path)
+        .unwrap_or_else(|| panic!("{path} not generated"))
+        .contents
+        .clone()
+}
+
+#[test]
+fn the_runner_supplies_the_access_machine_through_its_image_table() {
+    let (_, spec) = example("segmented");
+    let table = isoloom_core::images::Table::parse("access:\n  docker: kalilinux/kali-rolling\n  vm: kali\n").unwrap();
+    let applied = table.apply(&spec);
+    let compose = contents(&generate(&applied, Target::Docker).unwrap(), ".isoloom/docker/compose.yml");
+    // The access machine is a real container now (kept running idle), not the check stand-in.
+    assert!(
+        compose.contains("  user:\n    image: kalilinux/kali-rolling\n    entrypoint:\n    - sleep\n    - infinity\n"),
+        "{compose}"
+    );
+    assert!(!compose.contains("isoloom-access"));
+    // Its VM part comes from the spec, which wins over the table.
+    let vagrant = contents(&generate(&applied, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(vagrant.contains("config.vm.define \"user\" do |m|\n    m.vm.box = \"bento/debian-12\""));
+    // Without the table, nothing changes.
+    assert_eq!(isoloom_core::images::Table::default().apply(&spec), spec);
+}
+
+#[test]
+fn the_image_table_sits_between_built_in_images_and_the_spec() {
+    let (_, spec) = example("hello-stack");
+    let table = isoloom_core::images::Table::parse("os:\n  debian-12: { vagrant: my-org/debian-12, vagrant_version: \"1.2.0\" }\n").unwrap();
+    let vagrant = contents(&generate(&table.apply(&spec), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(
+        vagrant.contains("m.vm.box = \"my-org/debian-12\"\n    m.vm.box_version = \"1.2.0\""),
+        "{vagrant}"
+    );
+    // A spec's own vm.image still wins.
+    let (_, windows) = example("windows-hello");
+    let table = isoloom_core::images::Table::parse("os:\n  windows-server-2019: { vagrant: other/box }\n").unwrap();
+    let mut pinned = windows.clone();
+    for m in pinned.machines.values_mut() {
+        if let Some(vm) = &mut m.vm {
+            vm.image = Some(isoloom_core::model::VmImage {
+                vagrant: Some("spec/box".into()),
+                vagrant_version: None,
+            });
+        }
+    }
+    let vagrant = contents(&generate(&table.apply(&pinned), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(vagrant.contains("\"spec/box\"") && !vagrant.contains("other/box"));
+    assert!(isoloom_core::images::Table::parse("bogus: 1\n").is_err());
+}

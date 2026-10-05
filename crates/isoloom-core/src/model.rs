@@ -104,6 +104,11 @@ pub struct Machine {
     /// How a VM produces this machine (services installed natively, no Docker inside).
     #[serde(default)]
     pub vm: Option<VmImpl>,
+    /// Filled by the runner's image table (an access machine the spec leaves to the runner):
+    /// a stock image, kept running idle for the user to work from. Never in a spec file.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub supplied: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
