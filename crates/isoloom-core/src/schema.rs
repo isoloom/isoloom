@@ -41,9 +41,15 @@ pub fn schema() -> Value {
         &mut s,
         &["$defs", "Network", "properties", "cidr"],
         "pattern",
-        json!(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}/(2[4-9])$"),
+        json!(r"^(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}/(2[4-9])$"),
     );
     set(&mut s, &["$defs", "VmImpl", "properties", "os"], "enum", json!(KNOWN_OS));
+    set(
+        &mut s,
+        &["$defs", "NetworkDocker", "properties", "cidr"],
+        "pattern",
+        json!(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}/(2[4-9])$"),
+    );
     set(
         &mut s,
         &["$defs", "Machine", "properties", "networks"],
