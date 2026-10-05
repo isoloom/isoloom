@@ -283,3 +283,34 @@ fn proxmox_forwards_published_ports_from_the_router() {
     assert!(tf.contains("output \"published\""));
     assert!(tf.contains("\"web/") && tf.contains(":8080\""));
 }
+
+#[test]
+fn kubernetes_turns_networks_and_reach_into_network_policies() {
+    let (_, spec) = example("segmented");
+    let files = generate(&spec, Target::Kubernetes).unwrap();
+    let env = contents(&files, ".isoloom/kubernetes/environment.yaml");
+    // Deny by default, each network's machines together, then the reach rules (with ports).
+    assert!(env.contains("name: isoloom-default-deny"));
+    assert!(env.contains("name: net-back"));
+    assert!(env.contains("name: reach-access-front"));
+    assert!(env.contains("name: reach-front-back"));
+    assert!(env.contains("port: 6379"));
+    // Names resolve as everywhere else: a hostname and a Service per serving machine.
+    assert!(env.contains("hostname: web") && env.contains("kind: Service\nmetadata:\n  name: web"));
+    // A volume is a claim.
+    assert!(env.contains("kind: PersistentVolumeClaim"));
+    // Checks: a Job on the access machine's networks.
+    let job = contents(&files, ".isoloom/kubernetes/checks/job.yaml");
+    assert!(job.contains("net.isoloom.com/access: on"), "{job}");
+    let k = contents(&files, ".isoloom/kubernetes/kustomization.yaml");
+    assert!(k.contains("checks__web-reachable.sh=../../checks/web-reachable.sh"), "{k}");
+}
+
+#[test]
+fn kubernetes_publishes_and_keeps_offline_machines_inside() {
+    let (_, spec) = example("hello-stack");
+    let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
+    assert!(env.contains("type: LoadBalancer") && env.contains("port: 8080"), "{env}");
+    assert!(env.contains("name: offline-"));
+    assert!(env.contains("policyTypes:\n    - Egress") || env.contains("policyTypes:\n  - Egress"));
+}

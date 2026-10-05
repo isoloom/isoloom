@@ -5,6 +5,7 @@
 mod cloud_docker;
 mod docker;
 mod docker_vm;
+mod kubernetes;
 mod proxmox;
 mod router;
 mod vagrant;
@@ -56,6 +57,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
     Target::Hosted,
     Target::DockerVm,
     Target::CloudDocker,
+    Target::Kubernetes,
     Target::Vagrant,
     Target::Proxmox,
 ];
@@ -79,6 +81,7 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
             files.extend(docker_vm::generate(spec)?);
             Ok(files)
         }
+        Target::Kubernetes => kubernetes::generate(spec),
         Target::Vagrant => vagrant::generate(spec),
         Target::Proxmox => proxmox::generate(spec),
         other => Err(GenerateError::NoGenerator(other)),

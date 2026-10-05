@@ -51,6 +51,48 @@ jobs:
         run: docker compose -f .isoloom/docker/compose.yml --profile check down -v
 
   # A Compose file, imported, generated and started: the draft runs.
+  # The Kubernetes output on a real (throwaway) cluster: built images loaded, the environment
+  # applied and Available, then its checks as a Job (segmented's "cache is blocked" proves the
+  # network policies are enforced).
+  kubernetes:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [hello-stack, segmented]
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.example }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: isoloom
+      - name: Build and load the project's images
+        run: |
+          grep -E '^#   docker build -t ' .isoloom/kubernetes/environment.yaml | sed 's/^#   //' | while read -r cmd; do
+            $cmd
+            kind load docker-image --name isoloom "$(echo "$cmd" | awk '{print $4}')"
+          done
+      - name: Start
+        run: |
+          kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -
+          ns=$(awk '/^kind: Namespace/{getline; getline; print $2; exit}' .isoloom/kubernetes/environment.yaml)
+          echo "NS=$ns" >> "$GITHUB_ENV"
+          kubectl -n "$ns" wait --for=condition=Available deployment --all --timeout=600s
+      - name: Checks
+        run: |
+          kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes/checks | kubectl apply -f -
+          kubectl -n "$NS" wait --for=condition=complete job/isoloom-check --timeout=300s || true
+          kubectl -n "$NS" logs job/isoloom-check
+          kubectl -n "$NS" wait --for=condition=complete job/isoloom-check --timeout=5s
+      - name: State
+        if: failure()
+        run: |
+          kubectl -n "$NS" get all,networkpolicy,pvc -o wide || true
+          kubectl -n "$NS" describe pods || true
+          kubectl -n "$NS" logs --all-containers --prefix -l isoloom.com/machine --tail=50 || true
+
   import:
     runs-on: ubuntu-latest
     steps:

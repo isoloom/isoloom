@@ -32,13 +32,13 @@ const DIR: &str = "docker";
 /// From `.isoloom/docker/` back to the project folder.
 const ROOT: &str = "../..";
 /// The check runner: a small image with `sh`, `curl` and busybox `nc`.
-const CHECK_IMAGE: &str = "curlimages/curl:8.11.1";
+pub(super) const CHECK_IMAGE: &str = "curlimages/curl:8.11.1";
 
-fn s(v: impl Into<String>) -> Value {
+pub(super) fn s(v: impl Into<String>) -> Value {
     Value::String(v.into())
 }
 
-fn map(entries: impl IntoIterator<Item = (&'static str, Value)>) -> Value {
+pub(super) fn map(entries: impl IntoIterator<Item = (&'static str, Value)>) -> Value {
     let mut m = Mapping::new();
     for (k, v) in entries {
         m.insert(s(k), v);
@@ -46,19 +46,19 @@ fn map(entries: impl IntoIterator<Item = (&'static str, Value)>) -> Value {
     Value::Mapping(m)
 }
 
-fn list(items: impl IntoIterator<Item = Value>) -> Value {
+pub(super) fn list(items: impl IntoIterator<Item = Value>) -> Value {
     Value::Sequence(items.into_iter().collect())
 }
 
 /// The image a machine runs: the published one, or the name its build is tagged with (so
 /// its `init:` jobs can reuse it).
-fn image_of(spec: &Spec, name: &str, m: &Machine) -> String {
+pub(super) fn image_of(spec: &Spec, name: &str, m: &Machine) -> String {
     let d = m.docker.as_ref().expect("docker target: every machine has docker:");
     d.image.clone().unwrap_or_else(|| format!("isoloom/{}-{}", spec.name, name))
 }
 
 /// A TCP probe for each service port that works in most images: busybox/BSD `nc`, else bash.
-fn probe(m: &Machine) -> String {
+pub(super) fn probe(m: &Machine) -> String {
     m.services
         .iter()
         .map(|svc| {
@@ -101,7 +101,7 @@ fn init_names(name: &str, m: &Machine) -> Vec<String> {
     (1..=n).map(|i| format!("{name}-init-{i}")).collect()
 }
 
-fn file_name(path: &str) -> &str {
+pub(super) fn file_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
@@ -385,7 +385,7 @@ fn volume_name(machine: &str, volume: &str) -> String {
 /// Stands in for an access machine the runner supplies, so checks run from its side.
 const STAND_IN: &str = "isoloom-access";
 /// A small image with busybox `ip`, for the router, route sidecars and the stand-in.
-const UTILITY_IMAGE: &str = "alpine:3.20";
+pub(super) const UTILITY_IMAGE: &str = "alpine:3.20";
 
 /// Names of machines that share no network with `name` (Compose DNS only resolves
 /// machines on shared networks); they're reached through the router.
@@ -546,6 +546,6 @@ fn stand_in(spec: &Spec, name: &str, m: &Machine) -> Value {
 
 /// A machine is offline when none of its networks reaches the internet and no gateway
 /// decides for it.
-fn offline(spec: &Spec, name: &str, m: &Machine) -> bool {
+pub(super) fn offline(spec: &Spec, name: &str, m: &Machine) -> bool {
     !m.networks.keys().any(|n| spec.networks[n].internet) && router::default_gateway(spec, name, m).is_none()
 }

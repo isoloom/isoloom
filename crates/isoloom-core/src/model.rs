@@ -232,6 +232,8 @@ pub enum Target {
     DockerVm,
     /// Docker on one cloud VM.
     CloudDocker,
+    /// The containers on a Kubernetes cluster.
+    Kubernetes,
     /// One local VM per machine (Vagrant).
     Vagrant,
     /// One VM per machine on the player's Proxmox.
@@ -241,11 +243,12 @@ pub enum Target {
 }
 
 impl Target {
-    pub const ALL: [Target; 7] = [
+    pub const ALL: [Target; 8] = [
         Target::Docker,
         Target::Hosted,
         Target::DockerVm,
         Target::CloudDocker,
+        Target::Kubernetes,
         Target::Vagrant,
         Target::Proxmox,
         Target::CloudVm,
@@ -254,7 +257,7 @@ impl Target {
     /// The implementation every machine needs for this target.
     pub fn needs(self) -> Shape {
         match self {
-            Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker => Shape::Docker,
+            Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes => Shape::Docker,
             Target::Vagrant | Target::Proxmox | Target::CloudVm => Shape::Vm,
         }
     }
@@ -265,6 +268,7 @@ impl Target {
             Target::Hosted => "hosted",
             Target::DockerVm => "docker-vm",
             Target::CloudDocker => "cloud-docker",
+            Target::Kubernetes => "kubernetes",
             Target::Vagrant => "vagrant",
             Target::Proxmox => "proxmox",
             Target::CloudVm => "cloud-vm",
