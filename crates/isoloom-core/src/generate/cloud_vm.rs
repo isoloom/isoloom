@@ -121,6 +121,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         tf,
         r#"terraform {{
   required_version = ">= 1.6"
+  backend "local" {{}}
   required_providers {{
     aws = {{
       source  = "hashicorp/aws"

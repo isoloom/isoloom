@@ -241,6 +241,7 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
 /// when nothing is published: the templates then open SSH only).
 const AZURE: &str = r#"terraform {
   required_version = ">= 1.6"
+  backend "local" {}
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -372,6 +373,7 @@ resource "azurerm_linux_virtual_machine" "env" {
 
 const GCP: &str = r#"terraform {
   required_version = ">= 1.6"
+  backend "local" {}
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -488,6 +490,7 @@ resource "google_compute_instance" "env" {
 
 const DIGITALOCEAN: &str = r#"terraform {
   required_version = ">= 1.6"
+  backend "local" {}
   required_providers {
     digitalocean = {
       source  = "digitalocean/digitalocean"
@@ -570,6 +573,7 @@ resource "digitalocean_firewall" "env" {
 
 const LINODE: &str = r#"terraform {
   required_version = ">= 1.6"
+  backend "local" {}
   required_providers {
     linode = {
       source  = "linode/linode"
@@ -626,6 +630,7 @@ resource "linode_firewall" "env" {
 
 const OCI: &str = r#"terraform {
   required_version = ">= 1.6"
+  backend "local" {}
   required_providers {
     oci = {
       source  = "oracle/oci"
@@ -764,6 +769,7 @@ fn aws(spec: &Spec) -> GeneratedFile {
         tf,
         r#"terraform {{
   required_version = ">= 1.6"
+  backend "local" {{}}
   required_providers {{
     aws = {{
       source  = "hashicorp/aws"
@@ -989,6 +995,7 @@ output "ready_file" {{
 /// the guest agent, then the same SSH steps as the clouds.
 pub(super) const PROXMOX: &str = r##"terraform {
   required_version = ">= 1.6"
+  backend "local" {}
   required_providers {
     proxmox = {
       source  = "bpg/proxmox"

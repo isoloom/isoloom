@@ -1,2 +1,8 @@
 /target
 .vagrant/
+
+# Terraform working dirs (provider binaries), created by running the generated modules
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
