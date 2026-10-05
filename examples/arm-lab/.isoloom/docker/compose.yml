@@ -9,6 +9,7 @@ services:
   web:
     image: nginx:1.27
     platform: linux/arm64
+    privileged: true
     hostname: web
     networks:
       lab:

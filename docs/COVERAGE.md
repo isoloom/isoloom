@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 67% | 56 | 34 | 8 | 14 |
+| [Docker Compose](#docker-compose) | 69% | 56 | 35 | 8 | 13 |
 | [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-67% of 56 portable features (34 done, 8 partly, 14 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+69% of 56 portable features (35 done, 8 partly, 13 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -123,7 +123,7 @@ when a table disagrees with what Isoloom really generates.
 | `post_start` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
 | `pre_start` | Yes | Another way | Via machines.*.depends_on and docker.init |
 | `pre_stop` | n/a | No | Compose tooling, not the environment's behavior |
-| `privileged` | Yes | Not yet | What it's for, as a machine feature: running containers or VMs inside, loading kernel modules (Isoloom then makes the container privileged) |
+| `privileged` | Yes | Yes | From `machines.*.privileged` (the container runs privileged; a VM already has it, its workload is root) |
 | `profiles` | Yes | Yes | From `checks` (a `check` profile) |
 | `provider` | n/a | No | Compose tooling, not the environment's behavior |
 | `pull_policy` | n/a | No | Compose tooling, not the environment's behavior |

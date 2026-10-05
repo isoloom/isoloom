@@ -114,6 +114,10 @@ pub struct Machine {
     /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
     #[serde(default)]
     pub arch: Arch,
+    /// The machine needs kernel-level access (nested containers or VMs, loading kernel modules,
+    /// raw devices). A container runs privileged; a VM already has it (its workload is root).
+    #[serde(default)]
+    pub privileged: bool,
     #[serde(default)]
     pub services: Vec<Service>,
     /// The spec inputs this machine receives (only these).

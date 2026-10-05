@@ -31,6 +31,8 @@ spec:
       - name: web
         image: nginx:1.27
         imagePullPolicy: IfNotPresent
+        securityContext:
+          privileged: true
         ports:
         - containerPort: 80
         readinessProbe:

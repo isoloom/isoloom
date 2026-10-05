@@ -266,6 +266,11 @@ fn base_table() -> Vec<Row> {
             done("`box_architecture` on the VM", "segmented"),
         ),
         common(
+            "machines.*.privileged",
+            done("the container runs privileged (and a Kubernetes securityContext)", "arm-lab"),
+            na("a VM already has kernel access: its workload runs as root"),
+        ),
+        common(
             "machines.*.resources.cpus",
             done("a CPU limit", "supplier-portal-api"),
             done("the VM's CPUs on every provider", "supplier-portal-api"),

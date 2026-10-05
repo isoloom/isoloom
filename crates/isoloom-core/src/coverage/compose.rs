@@ -270,8 +270,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.pre_stop", TOOLING),
         (
             "services.*.privileged",
-            Planned {
-                note: "what it's for, as a machine feature: running containers or VMs inside, loading kernel modules (Isoloom then makes the container privileged)",
+            Emitted {
+                from: "machines.*.privileged (the container runs privileged; a VM already has it, its workload is root)",
             },
         ),
         (

@@ -13,6 +13,7 @@ machines:
   web:
     networks: { lab: 10 }
     arch: arm64
+    privileged: true
     services: [{ port: 80, http: true, publish: 8085 }]
     docker: { image: nginx:1.27 }
 
