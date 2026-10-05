@@ -743,13 +743,8 @@ resource "oci_core_instance" "env" {
 
 fn aws(spec: &Spec) -> GeneratedFile {
     let mem = memory_mb(spec);
-    let instance = if mem <= 4096 {
-        "t3.medium"
-    } else if mem <= 8192 {
-        "t3.large"
-    } else {
-        "t3.xlarge"
-    };
+    // Free Tier eligible sizes where they fit (the AWS Free plan refuses other types).
+    let instance = super::cloud_vm::instance_type(mem);
     let disk: u32 = spec
         .machines
         .values()

@@ -31,7 +31,7 @@ variable "ssh_private_key_file" {
 }
 variable "instance_type" {
   type    = string
-  default = "t3.medium"
+  default = "c7i-flex.large"
 }
 variable "auto_stop_minutes" {
   type        = number

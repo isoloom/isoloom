@@ -39,14 +39,15 @@ fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
     })
 }
 
-/// The instance type for a machine's memory.
-fn instance_type(memory_mb: u32) -> &'static str {
+/// The instance type for a machine's memory: Free Tier eligible up to 8 GB (accounts on the
+/// AWS Free plan can't launch other types), then general purpose.
+pub(super) fn instance_type(memory_mb: u32) -> &'static str {
     match memory_mb {
         0..=1024 => "t3.micro",
         1025..=2048 => "t3.small",
-        2049..=4096 => "t3.medium",
-        4097..=8192 => "t3.large",
-        _ => "t3.xlarge",
+        2049..=4096 => "c7i-flex.large",
+        4097..=8192 => "m7i-flex.large",
+        _ => "m7i-flex.xlarge",
     }
 }
 
