@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A hybrid environment: a Windows file server (a VM, it has no container form) next to an
+# intranet web app (a container), on one network. The `hybrid` target runs each the light way;
+# `vagrant` and the other VM targets run both as VMs. The checks reach both from the inside.
+version: 1
+name: mixed-office
+
+networks:
+  office: { cidr: 192.168.58.0/24 }
+
+machines:
+  files01:
+    networks: { office: 10 }
+    services: [{ port: 445 }]
+    resources: { cpus: 2, memory_mb: 3072 }
+    vm:
+      os: windows-server-2019
+      provision: [provision/share.ps1]
+
+  intranet:
+    networks: { office: 20 }
+    services: [{ port: 80, http: true, publish: 8083 }]
+    docker: { image: nginx:1.27 }
+    vm:
+      os: debian-12
+      provision: [provision/intranet.sh]
+
+checks:
+  - checks/both-answer.sh

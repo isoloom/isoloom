@@ -14,7 +14,7 @@ fn ids(targets: Vec<Target>) -> Vec<&'static str> {
 }
 
 const ALL: [&str; 8] = ["docker", "hosted", "docker-vm", "cloud-docker", "kubernetes", "vagrant", "proxmox", "cloud-vm"];
-const VM_ONLY: [&str; 3] = ["vagrant", "proxmox", "cloud-vm"];
+const VM_OR_HYBRID: [&str; 4] = ["hybrid", "vagrant", "proxmox", "cloud-vm"];
 
 #[test]
 fn supplier_portal_runs_everywhere() {
@@ -34,8 +34,8 @@ fn pivot_dmz_runs_everywhere_and_the_access_machine_needs_no_container() {
 fn ad_range_is_vm_only_even_with_one_container_ready_machine() {
     let r = example("corp-ad-basics");
     assert_eq!(validate(&r), vec![]);
-    // web01 could be a container, but dc01 and ws01 can't: all-or-nothing.
-    assert_eq!(ids(derive(&r)), VM_ONLY);
+    // web01 could be a container, but dc01 and ws01 can't: VMs, or hybrid with web01 a container.
+    assert_eq!(ids(derive(&r)), VM_OR_HYBRID);
     let t = totals(&r);
     assert_eq!((t.machines, t.memory_mb), (4, 4096 + 4096 + 1024 + 1024));
 }

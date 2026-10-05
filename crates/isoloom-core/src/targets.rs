@@ -13,6 +13,7 @@ pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
         .filter(|(_, m)| match shape {
             Shape::Docker => m.docker.is_none(),
             Shape::Vm => m.vm.is_none(),
+            Shape::Either => m.docker.is_none() && m.vm.is_none(),
         })
         .map(|(n, _)| n.clone())
         .collect()
@@ -20,7 +21,18 @@ pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
 
 /// Every target the implementations allow, narrowed by the spec's `targets:` when set.
 pub fn derive(spec: &Spec) -> Vec<Target> {
-    Target::ALL.into_iter().filter(|t| missing(spec, t.needs()).is_empty()).collect()
+    Target::ALL
+        .into_iter()
+        .filter(|t| missing(spec, t.needs()).is_empty())
+        .filter(|t| *t != Target::Hybrid || mixed(spec))
+        .collect()
+}
+
+/// Hybrid is worth it only when the environment mixes both: a machine that can only be a VM
+/// (Windows, say) and one that can be a container. Otherwise Docker or VMs alone run it.
+pub fn mixed(spec: &Spec) -> bool {
+    let own = || spec.machines.values().filter(|m| !m.access);
+    own().any(|m| m.docker.is_some()) && own().any(|m| m.docker.is_none() && m.vm.is_some())
 }
 
 /// The targets the generators should produce: derived, then narrowed by `targets:`.

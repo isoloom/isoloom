@@ -6,6 +6,7 @@ mod cloud_docker;
 mod cloud_vm;
 mod docker;
 mod docker_vm;
+mod hybrid;
 mod kubernetes;
 mod proxmox;
 mod router;
@@ -59,6 +60,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
     Target::DockerVm,
     Target::CloudDocker,
     Target::Kubernetes,
+    Target::Hybrid,
     Target::Vagrant,
     Target::Proxmox,
     Target::CloudVm,
@@ -84,6 +86,7 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
             Ok(files)
         }
         Target::Kubernetes => kubernetes::generate(spec),
+        Target::Hybrid => hybrid::generate(spec),
         Target::Vagrant => vagrant::generate(spec),
         Target::Proxmox => proxmox::generate(spec),
         Target::CloudVm => cloud_vm::generate(spec),

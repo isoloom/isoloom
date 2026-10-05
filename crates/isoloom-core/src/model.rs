@@ -234,6 +234,9 @@ pub enum Target {
     CloudDocker,
     /// The containers on a Kubernetes cluster.
     Kubernetes,
+    /// Containers and VMs together on the same networks (local VMs): each machine as a
+    /// container when it can be one, else as a VM.
+    Hybrid,
     /// One local VM per machine (Vagrant).
     Vagrant,
     /// One VM per machine on the player's Proxmox.
@@ -243,12 +246,13 @@ pub enum Target {
 }
 
 impl Target {
-    pub const ALL: [Target; 8] = [
+    pub const ALL: [Target; 9] = [
         Target::Docker,
         Target::Hosted,
         Target::DockerVm,
         Target::CloudDocker,
         Target::Kubernetes,
+        Target::Hybrid,
         Target::Vagrant,
         Target::Proxmox,
         Target::CloudVm,
@@ -259,6 +263,7 @@ impl Target {
         match self {
             Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes => Shape::Docker,
             Target::Vagrant | Target::Proxmox | Target::CloudVm => Shape::Vm,
+            Target::Hybrid => Shape::Either,
         }
     }
 
@@ -269,6 +274,7 @@ impl Target {
             Target::DockerVm => "docker-vm",
             Target::CloudDocker => "cloud-docker",
             Target::Kubernetes => "kubernetes",
+            Target::Hybrid => "hybrid",
             Target::Vagrant => "vagrant",
             Target::Proxmox => "proxmox",
             Target::CloudVm => "cloud-vm",
@@ -281,6 +287,8 @@ impl Target {
 pub enum Shape {
     Docker,
     Vm,
+    /// Either implementation, machine by machine.
+    Either,
 }
 
 impl Shape {
@@ -288,6 +296,7 @@ impl Shape {
         match self {
             Shape::Docker => "docker",
             Shape::Vm => "vm",
+            Shape::Either => "docker` or `vm",
         }
     }
 }
