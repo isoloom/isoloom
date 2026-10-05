@@ -280,15 +280,13 @@ pub fn draft(recorded: &Value, fallback_name: &str, source: &str) -> Result<Draf
                     NoteKind::Equivalent,
                     "a `.sh` step can run any tool".into(),
                 ),
-                ("synced_folder", _) => {
-                    if opts.get("disabled").and_then(Value::as_bool) != Some(true) {
-                        note(
-                            &mut notes,
-                            format!("{at}.vm.synced_folder"),
-                            NoteKind::Equivalent,
-                            "no shared folders: Isoloom copies the project into each Linux VM".into(),
-                        );
-                    }
+                ("synced_folder", _) if opts.get("disabled").and_then(Value::as_bool) != Some(true) => {
+                    note(
+                        &mut notes,
+                        format!("{at}.vm.synced_folder"),
+                        NoteKind::Equivalent,
+                        "no shared folders: Isoloom copies the project into each Linux VM".into(),
+                    );
                 }
                 _ => {}
             }
