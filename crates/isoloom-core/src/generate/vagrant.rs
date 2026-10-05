@@ -501,7 +501,10 @@ fn controller_vm(spec: &Spec, out: &mut String) {
         let _ = writeln!(
             out,
             "    m.vm.provision \"shell\", name: \"hosts\", inline: {}",
-            rb(&format!("for l in {}; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done", hosts.join(" ")))
+            rb(&format!(
+                "for l in {}; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done",
+                hosts.join(" ")
+            ))
         );
     }
     out.push_str(
