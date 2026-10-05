@@ -38,7 +38,7 @@ fn image_url(os: &str) -> Option<&'static str> {
 }
 
 /// An HCL string literal (with Terraform's `${` and `%{` escaped).
-fn hcl(s: &str) -> String {
+pub(super) fn hcl(s: &str) -> String {
     let escaped = s
         .replace('\\', "\\\\")
         .replace('"', "\\\"")
@@ -455,7 +455,7 @@ resource "proxmox_sdn_zone_simple" "env" {
 }
 
 /// A Terraform resource name from a machine, network or OS name.
-fn res(s: &str) -> String {
+pub(super) fn res(s: &str) -> String {
     s.replace(['-', '.'], "_")
 }
 

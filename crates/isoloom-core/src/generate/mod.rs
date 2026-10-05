@@ -3,6 +3,7 @@
 //! compare with what's committed. Output lives under `.isoloom/<target>/` in the project.
 
 mod cloud_docker;
+mod cloud_vm;
 mod docker;
 mod docker_vm;
 mod kubernetes;
@@ -60,6 +61,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
     Target::Kubernetes,
     Target::Vagrant,
     Target::Proxmox,
+    Target::CloudVm,
 ];
 
 /// The files for one target.
@@ -84,7 +86,7 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
         Target::Kubernetes => kubernetes::generate(spec),
         Target::Vagrant => vagrant::generate(spec),
         Target::Proxmox => proxmox::generate(spec),
-        other => Err(GenerateError::NoGenerator(other)),
+        Target::CloudVm => cloud_vm::generate(spec),
     }
 }
 

@@ -133,7 +133,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - name: Validate
         run: |
-          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/cloud-docker/*; do
+          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
             echo "== $d"
             terraform -chdir="$d" init -backend=false -input=false >/dev/null
             terraform -chdir="$d" validate

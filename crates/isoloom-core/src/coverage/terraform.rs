@@ -25,7 +25,7 @@ pub struct Cloud {
     pub list: &'static str,
     pub environment: &'static [&'static str],
     pub windows: &'static [&'static str],
-    /// What the cloud-docker generator writes today.
+    /// What the cloud generators (cloud-docker, and on AWS cloud-vm) write today.
     pub generated: &'static [&'static str],
 }
 
@@ -44,6 +44,7 @@ pub const CLOUDS: &[Cloud] = &[
             "aws_eip_association",
             "aws_route_table",
             "aws_route_table_association",
+            "aws_vpc_ipv4_cidr_block_association",
             "aws_route",
             "aws_security_group",
             "aws_vpc_security_group_ingress_rule",
@@ -57,6 +58,7 @@ pub const CLOUDS: &[Cloud] = &[
         windows: &[],
         generated: &[
             "aws_vpc",
+            "aws_vpc_ipv4_cidr_block_association",
             "aws_subnet",
             "aws_internet_gateway",
             "aws_route_table",
@@ -200,7 +202,7 @@ fn cloud(c: &Cloud) -> Format {
         .map(|r| {
             let s = if c.generated.contains(&r) {
                 Emitted {
-                    from: "the cloud-docker target (one VM running the Compose file)",
+                    from: "the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine)",
                 }
             } else if c.environment.contains(&r) {
                 Planned {

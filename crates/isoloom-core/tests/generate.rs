@@ -117,7 +117,9 @@ fn unsupported_features_are_refused_with_the_reason() {
         matches!(generate(&ad, Target::Proxmox), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("windows-server-2022")),
         "no Windows image on Proxmox yet"
     );
-    assert_eq!(generate(&ad, Target::CloudVm), Err(GenerateError::NoGenerator(Target::CloudVm)));
+    assert!(
+        matches!(generate(&ad, Target::CloudVm), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("no AWS image for `windows-server-2022`"))
+    );
 }
 
 #[test]
