@@ -175,11 +175,13 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             continue;
         }
 
-        // The other machines by name.
+        // The other machines by name. Windows machines are left out: in a domain they're
+        // reached through AD DNS, and a short-name /etc/hosts entry shadows it, so a Linux
+        // member's realm join fails the Kerberos SPN lookup ("Server not found").
         let hosts: Vec<String> = spec
             .machines
             .keys()
-            .filter(|o| o.as_str() != name)
+            .filter(|o| o.as_str() != name && !is_windows_machine(spec, o))
             .map(|o| format!("{} {o}", address_for(spec, name, o)))
             .collect();
         if !hosts.is_empty() {
@@ -224,14 +226,21 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             );
         }
 
-        // depends_on: wait until each dependency answers on its service ports.
+        // depends_on: wait until each dependency answers on its service ports. A Windows
+        // dependency is waited on by address, not name: it's left out of this Linux machine's
+        // /etc/hosts (so it doesn't shadow AD DNS), so only its address resolves.
         for dep in &m.depends_on {
             let ports: Vec<u16> = spec.machines[dep].services.iter().map(|svc| svc.port).collect();
+            let target = if is_windows_machine(spec, dep) {
+                address_for(spec, name, dep).to_string()
+            } else {
+                dep.clone()
+            };
             let _ = writeln!(
                 out,
                 "    m.vm.provision \"shell\", name: {}, inline: {}",
                 rb(&format!("wait for {dep}")),
-                rb(&router::wait_for(dep, &ports, 300))
+                rb(&router::wait_for(&target, &ports, 300))
             );
         }
 
@@ -438,6 +447,11 @@ fn windows_supported(spec: &Spec, name: &str, m: &Machine) -> Result<(), String>
         return Err(format!("machine `{name}`: volumes on Windows come later"));
     }
     Ok(())
+}
+
+/// Whether a machine runs Windows (used to leave Windows hosts out of `/etc/hosts`).
+fn is_windows_machine(spec: &Spec, name: &str) -> bool {
+    spec.machines.get(name).and_then(|m| m.vm.as_ref()).is_some_and(|vm| images::is_windows(&vm.os))
 }
 
 /// A Windows machine's steps, in PowerShell: the other machines' names, waiting for its

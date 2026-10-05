@@ -399,3 +399,25 @@ fn cloud_vm_runs_windows_over_winrm_with_its_name() {
     // A Windows-only environment: the controller runs the checks.
     assert!(tf.contains("host = aws_eip.isoloom_controller.public_ip"));
 }
+
+#[test]
+fn linux_machines_leave_windows_out_of_etc_hosts() {
+    // A Linux member joining an AD domain must not have the Windows DC in /etc/hosts by its
+    // short name: that shadows AD DNS and breaks the Kerberos SPN lookup on realm join.
+    let spec = isoloom_core::parse(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    services: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\n  lx01:\n    networks: { lab: 12 }\n    services: [{ port: 22 }]\n    depends_on: [dc01]\n    vm: { os: ubuntu-24.04, provision: [p.sh] }\n",
+    )
+    .unwrap();
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    let start = vf.find("config.vm.define \"lx01\"").unwrap();
+    let end = vf[start + 20..].find("config.vm.define").map(|i| start + 20 + i).unwrap_or(vf.len());
+    let lx = &vf[start..end];
+    // The Windows DC isn't added to lx01's /etc/hosts by name.
+    assert!(
+        !lx.contains("192.168.56.10 dc01"),
+        "Windows DC should be left out of the Linux host's /etc/hosts"
+    );
+    // And the depends_on wait on the Windows DC is by address, not name.
+    assert!(lx.contains("/192.168.56.10/389"), "the Windows dependency is waited on by address: {lx}");
+    assert!(!lx.contains("</dev/tcp/dc01/"), "not by the name that isn't in /etc/hosts");
+}
