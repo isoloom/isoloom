@@ -76,6 +76,7 @@ pub const CLOUDS: &[Cloud] = &[
             "azurerm_virtual_network",
             "azurerm_subnet",
             "azurerm_network_interface",
+            "azurerm_network_interface_security_group_association",
             "azurerm_network_security_group",
             "azurerm_network_security_rule",
             "azurerm_subnet_network_security_group_association",
@@ -89,7 +90,16 @@ pub const CLOUDS: &[Cloud] = &[
             "azurerm_virtual_machine_data_disk_attachment",
         ],
         windows: &["azurerm_windows_virtual_machine"],
-        generated: &[],
+        generated: &[
+            "azurerm_resource_group",
+            "azurerm_virtual_network",
+            "azurerm_subnet",
+            "azurerm_public_ip",
+            "azurerm_network_security_group",
+            "azurerm_network_interface",
+            "azurerm_network_interface_security_group_association",
+            "azurerm_linux_virtual_machine",
+        ],
     },
     Cloud {
         name: "Terraform: Google Cloud",
@@ -108,7 +118,12 @@ pub const CLOUDS: &[Cloud] = &[
             "google_compute_attached_disk",
         ],
         windows: &[],
-        generated: &[],
+        generated: &[
+            "google_compute_network",
+            "google_compute_subnetwork",
+            "google_compute_firewall",
+            "google_compute_instance",
+        ],
     },
     Cloud {
         name: "Terraform: DigitalOcean",
@@ -125,7 +140,7 @@ pub const CLOUDS: &[Cloud] = &[
             "digitalocean_volume_attachment",
         ],
         windows: &[],
-        generated: &[],
+        generated: &["digitalocean_vpc", "digitalocean_ssh_key", "digitalocean_droplet", "digitalocean_firewall"],
     },
     Cloud {
         name: "Terraform: Linode",
@@ -143,7 +158,7 @@ pub const CLOUDS: &[Cloud] = &[
             "linode_volume",
         ],
         windows: &[],
-        generated: &[],
+        generated: &["linode_instance", "linode_firewall"],
     },
     Cloud {
         name: "Terraform: Oracle Cloud",
@@ -165,7 +180,14 @@ pub const CLOUDS: &[Cloud] = &[
             "oci_core_volume_attachment",
         ],
         windows: &[],
-        generated: &[],
+        generated: &[
+            "oci_core_vcn",
+            "oci_core_internet_gateway",
+            "oci_core_route_table",
+            "oci_core_security_list",
+            "oci_core_subnet",
+            "oci_core_instance",
+        ],
     },
 ];
 

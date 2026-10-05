@@ -23,11 +23,11 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Terraform: Proxmox](#terraform-proxmox) | 43% | 16 | 7 | 0 | 9 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 44% | 18 | 8 | 0 | 10 |
-| [Terraform: Azure](#terraform-azure) | 0% | 17 | 0 | 0 | 17 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 0% | 10 | 0 | 0 | 10 |
-| [Terraform: DigitalOcean](#terraform-digitalocean) | 0% | 8 | 0 | 0 | 8 |
-| [Terraform: Linode](#terraform-linode) | 0% | 9 | 0 | 0 | 9 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 0% | 13 | 0 | 0 | 13 |
+| [Terraform: Azure](#terraform-azure) | 44% | 18 | 8 | 0 | 10 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 40% | 10 | 4 | 0 | 6 |
+| [Terraform: DigitalOcean](#terraform-digitalocean) | 50% | 8 | 4 | 0 | 4 |
+| [Terraform: Linode](#terraform-linode) | 22% | 9 | 2 | 0 | 7 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 46% | 13 | 6 | 0 | 7 |
 
 Done includes features produced another way, or set in the image. The lists come from the
 formats themselves (every key of the Compose schema, every setting of Vagrant and each provider
@@ -818,35 +818,36 @@ And 1710 other resource types: this cloud's managed services (databases, storage
 
 ## Terraform: Azure
 
-0% of 17 portable features (0 done, 0 partly, 17 to do; 1106 features in all). From hashicorp/azurerm 5.8.0 (its resource types).
+44% of 18 portable features (8 done, 0 partly, 10 to do; 1106 features in all). From hashicorp/azurerm 5.8.0 (its resource types).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `azurerm_linux_virtual_machine` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_linux_virtual_machine` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `azurerm_managed_disk` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `azurerm_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_network_interface` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_network_security_group` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_network_interface` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `azurerm_network_interface_security_group_association` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `azurerm_network_security_group` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `azurerm_network_security_rule` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_public_ip` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_resource_group` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_public_ip` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `azurerm_resource_group` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `azurerm_route` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `azurerm_route_table` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_subnet` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_subnet` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `azurerm_subnet_nat_gateway_association` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `azurerm_subnet_network_security_group_association` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `azurerm_subnet_route_table_association` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `azurerm_virtual_machine_data_disk_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_virtual_network` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_virtual_network` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `azurerm_windows_virtual_machine` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
 
-And 1089 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 1088 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Google Cloud
 
-0% of 10 portable features (0 done, 0 partly, 10 to do; 1369 features in all). From hashicorp/google 8.5.0 (its resource types).
+40% of 10 portable features (4 done, 0 partly, 6 to do; 1369 features in all). From hashicorp/google 8.5.0 (its resource types).
 
 ### Resource types
 
@@ -855,45 +856,45 @@ And 1089 other resource types: this cloud's managed services (databases, storage
 | `google_compute_address` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `google_compute_attached_disk` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `google_compute_disk` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `google_compute_firewall` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `google_compute_instance` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `google_compute_network` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `google_compute_firewall` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `google_compute_instance` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `google_compute_network` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `google_compute_route` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `google_compute_router` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `google_compute_router_nat` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `google_compute_subnetwork` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `google_compute_subnetwork` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 
 And 1359 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: DigitalOcean
 
-0% of 8 portable features (0 done, 0 partly, 8 to do; 79 features in all). From digitalocean/digitalocean 2.103.0 (its resource types).
+50% of 8 portable features (4 done, 0 partly, 4 to do; 79 features in all). From digitalocean/digitalocean 2.103.0 (its resource types).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `digitalocean_droplet` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `digitalocean_firewall` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `digitalocean_droplet` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `digitalocean_firewall` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `digitalocean_reserved_ip` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `digitalocean_reserved_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `digitalocean_ssh_key` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `digitalocean_ssh_key` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `digitalocean_volume` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `digitalocean_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `digitalocean_vpc` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `digitalocean_vpc` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 
 And 71 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Linode
 
-0% of 9 portable features (0 done, 0 partly, 9 to do; 47 features in all). From linode/linode 4.7.0 (its resource types).
+22% of 9 portable features (2 done, 0 partly, 7 to do; 47 features in all). From linode/linode 4.7.0 (its resource types).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `linode_firewall` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `linode_instance` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `linode_firewall` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `linode_instance` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `linode_instance_config` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `linode_instance_disk` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `linode_instance_ip` | Yes | Not yet | With the cloud generator (one VM per machine) |
@@ -906,22 +907,22 @@ And 38 other resource types: this cloud's managed services (databases, storage, 
 
 ## Terraform: Oracle Cloud
 
-0% of 13 portable features (0 done, 0 partly, 13 to do; 1020 features in all). From oracle/oci 9.8.0 (its resource types).
+46% of 13 portable features (6 done, 0 partly, 7 to do; 1020 features in all). From oracle/oci 9.8.0 (its resource types).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `oci_core_instance` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_internet_gateway` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `oci_core_instance` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `oci_core_internet_gateway` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `oci_core_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `oci_core_network_security_group` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `oci_core_network_security_group_security_rule` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `oci_core_public_ip` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_route_table` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_security_list` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_subnet` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_vcn` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `oci_core_route_table` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `oci_core_security_list` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `oci_core_subnet` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
+| `oci_core_vcn` | Yes | Yes | From the cloud-docker target (one VM running the Compose file) |
 | `oci_core_vnic_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `oci_core_volume` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `oci_core_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
