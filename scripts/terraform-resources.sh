@@ -26,3 +26,4 @@ extract google hashicorp/google 8.5.0
 extract digitalocean digitalocean/digitalocean 2.103.0
 extract linode linode/linode 4.7.0
 extract oci oracle/oci 9.8.0
+extract esxi josenk/esxi 1.10.3

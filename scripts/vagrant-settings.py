@@ -18,6 +18,8 @@ SOURCES = {
     # Apple Silicon Macs (besides VMware Fusion and Parallels above).
     "utm": "https://raw.githubusercontent.com/naveenrajm7/vagrant_utm/v0.1.6/lib/vagrant_utm/config.rb",
     "qemu": "https://raw.githubusercontent.com/ppggff/vagrant-qemu/v0.6.3/lib/vagrant-qemu/config.rb",
+    # Standalone ESXi hosts (no vCenter).
+    "vmware_esxi": "https://raw.githubusercontent.com/josenk/vagrant-vmware-esxi/v2.5.2/lib/vagrant-vmware-esxi/config.rb",
 }
 # Methods of the config classes that aren't settings.
 NOT_SETTINGS = {"merge", "validate", "finalize!", "to_s", "get_provider_config", "get_provider_overrides"}

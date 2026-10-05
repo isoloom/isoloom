@@ -15,3 +15,4 @@ unclassified settings fail the coverage tests.
 | libvirt.txt | vagrant-libvirt/vagrant-libvirt `lib/vagrant-libvirt/config.rb` | 0.12.2 |
 | utm.txt | naveenrajm7/vagrant_utm `lib/vagrant_utm/config.rb` | v0.1.6 |
 | qemu.txt | ppggff/vagrant-qemu `lib/vagrant-qemu/config.rb` | v0.6.3 |
+| vmware_esxi.txt | josenk/vagrant-vmware-esxi `lib/vagrant-vmware-esxi/config.rb` | v2.5.2 (latest tag) |

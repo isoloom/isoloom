@@ -14,6 +14,7 @@ const GOOGLE: &str = include_str!("../../coverage/terraform/google.txt");
 const DIGITALOCEAN: &str = include_str!("../../coverage/terraform/digitalocean.txt");
 const LINODE: &str = include_str!("../../coverage/terraform/linode.txt");
 const OCI: &str = include_str!("../../coverage/terraform/oci.txt");
+const ESXI: &str = include_str!("../../coverage/terraform/esxi.txt");
 
 /// A cloud provider: the resource types an environment needs (one VM per machine on its own
 /// networks), and its Windows VM types. Every other type is one of that cloud's managed
@@ -224,6 +225,7 @@ pub fn formats() -> Vec<Format> {
         rows,
         collapse_not_portable: false,
     }];
+    all.push(esxi());
     all.extend(CLOUDS.iter().map(cloud));
     all
 }
@@ -274,4 +276,30 @@ fn proxmox(r: &str) -> Option<Support> {
         }
         _ => return None,
     })
+}
+
+/// Standalone ESXi hosts (no vCenter), with the community provider josenk/esxi.
+fn esxi() -> Format {
+    let rows = names(ESXI)
+        .into_iter()
+        .map(|r| {
+            let s = match r {
+                "esxi_guest" | "esxi_portgroup" | "esxi_vswitch" | "esxi_virtual_disk" => Planned {
+                    note: "with the ESXi generator: a VM per machine, a port group per network",
+                },
+                "esxi_resource_pool" => Tooling {
+                    note: "where the host places the VMs: no change in behavior",
+                },
+                _ => Unclassified,
+            };
+            (format!("resource {r}"), s)
+        })
+        .collect();
+    Format {
+        name: "Terraform: ESXi",
+        file: ".isoloom/esxi/ (planned)",
+        source: "josenk/esxi 1.10.3 (its resource types)",
+        rows,
+        collapse_not_portable: false,
+    }
 }

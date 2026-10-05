@@ -1,0 +1,6 @@
+# Resource types of registry.terraform.io/josenk/esxi 1.10.3
+esxi_guest
+esxi_portgroup
+esxi_resource_pool
+esxi_virtual_disk
+esxi_vswitch

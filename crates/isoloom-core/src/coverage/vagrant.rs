@@ -13,6 +13,7 @@ const PARALLELS: &str = include_str!("../../coverage/vagrant/parallels.txt");
 const LIBVIRT: &str = include_str!("../../coverage/vagrant/libvirt.txt");
 const UTM: &str = include_str!("../../coverage/vagrant/utm.txt");
 const QEMU: &str = include_str!("../../coverage/vagrant/qemu.txt");
+const VMWARE_ESXI: &str = include_str!("../../coverage/vagrant/vmware_esxi.txt");
 
 /// The setting names in one extracted list (comment lines skipped).
 pub fn names(list: &str) -> Vec<&str> {
@@ -81,6 +82,7 @@ pub fn formats() -> Vec<Format> {
             f
         },
         provider("Vagrant: QEMU", "qemu", QEMU, qemu),
+        provider("Vagrant: ESXi", "vmware_esxi", VMWARE_ESXI, vmware_esxi),
     ]
 }
 
@@ -94,6 +96,7 @@ fn provider(name: &'static str, id: &'static str, list: &'static str, classify: 
             "libvirt" => "vagrant-libvirt 0.12.2 (its config class)",
             "utm" => "vagrant_utm 0.1.6 (its config class), for Apple Silicon Macs",
             "qemu" => "vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs",
+            "vmware_esxi" => "vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts",
             _ => "Vagrant 2.4.9 (the provider's config class)",
         },
         rows: names(list)
@@ -367,6 +370,60 @@ fn qemu(s: &str) -> Option<Support> {
         "firmware_format" => IMAGE_BOOTS,
         "image_path" | "qemu_bin" | "qemu_dir" | "default_qemu_dir" | "homebrew_prefix" => USER_SETUP,
         "control_port" | "debug_port" | "ssh_host" | "ssh_port" | "ssh_auto_correct" | "no_daemonize" | "other_default" | "graceful_timeout" => TOOLING,
+        _ => return None,
+    })
+}
+
+fn vmware_esxi(s: &str) -> Option<Support> {
+    const ESXI: Support = Planned {
+        note: "with the ESXi provider block (not verified on an ESXi host yet)",
+    };
+    Some(match s {
+        "guest_numvcpus" | "numvcpus" | "guest_memsize" | "memsize" | "guest_name" | "vmname" | "guest_name_prefix" | "vmname_prefix" => ESXI,
+        "esxi_virtual_network" | "virtual_network" => Planned {
+            note: "private networks: one ESXi port group per network",
+        },
+        "guest_boot_disk_size" | "guest_storage" => DISK,
+        "guest_guestos" | "guestos" => WINDOWS,
+        "guest_mac_address" | "mac_address" => NotPortable {
+            why: "cloud VMs get their MAC address from the provider",
+        },
+        "guest_nic_type"
+        | "nic_type"
+        | "guest_virtualhw_version"
+        | "virtualhw_version"
+        | "custom_vmx_settings"
+        | "guest_custom_vmx_settings"
+        | "guest_disk_type"
+        | "vm_disk_type" => HOST_TUNING,
+        "esxi_hostname"
+        | "esxi_hostport"
+        | "esxi_username"
+        | "esxi_password"
+        | "encoded_esxi_password"
+        | "esxi_private_keys"
+        | "esxi_disk_store"
+        | "vm_disk_store"
+        | "esxi_resource_pool"
+        | "resource_pool"
+        | "local_private_keys" => USER_SETUP,
+        "clone_from_vm" => LINKED_CLONE,
+        s if s.starts_with("supported_") => Tooling {
+            note: "the plugin's own list of accepted values",
+        },
+        "allow_overwrite"
+        | "local_allow_overwrite"
+        | "debug"
+        | "lax"
+        | "local_lax"
+        | "local_failonwarning"
+        | "local_use_ip_cache"
+        | "guest_autostart"
+        | "guest_snapshot_includememory"
+        | "guest_snapshot_quiesced"
+        | "guest_username"
+        | "ssh_username"
+        | "saved_ipaddress" => TOOLING,
         _ => return None,
     })
 }
