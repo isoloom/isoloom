@@ -298,14 +298,14 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         let usable = subnet
             .as_deref()
             .and_then(Cidr::parse)
-            .filter(|c| c.len >= 24 && c.len <= 29 && (c.base >> 24) == 10);
+            .filter(|c| c.len >= 24 && c.len <= 29 && crate::validate::PRIVATE.iter().any(|r| r.contains(*c)));
         let (cidr, text) = match usable {
             Some(c) => (c, subnet.clone().unwrap()),
             None => {
                 let text = format!("{READDRESS_BASE}.{next_block}.0/24");
                 next_block += 1;
                 let why = match &subnet {
-                    Some(s) => format!("{s} isn't a /24 to /29 inside 10.0.0.0/8; re-addressed to {text}"),
+                    Some(s) => format!("{s} isn't a private /24 to /29; re-addressed to {text}"),
                     None => format!("no subnet given; addressed as {text}"),
                 };
                 notes.push(Note {

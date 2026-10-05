@@ -32,7 +32,7 @@ services:
     profiles: [test]
 networks:
   front:
-    ipam: { config: [{ subnet: 172.30.1.0/24 }] }
+    ipam: { config: [{ subnet: 172.30.0.0/16 }] }
   back:
     internal: true
     ipam: { config: [{ subnet: 10.31.2.0/24 }] }
