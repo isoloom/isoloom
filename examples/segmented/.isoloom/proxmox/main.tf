@@ -248,7 +248,7 @@ resource "proxmox_virtual_environment_file" "cache" {
         ["sh", "-c", "mkdir -p /data"],
         ["sh", "-c", "cd /opt/isoloom && sh provision/cache.sh"],
         ["sh", "-c", "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/ready"]
+        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
   }
@@ -311,7 +311,7 @@ resource "proxmox_virtual_environment_file" "web" {
         ["sh", "-c", "printf '%s\\n' '10.61.20.20 cache' '10.61.99.10 user' >> /etc/hosts"],
         ["sh", "-c", "i=0; until (bash -c '</dev/tcp/cache/6379' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 600 ]; then echo \"cache didn't answer within 600s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\""],
         ["sh", "-c", "cd /opt/isoloom && sh provision/web.sh"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/ready"]
+        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
   }
@@ -372,7 +372,7 @@ resource "proxmox_virtual_environment_file" "user" {
       write_files = []
       runcmd = [
         ["sh", "-c", "printf '%s\\n' '10.61.20.20 cache' '10.61.10.10 web' >> /etc/hosts"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/ready"]
+        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
   }

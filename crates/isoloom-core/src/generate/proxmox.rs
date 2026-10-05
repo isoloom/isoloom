@@ -351,7 +351,7 @@ resource "proxmox_sdn_zone_simple" "env" {
                 "printf '%s\\n' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    ip daddr != {lab} ct state new drop' '  }}' '}}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"
             ));
         }
-        runcmd.push("mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/ready".into());
+        runcmd.push("mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready".into());
 
         let mut files = Vec::new();
         if !vm.provision.is_empty() {

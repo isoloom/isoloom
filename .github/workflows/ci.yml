@@ -75,7 +75,7 @@ jobs:
         working-directory: /tmp/shop
         run: docker compose -f .isoloom/docker/compose.yml down -v
 
-  # The generated Terraform (Proxmox, cloud-docker) is valid for its providers.
+  # The generated Terraform (Proxmox, docker-vm on Proxmox, cloud-docker) is valid for its providers.
   terraform:
     runs-on: ubuntu-latest
     steps:
@@ -83,7 +83,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - name: Validate
         run: |
-          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/cloud-docker/*; do
+          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/cloud-docker/*; do
             echo "== $d"
             terraform -chdir="$d" init -backend=false -input=false >/dev/null
             terraform -chdir="$d" validate

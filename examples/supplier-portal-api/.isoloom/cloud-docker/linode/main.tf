@@ -69,6 +69,11 @@ variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform copies the project over SSH"
 }
+variable "auto_stop_minutes" {
+  type        = number
+  default     = 0
+  description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
+}
 variable "inputs" {
   type      = map(string)
   default   = {}
@@ -86,7 +91,11 @@ resource "terraform_data" "environment" {
     timeout     = "10m"
   }
   provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown root /opt/isoloom"]
+    inline = [
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
+      "sudo mkdir -p /opt/isoloom && sudo chown root /opt/isoloom",
+    ]
   }
   provisioner "file" {
     source      = "${local.root}/"
@@ -100,7 +109,7 @@ resource "terraform_data" "environment" {
     inline = [
       "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
       "cd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
-      "sudo mkdir -p /var/lib/isoloom && sudo touch /var/lib/isoloom/ready",
+      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
     ]
   }
 }

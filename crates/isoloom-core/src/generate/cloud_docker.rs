@@ -27,8 +27,18 @@ fn published(spec: &Spec) -> Vec<u16> {
     ports
 }
 
+/// The CPUs every machine needs at once: at least 2, at most 16.
+pub(super) fn cpus(spec: &Spec) -> u32 {
+    spec.machines
+        .values()
+        .filter(|m| m.docker.is_some())
+        .map(|m| m.resources.and_then(|r| r.cpus).unwrap_or(1))
+        .sum::<u32>()
+        .clamp(2, 16)
+}
+
 /// The memory every machine needs at once, plus Docker's own, in MB.
-fn memory_mb(spec: &Spec) -> u32 {
+pub(super) fn memory_mb(spec: &Spec) -> u32 {
     spec.machines
         .values()
         .filter(|m| m.docker.is_some())
@@ -49,16 +59,24 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 }
 
 /// The variables every cloud shares.
-const COMMON_VARS: &str = r#"variable "allowed_cidr" {
+const ALLOWED_VAR: &str = r#"variable "allowed_cidr" {
   type        = string
   description = "Who may reach the VM (SSH and the published ports), e.g. your IP/32"
 }
-variable "ssh_public_key" {
+"#;
+
+/// The SSH and auto-stop variables every output shares.
+const COMMON_VARS: &str = r#"variable "ssh_public_key" {
   type = string
 }
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform copies the project over SSH"
+}
+variable "auto_stop_minutes" {
+  type        = number
+  default     = 0
+  description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
 }
 "#;
 
@@ -76,7 +94,11 @@ resource "terraform_data" "environment" {
     timeout     = "10m"
   }
   provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown __USER__ /opt/isoloom"]
+    inline = [
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
+      "sudo mkdir -p /opt/isoloom && sudo chown __USER__ /opt/isoloom",
+    ]
   }
   provisioner "file" {
     source      = "${local.root}/"
@@ -86,7 +108,7 @@ __INPUTS_FILE__  provisioner "remote-exec" {
     inline = [
       "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
       "cd /opt/isoloom && __SOURCE_INPUTS__sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
-      "sudo mkdir -p /var/lib/isoloom && sudo touch /var/lib/isoloom/ready",
+      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
     ]
   }
 }
@@ -105,6 +127,11 @@ output "ready_file" {
 /// A cloud's Terraform from its template: the provider, the network, firewall and VM
 /// (`__NAME__`, `__SIZE__`, `__PORTS__` filled in), then the shared variables and environment.
 fn other(spec: &Spec, cloud: &str, template: &str) -> GeneratedFile {
+    other_in(spec, "cloud-docker", cloud, template)
+}
+
+/// A provider's Terraform, under `.isoloom/<dir>/<cloud>/main.tf`.
+pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> GeneratedFile {
     let mem = memory_mb(spec);
     let size = |small: &str, medium: &str, large: &str| {
         (if mem <= 4096 {
@@ -141,6 +168,7 @@ fn other(spec: &Spec, cloud: &str, template: &str) -> GeneratedFile {
             "one(linode_instance.env.ipv4)",
             "linode_instance.env.id",
         ),
+        "proxmox" => (String::new(), "isoloom", "local.ip", "proxmox_virtual_environment_vm.env.id"),
         _ => (
             size("VM.Standard.E4.Flex", "VM.Standard.E4.Flex", "VM.Standard.E4.Flex"),
             "ubuntu",
@@ -160,7 +188,8 @@ fn other(spec: &Spec, cloud: &str, template: &str) -> GeneratedFile {
     };
     let mut tf = header("#");
     tf.push_str(&format!(
-        "# Start:  terraform -chdir=.isoloom/cloud-docker/{cloud} init && terraform -chdir=.isoloom/cloud-docker/{cloud} apply \\\n#           -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-docker/{cloud} destroy (same variables)\n\n"
+        "# Start:  terraform -chdir=.isoloom/{dir}/{cloud} init && terraform -chdir=.isoloom/{dir}/{cloud} apply \\\n#           {allowed}-var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/{dir}/{cloud} destroy (same variables)\n\n",
+        allowed = if cloud == "proxmox" { "-var proxmox_endpoint=https://<server>:8006/ -var proxmox_api_token=… " } else { "-var allowed_cidr=<your IP>/32 " }
     ));
     tf.push_str(
         &template
@@ -169,8 +198,13 @@ fn other(spec: &Spec, cloud: &str, template: &str) -> GeneratedFile {
             .replace("__PORTS_LIST__", &ports_list)
             .replace("__PORTS_QUOTED__", &ports_quoted)
             .replace("__OCPUS__", &ocpus_mem.0.to_string())
-            .replace("__OMEM__", &ocpus_mem.1.to_string()),
+            .replace("__OMEM__", &ocpus_mem.1.to_string())
+            .replace("__CPUS__", &cpus(spec).to_string())
+            .replace("__MEM_MB__", &mem.to_string()),
     );
+    if cloud != "proxmox" {
+        tf.push_str(ALLOWED_VAR);
+    }
     tf.push_str(COMMON_VARS);
     if !spec.inputs.is_empty() {
         tf.push_str("variable \"inputs\" {\n  type      = map(string)\n  default   = {}\n  sensitive = true\n}\n");
@@ -192,7 +226,7 @@ fn other(spec: &Spec, cloud: &str, template: &str) -> GeneratedFile {
             .replace("__SOURCE_INPUTS__", source_inputs),
     );
     GeneratedFile {
-        path: format!("{OUTPUT_DIR}/cloud-docker/{cloud}/main.tf"),
+        path: format!("{OUTPUT_DIR}/{dir}/{cloud}/main.tf"),
         contents: tf,
     }
 }
@@ -210,9 +244,11 @@ const AZURE: &str = r#"terraform {
 }
 
 variable "subscription_id" {
-  type = string
+  type        = string
+  default     = null
+  description = "Default: ARM_SUBSCRIPTION_ID from the environment"
 }
-variable "location" {
+variable "region" {
   type    = string
   default = "francecentral"
 }
@@ -241,14 +277,14 @@ locals {
 
 resource "azurerm_resource_group" "env" {
   name     = local.name
-  location = var.location
+  location = var.region
   tags     = local.tags
 }
 
 resource "azurerm_virtual_network" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   address_space       = ["10.42.0.0/16"]
 }
 
@@ -262,7 +298,7 @@ resource "azurerm_subnet" "env" {
 resource "azurerm_public_ip" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   allocation_method   = "Static"
   sku                 = "Standard"
 }
@@ -270,7 +306,7 @@ resource "azurerm_public_ip" "env" {
 resource "azurerm_network_security_group" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   security_rule {
     name                       = "ssh-and-published"
     priority                   = 100
@@ -287,7 +323,7 @@ resource "azurerm_network_security_group" "env" {
 resource "azurerm_network_interface" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   ip_configuration {
     name                          = "env"
     subnet_id                     = azurerm_subnet.env.id
@@ -304,7 +340,7 @@ resource "azurerm_network_interface_security_group_association" "env" {
 resource "azurerm_linux_virtual_machine" "env" {
   name                  = local.name
   resource_group_name   = azurerm_resource_group.env.name
-  location              = var.location
+  location              = var.region
   size                  = var.size
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.env.id]
@@ -887,7 +923,7 @@ resource "terraform_data" "environment" {{
     inline = [
       "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
       "cd /opt/isoloom && {source_inputs}sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
-      "sudo mkdir -p /var/lib/isoloom && sudo touch /var/lib/isoloom/ready",
+      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
     ]
   }}
 }}
@@ -908,3 +944,168 @@ output "ready_file" {{
         contents: tf,
     }
 }
+
+/// Docker on one VM on a Proxmox server: the VM on the uplink bridge (DHCP), its address from
+/// the guest agent, then the same SSH steps as the clouds.
+pub(super) const PROXMOX: &str = r##"terraform {
+  required_version = ">= 1.6"
+  required_providers {
+    proxmox = {
+      source  = "bpg/proxmox"
+      version = "~> 0.84"
+    }
+  }
+}
+
+variable "proxmox_endpoint" {
+  type        = string
+  description = "https://<server>:8006/"
+}
+variable "proxmox_api_token" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "user@realm!name=secret; or use proxmox_username and proxmox_password"
+}
+variable "proxmox_username" {
+  type    = string
+  default = "root@pam"
+}
+variable "proxmox_password" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "proxmox_insecure" {
+  type        = bool
+  default     = true
+  description = "Accept the server's self-signed certificate"
+}
+variable "proxmox_ssh_username" {
+  type        = string
+  default     = "root"
+  description = "Uploading the cloud-init snippet goes over SSH to the node"
+}
+variable "proxmox_ssh_private_key_file" {
+  type    = string
+  default = ""
+}
+variable "node" {
+  type    = string
+  default = "pve"
+}
+variable "datastore" {
+  type        = string
+  default     = "local-lvm"
+  description = "Where the VM's disk goes"
+}
+variable "image_datastore" {
+  type        = string
+  default     = "local"
+  description = "A datastore with 'iso' content, for the cloud image"
+}
+variable "snippets_datastore" {
+  type        = string
+  default     = "local"
+  description = "A datastore with 'snippets' content, for cloud-init"
+}
+variable "uplink_bridge" {
+  type        = string
+  default     = "vmbr0"
+  description = "The bridge the VM gets its address (DHCP) and the internet from"
+}
+variable "slot" {
+  type        = number
+  default     = 1
+  description = "1 to 99, unique per environment on this server"
+}
+
+provider "proxmox" {
+  endpoint  = var.proxmox_endpoint
+  api_token = var.proxmox_api_token != "" ? var.proxmox_api_token : null
+  username  = var.proxmox_api_token != "" ? null : var.proxmox_username
+  password  = var.proxmox_api_token != "" ? null : var.proxmox_password
+  insecure  = var.proxmox_insecure
+  ssh {
+    agent       = false
+    username    = var.proxmox_ssh_username
+    password    = var.proxmox_ssh_private_key_file != "" ? null : var.proxmox_password
+    private_key = var.proxmox_ssh_private_key_file != "" ? file(var.proxmox_ssh_private_key_file) : null
+  }
+}
+
+locals {
+  root = abspath("${path.module}/../../..")
+  # The VM's address on the uplink, from the guest agent (not the loopback).
+  ip = [for a in flatten(proxmox_virtual_environment_vm.env.ipv4_addresses) : a if a != "127.0.0.1"][0]
+}
+
+resource "proxmox_download_file" "debian" {
+  node_name           = var.node
+  datastore_id        = var.image_datastore
+  content_type        = "iso"
+  url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
+  file_name           = "iso${var.slot}-docker-debian-12.img"
+  overwrite_unmanaged = true
+}
+
+resource "proxmox_virtual_environment_file" "env" {
+  node_name    = var.node
+  datastore_id = var.snippets_datastore
+  content_type = "snippets"
+  source_raw {
+    file_name = "iso${var.slot}-docker.yaml"
+    data = "#cloud-config\n${yamlencode({
+      hostname = "__NAME__"
+      users = [{
+        name                = "isoloom"
+        sudo                = "ALL=(ALL) NOPASSWD:ALL"
+        shell               = "/bin/bash"
+        ssh_authorized_keys = [var.ssh_public_key]
+      }]
+      packages = ["qemu-guest-agent", "curl"]
+      runcmd   = [["systemctl", "enable", "--now", "qemu-guest-agent"]]
+    })}"
+  }
+}
+
+resource "proxmox_virtual_environment_vm" "env" {
+  name      = "iso${var.slot}-__NAME__"
+  node_name = var.node
+  tags      = ["isoloom", "__NAME__"]
+  on_boot   = false
+  agent {
+    enabled = true
+  }
+  cpu {
+    cores = __CPUS__
+    type  = "host"
+  }
+  memory {
+    dedicated = __MEM_MB__
+  }
+  disk {
+    datastore_id = var.datastore
+    file_id      = proxmox_download_file.debian.id
+    interface    = "virtio0"
+    size         = 30
+  }
+  network_device {
+    bridge = var.uplink_bridge
+  }
+  initialization {
+    datastore_id      = var.datastore
+    user_data_file_id = proxmox_virtual_environment_file.env.id
+    ip_config {
+      ipv4 {
+        address = "dhcp"
+      }
+    }
+  }
+  operating_system {
+    type = "l26"
+  }
+  serial_device {}
+}
+
+"##;

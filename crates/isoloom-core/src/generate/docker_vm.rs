@@ -7,6 +7,8 @@
 //! - When everything answers: /var/lib/isoloom/ready, for runners to poll.
 //! - Checks on demand: `vagrant provision --provision-with checks` (the Compose `check` profile).
 //! - Published ports: the VM forwards them from the host's loopback.
+//! - On a Proxmox server: `.isoloom/docker-vm/proxmox/main.tf` (Terraform, bpg/proxmox), one
+//!   VM on the uplink bridge, the same steps over SSH.
 //! - ESXi: the vagrant-vmware-esxi provider reads the host from ESXI_HOSTNAME, ESXI_USERNAME
 //!   and ESXI_PASSWORD (and the datastore from ESXI_DATASTORE).
 
@@ -92,7 +94,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         out,
         "  config.vm.provision \"shell\", name: \"environment\", inline: {}{env}",
         rb(
-            "cd /opt/isoloom && ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/ready"
+            "cd /opt/isoloom && ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
         )
     );
     if !spec.checks.is_empty() {
@@ -103,8 +105,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         );
     }
     out.push_str("end\n");
-    Ok(vec![GeneratedFile {
-        path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
-        contents: out,
-    }])
+    Ok(vec![
+        GeneratedFile {
+            path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
+            contents: out,
+        },
+        super::cloud_docker::other_in(spec, DIR, "proxmox", super::cloud_docker::PROXMOX),
+    ])
 }

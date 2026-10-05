@@ -225,7 +225,7 @@ resource "proxmox_virtual_environment_file" "store" {
         ["sh", "-c", "printf '%s\\n' '192.168.62.10 app' >> /etc/hosts"],
         ["sh", "-c", "cd /opt/isoloom && sh provision/store.sh"],
         ["sh", "-c", "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 192.168.62.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/ready"]
+        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
   }
@@ -289,7 +289,7 @@ resource "proxmox_virtual_environment_file" "app" {
         ["sh", "-c", "i=0; until (bash -c '</dev/tcp/store/6379' 2>/dev/null || nc -z -w 2 store 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 600 ]; then echo \"store didn't answer within 600s\" >&2; exit 1; fi; sleep 2; done; echo \"store answers\""],
         ["sh", "-c", "cd /opt/isoloom && sh provision/app.sh"],
         ["sh", "-c", "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 192.168.62.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/ready"]
+        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
   }
