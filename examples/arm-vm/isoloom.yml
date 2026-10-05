@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# One ARM64 Linux VM. `arch: arm64` pins the Vagrant box architecture, so Vagrant pulls the
+# arm64 build of the box and the VM runs natively on an Apple Silicon or Graviton host. The
+# default (amd64) leaves the box architecture unset, which is Vagrant's own default, so older
+# boxes that don't advertise an architecture still work. VM targets only (no container form);
+# the cloud targets are x86-64 only for now and refuse an arm64 machine.
+version: 1
+name: arm-vm
+
+networks:
+  lab: { cidr: 10.70.0.0/24 }
+
+machines:
+  box:
+    networks: { lab: 10 }
+    arch: arm64
+    services: [{ port: 22 }]
+    vm:
+      os: ubuntu-24.04
+      provision: [provision/setup.sh]

@@ -21,7 +21,6 @@ Vagrant.configure("2") do |config|
   config.vm.define "files01" do |m|
     m.vm.box = "StefanScherer/windows_2019"
     m.vm.box_version = "2021.05.15"
-    m.vm.box_architecture = "amd64"
     m.vm.hostname = "files01"
     m.vm.network "forwarded_port", guest: 3389, host: 3389, id: "rdp", disabled: true
     m.vm.guest = :windows
@@ -78,7 +77,6 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "intranet" do |m|
     m.vm.box = "bento/debian-12"
-    m.vm.box_architecture = "amd64"
     m.vm.hostname = "intranet"
     m.vm.network "private_network", ip: "192.168.58.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 80, host: 8083, host_ip: "127.0.0.1"

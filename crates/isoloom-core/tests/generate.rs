@@ -38,6 +38,7 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("ansible-pair");
     assert_committed("mixed-office");
     assert_committed("arm-lab");
+    assert_committed("arm-vm");
 }
 
 #[test]

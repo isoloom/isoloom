@@ -17,7 +17,7 @@ use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, comm
 use indexmap::IndexMap;
 
 use crate::images;
-use crate::model::{Machine, Spec, Target, VmImpl};
+use crate::model::{Arch, Machine, Spec, Target, VmImpl};
 
 const DIR: &str = "vagrant";
 
@@ -90,7 +90,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         if let Some(v) = &image.version {
             let _ = writeln!(out, "    m.vm.box_version = {}", rb(v));
         }
-        let _ = writeln!(out, "    m.vm.box_architecture = {}", rb(m.arch.id()));
+        // Only pin the architecture for non-default (arm64) boxes. amd64 is Vagrant's default;
+        // setting it explicitly makes Vagrant strict-match the box's Vagrant Cloud metadata, which
+        // older boxes (e.g. mayfly/windows_server2019) don't advertise, so they'd be rejected.
+        if m.arch != Arch::Amd64 {
+            let _ = writeln!(out, "    m.vm.box_architecture = {}", rb(m.arch.id()));
+        }
         let _ = writeln!(out, "    m.vm.hostname = {}", rb(name));
         if windows {
             // The box's own account, over WinRM (Windows has no SSH by default).
