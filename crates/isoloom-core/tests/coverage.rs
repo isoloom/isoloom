@@ -18,8 +18,8 @@ const EVERY_FIELD: &str = r#"
 version: 1
 name: every-field
 networks:
-  out: { cidr: 10.1.0.0/24, internet: true }
-  dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw }
+  out: { cidr: 10.1.0.0/24, internet: true, docker: { cidr: 10.1.0.0/24 } }
+  dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw, docker: { cidr: 10.1.1.0/24 } }
 reach: [{ from: out, to: dmz, ports: [80] }]
 inputs: [TOKEN]
 machines:

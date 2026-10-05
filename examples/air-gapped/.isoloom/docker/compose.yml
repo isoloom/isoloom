@@ -3,6 +3,7 @@
 # Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait
 # Checks: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
 # Stop:   docker compose -f .isoloom/docker/compose.yml down -v
+# On Docker, network `lab` uses 10.62.0.0/24 instead of 192.168.62.0/24 (same last octets).
 
 name: air-gapped
 services:

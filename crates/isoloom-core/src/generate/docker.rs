@@ -103,7 +103,9 @@ fn file_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
-pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
+/// `spec` is the spec as laid out on Docker (networks on their Docker blocks); `original` is
+/// what the author wrote, to say which networks moved.
+pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     common_unsupported(spec, Target::Docker)?;
 
     let mut services = Mapping::new();
@@ -336,10 +338,21 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     }
     let yaml = serde_yaml_ng::to_string(&Value::Mapping(root)).expect("a compose mapping serializes");
 
+    let moved: String = spec
+        .networks
+        .iter()
+        .filter(|(n, net)| original.networks[*n].cidr != net.cidr)
+        .map(|(n, net)| {
+            format!(
+                "# On Docker, network `{n}` uses {} instead of {} (same last octets).\n",
+                net.cidr, original.networks[n].cidr
+            )
+        })
+        .collect();
     let usage = "# Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait\n# Checks: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check\n# Stop:   docker compose -f .isoloom/docker/compose.yml down -v\n";
     Ok(vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
-        contents: format!("{}{usage}\n{yaml}", header("#")),
+        contents: format!("{}{usage}{moved}\n{yaml}", header("#")),
     }])
 }
 

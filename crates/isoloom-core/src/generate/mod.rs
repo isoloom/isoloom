@@ -9,6 +9,8 @@ mod vagrant;
 use std::fmt;
 use std::net::Ipv4Addr;
 
+use indexmap::IndexMap;
+
 use crate::model::{Spec, Target};
 use crate::targets::effective;
 use crate::validate::Cidr;
@@ -54,7 +56,7 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
         return Err(GenerateError::NotPossible(target));
     }
     match target {
-        Target::Docker => docker::generate(spec),
+        Target::Docker => docker::generate(&on_docker(spec), spec),
         Target::Vagrant => vagrant::generate(spec),
         other => Err(GenerateError::NoGenerator(other)),
     }
@@ -146,4 +148,53 @@ fn host_address(spec: &Spec, network: &str) -> Ipv4Addr {
     } else {
         cidr.gateway()
     }
+}
+
+/// Each network's block on the Docker target: its `docker.cidr` when set; its `cidr` when it's
+/// inside 10.0.0.0/8; otherwise moved there automatically, keeping its size (so each machine
+/// keeps its last octet): 192.168.X.0 -> 10.192.X.0, 172.N.X.0 -> 10.N.X.0, or the next free
+/// block when that one is taken. Validated specs only.
+pub fn docker_cidrs(spec: &Spec) -> Vec<(String, Cidr)> {
+    use crate::validate::DOCKER_BLOCK;
+    let parse = |s: &str| Cidr::parse(s).expect("validated cidr");
+    let mut fixed: Vec<(String, Cidr)> = Vec::new();
+    let mut moved: Vec<(String, Cidr)> = Vec::new();
+    for (name, n) in &spec.networks {
+        let c = parse(&n.cidr);
+        match &n.docker {
+            Some(d) => fixed.push((name.clone(), parse(&d.cidr))),
+            None if DOCKER_BLOCK.contains(c) => fixed.push((name.clone(), c)),
+            None => moved.push((name.clone(), c)),
+        }
+    }
+    let mut taken: Vec<Cidr> = fixed.iter().map(|(_, c)| *c).collect();
+    let mut out: IndexMap<String, Cidr> = fixed.into_iter().collect();
+    for (name, c) in moved {
+        let [a, b, x, y] = std::net::Ipv4Addr::from(c.base).octets();
+        let first = if a == 192 {
+            u32::from_be_bytes([10, 192, x, y])
+        } else {
+            u32::from_be_bytes([10, b, x, y])
+        };
+        let size = 1u32 << (32 - c.len);
+        // The mapped block, else the next free one of the same size from 10.240.0.0.
+        let candidates = std::iter::once(first).chain((0..).map(|i| 0x0af0_0000 + i * size));
+        let pick = candidates
+            .map(|base| Cidr { base, len: c.len })
+            .find(|cand| DOCKER_BLOCK.contains(*cand) && !taken.iter().any(|t| t.overlaps(*cand)))
+            .expect("10.0.0.0/8 has room");
+        taken.push(pick);
+        out.insert(name, pick);
+    }
+    spec.networks.keys().map(|n| (n.clone(), out[n])).collect()
+}
+
+/// The spec as the Docker target lays it out: every network on its Docker block.
+fn on_docker(spec: &Spec) -> Spec {
+    let mut s = spec.clone();
+    for (name, c) in docker_cidrs(spec) {
+        let n = s.networks.get_mut(&name).expect("same networks");
+        n.cidr = format!("{}/{}", Ipv4Addr::from(c.base), c.len);
+    }
+    s
 }

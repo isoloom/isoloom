@@ -1,11 +1,16 @@
 # yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # Two machines on a network with no internet and nothing published: on Docker, an internal
-# network; on VMs, outbound connections blocked once the machines are provisioned.
+# network; on VMs, outbound connections blocked once the machines are provisioned. VMs use
+# 192.168.62.0/24 as written; Docker uses the block the network names for it.
 version: 1
 name: air-gapped
 
 networks:
-  lab: { cidr: 10.62.0.0/24, internet: false }
+  lab:
+    cidr: 192.168.62.0/24
+    internet: false
+    docker:
+      cidr: 10.62.0.0/24   # Docker keeps out of 192.168.0.0/16
 
 machines:
   store:

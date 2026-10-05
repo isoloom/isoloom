@@ -14,7 +14,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "store" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "store"
-    m.vm.network "private_network", ip: "10.62.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "192.168.62.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "air-gapped · store"
       v.cpus = 1
@@ -44,7 +44,7 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.62.0.10 app'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '192.168.62.10 app'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     PROJECT.each do |entry|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
     end
@@ -88,7 +88,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "app" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "app"
-    m.vm.network "private_network", ip: "10.62.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "192.168.62.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "air-gapped · app"
       v.cpus = 1
@@ -118,7 +118,7 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.62.0.20 store'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '192.168.62.20 store'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "wait for store", inline: "i=0; until (bash -c '</dev/tcp/store/6379' 2>/dev/null || nc -z -w 2 store 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 300 ]; then echo \"store didn't answer within 300s\" >&2; exit 1; fi; sleep 2; done; echo \"store answers\""
     PROJECT.each do |entry|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"

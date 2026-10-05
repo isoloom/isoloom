@@ -43,6 +43,19 @@ pub struct Network {
     /// behavior for the checks to verify.
     #[serde(default)]
     pub gateway: Option<String>,
+    /// How the Docker target lays this network out, when it differs from the other targets.
+    #[serde(default)]
+    pub docker: Option<NetworkDocker>,
+}
+
+/// A network on the Docker target.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NetworkDocker {
+    /// The block to use on Docker instead of `cidr` (same size, inside 10.0.0.0/8). Without
+    /// it, a network outside 10.0.0.0/8 is moved into 10.0.0.0/8 automatically, since Docker's
+    /// own pools, Docker Desktop and home networks use 172.16.0.0/12 and 192.168.0.0/16.
+    pub cidr: String,
 }
 
 fn yes() -> bool {

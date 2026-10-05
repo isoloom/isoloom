@@ -102,9 +102,16 @@ fn input_name(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') && !s.starts_with(|c: char| c.is_ascii_digit())
 }
 
-/// Docker's default address pools (172.17.0.0/12 and 192.168.0.0/16) and the usual home LANs:
-/// networks stay inside 10.0.0.0/8 to avoid clashes.
-const LAB_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
+/// The private ranges a network can use (RFC 1918).
+pub const PRIVATE: [Cidr; 3] = [
+    Cidr { base: 0x0a00_0000, len: 8 },
+    Cidr { base: 0xac10_0000, len: 12 },
+    Cidr { base: 0xc0a8_0000, len: 16 },
+];
+
+/// Where the Docker target keeps its networks: 172.16.0.0/12 and 192.168.0.0/16 clash with
+/// Docker's own pools, Docker Desktop's network and home LANs.
+pub const DOCKER_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
 
 /// Checks the spec itself (no file system access). See [`validate_files`] for paths.
 pub fn validate(spec: &Spec) -> Vec<Problem> {
@@ -118,7 +125,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         add("name", "use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)".into());
     }
 
-    // Networks: valid, inside 10.0.0.0/8, sized /24 to /29, not overlapping each other.
+    // Networks: valid, private, sized /24 to /29, not overlapping each other.
     let mut cidrs: Vec<(String, Cidr)> = Vec::new();
     if spec.networks.is_empty() {
         add("networks", "declare at least one network".into());
@@ -131,10 +138,10 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         match Cidr::parse(&net.cidr) {
             None => add(&format!("{at}.cidr"), format!("`{}` isn't a network address like 10.20.0.0/24", net.cidr)),
             Some(c) => {
-                if !LAB_BLOCK.contains(c) {
+                if !PRIVATE.iter().any(|r| r.contains(c)) {
                     add(
                         &format!("{at}.cidr"),
-                        "use a block inside 10.0.0.0/8 (Docker's pools and home LANs use 172.16/12 and 192.168/16)".into(),
+                        "use a private block: inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16".into(),
                     );
                 } else if c.len < 24 || c.len > 29 {
                     add(&format!("{at}.cidr"), "use a /24 to /29 block".into());
@@ -142,6 +149,19 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 for (other, oc) in &cidrs {
                     if c.overlaps(*oc) {
                         add(&format!("{at}.cidr"), format!("overlaps network `{other}`"));
+                    }
+                }
+                if let Some(d) = &net.docker {
+                    match Cidr::parse(&d.cidr) {
+                        Some(dc) if dc.len == c.len && DOCKER_BLOCK.contains(dc) => {}
+                        Some(_) => add(
+                            &format!("{at}.docker.cidr"),
+                            format!(
+                                "use a /{} block inside 10.0.0.0/8 (the same size as `cidr`, so addresses keep their last octet)",
+                                c.len
+                            ),
+                        ),
+                        None => add(&format!("{at}.docker.cidr"), format!("`{}` isn't a network address like 10.20.0.0/24", d.cidr)),
                     }
                 }
                 cidrs.push((name.clone(), c));
@@ -347,6 +367,20 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 missing(spec, Shape::Vm).join(", ")
             ),
         );
+    }
+    // On Docker, the networks (moved or not) mustn't overlap either.
+    if p.is_empty() {
+        let docker = crate::generate::docker_cidrs(spec);
+        for (i, (a, ca)) in docker.iter().enumerate() {
+            for (b, cb) in docker.iter().skip(i + 1) {
+                if ca.overlaps(*cb) {
+                    p.push(Problem {
+                        at: format!("networks.{b}.docker.cidr"),
+                        message: format!("on Docker, overlaps network `{a}`; choose another block"),
+                    });
+                }
+            }
+        }
     }
     p
 }

@@ -143,6 +143,15 @@ pub fn table() -> Vec<Row> {
             done("a Compose network with that subnet", "hello-stack"),
             done("a private network (VirtualBox internal network, libvirt network)", "hello-stack"),
         ),
+        row(
+            "networks.*.docker.cidr",
+            done(
+                "the network's block on Docker (others outside 10.0.0.0/8 move there automatically)",
+                "air-gapped",
+            ),
+            na("Docker only: VMs use `cidr` as written"),
+            na("Docker only: VMs use `cidr` as written"),
+        ),
         common(
             "networks.*.internet",
             done(

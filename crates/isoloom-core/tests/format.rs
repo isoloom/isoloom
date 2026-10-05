@@ -63,9 +63,9 @@ fn narrowing_targets_keeps_only_those() {
 #[test]
 fn addresses_and_networks_are_checked() {
     let p = problems(
-        "version: 1\nname: t\nnetworks:\n  a: { cidr: 192.168.1.0/24 }\n  b: { cidr: 10.1.0.0/24 }\n  c: { cidr: 10.1.0.0/25 }\nmachines:\n  x: { networks: { b: 1 }, docker: { image: nginx } }\n  y: { networks: { b: 7, nope: 3 }, docker: { image: nginx } }\n  z: { networks: { b: 7 }, docker: { image: nginx } }\n",
+        "version: 1\nname: t\nnetworks:\n  a: { cidr: 8.8.8.0/24 }\n  b: { cidr: 10.1.0.0/24 }\n  c: { cidr: 10.1.0.0/25 }\nmachines:\n  x: { networks: { b: 1 }, docker: { image: nginx } }\n  y: { networks: { b: 7, nope: 3 }, docker: { image: nginx } }\n  z: { networks: { b: 7 }, docker: { image: nginx } }\n",
     );
-    assert!(p.iter().any(|m| m.starts_with("networks.a.cidr: use a block inside 10.0.0.0/8")), "{p:?}");
+    assert!(p.iter().any(|m| m.starts_with("networks.a.cidr: use a private block")), "{p:?}");
     assert!(p.iter().any(|m| m == "networks.c.cidr: overlaps network `b`"), "{p:?}");
     assert!(p.iter().any(|m| m.starts_with("machines.x.networks.b: 1 isn't a usable address")), "{p:?}");
     assert!(p.iter().any(|m| m == "machines.y.networks.nope: no network named `nope`"), "{p:?}");

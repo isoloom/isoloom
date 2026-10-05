@@ -149,3 +149,35 @@ fn vagrant_moves_machines_behind_their_gateway_after_provisioning() {
     assert!(provision < behind && behind < default, "installs first, then moves behind the firewall");
     assert!(web_block.contains("th dport 53 accept"), "name lookups still work behind a gateway");
 }
+
+#[test]
+fn networks_outside_10_move_into_10_on_docker_keeping_last_octets() {
+    let spec = isoloom_core::parse(
+        "version: 1\nname: t\nnetworks:\n  corp: { cidr: 192.168.20.0/24 }\n  dmz: { cidr: 172.18.5.0/24 }\n  taken: { cidr: 10.192.20.0/24 }\nmachines:\n  a: { networks: { corp: 10, dmz: 7, taken: 9 }, docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+    )
+    .unwrap();
+    assert_eq!(isoloom_core::validate(&spec), vec![]);
+    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    // 172.N.X -> 10.N.X; 192.168.X -> 10.192.X, taken here, so the next free block.
+    assert!(compose.contains("subnet: 10.18.5.0/24"), "{compose}");
+    assert!(compose.contains("ipv4_address: 10.18.5.7"));
+    assert!(compose.contains("subnet: 10.240.0.0/24"));
+    assert!(compose.contains("ipv4_address: 10.240.0.10"));
+    assert!(compose.contains("# On Docker, network `corp` uses 10.240.0.0/24 instead of 192.168.20.0/24"));
+    // VMs keep the spec's addresses.
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    assert!(vf.contains("ip: \"192.168.20.10\""));
+}
+
+#[test]
+fn a_network_can_name_its_docker_block() {
+    let base = "version: 1\nname: t\nnetworks:\n  corp: { cidr: 192.168.20.0/24, docker: { cidr: DOCKER } }\nmachines:\n  a: { networks: { corp: 10 }, docker: { image: x } }\n";
+    let spec = isoloom_core::parse(&base.replace("DOCKER", "10.77.0.0/24")).unwrap();
+    assert_eq!(isoloom_core::validate(&spec), vec![]);
+    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    assert!(compose.contains("ipv4_address: 10.77.0.10"));
+    for bad in ["10.77.0.0/25", "172.20.0.0/24"] {
+        let p = isoloom_core::validate(&isoloom_core::parse(&base.replace("DOCKER", bad)).unwrap());
+        assert!(p.iter().any(|x| x.at == "networks.corp.docker.cidr"), "{bad}: {p:?}");
+    }
+}
