@@ -59,6 +59,9 @@ pub const CLOUDS: &[Cloud] = &[
         generated: &[
             "aws_vpc",
             "aws_vpc_ipv4_cidr_block_association",
+            "aws_network_interface",
+            "aws_network_interface_attachment",
+            "aws_eip",
             "aws_subnet",
             "aws_internet_gateway",
             "aws_route_table",

@@ -318,3 +318,22 @@ fn kubernetes_publishes_and_keeps_offline_machines_inside() {
     assert!(env.contains("name: offline-isoloom-check"));
     assert!(env.contains("policyTypes:\n    - Egress") || env.contains("policyTypes:\n  - Egress"));
 }
+
+#[test]
+fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() {
+    let (_, mut spec) = example("pivot-dmz");
+    // Kali has no AWS image yet: the user lands on Debian here.
+    for m in spec.machines.values_mut() {
+        if let Some(vm) = &mut m.vm
+            && vm.os == "kali"
+        {
+            vm.os = "debian-12".into();
+        }
+    }
+    let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
+    assert!(tf.contains("resource \"aws_network_interface\" \"gateway_dmz\""), "{tf}");
+    assert!(tf.contains("resource \"aws_network_interface\" \"gateway_internal\""));
+    assert!(tf.contains("source_dest_check = false"));
+    assert!(tf.contains("resource \"aws_network_interface_attachment\" \"gateway_internal\""));
+    assert!(tf.contains("resource \"aws_eip\" \"gateway\""));
+}

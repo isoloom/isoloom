@@ -22,7 +22,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: ESXi](#vagrant-esxi) | 47% | 19 | 9 | 0 | 10 |
 | [Terraform: Proxmox](#terraform-proxmox) | 43% | 16 | 7 | 0 | 9 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
-| [Terraform: AWS](#terraform-aws) | 47% | 19 | 9 | 0 | 10 |
+| [Terraform: AWS](#terraform-aws) | 63% | 19 | 12 | 0 | 7 |
 | [Terraform: Azure](#terraform-azure) | 44% | 18 | 8 | 0 | 10 |
 | [Terraform: Google Cloud](#terraform-google-cloud) | 40% | 10 | 4 | 0 | 6 |
 | [Terraform: DigitalOcean](#terraform-digitalocean) | 50% | 8 | 4 | 0 | 4 |
@@ -789,21 +789,21 @@ when a table disagrees with what Isoloom really generates.
 
 ## Terraform: AWS
 
-47% of 19 portable features (9 done, 0 partly, 10 to do; 1728 features in all). From hashicorp/aws 6.67.0 (its resource types).
+63% of 19 portable features (12 done, 0 partly, 7 to do; 1728 features in all). From hashicorp/aws 6.67.0 (its resource types).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `aws_ebs_volume` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `aws_eip` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `aws_eip` | Yes | Yes | From the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine) |
 | `aws_eip_association` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `aws_instance` | Yes | Yes | From the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine) |
 | `aws_internet_gateway` | Yes | Yes | From the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine) |
 | `aws_key_pair` | Yes | Yes | From the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine) |
 | `aws_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `aws_network_interface` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `aws_network_interface_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `aws_network_interface` | Yes | Yes | From the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine) |
+| `aws_network_interface_attachment` | Yes | Yes | From the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine) |
 | `aws_route` | Yes | Not yet | With the cloud generator (one VM per machine) |
 | `aws_route_table` | Yes | Yes | From the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine) |
 | `aws_route_table_association` | Yes | Yes | From the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine) |

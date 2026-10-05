@@ -12,7 +12,9 @@
 //! - Published services: open to `allowed_cidr` on the instance's public address.
 //! - Checks: run on demand over SSH from the access machine (else the first), where a user
 //!   stands: the `checks` output gives the machine and the commands.
-//! - Not yet: machines on several networks, Windows, environment-level `provision:`.
+//! - A machine on several networks gets a network interface on each (source/destination
+//!   check off, so replies leave from the right one) and an Elastic IP on the first.
+//! - Not yet: Windows, environment-level `provision:`.
 
 use std::fmt::Write;
 
@@ -78,12 +80,7 @@ fn unsupported(spec: &Spec) -> Option<String> {
         if image(&vm.os).is_none() {
             return Some(format!("machine `{name}`: no AWS image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04)", vm.os));
         }
-        if m.networks.len() > 1 {
-            return Some(format!("machine `{name}`: machines on several networks in the cloud come later"));
-        }
-        if let Some((net, octet)) = m.networks.first()
-            && (*octet <= 3)
-        {
+        if let Some((net, _)) = m.networks.iter().find(|(_, o)| **o <= 3) {
             return Some(format!("machine `{name}`: AWS keeps the first addresses of a subnet (.1 to .3) on `{net}`"));
         }
     }
@@ -226,16 +223,35 @@ resource "aws_vpc" "env" {{
         let (net, octet) = m.networks.first().expect("validated: every machine is on a network");
         let id = res(name);
         let addr = address(spec, net, *octet);
+        let multi = m.networks.len() > 1;
+        // Its public address: auto-assigned with one interface; an Elastic IP with several (AWS
+        // doesn't auto-assign one then).
+        let pip = if multi {
+            format!("aws_eip.{id}.public_ip")
+        } else {
+            format!("aws_instance.{id}.public_ip")
+        };
         let mem = m.resources.and_then(|r| r.memory_mb).unwrap_or(crate::DEFAULT_MEMORY_MB);
         let disk = m.resources.and_then(|r| r.disk_gb).unwrap_or(crate::DEFAULT_DISK_GB);
 
         // Who may reach it: its own network, the networks `reach` opens to it, and allowed_cidr
         // for SSH and the published ports.
         let mut sg = format!(
-            "\n# Machine `{name}`: what may reach it.\nresource \"aws_security_group\" \"{id}\" {{\n  name   = \"${{local.name}}-{name}\"\n  vpc_id = aws_vpc.env.id\n  ingress {{\n    description = \"its network ({net})\"\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"{c}\"]\n  }}\n  ingress {{\n    description = \"SSH from allowed_cidr\"\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n",
-            c = spec.networks[net.as_str()].cidr
+            "\n# Machine `{name}`: what may reach it.\nresource \"aws_security_group\" \"{id}\" {{\n  name   = \"${{local.name}}-{name}\"\n  vpc_id = aws_vpc.env.id\n"
         );
-        for r in spec.reach.iter().filter(|r| &r.to == net) {
+        for n in m.networks.keys() {
+            let _ = write!(
+                sg,
+                "  ingress {{\n    description = \"its network ({n})\"\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"{c}\"]\n  }}\n",
+                c = spec.networks[n.as_str()].cidr
+            );
+        }
+        sg.push_str("  ingress {\n    description = \"SSH from allowed_cidr\"\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }\n");
+        for r in spec
+            .reach
+            .iter()
+            .filter(|r| m.networks.contains_key(&r.to) && !m.networks.contains_key(&r.from))
+        {
             let from = &spec.networks[&r.from].cidr;
             if r.ports.is_empty() {
                 let _ = write!(
@@ -266,19 +282,51 @@ resource "aws_vpc" "env" {{
                     redirects.push((h, sv.port));
                 }
                 let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
-                published_out.push((format!("\"{name}/{label}\""), format!("\"${{aws_instance.{id}.public_ip}}:{h}\"")));
+                published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }
         sg.push_str("  egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n");
         tf.push_str(&sg);
 
-        let _ = writeln!(
-            tf,
-            "\nresource \"aws_instance\" \"{id}\" {{\n  ami                         = data.aws_ami.{ami}.id\n  instance_type               = \"{itype}\"\n  subnet_id                   = aws_subnet.{netid}.id\n  private_ip                  = \"{addr}\"\n  associate_public_ip_address = true\n  key_name                    = aws_key_pair.env.key_name\n  vpc_security_group_ids      = [aws_security_group.{id}.id]\n  user_data                   = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  root_block_device {{\n    volume_size = {disk}\n  }}\n  tags = {{ Name = \"${{local.name}}-{name}\" }}\n}}",
-            ami = res(&vm.os),
-            itype = instance_type(mem),
-            netid = res(net),
-        );
+        if multi {
+            // An interface per network at its address; source/destination check off, so a reply
+            // can leave from the interface of the network it's for.
+            for (n, o) in &m.networks {
+                let _ = writeln!(
+                    tf,
+                    "\nresource \"aws_network_interface\" \"{id}_{nid}\" {{\n  subnet_id         = aws_subnet.{nid}.id\n  private_ips       = [\"{a}\"]\n  security_groups   = [aws_security_group.{id}.id]\n  source_dest_check = false\n  tags              = {{ Name = \"${{local.name}}-{name}-{n}\" }}\n}}",
+                    nid = res(n),
+                    a = address(spec, n, *o),
+                );
+            }
+            let _ = writeln!(
+                tf,
+                "\nresource \"aws_instance\" \"{id}\" {{\n  ami           = data.aws_ami.{ami}.id\n  instance_type = \"{itype}\"\n  key_name      = aws_key_pair.env.key_name\n  user_data     = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  primary_network_interface {{\n    network_interface_id = aws_network_interface.{id}_{netid}.id\n  }}\n  root_block_device {{\n    volume_size = {disk}\n  }}\n  tags = {{ Name = \"${{local.name}}-{name}\" }}\n}}",
+                ami = res(&vm.os),
+                itype = instance_type(mem),
+                netid = res(net),
+            );
+            for (i, n) in m.networks.keys().enumerate().skip(1) {
+                let _ = writeln!(
+                    tf,
+                    "\nresource \"aws_network_interface_attachment\" \"{id}_{nid}\" {{\n  instance_id          = aws_instance.{id}.id\n  network_interface_id = aws_network_interface.{id}_{nid}.id\n  device_index         = {i}\n}}",
+                    nid = res(n),
+                );
+            }
+            let _ = writeln!(
+                tf,
+                "\nresource \"aws_eip\" \"{id}\" {{\n  network_interface = aws_network_interface.{id}_{netid}.id\n  depends_on        = [aws_internet_gateway.env]\n}}",
+                netid = res(net),
+            );
+        } else {
+            let _ = writeln!(
+                tf,
+                "\nresource \"aws_instance\" \"{id}\" {{\n  ami                         = data.aws_ami.{ami}.id\n  instance_type               = \"{itype}\"\n  subnet_id                   = aws_subnet.{netid}.id\n  private_ip                  = \"{addr}\"\n  associate_public_ip_address = true\n  key_name                    = aws_key_pair.env.key_name\n  vpc_security_group_ids      = [aws_security_group.{id}.id]\n  user_data                   = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  root_block_device {{\n    volume_size = {disk}\n  }}\n  tags = {{ Name = \"${{local.name}}-{name}\" }}\n}}",
+                ami = res(&vm.os),
+                itype = instance_type(mem),
+                netid = res(net),
+            );
+        }
 
         // Its set-up, over SSH: names, volumes, waits, the project, its steps.
         let mut cmds: Vec<String> = vec![
@@ -286,11 +334,22 @@ resource "aws_vpc" "env" {{
             "cloud-init status --wait >/dev/null 2>&1 || true".into(),
             "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
         ];
+        // Its other interfaces, found by MAC address, at their addresses.
+        for (n, o) in m.networks.iter().skip(1) {
+            let c = cidr(spec, n);
+            cmds.push(format!(
+                "IF=$(ip -o link | grep -i \"${{lower(aws_network_interface.{id}_{nid}.mac_address)}}\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")",
+                nid = res(n),
+                a = address(spec, n, *o),
+                len = c.len,
+            ));
+        }
+        // The others by name, at their address on a network both are on (else their first).
         let hosts: Vec<String> = spec
             .machines
-            .iter()
-            .filter(|(o, _)| o.as_str() != name)
-            .filter_map(|(o, om)| om.networks.first().map(|(n, oc)| format!("{} {o}", address(spec, n, *oc))))
+            .keys()
+            .filter(|o| o.as_str() != name)
+            .map(|o| format!("{} {o}", super::address_for(spec, name, o)))
             .collect();
         if !hosts.is_empty() {
             cmds.push(format!(
@@ -346,7 +405,7 @@ resource "aws_vpc" "env" {{
             .map(|d| format!("terraform_data.{}", res(d)))
             .collect();
         let mut prov = format!(
-            "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [aws_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = aws_instance.{id}.public_ip\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \\\"${{local.root}}\\\" .\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
+            "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [aws_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \\\"${{local.root}}\\\" .\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
         );
         if !m.inputs.is_empty() {
             let lines: Vec<String> = m
@@ -371,10 +430,10 @@ resource "aws_vpc" "env" {{
         prov.push_str("}\n");
         tf.push_str(&prov);
 
-        public_ips.push((name.to_string(), format!("aws_instance.{id}.public_ip")));
+        public_ips.push((name.to_string(), pip.clone()));
         ssh_users.push((name.to_string(), format!("\"{user}\"")));
         if m.access || access_ip.is_none() {
-            access_ip = Some(format!("aws_instance.{id}.public_ip"));
+            access_ip = Some(pip.clone());
         }
     }
 
