@@ -215,8 +215,17 @@ fn write_draft(draft: &core::import::Draft, folder: PathBuf, out: Option<PathBuf
 /// installed) and returns every setting it made, as JSON. Nothing is created or started.
 fn record_vagrantfile(file: &std::path::Path) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     const RECORDER: &str = include_str!("vagrant_record.rb");
-    let script = std::env::temp_dir().join(format!("isoloom-vagrant-record-{}.rb", std::process::id()));
+    // A private per-run directory, created exclusively (fails if it already exists), so a
+    // local attacker can't pre-place a symlink at a guessable path and have us clobber a
+    // victim file or run a swapped script.
+    let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let dir = std::env::temp_dir().join(format!("isoloom-vagrant-{}-{nonce:x}", std::process::id()));
+    std::fs::create_dir(&dir)?;
+    let script = dir.join("record.rb");
     std::fs::write(&script, RECORDER)?;
+    let cleanup = || {
+        let _ = std::fs::remove_dir_all(&dir);
+    };
     let rubies = [
         "/opt/vagrant/embedded/bin/ruby",
         "C:\\HashiCorp\\Vagrant\\embedded\\mingw64\\bin\\ruby.exe",
@@ -226,7 +235,7 @@ fn record_vagrantfile(file: &std::path::Path) -> Result<serde_json::Value, Box<d
     for ruby in rubies {
         match std::process::Command::new(ruby).arg(&script).arg(file).output() {
             Ok(out) if out.status.success() => {
-                let _ = std::fs::remove_file(&script);
+                cleanup();
                 return Ok(serde_json::from_slice(&out.stdout)?);
             }
             Ok(out) => {
@@ -238,7 +247,7 @@ fn record_vagrantfile(file: &std::path::Path) -> Result<serde_json::Value, Box<d
             Err(_) => continue,
         }
     }
-    let _ = std::fs::remove_file(&script);
+    cleanup();
     Err(last.into())
 }
 
