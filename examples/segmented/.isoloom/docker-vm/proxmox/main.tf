@@ -47,6 +47,11 @@ variable "proxmox_ssh_private_key_file" {
   type    = string
   default = ""
 }
+variable "proxmox_ssh_address" {
+  type        = string
+  default     = ""
+  description = "The node's SSH address, when the API reports one this machine can't reach"
+}
 variable "node" {
   type    = string
   default = "pve"
@@ -88,6 +93,13 @@ provider "proxmox" {
     username    = var.proxmox_ssh_username
     password    = var.proxmox_ssh_private_key_file != "" ? null : var.proxmox_password
     private_key = var.proxmox_ssh_private_key_file != "" ? file(var.proxmox_ssh_private_key_file) : null
+    dynamic "node" {
+      for_each = var.proxmox_ssh_address == "" ? [] : [1]
+      content {
+        name    = var.node
+        address = var.proxmox_ssh_address
+      }
+    }
   }
 }
 
