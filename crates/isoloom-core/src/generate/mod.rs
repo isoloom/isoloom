@@ -227,12 +227,16 @@ pub fn docker_cidrs(spec: &Spec) -> Vec<(String, Cidr)> {
             u32::from_be_bytes([10, b, x, y])
         };
         let size = 1u32 << (32 - c.len);
-        // The mapped block, else the next free one of the same size from 10.240.0.0.
-        let candidates = std::iter::once(first).chain((0..).map(|i| 0x0af0_0000 + i * size));
+        // The mapped block, else the next free one of the same size scanning 10.240.0.0 upward
+        // within 10.0.0.0/8. A bounded, checked successor sequence: it can't overflow, and it
+        // ends at the top of the block so `find` terminates (and `expect` fires only on genuine
+        // exhaustion, which needs thousands of auto-moved networks).
+        let scan = std::iter::successors(Some(0x0af0_0000u32), move |&b| b.checked_add(size).filter(|&n| n <= 0x0aff_ffff));
+        let candidates = std::iter::once(first).chain(scan);
         let pick = candidates
             .map(|base| Cidr { base, len: c.len })
             .find(|cand| DOCKER_BLOCK.contains(*cand) && !taken.iter().any(|t| t.overlaps(*cand)))
-            .expect("10.0.0.0/8 has room");
+            .expect("10.0.0.0/8 has room for the Docker networks");
         taken.push(pick);
         out.insert(name, pick);
     }

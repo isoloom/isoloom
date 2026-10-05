@@ -90,11 +90,13 @@ pub fn totals(spec: &Spec) -> Totals {
             memory_mb: None,
             disk_gb: None,
         });
+        // Saturating: a spec with absurd per-machine resources reports a capped total instead of
+        // overflowing (a debug panic / release wrap).
         Totals {
             machines: t.machines + 1,
-            cpus: t.cpus + r.cpus.unwrap_or(DEFAULT_CPUS),
-            memory_mb: t.memory_mb + r.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
-            disk_gb: t.disk_gb + r.disk_gb.unwrap_or(DEFAULT_DISK_GB),
+            cpus: t.cpus.saturating_add(r.cpus.unwrap_or(DEFAULT_CPUS)),
+            memory_mb: t.memory_mb.saturating_add(r.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)),
+            disk_gb: t.disk_gb.saturating_add(r.disk_gb.unwrap_or(DEFAULT_DISK_GB)),
         }
     })
 }

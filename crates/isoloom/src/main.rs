@@ -471,7 +471,18 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Check { dir, images } => {
-            let spec = with_images(core::load(&dir)?, images.as_deref())?;
+            let spec = core::load(&dir)?;
+            // Generators assume a validated spec (they `expect` valid CIDRs and addresses). A spec
+            // that parses but is invalid must fail with the field and reason, not a panic.
+            let problems = core::validate(&spec);
+            if !problems.is_empty() {
+                for p in &problems {
+                    eprintln!("✗ {p}");
+                }
+                eprintln!("fix the spec first (`isoloom validate`)");
+                return Ok(ExitCode::FAILURE);
+            }
+            let spec = with_images(spec, images.as_deref())?;
             let (files, _) = core::generate_all(&spec);
             let mut stale = 0;
             for f in &files {

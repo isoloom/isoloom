@@ -580,5 +580,5 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 }
 
 fn yaml(v: &Value) -> String {
-    serde_yaml_ng::to_string(v).unwrap_or_default()
+    serde_yaml_ng::to_string(v).expect("a kubernetes manifest serializes")
 }
