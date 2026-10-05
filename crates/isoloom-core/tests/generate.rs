@@ -117,9 +117,7 @@ fn unsupported_features_are_refused_with_the_reason() {
         matches!(generate(&ad, Target::Proxmox), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("windows-server-2022")),
         "no Windows image on Proxmox yet"
     );
-    assert!(
-        matches!(generate(&ad, Target::CloudVm), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("no AWS image for `windows-server-2022`"))
-    );
+    assert!(matches!(generate(&ad, Target::CloudVm), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("Windows steps are .ps1 scripts")));
 }
 
 #[test]
@@ -353,4 +351,21 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() {
     assert!(tf.contains("depends_on = [terraform_data.web, terraform_data.cache]") || tf.contains("depends_on = [terraform_data.cache, terraform_data.web]"));
     assert!(tf.contains("ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini"));
     assert!(tf.contains("[webservers]"));
+}
+
+#[test]
+fn cloud_vm_runs_windows_over_winrm_with_its_name() {
+    let (_, spec) = example("windows-hello");
+    let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
+    // Amazon's image, no key pair (AWS refuses ED25519 on Windows), WinRM with a generated password.
+    assert!(tf.contains("Windows_Server-2019-English-Full-Base-*"));
+    assert!(tf.contains("resource \"random_password\" \"windows\""));
+    assert!(tf.contains("type     = \"winrm\""));
+    // Renamed and restarted before its set-up, which checks the name.
+    assert!(tf.contains("resource \"time_sleep\" \"web01_restart\""));
+    assert!(tf.contains("still named"));
+    // Auto-stop as a scheduled task (a pending shutdown would block the rename's restart).
+    assert!(tf.contains("isoloom-auto-stop"));
+    // A Windows-only environment: the controller runs the checks.
+    assert!(tf.contains("host = aws_eip.isoloom_controller.public_ip"));
 }

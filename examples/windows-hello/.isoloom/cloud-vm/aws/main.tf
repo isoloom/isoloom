@@ -11,10 +11,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.0"
-    }
   }
 }
 
@@ -42,7 +38,7 @@ variable "auto_stop_minutes" {
 provider "aws" {
   region = var.region
   default_tags {
-    tags = { "isoloom-environment" = "ansible-pair", "managed-by" = "isoloom" }
+    tags = { "isoloom-environment" = "windows-hello", "managed-by" = "isoloom" }
   }
 }
 
@@ -54,7 +50,7 @@ resource "terraform_data" "id" {
 }
 
 locals {
-  name = "isoloom-ansible-pair-${terraform_data.id.output}"
+  name = "isoloom-windows-hello-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
 }
 
@@ -64,7 +60,7 @@ data "aws_availability_zones" "available" {
 
 # The environment's networks: one VPC, a subnet per network with its exact range.
 resource "aws_vpc" "env" {
-  cidr_block = "10.63.0.0/24"
+  cidr_block = "192.168.57.0/24"
   tags       = { Name = local.name }
 }
 
@@ -82,7 +78,7 @@ resource "aws_route_table" "env" {
 
 resource "aws_subnet" "lab" {
   vpc_id            = aws_vpc.env.id
-  cidr_block        = "10.63.0.0/24"
+  cidr_block        = "192.168.57.0/24"
   availability_zone = data.aws_availability_zones.available.names[0]
   tags              = { Name = "${local.name}-lab" }
 }
@@ -95,6 +91,15 @@ resource "aws_route_table_association" "lab" {
 resource "aws_key_pair" "env" {
   key_name   = local.name
   public_key = var.ssh_public_key
+}
+
+# The Windows machines' administrator password (user isoloom), for WinRM.
+resource "random_password" "windows" {
+  length      = 24
+  special     = false
+  min_upper   = 2
+  min_lower   = 2
+  min_numeric = 2
 }
 
 # The controller's own key: it runs the playbooks over SSH on every machine.
@@ -115,21 +120,41 @@ data "aws_ami" "debian_12" {
   }
 }
 
-# Machine `web`: what may reach it.
-resource "aws_security_group" "web" {
-  name   = "${local.name}-web"
+data "aws_ami" "windows_server_2019" {
+  most_recent = true
+  owners      = ["801119661308"]
+  filter {
+    name   = "name"
+    values = ["Windows_Server-2019-English-Full-Base-*"]
+  }
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
+# Machine `web01` (Windows): what may reach it.
+resource "aws_security_group" "web01" {
+  name   = "${local.name}-web01"
   vpc_id = aws_vpc.env.id
   ingress {
     description = "its network (lab)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["10.63.0.0/24"]
+    cidr_blocks = ["192.168.57.0/24"]
   }
   ingress {
-    description = "SSH from allowed_cidr"
-    from_port   = 22
-    to_port     = 22
+    description = "WinRM from allowed_cidr (its set-up)"
+    from_port   = 5985
+    to_port     = 5985
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_cidr]
+  }
+  ingress {
+    description = "published"
+    from_port   = 8082
+    to_port     = 8082
     protocol    = "tcp"
     cidr_blocks = [var.allowed_cidr]
   }
@@ -141,122 +166,74 @@ resource "aws_security_group" "web" {
   }
 }
 
-resource "aws_instance" "web" {
-  ami                         = data.aws_ami.debian_12.id
-  instance_type               = "t3.micro"
+resource "aws_instance" "web01" {
+  ami                         = data.aws_ami.windows_server_2019.id
+  instance_type               = "c7i-flex.large"
   subnet_id                   = aws_subnet.lab.id
-  private_ip                  = "10.63.0.10"
+  private_ip                  = "192.168.57.10"
   associate_public_ip_address = true
-  key_name                    = aws_key_pair.env.key_name
-  vpc_security_group_ids      = [aws_security_group.web.id]
-  user_data                   = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
+  vpc_security_group_ids      = [aws_security_group.web01.id]
+  # No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.
+  user_data = <<-EOT
+    <powershell>
+    $p = ConvertTo-SecureString '${random_password.windows.result}' -AsPlainText -Force
+    New-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null
+    Add-LocalGroupMember -Group Administrators -Member isoloom
+    Enable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null
+    Set-Item WSMan:\localhost\Service\AllowUnencrypted $true
+    Set-Item WSMan:\localhost\Service\Auth\Basic $true
+    New-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null
+    ${var.auto_stop_minutes > 0 ? "Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(${var.auto_stop_minutes})) -User SYSTEM -RunLevel Highest -Force | Out-Null" : ""}
+    </powershell>
+  EOT
   root_block_device {
-    volume_size = 20
+    volume_size = 50
   }
-  tags = { Name = "${local.name}-web" }
+  tags = { Name = "${local.name}-web01" }
 }
 
-resource "terraform_data" "web" {
-  triggers_replace = [aws_instance.web.id]
+resource "terraform_data" "web01_name" {
+  triggers_replace = [aws_instance.web01.id]
   connection {
-    type        = "ssh"
-    host        = aws_instance.web.public_ip
-    user        = "admin"
-    private_key = file(pathexpand(var.ssh_private_key_file))
-    timeout     = "10m"
+    type     = "winrm"
+    host     = aws_instance.web01.public_ip
+    user     = "isoloom"
+    password = random_password.windows.result
+    https    = false
+    timeout  = "30m"
   }
   provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
+    inline = ["powershell -NoProfile -Command \"if ($env:COMPUTERNAME -ne 'WEB01') { Rename-Computer -NewName 'web01' -Force; shutdown /r /t 10 }\""]
   }
-  provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+}
+
+resource "time_sleep" "web01_restart" {
+  create_duration = "90s"
+  depends_on      = [terraform_data.web01_name]
+}
+
+resource "terraform_data" "web01" {
+  triggers_replace = [aws_instance.web01.id]
+  connection {
+    type     = "winrm"
+    host     = aws_instance.web01.public_ip
+    user     = "isoloom"
+    password = random_password.windows.result
+    https    = false
+    timeout  = "30m"
   }
   provisioner "file" {
-    source      = "${path.module}/.isoloom-project-web.tgz"
-    destination = "/tmp/isoloom-project.tgz"
-  }
-  provisioner "remote-exec" {
-    inline = [
-      "set -e",
-      "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
-      "printf '%s\\n' '10.63.0.20 cache' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
-    ]
-  }
-}
-
-# Machine `cache`: what may reach it.
-resource "aws_security_group" "cache" {
-  name   = "${local.name}-cache"
-  vpc_id = aws_vpc.env.id
-  ingress {
-    description = "its network (lab)"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["10.63.0.0/24"]
-  }
-  ingress {
-    description = "SSH from allowed_cidr"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr]
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_instance" "cache" {
-  ami                         = data.aws_ami.debian_12.id
-  instance_type               = "t3.micro"
-  subnet_id                   = aws_subnet.lab.id
-  private_ip                  = "10.63.0.20"
-  associate_public_ip_address = true
-  key_name                    = aws_key_pair.env.key_name
-  vpc_security_group_ids      = [aws_security_group.cache.id]
-  user_data                   = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
-  root_block_device {
-    volume_size = 20
-  }
-  tags = { Name = "${local.name}-cache" }
-}
-
-resource "terraform_data" "cache" {
-  triggers_replace = [aws_instance.cache.id]
-  connection {
-    type        = "ssh"
-    host        = aws_instance.cache.public_ip
-    user        = "admin"
-    private_key = file(pathexpand(var.ssh_private_key_file))
-    timeout     = "10m"
-  }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
-  provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project-cache.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+    source      = "${local.root}/provision/iis.ps1"
+    destination = "C:/isoloom/provision/iis.ps1"
   }
   provisioner "file" {
-    source      = "${path.module}/.isoloom-project-cache.tgz"
-    destination = "/tmp/isoloom-project.tgz"
+    content     = "$ErrorActionPreference = 'Stop'\nif ($env:COMPUTERNAME -ne 'WEB01') { throw \"still named $env:COMPUTERNAME: the rename hasn't taken effect\" }\nnetsh interface portproxy add v4tov4 listenport=8082 listenaddress=0.0.0.0 connectport=80 connectaddress=127.0.0.1 | Out-Null\nNew-NetFirewallRule -DisplayName 'isoloom 80' -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow | Out-Null\nNew-NetFirewallRule -DisplayName 'isoloom 8082' -Direction Inbound -Protocol TCP -LocalPort 8082 -Action Allow | Out-Null\n& powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\isoloom\\provision\\iis.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }\nNew-Item -ItemType Directory -Force C:\\ProgramData\\isoloom | Out-Null; Set-Content C:\\ProgramData\\isoloom\\ready 'ready'\n"
+    destination = "C:/isoloom/setup.ps1"
   }
   provisioner "remote-exec" {
-    inline = [
-      "set -e",
-      "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
-      "printf '%s\\n' '10.63.0.10 web' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
-    ]
+    inline = ["powershell -NoProfile -ExecutionPolicy Bypass -File C:/isoloom/setup.ps1"]
   }
+  depends_on = [time_sleep.web01_restart]
 }
 
 # The controller (Ansible): every network may reach it, and SSH from allowed_cidr.
@@ -268,7 +245,7 @@ resource "aws_security_group" "isoloom_controller" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["10.63.0.0/24"]
+    cidr_blocks = ["192.168.57.0/24"]
   }
   ingress {
     description = "SSH from allowed_cidr"
@@ -287,7 +264,7 @@ resource "aws_security_group" "isoloom_controller" {
 
 resource "aws_network_interface" "isoloom_controller_lab" {
   subnet_id         = aws_subnet.lab.id
-  private_ips       = ["10.63.0.253"]
+  private_ips       = ["192.168.57.253"]
   security_groups   = [aws_security_group.isoloom_controller.id]
   source_dest_check = false
 }
@@ -336,34 +313,32 @@ resource "terraform_data" "isoloom_controller" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | sudo tee -a /etc/hosts >/dev/null",
+      "printf '%s\\n' '192.168.57.10 web01' | sudo tee -a /etc/hosts >/dev/null",
       "sudo mkdir -p /etc/isoloom && sudo install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && rm -f /tmp/isoloom-controller-key",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null",
       "[ -x /opt/ansible/bin/ansible-playbook ] || { sudo python3 -m venv /opt/ansible && sudo /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }",
-      "printf '%s' '[linux]\nweb ansible_host=10.63.0.10 ansible_user=admin\ncache ansible_host=10.63.0.20 ansible_user=admin\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n' | sudo tee /etc/isoloom/inventory.ini >/dev/null",
-      "sudo sh -c 'set -e\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\ncd /opt/isoloom/ansible\nansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\"}'\\'' site.yml\n'",
+      "printf '%s' '[linux]\n\n[windows]\nweb01 ansible_host=192.168.57.10\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n' | sudo tee /etc/isoloom/inventory.ini >/dev/null",
+      "sudo sh -c 'set -e\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\n'",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
     ]
   }
-  depends_on = [terraform_data.web, terraform_data.cache]
+  depends_on = [terraform_data.web01]
 }
 
 output "machines" {
   value = {
-    web   = aws_instance.web.public_ip
-    cache = aws_instance.cache.public_ip
+    web01 = aws_instance.web01.public_ip
   }
 }
 
 output "ssh_users" {
   value = {
-    web   = "admin"
-    cache = "admin"
+    web01 = "isoloom"
   }
 }
 
 output "ip" {
-  value = aws_instance.web.public_ip
+  value = aws_eip.isoloom_controller.public_ip
 }
 
 output "ready_file" {
@@ -373,10 +348,16 @@ output "ready_file" {
 # The checks, from where a user stands: ssh <user>@<host> each command.
 output "checks" {
   value = {
-    host = aws_instance.web.public_ip
-    user = null
+    host = aws_eip.isoloom_controller.public_ip
+    user = "admin"
     commands = [
-      "cd /opt/isoloom && sh checks/web-answers.sh"
+      "cd /opt/isoloom && sh checks/web01-answers.sh"
     ]
+  }
+}
+
+output "published" {
+  value = {
+    "web01/80" = "${aws_instance.web01.public_ip}:8082"
   }
 }

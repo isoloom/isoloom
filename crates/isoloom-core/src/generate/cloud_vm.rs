@@ -16,7 +16,10 @@
 //!   check off, so replies leave from the right one) and an Elastic IP on the first.
 //! - Environment-level `provision:`: a Debian controller on every network (at the controller
 //!   address) runs the playbooks over SSH with a key of its own, once every machine is set up.
-//! - Not yet: Windows.
+//! - Windows (Amazon's Server images): an `isoloom` administrator with a generated password and
+//!   WinRM at first boot; its `.ps1` steps uploaded and run over WinRM; Ansible reaches it
+//!   from the controller, which also runs the checks when no Linux machine can.
+//! - Not yet: Windows machines on several networks.
 
 use std::fmt::Write;
 
@@ -39,6 +42,11 @@ fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
         "debian-13" => ("136693071363", "debian-13-amd64-*", "admin"),
         "ubuntu-22.04" => ("099720109477", "ubuntu/images/hvm-ssd*/ubuntu-jammy-22.04-amd64-server-*", "ubuntu"),
         "ubuntu-24.04" => ("099720109477", "ubuntu/images/hvm-ssd*/ubuntu-noble-24.04-amd64-server-*", "ubuntu"),
+        // Amazon's Windows Server images (license included, billed per hour).
+        "windows-server-2016" => ("801119661308", "Windows_Server-2016-English-Full-Base-*", "isoloom"),
+        "windows-server-2019" => ("801119661308", "Windows_Server-2019-English-Full-Base-*", "isoloom"),
+        "windows-server-2022" => ("801119661308", "Windows_Server-2022-English-Full-Base-*", "isoloom"),
+        "windows-server-2025" => ("801119661308", "Windows_Server-2025-English-Full-Base-*", "isoloom"),
         _ => return None,
     })
 }
@@ -77,7 +85,16 @@ fn unsupported(spec: &Spec) -> Option<String> {
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
         if image(&vm.os).is_none() {
-            return Some(format!("machine `{name}`: no AWS image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04)", vm.os));
+            return Some(format!(
+                "machine `{name}`: no AWS image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)",
+                vm.os
+            ));
+        }
+        if crate::images::is_windows(&vm.os) && m.networks.len() > 1 {
+            return Some(format!("machine `{name}`: Windows machines on several networks in the cloud come later"));
+        }
+        if crate::images::is_windows(&vm.os) && vm.provision.iter().any(|p| !p.ends_with(".ps1")) {
+            return Some(format!("machine `{name}`: Windows steps are .ps1 scripts"));
         }
         if let Some((net, _)) = m.networks.iter().find(|(_, o)| **o <= 3) {
             return Some(format!("machine `{name}`: AWS keeps the first addresses of a subnet (.1 to .3) on `{net}`"));
@@ -205,7 +222,10 @@ resource "aws_vpc" "env" {{
 
     // AMIs, once per OS.
     let mut oses: Vec<&str> = spec.machines.values().filter_map(|m| m.vm.as_ref()).map(|v| v.os.as_str()).collect();
-    if !spec.provision.is_empty() {
+    if has_windows(spec) {
+        tf.push_str("\n# The Windows machines' administrator password (user isoloom), for WinRM.\nresource \"random_password\" \"windows\" {\n  length      = 24\n  special     = false\n  min_upper   = 2\n  min_lower   = 2\n  min_numeric = 2\n}\n");
+    }
+    if needs_controller(spec) {
         oses.push(CONTROLLER_OS);
         tf.push_str("\n# The controller's own key: it runs the playbooks over SSH on every machine.\nresource \"tls_private_key\" \"controller\" {\n  algorithm = \"ED25519\"\n}\n");
     }
@@ -241,6 +261,12 @@ resource "aws_vpc" "env" {{
         };
         let mem = m.resources.and_then(|r| r.memory_mb).unwrap_or(crate::DEFAULT_MEMORY_MB);
         let disk = m.resources.and_then(|r| r.disk_gb).unwrap_or(crate::DEFAULT_DISK_GB);
+        if crate::images::is_windows(&vm.os) {
+            windows_machine(spec, name, &mut tf, mem, disk, &mut published_out);
+            public_ips.push((name.to_string(), pip.clone()));
+            ssh_users.push((name.to_string(), "\"isoloom\"".into()));
+            continue;
+        }
 
         // Who may reach it: its own network, the networks `reach` opens to it, and allowed_cidr
         // for SSH and the published ports.
@@ -342,7 +368,7 @@ resource "aws_vpc" "env" {{
             "cloud-init status --wait >/dev/null 2>&1 || true".into(),
             "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
         ];
-        if !spec.provision.is_empty() {
+        if needs_controller(spec) {
             cmds.push(format!(
                 "mkdir -p ~/.ssh && echo '{}' >> ~/.ssh/authorized_keys",
                 tf_expr("trimspace(tls_private_key.controller.public_key_openssh)")
@@ -451,13 +477,19 @@ resource "aws_vpc" "env" {{
         }
     }
 
-    if !spec.provision.is_empty() {
+    if needs_controller(spec) {
         controller(spec, &mut tf, &lab);
     }
 
     // Outputs: every machine's address, and one to start from (the access machine, else the
     // first), with its SSH user and ready marker, as the other cloud outputs give.
-    let first = access_ip.unwrap_or_else(|| "null".into());
+    // Where a user stands (checks, the launcher's SSH): the access machine, else the first Linux
+    // machine, else the controller (a Windows-only environment).
+    let (first, check_user) = match access_ip {
+        Some(ip) => (ip, None),
+        None if needs_controller(spec) => ("aws_eip.isoloom_controller.public_ip".to_string(), Some("admin")),
+        None => ("null".to_string(), None),
+    };
     let _ = write!(
         tf,
         "\noutput \"machines\" {{\n  value = {{\n{}\n  }}\n}}\n\noutput \"ssh_users\" {{\n  value = {{\n{}\n  }}\n}}\n\noutput \"ip\" {{\n  value = {first}\n}}\n\noutput \"ready_file\" {{\n  value = \"/var/lib/isoloom/ready\"\n}}\n",
@@ -468,8 +500,9 @@ resource "aws_vpc" "env" {{
         let runs: Vec<String> = spec.checks.iter().map(|c| format!("      \"cd /opt/isoloom && sh {c}\"")).collect();
         let _ = write!(
             tf,
-            "\n# The checks, from where a user stands: ssh <ssh_user>@<ip> each command.\noutput \"checks\" {{\n  value = {{\n    host = {first}\n    commands = [\n{}\n    ]\n  }}\n}}\n",
-            runs.join(",\n")
+            "\n# The checks, from where a user stands: ssh <user>@<host> each command.\noutput \"checks\" {{\n  value = {{\n    host = {first}\n    user = {user}\n    commands = [\n{}\n    ]\n  }}\n}}\n",
+            runs.join(",\n"),
+            user = check_user.map(|u| format!("\"{u}\"")).unwrap_or_else(|| "null".into()),
         );
     }
     if !published_out.is_empty() {
@@ -489,6 +522,22 @@ fn aligned(entries: &[(String, String)]) -> String {
 }
 
 const CONTROLLER_OS: &str = "debian-12";
+
+/// A controller runs the environment's playbooks, and the checks when no Linux machine can
+/// (a Windows-only environment).
+fn needs_controller(spec: &Spec) -> bool {
+    !spec.provision.is_empty() || (!spec.checks.is_empty() && linux_machines(spec).next().is_none())
+}
+
+fn linux_machines(spec: &Spec) -> impl Iterator<Item = (&String, &crate::model::Machine)> {
+    spec.machines
+        .iter()
+        .filter(|(_, m)| m.vm.as_ref().is_some_and(|v| !crate::images::is_windows(&v.os)))
+}
+
+fn has_windows(spec: &Spec) -> bool {
+    spec.machines.values().any(|m| m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os)))
+}
 
 /// The controller: a Debian instance with an interface on every network at the controller
 /// address, which runs the environment's playbooks once every machine is set up.
@@ -556,7 +605,7 @@ fn controller(spec: &Spec, tf: &mut String, lab: &str) {
     );
     cmds.push("sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null".into());
     cmds.push(
-        "[ -x /opt/ansible/bin/ansible-playbook ] || { sudo python3 -m venv /opt/ansible && sudo /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17'; }"
+        "[ -x /opt/ansible/bin/ansible-playbook ] || { sudo python3 -m venv /opt/ansible && sudo /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }"
             .into(),
     );
     cmds.push(format!(
@@ -579,17 +628,167 @@ fn controller(spec: &Spec, tf: &mut String, lab: &str) {
     );
 }
 
+/// A Windows machine: Amazon's image; at first boot (user data) the `isoloom` administrator with
+/// the generated password, WinRM over HTTP, its name; then over WinRM (from `allowed_cidr`): the
+/// other machines' names, its `.ps1` steps, its firewall openings, published ports, the ready
+/// marker.
+fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32, published_out: &mut Vec<(String, String)>) {
+    let m = &spec.machines[name];
+    let vm = m.vm.as_ref().expect("a VM machine");
+    let id = res(name);
+    let (net, octet) = m.networks.first().expect("validated: every machine is on a network");
+    let addr = address(spec, net, *octet);
+    // Windows wants 2 GB and more.
+    let mem = mem.max(2048);
+    // Its Windows name (NetBIOS: 15 characters).
+    let host: String = name.chars().take(15).collect();
+
+    let mut sg = format!(
+        "\n# Machine `{name}` (Windows): what may reach it.\nresource \"aws_security_group\" \"{id}\" {{\n  name   = \"${{local.name}}-{name}\"\n  vpc_id = aws_vpc.env.id\n  ingress {{\n    description = \"its network ({net})\"\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"{c}\"]\n  }}\n  ingress {{\n    description = \"WinRM from allowed_cidr (its set-up)\"\n    from_port   = 5985\n    to_port     = 5985\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n",
+        c = spec.networks[net.as_str()].cidr
+    );
+    for r in spec.reach.iter().filter(|r| &r.to == net) {
+        let from = &spec.networks[&r.from].cidr;
+        let ports: Vec<String> = if r.ports.is_empty() {
+            vec!["0".into()]
+        } else {
+            r.ports.iter().map(u16::to_string).collect()
+        };
+        for p in ports {
+            let (proto, to) = if p == "0" { ("-1", "0".to_string()) } else { ("tcp", p.clone()) };
+            let _ = write!(
+                sg,
+                "  ingress {{\n    description = \"reach from {f}\"\n    from_port   = {p}\n    to_port     = {to}\n    protocol    = \"{proto}\"\n    cidr_blocks = [\"{from}\"]\n  }}\n",
+                f = r.from
+            );
+        }
+    }
+    let mut ps: Vec<String> = vec![
+        "$ErrorActionPreference = 'Stop'".into(),
+        format!(
+            "if ($env:COMPUTERNAME -ne '{}') {{ throw \"still named $env:COMPUTERNAME: the rename hasn't taken effect\" }}",
+            host.to_uppercase()
+        ),
+    ];
+    for sv in &m.services {
+        if let Some(h) = sv.publish {
+            let _ = write!(
+                sg,
+                "  ingress {{\n    description = \"published\"\n    from_port   = {h}\n    to_port     = {h}\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n"
+            );
+            let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+            published_out.push((format!("\"{name}/{label}\""), format!("\"${{aws_instance.{id}.public_ip}}:{h}\"")));
+            if h != sv.port {
+                ps.push(format!(
+                    "netsh interface portproxy add v4tov4 listenport={h} listenaddress=0.0.0.0 connectport={p} connectaddress=127.0.0.1 | Out-Null",
+                    p = sv.port
+                ));
+            }
+        }
+    }
+    sg.push_str("  egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n");
+    tf.push_str(&sg);
+
+    // First boot: the administrator and WinRM.
+    let user_data = "<powershell>\n$p = ConvertTo-SecureString '${random_password.windows.result}' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n${var.auto_stop_minutes > 0 ? \"Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(${var.auto_stop_minutes})) -User SYSTEM -RunLevel Highest -Force | Out-Null\" : \"\"}\n</powershell>\n".to_string();
+    let _ = writeln!(
+        tf,
+        "\nresource \"aws_instance\" \"{id}\" {{\n  ami                         = data.aws_ami.{ami}.id\n  instance_type               = \"{itype}\"\n  subnet_id                   = aws_subnet.{netid}.id\n  private_ip                  = \"{addr}\"\n  associate_public_ip_address = true\n  vpc_security_group_ids      = [aws_security_group.{id}.id]\n  # No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.\n  user_data = <<-EOT\n{ud}  EOT\n  root_block_device {{\n    volume_size = {disk}\n  }}\n  tags = {{ Name = \"${{local.name}}-{name}\" }}\n}}",
+        ami = res(&vm.os),
+        itype = instance_type(mem),
+        netid = res(net),
+        ud = user_data.lines().map(|l| format!("    {l}\n")).collect::<String>(),
+        disk = disk.max(50),
+    );
+
+    // Over WinRM: names, firewall openings for its services, steps, the ready marker.
+    let hosts: Vec<String> = spec
+        .machines
+        .keys()
+        .filter(|o| o.as_str() != name)
+        .map(|o| format!("{} {o}", super::address_for(spec, name, o)))
+        .collect();
+    if !hosts.is_empty() {
+        ps.push(format!(
+            "Add-Content -Path \"$env:windir\\System32\\drivers\\etc\\hosts\" -Value @({})",
+            hosts.iter().map(|h| format!("'{h}'")).collect::<Vec<_>>().join(", ")
+        ));
+    }
+    for sv in &m.services {
+        ps.push(format!(
+            "New-NetFirewallRule -DisplayName 'isoloom {p}' -Direction Inbound -Protocol TCP -LocalPort {p} -Action Allow | Out-Null",
+            p = sv.port
+        ));
+        if let Some(h) = sv.publish.filter(|h| *h != sv.port) {
+            ps.push(format!(
+                "New-NetFirewallRule -DisplayName 'isoloom {h}' -Direction Inbound -Protocol TCP -LocalPort {h} -Action Allow | Out-Null"
+            ));
+        }
+    }
+    for step in &vm.provision {
+        ps.push(format!(
+            "& powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\isoloom\\{}'; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
+            step.replace('/', "\\")
+        ));
+    }
+    ps.push("New-Item -ItemType Directory -Force C:\\ProgramData\\isoloom | Out-Null; Set-Content C:\\ProgramData\\isoloom\\ready 'ready'".into());
+
+    let conn = format!(
+        "  connection {{\n    type     = \"winrm\"\n    host     = aws_instance.{id}.public_ip\n    user     = \"isoloom\"\n    password = random_password.windows.result\n    https    = false\n    timeout  = \"30m\"\n  }}\n"
+    );
+    // Its name: renamed, restarted, then a pause so the set-up reconnects after the restart.
+    let _ = writeln!(
+        tf,
+        "\nresource \"terraform_data\" \"{id}_name\" {{\n  triggers_replace = [aws_instance.{id}.id]\n{conn}  provisioner \"remote-exec\" {{\n    inline = [\"powershell -NoProfile -Command \\\"if ($env:COMPUTERNAME -ne '{up}') {{ Rename-Computer -NewName '{host}' -Force; shutdown /r /t 10 }}\\\"\"]\n  }}\n}}\n\nresource \"time_sleep\" \"{id}_restart\" {{\n  create_duration = \"90s\"\n  depends_on      = [terraform_data.{id}_name]\n}}",
+        up = host.to_uppercase(),
+    );
+    let mut prov = format!("\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [aws_instance.{id}.id]\n{conn}");
+    for step in &vm.provision {
+        let _ = write!(
+            prov,
+            "  provisioner \"file\" {{\n    source      = \"${{local.root}}/{step}\"\n    destination = \"C:/isoloom/{step}\"\n  }}\n"
+        );
+    }
+    let _ = write!(
+        prov,
+        "  provisioner \"file\" {{\n    content     = {}\n    destination = \"C:/isoloom/setup.ps1\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"powershell -NoProfile -ExecutionPolicy Bypass -File C:/isoloom/setup.ps1\"]\n  }}\n",
+        hcl(&(ps.join("\n") + "\n"))
+    );
+    let mut deps: Vec<String> = vec![format!("time_sleep.{id}_restart")];
+    deps.extend(
+        m.depends_on
+            .iter()
+            .filter(|d| spec.machines[*d].vm.is_some())
+            .map(|d| format!("terraform_data.{}", res(d))),
+    );
+    let _ = writeln!(prov, "  depends_on = [{}]", deps.join(", "));
+    prov.push_str("}\n");
+    tf.push_str(&prov);
+}
+
 /// The controller's inventory: every machine at its address, with its SSH user and the
 /// controller's key; the spec's groups.
 fn inventory(spec: &Spec) -> String {
-    let mut inv = String::from("[linux]\n");
+    let (mut linux, mut windows) = (String::new(), String::new());
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
         let Some((net, octet)) = m.networks.first() else { continue };
         let user = image(&vm.os).map(|i| i.2).unwrap_or("admin");
-        let _ = writeln!(inv, "{name} ansible_host={} ansible_user={user}", address(spec, net, *octet));
+        if crate::images::is_windows(&vm.os) {
+            let _ = writeln!(windows, "{name} ansible_host={}", address(spec, net, *octet));
+        } else {
+            let _ = writeln!(linux, "{name} ansible_host={} ansible_user={user}", address(spec, net, *octet));
+        }
     }
-    inv.push_str("\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n");
+    let mut inv = format!("[linux]\n{linux}\n[windows]\n{windows}\n");
+    inv.push_str("[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n");
+    if has_windows(spec) {
+        let _ = write!(
+            inv,
+            "\n[windows:vars]\nansible_user=isoloom\nansible_password={}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n",
+            tf_expr("random_password.windows.result")
+        );
+    }
     let mut groups: indexmap::IndexMap<&str, Vec<&str>> = indexmap::IndexMap::new();
     for step in &spec.provision {
         for (g, members) in &step.groups {

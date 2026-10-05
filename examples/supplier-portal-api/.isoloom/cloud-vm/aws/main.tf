@@ -291,10 +291,11 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <ssh_user>@<ip> each command.
+# The checks, from where a user stands: ssh <user>@<host> each command.
 output "checks" {
   value = {
     host = aws_instance.database.public_ip
+    user = null
     commands = [
       "cd /opt/isoloom && sh build/check/check.sh"
     ]
