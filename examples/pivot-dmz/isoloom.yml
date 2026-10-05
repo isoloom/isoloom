@@ -17,22 +17,32 @@ machines:
   gateway:
     networks: { dmz: 10, internal: 10 }
     services: [{ port: 80 }, { port: 22 }]
-    docker: { build: build/gateway }
-    vm: { os: debian-12, provision: [provision/gateway.yml] }
+    docker:
+      build: build/gateway
+    vm:
+      os: debian-12
+      provision: [provision/gateway.yml]
   app:
     networks: { internal: 20 }
     services: [{ port: 8080 }]
-    docker: { build: build/app }
-    vm: { os: debian-12, provision: [provision/app.yml] }
+    docker:
+      build: build/app
+    vm:
+      os: debian-12
+      provision: [provision/app.yml]
   db:
     networks: { internal: 30 }
     services: [{ port: 5432 }]
-    docker: { image: "postgres:16" }
-    vm: { os: debian-12, provision: [provision/db.yml] }
+    docker:
+      image: "postgres:16"
+    vm:
+      os: debian-12
+      provision: [provision/db.yml]
   user:
     access: true
     networks: { access: 10 }
-    vm: { os: kali }
+    vm:
+      os: kali
 
 checks:
   - checks/dmz-reachable.sh

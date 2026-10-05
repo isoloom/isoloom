@@ -17,20 +17,27 @@ machines:
   cache:
     networks: { back: 20 }
     services: [{ port: 6379, name: redis }]
-    docker: { image: "redis:7-alpine" }
-    vm: { os: debian-12, provision: [provision/cache.sh] }
+    docker:
+      image: "redis:7-alpine"
+    vm:
+      os: debian-12
+      provision: [provision/cache.sh]
 
   web:
     networks: { front: 10 }
     services: [{ port: 80, http: true }]
     depends_on: [cache]
-    docker: { build: build/web }
-    vm: { os: debian-12, provision: [provision/web.sh] }
+    docker:
+      build: build/web
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
 
   user:
     access: true
     networks: { access: 10 }
-    vm: { os: debian-12 }
+    vm:
+      os: debian-12
 
 checks:
   - checks/web-reachable.sh

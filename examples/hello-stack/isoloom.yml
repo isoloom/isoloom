@@ -16,14 +16,19 @@ machines:
     docker:
       image: "redis:7-alpine"
       init: [build/cache/seed.sh]
-    vm: { os: debian-12, provision: [provision/cache.sh] }
+    vm:
+      os: debian-12
+      provision: [provision/cache.sh]
 
   web:
     networks: { app: 10 }
     services: [{ port: 80, http: true, publish: 8080 }]
     depends_on: [cache]
-    docker: { build: build/web }
-    vm: { os: debian-12, provision: [provision/web.sh] }
+    docker:
+      build: build/web
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
 
 checks:
   - checks/web-answers.sh

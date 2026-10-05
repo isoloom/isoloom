@@ -807,12 +807,12 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         }
         match (&m.build, &m.image) {
             (Some(b), _) => {
-                let _ = writeln!(y, "    docker: {{ build: {} }}", yaml_str(b));
+                let _ = writeln!(y, "    docker:\n      build: {}", yaml_str(b));
             }
             (None, Some(img)) => {
-                let _ = writeln!(y, "    docker: {{ image: {} }}", yaml_str(img));
+                let _ = writeln!(y, "    docker:\n      image: {}", yaml_str(img));
             }
-            (None, None) => y.push_str("    docker: { image: \"\" }\n"),
+            (None, None) => y.push_str("    docker:\n      image: \"\"\n"),
         }
     }
     Ok(Draft { yaml: y, notes })

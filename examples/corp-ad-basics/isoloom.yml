@@ -30,8 +30,11 @@ machines:
   web01:
     networks: { dmz: 10, corp: 10 }
     services: [{ port: 80 }]
-    docker: { build: build/web01 }
-    vm: { os: debian-12, provision: [provision/web01.yml] }
+    docker:
+      build: build/web01
+    vm:
+      os: debian-12
+      provision: [provision/web01.yml]
   user:
     access: true
     networks: { access: 10 }

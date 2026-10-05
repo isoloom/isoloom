@@ -18,25 +18,35 @@ machines:
   fw:
     networks: { outside: 2, dmz: 1, lan: 1 }
     services: [{ port: 8080, name: status, http: true }]
-    docker: { build: build/fw }
-    vm: { os: debian-12, provision: [provision/fw.sh] }
+    docker:
+      build: build/fw
+    vm:
+      os: debian-12
+      provision: [provision/fw.sh]
 
   web:
     networks: { dmz: 10 }
     services: [{ port: 80, http: true }]
-    docker: { build: build/web }
-    vm: { os: debian-12, provision: [provision/web.sh] }
+    docker:
+      build: build/web
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
 
   cache:
     networks: { lan: 20 }
     services: [{ port: 6379, name: redis }]
-    docker: { image: "redis:7-alpine" }
-    vm: { os: debian-12, provision: [provision/cache.sh] }
+    docker:
+      image: "redis:7-alpine"
+    vm:
+      os: debian-12
+      provision: [provision/cache.sh]
 
   user:
     access: true
     networks: { outside: 10 }
-    vm: { os: debian-12 }
+    vm:
+      os: debian-12
 
 checks:
   - checks/web-through-firewall.sh

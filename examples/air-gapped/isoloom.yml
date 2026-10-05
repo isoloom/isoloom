@@ -11,15 +11,21 @@ machines:
   store:
     networks: { lab: 20 }
     services: [{ port: 6379, name: redis }]
-    docker: { image: "redis:7-alpine" }
-    vm: { os: debian-12, provision: [provision/store.sh] }
+    docker:
+      image: "redis:7-alpine"
+    vm:
+      os: debian-12
+      provision: [provision/store.sh]
 
   app:
     networks: { lab: 10 }
     services: [{ port: 80, http: true }]
     depends_on: [store]
-    docker: { image: "nginx:1.27-alpine" }
-    vm: { os: debian-12, provision: [provision/app.sh] }
+    docker:
+      image: "nginx:1.27-alpine"
+    vm:
+      os: debian-12
+      provision: [provision/app.sh]
 
 checks:
   - checks/app-answers.sh
