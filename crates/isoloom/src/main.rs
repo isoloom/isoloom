@@ -699,7 +699,17 @@ fn test_cmd(
         core::Target::Docker | core::Target::Hosted => {
             let f = out.join("docker/compose.yml").display().to_string();
             for (pos, _) in &groups {
-                let mut args = vec![s("compose"), s("--progress"), s("quiet"), s("-f"), f.clone(), s("--profile"), s("check"), s("run"), s("--rm")];
+                let mut args = vec![
+                    s("compose"),
+                    s("--progress"),
+                    s("quiet"),
+                    s("-f"),
+                    f.clone(),
+                    s("--profile"),
+                    s("check"),
+                    s("run"),
+                    s("--rm"),
+                ];
                 if no_derived {
                     args.extend([s("-e"), s("ISOLOOM_DERIVED=0")]);
                 }
