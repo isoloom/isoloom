@@ -5,3 +5,11 @@ kind: Kustomization
 namespace: isoloom-hello-stack
 resources:
   - job.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: isoloom-check-runners
+    files:
+      - networks.sh
+      - cache.sh
+      - web.sh

@@ -31,7 +31,3 @@ machines:
     vm:
       os: debian-12
       provision: [provision/app.sh]
-
-checks:
-  - checks/app-answers.sh
-  - checks/no-internet.sh

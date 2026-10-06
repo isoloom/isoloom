@@ -223,14 +223,12 @@ resource "digitalocean_firewall" "{id}" {{
         tf,
         "\noutput \"machines\" {{\n  value = {{\n{machines}\n  }}\n}}\n\noutput \"ssh_users\" {{\n  value = {{\n{ssh_users}\n  }}\n}}\n\noutput \"ip\" {{\n  value = {pip}\n}}\n\noutput \"ready_file\" {{\n  value = \"/var/lib/isoloom/ready\"\n}}\n",
     );
-    if !spec.checks.is_empty() {
-        let runs: Vec<String> = spec.checks.iter().map(|c| format!("      \"cd /opt/isoloom && sh {c}\"")).collect();
-        let _ = write!(
-            tf,
-            "\n# The checks, from where a user stands: ssh <user>@<host> each command.\noutput \"checks\" {{\n  value = {{\n    host = {pip}\n    user = \"{user}\"\n    commands = [\n{}\n    ]\n  }}\n}}\n",
-            runs.join(",\n"),
-        );
-    }
+    tf.push_str(&super::super::cloud_vm::checks_output(
+        spec,
+        &[(name.to_string(), pip.clone())],
+        &[(name.to_string(), format!("\"{user}\""))],
+        None,
+    ));
     if !published_out.is_empty() {
         let _ = write!(tf, "\noutput \"published\" {{\n  value = {{\n{}\n  }}\n}}\n", aligned(&published_out));
     }

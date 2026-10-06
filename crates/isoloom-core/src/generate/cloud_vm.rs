@@ -75,7 +75,7 @@ fn unsupported(spec: &Spec) -> Option<String> {
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine in the cloud come later".into());
     }
-    if spec.checks.iter().any(|c| c.ends_with(".yml") || c.ends_with(".yaml")) {
+    if spec.checks.iter().any(|c| c.is_playbook()) {
         return Some("Ansible checks (.yml) in the cloud come later".into());
     }
     let nets: Vec<Cidr> = spec.networks.keys().map(|n| cidr(spec, n)).collect();
@@ -119,7 +119,65 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         let _ = sub;
     }
+    files.extend(check_scripts(spec));
     Ok(files)
+}
+
+/// The check runners, one per position, shared by every cloud (addresses are kept as written
+/// in the cloud): `.isoloom/cloud-vm/checks/<position>.sh`, run on the machine over SSH from
+/// the project copy at /opt/isoloom.
+fn check_scripts(spec: &Spec) -> Vec<GeneratedFile> {
+    let plan = crate::checks::plan(spec);
+    let host = |h: &crate::checks::Host, _: &crate::checks::Position| -> String {
+        match h {
+            crate::checks::Host::Literal(l) => l.clone(),
+            crate::checks::Host::Machine { name, network } => address(spec, network, spec.machines[name].networks[network]).to_string(),
+        }
+    };
+    let run_script = |path: &str| format!("cd /opt/isoloom && sh {path}");
+    let render = crate::checks::Render {
+        host: &host,
+        script: &run_script,
+        playbook: None,
+    };
+    crate::checks::by_position(spec, &plan)
+        .into_iter()
+        .map(|(pos, group)| GeneratedFile {
+            path: format!("{OUTPUT_DIR}/{DIR}/checks/{}.sh", pos.id()),
+            contents: crate::checks::script(&pos, &group, &render),
+        })
+        .collect()
+}
+
+/// The `checks` output of a cloud module: each runner with the machine it runs on, that
+/// machine's public address and SSH user (HCL expressions from the driver), and the command.
+/// A position that isn't one of the cloud's machines (the environment's networks, a machine the
+/// runner supplies) runs from `fallback`: the controller, else the first Linux machine.
+pub(super) fn checks_output(spec: &Spec, public_ips: &[(String, String)], ssh_users: &[(String, String)], fallback: Option<(&str, &str)>) -> String {
+    let plan = crate::checks::plan(spec);
+    let mut entries = Vec::new();
+    for (pos, _) in crate::checks::by_position(spec, &plan) {
+        let on = match &pos {
+            crate::checks::Position::Machine(m) if public_ips.iter().any(|(n, _)| n == m) => Some((
+                m.clone(),
+                public_ips.iter().find(|(n, _)| n == m).map(|(_, e)| e.clone()).expect("found above"),
+                ssh_users.iter().find(|(n, _)| n == m).map(|(_, u)| u.clone()).unwrap_or_else(|| "null".into()),
+            )),
+            _ => fallback.map(|(h, u)| ("controller".to_string(), h.to_string(), format!("\"{u}\""))),
+        };
+        let Some((machine, host, user)) = on else { continue };
+        entries.push(format!(
+            "    {{ position = \"{id}\", machine = \"{machine}\", host = {host}, user = {user}, command = \"cd /opt/isoloom && sh .isoloom/cloud-vm/checks/{id}.sh\" }}",
+            id = pos.id()
+        ));
+    }
+    if entries.is_empty() {
+        return String::new();
+    }
+    format!(
+        "\n# The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.\noutput \"checks\" {{\n  value = [\n{}\n  ]\n}}\n",
+        entries.join(",\n")
+    )
 }
 
 fn aws(spec: &Spec) -> GeneratedFile {
@@ -439,15 +497,9 @@ resource "aws_vpc" "env" {{
         aligned(&public_ips),
         aligned(&ssh_users),
     );
-    if !spec.checks.is_empty() {
-        let runs: Vec<String> = spec.checks.iter().map(|c| format!("      \"cd /opt/isoloom && sh {c}\"")).collect();
-        let _ = write!(
-            tf,
-            "\n# The checks, from where a user stands: ssh <user>@<host> each command.\noutput \"checks\" {{\n  value = {{\n    host = {first}\n    user = {user}\n    commands = [\n{}\n    ]\n  }}\n}}\n",
-            runs.join(",\n"),
-            user = check_user.map(|u| format!("\"{u}\"")).unwrap_or_else(|| "null".into()),
-        );
-    }
+    let fallback = needs_controller(spec).then_some(("aws_eip.isoloom_controller.public_ip", "admin"));
+    let _ = check_user;
+    tf.push_str(&checks_output(spec, &public_ips, &ssh_users, fallback));
     if !published_out.is_empty() {
         let _ = write!(tf, "\noutput \"published\" {{\n  value = {{\n{}\n  }}\n}}\n", aligned(&published_out));
     }
@@ -469,7 +521,7 @@ pub(super) const CONTROLLER_OS: &str = "debian-12";
 /// A controller runs the environment's playbooks, and the checks when no Linux machine can
 /// (a Windows-only environment).
 pub(super) fn needs_controller(spec: &Spec) -> bool {
-    !spec.provision.is_empty() || (!spec.checks.is_empty() && linux_machines(spec).next().is_none())
+    !spec.provision.is_empty() || (!crate::checks::plan(spec).is_empty() && linux_machines(spec).next().is_none())
 }
 
 pub(super) fn linux_machines(spec: &Spec) -> impl Iterator<Item = (&String, &crate::model::Machine)> {

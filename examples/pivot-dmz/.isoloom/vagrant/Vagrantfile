@@ -171,6 +171,7 @@ Vagrant.configure("2") do |config|
       a.playbook = "provision/gateway.yml"
       a.install = false
     end
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/gateway.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   config.vm.define "app" do |m|
@@ -296,6 +297,7 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-egress.service
       systemctl restart isoloom-egress.service
     SH
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/app.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   config.vm.define "db" do |m|
@@ -421,6 +423,7 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-egress.service
       systemctl restart isoloom-egress.service
     SH
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/db.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   config.vm.define "user" do |m|
@@ -499,6 +502,6 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-routes.service
       systemctl restart isoloom-routes.service
     SH
-    m.vm.provision "shell", name: "checks", run: "never", inline: "failed=0\n" + ["checks/dmz-reachable.sh", "checks/internal-not-reachable-from-access.sh"].map { |c| "echo '== #{c}'\n(\n" + File.read(File.join(ROOT, c)) + "\n) || failed=1\n" }.join + "exit $failed\n"
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/user.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end

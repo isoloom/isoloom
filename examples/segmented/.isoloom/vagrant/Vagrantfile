@@ -197,6 +197,7 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-egress.service
       systemctl restart isoloom-egress.service
     SH
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/cache.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   config.vm.define "web" do |m|
@@ -282,6 +283,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh provision/web.sh"
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   config.vm.define "user" do |m|
@@ -361,6 +363,6 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-routes.service
       systemctl restart isoloom-routes.service
     SH
-    m.vm.provision "shell", name: "checks", run: "never", inline: "failed=0\n" + ["checks/web-reachable.sh", "checks/cache-blocked.sh"].map { |c| "echo '== #{c}'\n(\n" + File.read(File.join(ROOT, c)) + "\n) || failed=1\n" }.join + "exit $failed\n"
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/user.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end

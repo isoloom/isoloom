@@ -5,7 +5,8 @@
 //! - Docker from Docker's own repository; the project copied to /opt/isoloom; then
 //!   `docker compose up --wait` with `.isoloom/docker/compose.yml` (generated with it).
 //! - When everything answers: /var/lib/isoloom/ready, for runners to poll.
-//! - Checks on demand: `vagrant provision --provision-with checks` (the Compose `check` profile).
+//! - Checks on demand: `vagrant provision --provision-with checks` (every runner of the Compose
+//!   `check` profile), or `isoloom test docker-vm`.
 //! - Published ports: the VM forwards them from the host's loopback.
 //! - On a Proxmox server: `.isoloom/docker-vm/proxmox/main.tf` (Terraform, bpg/proxmox), one
 //!   VM on the uplink bridge, the same steps over SSH.
@@ -97,11 +98,20 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             "cd /opt/isoloom && ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
         )
     );
-    if !spec.checks.is_empty() {
+    // Checks on demand: every runner of the Compose `check` profile (one per position), the
+    // derived checks switched off with ISOLOOM_DERIVED=0 on the host.
+    if !crate::checks::plan(spec).is_empty() {
+        let env = if spec.inputs.is_empty() {
+            ", env: { \"ISOLOOM_DERIVED\" => ENV.fetch(\"ISOLOOM_DERIVED\", \"1\") }".to_string()
+        } else {
+            ", env: INPUTS.merge({ \"ISOLOOM_DERIVED\" => ENV.fetch(\"ISOLOOM_DERIVED\", \"1\") })".to_string()
+        };
         let _ = writeln!(
             out,
             "  config.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: {}{env}",
-            rb("cd /opt/isoloom && docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check")
+            rb(
+                "cd /opt/isoloom && failed=0; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit $failed"
+            )
         );
     }
     out.push_str("end\n");

@@ -18,3 +18,9 @@ machines:
     vm:
       os: ubuntu-24.04
       provision: [provision/setup.sh]
+
+checks:
+  - name: the box runs natively on arm64
+    from: box
+    exec: uname -m
+    expect: aarch64

@@ -13,7 +13,8 @@
 //! - Volumes: a PersistentVolumeClaim each. `init:` jobs: a container in the machine's pod
 //!   (same network and volumes), run once the machine answers. `depends_on`: init containers
 //!   that wait for the dependencies' services.
-//! - Checks: a Job on the access machine's networks, in `.isoloom/kubernetes/checks/`.
+//! - Checks: a Job per position in `.isoloom/kubernetes/checks/`, with the networks (labels) of
+//!   the machine it stands for, so the same policies apply to it.
 //! - Addresses: Kubernetes picks pod addresses; names, ports and reachability are kept.
 
 use std::fmt::Write;
@@ -22,6 +23,7 @@ use serde_yaml_ng::{Mapping, Value};
 
 use super::docker::{CHECK_IMAGE, UTILITY_IMAGE, image_of, list, map, offline, probe, s};
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
+use crate::checks;
 use crate::model::{Machine, Spec, Target};
 
 const DIR: &str = "kubernetes";
@@ -40,15 +42,8 @@ fn net_label(net: &str) -> String {
 
 const MACHINE_LABEL: &str = "isoloom.com/machine";
 const CHECK_LABEL: &str = "isoloom.com/check";
-
-/// The check pods' labels: where they stand, and that they're the checks.
-fn check_labels(nets: &[&String]) -> Value {
-    let mut l = pod_labels(None, nets);
-    if let Value::Mapping(m) = &mut l {
-        m.insert(s(CHECK_LABEL), s("runner"));
-    }
-    l
-}
+/// The ConfigMap holding the check runners' scripts.
+const CHECK_SCRIPTS: &str = "isoloom-check-runners";
 
 /// An egress policy for the pods `selector` matches: other pods of the environment, and DNS.
 fn offline_policy(name: &str, selector: Value) -> Value {
@@ -147,8 +142,8 @@ fn unsupported(spec: &Spec) -> Option<String> {
     if !spec.provision.is_empty() {
         return Some("environment-level provisioning (`provision:`) runs on VM targets for now".into());
     }
-    if spec.checks.iter().any(|c| c.ends_with(".yml") || c.ends_with(".yaml")) {
-        return Some("Ansible checks (.yml) run on VM targets for now".into());
+    if let Some(what) = super::container_checks_unsupported(spec) {
+        return Some(what);
     }
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine on Kubernetes come later".into());
@@ -494,74 +489,125 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         ));
     }
 
-    // Checks: a Job standing where the access machine stands (its networks), else on all.
+    // Checks: a Job per position, standing where that machine stands (its network labels, so
+    // the same policies apply), else on every network. Each runner is a sh script next to the
+    // Job, carried by a ConfigMap of its own.
     let mut check_files = Vec::new();
-    if !spec.checks.is_empty() {
-        let access_nets: Vec<&String> = match spec.machines.values().find(|m| m.access) {
-            Some(a) => a.networks.keys().collect(),
-            None => spec.networks.keys().collect(),
+    let plan = checks::plan(spec);
+    if !plan.is_empty() {
+        let default_pos = checks::default_position(spec);
+        // Kubernetes picks pod addresses: machines are reached by name (their Service).
+        let host = |h: &checks::Host, _: &checks::Position| -> String {
+            match h {
+                checks::Host::Literal(l) => l.clone(),
+                checks::Host::Machine { name, .. } => name.clone(),
+            }
         };
-        // Standing on offline networks, the checks are offline too (as a machine there would be).
-        if !access_nets.is_empty() && access_nets.iter().all(|n| !spec.networks[n.as_str()].internet) {
-            docs.push(offline_policy("offline-isoloom-check", labels(&[(CHECK_LABEL.to_string(), "runner")])));
+        let run_script = |path: &str| format!("sh /isoloom/scripts/{}", key(path));
+        let render = checks::Render {
+            host: &host,
+            script: &run_script,
+            playbook: None,
+        };
+        let mut jobs: Vec<Value> = Vec::new();
+        let mut runner_scripts: Vec<String> = Vec::new();
+        for (pos, group) in checks::by_position(spec, &plan) {
+            let id = pos.id();
+            let job_name = if pos == default_pos {
+                "isoloom-check".to_string()
+            } else {
+                format!("isoloom-check-{id}")
+            };
+            let nets: Vec<&String> = match &pos {
+                checks::Position::Machine(m) => spec.machines[m].networks.keys().collect(),
+                checks::Position::Networks => spec.networks.keys().collect(),
+            };
+            for c in &group {
+                if let checks::Probe::Script { path } = &c.probe {
+                    scripts.push(path.clone());
+                }
+            }
+            check_files.push(GeneratedFile {
+                path: format!("{OUTPUT_DIR}/{DIR}/checks/{id}.sh"),
+                contents: checks::script(&pos, &group, &render),
+            });
+            runner_scripts.push(format!("{id}.sh"));
+            let mut labels_ = pod_labels(None, &nets);
+            if let Value::Mapping(m) = &mut labels_ {
+                m.insert(s(CHECK_LABEL), s(job_name.as_str()));
+            }
+            // Standing on offline networks, the checks are offline too (as a machine there would be).
+            if !nets.is_empty() && nets.iter().all(|n| !spec.networks[n.as_str()].internet) {
+                docs.push(offline_policy(
+                    &format!("offline-{job_name}"),
+                    labels(&[(CHECK_LABEL.to_string(), job_name.as_str())]),
+                ));
+            }
+            let mut mounts = vec![map([("name", s("runner")), ("mountPath", s("/isoloom/run"))])];
+            let mut vols = vec![map([
+                ("name", s("runner")),
+                ("configMap", map([("name", s(CHECK_SCRIPTS)), ("defaultMode", Value::from(0o755))])),
+            ])];
+            if group.iter().any(|c| matches!(c.probe, checks::Probe::Script { .. })) {
+                mounts.push(map([("name", s("scripts")), ("mountPath", s("/isoloom/scripts"))]));
+                vols.push(map([
+                    ("name", s("scripts")),
+                    ("configMap", map([("name", s(SCRIPTS)), ("defaultMode", Value::from(0o755))])),
+                ]));
+            }
+            jobs.push(doc(
+                "Job",
+                "batch/v1",
+                &job_name,
+                vec![(
+                    "spec",
+                    map([
+                        ("backoffLimit", Value::from(0)),
+                        (
+                            "template",
+                            map([
+                                ("metadata", map([("labels", labels_)])),
+                                (
+                                    "spec",
+                                    map([
+                                        ("restartPolicy", s("Never")),
+                                        (
+                                            "containers",
+                                            list([map([
+                                                ("name", s("check")),
+                                                ("image", s(CHECK_IMAGE)),
+                                                ("command", list([s("/bin/sh"), s(format!("/isoloom/run/{id}.sh"))])),
+                                                ("volumeMounts", list(mounts)),
+                                            ])]),
+                                        ),
+                                        ("volumes", list(vols)),
+                                    ]),
+                                ),
+                            ]),
+                        ),
+                    ]),
+                )],
+            ));
         }
-        let mut run = Vec::new();
-        for c in &spec.checks {
-            scripts.push(c.clone());
-            run.push(format!("echo '== {c}' && sh /isoloom/scripts/{}", key(c)));
-        }
-        let job = doc(
-            "Job",
-            "batch/v1",
-            "isoloom-check",
-            vec![(
-                "spec",
-                map([
-                    ("backoffLimit", Value::from(0)),
-                    (
-                        "template",
-                        map([
-                            ("metadata", map([("labels", check_labels(&access_nets))])),
-                            (
-                                "spec",
-                                map([
-                                    ("restartPolicy", s("Never")),
-                                    (
-                                        "containers",
-                                        list([map([
-                                            ("name", s("check")),
-                                            ("image", s(CHECK_IMAGE)),
-                                            ("command", list([s("/bin/sh"), s("-c"), s(run.join(" && "))])),
-                                            ("volumeMounts", list([map([("name", s("scripts")), ("mountPath", s("/isoloom/scripts"))])])),
-                                        ])]),
-                                    ),
-                                    (
-                                        "volumes",
-                                        list([map([
-                                            ("name", s("scripts")),
-                                            ("configMap", map([("name", s(SCRIPTS)), ("defaultMode", Value::from(0o755))])),
-                                        ])]),
-                                    ),
-                                ]),
-                            ),
-                        ]),
-                    ),
-                ]),
-            )],
-        );
-        let mut checks = header("#");
-        checks.push_str(&format!(
-            "# The environment's checks, from the access machine's networks. Run after the environment:\n#   kubectl -n {ns} delete job isoloom-check --ignore-not-found\n#   kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes/checks | kubectl apply -f -\n#   kubectl -n {ns} wait --for=condition=complete job/isoloom-check --timeout=300s; kubectl -n {ns} logs job/isoloom-check\n"
+        let job_names: Vec<String> = jobs.iter().filter_map(|j| j["metadata"]["name"].as_str().map(str::to_string)).collect();
+        let mut out = header("#");
+        out.push_str(&format!(
+            "# The environment's checks, one Job per position. Run after the environment (or `isoloom test kubernetes`):\n#   kubectl -n {ns} delete job {names} --ignore-not-found\n#   kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes/checks | kubectl apply -f -\n#   kubectl -n {ns} wait --for=condition=complete job --all --timeout=300s; kubectl -n {ns} logs -l {CHECK_LABEL}\n",
+            names = job_names.join(" ")
         ));
-        checks.push_str(&yaml(&job));
+        let body: Vec<String> = jobs.iter().map(yaml).collect();
+        out.push_str(&body.join("---\n"));
         check_files.push(GeneratedFile {
             path: format!("{OUTPUT_DIR}/{DIR}/checks/job.yaml"),
-            contents: checks,
+            contents: out,
         });
         let mut k = header("#");
         k.push_str(&format!(
-            "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nnamespace: {ns}\nresources:\n  - job.yaml\n"
+            "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nnamespace: {ns}\nresources:\n  - job.yaml\ngeneratorOptions:\n  disableNameSuffixHash: true\nconfigMapGenerator:\n  - name: {CHECK_SCRIPTS}\n    files:\n"
         ));
+        for f in &runner_scripts {
+            let _ = writeln!(k, "      - {f}");
+        }
         check_files.push(GeneratedFile {
             path: format!("{OUTPUT_DIR}/{DIR}/checks/kustomization.yaml"),
             contents: k,

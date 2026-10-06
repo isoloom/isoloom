@@ -14,4 +14,5 @@ path = "src/main.rs"
 [dependencies]
 isoloom-core.workspace = true
 clap.workspace = true
+serde.workspace = true
 serde_json.workspace = true

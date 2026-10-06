@@ -13,5 +13,3 @@ configMapGenerator:
     files:
       - build__cache__seed.sh=../../build/cache/seed.sh
       - checks__cache-seeded.sh=../../checks/cache-seeded.sh
-      - checks__no-internet.sh=../../checks/no-internet.sh
-      - checks__web-answers.sh=../../checks/web-answers.sh

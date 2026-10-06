@@ -5,11 +5,3 @@ kind: Kustomization
 namespace: isoloom-segmented
 resources:
   - environment.yaml
-# The project's scripts the pods run (init jobs, checks), read from the project at apply time.
-generatorOptions:
-  disableNameSuffixHash: true
-configMapGenerator:
-  - name: isoloom-scripts
-    files:
-      - checks__cache-blocked.sh=../../checks/cache-blocked.sh
-      - checks__web-reachable.sh=../../checks/web-reachable.sh

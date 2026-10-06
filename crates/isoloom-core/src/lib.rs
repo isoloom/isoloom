@@ -6,6 +6,7 @@
 //! and add up what it needs; generate each target's files (Docker Compose, Vagrant); and
 //! track what each output does with every field ([`coverage`]).
 
+pub mod checks;
 pub mod coverage;
 pub mod generate;
 pub mod images;
@@ -18,7 +19,7 @@ pub mod validate;
 use std::path::{Path, PathBuf};
 
 pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, refusal};
-pub use model::{Arch, Dns, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target};
+pub use model::{Arch, Check, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target};
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};
 

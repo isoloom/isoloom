@@ -104,6 +104,7 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-egress.service
       systemctl restart isoloom-egress.service
     SH
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/cache.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   config.vm.define "web" do |m|
@@ -193,6 +194,7 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-egress.service
       systemctl restart isoloom-egress.service
     SH
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   config.vm.define "isoloom-controller" do |m|
@@ -299,16 +301,6 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-egress.service
       systemctl restart isoloom-egress.service
     SH
-    m.vm.provision "shell", name: "checks", run: "never", inline: <<~'SH'
-      export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False
-      failed=0
-      echo '== checks/web-answers.sh'
-      (cd /opt/isoloom && sh checks/web-answers.sh) || failed=1
-      echo '== checks/cache-seeded.sh'
-      (cd /opt/isoloom && sh checks/cache-seeded.sh) || failed=1
-      echo '== checks/no-internet.sh'
-      (cd /opt/isoloom && sh checks/no-internet.sh) || failed=1
-      exit $failed
-    SH
+    m.vm.provision "shell", name: "checks", run: "never", path: "checks/controller.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # An edge firewall that belongs to the environment: `fw` routes the DMZ and the LAN, and its
 # own rules (build/fw/rules.nft) decide what crosses. Isoloom adds no router of its own; `reach`
-# describes what the firewall should allow, and the checks verify it.
+# describes what the firewall should allow, and the derived checks verify it.
 version: 1
 name: edge-firewall
 
@@ -49,5 +49,6 @@ machines:
       os: debian-12
 
 checks:
-  - checks/web-through-firewall.sh
-  - checks/lan-blocked.sh
+  - name: the web page answers through the firewall
+    from: user
+    script: checks/web-through-firewall.sh

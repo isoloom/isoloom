@@ -16,6 +16,7 @@ use std::fmt::Write;
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, netmask, router, start_order};
 use indexmap::IndexMap;
 
+use crate::checks;
 use crate::images;
 use crate::model::{Arch, Machine, Spec, Target, VmImpl};
 
@@ -74,6 +75,31 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     if router::needed(spec) {
         router_vm(spec, &mut out);
     }
+
+    // The checks, resolved: a runner script per machine that has some (uploaded by its
+    // provisioner), and one for the controller.
+    let plan = checks::plan(spec);
+    let groups = checks::by_position(spec, &plan);
+    let mut check_files: Vec<GeneratedFile> = Vec::new();
+    let host = |h: &checks::Host, _: &checks::Position| -> String {
+        match h {
+            checks::Host::Literal(l) => l.clone(),
+            checks::Host::Machine { name, network } => address(spec, network, spec.machines[name].networks[network]).to_string(),
+        }
+    };
+    let run_script = |path: &str| format!("cd /opt/isoloom && sh {path}");
+    let run_playbook = |path: &str| {
+        let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
+        let file = path.rsplit('/').next().unwrap_or(path);
+        format!(
+            "export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False && cd /opt/isoloom/{dir} && ansible-playbook -i /etc/isoloom/inventory.ini {file}"
+        )
+    };
+    let render = checks::Render {
+        host: &host,
+        script: &run_script,
+        playbook: Some(&run_playbook),
+    };
 
     for name in start_order(spec) {
         let m = &spec.machines[name];
@@ -312,28 +338,62 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 indent(&routes_unit(&router::route_commands(spec, name, m, true)), 6)
             );
         }
-        // The access machine runs the script checks on demand, from where a user stands.
-        if access_vm(spec) == Some(name) {
-            let scripts: Vec<String> = spec.checks.iter().filter(|c| c.ends_with(".sh")).map(|c| rb(c)).collect();
-            if !scripts.is_empty() {
-                let _ = writeln!(
-                    out,
-                    "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: \"failed=0\\n\" + [{}].map {{ |c| \"echo '== #{{c}}'\\n(\\n\" + File.read(File.join(ROOT, c)) + \"\\n) || failed=1\\n\" }}.join + \"exit $failed\\n\"",
-                    scripts.join(", ")
-                );
-            }
+        // This machine's checks, on demand (`vagrant provision --provision-with checks`): the
+        // runner script next to the Vagrantfile, uploaded and run here, where the machine stands.
+        if let Some(group) = groups.iter().find(|(p, _)| *p == checks::Position::Machine(name.to_string())).map(|(_, g)| g) {
+            check_files.push(GeneratedFile {
+                path: format!("{OUTPUT_DIR}/{DIR}/checks/{name}.sh"),
+                contents: checks::script(&checks::Position::Machine(name.to_string()), group, &render),
+            });
+            let _ = writeln!(
+                out,
+                "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", path: {}{CHECK_ENV}",
+                rb(&format!("checks/{name}.sh"))
+            );
         }
         out.push_str("  end\n");
     }
-    if needs_controller(spec) {
-        controller_vm(spec, &mut out);
+    let on_controller = controller_checks(spec, &plan);
+    if !spec.provision.is_empty() || !on_controller.is_empty() {
+        if !on_controller.is_empty() {
+            check_files.push(GeneratedFile {
+                path: format!("{OUTPUT_DIR}/{DIR}/checks/controller.sh"),
+                contents: checks::script(&checks::Position::Networks, &on_controller, &render),
+            });
+        }
+        controller_vm(spec, &mut out, !on_controller.is_empty());
     }
     out.push_str("end\n");
 
-    Ok(vec![GeneratedFile {
+    let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
         contents: out,
-    }])
+    }];
+    files.extend(check_files);
+    Ok(files)
+}
+
+/// The derived-checks switch, read from the host's environment when Vagrant runs.
+const CHECK_ENV: &str = ", env: { \"ISOLOOM_DERIVED\" => ENV.fetch(\"ISOLOOM_DERIVED\", \"1\") }";
+
+/// Whether a position's checks run on that machine itself: a Linux VM of the environment.
+fn runs_on_vm(spec: &Spec, pos: &checks::Position) -> bool {
+    match pos {
+        checks::Position::Machine(m) => spec.machines[m].vm.as_ref().is_some_and(|v| !images::is_windows(&v.os)),
+        checks::Position::Networks => false,
+    }
+}
+
+/// The checks the controller runs: those standing on every network, Ansible playbooks, and the
+/// author's checks of a machine that isn't a VM here (supplied by the runner, or a container in
+/// a hybrid environment). Derived checks of such a machine are left out: the controller sees
+/// every network, not that machine's view.
+fn controller_checks<'a>(spec: &Spec, plan: &'a [checks::Resolved]) -> Vec<&'a checks::Resolved> {
+    plan.iter()
+        .filter(|c| {
+            matches!(c.probe, checks::Probe::Playbook { .. }) || (!runs_on_vm(spec, &c.position) && !(c.derived && c.position != checks::Position::Networks))
+        })
+        .collect()
 }
 
 /// Blocks new outgoing connections on the NAT interface (the default route's), in its own
@@ -513,7 +573,7 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
 
 /// The controller: a Debian VM on every network at its controller address, started after every
 /// machine. It writes the inventory and runs the environment-level Ansible playbooks.
-fn controller_vm(spec: &Spec, out: &mut String) {
+fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
     let _ = writeln!(out, "\n  config.vm.define \"isoloom-controller\" do |m|");
     let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
@@ -590,55 +650,21 @@ fn controller_vm(spec: &Spec, out: &mut String) {
     }
     // Standing in for a user on offline networks, the controller goes offline too once it's
     // done installing (its checks would otherwise see its own NAT internet).
-    if access_vm(spec).is_none() && !spec.checks.is_empty() && !spec.networks.values().any(|n| n.internet) {
+    if with_checks && !spec.networks.values().any(|n| n.internet) {
         let _ = writeln!(
             out,
             "    m.vm.provision \"shell\", name: \"no internet\", inline: <<~'SH'\n{}    SH",
             indent(&egress(false), 6)
         );
     }
-    // Checks, run on demand (`vagrant provision --provision-with checks`): Ansible ones here,
-    // and the scripts too when no access machine stands where a user would.
-    let mut checks = String::from("export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\nfailed=0\n");
-    let mut any = false;
-    for c in &spec.checks {
-        if c.ends_with(".yml") || c.ends_with(".yaml") {
-            let dir = c.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
-            let file = c.rsplit('/').next().unwrap_or(c);
-            checks.push_str(&format!(
-                "echo '== {c}'\n(cd /opt/isoloom/{dir} && ansible-playbook -i /etc/isoloom/inventory.ini {file}) || failed=1\n"
-            ));
-            any = true;
-        } else if access_vm(spec).is_none() {
-            checks.push_str(&format!("echo '== {c}'\n(cd /opt/isoloom && sh {c}) || failed=1\n"));
-            any = true;
-        }
-    }
-    if any {
-        checks.push_str("exit $failed\n");
+    // Its checks, on demand (`vagrant provision --provision-with checks`).
+    if with_checks {
         let _ = writeln!(
             out,
-            "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: <<~'SH'\n{}    SH",
-            indent(&checks, 6)
+            "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", path: \"checks/controller.sh\"{CHECK_ENV}"
         );
     }
     out.push_str("  end\n");
-}
-
-/// The access machine, when it's a Linux VM: script checks run there, where a user stands.
-fn access_vm(spec: &Spec) -> Option<&str> {
-    spec.machines
-        .iter()
-        .find(|(_, m)| m.access && m.vm.as_ref().is_some_and(|v| !images::is_windows(&v.os)))
-        .map(|(n, _)| n.as_str())
-}
-
-/// Whether the environment gets a controller: for `provision:`, Ansible checks, or script checks
-/// when no access machine can run them.
-fn needs_controller(spec: &Spec) -> bool {
-    !spec.provision.is_empty()
-        || spec.checks.iter().any(|c| c.ends_with(".yml") || c.ends_with(".yaml"))
-        || (!spec.checks.is_empty() && access_vm(spec).is_none())
 }
 
 /// The inventory Isoloom writes: every VM machine at its address on its first network, with its

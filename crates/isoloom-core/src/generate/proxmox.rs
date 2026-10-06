@@ -519,7 +519,11 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
     }
     runcmd.push(format!("sh -c {}", super::cloud_vm::sh_quote(&super::vagrant::ansible_runs(spec))));
     runcmd.push("mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready".into());
-    let runcmd_hcl = runcmd.iter().map(|c| format!("[\"sh\", \"-c\", {}]", hcl(c))).collect::<Vec<_>>().join(",\n        ");
+    let runcmd_hcl = runcmd
+        .iter()
+        .map(|c| format!("[\"sh\", \"-c\", {}]", hcl(c)))
+        .collect::<Vec<_>>()
+        .join(",\n        ");
     // Its files: the project, its key, the inventory.
     let write_files = format!(
         "concat(local.project_files, [{{ path = \"/etc/isoloom/id_ed25519\", permissions = \"0600\", content = tls_private_key.controller.private_key_openssh }}, {{ path = \"/etc/isoloom/inventory.ini\", permissions = \"0644\", content = {} }}])",
@@ -535,7 +539,12 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
     for net in nets {
         let c = cidr(spec, net);
         let _ = writeln!(nics, "  network_device {{\n    bridge = proxmox_sdn_vnet.{}.id\n  }}", res(net));
-        let _ = writeln!(ipcfg, "    ip_config {{\n      ipv4 {{\n        address = \"{}/{}\"\n      }}\n    }}", c.controller(), c.len);
+        let _ = writeln!(
+            ipcfg,
+            "    ip_config {{\n      ipv4 {{\n        address = \"{}/{}\"\n      }}\n    }}",
+            c.controller(),
+            c.len
+        );
     }
     let deps: String = spec
         .machines
@@ -563,9 +572,7 @@ fn inventory(spec: &Spec) -> String {
             let _ = writeln!(linux, "{name} ansible_host={} ansible_user=isoloom", address(spec, net, *octet));
         }
     }
-    let mut inv = format!(
-        "[linux]\n{linux}\n[windows]\n{windows}\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n"
-    );
+    let mut inv = format!("[linux]\n{linux}\n[windows]\n{windows}\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n");
     let mut groups: indexmap::IndexMap<&str, Vec<&str>> = indexmap::IndexMap::new();
     for step in &spec.provision {
         for (g, members) in &step.groups {

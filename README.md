@@ -35,7 +35,9 @@ machines:
     docker: { build: build/web }
     vm: { os: debian-12, provision: [provision/web.sh] }
 
-checks: [build/check/check.sh]   # black-box checks, run against every target
+checks:                          # plus the checks Isoloom derives from services and reach
+  - build/check/check.sh
+  - { from: web, tcp: database:3207 }
 ```
 
 - **Targets are derived, not declared.** Every machine has `docker:` → Docker targets; every
@@ -70,11 +72,14 @@ isoloom targets [DIR]     # where it can run, and why not elsewhere
 isoloom resources [DIR]   # machines, CPUs, memory, disk
 isoloom generate [DIR]    # each target's files under .isoloom/ (--target, --images FILE)
 isoloom check [DIR]       # fails when .isoloom/ doesn't match the spec (for CI)
+isoloom run TARGET [DIR]  # generate, then bring the environment up with the target's own tool
+isoloom test TARGET [DIR] # run the checks against it: the spec's, and the ones derived from it
+isoloom down TARGET [DIR] # tear it down
 ```
 
 `DIR` holds `isoloom.yml` (`isoloom.yaml` also works).
 
-Run what it generates:
+Or run what it generates by hand:
 
 ```
 docker compose -f .isoloom/docker/compose.yml up -d --wait          # containers
@@ -82,6 +87,11 @@ docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-c
 cd .isoloom/vagrant && vagrant up                                    # one VM per machine
 kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -
 ```
+
+Checks come in three kinds, and `isoloom test` runs them all from inside the environment:
+**derived** from the spec (every service answers from the machines `reach` lets through and from
+nowhere else; offline networks stay offline), **declared** (`http`, `tcp`, `exec`, with `from`,
+`expect` and `wait`), and **scripts**.
 
 ## Layout
 

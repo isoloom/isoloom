@@ -239,17 +239,6 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <user>@<host> each command.
-output "checks" {
-  value = {
-    host = azurerm_public_ip.web.ip_address
-    user = null
-    commands = [
-      "cd /opt/isoloom && sh checks/web-answers.sh"
-    ]
-  }
-}
-
 output "published" {
   value = {
     "web/80" = "${azurerm_public_ip.web.ip_address}:8080"

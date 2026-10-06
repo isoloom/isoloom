@@ -182,11 +182,34 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: offline-isoloom-check
+  name: offline-isoloom-check-store
 spec:
   podSelector:
     matchLabels:
-      isoloom.com/check: runner
+      isoloom.com/check: isoloom-check-store
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: offline-isoloom-check-app
+spec:
+  podSelector:
+    matchLabels:
+      isoloom.com/check: isoloom-check-app
   policyTypes:
   - Egress
   egress:

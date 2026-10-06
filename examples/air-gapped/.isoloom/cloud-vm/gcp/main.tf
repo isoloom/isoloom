@@ -297,14 +297,10 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <user>@<host> each command.
+# The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
-  value = {
-    host = google_compute_instance.store.network_interface[0].access_config[0].nat_ip
-    user = null
-    commands = [
-      "cd /opt/isoloom && sh checks/app-answers.sh",
-      "cd /opt/isoloom && sh checks/no-internet.sh"
-    ]
-  }
+  value = [
+    { position = "store", machine = "store", host = google_compute_instance.store.network_interface[0].access_config[0].nat_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/store.sh" },
+    { position = "app", machine = "app", host = google_compute_instance.app.network_interface[0].access_config[0].nat_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/app.sh" }
+  ]
 }

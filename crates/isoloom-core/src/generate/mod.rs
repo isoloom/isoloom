@@ -173,13 +173,25 @@ fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> 
             what: "environment-level provisioning (`provision:`) runs on VM targets for now".into(),
         });
     }
-    if target == Target::Docker && spec.checks.iter().any(|c| c.ends_with(".yml") || c.ends_with(".yaml")) {
-        return Err(GenerateError::Unsupported {
-            target,
-            what: "Ansible checks (.yml) run on VM targets for now".into(),
-        });
+    if target == Target::Docker
+        && let Some(what) = container_checks_unsupported(spec)
+    {
+        return Err(GenerateError::Unsupported { target, what });
     }
     Ok(())
+}
+
+/// What the container outputs (Compose, Kubernetes) can't run as checks yet: Ansible playbooks
+/// (they run from the VM targets' controller) and `exec` (the runner shares a machine's network,
+/// not its filesystem).
+pub(crate) fn container_checks_unsupported(spec: &Spec) -> Option<String> {
+    if spec.checks.iter().any(|c| c.is_playbook()) {
+        return Some("Ansible checks (.yml) run on VM targets for now".into());
+    }
+    if spec.checks.iter().any(|c| matches!(c, crate::model::Check::Declared(d) if d.exec.is_some())) {
+        return Some("`exec` checks run on VM targets for now".into());
+    }
+    None
 }
 
 /// Machines in start order: each after the machines it depends on (validated: no cycles).

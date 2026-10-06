@@ -25,9 +25,11 @@ pub struct Spec {
     /// controller on the environment's networks, with an inventory Isoloom writes.
     #[serde(default)]
     pub provision: Vec<Provision>,
-    /// Black-box checks (scripts) run on the environment's networks; they prove the behavior on every target.
+    /// Black-box checks that prove the behavior on every target: scripts, or declared probes
+    /// (`http`, `tcp`, `exec`, `script`) run from a machine of the environment. Isoloom adds
+    /// derived checks of its own from `services` and `reach`.
     #[serde(default)]
-    pub checks: Vec<String>,
+    pub checks: Vec<Check>,
     /// Narrows the targets derived from the implementations (e.g. not tested on Proxmox yet).
     #[serde(default)]
     pub targets: Option<Vec<Target>>,
@@ -281,6 +283,98 @@ pub struct Provision {
     /// `requirements.yml` next to the playbook, when there is one.
     #[serde(default)]
     pub requirements: Option<String>,
+}
+
+/// One check: a script in the project (a string), or a declared probe (a map).
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Check {
+    /// A path in the project: a `.sh` script run with sh from where a user stands (exits 0
+    /// when the behavior holds), or an Ansible playbook (`.yml`) run from the controller.
+    Script(String),
+    /// A probe Isoloom runs itself, from a machine of the environment.
+    Declared(Declared),
+}
+
+impl Check {
+    /// The project path this check runs, when it is a script or a playbook.
+    pub fn path(&self) -> Option<&str> {
+        match self {
+            Check::Script(p) => Some(p),
+            Check::Declared(d) => d.script.as_deref(),
+        }
+    }
+
+    /// Whether this check is an Ansible playbook (`.yml` / `.yaml`).
+    pub fn is_playbook(&self) -> bool {
+        self.path().is_some_and(|p| p.ends_with(".yml") || p.ends_with(".yaml"))
+    }
+}
+
+// A string is a script; a map is a declared check. Written by hand (not `untagged`) so a typo in
+// a declared check is reported as such, with its field, instead of "no variant matched".
+impl<'de> Deserialize<'de> for Check {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = Check;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a script path, or a check with `http`, `tcp`, `exec` or `script`")
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Check, E> {
+                Ok(Check::Script(v.to_string()))
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<Check, A::Error> {
+                Declared::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(Check::Declared)
+            }
+        }
+        d.deserialize_any(V)
+    }
+}
+
+/// A check Isoloom runs itself. Exactly one of `http`, `tcp`, `exec` and `script` says what to
+/// check; `from` says where from; `expect` what counts as passing.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Declared {
+    /// Shown in results. Default: what the check does (`http://web/ from user`).
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The machine the check runs from (its networks, its routes, its view). Default: the
+    /// access machine when the spec has one, else the environment's networks at once.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// An HTTP(S) request to this URL. `expect`: a status code (default 200), `any` (an answer
+    /// of any status), or `blocked` (nothing answers).
+    #[serde(default)]
+    pub http: Option<String>,
+    /// A TCP connection to `host:port`. `expect`: `open` (default) or `blocked`.
+    #[serde(default)]
+    pub tcp: Option<String>,
+    /// A command run inside the `from` machine (`from` is required). `expect`: text its output
+    /// must contain (default: the command succeeds).
+    #[serde(default)]
+    pub exec: Option<String>,
+    /// A script in the project, run with sh from the `from` machine's position; it exits 0 when
+    /// the behavior holds.
+    #[serde(default)]
+    pub script: Option<String>,
+    /// What counts as passing: see `http`, `tcp` and `exec`.
+    #[serde(default)]
+    pub expect: Option<Expect>,
+    /// Seconds to keep retrying until the check passes: default 30 for `http` and `tcp`
+    /// (except `blocked`, tried once), 0 for `exec` and `script`.
+    #[serde(default)]
+    pub wait: Option<u32>,
+}
+
+/// What a declared check expects: an HTTP status code, or a word (`any`, `blocked`, `open`),
+/// or for `exec` the text the output must contain.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Expect {
+    Status(u16),
+    Text(String),
 }
 
 /// OS names a `vm:` may use. Each target maps them to its own images (e.g. Windows from an

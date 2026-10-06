@@ -5,3 +5,12 @@ kind: Kustomization
 namespace: isoloom-pivot-dmz
 resources:
   - job.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: isoloom-check-runners
+    files:
+      - user.sh
+      - gateway.sh
+      - app.sh
+      - db.sh

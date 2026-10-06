@@ -279,14 +279,10 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <user>@<host> each command.
+# The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
-  value = {
-    host = aws_instance.store.public_ip
-    user = null
-    commands = [
-      "cd /opt/isoloom && sh checks/app-answers.sh",
-      "cd /opt/isoloom && sh checks/no-internet.sh"
-    ]
-  }
+  value = [
+    { position = "store", machine = "store", host = aws_instance.store.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/store.sh" },
+    { position = "app", machine = "app", host = aws_instance.app.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/app.sh" }
+  ]
 }

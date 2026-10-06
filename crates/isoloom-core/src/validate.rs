@@ -382,6 +382,15 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         }
     }
 
+    // Declared checks: one probe each, from a machine that can run it.
+    for (i, c) in spec.checks.iter().enumerate() {
+        match c {
+            crate::model::Check::Script(path) if path.trim().is_empty() => add(&format!("checks[{i}]"), "give the script's path in the project".into()),
+            crate::model::Check::Script(_) => {}
+            crate::model::Check::Declared(d) => validate_check(spec, i, d, &mut add),
+        }
+    }
+
     // Targets: requested ones must be possible.
     if let Some(requested) = &spec.targets {
         let possible = derive(spec);
@@ -508,7 +517,85 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
         }
     }
     for (i, c) in spec.checks.iter().enumerate() {
-        check(format!("checks[{i}]"), c);
+        if let Some(path) = c.path() {
+            let at = match c {
+                crate::model::Check::Script(_) => format!("checks[{i}]"),
+                crate::model::Check::Declared(_) => format!("checks[{i}].script"),
+            };
+            check(at, path);
+        }
     }
     p
+}
+
+/// A declared check: one probe, a machine it can run from, an `expect` its probe understands.
+fn validate_check(spec: &Spec, i: usize, d: &crate::model::Declared, add: &mut dyn FnMut(&str, String)) {
+    use crate::checks::Url;
+    use crate::model::Expect;
+    let at = format!("checks[{i}]");
+    let kinds = [d.http.is_some(), d.tcp.is_some(), d.exec.is_some(), d.script.is_some()]
+        .iter()
+        .filter(|k| **k)
+        .count();
+    if kinds != 1 {
+        add(&at, "say what to check with exactly one of `http`, `tcp`, `exec` or `script`".into());
+        return;
+    }
+    if let Some(n) = &d.name
+        && n.trim().is_empty()
+    {
+        add(&format!("{at}.name"), "give the check a name, or leave `name` out".into());
+    }
+    match &d.from {
+        Some(f) => match spec.machines.get(f) {
+            None => add(&format!("{at}.from"), format!("no machine named `{f}`")),
+            Some(m) if !crate::checks::can_run_checks(m) => add(&format!("{at}.from"), format!("`{f}` runs Windows; checks run from Linux machines for now")),
+            Some(_) => {}
+        },
+        None if d.exec.is_some() => add(&at, "`exec` runs inside a machine: say which with `from`".into()),
+        None => {}
+    }
+    if let Some(w) = d.wait
+        && w > 3600
+    {
+        add(&format!("{at}.wait"), "at most 3600 seconds".into());
+    }
+    if let Some(u) = &d.http {
+        if Url::parse(u).is_none() {
+            add(&format!("{at}.http"), format!("`{u}` isn't a URL like http://web:8080/path"));
+        }
+        match &d.expect {
+            None | Some(Expect::Status(100..=599)) => {}
+            Some(Expect::Text(t)) if t == "any" || t == "blocked" => {}
+            Some(_) => add(&format!("{at}.expect"), "for `http`: a status code (100-599), `any` or `blocked`".into()),
+        }
+    }
+    if let Some(t) = &d.tcp {
+        let ok = t
+            .rsplit_once(':')
+            .and_then(|(h, p)| p.parse::<u16>().ok().filter(|p| *p > 0).map(|_| h))
+            .is_some_and(|h| !h.is_empty() && !h.chars().any(|c| c.is_whitespace() || c == '\'' || c == '"'));
+        if !ok {
+            add(&format!("{at}.tcp"), format!("`{t}` isn't `host:port`, like cache:6379"));
+        }
+        match &d.expect {
+            None => {}
+            Some(Expect::Text(t)) if t == "open" || t == "blocked" => {}
+            Some(_) => add(&format!("{at}.expect"), "for `tcp`: `open` or `blocked`".into()),
+        }
+    }
+    if d.exec.is_some() {
+        if d.exec.as_deref().is_some_and(|c| c.trim().is_empty()) {
+            add(&format!("{at}.exec"), "give a command to run".into());
+        }
+        if matches!(d.expect, Some(Expect::Status(_))) {
+            add(&format!("{at}.expect"), "for `exec`: the text the output must contain".into());
+        }
+    }
+    if d.script.is_some() && d.expect.is_some() {
+        add(
+            &format!("{at}.expect"),
+            "a script says whether it passed by exiting 0; leave `expect` out".into(),
+        );
+    }
 }

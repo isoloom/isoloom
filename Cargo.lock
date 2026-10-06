@@ -462,6 +462,7 @@ version = "0.7.2"
 dependencies = [
  "clap",
  "isoloom-core",
+ "serde",
  "serde_json",
 ]
 

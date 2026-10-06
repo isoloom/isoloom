@@ -270,15 +270,12 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <user>@<host> each command.
+# The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
-  value = {
-    host = one(linode_instance.database.ipv4)
-    user = "root"
-    commands = [
-      "cd /opt/isoloom && sh build/check/check.sh"
-    ]
-  }
+  value = [
+    { position = "database", machine = "database", host = one(linode_instance.database.ipv4), user = "root", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/database.sh" },
+    { position = "web", machine = "web", host = one(linode_instance.web.ipv4), user = "root", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" }
+  ]
 }
 
 output "published" {

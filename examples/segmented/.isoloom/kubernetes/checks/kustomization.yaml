@@ -5,3 +5,11 @@ kind: Kustomization
 namespace: isoloom-segmented
 resources:
   - job.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: isoloom-check-runners
+    files:
+      - user.sh
+      - cache.sh
+      - web.sh

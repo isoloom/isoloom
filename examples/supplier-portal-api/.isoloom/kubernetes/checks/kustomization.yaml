@@ -5,3 +5,11 @@ kind: Kustomization
 namespace: isoloom-supplier-portal-api
 resources:
   - job.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: isoloom-check-runners
+    files:
+      - networks.sh
+      - database.sh
+      - web.sh

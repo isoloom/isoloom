@@ -62,8 +62,20 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         GenerateError::Unsupported { what, .. } => unsupported(what),
         other => other,
     })?;
-    let mut vagrantfile = vfiles.into_iter().find(|f| f.path.ends_with("Vagrantfile")).expect("a Vagrantfile").contents;
-    vagrantfile = vagrantfile.replace(".isoloom/vagrant", ".isoloom/hybrid");
+    // The Vagrantfile and the check runners next to it, as the hybrid output's own.
+    let mut extra: Vec<GeneratedFile> = Vec::new();
+    let mut vagrantfile = String::new();
+    for f in vfiles {
+        if f.path.ends_with("Vagrantfile") {
+            vagrantfile = f.contents.replace(".isoloom/vagrant", ".isoloom/hybrid");
+        } else {
+            extra.push(GeneratedFile {
+                path: f.path.replace(".isoloom/vagrant/", ".isoloom/hybrid/"),
+                contents: f.contents,
+            });
+        }
+    }
+    assert!(!vagrantfile.is_empty(), "a Vagrantfile");
 
     // The containers: the Compose file of the container machines alone, plugged into the host's
     // networks; the router is the router VM; the checks run from the VM side.
@@ -224,7 +236,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     let at = vagrantfile.rfind("end\n").expect("the Vagrantfile ends its configure block");
     vagrantfile.insert_str(at, &host);
 
-    Ok(vec![
+    let mut files = vec![
         GeneratedFile {
             path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
             contents: vagrantfile,
@@ -233,7 +245,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
             contents: compose_out,
         },
-    ])
+    ];
+    files.extend(extra);
+    Ok(files)
 }
 
 fn indent(s: &str, n: usize) -> String {

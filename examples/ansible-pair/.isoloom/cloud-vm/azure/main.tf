@@ -499,13 +499,11 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <user>@<host> each command.
+# The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
-  value = {
-    host = azurerm_public_ip.web.ip_address
-    user = null
-    commands = [
-      "cd /opt/isoloom && sh checks/web-answers.sh"
-    ]
-  }
+  value = [
+    { position = "networks", machine = "controller", host = azurerm_public_ip.isoloom_controller.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh" },
+    { position = "web", machine = "web", host = azurerm_public_ip.web.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" },
+    { position = "cache", machine = "cache", host = azurerm_public_ip.cache.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh" }
+  ]
 }

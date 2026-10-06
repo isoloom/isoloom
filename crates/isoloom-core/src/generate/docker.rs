@@ -13,7 +13,8 @@
 //!   after it answers; machines depending on it wait for them to finish.
 //! - Inputs become environment variables read from the shell (`${NAME:-}`), only on the
 //!   machines that list them.
-//! - Checks run in a `check` profile: `docker compose --profile check run --rm isoloom-check`.
+//! - Checks run in a `check` profile, one runner per position (`isoloom-check` where a user
+//!   stands, `isoloom-check-<machine>` for the others), each a sh script in `checks/`.
 //!
 //! - A service's `publish` port is published on the host's loopback (127.0.0.1) only, on an
 //!   ephemeral host port Docker picks, so two labs publishing the same port never collide; the
@@ -28,6 +29,7 @@
 use serde_yaml_ng::{Mapping, Value};
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, router};
+use crate::checks;
 use crate::model::{Machine, Spec, Target};
 
 const DIR: &str = "docker";
@@ -283,16 +285,41 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         }
     }
 
-    // The check runner stands where a user would: in the access machine's network namespace
-    // (a stand-in when the runner supplies the access machine), else on every network.
-    if !spec.checks.is_empty() {
-        let mut volumes = Vec::new();
-        let mut run = Vec::new();
-        for (i, c) in spec.checks.iter().enumerate() {
-            let mounted = format!("/isoloom/checks/{:02}-{}", i + 1, file_name(c));
-            volumes.push(s(format!("{ROOT}/{c}:{mounted}:ro")));
-            run.push(format!("echo '== {c}' && sh {mounted}"));
+    // The check runners: one per position. A machine's checks run in its network namespace (a
+    // stand-in's when the runner supplies the access machine); checks without a position stand
+    // on every network. Each runner is a sh script next to the Compose file.
+    let plan = checks::plan(spec);
+    let default_pos = checks::default_position(spec);
+    let mut runner_files = Vec::new();
+    let host = |h: &checks::Host, _: &checks::Position| -> String {
+        match h {
+            checks::Host::Literal(l) => l.clone(),
+            checks::Host::Machine { name, network } => address(spec, network, spec.machines[name].networks[network]).to_string(),
         }
+    };
+    let run_script = |path: &str| format!("cd /isoloom/project && sh {path}");
+    let render = checks::Render {
+        host: &host,
+        script: &run_script,
+        playbook: None,
+    };
+    let mut stand_in_added = false;
+    for (pos, group) in checks::by_position(spec, &plan) {
+        let id = pos.id();
+        let runner = if pos == default_pos {
+            "isoloom-check".to_string()
+        } else {
+            format!("isoloom-check-{id}")
+        };
+        runner_files.push(GeneratedFile {
+            path: format!("{OUTPUT_DIR}/{DIR}/checks/{id}.sh"),
+            contents: checks::script(&pos, &group, &render),
+        });
+        let mut volumes = vec![s(format!("./checks/{id}.sh:/isoloom/run.sh:ro"))];
+        if group.iter().any(|c| matches!(c.probe, checks::Probe::Script { .. })) {
+            volumes.push(s(format!("{ROOT}:/isoloom/project:ro")));
+        }
+        // After every machine answers (and its init jobs and routes are done).
         let mut deps = Mapping::new();
         for (name, m) in &spec.machines {
             if m.docker.is_none() {
@@ -311,29 +338,38 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         let mut c = Mapping::new();
         c.insert(s("image"), s(CHECK_IMAGE));
         c.insert(s("profiles"), list([s("check")]));
-        c.insert(s("entrypoint"), list([s("/bin/sh"), s("-c"), s(run.join(" && "))]));
+        c.insert(s("entrypoint"), list([s("/bin/sh"), s("/isoloom/run.sh")]));
         c.insert(s("volumes"), Value::Sequence(volumes));
-        match spec.machines.iter().find(|(_, m)| m.access) {
-            Some((name, m)) => {
-                let host = if m.docker.is_some() {
+        match &pos {
+            checks::Position::Machine(name) => {
+                let m = &spec.machines[name];
+                let ns = if m.docker.is_some() {
+                    if m.services.is_empty() {
+                        deps.insert(s(name.as_str()), map([("condition", s("service_started"))]));
+                    }
                     name.clone()
                 } else {
-                    services.insert(s(STAND_IN), stand_in(spec, name, m));
+                    if !stand_in_added {
+                        services.insert(s(STAND_IN), stand_in(spec, name, m));
+                        if needs_routes(name, m) {
+                            let mut sidecar = routes_sidecar(spec, STAND_IN, name, m);
+                            if let Value::Mapping(map) = &mut sidecar {
+                                // Like the stand-in, only started with the check profile.
+                                map.insert(s("profiles"), list([s("check")]));
+                            }
+                            services.insert(s(format!("{STAND_IN}-routes")), sidecar);
+                        }
+                        stand_in_added = true;
+                    }
                     deps.insert(s(STAND_IN), map([("condition", s("service_started"))]));
                     if needs_routes(name, m) {
-                        let mut sidecar = routes_sidecar(spec, STAND_IN, name, m);
-                        if let Value::Mapping(map) = &mut sidecar {
-                            // Like the stand-in, only started with the check profile.
-                            map.insert(s("profiles"), list([s("check")]));
-                        }
-                        services.insert(s(format!("{STAND_IN}-routes")), sidecar);
                         deps.insert(s(format!("{STAND_IN}-routes")), map([("condition", s("service_healthy"))]));
                     }
                     STAND_IN.to_string()
                 };
-                c.insert(s("network_mode"), s(format!("service:{host}")));
+                c.insert(s("network_mode"), s(format!("service:{ns}")));
             }
-            None => {
+            checks::Position::Networks => {
                 let mut nets = Mapping::new();
                 for net in spec.networks.keys() {
                     nets.insert(s(net.as_str()), Value::Null);
@@ -347,7 +383,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                     c.insert(s("cap_add"), list([s("NET_ADMIN")]));
                     c.insert(
                         s("entrypoint"),
-                        list([s("/bin/sh"), s("-c"), s(format!("ip route del default 2>/dev/null; {}", run.join(" && ")))]),
+                        list([s("/bin/sh"), s("-c"), s("ip route del default 2>/dev/null; exec sh /isoloom/run.sh")]),
                     );
                 }
             }
@@ -355,7 +391,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         if !deps.is_empty() {
             c.insert(s("depends_on"), Value::Mapping(deps));
         }
-        services.insert(s("isoloom-check"), Value::Mapping(c));
+        services.insert(s(runner), Value::Mapping(c));
     }
 
     let mut networks = Mapping::new();
@@ -406,11 +442,13 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             )
         })
         .collect();
-    let usage = "# Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait\n# Checks: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check\n# Stop:   docker compose -f .isoloom/docker/compose.yml down -v\n";
-    Ok(vec![GeneratedFile {
+    let usage = "# Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait\n# Checks: isoloom test docker (or: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check, and isoloom-check-<machine>)\n# Stop:   docker compose -f .isoloom/docker/compose.yml down -v\n";
+    let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
         contents: format!("{}{usage}{moved}\n{yaml}", header("#")),
-    }])
+    }];
+    files.extend(runner_files);
+    Ok(files)
 }
 
 /// A machine's volume, named for Compose (scoped to the environment by Compose itself).

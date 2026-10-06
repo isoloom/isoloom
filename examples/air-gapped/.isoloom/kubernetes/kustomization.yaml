@@ -5,11 +5,3 @@ kind: Kustomization
 namespace: isoloom-air-gapped
 resources:
   - environment.yaml
-# The project's scripts the pods run (init jobs, checks), read from the project at apply time.
-generatorOptions:
-  disableNameSuffixHash: true
-configMapGenerator:
-  - name: isoloom-scripts
-    files:
-      - checks__app-answers.sh=../../checks/app-answers.sh
-      - checks__no-internet.sh=../../checks/no-internet.sh

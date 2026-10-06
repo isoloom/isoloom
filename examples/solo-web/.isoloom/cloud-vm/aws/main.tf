@@ -207,17 +207,6 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <user>@<host> each command.
-output "checks" {
-  value = {
-    host = aws_instance.web.public_ip
-    user = null
-    commands = [
-      "cd /opt/isoloom && sh checks/web-answers.sh"
-    ]
-  }
-}
-
 output "published" {
   value = {
     "web/80" = "${aws_instance.web.public_ip}:8080"

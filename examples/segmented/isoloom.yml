@@ -43,5 +43,12 @@ machines:
       os: debian-12
 
 checks:
-  - checks/web-reachable.sh
-  - checks/cache-blocked.sh
+  - name: the web page answers through the router
+    from: user
+    http: http://web/
+    expect: 200
+    wait: 60
+  - name: the cache is sealed off from the user
+    from: user
+    tcp: cache:6379
+    expect: blocked

@@ -5,3 +5,10 @@ kind: Kustomization
 namespace: isoloom-air-gapped
 resources:
   - job.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: isoloom-check-runners
+    files:
+      - store.sh
+      - app.sh

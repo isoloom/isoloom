@@ -266,17 +266,12 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <user>@<host> each command.
+# The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
-  value = {
-    host = one(linode_instance.cache.ipv4)
-    user = "root"
-    commands = [
-      "cd /opt/isoloom && sh checks/web-answers.sh",
-      "cd /opt/isoloom && sh checks/cache-seeded.sh",
-      "cd /opt/isoloom && sh checks/no-internet.sh"
-    ]
-  }
+  value = [
+    { position = "cache", machine = "cache", host = one(linode_instance.cache.ipv4), user = "root", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh" },
+    { position = "web", machine = "web", host = one(linode_instance.web.ipv4), user = "root", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" }
+  ]
 }
 
 output "published" {

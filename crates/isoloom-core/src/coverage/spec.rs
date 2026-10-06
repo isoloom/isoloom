@@ -399,12 +399,65 @@ fn base_table() -> Vec<Row> {
             done("Galaxy collections and roles installed first", "ansible-pair"),
         ),
         common(
-            "checks",
-            done("a `check` profile running them from the access side", "hello-stack"),
+            "checks[]",
             done(
-                "on demand (`vagrant provision --provision-with checks`): scripts from the access machine or the controller, Ansible checks from the controller",
+                "a `check` profile: a runner per position (a sh script next to the Compose file), scripts from the project mounted read-only",
                 "hello-stack",
             ),
+            done(
+                "on demand (`vagrant provision --provision-with checks`): a runner script per machine, the controller's for the rest and for Ansible checks",
+                "hello-stack",
+            ),
+        ),
+        common(
+            "checks[].name",
+            done("the runner's PASS/FAIL line", "hello-stack"),
+            done("the runner's PASS/FAIL line", "hello-stack"),
+        ),
+        common(
+            "checks[].from",
+            done(
+                "the runner in that machine's network namespace (a stand-in's when the runner supplies it)",
+                "segmented",
+            ),
+            done("the runner on that machine", "segmented"),
+        ),
+        common(
+            "checks[].http",
+            done("curl (else wget, else bash) from the position, retried for `wait`", "hello-stack"),
+            done("curl (else wget, else bash) from the machine, retried for `wait`", "hello-stack"),
+        ),
+        common(
+            "checks[].tcp",
+            done("nc (else bash) from the position", "segmented"),
+            done("nc (else bash) from the machine", "segmented"),
+        ),
+        row(
+            "checks[].exec",
+            planned("the runner shares the machine's network, not its filesystem"),
+            done("the command in the machine's own shell", "arm-vm"),
+            VM_PLANNED,
+        ),
+        common(
+            "checks[].script",
+            done("sh, from the project mounted read-only", "edge-firewall"),
+            done("sh, from /opt/isoloom", "edge-firewall"),
+        ),
+        common(
+            "checks[].expect",
+            done(
+                "a status code, `any` or `blocked` (http); `open` or `blocked` (tcp); text (exec)",
+                "hello-stack",
+            ),
+            done(
+                "a status code, `any` or `blocked` (http); `open` or `blocked` (tcp); text (exec)",
+                "hello-stack",
+            ),
+        ),
+        common(
+            "checks[].wait",
+            done("retried every 2s until it passes or the time is up", "segmented"),
+            done("retried every 2s until it passes or the time is up", "segmented"),
         ),
         Row {
             path: "targets",

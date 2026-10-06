@@ -90,6 +90,30 @@ enum Command {
         #[arg(long)]
         cloud: Option<String>,
     },
+    /// Run the environment's checks against a running target: the spec's (scripts and declared
+    /// probes) and the ones Isoloom derives from `services` and `reach`. One line per check;
+    /// exits 1 when any fails.
+    Test {
+        /// The target the environment is running on (as for `run`).
+        target: Option<String>,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// For the cloud targets, which cloud's module (as for `run`).
+        #[arg(long)]
+        cloud: Option<String>,
+        /// Your own image table (YAML), as for `generate`.
+        #[arg(long)]
+        images: Option<PathBuf>,
+        /// Only the spec's own checks; skip the derived ones.
+        #[arg(long)]
+        no_derived: bool,
+        /// Machine-readable results.
+        #[arg(long)]
+        json: bool,
+        /// The SSH private key for the cloud targets (default: your SSH agent and config).
+        #[arg(long)]
+        ssh_key: Option<PathBuf>,
+    },
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
     Schema,
     /// Draft an isoloom.yml from files you already have.
@@ -383,6 +407,23 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
         }
         Command::Run { target, dir, cloud, images } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), images.as_deref(), false),
         Command::Down { target, dir, cloud } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), None, true),
+        Command::Test {
+            target,
+            dir,
+            cloud,
+            images,
+            no_derived,
+            json,
+            ssh_key,
+        } => test_cmd(
+            &dir,
+            target.as_deref(),
+            cloud.as_deref(),
+            images.as_deref(),
+            no_derived,
+            json,
+            ssh_key.as_deref(),
+        ),
         Command::Schema => {
             println!("{}", serde_json::to_string_pretty(&core::schema::schema())?);
             Ok(ExitCode::SUCCESS)
@@ -528,17 +569,18 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
 
 /// `isoloom run`/`down`: pick the target, generate its files, then bring it up (or tear it down)
 /// with the tool that owns that output. `down` is the same dispatch with the inverse command.
-fn run_cmd(
+/// Loads and validates the spec, applies the image table, picks the target (the one named, the
+/// only possibility, or an error listing them) and writes that target's files, so a run or a
+/// test is always against the current spec.
+fn prepare(
     dir: &std::path::Path,
     target: Option<&str>,
-    cloud: Option<&str>,
     images: Option<&std::path::Path>,
-    down: bool,
-) -> Result<ExitCode, Box<dyn std::error::Error>> {
+) -> Result<(core::Spec, PathBuf, core::Target), Box<dyn std::error::Error>> {
     let spec = core::load(dir)?;
     // Absolute, so the paths we hand to docker/vagrant/terraform don't depend on their working
     // directory (compose runs from `dir`, terraform and vagrant from the module folder).
-    let dir = &std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    let dir = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
     let problems = core::validate(&spec);
     if !problems.is_empty() {
         for p in &problems {
@@ -548,7 +590,6 @@ fn run_cmd(
     }
     let spec = with_images(spec, images)?;
 
-    // Pick the target: the one named, or the only possibility, else ask.
     let possible = core::effective(&spec);
     let t = match target {
         Some(id) => core::Target::ALL
@@ -568,7 +609,6 @@ fn run_cmd(
         return Err(format!("this spec can't run on `{}`; see `isoloom targets`", t.id()).into());
     }
 
-    // Generate just this target's files (so a run is always against the current spec).
     let files = core::generate(&spec, t).map_err(|e| format!("can't generate `{}`: {e}", t.id()))?;
     for f in &files {
         let path = dir.join(&f.path);
@@ -577,7 +617,18 @@ fn run_cmd(
         }
         std::fs::write(&path, &f.contents)?;
     }
+    Ok((spec, dir, t))
+}
 
+fn run_cmd(
+    dir: &std::path::Path,
+    target: Option<&str>,
+    cloud: Option<&str>,
+    images: Option<&std::path::Path>,
+    down: bool,
+) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let (_, dir, t) = prepare(dir, target, images)?;
+    let dir = &dir;
     let (program, args, wd) = bring_up(dir, t, cloud, down)?;
     eprintln!("{} {} ({})", if down { "Tearing down" } else { "Running" }, t.id(), wd.display());
     let status = std::process::Command::new(&program).args(&args).current_dir(&wd).status();
@@ -586,6 +637,319 @@ fn run_cmd(
         Ok(s) => Err(format!("{program} exited with {s}").into()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(format!("`{program}` isn't installed").into()),
         Err(e) => Err(Box::new(e)),
+    }
+}
+
+/// One check runner to execute: where it stands, and the command that runs it and prints the
+/// `isoloom-check:` lines.
+struct Runner {
+    label: String,
+    program: String,
+    args: Vec<String>,
+    wd: PathBuf,
+    env: Vec<(String, String)>,
+}
+
+#[derive(serde::Serialize)]
+struct Outcome {
+    position: String,
+    name: String,
+    ok: bool,
+    detail: String,
+}
+
+fn test_cmd(
+    dir: &std::path::Path,
+    target: Option<&str>,
+    cloud: Option<&str>,
+    images: Option<&std::path::Path>,
+    no_derived: bool,
+    json: bool,
+    ssh_key: Option<&std::path::Path>,
+) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    use core::checks::{self, Line, Position};
+    let (spec, dir, t) = prepare(dir, target, images)?;
+    let plan = checks::plan(&spec);
+    let expected: Vec<&checks::Resolved> = plan.iter().filter(|c| !(no_derived && c.derived)).collect();
+    if expected.is_empty() {
+        if !json {
+            println!("nothing to check: no `checks:` in the spec, and no derived checks (no services other machines could reach)");
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+    let groups = checks::by_position(&spec, &plan);
+    let default_pos = checks::default_position(&spec);
+    let runner_name = |pos: &Position| {
+        if *pos == default_pos {
+            "isoloom-check".to_string()
+        } else {
+            format!("isoloom-check-{}", pos.id())
+        }
+    };
+    let out = dir.join(core::OUTPUT_DIR);
+    let derived_env = |runner: &mut Runner| {
+        if no_derived {
+            runner.env.push(("ISOLOOM_DERIVED".into(), "0".into()));
+        }
+    };
+    let s = |x: &str| x.to_string();
+
+    let mut runners: Vec<Runner> = Vec::new();
+    match t {
+        core::Target::Docker | core::Target::Hosted => {
+            let f = out.join("docker/compose.yml").display().to_string();
+            for (pos, _) in &groups {
+                let mut args = vec![s("compose"), s("--progress"), s("quiet"), s("-f"), f.clone(), s("--profile"), s("check"), s("run"), s("--rm")];
+                if no_derived {
+                    args.extend([s("-e"), s("ISOLOOM_DERIVED=0")]);
+                }
+                args.push(runner_name(pos));
+                runners.push(Runner {
+                    label: pos.label(),
+                    program: s("docker"),
+                    args,
+                    wd: dir.clone(),
+                    env: vec![],
+                });
+            }
+        }
+        core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid => {
+            let sub = match t {
+                core::Target::Vagrant => "vagrant",
+                core::Target::DockerVm => "docker-vm",
+                _ => "hybrid",
+            };
+            let mut r = Runner {
+                label: "every machine".into(),
+                program: s("vagrant"),
+                args: vec![s("provision"), s("--provision-with"), s("checks")],
+                wd: out.join(sub),
+                env: vec![],
+            };
+            derived_env(&mut r);
+            runners.push(r);
+        }
+        core::Target::Kubernetes => {
+            if no_derived {
+                return Err("--no-derived isn't available on Kubernetes yet (the Jobs are static manifests)".into());
+            }
+            let ns = format!("isoloom-{}", spec.name);
+            let kdir = out.join("kubernetes/checks").display().to_string();
+            let names: Vec<String> = groups.iter().map(|(p, _)| runner_name(p)).collect();
+            // Fresh Jobs (a Job can't be re-run), then each one's logs once it has finished either way.
+            let apply = format!(
+                "kubectl -n {ns} delete job {} --ignore-not-found >/dev/null && kubectl kustomize --load-restrictor LoadRestrictionsNone {kdir} | kubectl apply -f - >/dev/null",
+                names.join(" ")
+            );
+            runners.push(Runner {
+                label: "starting the check Jobs".into(),
+                program: s("sh"),
+                args: vec![s("-c"), apply],
+                wd: dir.clone(),
+                env: vec![],
+            });
+            for (pos, _) in &groups {
+                let job = runner_name(pos);
+                let script = format!(
+                    "i=0; until [ \"$(kubectl -n {ns} get job {job} -o jsonpath='{{.status.conditions[*].type}}' 2>/dev/null)\" != \"\" ]; do i=$((i+2)); [ $i -ge 300 ] && break; sleep 2; done; kubectl -n {ns} logs job/{job} --all-containers 2>/dev/null || true"
+                );
+                runners.push(Runner {
+                    label: pos.label(),
+                    program: s("sh"),
+                    args: vec![s("-c"), script],
+                    wd: dir.clone(),
+                    env: vec![],
+                });
+            }
+        }
+        core::Target::CloudVm => {
+            let module = out.join("cloud-vm").join(cloud.unwrap_or("aws"));
+            let outputs = terraform_output(&module)?;
+            let Some(list) = outputs.get("checks").and_then(|v| v.as_array()) else {
+                return Err("the module has no `checks` output: run `isoloom run cloud-vm` first".into());
+            };
+            for entry in list {
+                let host = entry["host"].as_str().unwrap_or_default();
+                let user = entry["user"].as_str().unwrap_or("root");
+                let command = entry["command"].as_str().unwrap_or_default();
+                let position = entry["position"].as_str().unwrap_or_default();
+                let mut r = ssh_runner(ssh_key, user, host, command, no_derived);
+                r.label = if position == "networks" {
+                    s("from the environment's networks")
+                } else {
+                    format!("from {position}")
+                };
+                runners.push(r);
+            }
+        }
+        core::Target::CloudDocker => {
+            let cloud = cloud.ok_or("`cloud-docker` needs --cloud (aws, azure, gcp, digitalocean, linode, oci)")?;
+            let outputs = terraform_output(&out.join("cloud-docker").join(cloud))?;
+            let host = outputs["ip"]
+                .as_str()
+                .ok_or("the module has no `ip` output: run `isoloom run cloud-docker` first")?;
+            let user = outputs["ssh_user"].as_str().unwrap_or("root");
+            for (pos, _) in &groups {
+                let command = format!(
+                    "cd /opt/isoloom && sudo docker compose -f .isoloom/docker/compose.yml --profile check run --rm -e ISOLOOM_DERIVED {}",
+                    runner_name(pos)
+                );
+                let mut r = ssh_runner(ssh_key, user, host, &command, no_derived);
+                r.label = pos.label();
+                runners.push(r);
+            }
+        }
+        core::Target::Proxmox => return Err("checks on Proxmox come next; run them from a machine by hand for now".into()),
+    }
+
+    // Run each, reading the PASS/FAIL lines (whatever prefix the tool adds), streaming the rest.
+    let mut outcomes: Vec<Outcome> = Vec::new();
+    let mut finished = 0usize;
+    let mut broken: Vec<String> = Vec::new();
+    for r in &runners {
+        if !json {
+            println!("{}", r.label);
+        }
+        let mut cmd = std::process::Command::new(&r.program);
+        cmd.args(&r.args).current_dir(&r.wd).stdout(std::process::Stdio::piped());
+        for (k, v) in &r.env {
+            cmd.env(k, v);
+        }
+        let mut child = cmd.spawn().map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => format!("`{}` isn't installed", r.program),
+            _ => e.to_string(),
+        })?;
+        let stdout = child.stdout.take().expect("piped");
+        let mut ended = false;
+        use std::io::BufRead;
+        for line in std::io::BufReader::new(stdout).lines() {
+            let line = line?;
+            // Vagrant prefixes each VM's output with its name: it says which machine ran the check.
+            let position = line
+                .split_once("isoloom-check: ")
+                .map(|(pre, _)| pre.trim().trim_end_matches(':').to_string())
+                .filter(|p| !p.is_empty())
+                .unwrap_or_else(|| r.label.clone());
+            match checks::parse_line(&line) {
+                Some(Line::Pass(name)) => {
+                    if !json {
+                        println!("  ✓ {name}");
+                    }
+                    outcomes.push(Outcome {
+                        position,
+                        name,
+                        ok: true,
+                        detail: String::new(),
+                    });
+                }
+                Some(Line::Fail(name, why)) => {
+                    if !json {
+                        println!("  ✗ {name}: {why}");
+                    }
+                    outcomes.push(Outcome {
+                        position,
+                        name,
+                        ok: false,
+                        detail: why,
+                    });
+                }
+                Some(Line::End(_, _)) => {
+                    ended = true;
+                    finished += 1;
+                }
+                None if !json && !line.trim().is_empty() => println!("    {line}"),
+                None => {}
+            }
+        }
+        let _ = child.wait();
+        if !ended && r.label != "starting the check Jobs" && !(matches!(t, core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid)) {
+            broken.push(r.label.clone());
+        }
+    }
+    let _ = finished;
+    let passed = outcomes.iter().filter(|o| o.ok).count();
+    let failed = outcomes.iter().filter(|o| !o.ok).count();
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "target": t.id(),
+                "passed": passed,
+                "failed": failed,
+                "unfinished": broken,
+                "results": outcomes,
+            }))?
+        );
+    } else {
+        println!();
+        if failed == 0 && broken.is_empty() {
+            println!("{passed} passed");
+        } else {
+            println!("{passed} passed, {failed} failed");
+        }
+        for b in &broken {
+            println!("✗ the runner {b} didn't finish (see its output above)");
+        }
+    }
+    Ok(if failed == 0 && broken.is_empty() && !outcomes.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    })
+}
+
+/// `terraform output -json` of a module, as a map of output name to value.
+fn terraform_output(module: &std::path::Path) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let out = std::process::Command::new("terraform")
+        .args(["output", "-json"])
+        .current_dir(module)
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "`terraform` isn't installed".to_string()
+            } else {
+                e.to_string()
+            }
+        })?;
+    if !out.status.success() {
+        return Err(format!(
+            "terraform output failed in {}: {}",
+            module.display(),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )
+        .into());
+    }
+    let raw: serde_json::Value = serde_json::from_slice(&out.stdout)?;
+    // Each output is { "value": ..., "type": ... }: keep the values.
+    let mut map = serde_json::Map::new();
+    if let Some(obj) = raw.as_object() {
+        for (k, v) in obj {
+            map.insert(k.clone(), v.get("value").cloned().unwrap_or(serde_json::Value::Null));
+        }
+    }
+    Ok(serde_json::Value::Object(map))
+}
+
+/// A check runner reached over SSH (the cloud targets).
+fn ssh_runner(key: Option<&std::path::Path>, user: &str, host: &str, command: &str, no_derived: bool) -> Runner {
+    let mut args = vec![
+        "-o".to_string(),
+        "StrictHostKeyChecking=accept-new".to_string(),
+        "-o".to_string(),
+        "BatchMode=yes".to_string(),
+    ];
+    if let Some(k) = key {
+        args.extend(["-i".to_string(), k.display().to_string()]);
+    }
+    args.push(format!("{user}@{host}"));
+    let derived = if no_derived { "ISOLOOM_DERIVED=0 " } else { "" };
+    args.push(format!("{derived}{command}"));
+    Runner {
+        label: format!("on {host}"),
+        program: "ssh".to_string(),
+        args,
+        wd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        env: vec![],
     }
 }
 

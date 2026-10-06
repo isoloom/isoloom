@@ -27,7 +27,8 @@ jobs:
         run: |
           for e in examples/hello-stack examples/supplier-portal-api examples/segmented examples/pivot-dmz examples/edge-firewall examples/air-gapped; do cargo run -q -- check "$e"; done
 
-  # The generated Compose files, run for real: everything answers, and the checks pass.
+  # The generated Compose files, run for real: everything answers, and `isoloom test` passes
+  # (the spec's checks and the ones derived from its services and reach rules).
   docker:
     runs-on: ubuntu-latest
     strategy:
@@ -39,10 +40,12 @@ jobs:
         working-directory: examples/${{ matrix.example }}
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Start
         run: docker compose -f .isoloom/docker/compose.yml up -d --wait --wait-timeout 300
-      - name: Checks
-        run: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
+      - name: Checks (the spec's and the derived ones, from every machine)
+        run: cargo run -q -- test docker .
       - name: Logs
         if: failure()
         run: docker compose -f .isoloom/docker/compose.yml --profile check logs --no-color
@@ -88,12 +91,10 @@ jobs:
           ns=$(awk '/^kind: Namespace/{getline; getline; print $2; exit}' .isoloom/kubernetes/environment.yaml)
           echo "NS=$ns" >> "$GITHUB_ENV"
           kubectl -n "$ns" wait --for=condition=Available deployment --all --timeout=600s
-      - name: Checks
-        run: |
-          kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes/checks | kubectl apply -f -
-          kubectl -n "$NS" wait --for=condition=complete job/isoloom-check --timeout=300s || true
-          kubectl -n "$NS" logs job/isoloom-check
-          kubectl -n "$NS" wait --for=condition=complete job/isoloom-check --timeout=5s
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Checks (the spec's and the derived ones, from every machine)
+        run: cargo run -q -- test kubernetes .
       - name: State
         if: failure()
         run: |

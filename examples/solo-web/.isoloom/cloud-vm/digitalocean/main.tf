@@ -171,17 +171,6 @@ output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
 
-# The checks, from where a user stands: ssh <user>@<host> each command.
-output "checks" {
-  value = {
-    host = digitalocean_droplet.web.ipv4_address
-    user = "root"
-    commands = [
-      "cd /opt/isoloom && sh checks/web-answers.sh"
-    ]
-  }
-}
-
 output "published" {
   value = {
     "web/80" = "${digitalocean_droplet.web.ipv4_address}:8080"

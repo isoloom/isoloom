@@ -338,14 +338,7 @@ resource "oci_core_instance" "{id}" {{
         aligned(&public_ips),
         aligned(&ssh_users),
     );
-    if !spec.checks.is_empty() {
-        let runs: Vec<String> = spec.checks.iter().map(|c| format!("      \"cd /opt/isoloom && sh {c}\"")).collect();
-        let _ = write!(
-            tf,
-            "\n# The checks, from where a user stands: ssh <user>@<host> each command.\noutput \"checks\" {{\n  value = {{\n    host = {first}\n    user = null\n    commands = [\n{}\n    ]\n  }}\n}}\n",
-            runs.join(",\n"),
-        );
-    }
+    tf.push_str(&super::super::cloud_vm::checks_output(spec, &public_ips, &ssh_users, None));
     if !published_out.is_empty() {
         let _ = write!(tf, "\noutput \"published\" {{\n  value = {{\n{}\n  }}\n}}\n", aligned(&published_out));
     }
