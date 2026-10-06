@@ -22,7 +22,7 @@ terraform {
 
 variable "region" {
   type    = string
-  default = "eu-central"
+  default = "fr-par"
 }
 variable "allowed_cidr" {
   type        = string

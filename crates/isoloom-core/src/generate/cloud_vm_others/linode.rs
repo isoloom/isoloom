@@ -73,7 +73,7 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
 
 variable "region" {{
   type    = string
-  default = "eu-central"
+  default = "fr-par"
 }}
 variable "allowed_cidr" {{
   type        = string

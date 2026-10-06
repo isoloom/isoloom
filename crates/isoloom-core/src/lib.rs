@@ -8,6 +8,7 @@
 
 pub mod checks;
 pub mod coverage;
+pub mod defaults;
 pub mod generate;
 pub mod images;
 pub mod import;
@@ -68,8 +69,15 @@ pub fn find(dir: &Path) -> Result<PathBuf, LoadError> {
 
 /// Reads the spec in `dir` (see [`find`]).
 pub fn load(dir: &Path) -> Result<Spec, LoadError> {
+    load_with(dir, &[])
+}
+
+/// Reads the spec in `dir` with `-s key=value` overrides applied first (see
+/// [`defaults::override_spec`]); keys prefixed `defaults.` are left to the defaults.
+pub fn load_with(dir: &Path, sets: &[String]) -> Result<Spec, LoadError> {
     let path = find(dir)?;
     let text = std::fs::read_to_string(&path).map_err(|e| LoadError::Read(path, e))?;
+    let text = defaults::override_spec(&text, sets).map_err(LoadError::Parse)?;
     parse(&text)
 }
 

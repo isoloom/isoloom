@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Defaults: a hierarchy, and `-s key=value`
+- Settings that are a person's or a team's rather than the spec's, in layers (the last wins, leaf by leaf): built in, `~/.isoloom/defaults.yml`, the project's `isoloom.defaults.yml`, `ISOLOOM_<KEY>` environment variables (`__` for a dot), and `-s defaults.<key>=<value>`. Keys: `images` (the image table: `generate --images` is now one more layer of it), `vagrant.provider` (passed to `vagrant up`), `cloud.<cloud>.region` (the generated module's default). Unknown keys are errors naming the layer.
+- `-s key=value` on `generate`, `check`, `run`, `down`, `test` and `inspect` overrides the spec for that command (`-s machines.web.vm.os=ubuntu-24.04`), before it is parsed; the file is untouched.
+- `isoloom defaults [--system] [--json]` prints every default in effect and where it comes from.
+
 ### Instances: the same environment several times on one host
 - `--instance <1-99>` on `run`, `down`, `test`, `connect`, `exec`, `capture` and `inspect`. Instance `n` suffixes the name (`segmented-2`: Compose project, container, network, VM and namespace names all differ), moves the Docker networks to other blocks (the second octet shifts by `n`, since Docker refuses two networks on one subnet) and shifts published host ports by 100 per instance. Local VM networks are isolated by name already, so machines keep the addresses the spec writes.
 - An instance's files go to `.isoloom-<n>/` next to the committed `.isoloom/` (add `.isoloom-*` to `.gitignore`); the snapshot there says `"instance": n`. The registry and `isoloom status` carry the instance.

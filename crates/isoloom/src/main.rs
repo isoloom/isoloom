@@ -58,6 +58,10 @@ enum Command {
         /// it to the runner. See https://www.isoloom.com/en/docs/images
         #[arg(long, value_name = "FILE")]
         images: Option<PathBuf>,
+        /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,
+        /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
     },
     /// Fail when the generated files under .isoloom/ don't match the spec (for CI).
     Check {
@@ -66,6 +70,22 @@ enum Command {
         /// The image table the files were generated with (see `generate --images`).
         #[arg(long, value_name = "FILE")]
         images: Option<PathBuf>,
+        /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,
+        /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
+    },
+    /// The defaults in effect here (built in, your file, the project's, the environment) and
+    /// where each comes from. See https://www.isoloom.com/en/docs/defaults
+    Defaults {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// Only the built-in layer.
+        #[arg(long)]
+        system: bool,
+        /// Machine-readable output.
+        #[arg(long)]
+        json: bool,
     },
     /// Generate a target's files, then bring the environment up with the right tool
     /// (docker compose, vagrant, kubectl, or terraform).
@@ -86,6 +106,10 @@ enum Command {
         /// ports, files under .isoloom-N/. For several copies on one host.
         #[arg(long, value_name = "N")]
         instance: Option<u8>,
+        /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,
+        /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
     },
     /// Tear down what `run` started for a target (the inverse tool: compose down, vagrant
     /// destroy, kubectl delete, or terraform destroy).
@@ -99,6 +123,10 @@ enum Command {
         /// ports, files under .isoloom-N/. For several copies on one host.
         #[arg(long, value_name = "N")]
         instance: Option<u8>,
+        /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,
+        /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
     },
     /// Run the environment's checks against a running target: the spec's (scripts and declared
     /// probes) and the ones Isoloom derives from `services` and `reach`. One line per check;
@@ -127,6 +155,10 @@ enum Command {
         /// ports, files under .isoloom-N/. For several copies on one host.
         #[arg(long, value_name = "N")]
         instance: Option<u8>,
+        /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,
+        /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
     },
     /// The environments `run` brought up on this host, with their live state.
     Status {
@@ -213,6 +245,10 @@ enum Command {
         /// ports, files under .isoloom-N/. For several copies on one host.
         #[arg(long, value_name = "N")]
         instance: Option<u8>,
+        /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,
+        /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
     },
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
     Schema,
@@ -463,8 +499,8 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        Command::Generate { dir, target, images } => {
-            let spec = core::load(&dir)?;
+        Command::Generate { dir, target, images, sets } => {
+            let (spec, settings) = load_settings(&dir, images.as_deref(), &sets)?;
             let problems = core::validate(&spec);
             if !problems.is_empty() {
                 for p in &problems {
@@ -473,7 +509,6 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 eprintln!("fix the spec first (`isoloom validate`)");
                 return Ok(ExitCode::FAILURE);
             }
-            let spec = with_images(spec, images.as_deref())?;
             let (files, skipped) = match &target {
                 Some(id) => {
                     let t = core::Target::ALL
@@ -487,6 +522,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 }
                 None => core::generate_all(&spec),
             };
+            let files = core::defaults::apply_to_files(files, &settings.defaults);
             for f in &files {
                 let path = dir.join(&f.path);
                 if let Some(parent) = path.parent() {
@@ -511,8 +547,15 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             cloud,
             images,
             instance,
-        } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), images.as_deref(), instance, false),
-        Command::Down { target, dir, cloud, instance } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), None, instance, true),
+            sets,
+        } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), images.as_deref(), instance, &sets, false),
+        Command::Down {
+            target,
+            dir,
+            cloud,
+            instance,
+            sets,
+        } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), None, instance, &sets, true),
         Command::Test {
             target,
             dir,
@@ -522,6 +565,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             json,
             ssh_key,
             instance,
+            sets,
         } => test_cmd(
             &dir,
             target.as_deref(),
@@ -532,6 +576,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 json,
                 ssh_key: ssh_key.as_deref(),
                 instance,
+                sets: &sets,
             },
         ),
         Command::Status { json, cleanup } => lifecycle::status(json, cleanup.as_deref(), None),
@@ -559,13 +604,19 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             instance,
             args,
         } => lifecycle::capture(&abs(&dir)?, target.as_deref(), instance, &machine, &network, &args, ssh_key.as_deref()),
-        Command::Inspect { what, dir, yaml, instance } => {
+        Command::Inspect {
+            what,
+            dir,
+            yaml,
+            instance,
+            sets,
+        } => {
             // `isoloom inspect examples/segmented` names the project, not a path in the snapshot.
             let (what, dir) = match (what, dir) {
                 (Some(w), None) if w.contains('/') || std::path::Path::new(&w).is_dir() => (None, PathBuf::from(w)),
                 (w, d) => (w, d.unwrap_or_else(|| PathBuf::from("."))),
             };
-            let spec = core::load(&dir)?;
+            let (spec, _) = load_settings(&dir, None, &sets)?;
             let problems = core::validate(&spec);
             if !problems.is_empty() {
                 for p in &problems {
@@ -697,8 +748,56 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        Command::Check { dir, images } => {
-            let spec = core::load(&dir)?;
+        Command::Defaults { dir, system, json } => {
+            let value = if system {
+                core::defaults::builtin()
+            } else {
+                let r = core::defaults::load(&dir, None, &[])?;
+                let mut merged = core::defaults::builtin();
+                core::defaults::merge(&mut merged, &r.merged);
+                if json {
+                    let sources: serde_json::Map<String, serde_json::Value> = r.sources.iter().map(|(k, v)| (k.clone(), serde_json::json!(v))).collect();
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(
+                            &serde_json::json!({ "defaults": serde_json::to_value(&merged)?, "sources": sources, "user_file": core::defaults::user_file(), "project_file": dir.join(core::defaults::PROJECT_FILE) })
+                        )?
+                    );
+                    return Ok(ExitCode::SUCCESS);
+                }
+                let builtin_leaves = core::defaults::leaves(&core::defaults::builtin(), "");
+                let width = r
+                    .sources
+                    .iter()
+                    .map(|(k, _)| k.len())
+                    .chain(builtin_leaves.iter().map(String::len))
+                    .max()
+                    .unwrap_or(0);
+                for leaf in core::defaults::leaves(&merged, "") {
+                    let value = leaf
+                        .split('.')
+                        .try_fold(&merged, |v, k| v.get(k))
+                        .map(|v| serde_yaml_ng::to_string(v).unwrap_or_default().trim().to_string())
+                        .unwrap_or_default();
+                    let source = r.sources.iter().find(|(k, _)| *k == leaf).map(|(_, s)| s.as_str()).unwrap_or("built in");
+                    println!("{leaf:<width$}  {value:<24}  {source}");
+                }
+                println!(
+                    "\nfiles: {} (yours), {} (the project's); environment ISOLOOM_<KEY>; -s defaults.<key>=<value>",
+                    core::defaults::user_file().display(),
+                    dir.join(core::defaults::PROJECT_FILE).display()
+                );
+                return Ok(ExitCode::SUCCESS);
+            };
+            if json {
+                println!("{}", serde_json::to_string_pretty(&serde_json::to_value(&value)?)?);
+            } else {
+                print!("{}", serde_yaml_ng::to_string(&value)?);
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::Check { dir, images, sets } => {
+            let (spec, settings) = load_settings(&dir, images.as_deref(), &sets)?;
             // Generators assume a validated spec (they `expect` valid CIDRs and addresses). A spec
             // that parses but is invalid must fail with the field and reason, not a panic.
             let problems = core::validate(&spec);
@@ -709,8 +808,8 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 eprintln!("fix the spec first (`isoloom validate`)");
                 return Ok(ExitCode::FAILURE);
             }
-            let spec = with_images(spec, images.as_deref())?;
             let (files, _) = core::generate_all(&spec);
+            let files = core::defaults::apply_to_files(files, &settings.defaults);
             let mut stale = 0;
             for f in &files {
                 match std::fs::read_to_string(dir.join(&f.path)) {
@@ -744,8 +843,9 @@ fn prepare(
     target: Option<&str>,
     images: Option<&std::path::Path>,
     instance: Option<u8>,
-) -> Result<(core::Spec, PathBuf, core::Target), Box<dyn std::error::Error>> {
-    let spec = core::load(dir)?;
+    sets: &[String],
+) -> Result<(core::Spec, PathBuf, core::Target, core::defaults::Defaults), Box<dyn std::error::Error>> {
+    let (spec, settings) = load_settings(dir, images, sets)?;
     // Absolute, so the paths we hand to docker/vagrant/terraform don't depend on their working
     // directory (compose runs from `dir`, terraform and vagrant from the module folder).
     let dir = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
@@ -756,7 +856,6 @@ fn prepare(
         }
         return Err("fix the spec first (`isoloom validate`)".into());
     }
-    let spec = with_images(spec, images)?;
 
     let possible = core::effective(&spec);
     let t = match target {
@@ -782,6 +881,7 @@ fn prepare(
         None => core::generate(&spec, t),
     }
     .map_err(|e| format!("can't generate `{}`: {e}", t.id()))?;
+    let files = core::defaults::apply_to_files(files, &settings.defaults);
     for f in &files {
         let path = dir.join(&f.path);
         if let Some(parent) = path.parent() {
@@ -794,7 +894,19 @@ fn prepare(
         Some(n) => core::instance::apply(&spec, n)?,
         None => spec,
     };
-    Ok((spec, dir, t))
+    Ok((spec, dir, t, settings.defaults))
+}
+
+/// The spec with `-s` overrides and the image table applied, and the defaults in effect.
+fn load_settings(
+    dir: &std::path::Path,
+    images: Option<&std::path::Path>,
+    sets: &[String],
+) -> Result<(core::Spec, core::defaults::Resolved), Box<dyn std::error::Error>> {
+    let spec = core::load_with(dir, sets)?;
+    let settings = core::defaults::load(dir, images, sets)?;
+    let spec = settings.defaults.images.apply(&spec);
+    Ok((spec, settings))
 }
 
 fn run_cmd(
@@ -803,11 +915,19 @@ fn run_cmd(
     cloud: Option<&str>,
     images: Option<&std::path::Path>,
     instance: Option<u8>,
+    sets: &[String],
     down: bool,
 ) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let (spec, dir, t) = prepare(dir, target, images, instance)?;
+    let (spec, dir, t, defaults) = prepare(dir, target, images, instance, sets)?;
     let dir = &dir;
-    let (program, args, wd) = bring_up(dir, t, cloud, instance, down)?;
+    let (program, mut args, wd) = bring_up(dir, t, cloud, instance, down)?;
+    // The preferred Vagrant provider, from the defaults.
+    if !down
+        && program == "vagrant"
+        && let Some(p) = &defaults.vagrant.provider
+    {
+        args.extend(["--provider".to_string(), p.clone()]);
+    }
     eprintln!("{} {} ({})", if down { "Tearing down" } else { "Running" }, t.id(), wd.display());
     let status = std::process::Command::new(&program).args(&args).current_dir(&wd).status();
     match status {
@@ -865,6 +985,7 @@ struct TestOpts<'a> {
     json: bool,
     ssh_key: Option<&'a std::path::Path>,
     instance: Option<u8>,
+    sets: &'a [String],
 }
 
 fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Result<ExitCode, Box<dyn std::error::Error>> {
@@ -876,8 +997,9 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
         json,
         ssh_key,
         instance,
+        sets,
     } = opts;
-    let (spec, dir, t) = prepare(dir, target, images, instance)?;
+    let (spec, dir, t, _) = prepare(dir, target, images, instance, sets)?;
     let plan = checks::plan(&spec);
     let expected: Vec<&checks::Resolved> = plan.iter().filter(|c| !(no_derived && c.derived)).collect();
     if expected.is_empty() {
@@ -1246,12 +1368,4 @@ fn tf_run(down: bool, module: PathBuf) -> (String, Vec<String>, PathBuf) {
         "terraform init -input=false && terraform apply -auto-approve".to_string()
     };
     ("sh".to_string(), vec!["-c".to_string(), script], module)
-}
-
-/// The spec with the user's image table applied, when one is given.
-fn with_images(spec: core::Spec, file: Option<&std::path::Path>) -> Result<core::Spec, Box<dyn std::error::Error>> {
-    let Some(file) = file else { return Ok(spec) };
-    let text = std::fs::read_to_string(file).map_err(|e| format!("can't read {}: {e}", file.display()))?;
-    let table = core::images::Table::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
-    Ok(table.apply(&spec))
 }
