@@ -86,11 +86,13 @@ fn builtin_regions_are_what_the_generators_write_and_can_be_replaced() {
         let Some(f) = files.iter().find(|f| f.path == format!(".isoloom/cloud-vm/{cloud}/main.tf")) else {
             continue;
         };
-        assert!(
-            f.contents.contains(&format!("default = \"{region}\"")),
-            "{cloud}: {}",
-            f.contents.lines().take(40).collect::<Vec<_>>().join("\n")
-        );
+        let block = f
+            .contents
+            .split("variable \"region\"")
+            .nth(1)
+            .and_then(|b| b.split("\n}").next())
+            .unwrap_or_default();
+        assert!(block.contains(&format!("\"{region}\"")), "{cloud}: {block}");
     }
     let r = resolve(vec![Layer {
         source: "t".into(),
@@ -99,7 +101,7 @@ fn builtin_regions_are_what_the_generators_write_and_can_be_replaced() {
     .unwrap();
     let out = apply_to_files(files, &r.defaults);
     let aws = out.iter().find(|f| f.path == ".isoloom/cloud-vm/aws/main.tf").unwrap();
-    assert!(aws.contents.contains("default = \"eu-west-1\"") && !aws.contents.contains("default = \"eu-west-3\""));
+    assert!(aws.contents.contains("default = \"eu-west-1\"") && !aws.contents.contains("\"eu-west-3\""));
     // Other clouds untouched.
     let az = out.iter().find(|f| f.path == ".isoloom/cloud-vm/azure/main.tf").unwrap();
     assert!(az.contents.contains("default = \"swedencentral\""));
