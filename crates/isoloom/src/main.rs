@@ -1168,6 +1168,9 @@ fn run_cmd(
             .into());
         }
     }
+    if t == core::Target::External && !down {
+        lifecycle::external_up(dir, &spec, instance)?;
+    }
     let (program, mut args, wd) = bring_up(dir, t, cloud, instance, down)?;
     // The preferred Vagrant provider, from the defaults.
     if !down
@@ -1393,6 +1396,37 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
             }
         }
         core::Target::Proxmox => return Err("checks on Proxmox come next; run them from a machine by hand for now".into()),
+        core::Target::External => {
+            // Each machine's runner, piped to its shell over SSH.
+            let machines = lifecycle::external_machines(&out)?;
+            for (pos, _) in &groups {
+                let core::checks::Position::Machine(m) = pos else { continue };
+                let Some(e) = machines.get(m) else { continue };
+                let script = out.join("external/checks").join(format!("{m}.sh"));
+                if !script.exists() {
+                    continue;
+                }
+                let derived = if no_derived { "ISOLOOM_DERIVED=0 " } else { "" };
+                let mut r = ssh_runner(
+                    ssh_key.or(e.key.as_deref().map(std::path::Path::new)),
+                    &e.user,
+                    &e.address,
+                    &format!("{derived}sh -s"),
+                    false,
+                );
+                r.args.insert(r.args.len() - 2, format!("-p{}", e.port));
+                // `sh -s < script`: through a shell so the runner's stdin is the file.
+                let ssh_line = format!(
+                    "ssh {} < {}",
+                    r.args.iter().map(|a| core::checks::sq(a)).collect::<Vec<_>>().join(" "),
+                    core::checks::sq(&script.display().to_string())
+                );
+                r.program = s("sh");
+                r.args = vec![s("-c"), ssh_line];
+                r.label = pos.label();
+                runners.push(r);
+            }
+        }
     }
 
     // Run each, reading the PASS/FAIL lines (whatever prefix the tool adds), streaming the rest.
@@ -1624,6 +1658,9 @@ fn bring_up(
             let cloud = cloud.ok_or("`cloud-docker` needs --cloud (aws, azure, gcp, digitalocean, linode, oci)")?;
             tf_run(down, out.join("cloud-docker").join(cloud))
         }
+        // Nothing to create or destroy: `run` provisions over SSH (see lifecycle::external_up),
+        // `down` only forgets the environment.
+        core::Target::External => (s("true"), vec![], dir.to_path_buf()),
     })
 }
 

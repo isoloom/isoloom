@@ -130,7 +130,8 @@
       "hosted": "needs `docker:` on files01",
       "docker-vm": "needs `docker:` on files01",
       "cloud-docker": "needs `docker:` on files01",
-      "kubernetes": "needs `docker:` on files01"
+      "kubernetes": "needs `docker:` on files01",
+      "external": "needs `external:` on files01, intranet"
     }
   },
   "checks": {

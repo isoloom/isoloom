@@ -258,7 +258,8 @@
       "cloud-vm": "networks with a `gateway` machine in the cloud come later"
     },
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs"
+      "hybrid": "only when some machines are containers and others are VMs",
+      "external": "needs `external:` on fw, web, cache"
     }
   },
   "checks": {

@@ -41,6 +41,7 @@ machines:
     access: false
     docker: { image: a, init: [x.sh], idle: true }
     vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1", winrm: ssl } }
+    external: { address: 192.168.1.2, user: admin, port: 2222, key: ~/.ssh/lab }
   h:
     count: 2
     networks: { out: 10 }

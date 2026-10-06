@@ -243,6 +243,10 @@ pub struct Machine {
     /// How a VM produces this machine (services installed natively, no Docker inside).
     #[serde(default)]
     pub vm: Option<VmImpl>,
+    /// Where this machine already exists (the `external` target): Isoloom creates nothing and
+    /// reaches it over SSH to provision, check and connect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external: Option<External>,
     /// Filled by the runner's image table (an access machine the spec leaves to the runner):
     /// a stock image, kept running idle for the user to work from. Never in a spec file.
     #[serde(skip)]
@@ -443,6 +447,23 @@ pub struct Group {
     pub shared: Shared,
 }
 
+/// An existing machine's SSH endpoint, for the `external` target.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct External {
+    /// An address or hostname reachable from where Isoloom runs.
+    pub address: String,
+    /// The SSH user (default `root`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
+    /// The SSH port (default 22).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    /// A private key file (default: the SSH agent and config).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+}
+
 /// One check: a script in the project (a string), or a declared probe (a map).
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(untagged)]
@@ -580,10 +601,13 @@ pub enum Target {
     Proxmox,
     /// One cloud VM per machine.
     CloudVm,
+    /// Machines that already exist, reached over SSH at the addresses the spec gives
+    /// (`machines.*.external`): nothing is created, everything else applies.
+    External,
 }
 
 impl Target {
-    pub const ALL: [Target; 9] = [
+    pub const ALL: [Target; 10] = [
         Target::Docker,
         Target::Hosted,
         Target::DockerVm,
@@ -593,6 +617,7 @@ impl Target {
         Target::Vagrant,
         Target::Proxmox,
         Target::CloudVm,
+        Target::External,
     ];
 
     /// The implementation every machine needs for this target.
@@ -601,6 +626,7 @@ impl Target {
             Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes => Shape::Docker,
             Target::Vagrant | Target::Proxmox | Target::CloudVm => Shape::Vm,
             Target::Hybrid => Shape::Either,
+            Target::External => Shape::External,
         }
     }
 
@@ -615,6 +641,7 @@ impl Target {
             Target::Vagrant => "vagrant",
             Target::Proxmox => "proxmox",
             Target::CloudVm => "cloud-vm",
+            Target::External => "external",
         }
     }
 }
@@ -626,6 +653,8 @@ pub enum Shape {
     Vm,
     /// Either implementation, machine by machine.
     Either,
+    /// An `external` block: the machine exists already.
+    External,
 }
 
 impl Shape {
@@ -634,6 +663,7 @@ impl Shape {
             Shape::Docker => "docker",
             Shape::Vm => "vm",
             Shape::Either => "docker` or `vm",
+            Shape::External => "external",
         }
     }
 }

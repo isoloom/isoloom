@@ -507,6 +507,30 @@ fn base_table() -> Vec<Row> {
             }),
         },
         Row {
+            path: "machines.*.external.address",
+            outputs: all(Status::Core {
+                note: "the `external` target's SSH endpoint (inventory, checks, connect)",
+            }),
+        },
+        Row {
+            path: "machines.*.external.user",
+            outputs: all(Status::Core {
+                note: "the `external` target's SSH user",
+            }),
+        },
+        Row {
+            path: "machines.*.external.port",
+            outputs: all(Status::Core {
+                note: "the `external` target's SSH port",
+            }),
+        },
+        Row {
+            path: "machines.*.external.key",
+            outputs: all(Status::Core {
+                note: "the `external` target's SSH key",
+            }),
+        },
+        Row {
             path: "message",
             outputs: all(Status::Descriptive {
                 note: "printed by `isoloom run` and `isoloom message`, placeholders filled from the snapshot",

@@ -7,6 +7,7 @@ mod cloud_vm;
 mod cloud_vm_others;
 mod docker;
 mod docker_vm;
+mod external;
 mod hybrid;
 mod kubernetes;
 mod proxmox;
@@ -71,6 +72,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
     Target::Vagrant,
     Target::Proxmox,
     Target::CloudVm,
+    Target::External,
 ];
 
 /// The files for one target.
@@ -121,6 +123,7 @@ fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
         Target::Vagrant => vagrant::generate(spec),
         Target::Proxmox => proxmox::generate(spec),
         Target::CloudVm => cloud_vm::generate(spec),
+        Target::External => external::generate(spec),
     }
 }
 

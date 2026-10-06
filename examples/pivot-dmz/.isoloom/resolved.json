@@ -282,7 +282,8 @@
       "cloud-vm": "machine `user`: no AWS image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)"
     },
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs"
+      "hybrid": "only when some machines are containers and others are VMs",
+      "external": "needs `external:` on gateway, app, db"
     }
   },
   "checks": {

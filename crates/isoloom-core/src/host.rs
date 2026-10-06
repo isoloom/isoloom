@@ -221,6 +221,9 @@ pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
                 "the cluster doesn't answer (kubectl cluster-info)",
             );
         }
+        Target::External => {
+            need((h.run)("ssh", &["-G", "localhost"]).map(|_| "ssh".to_string()), "ssh isn't installed");
+        }
         Target::Proxmox => {
             need(
                 (h.run)("terraform", &["version", "-json"]).map(|_| "Terraform".to_string()),

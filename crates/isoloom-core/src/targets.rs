@@ -14,6 +14,7 @@ pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
             Shape::Docker => m.docker.is_none(),
             Shape::Vm => m.vm.is_none(),
             Shape::Either => m.docker.is_none() && m.vm.is_none(),
+            Shape::External => m.external.is_none(),
         })
         .map(|(n, _)| n.clone())
         .collect()

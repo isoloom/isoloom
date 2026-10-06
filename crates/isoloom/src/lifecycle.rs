@@ -162,6 +162,33 @@ fn probe(e: &Entry) -> String {
                 counted(ready, items.len())
             })
         }
+        Target::External => {
+            // Each machine answers SSH, or not.
+            let machines = external_machines(&out).unwrap_or_default();
+            let total = machines.len();
+            let up = machines
+                .values()
+                .filter(|m| {
+                    let mut args = vec![
+                        "-o".to_string(),
+                        "BatchMode=yes".into(),
+                        "-o".into(),
+                        "ConnectTimeout=5".into(),
+                        "-o".into(),
+                        "StrictHostKeyChecking=accept-new".into(),
+                        format!("-p{}", m.port),
+                    ];
+                    if let Some(k) = &m.key {
+                        args.extend(["-i".to_string(), k.clone()]);
+                    }
+                    args.push(format!("{}@{}", m.user, m.address));
+                    args.push("true".into());
+                    let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+                    core::host::run_limited("ssh", &refs, 10).ok().flatten().is_some()
+                })
+                .count();
+            Ok(counted(up, total))
+        }
         Target::Proxmox | Target::CloudVm | Target::CloudDocker => {
             let module = match e.target {
                 Target::Proxmox => out.join("proxmox"),
@@ -346,6 +373,15 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 core::instance::output_dir(instance),
                 sq(&inner)
             ));
+        }
+        Target::External => {
+            let e = m.external.as_ref().ok_or_else(|| format!("`{machine}` has no `external:` address"))?;
+            let key = ssh_key.or(e.key.as_deref().map(Path::new));
+            c = ssh(key, e.user.as_deref().unwrap_or("root"), &e.address, tty);
+            if let Some(p) = e.port {
+                c.arg(format!("-p{p}"));
+            }
+            c.arg(format!("{sudo}sh -c {}", sq(&inner)));
         }
         Target::Proxmox => return Err("reaching machines on Proxmox comes next".into()),
     }
@@ -616,6 +652,110 @@ pub fn tc(dir: &Path, target: Option<&str>, instance: Option<u8>, action: &str, 
     };
     let status = c.status().map_err(|e| tool_error(&c, e))?;
     Ok(if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+}
+
+/// An external machine's SSH endpoint, as `.isoloom/external/machines.json` records it.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ExternalMachine {
+    pub address: String,
+    pub user: String,
+    pub port: u16,
+    pub key: Option<String>,
+}
+
+/// The external machines of a generated project (`<out>/external/machines.json`).
+pub fn external_machines(out: &Path) -> Res<std::collections::BTreeMap<String, ExternalMachine>> {
+    let path = out.join("external/machines.json");
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e} (run `isoloom generate --target external`)", path.display()))?;
+    Ok(serde_json::from_str(&text)?)
+}
+
+/// `isoloom run external`: provisions the existing machines over SSH, in start order: the
+/// project copied to /opt/isoloom, each machine's `.sh` steps run there, its `.yml` steps run
+/// from here against it, then the environment's `provision:` playbooks with the inventory.
+pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<()> {
+    let out = dir.join(core::instance::output_dir(instance));
+    let machines = external_machines(&out)?;
+    let ssh_args = |m: &ExternalMachine| -> Vec<String> {
+        let mut a = vec!["-o".to_string(), "StrictHostKeyChecking=accept-new".into(), format!("-p{}", m.port)];
+        if let Some(k) = &m.key {
+            a.extend(["-i".to_string(), k.clone()]);
+        }
+        a.push(format!("{}@{}", m.user, m.address));
+        a
+    };
+    let run = |program: &str, args: &[String], stdin: Option<std::process::Stdio>| -> Res<()> {
+        let mut c = Command::new(program);
+        c.args(args);
+        if let Some(i) = stdin {
+            c.stdin(i);
+        }
+        let st = c.status().map_err(|e| tool_error(&c, e))?;
+        if st.success() {
+            Ok(())
+        } else {
+            Err(format!("{program} {} failed", args.iter().take(3).cloned().collect::<Vec<_>>().join(" ")).into())
+        }
+    };
+    let order: Vec<String> = core::resolved::lookup(&core::resolved::resolve_with(spec, instance), "start_order")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+        .unwrap_or_default();
+    for name in &order {
+        let Some(m) = machines.get(name) else { continue };
+        let machine = &spec.machines[name];
+        let Some(vm) = &machine.vm else { continue };
+        if core::images::is_windows(&vm.os) {
+            eprintln!("{name}: Windows; provision it with the environment's playbooks (per-machine steps over SSH come later)");
+            continue;
+        }
+        eprintln!("{name}: copying the project to {}:/opt/isoloom", m.address);
+        let tar = Command::new("tar")
+            .args([
+                "-czf",
+                "-",
+                "--exclude=.git",
+                "--exclude=.vagrant",
+                "--exclude=.terraform",
+                "-C",
+                &dir.display().to_string(),
+                ".",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("tar: {e}"))?;
+        let mut a = ssh_args(m);
+        a.push("sudo mkdir -p /opt/isoloom && sudo chown \"$(id -un)\" /opt/isoloom && tar -xzf - -C /opt/isoloom".into());
+        run("ssh", &a, Some(std::process::Stdio::from(tar.stdout.expect("piped"))))?;
+        for step in &vm.provision {
+            eprintln!("{name}: {step}");
+            if step.ends_with(".sh") {
+                let mut a = ssh_args(m);
+                a.push(format!("cd /opt/isoloom && sudo sh {step}"));
+                run("ssh", &a, None)?;
+            } else {
+                let mut a = vec!["-i".to_string(), format!("{},", m.address), "-u".into(), m.user.clone(), "--become".into()];
+                if let Some(k) = &m.key {
+                    a.extend(["--private-key".to_string(), k.clone()]);
+                }
+                a.extend(["-e".to_string(), format!("ansible_port={}", m.port), step.clone()]);
+                run("ansible-playbook", &a, None)?;
+            }
+        }
+    }
+    for step in &spec.provision {
+        eprintln!("environment: {}", step.ansible);
+        let mut a = vec!["-i".to_string(), out.join("external/inventory.ini").display().to_string()];
+        for inv in &step.inventory {
+            a.extend(["-i".to_string(), dir.join(inv).display().to_string()]);
+        }
+        for (k, v) in &step.vars {
+            a.extend(["-e".to_string(), format!("{k}={v}")]);
+        }
+        a.push(dir.join(&step.ansible).display().to_string());
+        run("ansible-playbook", &a, None)?;
+    }
+    Ok(())
 }
 
 /// The spec, as the instance when one is named (its names and ports are the instance's).

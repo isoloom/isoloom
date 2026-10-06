@@ -130,7 +130,8 @@
     ],
     "refused": {},
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs"
+      "hybrid": "only when some machines are containers and others are VMs",
+      "external": "needs `external:` on store, app"
     }
   },
   "checks": {

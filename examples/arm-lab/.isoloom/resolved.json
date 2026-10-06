@@ -93,7 +93,8 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "vagrant": "needs `vm:` on web",
       "proxmox": "needs `vm:` on web",
-      "cloud-vm": "needs `vm:` on web"
+      "cloud-vm": "needs `vm:` on web",
+      "external": "needs `external:` on web"
     }
   },
   "checks": {

@@ -116,7 +116,8 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "vagrant": "needs `vm:` on bench, web",
       "proxmox": "needs `vm:` on bench, web",
-      "cloud-vm": "needs `vm:` on bench, web"
+      "cloud-vm": "needs `vm:` on bench, web",
+      "external": "needs `external:` on bench, web"
     }
   },
   "checks": {

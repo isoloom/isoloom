@@ -387,6 +387,24 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         }
     }
 
+    // External machines: an address, a sane port, a user name.
+    for (name, m) in &spec.machines {
+        let Some(e) = &m.external else { continue };
+        let at = format!("machines.{name}.external");
+        if e.address.trim().is_empty() || e.address.chars().any(|c| c.is_whitespace() || c == '@' || c == '\'' || c == '"') {
+            add(
+                &format!("{at}.address"),
+                "an address or hostname reachable from here, like 192.168.1.20 or dc01.lab.local".into(),
+            );
+        }
+        if e.port == Some(0) {
+            add(&format!("{at}.port"), "1 to 65535".into());
+        }
+        if e.user.as_deref().is_some_and(|u| u.trim().is_empty() || u.contains(['@', ' '])) {
+            add(&format!("{at}.user"), "a user name".into());
+        }
+    }
+
     // Link impairment: well-formed, and on a network Isoloom's router is on.
     for (name, net) in &spec.networks {
         let Some(tc) = &net.tc else { continue };

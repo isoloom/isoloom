@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Machines that already exist: two VMs someone built by hand on a home lab, reached over SSH at
+# the addresses in `external:`. Isoloom creates nothing; `isoloom run external` provisions them,
+# `isoloom test external` runs the checks from each, `connect` and `exec` reach them. Networks
+# and `reach` describe what the lab's own switches and firewall should allow, which the derived
+# checks verify. These machines keep `vm:` too, so the same spec also builds the lab from scratch.
+version: 1
+name: existing-hosts
+
+networks:
+  lab: { cidr: 192.168.1.0/24 }
+
+machines:
+  web:
+    networks: { lab: 20 }
+    services: [{ port: 80, http: true }]
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
+    external: { address: 192.168.1.20, user: florian, key: ~/.ssh/id_ed25519 }
+  cache:
+    networks: { lab: 21 }
+    services: [{ port: 6379, name: redis }]
+    vm:
+      os: debian-12
+      provision: [provision/cache.sh]
+    external: { address: 192.168.1.21, user: florian, key: ~/.ssh/id_ed25519 }
