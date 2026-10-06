@@ -118,6 +118,22 @@ pub fn nftables(spec: &Spec) -> String {
     format!("table inet isoloom {{\n  chain forward {{\n    type filter hook forward priority 0; policy drop;\n{body}\n  }}\n}}\n")
 }
 
+/// Shell that applies each network's `tc` on the router's interface into it (found by the
+/// router's address there), or `None` when no network asks for it. Idempotent (`replace`).
+pub fn tc_script(spec: &Spec) -> Option<String> {
+    let lines: Vec<String> = networks(spec)
+        .filter_map(|n| spec.networks[n].tc.as_ref().map(|t| (n, t)))
+        .map(|(n, t)| {
+            let addr = address(spec, n).to_string().replace('.', "\\.");
+            format!(
+                "IF=$(ip -o -4 addr show | awk '$4 ~ /^{addr}\\//{{print $2}}' | head -n 1); [ -n \"$IF\" ] && tc qdisc replace dev \"$IF\" root netem {}",
+                t.netem()
+            )
+        })
+        .collect();
+    (!lines.is_empty()).then(|| format!("{}\n", lines.join("\n")))
+}
+
 /// A shell loop that waits until `host` answers on every port (bash's /dev/tcp, then nc),
 /// giving up after `timeout` seconds.
 pub fn wait_for(host: &str, ports: &[u16], timeout: u32) -> String {

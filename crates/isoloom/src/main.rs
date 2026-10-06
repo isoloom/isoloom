@@ -277,6 +277,34 @@ enum Command {
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
     },
+    /// Link impairment on a running environment's router: `show`, `set` (with `--delay`, `--jitter`,
+    /// `--loss`, `--rate`) or `disable` on a network, or `reset` to the spec's `tc`.
+    Tc {
+        /// `show`, `set`, `disable` or `reset`.
+        action: String,
+        /// The network (one Isoloom's router is on).
+        network: String,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// The target it runs on (default: what `run` recorded for this folder).
+        #[arg(long)]
+        target: Option<String>,
+        /// The instance.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
+        /// For `set`: one-way delay, e.g. 50ms.
+        #[arg(long)]
+        delay: Option<String>,
+        /// For `set`: delay variation, e.g. 5ms.
+        #[arg(long)]
+        jitter: Option<String>,
+        /// For `set`: loss in percent.
+        #[arg(long)]
+        loss: Option<f64>,
+        /// For `set`: rate cap, e.g. 10mbit.
+        #[arg(long)]
+        rate: Option<String>,
+    },
     /// Print the spec's `message` (how to use the environment), its placeholders filled.
     Message {
         #[arg(default_value = ".")]
@@ -712,6 +740,24 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             instance,
             args,
         } => lifecycle::capture(&abs(&dir)?, target.as_deref(), instance, &machine, &network, &args, ssh_key.as_deref()),
+        Command::Tc {
+            action,
+            network,
+            dir,
+            target,
+            instance,
+            delay,
+            jitter,
+            loss,
+            rate,
+        } => lifecycle::tc(
+            &abs(&dir)?,
+            target.as_deref(),
+            instance,
+            &action,
+            &network,
+            core::Tc { delay, jitter, loss, rate },
+        ),
         Command::Message { dir, instance, sets } => {
             let (spec, _) = load_settings(&dir, None, &sets)?;
             let problems = core::validate(&spec);

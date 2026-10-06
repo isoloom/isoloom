@@ -78,6 +78,9 @@ fn unsupported(spec: &Spec) -> Option<String> {
     if spec.checks.iter().any(|c| c.is_playbook()) {
         return Some("Ansible checks (.yml) in the cloud come later".into());
     }
+    if spec.networks.values().any(|n| n.tc.is_some()) {
+        return Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none".into());
+    }
     let nets: Vec<Cidr> = spec.networks.keys().map(|n| cidr(spec, n)).collect();
     if nets.iter().any(|c| c.len > 28) {
         return Some("AWS subnets are /28 or larger".into());

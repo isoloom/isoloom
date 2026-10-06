@@ -387,6 +387,60 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         }
     }
 
+    // Link impairment: well-formed, and on a network Isoloom's router is on.
+    for (name, net) in &spec.networks {
+        let Some(tc) = &net.tc else { continue };
+        let at = format!("networks.{name}.tc");
+        let time_ok = |v: &str| {
+            let digits = v.trim_end_matches(|c: char| c.is_ascii_alphabetic());
+            let unit = &v[digits.len()..];
+            !digits.is_empty() && digits.parse::<f64>().is_ok() && ["ms", "s", "us"].contains(&unit)
+        };
+        if tc.delay.is_none() && tc.jitter.is_none() && tc.loss.is_none() && tc.rate.is_none() {
+            add(&at, "say what to impair: `delay`, `jitter`, `loss` or `rate`".into());
+        }
+        if let Some(d) = &tc.delay
+            && !time_ok(d)
+        {
+            add(&format!("{at}.delay"), format!("`{d}` isn't a time like 50ms or 1s"));
+        }
+        if let Some(j) = &tc.jitter {
+            if !time_ok(j) {
+                add(&format!("{at}.jitter"), format!("`{j}` isn't a time like 5ms"));
+            }
+            if tc.delay.is_none() {
+                add(&format!("{at}.jitter"), "jitter varies a `delay`; set one".into());
+            }
+        }
+        if let Some(l) = tc.loss
+            && !(0.0..=100.0).contains(&l)
+        {
+            add(&format!("{at}.loss"), "a percentage, 0 to 100".into());
+        }
+        if let Some(r) = &tc.rate {
+            let digits = r.trim_end_matches(|c: char| c.is_ascii_alphabetic());
+            let unit = &r[digits.len()..];
+            if digits.is_empty() || digits.parse::<f64>().is_err() || !["bit", "kbit", "mbit", "gbit", "bps", "kbps", "mbps", "gbps"].contains(&unit) {
+                add(&format!("{at}.rate"), format!("`{r}` isn't a rate like 10mbit or 512kbit"));
+            }
+        }
+        if net.gateway.is_some() {
+            add(
+                &at,
+                format!("`{name}` is routed by its gateway machine, which owns its link; `tc` applies on Isoloom's router"),
+            );
+        } else if !spec.reach.iter().any(|r| {
+            (r.from == *name || r.to == *name)
+                && spec.networks.get(&r.from).is_some_and(|n| n.gateway.is_none())
+                && spec.networks.get(&r.to).is_some_and(|n| n.gateway.is_none())
+        }) {
+            add(
+                &at,
+                format!("Isoloom's router isn't on `{name}`: add a `reach` rule to or from it (impairment applies to traffic entering through the router)"),
+            );
+        }
+    }
+
     // The message: balanced placeholders with a path inside.
     if let Some(m) = &spec.message {
         let mut rest = m.as_str();

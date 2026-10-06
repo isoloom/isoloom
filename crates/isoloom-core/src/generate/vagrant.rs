@@ -425,6 +425,13 @@ fn routes_unit(cmds: &[String]) -> String {
     )
 }
 
+/// Link impairment on the router, re-applied at every boot (netem doesn't survive one).
+fn tc_unit(script: &str) -> String {
+    format!(
+        "mkdir -p /etc/isoloom\ncat > /etc/isoloom/tc.sh <<'TC'\n#!/bin/sh\n# Link impairment (networks.*.tc) on this router's interfaces.\n{script}TC\nchmod +x /etc/isoloom/tc.sh\ncat > /etc/systemd/system/isoloom-tc.service <<'UNIT'\n[Unit]\nDescription=Link impairment on the isoloom router\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/tc.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-tc.service\nsystemctl restart isoloom-tc.service\n"
+    )
+}
+
 /// Indents every line of a script for a Ruby squiggly heredoc.
 fn indent(script: &str, spaces: usize) -> String {
     let pad = " ".repeat(spaces);
@@ -487,8 +494,9 @@ fn router_vm(spec: &Spec, out: &mut String) {
     let router_nets: Vec<&str> = router::networks(spec).map(String::as_str).collect();
     esxi(out, &format!("{}-router", spec.name), 1, 512, &router_nets);
     let script = format!(
-        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n",
-        router::nftables(spec)
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{}",
+        router::nftables(spec),
+        router::tc_script(spec).map(|t| tc_unit(&t)).unwrap_or_default()
     );
     let _ = writeln!(
         out,

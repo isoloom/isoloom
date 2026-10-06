@@ -187,6 +187,26 @@ fn base_table() -> Vec<Row> {
             done("a Compose network with that subnet", "hello-stack"),
             done("a private network (VirtualBox internal network, libvirt network)", "hello-stack"),
         ),
+        common(
+            "networks.*.tc.delay",
+            done("netem on the router's interface into the network", "slow-link"),
+            done("netem on the router VM, re-applied at boot", "slow-link"),
+        ),
+        common(
+            "networks.*.tc.jitter",
+            done("netem on the router's interface into the network", "slow-link"),
+            done("netem on the router VM, re-applied at boot", "slow-link"),
+        ),
+        common(
+            "networks.*.tc.loss",
+            done("netem on the router's interface into the network", "slow-link"),
+            done("netem on the router VM, re-applied at boot", "slow-link"),
+        ),
+        common(
+            "networks.*.tc.rate",
+            done("netem on the router's interface into the network", "slow-link"),
+            done("netem on the router VM, re-applied at boot", "slow-link"),
+        ),
         row(
             "networks.*.docker.cidr",
             done(

@@ -490,16 +490,20 @@ fn router_service(spec: &Spec) -> Value {
     r.insert(s("networks"), Value::Mapping(nets));
     let mut env = Mapping::new();
     env.insert(s("RULES"), s(router::nftables(spec)));
+    let tc = router::tc_script(spec);
+    if let Some(t) = &tc {
+        // `$$`: the script's own variables, not Compose's interpolation.
+        env.insert(s("TC"), s(t.replace('$', "$$")));
+    }
     r.insert(s("environment"), Value::Mapping(env));
-    // `$$` keeps Compose from interpolating the shell variable.
-    r.insert(
-        s("entrypoint"),
-        list([
-            s("/bin/sh"),
-            s("-c"),
-            s("apk add --no-cache nftables >/dev/null && printf '%s' \"$$RULES\" | nft -f - && exec sleep infinity"),
-        ]),
-    );
+    // `$$` keeps Compose from interpolating the shell variable. With `tc`, iproute2 (for tc) and
+    // the netem commands after the rules.
+    let start = if tc.is_some() {
+        "apk add --no-cache nftables iproute2 >/dev/null && printf '%s' \"$$RULES\" | nft -f - && printf '%s' \"$$TC\" | sh && exec sleep infinity"
+    } else {
+        "apk add --no-cache nftables >/dev/null && printf '%s' \"$$RULES\" | nft -f - && exec sleep infinity"
+    };
+    r.insert(s("entrypoint"), list([s("/bin/sh"), s("-c"), s(start)]));
     r.insert(
         s("healthcheck"),
         map([

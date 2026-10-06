@@ -39,6 +39,7 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("mixed-office");
     assert_committed("arm-lab");
     assert_committed("arm-vm");
+    assert_committed("slow-link");
     assert_committed("workbench");
 }
 

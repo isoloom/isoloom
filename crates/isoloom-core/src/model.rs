@@ -76,6 +76,49 @@ pub struct Network {
     /// `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub vlans: IndexMap<u16, Vlan>,
+    /// Link impairment on traffic entering this network through Isoloom's router (a slow or
+    /// lossy link): delay, jitter, loss, rate. Needs the router on the network (a `reach` rule
+    /// touching it, no `gateway` machine).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tc: Option<Tc>,
+}
+
+/// Link impairment (Linux netem on the router's interface into the network).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Tc {
+    /// One-way delay added, e.g. `50ms`, `1s`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delay: Option<String>,
+    /// Random variation of the delay, e.g. `5ms` (needs `delay`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jitter: Option<String>,
+    /// Packets dropped, in percent (`0.5` = 0.5%).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss: Option<f64>,
+    /// Bandwidth cap, e.g. `10mbit`, `512kbit`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<String>,
+}
+
+impl Tc {
+    /// The netem parameters, as `tc qdisc ... netem` takes them.
+    pub fn netem(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(d) = &self.delay {
+            parts.push(format!("delay {d}"));
+            if let Some(j) = &self.jitter {
+                parts.push(j.clone());
+            }
+        }
+        if let Some(l) = self.loss {
+            parts.push(format!("loss {l}%"));
+        }
+        if let Some(r) = &self.rate {
+            parts.push(format!("rate {r}"));
+        }
+        parts.join(" ")
+    }
 }
 
 /// A VLAN of a LAN (see [`Network::vlans`]).

@@ -23,6 +23,11 @@ use crate::model::{Spec, Target};
 use crate::targets::effective;
 use crate::validate::Cidr;
 
+/// The name of the router Isoloom adds (a Compose service, a VM) when `reach` rules need one.
+pub fn router_name() -> &'static str {
+    router::NAME
+}
+
 /// Where generated files go, relative to the project folder.
 pub const OUTPUT_DIR: &str = ".isoloom";
 

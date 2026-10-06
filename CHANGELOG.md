@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Link impairment: `networks.*.tc`
+- `tc: { delay, jitter, loss, rate }` on a network: Isoloom's router applies Linux netem on its interface into it, so traffic entering from the other networks is delayed, jittered, lossy or capped. Docker (the router container gets iproute2) and local VMs (a oneshot unit re-applies it at boot). Kubernetes and the cloud refuse with the reason (no router in the path). Validation checks the values and that the router is on the network.
+- `isoloom tc show|set|disable|reset <network>` changes it on a running environment.
+- Example: slow-link, whose check measures the delay; it runs in CI on Docker.
+
 ### `message:` once the environment is up
 - A top-level `message:` (Markdown) printed by `isoloom run` when the environment is up and by `isoloom message` any time; `{{ machines.web.services.0.publish }}`-style placeholders take any value of the resolved snapshot (addresses, published ports, the instance). The snapshot carries the rendered text for embedders. Validation catches unbalanced or empty placeholders; one pointing at nothing is an error naming it.
 

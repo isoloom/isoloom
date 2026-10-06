@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Two sites joined by a slow link: the user at the branch reaches the web server at the far site
+# through Isoloom's router, whose interface into `far` adds 80 ms of delay, jitter, 1% loss and a
+# 10 Mbit cap (`networks.far.tc`). The check measures the delay; `isoloom tc` changes it live.
+version: 1
+name: slow-link
+
+networks:
+  branch: { cidr: 10.75.1.0/24 }
+  far:
+    cidr: 10.75.2.0/24
+    tc: { delay: 80ms, jitter: 10ms, loss: 1, rate: 10mbit }
+
+reach:
+  - { from: branch, to: far, ports: [80] }
+
+machines:
+  web:
+    networks: { far: 10 }
+    services: [{ port: 80, http: true }]
+    docker:
+      build: build/web
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
+  user:
+    access: true
+    networks: { branch: 10 }
+    vm:
+      os: debian-12
+
+checks:
+  - name: the far site answers, slowly
+    from: user
+    script: checks/slow-but-there.sh

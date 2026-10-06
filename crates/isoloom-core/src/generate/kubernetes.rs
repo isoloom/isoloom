@@ -148,6 +148,9 @@ fn unsupported(spec: &Spec) -> Option<String> {
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine on Kubernetes come later".into());
     }
+    if spec.networks.values().any(|n| n.tc.is_some()) {
+        return Some("link impairment (`tc`) needs a router in the path; Kubernetes has none".into());
+    }
     None
 }
 
