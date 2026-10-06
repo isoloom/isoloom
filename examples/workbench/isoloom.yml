@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A machine to work from, next to a web server: the workbench is a stock Alpine image with no
+# service of its own, so `idle: true` keeps its container running (it would otherwise exit at
+# once and restart in a loop). Exec into it and reach web:80 from there.
+version: 1
+name: workbench
+
+networks:
+  lan: { cidr: 10.90.0.0/24 }
+
+machines:
+  bench:
+    networks: { lan: 10 }
+    docker: { image: "alpine:3.20", idle: true }
+  web:
+    networks: { lan: 11 }
+    services: [{ port: 80, http: true }]
+    docker: { image: "nginx:1.27-alpine" }

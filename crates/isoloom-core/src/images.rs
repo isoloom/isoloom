@@ -63,6 +63,7 @@ impl Table {
                     image: Some(image.clone()),
                     build: None,
                     init: Vec::new(),
+                    idle: false,
                 });
                 m.supplied = true;
             }

@@ -157,9 +157,9 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                 svc.insert(s("domainname"), s(domain.as_str()));
             }
         }
-        // A stock image the runner supplies for the user to work from: kept running idle
-        // (its own command may be a shell that exits at once).
-        if m.supplied {
+        // A stock image the runner supplies for the user to work from, or one the spec marks
+        // `idle`: kept running idle (its own command may be a shell that exits at once).
+        if m.supplied || m.docker.as_ref().is_some_and(|d| d.idle) {
             svc.insert(s("entrypoint"), list([s("sleep"), s("infinity")]));
         }
         svc.insert(s("hostname"), s(name.as_str()));

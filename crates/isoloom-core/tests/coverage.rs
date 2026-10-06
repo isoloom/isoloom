@@ -37,7 +37,7 @@ machines:
     depends_on: []
     volumes: { data: /data }
     access: false
-    docker: { image: a, init: [x.sh] }
+    docker: { image: a, init: [x.sh], idle: true }
     vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1" } }
 provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, requirements: req.yml }]
 checks: [c.sh, { name: n, from: fw, http: "http://x/", tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]

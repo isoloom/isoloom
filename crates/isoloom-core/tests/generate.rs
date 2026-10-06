@@ -39,6 +39,7 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("mixed-office");
     assert_committed("arm-lab");
     assert_committed("arm-vm");
+    assert_committed("workbench");
 }
 
 #[test]
@@ -482,4 +483,19 @@ fn linux_machines_leave_windows_out_of_etc_hosts() {
     // And the depends_on wait on the Windows DC is by address, not name.
     assert!(lx.contains("/192.168.56.10/389"), "the Windows dependency is waited on by address: {lx}");
     assert!(!lx.contains("</dev/tcp/dc01/"), "not by the name that isn't in /etc/hosts");
+}
+
+#[test]
+fn an_idle_container_is_kept_running() {
+    let spec = parse(
+        "version: 1\nname: idle\nnetworks:\n  lan: { cidr: 10.10.1.0/24 }\nmachines:\n  box:\n    networks: { lan: 10 }\n    docker: { image: \"alpine:3.20\", idle: true }\n  web:\n    networks: { lan: 11 }\n    services: [{ port: 80 }]\n    docker: { image: \"nginx:1.27-alpine\" }\n",
+    )
+    .expect("spec parses");
+    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    assert!(compose.contains("  box:\n    image: alpine:3.20\n    platform: linux/amd64\n    entrypoint:\n    - sleep\n    - infinity\n"), "{compose}");
+    // A machine that runs its own service keeps its image's command.
+    let web = compose.split("  web:").nth(1).unwrap();
+    assert!(!web.split("\n  ").next().unwrap().contains("entrypoint"), "{compose}");
+    let k8s: String = generate(&spec, Target::Kubernetes).unwrap().iter().map(|f| f.contents.clone()).collect();
+    assert!(k8s.contains("command:\n        - sleep\n        - infinity") || k8s.contains("command:\n          - sleep\n          - infinity") || k8s.contains("- sleep\n"), "{k8s}");
 }

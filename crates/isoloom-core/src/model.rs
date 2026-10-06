@@ -204,6 +204,10 @@ pub struct DockerImpl {
     /// One-shot jobs (scripts or folders in the project) run before the machine counts as ready.
     #[serde(default)]
     pub init: Vec<String>,
+    /// The image runs no service of its own (a stock Linux image whose command is a shell that
+    /// exits at once): keep the container running idle, as a machine to work from.
+    #[serde(default)]
+    pub idle: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

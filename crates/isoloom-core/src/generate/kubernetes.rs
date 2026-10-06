@@ -186,7 +186,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             }
             c.insert(s("securityContext"), Value::Mapping(sec));
         }
-        if m.supplied {
+        if m.supplied || m.docker.as_ref().is_some_and(|d| d.idle) {
             c.insert(s("command"), list([s("sleep"), s("infinity")]));
         }
         if !m.services.is_empty() {

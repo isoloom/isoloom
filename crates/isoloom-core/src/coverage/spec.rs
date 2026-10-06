@@ -352,6 +352,12 @@ fn base_table() -> Vec<Row> {
             NOT_A_CONTAINER,
             NOT_A_CONTAINER,
         ),
+        row(
+            "machines.*.docker.idle",
+            done("kept running idle (`entrypoint: [sleep, infinity]`), a machine to work from", "workbench"),
+            NOT_A_CONTAINER,
+            NOT_A_CONTAINER,
+        ),
         vm_field(
             "machines.*.vm.os",
             Status::Partial {
