@@ -153,6 +153,17 @@ fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
     Ipv4Addr::from(if cidr.len == 0 { 0 } else { u32::MAX << (32 - cidr.len) })
 }
 
+/// Why `target`'s generator would refuse this spec, if it would: the thing it doesn't support
+/// yet (a Windows machine on Proxmox, environment-level provisioning on Docker, ...). `None`
+/// when `generate` produces the target. Lets `isoloom targets` tell the truth: a target can be
+/// possible by its machines' editions and still not be generated.
+pub fn refusal(spec: &Spec, target: Target) -> Option<String> {
+    match generate(spec, target) {
+        Err(GenerateError::Unsupported { what, .. }) => Some(what),
+        _ => None,
+    }
+}
+
 /// Features no generator supports yet, shared by both (none today: kept as the place to
 /// refuse a spec feature before a generator learns it).
 fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> {

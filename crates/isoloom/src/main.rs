@@ -291,14 +291,21 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
         Command::Targets { dir, json } => {
             let spec = core::load(&dir)?;
             let effective = core::effective(&spec);
+            // A target can be possible by its machines' editions and still be refused by its
+            // generator (a Windows machine on Proxmox, say). A ✓ here means `generate` really
+            // produces it; a refusal shows as ✗ with the generator's reason.
+            let refused = |t: core::Target| core::refusal(&spec, t);
             if json {
-                let ids: Vec<&str> = effective.iter().map(|t| t.id()).collect();
+                let ids: Vec<&str> = effective.iter().copied().filter(|t| refused(*t).is_none()).map(|t| t.id()).collect();
                 println!("{}", serde_json::to_string_pretty(&ids)?);
                 return Ok(ExitCode::SUCCESS);
             }
             for t in core::Target::ALL {
                 if effective.contains(&t) {
-                    println!("✓ {}", t.id());
+                    match refused(t) {
+                        None => println!("✓ {}", t.id()),
+                        Some(why) => println!("✗ {} ({why})", t.id()),
+                    }
                 } else {
                     let lacking = core::targets::missing(&spec, t.needs());
                     let why = if !lacking.is_empty() {

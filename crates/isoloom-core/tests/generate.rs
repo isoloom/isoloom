@@ -42,6 +42,22 @@ fn committed_outputs_are_up_to_date() {
 }
 
 #[test]
+fn refusal_reports_what_a_generator_would_refuse() {
+    // A target can be possible by its machines' editions yet refused by its generator; `targets`
+    // used to show ✓ for those (Proxmox for a Windows lab, or one with environment provisioning).
+    let (_, windows) = example("windows-hello");
+    let why = isoloom_core::refusal(&windows, Target::Proxmox).expect("Windows has no Proxmox image yet");
+    assert!(why.contains("Proxmox image"), "{why}");
+    let (_, ansible) = example("ansible-pair");
+    let why = isoloom_core::refusal(&ansible, Target::Proxmox).expect("environment provisioning on Proxmox is refused");
+    assert!(why.contains("provisioning"), "{why}");
+    // A plain Linux lab is generated: nothing to refuse.
+    let (_, plain) = example("hello-stack");
+    assert_eq!(isoloom_core::refusal(&plain, Target::Proxmox), None);
+    assert_eq!(isoloom_core::refusal(&plain, Target::Docker), None);
+}
+
+#[test]
 fn hybrid_runs_containers_beside_the_vms() {
     let (_, spec) = example("mixed-office");
     let files = generate(&spec, Target::Hybrid).unwrap();

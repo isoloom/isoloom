@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Proxmox
+- `isoloom targets` now tells the truth: a target can be possible by its machines' editions and still be refused by its generator (a Windows machine on Proxmox, environment-level provisioning). It is listed ✗ with the generator's reason, and `--json` leaves it out, instead of a ✓ that `generate` then declined. New `refusal(spec, target)` in isoloom-core.
+
 ## 0.7.2
 
 ### cloud-vm on every cloud
