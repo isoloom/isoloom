@@ -41,7 +41,11 @@ fn instance_files_live_next_to_the_committed_ones() {
         "{}",
         compose.contents
     );
-    assert!(!compose.contents.contains("ipv4_address: 10.61.") && !compose.contents.contains("subnet: 10.61."), "{}", compose.contents);
+    assert!(
+        !compose.contents.contains("ipv4_address: 10.61.") && !compose.contents.contains("subnet: 10.61."),
+        "{}",
+        compose.contents
+    );
     // Paths inside the files follow the folder.
     assert!(compose.contents.contains("isoloom test docker"));
     assert!(
