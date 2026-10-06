@@ -380,6 +380,9 @@ fn windows_hint(spec: &core::Spec, machine: &str) -> String {
 pub fn connect(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: &str, ssh_key: Option<&Path>) -> Res<ExitCode> {
     let spec = load_as(dir, instance)?;
     let (t, cloud) = pick(dir, target, instance, &spec)?;
+    if let Some(clones) = spec.clones.get(machine) {
+        return Err(format!("`{machine}` is {} machines; connect to one of them: {}", clones.len(), clones.join(", ")).into());
+    }
     let env = Env {
         dir,
         spec: &spec,
@@ -421,7 +424,7 @@ pub fn exec(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: &st
         instance,
         ssh_key,
     };
-    if machine != "all" && !spec.groups.contains_key(machine) {
+    if machine != "all" && !spec.groups.contains_key(machine) && !spec.clones.contains_key(machine) {
         let mut c = on_machine(&env, machine, Some(&cmd), false, false)?;
         let status = c.status().map_err(|e| tool_error(&c, e))?;
         return Ok(if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE });
@@ -429,6 +432,8 @@ pub fn exec(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: &st
     let mut failed = false;
     let targets: Vec<String> = if machine == "all" {
         spec.machines.keys().cloned().collect()
+    } else if let Some(clones) = spec.clones.get(machine) {
+        clones.clone()
     } else {
         core::groups::members(&spec, machine)
     };

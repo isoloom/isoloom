@@ -57,6 +57,7 @@
   "start_order": [
     "box"
   ],
+  "clones": {},
   "groups": {},
   "router": null,
   "controller": {

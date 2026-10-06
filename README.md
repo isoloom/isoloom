@@ -45,8 +45,8 @@ checks:                          # plus the checks Isoloom derives from services
   that environment never gets a broken Docker file. `targets:` can only narrow the list.
 - **Behavior is the contract.** The same checks run on every target; a target whose checks fail
   isn't offered.
-- **Say it once.** `common:` and `groups:` hold what several machines share; the spec stays short
-  when five servers get the same box, size and playbook.
+- **Say it once.** `common:` and `groups:` hold what several machines share, and `count: 5` makes
+  five of a machine; the spec stays short when a fleet gets the same box, size and playbook.
 - **Generic.** Nothing is specific to one use: launch-time values reach machines through
   `inputs:`, and `access: true` marks the machine a user lands on.
 

@@ -64,7 +64,7 @@ fn group_problems_name_the_field() {
 fn groups_become_inventory_groups_and_snapshot_entries() {
     let ad = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/corp-ad-basics")).unwrap();
     assert_eq!(ad.machines["dc01"].resources.unwrap().memory_mb, Some(4096));
-    assert_eq!(groups::members(&ad, "domain"), ["dc01", "ws01"]);
+    assert_eq!(groups::members(&ad, "domain"), ["dc01", "ws-01", "ws-02"]);
     let r = isoloom_core::resolved::resolve(&ad);
     assert_eq!(
         isoloom_core::resolved::lookup(&r, "groups.domain").unwrap(),

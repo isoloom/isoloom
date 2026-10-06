@@ -16,7 +16,7 @@ reach:
 # Ansible inventory group for the domain playbooks.
 groups:
   domain:
-    members: [dc01, ws01]
+    members: [dc01, ws]      # ws means both workstations
     resources: { cpus: 2, memory_mb: 4096, disk_gb: 60 }
 
 machines:
@@ -26,12 +26,13 @@ machines:
     vm:
       os: windows-server-2022
       provision: [provision/ad-domain.yml]
-  ws01:
+  ws:
+    count: 2                   # ws-01 and ws-02, at .21 and .22
     networks: { corp: 21 }
     depends_on: [dc01]
     vm:
       os: windows-11
-      provision: [provision/ad-join.yml, provision/ws01.yml]
+      provision: [provision/ad-join.yml, provision/ws.yml]
   web01:
     networks: { dmz: 10, corp: 10 }
     services: [{ port: 80 }]

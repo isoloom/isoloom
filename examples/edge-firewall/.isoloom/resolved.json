@@ -223,6 +223,7 @@
     "cache",
     "user"
   ],
+  "clones": {},
   "groups": {},
   "router": null,
   "controller": {

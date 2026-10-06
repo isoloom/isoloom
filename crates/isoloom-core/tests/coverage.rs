@@ -38,7 +38,11 @@ machines:
     volumes: { data: /data }
     access: false
     docker: { image: a, init: [x.sh], idle: true }
-    vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1" } }
+    vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1", winrm: ssl } }
+  h:
+    count: 2
+    networks: { out: 10 }
+    docker: { build: h }
 provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, requirements: req.yml }]
 common: { resources: { cpus: 1 } }
 groups: { g: { members: [fw], arch: amd64 } }
@@ -48,8 +52,10 @@ targets: [docker]
 
 #[test]
 fn every_field_of_the_format_has_a_row_and_every_row_is_a_field() {
-    let spec = parse(EVERY_FIELD).expect("parses");
-    let fields: BTreeSet<String> = paths(&serde_yaml_ng::to_value(&spec).unwrap()).into_iter().collect();
+    parse(EVERY_FIELD).expect("parses");
+    // The document as written: `count`, `common` and `groups` are folded away by parsing.
+    let raw: serde_yaml_ng::Value = serde_yaml_ng::from_str(EVERY_FIELD).unwrap();
+    let fields: BTreeSet<String> = paths(&raw).into_iter().collect();
     let rows: BTreeSet<String> = table().iter().map(|r| r.path.to_string()).collect();
     let missing: Vec<_> = fields.difference(&rows).collect();
     let stale: Vec<_> = rows.difference(&fields).collect();

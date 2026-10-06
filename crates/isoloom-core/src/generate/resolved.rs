@@ -225,6 +225,7 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
         "reach": spec.reach.iter().map(|r| json!({ "from": r.from, "to": r.to, "ports": r.ports })).collect::<Vec<_>>(),
         "machines": machines,
         "start_order": start_order(spec),
+        "clones": spec.clones,
         "groups": spec.groups.keys().map(|g| (g.clone(), json!(crate::groups::members(spec, g)))).collect::<Map<_, _>>(),
         "router": router_value,
         "controller": controller,

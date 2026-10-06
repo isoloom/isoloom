@@ -188,6 +188,7 @@
     "web",
     "user"
   ],
+  "clones": {},
   "groups": {},
   "router": {
     "networks": [

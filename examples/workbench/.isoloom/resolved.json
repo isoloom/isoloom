@@ -87,6 +87,7 @@
     "bench",
     "web"
   ],
+  "clones": {},
   "groups": {},
   "router": null,
   "controller": {

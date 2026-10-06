@@ -472,6 +472,12 @@ fn base_table() -> Vec<Row> {
             }),
         },
         Row {
+            path: "machines.*.count",
+            outputs: all(Status::Core {
+                note: "expanded into clones before generation",
+            }),
+        },
+        Row {
             path: "common",
             outputs: all(Status::Core {
                 note: "folded into every machine before generation",

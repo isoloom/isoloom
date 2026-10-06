@@ -57,6 +57,7 @@
   "start_order": [
     "web01"
   ],
+  "clones": {},
   "groups": {},
   "router": null,
   "controller": {

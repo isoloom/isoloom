@@ -42,6 +42,10 @@ pub struct Spec {
     /// Narrows the targets derived from the implementations (e.g. not tested on Proxmox yet).
     #[serde(default)]
     pub targets: Option<Vec<Target>>,
+    /// Base machine name -> its clones, for machines that had a `count`. Filled when parsing.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub clones: IndexMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -122,6 +126,11 @@ impl Arch {
 pub struct Machine {
     /// Network name -> last octet of the machine's address on it.
     pub networks: IndexMap<String, u8>,
+    /// How many of this machine (2 to 99): clones named `<name>-01`, `<name>-02`, ..., each one
+    /// address further along on every network. Where the spec names this machine, it means
+    /// every clone. Expanded before anything else reads the spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub count: Option<u8>,
     /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
     #[serde(default)]
     pub arch: Arch,

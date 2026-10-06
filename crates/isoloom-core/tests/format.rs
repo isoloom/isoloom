@@ -37,7 +37,8 @@ fn ad_range_is_vm_only_even_with_one_container_ready_machine() {
     // web01 could be a container, but dc01 and ws01 can't: VMs, or hybrid with web01 a container.
     assert_eq!(ids(derive(&r)), VM_OR_HYBRID);
     let t = totals(&r);
-    assert_eq!((t.machines, t.memory_mb), (4, 4096 + 4096 + 1024 + 1024));
+    // dc01 and the two workstations (`count: 2`) at 4 GB, web01 and the access machine at 1 GB.
+    assert_eq!((t.machines, t.memory_mb), (5, 4096 * 3 + 1024 * 2));
 }
 
 fn problems(yaml: &str) -> Vec<String> {
