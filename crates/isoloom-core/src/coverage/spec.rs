@@ -471,8 +471,27 @@ fn base_table() -> Vec<Row> {
                 note: "narrows the targets Isoloom generates",
             }),
         },
+        Row {
+            path: "common",
+            outputs: all(Status::Core {
+                note: "folded into every machine before generation",
+            }),
+        },
+        Row {
+            path: "groups",
+            outputs: [
+                Status::Core {
+                    note: "folded into their members before generation",
+                },
+                done("folded into their members; Ansible inventory groups", "ansible-pair"),
+                done("folded into their members; Ansible inventory groups", "ansible-pair"),
+            ],
+        },
     ]
 }
+
+/// Fields counted as one feature whatever they hold.
+const WHOLE: &[&str] = &["common", "groups"];
 
 /// Where in the spec names are chosen by the author (map keys become `*`).
 const NAMED: &[&str] = &[
@@ -488,6 +507,11 @@ const NAMED: &[&str] = &[
 /// A map of plain values under author-chosen names (`machines.*.networks`) counts as one field.
 pub fn paths(doc: &Value) -> Vec<String> {
     fn walk(v: &Value, at: &str, out: &mut Vec<String>) {
+        // Shared machine fields are one feature, however many fields they carry.
+        if WHOLE.contains(&at) {
+            out.push(at.to_string());
+            return;
+        }
         match v {
             Value::Mapping(m) if NAMED.contains(&at) => {
                 if m.values().all(|c| !matches!(c, Value::Mapping(_))) {

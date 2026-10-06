@@ -57,6 +57,7 @@
   "start_order": [
     "box"
   ],
+  "groups": {},
   "router": null,
   "controller": {
     "addresses": {

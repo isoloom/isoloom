@@ -57,6 +57,7 @@
   "start_order": [
     "web01"
   ],
+  "groups": {},
   "router": null,
   "controller": {
     "addresses": {

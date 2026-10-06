@@ -100,6 +100,7 @@
     "cache",
     "web"
   ],
+  "groups": {},
   "router": null,
   "controller": {
     "addresses": {

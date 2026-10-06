@@ -95,6 +95,7 @@
     "files01",
     "intranet"
   ],
+  "groups": {},
   "router": null,
   "controller": {
     "addresses": {

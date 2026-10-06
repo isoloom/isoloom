@@ -188,6 +188,7 @@
     "web",
     "user"
   ],
+  "groups": {},
   "router": {
     "networks": [
       "front",

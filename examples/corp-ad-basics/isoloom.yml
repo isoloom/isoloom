@@ -12,18 +12,23 @@ reach:
   - { from: access, to: dmz }
   - { from: dmz, to: corp }
 
+# Shared fields: every Windows box gets the same size through its group, and the group is an
+# Ansible inventory group for the domain playbooks.
+groups:
+  domain:
+    members: [dc01, ws01]
+    resources: { cpus: 2, memory_mb: 4096, disk_gb: 60 }
+
 machines:
   dc01:
     networks: { corp: 5 }
     services: [{ port: 53 }, { port: 88 }, { port: 389 }, { port: 445 }]
-    resources: { cpus: 2, memory_mb: 4096, disk_gb: 60 }
     vm:
       os: windows-server-2022
       provision: [provision/ad-domain.yml]
   ws01:
     networks: { corp: 21 }
     depends_on: [dc01]
-    resources: { cpus: 2, memory_mb: 4096, disk_gb: 60 }
     vm:
       os: windows-11
       provision: [provision/ad-join.yml, provision/ws01.yml]

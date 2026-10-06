@@ -223,6 +223,7 @@
     "cache",
     "user"
   ],
+  "groups": {},
   "router": null,
   "controller": {
     "addresses": {

@@ -193,6 +193,10 @@ Vagrant.configure("2") do |config|
 
       [caches]
       cache
+
+      [pair]
+      web
+      cache
       INV
     SH
     m.vm.provision "shell", name: "ansible", inline: <<~'SH'

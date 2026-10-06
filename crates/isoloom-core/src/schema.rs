@@ -44,6 +44,8 @@ pub fn schema() -> Value {
         json!(r"^(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}/(2[4-9])$"),
     );
     set(&mut s, &["$defs", "VmImpl", "properties", "os"], "enum", json!(KNOWN_OS));
+    // `vm: {}` is complete when `common:` or a group supplies the OS.
+    set(&mut s, &["$defs", "VmImpl"], "required", json!([]));
     set(
         &mut s,
         &["$defs", "NetworkDocker", "properties", "cidr"],

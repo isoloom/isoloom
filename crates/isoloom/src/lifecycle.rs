@@ -421,13 +421,18 @@ pub fn exec(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: &st
         instance,
         ssh_key,
     };
-    if machine != "all" {
+    if machine != "all" && !spec.groups.contains_key(machine) {
         let mut c = on_machine(&env, machine, Some(&cmd), false, false)?;
         let status = c.status().map_err(|e| tool_error(&c, e))?;
         return Ok(if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE });
     }
     let mut failed = false;
-    for name in spec.machines.keys() {
+    let targets: Vec<String> = if machine == "all" {
+        spec.machines.keys().cloned().collect()
+    } else {
+        core::groups::members(&spec, machine)
+    };
+    for name in &targets {
         let mut c = match on_machine(&env, name, Some(&cmd), false, false) {
             Ok(c) => c,
             Err(why) => {

@@ -894,6 +894,25 @@ pub(super) fn inventory(spec: &Spec) -> String {
             }
         }
     }
+    // The spec's own groups, with the machines that are VMs here.
+    let resolved: Vec<(&str, Vec<String>)> = spec
+        .groups
+        .keys()
+        .map(|g| {
+            (
+                g.as_str(),
+                crate::groups::members(spec, g).into_iter().filter(|m| spec.machines[m].vm.is_some()).collect(),
+            )
+        })
+        .collect();
+    for (g, members) in &resolved {
+        let e = groups.entry(g).or_default();
+        for mbr in members {
+            if !e.contains(&mbr.as_str()) {
+                e.push(mbr.as_str());
+            }
+        }
+    }
     for (g, members) in groups {
         let _ = write!(inv, "\n[{g}]\n{}\n", members.join("\n"));
     }

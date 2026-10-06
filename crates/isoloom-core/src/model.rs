@@ -21,6 +21,15 @@ pub struct Spec {
     #[serde(default)]
     pub inputs: Vec<String>,
     pub machines: IndexMap<String, Machine>,
+    /// Machine fields shared by every machine (a machine's own value wins). `docker:` and `vm:`
+    /// here only complete an implementation a machine declares itself.
+    #[serde(default)]
+    pub common: Option<Shared>,
+    /// Named sets of machines sharing fields (over `common:`, under the machine's own; the most
+    /// specific group wins). They also become Ansible inventory groups, and `isoloom exec`
+    /// targets.
+    #[serde(default)]
+    pub groups: IndexMap<String, Group>,
     /// Provisioning across machines, once every machine is up: Ansible playbooks run from a
     /// controller on the environment's networks, with an inventory Isoloom writes.
     #[serde(default)]
@@ -213,7 +222,9 @@ pub struct DockerImpl {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VmImpl {
-    /// An OS name from [`KNOWN_OS`]; each target maps it to an image.
+    /// An OS name from [`KNOWN_OS`]; each target maps it to an image. May come from `common:`
+    /// or a group (`vm: {}` in the machine).
+    #[serde(default)]
     pub os: String,
     /// Steps run inside the VM, in order: `.sh` on Linux (and Ansible playbooks, `.yml`),
     /// `.ps1` on Windows.
@@ -287,6 +298,75 @@ pub struct Provision {
     /// `requirements.yml` next to the playbook, when there is one.
     #[serde(default)]
     pub requirements: Option<String>,
+}
+
+/// Fields several machines share, through `common:` or a group: everything about how a machine
+/// is built, nothing about what it is (its networks, services and `access` stay its own).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Shared {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arch: Option<Arch>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub privileged: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_only: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tmpfs: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shm_size: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dns: Option<Dns>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inputs: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resources: Option<Resources>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depends_on: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volumes: Option<IndexMap<String, String>>,
+    /// Completes the `docker:` of machines that have one (image, build, init, idle).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub docker: Option<SharedDocker>,
+    /// Completes the `vm:` of machines that have one (os, provision, image).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vm: Option<SharedVm>,
+}
+
+/// A shared `docker:` part: each field optional.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SharedDocker {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub init: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idle: Option<bool>,
+}
+
+/// A shared `vm:` part: each field optional.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SharedVm {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub os: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provision: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<VmImage>,
+}
+
+/// A group: the machines in it, and the fields they share.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Group {
+    /// Machine names, globs (`ws*`), or other groups.
+    pub members: Vec<String>,
+    #[serde(flatten)]
+    pub shared: Shared,
 }
 
 /// One check: a script in the project (a string), or a declared probe (a map).

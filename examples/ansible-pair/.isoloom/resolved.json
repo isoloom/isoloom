@@ -94,6 +94,12 @@
     "web",
     "cache"
   ],
+  "groups": {
+    "pair": [
+      "web",
+      "cache"
+    ]
+  },
   "router": null,
   "controller": {
     "addresses": {

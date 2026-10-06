@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Shared machine fields: `common:` and `groups:`
+- `common:` holds machine fields every machine shares; `groups:` names sets of machines (names, globs like `ws*`, other groups) and the fields they share. They fold into the machines before anything else reads the spec: the machine's own value wins, then the most specific group (a member group over the group that holds it; otherwise the later declared), then `common`. Mappings merge, lists and scalars are replaced.
+- What a machine *is* stays its own (`networks`, `services`, `access`); a shared `docker:` or `vm:` only completes an implementation the machine declares (even as `vm: {}`).
+- Groups become Ansible inventory groups next to `linux` and `windows`, appear in the snapshot, and `isoloom exec <group> -- <command>` runs on their members. Validation names a member that matches nothing, a reserved or taken group name, and loops.
+
 ### Defaults: a hierarchy, and `-s key=value`
 - Settings that are a person's or a team's rather than the spec's, in layers (the last wins, leaf by leaf): built in, `~/.isoloom/defaults.yml`, the project's `isoloom.defaults.yml`, `ISOLOOM_<KEY>` environment variables (`__` for a dot), and `-s defaults.<key>=<value>`. Keys: `images` (the image table: `generate --images` is now one more layer of it), `vagrant.provider` (passed to `vagrant up`), `cloud.<cloud>.region` (the generated module's default). Unknown keys are errors naming the layer.
 - `-s key=value` on `generate`, `check`, `run`, `down`, `test` and `inspect` overrides the spec for that command (`-s machines.web.vm.os=ubuntu-24.04`), before it is parsed; the file is untouched.

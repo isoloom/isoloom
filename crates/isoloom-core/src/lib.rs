@@ -10,6 +10,7 @@ pub mod checks;
 pub mod coverage;
 pub mod defaults;
 pub mod generate;
+pub mod groups;
 pub mod images;
 pub mod import;
 pub mod instance;
@@ -54,7 +55,10 @@ impl std::error::Error for LoadError {}
 
 /// Parses a spec from YAML text. Unknown fields are errors (typos shouldn't pass silently).
 pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
-    serde_yaml_ng::from_str(yaml).map_err(|e| LoadError::Parse(e.to_string()))
+    let mut doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml).map_err(|e| LoadError::Parse(e.to_string()))?;
+    // `common:` and `groups:` fold into the machines first, so every reader sees finished ones.
+    groups::expand(&mut doc).map_err(LoadError::Parse)?;
+    serde_yaml_ng::from_value(doc).map_err(|e| LoadError::Parse(e.to_string()))
 }
 
 /// The spec file in `dir`: `isoloom.yml` or `isoloom.yaml`, never both.

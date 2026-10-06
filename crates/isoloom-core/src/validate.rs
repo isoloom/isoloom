@@ -345,7 +345,12 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             }
         }
         if let Some(v) = &m.vm {
-            if !KNOWN_OS.contains(&v.os.as_str()) {
+            if v.os.is_empty() {
+                add(
+                    &format!("{at}.vm.os"),
+                    format!("name the machine's OS (or share one through `common:` or a group): {}", KNOWN_OS.join(", ")),
+                );
+            } else if !KNOWN_OS.contains(&v.os.as_str()) {
                 add(&format!("{at}.vm.os"), format!("unknown OS `{}`; use one of: {}", v.os, KNOWN_OS.join(", ")));
             }
             if v.provision.is_empty() && !m.access && spec.provision.is_empty() {
@@ -380,6 +385,11 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 }
             }
         }
+    }
+
+    // Groups: names and members.
+    for (at, message) in crate::groups::problems(spec) {
+        add(&at, message);
     }
 
     // Declared checks: one probe each, from a machine that can run it.
