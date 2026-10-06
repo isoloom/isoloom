@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Lifecycle: `status`, `connect`, `exec`, `capture`
+- `isoloom run` records what it brought up in `~/.isoloom/status.yml` (`$ISOLOOM_HOME` to move it): the spec's name, the project folder, the target, the cloud module and when; `isoloom down` forgets it. Tools embedding Isoloom read it through `isoloom_core::registry`.
+- `isoloom status [--json]`: every environment up on this host with its live state from the target's own tool (`running (3/3)`, `partly`, `stopped`, `applied (12 resources)`), and `--cleanup <name>` to tear one down and forget it from anywhere.
+- `isoloom connect <machine>`: a shell on the machine with the right tool for the target (`docker compose exec`, `vagrant ssh`, `kubectl exec`, `ssh` with Terraform's outputs); a Windows machine gets its RDP/WinRM address instead. The target comes from what `run` recorded for the folder, or `--target`.
+- `isoloom exec <machine|all> -- <command>`: the command on one machine, or on every machine that can be reached, each line prefixed with the machine's name.
+- `isoloom capture <machine> <network> [-- tcpdump args]`: tcpdump on the machine's interface on that network, found by its address from inside the machine's network namespace (a netshoot container on Docker, `sudo tcpdump` on local and cloud VMs).
+
 ### The resolved snapshot and `isoloom inspect`
 - `isoloom generate` writes `.isoloom/resolved.json` with every target: the spec after Isoloom has worked everything out. Every address (machines on each network and on Docker's blocks, the router, the controller, the gateways), routes and default gateways, start order, published ports, the targets (possible, generated, refused with the reason, not possible with the reason) and the checks by position with the runner each target names them by. For programs: tools embedding Isoloom read it instead of parsing a Vagrantfile. `resolved_version: 1`.
 - `isoloom inspect [PATH] [DIR] [--yaml]` prints the snapshot, or the part a dotted path names (`machines.web.addresses`, `checks.positions.0.runner`).

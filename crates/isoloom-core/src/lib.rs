@@ -12,6 +12,7 @@ pub mod generate;
 pub mod images;
 pub mod import;
 pub mod model;
+pub mod registry;
 pub mod schema;
 pub mod targets;
 pub mod validate;

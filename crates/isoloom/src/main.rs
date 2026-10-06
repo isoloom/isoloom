@@ -6,6 +6,8 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use isoloom_core as core;
 
+mod lifecycle;
+
 #[derive(Parser)]
 #[command(
     name = "isoloom",
@@ -113,6 +115,64 @@ enum Command {
         /// The SSH private key for the cloud targets (default: your SSH agent and config).
         #[arg(long)]
         ssh_key: Option<PathBuf>,
+    },
+    /// The environments `run` brought up on this host, with their live state.
+    Status {
+        /// Machine-readable output.
+        #[arg(long)]
+        json: bool,
+        /// Tear this environment down (by name) and forget it, from anywhere.
+        #[arg(long, value_name = "NAME")]
+        cleanup: Option<String>,
+    },
+    /// Open a shell on a machine of a running environment (docker compose exec, vagrant ssh,
+    /// kubectl exec, or ssh for the cloud targets).
+    Connect {
+        /// The machine.
+        machine: String,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// The target it runs on (default: what `run` recorded for this folder).
+        #[arg(long)]
+        target: Option<String>,
+        /// The SSH private key for the cloud targets.
+        #[arg(long)]
+        ssh_key: Option<PathBuf>,
+    },
+    /// Run a command on a machine, or on every machine (`all`), of a running environment.
+    Exec {
+        /// The machine, or `all`.
+        machine: String,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// The target it runs on (default: what `run` recorded for this folder).
+        #[arg(long)]
+        target: Option<String>,
+        /// The SSH private key for the cloud targets.
+        #[arg(long)]
+        ssh_key: Option<PathBuf>,
+        /// The command, after `--`.
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
+    /// Capture packets on a machine's interface on one of its networks (tcpdump, from inside
+    /// the machine's network namespace).
+    Capture {
+        /// The machine.
+        machine: String,
+        /// The network (one of the machine's).
+        network: String,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// The target it runs on (default: what `run` recorded for this folder).
+        #[arg(long)]
+        target: Option<String>,
+        /// The SSH private key for the cloud targets.
+        #[arg(long)]
+        ssh_key: Option<PathBuf>,
+        /// tcpdump arguments, after `--` (default: `-l -v`).
+        #[arg(last = true)]
+        args: Vec<String>,
     },
     /// Show the resolved snapshot (what `.isoloom/resolved.json` holds): every address, routes,
     /// targets and checks, worked out from the spec. A dotted path narrows it:
@@ -436,6 +496,23 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             json,
             ssh_key.as_deref(),
         ),
+        Command::Status { json, cleanup } => lifecycle::status(json, cleanup.as_deref(), None),
+        Command::Connect { machine, dir, target, ssh_key } => lifecycle::connect(&abs(&dir)?, target.as_deref(), &machine, ssh_key.as_deref()),
+        Command::Exec {
+            machine,
+            dir,
+            target,
+            ssh_key,
+            command,
+        } => lifecycle::exec(&abs(&dir)?, target.as_deref(), &machine, &command, ssh_key.as_deref()),
+        Command::Capture {
+            machine,
+            network,
+            dir,
+            target,
+            ssh_key,
+            args,
+        } => lifecycle::capture(&abs(&dir)?, target.as_deref(), &machine, &network, &args, ssh_key.as_deref()),
         Command::Inspect { what, dir, yaml } => {
             // `isoloom inspect examples/segmented` names the project, not a path in the snapshot.
             let (what, dir) = match (what, dir) {
@@ -667,13 +744,33 @@ fn run_cmd(
     images: Option<&std::path::Path>,
     down: bool,
 ) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let (_, dir, t) = prepare(dir, target, images)?;
+    let (spec, dir, t) = prepare(dir, target, images)?;
     let dir = &dir;
     let (program, args, wd) = bring_up(dir, t, cloud, down)?;
     eprintln!("{} {} ({})", if down { "Tearing down" } else { "Running" }, t.id(), wd.display());
     let status = std::process::Command::new(&program).args(&args).current_dir(&wd).status();
     match status {
-        Ok(s) if s.success() => Ok(ExitCode::SUCCESS),
+        Ok(s) if s.success() => {
+            // Remember what is up on this host, for status / connect / exec / capture.
+            let recorded = core::registry::load().and_then(|mut reg| {
+                if down {
+                    reg.remove(dir, t);
+                } else {
+                    reg.upsert(core::registry::Entry {
+                        name: spec.name.clone(),
+                        dir: dir.clone(),
+                        target: t,
+                        cloud: cloud.map(str::to_string),
+                        started: core::registry::now(),
+                    });
+                }
+                core::registry::save(&reg)
+            });
+            if let Err(e) = recorded {
+                eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
+            }
+            Ok(ExitCode::SUCCESS)
+        }
         Ok(s) => Err(format!("{program} exited with {s}").into()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(format!("`{program}` isn't installed").into()),
         Err(e) => Err(Box::new(e)),
@@ -1003,6 +1100,11 @@ fn ssh_runner(key: Option<&std::path::Path>, user: &str, host: &str, command: &s
     }
 }
 
+/// A project folder as an absolute path (the registry and the tools' working directories need one).
+fn abs(dir: &std::path::Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()).into())
+}
+
 /// The command (and its working directory) that brings a target up or tears it down.
 fn bring_up(dir: &std::path::Path, t: core::Target, cloud: Option<&str>, down: bool) -> Result<(String, Vec<String>, PathBuf), Box<dyn std::error::Error>> {
     let s = |x: &str| x.to_string();
@@ -1010,8 +1112,9 @@ fn bring_up(dir: &std::path::Path, t: core::Target, cloud: Option<&str>, down: b
     Ok(match t {
         core::Target::Docker | core::Target::Hosted => {
             let f = out.join("docker/compose.yml");
+            // Down with the `check` profile too, so the runners' stand-ins go as well.
             let args = if down {
-                vec![s("compose"), s("-f"), f.display().to_string(), s("down"), s("-v")]
+                vec![s("compose"), s("-f"), f.display().to_string(), s("--profile"), s("check"), s("down"), s("-v")]
             } else {
                 vec![s("compose"), s("-f"), f.display().to_string(), s("up"), s("-d"), s("--build"), s("--wait")]
             };
