@@ -377,3 +377,24 @@ output "published" {
     "web/portal" = "${local.router_address}:3206"
   }
 }
+
+# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+output "machines" {
+  value = {
+    "database" = "10.20.0.32"
+    "web"      = "10.20.0.31"
+  }
+}
+
+output "ssh_user" {
+  value = "isoloom"
+}
+
+# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+output "checks" {
+  value = [
+    { position = "networks", machine = "database", host = "10.20.0.32", user = "isoloom", script = ".isoloom/proxmox/checks/networks.sh" },
+    { position = "database", machine = "database", host = "10.20.0.32", user = "isoloom", script = ".isoloom/proxmox/checks/database.sh" },
+    { position = "web", machine = "web", host = "10.20.0.31", user = "isoloom", script = ".isoloom/proxmox/checks/web.sh" }
+  ]
+}

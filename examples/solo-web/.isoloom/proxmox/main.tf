@@ -307,3 +307,21 @@ output "published" {
     "web/80" = "${local.router_address}:8080"
   }
 }
+
+# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+output "machines" {
+  value = {
+    "web" = "10.80.0.10"
+  }
+}
+
+output "ssh_user" {
+  value = "isoloom"
+}
+
+# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+output "checks" {
+  value = [
+    { position = "networks", machine = "web", host = "10.80.0.10", user = "isoloom", script = ".isoloom/proxmox/checks/networks.sh" }
+  ]
+}

@@ -366,3 +366,23 @@ locals {
 output "address" {
   value = local.router_address
 }
+
+# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+output "machines" {
+  value = {
+    "store" = "192.168.62.20"
+    "app"   = "192.168.62.10"
+  }
+}
+
+output "ssh_user" {
+  value = "isoloom"
+}
+
+# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+output "checks" {
+  value = [
+    { position = "store", machine = "store", host = "192.168.62.20", user = "isoloom", script = ".isoloom/proxmox/checks/store.sh" },
+    { position = "app", machine = "app", host = "192.168.62.10", user = "isoloom", script = ".isoloom/proxmox/checks/app.sh" }
+  ]
+}

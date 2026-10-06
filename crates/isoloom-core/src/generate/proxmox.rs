@@ -11,10 +11,15 @@
 //!   provisioning, and, offline, a block on new connections leaving the environment.
 //! - The connection, the node, the datastores and a `slot` (unique per environment on the
 //!   server: SDN ids are short) are variables.
+//! - Machines are reached through the router (`ssh -J isoloom@<address>`, the `isoloom` user
+//!   with `ssh_public_key`): the `machines` output gives their addresses, and the check runners
+//!   in `.isoloom/proxmox/checks/<position>.sh` are piped to them by `isoloom test proxmox`
+//!   (the `checks` output says which runs where).
 
 use std::fmt::Write;
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, header, router, start_order};
+use crate::checks::{self, Position, Probe};
 use crate::images;
 use crate::model::{Spec, Target};
 use crate::validate::Cidr;
@@ -332,6 +337,19 @@ locals {
         img = res("debian-12"),
     );
 
+    // The checks: a runner per position, piped to its machine over SSH through the router by
+    // `isoloom test proxmox`. A machine whose runner runs a script needs the project.
+    let plan = checks::plan(spec);
+    let groups = checks::by_position(spec, &plan);
+    let runs_script: Vec<&str> = groups
+        .iter()
+        .filter(|(_, g)| g.iter().any(|c| matches!(c.probe, Probe::Script { .. })))
+        .filter_map(|(p, _)| match p {
+            Position::Machine(m) => Some(m.as_str()),
+            _ => None,
+        })
+        .collect();
+
     // The machines, in start order.
     for name in start_order(spec) {
         let m = &spec.machines[name];
@@ -389,7 +407,7 @@ locals {
         runcmd.push("mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready".into());
 
         let mut files = Vec::new();
-        if !vm.provision.is_empty() {
+        if !vm.provision.is_empty() || runs_script.contains(&name) {
             files.push("local.project_files".to_string());
         }
         if !m.inputs.is_empty() {
@@ -480,10 +498,74 @@ locals {
         tf.push_str("  }\n}\n");
     }
 
-    Ok(vec![GeneratedFile {
+    // Each machine at its first address, reached through the router as the `isoloom` user.
+    let first_address = |name: &str| spec.machines[name].networks.first().map(|(net, o)| address(spec, net, *o));
+    let machine_addrs: Vec<(String, String)> = spec
+        .machines
+        .iter()
+        .filter(|(_, m)| m.vm.is_some())
+        .filter_map(|(n, _)| first_address(n).map(|a| (format!("\"{n}\""), format!("\"{a}\""))))
+        .collect();
+    let _ = write!(
+        tf,
+        "\n# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.\noutput \"machines\" {{\n  value = {{\n{}\n  }}\n}}\n\noutput \"ssh_user\" {{\n  value = \"isoloom\"\n}}\n",
+        super::cloud_vm::aligned(&machine_addrs)
+    );
+
+    // The check runners: each on the machine it stands for; a position that isn't one of the
+    // VMs (the environment's networks, a machine the runner supplies) runs from the controller,
+    // else the first machine.
+    let fallback: Option<(String, std::net::Ipv4Addr)> = if super::cloud_vm::needs_controller(spec) {
+        Some(("controller".to_string(), cidr(spec, nets[0]).controller()))
+    } else {
+        start_order(spec)
+            .into_iter()
+            .find(|n| spec.machines[*n].vm.is_some())
+            .and_then(|n| first_address(n).map(|a| (n.to_string(), a)))
+    };
+    let mut entries = Vec::new();
+    for (pos, _) in &groups {
+        let on = match pos {
+            Position::Machine(m) if spec.machines[m].vm.is_some() => first_address(m).map(|a| (m.clone(), a)),
+            _ => fallback.clone(),
+        };
+        let Some((machine, host)) = on else { continue };
+        entries.push(format!(
+            "    {{ position = \"{id}\", machine = \"{machine}\", host = \"{host}\", user = \"isoloom\", script = \"{OUTPUT_DIR}/{DIR}/checks/{id}.sh\" }}",
+            id = pos.id()
+        ));
+    }
+    if !entries.is_empty() {
+        let _ = write!(
+            tf,
+            "\n# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.\noutput \"checks\" {{\n  value = [\n{}\n  ]\n}}\n",
+            entries.join(",\n")
+        );
+    }
+
+    let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/main.tf"),
         contents: tf,
-    }])
+    }];
+    let host = |h: &checks::Host, _: &Position| -> String {
+        match h {
+            checks::Host::Literal(l) => l.clone(),
+            checks::Host::Machine { name, network } => address(spec, network, spec.machines[name].networks[network]).to_string(),
+        }
+    };
+    let run_script = |path: &str| format!("cd /opt/isoloom && sh {path}");
+    let render = checks::Render {
+        host: &host,
+        script: &run_script,
+        playbook: None,
+    };
+    for (pos, group) in &groups {
+        files.push(GeneratedFile {
+            path: format!("{OUTPUT_DIR}/{DIR}/checks/{}.sh", pos.id()),
+            contents: checks::script(pos, group, &render),
+        });
+    }
+    Ok(files)
 }
 
 /// The controller: a Debian VM that runs the environment's playbooks once every machine is up,
@@ -612,9 +694,39 @@ fn published(spec: &Spec) -> Vec<(String, String, std::net::Ipv4Addr, u16, u16)>
 
 #[cfg(test)]
 mod tests {
-    use super::image_url;
+    use super::{generate, image_url};
     use crate::images::is_windows;
     use crate::model::KNOWN_OS;
+
+    const WITH_CHECKS: &str = "version: 1
+name: px
+networks:
+  lab: { cidr: 10.9.0.0/24 }
+machines:
+  web:
+    networks: { lab: 10 }
+    services: [{ port: 80, http: true }]
+    vm: { os: debian-12 }
+  probe:
+    networks: { lab: 11 }
+    vm: { os: debian-12 }
+checks:
+  - { from: probe, http: http://web:80/, expect: 200 }
+  - { from: probe, script: check.sh }
+";
+
+    #[test]
+    fn check_runners_are_written_and_the_module_says_where_they_run() {
+        let spec = crate::parse(WITH_CHECKS).unwrap();
+        let files = generate(&spec).unwrap();
+        let tf = &files.iter().find(|f| f.path.ends_with("main.tf")).unwrap().contents;
+        assert!(files.iter().any(|f| f.path == ".isoloom/proxmox/checks/probe.sh"));
+        assert!(tf.contains("output \"machines\""), "{tf}");
+        assert!(tf.contains("\"probe\" = \"10.9.0.11\""), "{tf}");
+        assert!(tf.contains("position = \"probe\", machine = \"probe\", host = \"10.9.0.11\""), "{tf}");
+        // `probe` runs a script, so it gets the project although it has no provisioning; `web` doesn't.
+        assert_eq!(tf.matches("write_files = local.project_files").count(), 1, "{tf}");
+    }
 
     #[test]
     fn every_linux_os_has_a_cloud_image_but_kali_and_fedora() {

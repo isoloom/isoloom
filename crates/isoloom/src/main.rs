@@ -1395,7 +1395,40 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                 runners.push(r);
             }
         }
-        core::Target::Proxmox => return Err("checks on Proxmox come next; run them from a machine by hand for now".into()),
+        core::Target::Proxmox => {
+            // Each runner piped to its machine over SSH, through the router.
+            let outputs = terraform_output(&out.join("proxmox"))?;
+            let router = outputs["address"]
+                .as_str()
+                .ok_or("the module has no `address` output: run `isoloom run proxmox` first")?
+                .to_string();
+            let Some(list) = outputs.get("checks").and_then(|v| v.as_array()) else {
+                return Err("the module has no `checks` output: run `isoloom run proxmox` first".into());
+            };
+            for entry in list {
+                let host = entry["host"].as_str().unwrap_or_default();
+                let user = entry["user"].as_str().unwrap_or("isoloom");
+                let position = entry["position"].as_str().unwrap_or_default();
+                let script = out.join("proxmox/checks").join(format!("{position}.sh"));
+                let derived = if no_derived { "ISOLOOM_DERIVED=0 " } else { "" };
+                let mut r = ssh_runner(ssh_key, user, host, &format!("{derived}sh -s"), false);
+                r.args.insert(0, format!("isoloom@{router}"));
+                r.args.insert(0, s("-J"));
+                let ssh_line = format!(
+                    "ssh {} < {}",
+                    r.args.iter().map(|a| core::checks::sq(a)).collect::<Vec<_>>().join(" "),
+                    core::checks::sq(&script.display().to_string())
+                );
+                r.program = s("sh");
+                r.args = vec![s("-c"), ssh_line];
+                r.label = if position == "networks" {
+                    s("from the environment's networks")
+                } else {
+                    format!("from {position}")
+                };
+                runners.push(r);
+            }
+        }
         core::Target::External => {
             // Each machine's runner, piped to its shell over SSH.
             let machines = lifecycle::external_machines(&out)?;

@@ -316,7 +316,7 @@ resource "proxmox_virtual_environment_file" "user" {
       hostname    = "user"
       users       = local.users
       packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = []
+      write_files = local.project_files
       runcmd = [
         ["sh", "-c", "printf '%s\\n' '10.75.2.10 web' >> /etc/hosts"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
@@ -372,4 +372,23 @@ locals {
 
 output "address" {
   value = local.router_address
+}
+
+# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+output "machines" {
+  value = {
+    "web"  = "10.75.2.10"
+    "user" = "10.75.1.10"
+  }
+}
+
+output "ssh_user" {
+  value = "isoloom"
+}
+
+# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+output "checks" {
+  value = [
+    { position = "user", machine = "user", host = "10.75.1.10", user = "isoloom", script = ".isoloom/proxmox/checks/user.sh" }
+  ]
 }

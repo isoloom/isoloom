@@ -391,7 +391,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 .ok_or_else(|| format!("no address for `{machine}` in the module's outputs; is it applied?"))?
                 .to_string();
             let user = outputs["ssh_users"][machine].as_str().unwrap_or("isoloom").to_string();
-            c = ssh(ssh_key, &user, &host, tty);
+            c = ssh(ssh_key, &user, &host, tty, None);
             c.arg(format!("{sudo}sh -c {}", sq(&inner)));
         }
         Target::CloudDocker => {
@@ -401,7 +401,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
             let host = outputs["ip"].as_str().ok_or("the module has no `ip` output; is it applied?")?.to_string();
             let user = outputs["ssh_user"].as_str().unwrap_or("root").to_string();
             let flags = if tty { "-it" } else { "-T" };
-            c = ssh(ssh_key, &user, &host, tty);
+            c = ssh(ssh_key, &user, &host, tty, None);
             c.arg(format!(
                 "cd /opt/isoloom && sudo docker compose -f {}/docker/compose.yml exec {flags} {machine} sh -c {}",
                 core::instance::output_dir(instance),
@@ -411,22 +411,39 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         Target::External => {
             let e = m.external.as_ref().ok_or_else(|| format!("`{machine}` has no `external:` address"))?;
             let key = ssh_key.or(e.key.as_deref().map(Path::new));
-            c = ssh(key, e.user.as_deref().unwrap_or("root"), &e.address, tty);
+            c = ssh(key, e.user.as_deref().unwrap_or("root"), &e.address, tty, None);
             if let Some(p) = e.port {
                 c.arg(format!("-p{p}"));
             }
             c.arg(format!("{sudo}sh -c {}", sq(&inner)));
         }
-        Target::Proxmox => return Err("reaching machines on Proxmox comes next".into()),
+        Target::Proxmox => {
+            // Through the router (the only VM on the uplink), as the `isoloom` user.
+            let outputs = super::terraform_output(&out.join("proxmox"))?;
+            let router = outputs["address"]
+                .as_str()
+                .ok_or("the module has no `address` output; is it applied?")?
+                .to_string();
+            let host = outputs["machines"][machine]
+                .as_str()
+                .ok_or_else(|| format!("no address for `{machine}` in the module's outputs; is it applied?"))?
+                .to_string();
+            let jump = format!("isoloom@{router}");
+            c = ssh(ssh_key, "isoloom", &host, tty, Some(&jump));
+            c.arg(format!("{sudo}sh -c {}", sq(&inner)));
+        }
     }
     Ok(c)
 }
 
-fn ssh(key: Option<&Path>, user: &str, host: &str, tty: bool) -> Command {
+fn ssh(key: Option<&Path>, user: &str, host: &str, tty: bool, jump: Option<&str>) -> Command {
     let mut c = Command::new("ssh");
     c.args(["-o", "StrictHostKeyChecking=accept-new"]);
     if let Some(k) = key {
         c.arg("-i").arg(k);
+    }
+    if let Some(j) = jump {
+        c.arg("-J").arg(j);
     }
     if tty {
         c.arg("-t");

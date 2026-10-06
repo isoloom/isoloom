@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Proxmox: checks and a way in
+- `isoloom test proxmox` runs the checks: a runner per position in `.isoloom/proxmox/checks/<position>.sh`, piped over SSH to the machine it stands for through the router (`ssh -J isoloom@<address>`), the controller or the first machine for positions that aren't a VM. A machine whose runner runs a `script:` gets the project in cloud-init even without provisioning. The module gains `machines` (each VM's first address), `ssh_user` and `checks` outputs.
+- `isoloom connect`, `exec` and `capture` reach Proxmox machines the same way, as the `isoloom` user (`ssh_public_key`).
+
 ## 0.8.0
 
 The operating model around the spec: derived checks and `isoloom test`, the resolved snapshot, a registry with `status`/`connect`/`exec`/`capture`, instances, defaults, shared fields, clones, host readiness, `graph`/`report`, `message`, link impairment, the `external` target and tools. Every feature below landed between 0.7.2 and this release.

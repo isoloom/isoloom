@@ -448,3 +448,25 @@ locals {
 output "address" {
   value = local.router_address
 }
+
+# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+output "machines" {
+  value = {
+    "intranet" = "10.70.99.10"
+    "staff"    = "10.70.10.10"
+    "guest"    = "10.70.20.10"
+  }
+}
+
+output "ssh_user" {
+  value = "isoloom"
+}
+
+# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+output "checks" {
+  value = [
+    { position = "staff", machine = "staff", host = "10.70.10.10", user = "isoloom", script = ".isoloom/proxmox/checks/staff.sh" },
+    { position = "intranet", machine = "intranet", host = "10.70.99.10", user = "isoloom", script = ".isoloom/proxmox/checks/intranet.sh" },
+    { position = "guest", machine = "guest", host = "10.70.20.10", user = "isoloom", script = ".isoloom/proxmox/checks/guest.sh" }
+  ]
+}
