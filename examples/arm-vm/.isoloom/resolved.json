@@ -1,0 +1,108 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "arm-vm",
+  "inputs": [],
+  "networks": {
+    "lab": {
+      "cidr": "10.70.0.0/24",
+      "docker_cidr": "10.70.0.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "10.70.0.1",
+      "router": null,
+      "controller": "10.70.0.253"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "box": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "arch": "arm64",
+      "os": "ubuntu-24.04",
+      "windows": false,
+      "addresses": {
+        "lab": "10.70.0.10"
+      },
+      "docker_addresses": {
+        "lab": "10.70.0.10"
+      },
+      "services": [
+        {
+          "port": 22,
+          "name": null,
+          "http": false,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    }
+  },
+  "start_order": [
+    "box"
+  ],
+  "router": null,
+  "controller": {
+    "addresses": {
+      "lab": "10.70.0.253"
+    }
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "generated": [
+      "vagrant"
+    ],
+    "refused": {
+      "proxmox": "machine `box`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts)",
+      "cloud-vm": "machine `box`: arm64 on AWS comes later (Graviton instances and arm64 AMIs)"
+    },
+    "not_possible": {
+      "docker": "needs `docker:` on box",
+      "hosted": "needs `docker:` on box",
+      "docker-vm": "needs `docker:` on box",
+      "cloud-docker": "needs `docker:` on box",
+      "kubernetes": "needs `docker:` on box",
+      "hybrid": "only when some machines are containers and others are VMs"
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "box",
+        "machine": "box",
+        "runner": "isoloom-check-box",
+        "checks": [
+          {
+            "name": "the box runs natively on arm64",
+            "derived": false,
+            "kind": "exec",
+            "target": "uname -m",
+            "expect": "aarch64",
+            "wait": 0
+          }
+        ]
+      }
+    ]
+  }
+}

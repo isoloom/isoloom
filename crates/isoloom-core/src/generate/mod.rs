@@ -10,6 +10,7 @@ mod docker_vm;
 mod hybrid;
 mod kubernetes;
 mod proxmox;
+pub mod resolved;
 mod router;
 mod vagrant;
 
@@ -69,6 +70,15 @@ pub const GENERATED_TARGETS: &[Target] = &[
 
 /// The files for one target.
 pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
+    let mut files = target_files(spec, target)?;
+    // The resolved snapshot goes with every target (the same file each time).
+    files.push(resolved::file(spec));
+    Ok(files)
+}
+
+/// A target's own files, without the snapshot (which asks every generator whether it would
+/// refuse the spec, so it can't be part of what a generator produces).
+fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
     if !effective(spec).contains(&target) {
         return Err(GenerateError::NotPossible(target));
     }
@@ -158,7 +168,7 @@ fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
 /// when `generate` produces the target. Lets `isoloom targets` tell the truth: a target can be
 /// possible by its machines' editions and still not be generated.
 pub fn refusal(spec: &Spec, target: Target) -> Option<String> {
-    match generate(spec, target) {
+    match target_files(spec, target) {
         Err(GenerateError::Unsupported { what, .. }) => Some(what),
         _ => None,
     }

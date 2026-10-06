@@ -1,0 +1,174 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "ansible-pair",
+  "inputs": [],
+  "networks": {
+    "lab": {
+      "cidr": "10.63.0.0/24",
+      "docker_cidr": "10.63.0.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "10.63.0.1",
+      "router": null,
+      "controller": "10.63.0.253"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "web": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "lab": "10.63.0.10"
+      },
+      "docker_addresses": {
+        "lab": "10.63.0.10"
+      },
+      "services": [
+        {
+          "port": 80,
+          "name": null,
+          "http": true,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    },
+    "cache": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "lab": "10.63.0.20"
+      },
+      "docker_addresses": {
+        "lab": "10.63.0.20"
+      },
+      "services": [
+        {
+          "port": 6379,
+          "name": "redis",
+          "http": false,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    }
+  },
+  "start_order": [
+    "web",
+    "cache"
+  ],
+  "router": null,
+  "controller": {
+    "addresses": {
+      "lab": "10.63.0.253"
+    }
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "generated": [
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "refused": {},
+    "not_possible": {
+      "docker": "needs `docker:` on web, cache",
+      "hosted": "needs `docker:` on web, cache",
+      "docker-vm": "needs `docker:` on web, cache",
+      "cloud-docker": "needs `docker:` on web, cache",
+      "kubernetes": "needs `docker:` on web, cache",
+      "hybrid": "only when some machines are containers and others are VMs"
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "networks",
+        "machine": null,
+        "runner": "isoloom-check",
+        "checks": [
+          {
+            "name": "checks/web-answers.sh",
+            "derived": false,
+            "kind": "script",
+            "target": "checks/web-answers.sh",
+            "expect": "",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "web",
+        "machine": "web",
+        "runner": "isoloom-check-web",
+        "checks": [
+          {
+            "name": "cache:6379 from web",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.63.0.20:6379",
+            "expect": "open",
+            "wait": 30
+          }
+        ]
+      },
+      {
+        "position": "cache",
+        "machine": "cache",
+        "runner": "isoloom-check-cache",
+        "checks": [
+          {
+            "name": "web:80 from cache",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.63.0.10:80/",
+            "expect": "any",
+            "wait": 30
+          }
+        ]
+      }
+    ]
+  }
+}

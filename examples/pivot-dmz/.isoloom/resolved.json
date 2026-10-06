@@ -1,0 +1,446 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "pivot-dmz",
+  "inputs": [],
+  "networks": {
+    "dmz": {
+      "cidr": "10.30.10.0/24",
+      "docker_cidr": "10.30.10.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "10.30.10.1",
+      "router": "10.30.10.254",
+      "controller": "10.30.10.253"
+    },
+    "internal": {
+      "cidr": "10.30.20.0/24",
+      "docker_cidr": "10.30.20.0/24",
+      "internet": false,
+      "gateway": null,
+      "gateway_address": "10.30.20.1",
+      "router": "10.30.20.254",
+      "controller": "10.30.20.253"
+    },
+    "access": {
+      "cidr": "10.30.99.0/24",
+      "docker_cidr": "10.30.99.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "10.30.99.1",
+      "router": "10.30.99.254",
+      "controller": "10.30.99.253"
+    }
+  },
+  "reach": [
+    {
+      "from": "access",
+      "to": "dmz",
+      "ports": []
+    },
+    {
+      "from": "dmz",
+      "to": "internal",
+      "ports": [
+        8080,
+        5432
+      ]
+    }
+  ],
+  "machines": {
+    "gateway": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "dmz": "10.30.10.10",
+        "internal": "10.30.20.10"
+      },
+      "docker_addresses": {
+        "dmz": "10.30.10.10",
+        "internal": "10.30.20.10"
+      },
+      "services": [
+        {
+          "port": 80,
+          "name": null,
+          "http": false,
+          "publish": null
+        },
+        {
+          "port": 22,
+          "name": null,
+          "http": false,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [
+        {
+          "to": "10.30.99.0/24",
+          "via": "10.30.10.254"
+        }
+      ],
+      "default_gateway": null,
+      "offline": false
+    },
+    "app": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "internal": "10.30.20.20"
+      },
+      "docker_addresses": {
+        "internal": "10.30.20.20"
+      },
+      "services": [
+        {
+          "port": 8080,
+          "name": null,
+          "http": false,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [
+        {
+          "to": "10.30.10.0/24",
+          "via": "10.30.20.254"
+        },
+        {
+          "to": "10.30.99.0/24",
+          "via": "10.30.20.254"
+        }
+      ],
+      "default_gateway": null,
+      "offline": true
+    },
+    "db": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "internal": "10.30.20.30"
+      },
+      "docker_addresses": {
+        "internal": "10.30.20.30"
+      },
+      "services": [
+        {
+          "port": 5432,
+          "name": null,
+          "http": false,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [
+        {
+          "to": "10.30.10.0/24",
+          "via": "10.30.20.254"
+        },
+        {
+          "to": "10.30.99.0/24",
+          "via": "10.30.20.254"
+        }
+      ],
+      "default_gateway": null,
+      "offline": true
+    },
+    "user": {
+      "access": true,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "kali",
+      "windows": false,
+      "addresses": {
+        "access": "10.30.99.10"
+      },
+      "docker_addresses": {
+        "access": "10.30.99.10"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [
+        {
+          "to": "10.30.10.0/24",
+          "via": "10.30.99.254"
+        },
+        {
+          "to": "10.30.20.0/24",
+          "via": "10.30.99.254"
+        }
+      ],
+      "default_gateway": null,
+      "offline": false
+    }
+  },
+  "start_order": [
+    "gateway",
+    "app",
+    "db",
+    "user"
+  ],
+  "router": {
+    "networks": [
+      "dmz",
+      "internal",
+      "access"
+    ],
+    "addresses": {
+      "dmz": "10.30.10.254",
+      "internal": "10.30.20.254",
+      "access": "10.30.99.254"
+    }
+  },
+  "controller": {
+    "addresses": {
+      "dmz": "10.30.10.253",
+      "internal": "10.30.20.253",
+      "access": "10.30.99.253"
+    }
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes",
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "generated": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes",
+      "vagrant"
+    ],
+    "refused": {
+      "proxmox": "machine `user`: no Proxmox image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7)",
+      "cloud-vm": "machine `user`: no AWS image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)"
+    },
+    "not_possible": {
+      "hybrid": "only when some machines are containers and others are VMs"
+    }
+  },
+  "checks": {
+    "default_position": "user",
+    "positions": [
+      {
+        "position": "user",
+        "machine": "user",
+        "runner": "isoloom-check",
+        "checks": [
+          {
+            "name": "checks/dmz-reachable.sh",
+            "derived": false,
+            "kind": "script",
+            "target": "checks/dmz-reachable.sh",
+            "expect": "",
+            "wait": 0
+          },
+          {
+            "name": "checks/internal-not-reachable-from-access.sh",
+            "derived": false,
+            "kind": "script",
+            "target": "checks/internal-not-reachable-from-access.sh",
+            "expect": "",
+            "wait": 0
+          },
+          {
+            "name": "gateway:80 on dmz from user",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.10.10:80",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "gateway:22 on dmz from user",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.10.10:22",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "app:8080 blocked from user",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.20:8080",
+            "expect": "blocked",
+            "wait": 0
+          },
+          {
+            "name": "db:5432 blocked from user",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.30:5432",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "gateway",
+        "machine": "gateway",
+        "runner": "isoloom-check-gateway",
+        "checks": [
+          {
+            "name": "app:8080 from gateway",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.20:8080",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "db:5432 from gateway",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.30:5432",
+            "expect": "open",
+            "wait": 30
+          }
+        ]
+      },
+      {
+        "position": "app",
+        "machine": "app",
+        "runner": "isoloom-check-app",
+        "checks": [
+          {
+            "name": "gateway:80 on internal from app",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.10:80",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "gateway:22 on internal from app",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.10:22",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "db:5432 from app",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.30:5432",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "no internet from app",
+            "derived": true,
+            "kind": "http",
+            "target": "http://1.1.1.1/",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "db",
+        "machine": "db",
+        "runner": "isoloom-check-db",
+        "checks": [
+          {
+            "name": "gateway:80 on internal from db",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.10:80",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "gateway:22 on internal from db",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.10:22",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "app:8080 from db",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.30.20.20:8080",
+            "expect": "open",
+            "wait": 30
+          },
+          {
+            "name": "no internet from db",
+            "derived": true,
+            "kind": "http",
+            "target": "http://1.1.1.1/",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      }
+    ]
+  }
+}

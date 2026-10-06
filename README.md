@@ -72,6 +72,7 @@ isoloom targets [DIR]     # where it can run, and why not elsewhere
 isoloom resources [DIR]   # machines, CPUs, memory, disk
 isoloom generate [DIR]    # each target's files under .isoloom/ (--target, --images FILE)
 isoloom check [DIR]       # fails when .isoloom/ doesn't match the spec (for CI)
+isoloom inspect [PATH]    # the resolved snapshot (.isoloom/resolved.json), or one part of it
 isoloom run TARGET [DIR]  # generate, then bring the environment up with the target's own tool
 isoloom test TARGET [DIR] # run the checks against it: the spec's, and the ones derived from it
 isoloom down TARGET [DIR] # tear it down

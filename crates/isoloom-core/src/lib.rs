@@ -18,6 +18,7 @@ pub mod validate;
 
 use std::path::{Path, PathBuf};
 
+pub use generate::resolved;
 pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, refusal};
 pub use model::{Arch, Check, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target};
 pub use targets::{derive, effective};

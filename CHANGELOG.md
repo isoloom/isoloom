@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### The resolved snapshot and `isoloom inspect`
+- `isoloom generate` writes `.isoloom/resolved.json` with every target: the spec after Isoloom has worked everything out. Every address (machines on each network and on Docker's blocks, the router, the controller, the gateways), routes and default gateways, start order, published ports, the targets (possible, generated, refused with the reason, not possible with the reason) and the checks by position with the runner each target names them by. For programs: tools embedding Isoloom read it instead of parsing a Vagrantfile. `resolved_version: 1`.
+- `isoloom inspect [PATH] [DIR] [--yaml]` prints the snapshot, or the part a dotted path names (`machines.web.addresses`, `checks.positions.0.runner`).
+- JSON outputs keep the spec's order (networks and machines as written).
+
 ### Idle containers
 - `docker: { idle: true }`: the image runs no service of its own (a stock Linux image whose command is a shell that exits at once), so its container is kept running idle, as a machine to work from. Compose (and every target built on it) sets `entrypoint: [sleep, infinity]`; Kubernetes sets the container's `command`. Without it, such a container exits and restarts in a loop.
 

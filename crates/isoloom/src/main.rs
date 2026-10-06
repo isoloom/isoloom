@@ -114,6 +114,18 @@ enum Command {
         #[arg(long)]
         ssh_key: Option<PathBuf>,
     },
+    /// Show the resolved snapshot (what `.isoloom/resolved.json` holds): every address, routes,
+    /// targets and checks, worked out from the spec. A dotted path narrows it:
+    /// `isoloom inspect machines.web.addresses`, `isoloom inspect targets`.
+    Inspect {
+        /// A dotted path into the snapshot (default: all of it). A folder here means the project.
+        what: Option<String>,
+        /// The project folder (holding isoloom.yml).
+        dir: Option<PathBuf>,
+        /// YAML instead of JSON.
+        #[arg(long)]
+        yaml: bool,
+    },
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
     Schema,
     /// Draft an isoloom.yml from files you already have.
@@ -424,6 +436,34 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             json,
             ssh_key.as_deref(),
         ),
+        Command::Inspect { what, dir, yaml } => {
+            // `isoloom inspect examples/segmented` names the project, not a path in the snapshot.
+            let (what, dir) = match (what, dir) {
+                (Some(w), None) if w.contains('/') || std::path::Path::new(&w).is_dir() => (None, PathBuf::from(w)),
+                (w, d) => (w, d.unwrap_or_else(|| PathBuf::from("."))),
+            };
+            let spec = core::load(&dir)?;
+            let problems = core::validate(&spec);
+            if !problems.is_empty() {
+                for p in &problems {
+                    eprintln!("✗ {p}");
+                }
+                return Err("fix the spec first (`isoloom validate`)".into());
+            }
+            let all = core::resolved::resolve(&spec);
+            let value = match &what {
+                Some(path) => {
+                    core::resolved::lookup(&all, path).ok_or_else(|| format!("nothing at `{path}` in the snapshot; try `isoloom inspect` to see it all"))?
+                }
+                None => &all,
+            };
+            if yaml {
+                print!("{}", serde_yaml_ng::to_string(value)?);
+            } else {
+                println!("{}", serde_json::to_string_pretty(value)?);
+            }
+            Ok(ExitCode::SUCCESS)
+        }
         Command::Schema => {
             println!("{}", serde_json::to_string_pretty(&core::schema::schema())?);
             Ok(ExitCode::SUCCESS)

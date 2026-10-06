@@ -492,10 +492,18 @@ fn an_idle_container_is_kept_running() {
     )
     .expect("spec parses");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
-    assert!(compose.contains("  box:\n    image: alpine:3.20\n    platform: linux/amd64\n    entrypoint:\n    - sleep\n    - infinity\n"), "{compose}");
+    assert!(
+        compose.contains("  box:\n    image: alpine:3.20\n    platform: linux/amd64\n    entrypoint:\n    - sleep\n    - infinity\n"),
+        "{compose}"
+    );
     // A machine that runs its own service keeps its image's command.
     let web = compose.split("  web:").nth(1).unwrap();
     assert!(!web.split("\n  ").next().unwrap().contains("entrypoint"), "{compose}");
     let k8s: String = generate(&spec, Target::Kubernetes).unwrap().iter().map(|f| f.contents.clone()).collect();
-    assert!(k8s.contains("command:\n        - sleep\n        - infinity") || k8s.contains("command:\n          - sleep\n          - infinity") || k8s.contains("- sleep\n"), "{k8s}");
+    assert!(
+        k8s.contains("command:\n        - sleep\n        - infinity")
+            || k8s.contains("command:\n          - sleep\n          - infinity")
+            || k8s.contains("- sleep\n"),
+        "{k8s}"
+    );
 }

@@ -1,0 +1,114 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "windows-hello",
+  "inputs": [],
+  "networks": {
+    "lab": {
+      "cidr": "192.168.57.0/24",
+      "docker_cidr": "10.192.57.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "192.168.57.1",
+      "router": null,
+      "controller": "192.168.57.253"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "web01": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "windows-server-2019",
+      "windows": true,
+      "addresses": {
+        "lab": "192.168.57.10"
+      },
+      "docker_addresses": {
+        "lab": "10.192.57.10"
+      },
+      "services": [
+        {
+          "port": 80,
+          "name": null,
+          "http": true,
+          "publish": 8082
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 3072,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    }
+  },
+  "start_order": [
+    "web01"
+  ],
+  "router": null,
+  "controller": {
+    "addresses": {
+      "lab": "192.168.57.253"
+    }
+  },
+  "published": [
+    {
+      "machine": "web01",
+      "port": 80,
+      "host_port": 8082
+    }
+  ],
+  "targets": {
+    "possible": [
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "generated": [
+      "vagrant",
+      "cloud-vm"
+    ],
+    "refused": {
+      "proxmox": "machine `web01`: no Proxmox image for `windows-server-2019` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7)"
+    },
+    "not_possible": {
+      "docker": "needs `docker:` on web01",
+      "hosted": "needs `docker:` on web01",
+      "docker-vm": "needs `docker:` on web01",
+      "cloud-docker": "needs `docker:` on web01",
+      "kubernetes": "needs `docker:` on web01",
+      "hybrid": "only when some machines are containers and others are VMs"
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "networks",
+        "machine": null,
+        "runner": "isoloom-check",
+        "checks": [
+          {
+            "name": "checks/web01-answers.sh",
+            "derived": false,
+            "kind": "script",
+            "target": "checks/web01-answers.sh",
+            "expect": "",
+            "wait": 0
+          }
+        ]
+      }
+    ]
+  }
+}

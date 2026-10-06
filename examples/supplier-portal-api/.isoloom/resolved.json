@@ -1,0 +1,195 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "supplier-portal-api",
+  "inputs": [
+    "API_URL",
+    "LAUNCH_TOKEN"
+  ],
+  "networks": {
+    "lab": {
+      "cidr": "10.20.0.0/24",
+      "docker_cidr": "10.20.0.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "10.20.0.1",
+      "router": null,
+      "controller": "10.20.0.253"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "database": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "lab": "10.20.0.32"
+      },
+      "docker_addresses": {
+        "lab": "10.20.0.32"
+      },
+      "services": [
+        {
+          "port": 3207,
+          "name": "mysql",
+          "http": false,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [
+        "API_URL",
+        "LAUNCH_TOKEN"
+      ],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    },
+    "web": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "lab": "10.20.0.31"
+      },
+      "docker_addresses": {
+        "lab": "10.20.0.31"
+      },
+      "services": [
+        {
+          "port": 3206,
+          "name": "portal",
+          "http": true,
+          "publish": 3206
+        }
+      ],
+      "depends_on": [
+        "database"
+      ],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    }
+  },
+  "start_order": [
+    "database",
+    "web"
+  ],
+  "router": null,
+  "controller": {
+    "addresses": {
+      "lab": "10.20.0.253"
+    }
+  },
+  "published": [
+    {
+      "machine": "web",
+      "port": 3206,
+      "host_port": 3206
+    }
+  ],
+  "targets": {
+    "possible": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes",
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "generated": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes",
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "refused": {},
+    "not_possible": {
+      "hybrid": "only when some machines are containers and others are VMs"
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "networks",
+        "machine": null,
+        "runner": "isoloom-check",
+        "checks": [
+          {
+            "name": "build/check/check.sh",
+            "derived": false,
+            "kind": "script",
+            "target": "build/check/check.sh",
+            "expect": "",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "database",
+        "machine": "database",
+        "runner": "isoloom-check-database",
+        "checks": [
+          {
+            "name": "web:3206 from database",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.20.0.31:3206/",
+            "expect": "any",
+            "wait": 30
+          }
+        ]
+      },
+      {
+        "position": "web",
+        "machine": "web",
+        "runner": "isoloom-check-web",
+        "checks": [
+          {
+            "name": "database:3207 from web",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.20.0.32:3207",
+            "expect": "open",
+            "wait": 30
+          }
+        ]
+      }
+    ]
+  }
+}

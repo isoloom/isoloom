@@ -1,0 +1,168 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "mixed-office",
+  "inputs": [],
+  "networks": {
+    "office": {
+      "cidr": "192.168.58.0/24",
+      "docker_cidr": "10.192.58.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "192.168.58.1",
+      "router": null,
+      "controller": "192.168.58.253"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "files01": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "windows-server-2019",
+      "windows": true,
+      "addresses": {
+        "office": "192.168.58.10"
+      },
+      "docker_addresses": {
+        "office": "10.192.58.10"
+      },
+      "services": [
+        {
+          "port": 445,
+          "name": null,
+          "http": false,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 3072,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    },
+    "intranet": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "office": "192.168.58.20"
+      },
+      "docker_addresses": {
+        "office": "10.192.58.20"
+      },
+      "services": [
+        {
+          "port": 80,
+          "name": null,
+          "http": true,
+          "publish": 8083
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    }
+  },
+  "start_order": [
+    "files01",
+    "intranet"
+  ],
+  "router": null,
+  "controller": {
+    "addresses": {
+      "office": "192.168.58.253"
+    }
+  },
+  "published": [
+    {
+      "machine": "intranet",
+      "port": 80,
+      "host_port": 8083
+    }
+  ],
+  "targets": {
+    "possible": [
+      "hybrid",
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "generated": [
+      "hybrid",
+      "vagrant",
+      "cloud-vm"
+    ],
+    "refused": {
+      "proxmox": "machine `files01`: no Proxmox image for `windows-server-2019` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7)"
+    },
+    "not_possible": {
+      "docker": "needs `docker:` on files01",
+      "hosted": "needs `docker:` on files01",
+      "docker-vm": "needs `docker:` on files01",
+      "cloud-docker": "needs `docker:` on files01",
+      "kubernetes": "needs `docker:` on files01"
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "networks",
+        "machine": null,
+        "runner": "isoloom-check",
+        "checks": [
+          {
+            "name": "checks/both-answer.sh",
+            "derived": false,
+            "kind": "script",
+            "target": "checks/both-answer.sh",
+            "expect": "",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "intranet",
+        "machine": "intranet",
+        "runner": "isoloom-check-intranet",
+        "checks": [
+          {
+            "name": "files01:445 from intranet",
+            "derived": true,
+            "kind": "tcp",
+            "target": "192.168.58.10:445",
+            "expect": "open",
+            "wait": 30
+          }
+        ]
+      }
+    ]
+  }
+}
