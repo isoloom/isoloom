@@ -613,7 +613,14 @@ fn bring_up(dir: &std::path::Path, t: core::Target, cloud: Option<&str>, down: b
             (s("sh"), vec![s("-c"), format!("{build} | kubectl {verb} -f -")], dir.to_path_buf())
         }
         core::Target::Proxmox => tf_run(down, out.join("proxmox")),
-        core::Target::CloudVm => tf_run(down, out.join("cloud-vm/aws")),
+        core::Target::CloudVm => {
+            // Only AWS is generated for cloud-vm so far; accept --cloud aws, reject anything else
+            // rather than silently running AWS for it.
+            if let Some(c) = cloud.filter(|c| *c != "aws") {
+                return Err(format!("`cloud-vm` only supports --cloud aws so far, not `{c}`").into());
+            }
+            tf_run(down, out.join("cloud-vm/aws"))
+        }
         core::Target::CloudDocker => {
             let cloud = cloud.ok_or("`cloud-docker` needs --cloud (aws, azure, gcp, digitalocean, linode, oci)")?;
             tf_run(down, out.join("cloud-docker").join(cloud))

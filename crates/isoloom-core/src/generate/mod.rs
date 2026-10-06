@@ -4,6 +4,7 @@
 
 mod cloud_docker;
 mod cloud_vm;
+mod cloud_vm_others;
 mod docker;
 mod docker_vm;
 mod hybrid;

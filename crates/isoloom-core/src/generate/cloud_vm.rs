@@ -30,7 +30,7 @@ use crate::validate::Cidr;
 
 const DIR: &str = "cloud-vm";
 
-fn cidr(spec: &Spec, net: &str) -> Cidr {
+pub(super) fn cidr(spec: &Spec, net: &str) -> Cidr {
     Cidr::parse(&spec.networks[net].cidr).expect("validated cidr")
 }
 
@@ -64,7 +64,7 @@ pub(super) fn instance_type(memory_mb: u32) -> &'static str {
 }
 
 /// The private-range family of a network (AWS can't mix them in one VPC).
-fn family(c: Cidr) -> u8 {
+pub(super) fn family(c: Cidr) -> u8 {
     (c.base >> 24) as u8
 }
 
@@ -107,9 +107,22 @@ fn unsupported(spec: &Spec) -> Option<String> {
 }
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
+    // Things no cloud can do yet fail the whole target; a single cloud's own limits only drop
+    // that cloud's module (best-effort: a lab runs on the clouds whose model fits it).
     if let Some(what) = unsupported(spec) {
         return Err(GenerateError::Unsupported { target: Target::CloudVm, what });
     }
+    let mut files = vec![aws(spec)];
+    for (sub, builder, refusal) in super::cloud_vm_others::DRIVERS {
+        if refusal(spec).is_none() {
+            files.push(builder(spec));
+        }
+        let _ = sub;
+    }
+    Ok(files)
+}
+
+fn aws(spec: &Spec) -> GeneratedFile {
     let nets: Vec<&String> = spec.networks.keys().collect();
     let lab = format!(
         "{{ {} }}",
@@ -309,16 +322,13 @@ resource "aws_vpc" "env" {{
                 }
             }
         }
-        let mut redirects = Vec::new();
+        let redirects = redirects(m);
         for sv in &m.services {
             if let Some(h) = sv.publish {
                 let _ = write!(
                     sg,
                     "  ingress {{\n    description = \"published\"\n    from_port   = {h}\n    to_port     = {h}\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n"
                 );
-                if h != sv.port {
-                    redirects.push((h, sv.port));
-                }
                 let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
@@ -367,80 +377,9 @@ resource "aws_vpc" "env" {{
         }
 
         // Its set-up, over SSH: names, volumes, waits, the project, its steps.
-        let mut cmds: Vec<String> = vec![
-            "set -e".into(),
-            "cloud-init status --wait >/dev/null 2>&1 || true".into(),
-            "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
-        ];
-        if needs_controller(spec) {
-            cmds.push(format!(
-                "mkdir -p ~/.ssh && echo '{}' >> ~/.ssh/authorized_keys",
-                tf_expr("trimspace(tls_private_key.controller.public_key_openssh)")
-            ));
-        }
-        // Its other interfaces, found by MAC address, at their addresses.
-        for (n, o) in m.networks.iter().skip(1) {
-            let c = cidr(spec, n);
-            cmds.push(format!(
-                "IF=$(ip -o link | grep -i \"{mac}\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")",
-                mac = tf_expr(&format!("lower(aws_network_interface.{id}_{}.mac_address)", res(n))),
-                a = address(spec, n, *o),
-                len = c.len,
-            ));
-        }
-        // The others by name, at their address on a network both are on (else their first).
-        let hosts: Vec<String> = spec
-            .machines
-            .keys()
-            .filter(|o| o.as_str() != name)
-            .map(|o| format!("{} {o}", super::address_for(spec, name, o)))
-            .collect();
-        if !hosts.is_empty() {
-            cmds.push(format!(
-                "printf '%s\\n' {} | sudo tee -a /etc/hosts >/dev/null",
-                hosts.iter().map(|h| format!("'{h}'")).collect::<Vec<_>>().join(" ")
-            ));
-        }
-        if !m.volumes.is_empty() {
-            cmds.push(format!("sudo mkdir -p {}", m.volumes.values().cloned().collect::<Vec<_>>().join(" ")));
-        }
-        for dep in &m.depends_on {
-            let ports: Vec<u16> = spec.machines[dep].services.iter().map(|s| s.port).collect();
-            if !ports.is_empty() {
-                cmds.push(format!("sh -c {}", sh_quote(&router::wait_for(dep, &ports, 900))));
-            }
-        }
-        let env = if m.inputs.is_empty() {
-            ""
-        } else {
-            "set -a; . /tmp/isoloom-inputs.env; set +a; "
-        };
-        for step in &vm.provision {
-            if step.ends_with(".sh") {
-                cmds.push(format!("cd /opt/isoloom && sudo -E sh -c {}", sh_quote(&format!("{env}sh {step}"))));
-            } else {
-                cmds.push("command -v ansible-playbook >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)".into());
-                cmds.push(format!(
-                    "cd /opt/isoloom && sudo -E sh -c {}",
-                    sh_quote(&format!("{env}ansible-playbook -c local -i localhost, {step}"))
-                ));
-            }
-        }
-        if !redirects.is_empty() || !m.networks.keys().any(|n| spec.networks[n].internet) {
-            cmds.push("command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)".into());
-        }
-        for (h, p) in &redirects {
-            cmds.push(format!(
-                "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting {{ type nat hook prerouting priority -100; }}' && sudo nft add rule ip isoloom-publish prerouting tcp dport {h} redirect to :{p}"
-            ));
-        }
-        // Offline: no new connections leaving the environment, once provisioned.
-        if !m.networks.keys().any(|n| spec.networks[n].internet) {
-            cmds.push(format!(
-                "printf '%s\\n' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    ip daddr != {lab} ct state new drop' '  }}' '}}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft"
-            ));
-        }
-        cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
+        let cmds = linux_setup_cmds(spec, name, m, vm, &lab, &redirects, &|nid| {
+            tf_expr(&format!("lower(aws_network_interface.{id}_{nid}.mac_address)"))
+        });
 
         let deps: Vec<String> = m
             .depends_on
@@ -513,34 +452,133 @@ resource "aws_vpc" "env" {{
         let _ = write!(tf, "\noutput \"published\" {{\n  value = {{\n{}\n  }}\n}}\n", aligned(&published_out));
     }
 
-    Ok(vec![GeneratedFile {
+    GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/aws/main.tf"),
         contents: tf,
-    }])
+    }
 }
 
 /// HCL map entries with their `=` aligned (as `terraform fmt` writes them).
-fn aligned(entries: &[(String, String)]) -> String {
+pub(super) fn aligned(entries: &[(String, String)]) -> String {
     let w = entries.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
     entries.iter().map(|(k, v)| format!("    {k:<w$} = {v}")).collect::<Vec<_>>().join("\n")
 }
 
-const CONTROLLER_OS: &str = "debian-12";
+pub(super) const CONTROLLER_OS: &str = "debian-12";
 
 /// A controller runs the environment's playbooks, and the checks when no Linux machine can
 /// (a Windows-only environment).
-fn needs_controller(spec: &Spec) -> bool {
+pub(super) fn needs_controller(spec: &Spec) -> bool {
     !spec.provision.is_empty() || (!spec.checks.is_empty() && linux_machines(spec).next().is_none())
 }
 
-fn linux_machines(spec: &Spec) -> impl Iterator<Item = (&String, &crate::model::Machine)> {
+pub(super) fn linux_machines(spec: &Spec) -> impl Iterator<Item = (&String, &crate::model::Machine)> {
     spec.machines
         .iter()
         .filter(|(_, m)| m.vm.as_ref().is_some_and(|v| !crate::images::is_windows(&v.os)))
 }
 
-fn has_windows(spec: &Spec) -> bool {
+pub(super) fn has_windows(spec: &Spec) -> bool {
     spec.machines.values().any(|m| m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os)))
+}
+
+/// The redirects a machine needs: a published port that differs from the service's own port.
+pub(super) fn redirects(m: &crate::model::Machine) -> Vec<(u16, u16)> {
+    m.services
+        .iter()
+        .filter_map(|s| s.publish.filter(|h| *h != s.port).map(|h| (h, s.port)))
+        .collect()
+}
+
+/// A Linux machine's set-up over SSH, the same on every cloud: the controller's key, its extra
+/// interfaces (found by MAC, which each cloud expresses its own way), the other machines' names,
+/// its volumes, its dependency waits, its provision steps, published-port redirects, the offline
+/// egress rule, and the ready marker. `mac_expr(nid)` is the Terraform expression for the MAC of
+/// the interface on network `nid` (the resource-safe network id).
+pub(super) fn linux_setup_cmds(
+    spec: &Spec,
+    name: &str,
+    m: &crate::model::Machine,
+    vm: &crate::model::VmImpl,
+    lab: &str,
+    redirects: &[(u16, u16)],
+    mac_expr: &dyn Fn(&str) -> String,
+) -> Vec<String> {
+    let mut cmds: Vec<String> = vec![
+        "set -e".into(),
+        "cloud-init status --wait >/dev/null 2>&1 || true".into(),
+        "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
+    ];
+    if needs_controller(spec) {
+        cmds.push(format!(
+            "mkdir -p ~/.ssh && echo '{}' >> ~/.ssh/authorized_keys",
+            tf_expr("trimspace(tls_private_key.controller.public_key_openssh)")
+        ));
+    }
+    // Its other interfaces, found by MAC address, at their addresses.
+    for (n, o) in m.networks.iter().skip(1) {
+        let c = cidr(spec, n);
+        cmds.push(format!(
+            "IF=$(ip -o link | grep -i \"{mac}\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")",
+            mac = mac_expr(&res(n)),
+            a = address(spec, n, *o),
+            len = c.len,
+        ));
+    }
+    // The others by name, at their address on a network both are on (else their first).
+    let hosts: Vec<String> = spec
+        .machines
+        .keys()
+        .filter(|o| o.as_str() != name)
+        .map(|o| format!("{} {o}", super::address_for(spec, name, o)))
+        .collect();
+    if !hosts.is_empty() {
+        cmds.push(format!(
+            "printf '%s\\n' {} | sudo tee -a /etc/hosts >/dev/null",
+            hosts.iter().map(|h| format!("'{h}'")).collect::<Vec<_>>().join(" ")
+        ));
+    }
+    if !m.volumes.is_empty() {
+        cmds.push(format!("sudo mkdir -p {}", m.volumes.values().cloned().collect::<Vec<_>>().join(" ")));
+    }
+    for dep in &m.depends_on {
+        let ports: Vec<u16> = spec.machines[dep].services.iter().map(|s| s.port).collect();
+        if !ports.is_empty() {
+            cmds.push(format!("sh -c {}", sh_quote(&router::wait_for(dep, &ports, 900))));
+        }
+    }
+    let env = if m.inputs.is_empty() {
+        ""
+    } else {
+        "set -a; . /tmp/isoloom-inputs.env; set +a; "
+    };
+    for step in &vm.provision {
+        if step.ends_with(".sh") {
+            cmds.push(format!("cd /opt/isoloom && sudo -E sh -c {}", sh_quote(&format!("{env}sh {step}"))));
+        } else {
+            cmds.push("command -v ansible-playbook >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)".into());
+            cmds.push(format!(
+                "cd /opt/isoloom && sudo -E sh -c {}",
+                sh_quote(&format!("{env}ansible-playbook -c local -i localhost, {step}"))
+            ));
+        }
+    }
+    if !redirects.is_empty() || !m.networks.keys().any(|n| spec.networks[n].internet) {
+        cmds.push("command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)".into());
+    }
+    for (h, p) in redirects {
+        cmds.push(format!(
+            "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting {{ type nat hook prerouting priority -100; }}' && sudo nft add rule ip isoloom-publish prerouting tcp dport {h} redirect to :{p}"
+        ));
+    }
+    // Offline: no new connections leaving the environment, once provisioned.
+    if !m.networks.keys().any(|n| spec.networks[n].internet) {
+        cmds.push(format!(
+            "printf '%s\\n' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    ip daddr != {lab} ct state new drop' '  }}' '}}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft"
+        ));
+    }
+    cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
+    cmds
 }
 
 /// The controller: a Debian instance with an interface on every network at the controller
@@ -772,7 +810,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
 
 /// The controller's inventory: every machine at its address, with its SSH user and the
 /// controller's key; the spec's groups.
-fn inventory(spec: &Spec) -> String {
+pub(super) fn inventory(spec: &Spec) -> String {
     let (mut linux, mut windows) = (String::new(), String::new());
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
@@ -812,16 +850,16 @@ fn inventory(spec: &Spec) -> String {
 
 /// A Terraform expression inside a set-up command: kept through `hcl`'s escaping (which turns
 /// `${` into a literal) and turned into `${expr}` by `hcl_cmd`.
-fn tf_expr(expr: &str) -> String {
+pub(super) fn tf_expr(expr: &str) -> String {
     format!("\u{1}{expr}\u{2}")
 }
 
 /// A set-up command as an HCL string, its `tf` expressions interpolated.
-fn hcl_cmd(c: &str) -> String {
+pub(super) fn hcl_cmd(c: &str) -> String {
     hcl(c).replace('\u{1}', "${").replace('\u{2}', "}")
 }
 
 /// A single-quoted shell word.
-fn sh_quote(s: &str) -> String {
+pub(super) fn sh_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
