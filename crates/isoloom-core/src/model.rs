@@ -47,6 +47,11 @@ pub struct Spec {
     /// resolved snapshot (`isoloom inspect` shows the paths).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// Observers beside the environment, on every network, that aren't machines of it (not
+    /// in `reach`, `resources` or the derived checks): a toolbox to look from (`shell`), or any
+    /// container image. See [`Tool`].
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub tools: IndexMap<String, Tool>,
     /// Base machine name -> its clones, for machines that had a `count`. Filled when parsing.
     #[serde(skip)]
     #[schemars(skip)]
@@ -446,6 +451,29 @@ pub struct Group {
     #[serde(flatten)]
     pub shared: Shared,
 }
+
+/// A tool attached beside the environment. The built-in recipe `shell` (an empty block) is a
+/// toolbox on every network: tcpdump, nmap, curl, dig, netcat (a netshoot container on Docker, a
+/// Debian VM on local VMs). Any other name takes a container image (container targets).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Tool {
+    /// A container image (needed unless the name is a built-in recipe).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    /// The command to run, when the image's own isn't right.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub command: Vec<String>,
+    /// A port the tool serves (its web UI), reachable from every network.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    /// Publish that port on the host's loopback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publish: Option<u16>,
+}
+
+/// Built-in tool recipes.
+pub const TOOL_RECIPES: &[&str] = &["shell"];
 
 /// An existing machine's SSH endpoint, for the `external` target.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]

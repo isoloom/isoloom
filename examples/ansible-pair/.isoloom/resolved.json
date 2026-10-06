@@ -95,6 +95,7 @@
     "cache"
   ],
   "clones": {},
+  "tools": {},
   "groups": {
     "pair": [
       "web",

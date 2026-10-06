@@ -29,6 +29,9 @@ machines:
     vm:
       os: debian-12
 
+tools:
+  shell: {}                 # a toolbox on both networks to watch the link from (isoloom connect shell)
+
 checks:
   - name: the far site answers, slowly
     from: user

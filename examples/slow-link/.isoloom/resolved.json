@@ -116,6 +116,21 @@
     "user"
   ],
   "clones": {},
+  "tools": {
+    "shell": {
+      "image": "nicolaka/netshoot",
+      "port": null,
+      "publish": null,
+      "addresses": {
+        "branch": "10.75.1.252",
+        "far": "10.75.2.252"
+      },
+      "docker_addresses": {
+        "branch": "10.75.1.252",
+        "far": "10.75.2.252"
+      }
+    }
+  },
   "groups": {},
   "router": {
     "networks": [

@@ -52,6 +52,7 @@ groups: { g: { members: [fw], arch: amd64 } }
 checks: [c.sh, { name: n, from: fw, http: "http://x/", tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]
 targets: [docker]
 message: hello
+tools: { shell: {}, viewer: { image: x, command: [serve], port: 80, publish: 9000 } }
 "#;
 
 #[test]

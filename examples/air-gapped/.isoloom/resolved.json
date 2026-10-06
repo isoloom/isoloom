@@ -99,6 +99,7 @@
     "app"
   ],
   "clones": {},
+  "tools": {},
   "groups": {},
   "router": null,
   "controller": {

@@ -226,6 +226,15 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
         "machines": machines,
         "start_order": start_order(spec),
         "clones": spec.clones,
+        "tools": spec.tools.iter().enumerate().map(|(i, (n, t))| {
+            (n.clone(), json!({
+                "image": t.image.clone().or_else(|| (n == "shell").then(|| "nicolaka/netshoot".to_string())),
+                "port": t.port,
+                "publish": t.publish,
+                "addresses": spec.networks.keys().map(|net| (net.clone(), json!(cidr(net).tool(i).to_string()))).collect::<Map<_, _>>(),
+                "docker_addresses": spec.networks.keys().map(|net| (net.clone(), json!(Cidr::parse(&docker.networks[net].cidr).expect("validated cidr").tool(i).to_string()))).collect::<Map<_, _>>(),
+            }))
+        }).collect::<Map<_, _>>(),
         "groups": spec.groups.keys().map(|g| (g.clone(), json!(crate::groups::members(spec, g)))).collect::<Map<_, _>>(),
         "router": router_value,
         "controller": controller,

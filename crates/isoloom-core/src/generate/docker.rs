@@ -394,6 +394,34 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         services.insert(s(runner), Value::Mapping(c));
     }
 
+    // Tools: observers on every network at the reserved addresses, outside the environment's
+    // contract (no reach rule, no check names them).
+    for (i, (name, tool)) in spec.tools.iter().enumerate() {
+        let mut t = Mapping::new();
+        let shell = name == "shell";
+        t.insert(s("image"), s(tool.image.clone().unwrap_or_else(|| TOOLBOX_IMAGE.to_string())));
+        t.insert(s("hostname"), s(name.as_str()));
+        if !tool.command.is_empty() {
+            t.insert(s("command"), list(tool.command.iter().map(|c| s(c.as_str()))));
+        } else if shell {
+            t.insert(s("entrypoint"), list([s("sleep"), s("infinity")]));
+        }
+        if shell {
+            t.insert(s("cap_add"), list([s("NET_ADMIN"), s("NET_RAW")]));
+        }
+        let mut nets = Mapping::new();
+        for net in spec.networks.keys() {
+            let cidr = crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
+            nets.insert(s(net.as_str()), map([("ipv4_address", s(cidr.tool(i).to_string()))]));
+        }
+        t.insert(s("networks"), Value::Mapping(nets));
+        if let (Some(port), Some(host)) = (tool.port, tool.publish) {
+            t.insert(s("ports"), list([s(format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{host}:{port}"))]));
+        }
+        t.insert(s("restart"), s("unless-stopped"));
+        services.insert(s(format!("isoloom-tool-{name}")), Value::Mapping(t));
+    }
+
     let mut networks = Mapping::new();
     for (net, n) in &spec.networks {
         let gateway = super::host_address(spec, net);
@@ -455,6 +483,9 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
 fn volume_name(machine: &str, volume: &str) -> String {
     format!("{machine}-{volume}")
 }
+
+/// The `shell` tool's image: a toolbox with tcpdump, nmap, curl, dig, netcat and more.
+pub(super) const TOOLBOX_IMAGE: &str = "nicolaka/netshoot";
 
 /// Stands in for an access machine the runner supplies, so checks run from its side.
 const STAND_IN: &str = "isoloom-access";

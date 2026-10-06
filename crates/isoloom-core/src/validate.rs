@@ -86,6 +86,12 @@ impl Cidr {
         Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 3)
     }
 
+    /// The address of the `i`th tool (0-based): just below the controller (.252, .251, .250 in
+    /// a /24), reserved for tools when the spec has any.
+    pub fn tool(self, i: usize) -> Ipv4Addr {
+        Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 4 - i as u32)
+    }
+
     /// The router's address: the last usable address of the block (e.g. .254 in a /24).
     pub fn router(self) -> Ipv4Addr {
         Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 2)
@@ -384,6 +390,65 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                     add(&format!("provision[{i}].groups.{group}[{j}]"), format!("no machine named `{member}`"));
                 }
             }
+        }
+    }
+
+    // Tools take the addresses just below the controller on every network: no machine there.
+    if !spec.tools.is_empty() {
+        for (mname, m) in &spec.machines {
+            for (net, octet) in &m.networks {
+                if let Some(c) = cidr_of.get(net.as_str())
+                    && (0..spec.tools.len()).any(|i| c.tool(i).octets()[3] == *octet)
+                {
+                    add(
+                        &format!("machines.{mname}.networks.{net}"),
+                        format!(
+                            ".{octet} is reserved for the tools (the {} addresses below .{}) when `tools:` is set",
+                            spec.tools.len(),
+                            c.controller().octets()[3]
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    // Tools: names, a recipe or an image, ports.
+    for (name, t) in &spec.tools {
+        let at = format!("tools.{name}");
+        if !dns_label(name) {
+            add(&at, "tool names are kebab-case and start with a letter".into());
+        }
+        if spec.machines.contains_key(name) || spec.groups.contains_key(name) {
+            add(&at, format!("`{name}` is already a machine's or a group's name"));
+        }
+        let recipe = crate::model::TOOL_RECIPES.contains(&name.as_str());
+        if !recipe && t.image.is_none() {
+            add(
+                &format!("{at}.image"),
+                format!("give a container image, or use a recipe: {}", crate::model::TOOL_RECIPES.join(", ")),
+            );
+        }
+        if recipe && t.image.is_some() {
+            add(
+                &format!("{at}.image"),
+                format!("`{name}` is a recipe with its own image; leave `image` out or choose another name"),
+            );
+        }
+        if t.publish.is_some() && t.port.is_none() {
+            add(&format!("{at}.publish"), "say which `port` the tool serves".into());
+        }
+        if let Some(p) = t.publish
+            && spec.machines.values().any(|m| m.services.iter().any(|s| s.publish == Some(p)))
+        {
+            add(&format!("{at}.publish"), format!("host port {p} is already published by a machine"));
+        }
+        if spec.tools.len() > 3 {
+            add(
+                "tools",
+                "at most 3 tools (each takes one of the addresses Isoloom reserves on every network)".into(),
+            );
+            break;
         }
     }
 

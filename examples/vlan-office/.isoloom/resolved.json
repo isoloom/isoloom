@@ -173,6 +173,7 @@
     "guest"
   ],
   "clones": {},
+  "tools": {},
   "groups": {},
   "router": {
     "networks": [

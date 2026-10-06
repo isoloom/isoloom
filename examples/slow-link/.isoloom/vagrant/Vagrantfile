@@ -264,4 +264,36 @@ Vagrant.configure("2") do |config|
     SH
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/user.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
+
+  # Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).
+  config.vm.define "isoloom-tool-shell" do |m|
+    m.vm.box = "bento/debian-12"
+    m.vm.hostname = "shell"
+    m.vm.network "private_network", ip: "10.75.1.252", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-branch", libvirt__network_name: "isoloom-slow-link-branch", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.75.2.252", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-far", libvirt__network_name: "isoloom-slow-link-far", libvirt__dhcp_enabled: false
+    m.vm.provider "virtualbox" do |v|
+      v.name = "slow-link · tool shell"
+      v.linked_clone = true
+      v.cpus = 1
+      v.memory = 512
+    end
+    m.vm.provider "libvirt" do |v, o|
+      o.vm.box = "generic/debian12"
+      v.cpus = 1
+      v.memory = 512
+    end
+    m.vm.provider "vmware_esxi" do |v|
+      v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
+      v.esxi_hostport = ENV.fetch("ESXI_HOSTPORT", "22").to_i
+      v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
+      v.esxi_password = "env:ESXI_PASSWORD"
+      v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
+      v.esxi_virtual_network = esxi_networks(["branch", "far"])
+      v.guest_name = "slow-link-tool-shell"
+      v.guest_numvcpus = 1
+      v.guest_memsize = 512
+    end
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.75.2.10 web' '10.75.1.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "toolbox", inline: "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq tcpdump nmap curl dnsutils netcat-openbsd iproute2 >/dev/null"
+  end
 end

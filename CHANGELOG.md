@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `tools:` observers beside the environment
+- `tools:` attaches observers on every network at reserved addresses (just below the controller's), outside the contract: no `reach` rule, check or resource total names them, and the environment behaves the same without them. `shell` is a built-in toolbox (tcpdump, nmap, curl, dig, netcat: netshoot on Docker, a Debian VM on local VMs); any other name is a container image with an optional `command`, `port` and `publish`. `isoloom connect <tool>` reaches it; the snapshot lists them. Validation reserves the tool addresses and checks names, recipes and ports.
+
 ### The `external` target: machines that already exist
 - `machines.*.external: { address, user, port, key }` gives a machine's SSH endpoint; when every machine has one, the `external` target is possible. Isoloom creates nothing: `generate` writes `.isoloom/external/` (an Ansible inventory with the `linux`/`windows` and spec groups, `machines.json`, a check runner per machine), `run external` copies the project to each machine and runs its `.sh` steps there and its `.yml` playbooks from here, then the environment's `provision:` playbooks with the inventory; `test external` runs each machine's runner over SSH (probes only); `connect`, `exec` and `capture` reach the address; `status` says which machines answer SSH; `down` only forgets it. Networks and `reach` are expected behavior, verified by the derived checks.
 - Example: existing-hosts.

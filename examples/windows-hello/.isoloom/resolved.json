@@ -58,6 +58,7 @@
     "web01"
   ],
   "clones": {},
+  "tools": {},
   "groups": {},
   "router": null,
   "controller": {

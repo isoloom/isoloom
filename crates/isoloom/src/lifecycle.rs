@@ -262,6 +262,40 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         instance,
         ssh_key,
     } = *env;
+    // A tool: its container (Docker) or VM (local VMs).
+    if spec.tools.contains_key(machine) && !spec.machines.contains_key(machine) {
+        let out = dir.join(core::instance::output_dir(instance));
+        let unit = format!("isoloom-tool-{machine}");
+        let inner = shell(cmd);
+        let mut c;
+        match target {
+            Target::Docker | Target::Hosted => {
+                c = Command::new("docker");
+                c.args([
+                    "compose",
+                    "--progress",
+                    "quiet",
+                    "-f",
+                    &out.join("docker/compose.yml").display().to_string(),
+                    "exec",
+                ]);
+                c.arg(if tty { "-it" } else { "-T" });
+                c.args([unit.as_str(), "sh", "-c", &inner]);
+                c.current_dir(dir);
+            }
+            Target::Vagrant | Target::Hybrid if machine == "shell" => {
+                let sub = if target == Target::Vagrant { "vagrant" } else { "hybrid" };
+                c = Command::new("vagrant");
+                c.current_dir(out.join(sub));
+                c.args(["ssh", &unit]);
+                if cmd.is_some() || root {
+                    c.args(["-c", &format!("{}sh -c {}", if root { "sudo " } else { "" }, sq(&inner))]);
+                }
+            }
+            other => return Err(format!("tool `{machine}` has no form on {}", other.id()).into()),
+        }
+        return Ok(c);
+    }
     let m = spec.machines.get(machine).ok_or_else(|| {
         format!(
             "no machine named `{machine}` (machines: {})",

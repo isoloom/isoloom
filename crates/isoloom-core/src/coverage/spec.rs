@@ -506,6 +506,17 @@ fn base_table() -> Vec<Row> {
                 note: "narrows the targets Isoloom generates",
             }),
         },
+        common(
+            "tools",
+            done(
+                "a container per tool on every network at the reserved addresses (`shell`: netshoot)",
+                "slow-link",
+            ),
+            done(
+                "the `shell` tool as a Debian VM with the usual tools; image tools are container-only",
+                "slow-link",
+            ),
+        ),
         Row {
             path: "machines.*.external.address",
             outputs: all(Status::Core {
@@ -562,7 +573,7 @@ fn base_table() -> Vec<Row> {
 }
 
 /// Fields counted as one feature whatever they hold.
-const WHOLE: &[&str] = &["common", "groups"];
+const WHOLE: &[&str] = &["common", "groups", "tools"];
 
 /// Where in the spec names are chosen by the author (map keys become `*`).
 const NAMED: &[&str] = &[

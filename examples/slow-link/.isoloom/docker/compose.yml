@@ -143,6 +143,21 @@ services:
         condition: service_started
       isoloom-access-routes:
         condition: service_healthy
+  isoloom-tool-shell:
+    image: nicolaka/netshoot
+    hostname: shell
+    entrypoint:
+    - sleep
+    - infinity
+    cap_add:
+    - NET_ADMIN
+    - NET_RAW
+    networks:
+      branch:
+        ipv4_address: 10.75.1.252
+      far:
+        ipv4_address: 10.75.2.252
+    restart: unless-stopped
 networks:
   branch:
     ipam:

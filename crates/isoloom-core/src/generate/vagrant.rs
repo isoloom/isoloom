@@ -353,6 +353,17 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         out.push_str("  end\n");
     }
+    for (i, (name, tool)) in spec.tools.iter().enumerate() {
+        if name == "shell" {
+            tool_vm(spec, i, &mut out);
+        } else {
+            let _ = writeln!(
+                out,
+                "\n  # Tool `{name}` ({}) runs on the container targets; no VM form.",
+                tool.image.as_deref().unwrap_or("image")
+            );
+        }
+    }
     let on_controller = controller_checks(spec, &plan);
     if !spec.provision.is_empty() || !on_controller.is_empty() {
         if !on_controller.is_empty() {
@@ -423,6 +434,60 @@ fn routes_unit(cmds: &[String]) -> String {
     format!(
         "mkdir -p /etc/isoloom\ncat > /etc/isoloom/routes.sh <<'ROUTES'\n#!/bin/sh\n# Routes to the other isoloom networks.\n{lines}ROUTES\nchmod +x /etc/isoloom/routes.sh\nfor d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do\n  if [ -d \"$d\" ]; then ln -sf /etc/isoloom/routes.sh \"$d/zz-isoloom-routes\"; fi\ndone\ncat > /etc/systemd/system/isoloom-routes.service <<'UNIT'\n[Unit]\nDescription=Routes to the other isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/routes.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-routes.service\nsystemctl restart isoloom-routes.service\n"
     )
+}
+
+/// The `shell` tool: a Debian VM on every network at the tool's address, with the usual
+/// observation tools, outside the environment's contract.
+fn tool_vm(spec: &Spec, index: usize, out: &mut String) {
+    let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
+    let _ = writeln!(out, "\n  # Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).");
+    let _ = writeln!(out, "  config.vm.define \"isoloom-tool-shell\" do |m|");
+    let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
+    let _ = writeln!(out, "    m.vm.hostname = \"shell\"");
+    for net in spec.networks.keys() {
+        let netname = format!("isoloom-{}-{net}", spec.name);
+        let _ = writeln!(
+            out,
+            "    m.vm.network \"private_network\", ip: {}, netmask: {}, virtualbox__intnet: {}, libvirt__network_name: {}, libvirt__dhcp_enabled: false",
+            rb(&cidr(net).tool(index).to_string()),
+            rb(&netmask(spec, net).to_string()),
+            rb(&netname),
+            rb(&netname),
+        );
+    }
+    let label = format!("{} · tool shell", spec.name);
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 512\n    end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 512\n    end"
+    );
+    let all: Vec<&str> = spec.networks.keys().map(String::as_str).collect();
+    esxi(out, &format!("{}-tool-shell", spec.name), 1, 512, &all);
+    let hosts: Vec<String> = spec
+        .machines
+        .iter()
+        .filter_map(|(n, m)| m.networks.first().map(|(net, o)| format!("'{} {n}'", address(spec, net, *o))))
+        .collect();
+    if !hosts.is_empty() {
+        let _ = writeln!(
+            out,
+            "    m.vm.provision \"shell\", name: \"hosts\", inline: {}",
+            rb(&format!(
+                "for l in {}; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done",
+                hosts.join(" ")
+            ))
+        );
+    }
+    let _ = writeln!(
+        out,
+        "    m.vm.provision \"shell\", name: \"toolbox\", inline: {}",
+        rb("export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq tcpdump nmap curl dnsutils netcat-openbsd iproute2 >/dev/null")
+    );
+    out.push_str("  end\n");
 }
 
 /// Link impairment on the router, re-applied at every boot (netem doesn't survive one).
