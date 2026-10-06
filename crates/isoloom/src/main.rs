@@ -241,6 +241,42 @@ enum Command {
         #[arg(last = true)]
         args: Vec<String>,
     },
+    /// Draw the environment: networks, machines with their addresses and services, reach rules,
+    /// gateways and the access machine. D2 by default; `--format dot` for Graphviz. With
+    /// `-o x.svg` or `-o x.png` the diagram is rendered when `d2` (or `dot`) is installed.
+    Graph {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// `d2` (default) or `dot`.
+        #[arg(long, default_value = "d2")]
+        format: String,
+        /// Write here instead of stdout; `.svg` and `.png` are rendered.
+        #[arg(short = 'o', long)]
+        out: Option<PathBuf>,
+        /// Draw instance N (its blocks and name).
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
+        /// Overrides, as for `generate`.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
+    },
+    /// Print a table about the environment: `addressing`, `services`, `wiring` or `resources`
+    /// (text, or `--md` for Markdown). `isoloom report list` names them.
+    Report {
+        /// The report.
+        name: String,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// Markdown instead of aligned text.
+        #[arg(long)]
+        md: bool,
+        /// Report on instance N.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
+        /// Overrides, as for `generate`.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
+    },
     /// Show the resolved snapshot (what `.isoloom/resolved.json` holds): every address, routes,
     /// targets and checks, worked out from the spec. A dotted path narrows it:
     /// `isoloom inspect machines.web.addresses`, `isoloom inspect targets`.
@@ -665,6 +701,70 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             instance,
             args,
         } => lifecycle::capture(&abs(&dir)?, target.as_deref(), instance, &machine, &network, &args, ssh_key.as_deref()),
+        Command::Graph {
+            dir,
+            format,
+            out,
+            instance,
+            sets,
+        } => {
+            let snapshot = snapshot_of(&dir, instance, &sets)?;
+            let text = match format.as_str() {
+                "d2" => core::report::graph_d2(&snapshot),
+                "dot" => core::report::graph_dot(&snapshot),
+                other => return Err(format!("unknown format `{other}`; `d2` or `dot`").into()),
+            };
+            let Some(out) = out else {
+                print!("{text}");
+                return Ok(ExitCode::SUCCESS);
+            };
+            let ext = out.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if matches!(ext, "svg" | "png") {
+                // Rendered by the format's own tool, from a sibling source file.
+                let src = out.with_extension(&format);
+                std::fs::write(&src, &text)?;
+                let (program, args): (&str, Vec<String>) = match format.as_str() {
+                    "d2" => ("d2", vec![src.display().to_string(), out.display().to_string()]),
+                    _ => (
+                        "dot",
+                        vec![format!("-T{ext}"), "-o".into(), out.display().to_string(), src.display().to_string()],
+                    ),
+                };
+                match std::process::Command::new(program).args(&args).status() {
+                    Ok(st) if st.success() => {
+                        println!("✓ {} (source: {})", out.display(), src.display());
+                        Ok(ExitCode::SUCCESS)
+                    }
+                    Ok(_) => Err(format!("{program} failed; the source is at {}", src.display()).into()),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(format!(
+                        "`{program}` isn't installed, so the diagram isn't rendered; the source is at {} ({})",
+                        src.display(),
+                        if format == "d2" {
+                            "https://d2lang.com/tour/install"
+                        } else {
+                            "https://graphviz.org/download/"
+                        }
+                    )
+                    .into()),
+                    Err(e) => Err(e.into()),
+                }
+            } else {
+                std::fs::write(&out, &text)?;
+                println!("✓ {}", out.display());
+                Ok(ExitCode::SUCCESS)
+            }
+        }
+        Command::Report { name, dir, md, instance, sets } => {
+            if name == "list" {
+                for (n, what) in core::report::REPORTS {
+                    println!("{n:<12} {what}");
+                }
+                return Ok(ExitCode::SUCCESS);
+            }
+            let snapshot = snapshot_of(&dir, instance, &sets)?;
+            print!("{}", core::report::report(&name, &snapshot, md)?);
+            Ok(ExitCode::SUCCESS)
+        }
         Command::Inspect {
             what,
             dir,
@@ -1364,6 +1464,23 @@ fn ssh_runner(key: Option<&std::path::Path>, user: &str, host: &str, command: &s
         wd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         env: vec![],
     }
+}
+
+/// The resolved snapshot of a project (as an instance when asked), after validation.
+fn snapshot_of(dir: &std::path::Path, instance: Option<u8>, sets: &[String]) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let (spec, _) = load_settings(dir, None, sets)?;
+    let problems = core::validate(&spec);
+    if !problems.is_empty() {
+        for p in &problems {
+            eprintln!("✗ {p}");
+        }
+        return Err("fix the spec first (`isoloom validate`)".into());
+    }
+    let spec = match instance {
+        Some(n) => core::instance::apply(&spec, n)?,
+        None => spec,
+    };
+    Ok(core::resolved::resolve_with(&spec, instance))
 }
 
 /// A project folder as an absolute path (the registry and the tools' working directories need one).

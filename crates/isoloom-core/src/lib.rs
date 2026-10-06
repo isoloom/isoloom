@@ -18,6 +18,7 @@ pub mod import;
 pub mod instance;
 pub mod model;
 pub mod registry;
+pub mod report;
 pub mod schema;
 pub mod targets;
 pub mod validate;
