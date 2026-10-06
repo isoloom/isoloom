@@ -22,7 +22,12 @@ pub const PATH: &str = ".isoloom/resolved.json";
 
 /// The snapshot as a generated file.
 pub fn file(spec: &Spec) -> GeneratedFile {
-    let mut text = serde_json::to_string_pretty(&resolve(spec)).expect("a JSON object serializes");
+    file_with(spec, None)
+}
+
+/// The snapshot of an instance of the spec (the spec already as that instance).
+pub fn file_with(spec: &Spec, instance: Option<u8>) -> GeneratedFile {
+    let mut text = serde_json::to_string_pretty(&resolve_with(spec, instance)).expect("a JSON object serializes");
     text.push('\n');
     GeneratedFile {
         path: PATH.to_string(),
@@ -32,6 +37,11 @@ pub fn file(spec: &Spec) -> GeneratedFile {
 
 /// The snapshot as JSON (validated specs only).
 pub fn resolve(spec: &Spec) -> Value {
+    resolve_with(spec, None)
+}
+
+/// The snapshot of an instance (`None`: the spec as written).
+pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
     let docker = on_docker(spec);
     let docker_blocks: Map<String, Value> = docker_cidrs(spec)
         .into_iter()
@@ -209,6 +219,7 @@ pub fn resolve(spec: &Spec) -> Value {
         "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
         "resolved_version": RESOLVED_VERSION,
         "name": spec.name,
+        "instance": instance,
         "inputs": spec.inputs,
         "networks": networks,
         "reach": spec.reach.iter().map(|r| json!({ "from": r.from, "to": r.to, "ports": r.ports })).collect::<Vec<_>>(),

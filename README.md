@@ -75,6 +75,7 @@ isoloom check [DIR]       # fails when .isoloom/ doesn't match the spec (for CI)
 isoloom inspect [PATH]    # the resolved snapshot (.isoloom/resolved.json), or one part of it
 isoloom run TARGET [DIR]  # generate, then bring the environment up with the target's own tool
 isoloom test TARGET [DIR] # run the checks against it: the spec's, and the ones derived from it
+isoloom run docker --instance 2   # a second copy, with its own names, blocks and ports
 isoloom status            # what is up on this host, and whether it still runs
 isoloom connect MACHINE   # a shell on a machine (compose exec, vagrant ssh, kubectl exec, ssh)
 isoloom exec MACHINE -- … # a command on one machine, or `all`

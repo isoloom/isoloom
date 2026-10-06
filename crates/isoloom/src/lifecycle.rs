@@ -21,8 +21,8 @@ pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<
             return Err(format!("no environment named `{name}` in {}", registry::path().display()).into());
         }
         for e in targets {
-            if e.dir.join(core::OUTPUT_DIR).is_dir() {
-                let (program, args, wd) = super::bring_up(&e.dir, e.target, e.cloud.as_deref(), true)?;
+            if e.dir.join(core::instance::output_dir(e.instance)).is_dir() {
+                let (program, args, wd) = super::bring_up(&e.dir, e.target, e.cloud.as_deref(), e.instance, true)?;
                 eprintln!("Tearing down {} on {} ({})", e.name, e.target.id(), wd.display());
                 let ok = Command::new(&program)
                     .args(&args)
@@ -36,7 +36,7 @@ pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<
             } else {
                 eprintln!("{}: folder gone, removing the entry", e.name);
             }
-            reg.remove(&e.dir, e.target);
+            reg.remove(&e.dir, e.target, e.instance);
         }
         registry::save(&reg)?;
         let _ = ssh_key;
@@ -49,7 +49,7 @@ pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<
             .iter()
             .map(|(e, state)| {
                 serde_json::json!({
-                    "name": e.name, "dir": e.dir, "target": e.target.id(), "cloud": e.cloud, "started": e.started, "state": state,
+                    "name": e.name, "dir": e.dir, "target": e.target.id(), "instance": e.instance, "cloud": e.cloud, "started": e.started, "state": state,
                 })
             })
             .collect();
@@ -84,16 +84,20 @@ pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<
 }
 
 fn target_label(e: &Entry) -> String {
-    match &e.cloud {
+    let mut label = match &e.cloud {
         Some(c) => format!("{} ({c})", e.target.id()),
         None => e.target.id().to_string(),
+    };
+    if let Some(n) = e.instance {
+        label.push_str(&format!(" #{n}"));
     }
+    label
 }
 
 /// What the target's tool says about an environment: `running (3/3)`, `partly (1/3)`,
 /// `stopped`, `applied (12 resources)`, or why it can't tell.
 fn probe(e: &Entry) -> String {
-    let out = e.dir.join(core::OUTPUT_DIR);
+    let out = e.dir.join(core::instance::output_dir(e.instance));
     if !out.is_dir() {
         return "stale (folder gone)".into();
     }
@@ -173,9 +177,9 @@ fn probe(e: &Entry) -> String {
 
 /// The target of a project to talk to: the one named; else what `run` recorded for the
 /// project (when there is exactly one); else the spec's single possible target.
-pub fn pick(dir: &Path, target: Option<&str>, spec: &core::Spec) -> Res<(Target, Option<String>)> {
+pub fn pick(dir: &Path, target: Option<&str>, instance: Option<u8>, spec: &core::Spec) -> Res<(Target, Option<String>)> {
     let reg = registry::load().unwrap_or_default();
-    let recorded = reg.for_dir(dir);
+    let recorded: Vec<&Entry> = reg.for_dir(dir).into_iter().filter(|e| e.instance == instance).collect();
     if let Some(id) = target {
         let t = Target::ALL.into_iter().find(|t| t.id() == id).ok_or_else(|| format!("unknown target `{id}`"))?;
         let cloud = recorded.iter().find(|e| e.target == t).and_then(|e| e.cloud.clone());
@@ -186,7 +190,8 @@ pub fn pick(dir: &Path, target: Option<&str>, spec: &core::Spec) -> Res<(Target,
         [] => match core::effective(spec).as_slice() {
             [one] => Ok((*one, None)),
             many => Err(format!(
-                "nothing recorded as running here (`isoloom status`); pass the target: {}",
+                "nothing recorded as running here{} (`isoloom status`); pass the target: {}",
+                instance.map(|n| format!(" as instance {n}")).unwrap_or_default(),
                 many.iter().map(|t| format!("--target {}", t.id())).collect::<Vec<_>>().join(", ")
             )
             .into()),
@@ -213,6 +218,7 @@ pub struct Env<'a> {
     pub spec: &'a core::Spec,
     pub target: Target,
     pub cloud: Option<&'a str>,
+    pub instance: Option<u8>,
     pub ssh_key: Option<&'a Path>,
 }
 
@@ -224,6 +230,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         spec,
         target,
         cloud,
+        instance,
         ssh_key,
     } = *env;
     let m = spec.machines.get(machine).ok_or_else(|| {
@@ -232,7 +239,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
             spec.machines.keys().cloned().collect::<Vec<_>>().join(", ")
         )
     })?;
-    let out = dir.join(core::OUTPUT_DIR);
+    let out = dir.join(core::instance::output_dir(instance));
     let windows = m.vm.as_ref().is_some_and(|v| core::images::is_windows(&v.os));
     let inner = shell(cmd);
     let sudo = if root { "sudo " } else { "" };
@@ -294,7 +301,8 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 "ssh",
                 "-c",
                 &format!(
-                    "cd /opt/isoloom && sudo docker compose -f .isoloom/docker/compose.yml exec {flags} {machine} sh -c {}",
+                    "cd /opt/isoloom && sudo docker compose -f {}/docker/compose.yml exec {flags} {machine} sh -c {}",
+                    core::instance::output_dir(instance),
                     sq(&inner)
                 ),
             ]);
@@ -332,7 +340,8 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
             let flags = if tty { "-it" } else { "-T" };
             c = ssh(ssh_key, &user, &host, tty);
             c.arg(format!(
-                "cd /opt/isoloom && sudo docker compose -f .isoloom/docker/compose.yml exec {flags} {machine} sh -c {}",
+                "cd /opt/isoloom && sudo docker compose -f {}/docker/compose.yml exec {flags} {machine} sh -c {}",
+                core::instance::output_dir(instance),
                 sq(&inner)
             ));
         }
@@ -368,14 +377,15 @@ fn windows_hint(spec: &core::Spec, machine: &str) -> String {
 }
 
 /// `isoloom connect <machine>`: a shell on the machine.
-pub fn connect(dir: &Path, target: Option<&str>, machine: &str, ssh_key: Option<&Path>) -> Res<ExitCode> {
-    let spec = core::load(dir)?;
-    let (t, cloud) = pick(dir, target, &spec)?;
+pub fn connect(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: &str, ssh_key: Option<&Path>) -> Res<ExitCode> {
+    let spec = load_as(dir, instance)?;
+    let (t, cloud) = pick(dir, target, instance, &spec)?;
     let env = Env {
         dir,
         spec: &spec,
         target: t,
         cloud: cloud.as_deref(),
+        instance,
         ssh_key,
     };
     let mut c = on_machine(&env, machine, None, terminal(), false)?;
@@ -385,12 +395,12 @@ pub fn connect(dir: &Path, target: Option<&str>, machine: &str, ssh_key: Option<
 
 /// `isoloom exec <machine|all> -- <command>`: the command on one machine, or on every machine
 /// that can be reached, each line prefixed with the machine's name.
-pub fn exec(dir: &Path, target: Option<&str>, machine: &str, command: &[String], ssh_key: Option<&Path>) -> Res<ExitCode> {
+pub fn exec(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: &str, command: &[String], ssh_key: Option<&Path>) -> Res<ExitCode> {
     if command.is_empty() {
         return Err("give the command after `--`, e.g. `isoloom exec web -- uname -a`".into());
     }
-    let spec = core::load(dir)?;
-    let (t, cloud) = pick(dir, target, &spec)?;
+    let spec = load_as(dir, instance)?;
+    let (t, cloud) = pick(dir, target, instance, &spec)?;
     // Each word quoted again for the machine's shell, so `exec web -- sh -c 'a; b'` arrives intact.
     let cmd = command
         .iter()
@@ -408,6 +418,7 @@ pub fn exec(dir: &Path, target: Option<&str>, machine: &str, command: &[String],
         spec: &spec,
         target: t,
         cloud: cloud.as_deref(),
+        instance,
         ssh_key,
     };
     if machine != "all" {
@@ -444,9 +455,9 @@ pub fn exec(dir: &Path, target: Option<&str>, machine: &str, command: &[String],
 /// `isoloom capture <machine> <network> [-- tcpdump args]`: tcpdump on the machine's interface
 /// on that network, found by its address from inside the machine's network namespace (so it
 /// works the same on Docker Desktop, Linux, local VMs and cloud VMs).
-pub fn capture(dir: &Path, target: Option<&str>, machine: &str, network: &str, args: &[String], ssh_key: Option<&Path>) -> Res<ExitCode> {
-    let spec = core::load(dir)?;
-    let (t, cloud) = pick(dir, target, &spec)?;
+pub fn capture(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: &str, network: &str, args: &[String], ssh_key: Option<&Path>) -> Res<ExitCode> {
+    let spec = load_as(dir, instance)?;
+    let (t, cloud) = pick(dir, target, instance, &spec)?;
     let m = spec.machines.get(machine).ok_or_else(|| format!("no machine named `{machine}`"))?;
     if !m.networks.contains_key(network) {
         return Err(format!(
@@ -480,7 +491,7 @@ pub fn capture(dir: &Path, target: Option<&str>, machine: &str, network: &str, a
             if m.docker.is_none() {
                 return Err(format!("`{machine}` has no `docker:`: on Docker it is supplied by the runner").into());
             }
-            let f = dir.join(core::OUTPUT_DIR).join("docker/compose.yml").display().to_string();
+            let f = dir.join(core::instance::output_dir(instance)).join("docker/compose.yml").display().to_string();
             let id = Command::new("docker")
                 .args(["compose", "-f", &f, "ps", "-q", machine])
                 .current_dir(dir)
@@ -511,6 +522,7 @@ pub fn capture(dir: &Path, target: Option<&str>, machine: &str, network: &str, a
                 spec: &spec,
                 target: t,
                 cloud: cloud.as_deref(),
+                instance,
                 ssh_key,
             },
             machine,
@@ -522,6 +534,15 @@ pub fn capture(dir: &Path, target: Option<&str>, machine: &str, network: &str, a
     };
     let status = c.status().map_err(|e| tool_error(&c, e))?;
     Ok(if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+}
+
+/// The spec, as the instance when one is named (its names and ports are the instance's).
+fn load_as(dir: &Path, instance: Option<u8>) -> Res<core::Spec> {
+    let spec = core::load(dir)?;
+    Ok(match instance {
+        Some(n) => core::instance::apply(&spec, n)?,
+        None => spec,
+    })
 }
 
 /// Whether a terminal is attached (so `-t` can be asked of the tools).

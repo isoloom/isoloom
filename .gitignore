@@ -7,3 +7,6 @@
 *.tfstate
 *.tfstate.*
 .claude/
+
+# Instance folders written by `isoloom run --instance N` (the committed files are under .isoloom/).
+.isoloom-*/

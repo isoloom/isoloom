@@ -17,6 +17,9 @@ pub struct Entry {
     /// The project folder (absolute).
     pub dir: PathBuf,
     pub target: Target,
+    /// The instance number, when `run --instance` was used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance: Option<u8>,
     /// The cloud module, for the cloud targets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<String>,
@@ -71,16 +74,17 @@ pub fn save(r: &Registry) -> Result<(), String> {
 }
 
 impl Registry {
-    /// Adds or replaces the entry for this project and target.
+    /// Adds or replaces the entry for this project, target and instance.
     pub fn upsert(&mut self, entry: Entry) {
-        self.environments.retain(|e| !(e.dir == entry.dir && e.target == entry.target));
+        self.environments
+            .retain(|e| !(e.dir == entry.dir && e.target == entry.target && e.instance == entry.instance));
         self.environments.push(entry);
     }
 
-    /// Drops the entry for this project and target; whether there was one.
-    pub fn remove(&mut self, dir: &Path, target: Target) -> bool {
+    /// Drops the entry for this project, target and instance; whether there was one.
+    pub fn remove(&mut self, dir: &Path, target: Target, instance: Option<u8>) -> bool {
         let before = self.environments.len();
-        self.environments.retain(|e| !(e.dir == dir && e.target == target));
+        self.environments.retain(|e| !(e.dir == dir && e.target == target && e.instance == instance));
         before != self.environments.len()
     }
 
@@ -135,6 +139,7 @@ mod tests {
             name: "x".into(),
             dir: PathBuf::from("/p"),
             target: t,
+            instance: None,
             cloud: None,
             started: rfc3339(0),
         };
@@ -142,8 +147,8 @@ mod tests {
         r.upsert(e(Target::Vagrant));
         r.upsert(e(Target::Docker));
         assert_eq!(r.environments.len(), 2);
-        assert!(r.remove(Path::new("/p"), Target::Docker));
-        assert!(!r.remove(Path::new("/p"), Target::Docker));
+        assert!(r.remove(Path::new("/p"), Target::Docker, None));
+        assert!(!r.remove(Path::new("/p"), Target::Docker, None));
         assert_eq!(r.for_dir(Path::new("/p")).len(), 1);
     }
 }

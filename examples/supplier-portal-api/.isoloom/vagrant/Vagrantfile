@@ -5,7 +5,7 @@
 
 ROOT = File.expand_path("../..", __dir__)
 # Copied into each VM: the project, without version control or generated files.
-PROJECT = Dir.children(ROOT).reject { |e| [".git", ".isoloom", ".vagrant"].include?(e) }.sort
+PROJECT = Dir.children(ROOT).reject { |e| [".git", ".vagrant"].include?(e) || e.start_with?(".isoloom") }.sort
 # Values provided at launch (empty when unset).
 INPUTS = {
   "API_URL" => ENV.fetch("API_URL", ""),

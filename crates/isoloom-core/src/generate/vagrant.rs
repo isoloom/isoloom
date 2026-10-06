@@ -55,7 +55,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("# Start:  cd .isoloom/vagrant && vagrant up\n# Stop:   cd .isoloom/vagrant && vagrant destroy -f\n\n");
     out.push_str("ROOT = File.expand_path(\"../..\", __dir__)\n");
     out.push_str("# Copied into each VM: the project, without version control or generated files.\n");
-    out.push_str("PROJECT = Dir.children(ROOT).reject { |e| [\".git\", \".isoloom\", \".vagrant\"].include?(e) }.sort\n");
+    out.push_str("PROJECT = Dir.children(ROOT).reject { |e| [\".git\", \".vagrant\"].include?(e) || e.start_with?(\".isoloom\") }.sort\n");
     if !spec.inputs.is_empty() {
         out.push_str("# Values provided at launch (empty when unset).\nINPUTS = {\n");
         for i in &spec.inputs {

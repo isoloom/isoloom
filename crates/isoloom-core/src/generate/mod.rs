@@ -76,6 +76,21 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
     Ok(files)
 }
 
+/// The files for one target as instance `n` of the spec (see [`crate::instance`]): names
+/// suffixed, Docker blocks and published ports moved, everything under `.isoloom-<n>/`.
+pub fn generate_instance(spec: &Spec, target: Target, n: u8) -> Result<Vec<GeneratedFile>, GenerateError> {
+    let applied = crate::instance::apply(spec, n).map_err(|what| GenerateError::Unsupported { target, what })?;
+    let mut files = target_files(&applied, target)?;
+    files.push(resolved::file_with(&applied, Some(n)));
+    Ok(files
+        .into_iter()
+        .map(|f| {
+            let (path, contents) = crate::instance::relocate(&f.path, &f.contents, n);
+            GeneratedFile { path, contents }
+        })
+        .collect())
+}
+
 /// A target's own files, without the snapshot (which asks every generator whether it would
 /// refuse the spec, so it can't be part of what a generator produces).
 fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {

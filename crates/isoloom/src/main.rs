@@ -82,6 +82,10 @@ enum Command {
         /// Your own image table (YAML), as for `generate`.
         #[arg(long, value_name = "FILE")]
         images: Option<PathBuf>,
+        /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
+        /// ports, files under .isoloom-N/. For several copies on one host.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
     },
     /// Tear down what `run` started for a target (the inverse tool: compose down, vagrant
     /// destroy, kubectl delete, or terraform destroy).
@@ -91,6 +95,10 @@ enum Command {
         dir: PathBuf,
         #[arg(long)]
         cloud: Option<String>,
+        /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
+        /// ports, files under .isoloom-N/. For several copies on one host.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
     },
     /// Run the environment's checks against a running target: the spec's (scripts and declared
     /// probes) and the ones Isoloom derives from `services` and `reach`. One line per check;
@@ -115,6 +123,10 @@ enum Command {
         /// The SSH private key for the cloud targets (default: your SSH agent and config).
         #[arg(long)]
         ssh_key: Option<PathBuf>,
+        /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
+        /// ports, files under .isoloom-N/. For several copies on one host.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
     },
     /// The environments `run` brought up on this host, with their live state.
     Status {
@@ -138,6 +150,10 @@ enum Command {
         /// The SSH private key for the cloud targets.
         #[arg(long)]
         ssh_key: Option<PathBuf>,
+        /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
+        /// ports, files under .isoloom-N/. For several copies on one host.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
     },
     /// Run a command on a machine, or on every machine (`all`), of a running environment.
     Exec {
@@ -151,6 +167,10 @@ enum Command {
         /// The SSH private key for the cloud targets.
         #[arg(long)]
         ssh_key: Option<PathBuf>,
+        /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
+        /// ports, files under .isoloom-N/. For several copies on one host.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
         /// The command, after `--`.
         #[arg(last = true)]
         command: Vec<String>,
@@ -170,6 +190,10 @@ enum Command {
         /// The SSH private key for the cloud targets.
         #[arg(long)]
         ssh_key: Option<PathBuf>,
+        /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
+        /// ports, files under .isoloom-N/. For several copies on one host.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
         /// tcpdump arguments, after `--` (default: `-l -v`).
         #[arg(last = true)]
         args: Vec<String>,
@@ -185,6 +209,10 @@ enum Command {
         /// YAML instead of JSON.
         #[arg(long)]
         yaml: bool,
+        /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
+        /// ports, files under .isoloom-N/. For several copies on one host.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
     },
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
     Schema,
@@ -477,8 +505,14 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 ExitCode::SUCCESS
             })
         }
-        Command::Run { target, dir, cloud, images } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), images.as_deref(), false),
-        Command::Down { target, dir, cloud } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), None, true),
+        Command::Run {
+            target,
+            dir,
+            cloud,
+            images,
+            instance,
+        } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), images.as_deref(), instance, false),
+        Command::Down { target, dir, cloud, instance } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), None, instance, true),
         Command::Test {
             target,
             dir,
@@ -487,33 +521,45 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             no_derived,
             json,
             ssh_key,
+            instance,
         } => test_cmd(
             &dir,
             target.as_deref(),
-            cloud.as_deref(),
-            images.as_deref(),
-            no_derived,
-            json,
-            ssh_key.as_deref(),
+            TestOpts {
+                cloud: cloud.as_deref(),
+                images: images.as_deref(),
+                no_derived,
+                json,
+                ssh_key: ssh_key.as_deref(),
+                instance,
+            },
         ),
         Command::Status { json, cleanup } => lifecycle::status(json, cleanup.as_deref(), None),
-        Command::Connect { machine, dir, target, ssh_key } => lifecycle::connect(&abs(&dir)?, target.as_deref(), &machine, ssh_key.as_deref()),
+        Command::Connect {
+            machine,
+            dir,
+            target,
+            ssh_key,
+            instance,
+        } => lifecycle::connect(&abs(&dir)?, target.as_deref(), instance, &machine, ssh_key.as_deref()),
         Command::Exec {
             machine,
             dir,
             target,
             ssh_key,
+            instance,
             command,
-        } => lifecycle::exec(&abs(&dir)?, target.as_deref(), &machine, &command, ssh_key.as_deref()),
+        } => lifecycle::exec(&abs(&dir)?, target.as_deref(), instance, &machine, &command, ssh_key.as_deref()),
         Command::Capture {
             machine,
             network,
             dir,
             target,
             ssh_key,
+            instance,
             args,
-        } => lifecycle::capture(&abs(&dir)?, target.as_deref(), &machine, &network, &args, ssh_key.as_deref()),
-        Command::Inspect { what, dir, yaml } => {
+        } => lifecycle::capture(&abs(&dir)?, target.as_deref(), instance, &machine, &network, &args, ssh_key.as_deref()),
+        Command::Inspect { what, dir, yaml, instance } => {
             // `isoloom inspect examples/segmented` names the project, not a path in the snapshot.
             let (what, dir) = match (what, dir) {
                 (Some(w), None) if w.contains('/') || std::path::Path::new(&w).is_dir() => (None, PathBuf::from(w)),
@@ -527,7 +573,11 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 }
                 return Err("fix the spec first (`isoloom validate`)".into());
             }
-            let all = core::resolved::resolve(&spec);
+            let spec = match instance {
+                Some(n) => core::instance::apply(&spec, n)?,
+                None => spec,
+            };
+            let all = core::resolved::resolve_with(&spec, instance);
             let value = match &what {
                 Some(path) => {
                     core::resolved::lookup(&all, path).ok_or_else(|| format!("nothing at `{path}` in the snapshot; try `isoloom inspect` to see it all"))?
@@ -693,6 +743,7 @@ fn prepare(
     dir: &std::path::Path,
     target: Option<&str>,
     images: Option<&std::path::Path>,
+    instance: Option<u8>,
 ) -> Result<(core::Spec, PathBuf, core::Target), Box<dyn std::error::Error>> {
     let spec = core::load(dir)?;
     // Absolute, so the paths we hand to docker/vagrant/terraform don't depend on their working
@@ -726,7 +777,11 @@ fn prepare(
         return Err(format!("this spec can't run on `{}`; see `isoloom targets`", t.id()).into());
     }
 
-    let files = core::generate(&spec, t).map_err(|e| format!("can't generate `{}`: {e}", t.id()))?;
+    let files = match instance {
+        Some(n) => core::generate_instance(&spec, t, n),
+        None => core::generate(&spec, t),
+    }
+    .map_err(|e| format!("can't generate `{}`: {e}", t.id()))?;
     for f in &files {
         let path = dir.join(&f.path);
         if let Some(parent) = path.parent() {
@@ -734,6 +789,11 @@ fn prepare(
         }
         std::fs::write(&path, &f.contents)?;
     }
+    // The spec as the instance, so names and ports downstream are the instance's.
+    let spec = match instance {
+        Some(n) => core::instance::apply(&spec, n)?,
+        None => spec,
+    };
     Ok((spec, dir, t))
 }
 
@@ -742,11 +802,12 @@ fn run_cmd(
     target: Option<&str>,
     cloud: Option<&str>,
     images: Option<&std::path::Path>,
+    instance: Option<u8>,
     down: bool,
 ) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let (spec, dir, t) = prepare(dir, target, images)?;
+    let (spec, dir, t) = prepare(dir, target, images, instance)?;
     let dir = &dir;
-    let (program, args, wd) = bring_up(dir, t, cloud, down)?;
+    let (program, args, wd) = bring_up(dir, t, cloud, instance, down)?;
     eprintln!("{} {} ({})", if down { "Tearing down" } else { "Running" }, t.id(), wd.display());
     let status = std::process::Command::new(&program).args(&args).current_dir(&wd).status();
     match status {
@@ -754,12 +815,13 @@ fn run_cmd(
             // Remember what is up on this host, for status / connect / exec / capture.
             let recorded = core::registry::load().and_then(|mut reg| {
                 if down {
-                    reg.remove(dir, t);
+                    reg.remove(dir, t, instance);
                 } else {
                     reg.upsert(core::registry::Entry {
                         name: spec.name.clone(),
                         dir: dir.clone(),
                         target: t,
+                        instance,
                         cloud: cloud.map(str::to_string),
                         started: core::registry::now(),
                     });
@@ -795,17 +857,27 @@ struct Outcome {
     detail: String,
 }
 
-fn test_cmd(
-    dir: &std::path::Path,
-    target: Option<&str>,
-    cloud: Option<&str>,
-    images: Option<&std::path::Path>,
+/// What `isoloom test` was asked beyond the target.
+struct TestOpts<'a> {
+    cloud: Option<&'a str>,
+    images: Option<&'a std::path::Path>,
     no_derived: bool,
     json: bool,
-    ssh_key: Option<&std::path::Path>,
-) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    ssh_key: Option<&'a std::path::Path>,
+    instance: Option<u8>,
+}
+
+fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Result<ExitCode, Box<dyn std::error::Error>> {
     use core::checks::{self, Line, Position};
-    let (spec, dir, t) = prepare(dir, target, images)?;
+    let TestOpts {
+        cloud,
+        images,
+        no_derived,
+        json,
+        ssh_key,
+        instance,
+    } = opts;
+    let (spec, dir, t) = prepare(dir, target, images, instance)?;
     let plan = checks::plan(&spec);
     let expected: Vec<&checks::Resolved> = plan.iter().filter(|c| !(no_derived && c.derived)).collect();
     if expected.is_empty() {
@@ -823,7 +895,7 @@ fn test_cmd(
             format!("isoloom-check-{}", pos.id())
         }
     };
-    let out = dir.join(core::OUTPUT_DIR);
+    let out = dir.join(core::instance::output_dir(instance));
     let derived_env = |runner: &mut Runner| {
         if no_derived {
             runner.env.push(("ISOLOOM_DERIVED".into(), "0".into()));
@@ -1106,9 +1178,15 @@ fn abs(dir: &std::path::Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
 }
 
 /// The command (and its working directory) that brings a target up or tears it down.
-fn bring_up(dir: &std::path::Path, t: core::Target, cloud: Option<&str>, down: bool) -> Result<(String, Vec<String>, PathBuf), Box<dyn std::error::Error>> {
+fn bring_up(
+    dir: &std::path::Path,
+    t: core::Target,
+    cloud: Option<&str>,
+    instance: Option<u8>,
+    down: bool,
+) -> Result<(String, Vec<String>, PathBuf), Box<dyn std::error::Error>> {
     let s = |x: &str| x.to_string();
-    let out = dir.join(core::OUTPUT_DIR);
+    let out = dir.join(core::instance::output_dir(instance));
     Ok(match t {
         core::Target::Docker | core::Target::Hosted => {
             let f = out.join("docker/compose.yml");
