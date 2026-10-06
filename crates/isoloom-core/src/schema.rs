@@ -37,12 +37,30 @@ pub fn schema() -> Value {
     set(&mut s, &["properties", "networks"], "propertyNames", json!({ "pattern": kebab }));
     set(&mut s, &["properties", "machines"], "propertyNames", json!({ "pattern": kebab }));
     set(&mut s, &["properties", "inputs", "items"], "pattern", json!("^[A-Z_][A-Z0-9_]*$"));
+    // A network is a /24 to /29; a LAN split into VLANs may be larger (from /8), its VLANs are
+    // the /24 to /29 networks.
+    let private = r"^(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}";
+    let network = format!("{private}/(2[4-9])$");
     set(
         &mut s,
         &["$defs", "Network", "properties", "cidr"],
         "pattern",
-        json!(r"^(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}/(2[4-9])$"),
+        json!(format!(r"{private}/([89]|1\d|2[0-9])$")),
     );
+    set(&mut s, &["$defs", "Network"], "if", json!({ "not": { "required": ["vlans"] } }));
+    set(
+        &mut s,
+        &["$defs", "Network"],
+        "then",
+        json!({ "properties": { "cidr": { "pattern": network } } }),
+    );
+    set(
+        &mut s,
+        &["$defs", "Network", "properties", "vlans"],
+        "propertyNames",
+        json!({ "pattern": "^[1-9][0-9]{0,3}$" }),
+    );
+    set(&mut s, &["$defs", "Vlan", "properties", "cidr"], "pattern", json!(network));
     set(&mut s, &["$defs", "VmImpl", "properties", "os"], "enum", json!(KNOWN_OS));
     // `vm: {}` is complete when `common:` or a group supplies the OS.
     set(&mut s, &["$defs", "VmImpl"], "required", json!([]));

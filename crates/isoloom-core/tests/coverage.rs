@@ -20,6 +20,7 @@ name: every-field
 networks:
   out: { cidr: 10.1.0.0/24, internet: true, docker: { cidr: 10.1.0.0/24 } }
   dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw, docker: { cidr: 10.1.1.0/24 } }
+  office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
 reach: [{ from: out, to: dmz, ports: [80] }]
 inputs: [TOKEN]
 machines:
@@ -53,7 +54,7 @@ targets: [docker]
 #[test]
 fn every_field_of_the_format_has_a_row_and_every_row_is_a_field() {
     parse(EVERY_FIELD).expect("parses");
-    // The document as written: `count`, `common` and `groups` are folded away by parsing.
+    // The document as written: `count`, `common`, `groups` and `vlans` are folded away by parsing.
     let raw: serde_yaml_ng::Value = serde_yaml_ng::from_str(EVERY_FIELD).unwrap();
     let fields: BTreeSet<String> = paths(&raw).into_iter().collect();
     let rows: BTreeSet<String> = table().iter().map(|r| r.path.to_string()).collect();

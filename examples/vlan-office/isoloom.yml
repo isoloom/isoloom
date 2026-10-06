@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# An office LAN split into two VLANs, as a switch would: staff on VLAN 10, guests on VLAN 20.
+# Staff may reach the intranet server; guests only the internet. Each VLAN becomes a network
+# of its own (`office-vlan10`, `office-vlan20`); machines join them as `office.vlan10`.
+version: 1
+name: vlan-office
+
+networks:
+  office:
+    cidr: 10.70.0.0/16
+    internet: false
+    vlans:
+      10: { cidr: 10.70.10.0/24 }
+      20: { cidr: 10.70.20.0/24, internet: true }
+  servers: { cidr: 10.70.99.0/24, internet: false }
+
+reach:
+  - { from: office.vlan10, to: servers, ports: [80] }
+
+machines:
+  intranet:
+    networks: { servers: 10 }
+    services: [{ port: 80, http: true }]
+    docker:
+      image: "nginx:1.27-alpine"
+    vm:
+      os: debian-12
+      provision: [provision/intranet.sh]
+
+  staff:
+    access: true
+    networks: { office.vlan10: 10 }
+    vm:
+      os: debian-12
+
+  guest:
+    networks: { office.vlan20: 10 }
+    docker:
+      image: "alpine:3.20"
+      idle: true
+    vm:
+      os: debian-12
+      provision: [provision/guest.sh]
+
+checks:
+  - name: staff reach the intranet
+    from: staff
+    http: http://intranet/
+    expect: 200
+    wait: 60
+  - name: guests don't
+    from: guest
+    tcp: intranet:80
+    expect: blocked

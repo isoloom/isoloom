@@ -1,0 +1,297 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "vlan-office",
+  "instance": null,
+  "inputs": [],
+  "networks": {
+    "office-vlan10": {
+      "cidr": "10.70.10.0/24",
+      "docker_cidr": "10.70.10.0/24",
+      "internet": false,
+      "gateway": null,
+      "gateway_address": "10.70.10.1",
+      "router": "10.70.10.254",
+      "controller": "10.70.10.253"
+    },
+    "office-vlan20": {
+      "cidr": "10.70.20.0/24",
+      "docker_cidr": "10.70.20.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "10.70.20.1",
+      "router": "10.70.20.254",
+      "controller": "10.70.20.253"
+    },
+    "servers": {
+      "cidr": "10.70.99.0/24",
+      "docker_cidr": "10.70.99.0/24",
+      "internet": false,
+      "gateway": null,
+      "gateway_address": "10.70.99.1",
+      "router": "10.70.99.254",
+      "controller": "10.70.99.253"
+    }
+  },
+  "reach": [
+    {
+      "from": "office-vlan10",
+      "to": "servers",
+      "ports": [
+        80
+      ]
+    }
+  ],
+  "machines": {
+    "intranet": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "servers": "10.70.99.10"
+      },
+      "docker_addresses": {
+        "servers": "10.70.99.10"
+      },
+      "services": [
+        {
+          "port": 80,
+          "name": null,
+          "http": true,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [
+        {
+          "to": "10.70.10.0/24",
+          "via": "10.70.99.254"
+        },
+        {
+          "to": "10.70.20.0/24",
+          "via": "10.70.99.254"
+        }
+      ],
+      "default_gateway": null,
+      "offline": true
+    },
+    "staff": {
+      "access": true,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "office-vlan10": "10.70.10.10"
+      },
+      "docker_addresses": {
+        "office-vlan10": "10.70.10.10"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [
+        {
+          "to": "10.70.20.0/24",
+          "via": "10.70.10.254"
+        },
+        {
+          "to": "10.70.99.0/24",
+          "via": "10.70.10.254"
+        }
+      ],
+      "default_gateway": null,
+      "offline": true
+    },
+    "guest": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "office-vlan20": "10.70.20.10"
+      },
+      "docker_addresses": {
+        "office-vlan20": "10.70.20.10"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [
+        {
+          "to": "10.70.10.0/24",
+          "via": "10.70.20.254"
+        },
+        {
+          "to": "10.70.99.0/24",
+          "via": "10.70.20.254"
+        }
+      ],
+      "default_gateway": null,
+      "offline": false
+    }
+  },
+  "start_order": [
+    "intranet",
+    "staff",
+    "guest"
+  ],
+  "clones": {},
+  "groups": {},
+  "router": {
+    "networks": [
+      "office-vlan10",
+      "office-vlan20",
+      "servers"
+    ],
+    "addresses": {
+      "office-vlan10": "10.70.10.254",
+      "office-vlan20": "10.70.20.254",
+      "servers": "10.70.99.254"
+    }
+  },
+  "controller": {
+    "addresses": {
+      "office-vlan10": "10.70.10.253",
+      "office-vlan20": "10.70.20.253",
+      "servers": "10.70.99.253"
+    }
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes",
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "generated": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes",
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "refused": {},
+    "not_possible": {
+      "hybrid": "only when some machines are containers and others are VMs"
+    }
+  },
+  "checks": {
+    "default_position": "staff",
+    "positions": [
+      {
+        "position": "staff",
+        "machine": "staff",
+        "runner": "isoloom-check",
+        "checks": [
+          {
+            "name": "staff reach the intranet",
+            "derived": false,
+            "kind": "http",
+            "target": "http://intranet/",
+            "expect": "200",
+            "wait": 60
+          },
+          {
+            "name": "intranet:80 from staff",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.70.99.10:80/",
+            "expect": "any",
+            "wait": 30
+          },
+          {
+            "name": "no internet from staff",
+            "derived": true,
+            "kind": "http",
+            "target": "http://1.1.1.1/",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "intranet",
+        "machine": "intranet",
+        "runner": "isoloom-check-intranet",
+        "checks": [
+          {
+            "name": "no internet from intranet",
+            "derived": true,
+            "kind": "http",
+            "target": "http://1.1.1.1/",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "guest",
+        "machine": "guest",
+        "runner": "isoloom-check-guest",
+        "checks": [
+          {
+            "name": "guests don't",
+            "derived": false,
+            "kind": "tcp",
+            "target": "intranet:80",
+            "expect": "blocked",
+            "wait": 0
+          },
+          {
+            "name": "intranet:80 blocked from guest",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.70.99.10:80",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      }
+    ]
+  }
+}

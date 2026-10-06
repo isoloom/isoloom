@@ -20,12 +20,13 @@ pub mod registry;
 pub mod schema;
 pub mod targets;
 pub mod validate;
+pub mod vlans;
 
 use std::path::{Path, PathBuf};
 
 pub use generate::resolved;
 pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, generate_instance, refusal};
-pub use model::{Arch, Check, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target};
+pub use model::{Arch, Check, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target, Vlan};
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};
 
@@ -55,6 +56,8 @@ impl std::fmt::Display for LoadError {
 impl std::error::Error for LoadError {}
 
 /// Parses a spec from YAML text. Unknown fields are errors (typos shouldn't pass silently).
+/// VLANs written under their LAN come back as networks of their own ([`vlans::flatten`]): the
+/// rest of Isoloom only deals in networks.
 pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
     let mut doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml).map_err(|e| LoadError::Parse(e.to_string()))?;
     // `count:` clones, then `common:` and `groups:` fold into the machines, so every reader sees
@@ -63,7 +66,7 @@ pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
     groups::expand(&mut doc).map_err(LoadError::Parse)?;
     let mut spec: Spec = serde_yaml_ng::from_value(doc).map_err(|e| LoadError::Parse(e.to_string()))?;
     spec.clones = clones;
-    Ok(spec)
+    vlans::flatten(spec).map_err(LoadError::Parse)
 }
 
 /// The spec file in `dir`: `isoloom.yml` or `isoloom.yaml`, never both.

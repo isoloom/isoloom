@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### VLANs under their LAN
+- `networks.<lan>.vlans`: a LAN split into VLANs, by id (1–4094), each with its own `cidr` inside the LAN's block (which may then be as large as a /8) and optionally its own `internet` (the LAN's by default). Machines join one as `<lan>.vlan<id>`; a `reach` rule naming the LAN covers all of its VLANs. Each VLAN becomes a network of its own, `<lan>-vlan<id>`, on every target (right after parsing, so every generator and check works unchanged); the LAN stays a network only when a machine joins it directly. New example: vlan-office.
+
 ### `count:` for several of a kind
 - A machine with `count: N` (2 to 99) becomes clones `<name>-01` to `<name>-NN`, each one address further along on every network. Where the spec names the base machine, every clone is meant: `depends_on`, a check's `from` (one check per clone), group members, provisioning groups, `isoloom exec <name>`. A gateway and the access machine take no count. The snapshot lists `clones`.
 

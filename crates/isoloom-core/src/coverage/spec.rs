@@ -196,6 +196,21 @@ fn base_table() -> Vec<Row> {
             na("Docker only: VMs use `cidr` as written"),
             na("Docker only: VMs use `cidr` as written"),
         ),
+        row(
+            "networks.*.vlans.*.cidr",
+            done(
+                "a Compose network per VLAN (`<lan>-vlan<id>`), machines on `<lan>.vlan<id>` attached to it",
+                "vlan-office",
+            ),
+            done("a private network per VLAN", "vlan-office"),
+            done("an SDN VNet per VLAN", "vlan-office"),
+        ),
+        row(
+            "networks.*.vlans.*.internet",
+            done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
+            done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
+            done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
+        ),
         common(
             "networks.*.internet",
             done(
@@ -502,6 +517,7 @@ const WHOLE: &[&str] = &["common", "groups"];
 /// Where in the spec names are chosen by the author (map keys become `*`).
 const NAMED: &[&str] = &[
     "networks",
+    "networks.*.vlans",
     "machines",
     "machines.*.networks",
     "machines.*.volumes",

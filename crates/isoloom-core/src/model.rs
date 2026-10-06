@@ -65,6 +65,23 @@ pub struct Network {
     /// How the Docker target lays this network out, when it differs from the other targets.
     #[serde(default)]
     pub docker: Option<NetworkDocker>,
+    /// The VLANs this LAN is split into, by id (1-4094), each with its own block inside the
+    /// LAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming
+    /// the LAN covers all of its VLANs. Each VLAN becomes a network of its own,
+    /// `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub vlans: IndexMap<u16, Vlan>,
+}
+
+/// A VLAN of a LAN (see [`Network::vlans`]).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Vlan {
+    /// Its IPv4 block, inside the LAN's (e.g. 10.10.10.0/24 in 10.10.0.0/16).
+    pub cidr: String,
+    /// Whether machines on it may reach the internet (default: as the LAN).
+    #[serde(default)]
+    pub internet: Option<bool>,
 }
 
 /// A network on the Docker target.
