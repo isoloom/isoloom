@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Host readiness: `targets --host` and `isoloom doctor`
+- `isoloom targets --host` says, for each possible target, whether this machine can run it and what is missing: Docker and Compose v2; Vagrant and a provider (VirtualBox, VMware, Parallels, libvirt, UTM, QEMU, ESXi; hybrid needs VirtualBox); a reachable Kubernetes context; Terraform and each cloud's credentials (AWS keys/profile/file, `az` login or ARM variables, Google application default credentials, DigitalOcean and Linode tokens, `~/.oci/config`); Proxmox's endpoint and token.
+- `isoloom doctor [--json]`: the same for every target, without a spec.
+- `isoloom run` makes the check first and stops with the reason instead of failing halfway. `isoloom_core::host` for tools embedding Isoloom.
+
 ### VLANs under their LAN
 - `networks.<lan>.vlans`: a LAN split into VLANs, by id (1–4094), each with its own `cidr` inside the LAN's block (which may then be as large as a /8) and optionally its own `internet` (the LAN's by default). Machines join one as `<lan>.vlan<id>`; a `reach` rule naming the LAN covers all of its VLANs. Each VLAN becomes a network of its own, `<lan>-vlan<id>`, on every target (right after parsing, so every generator and check works unchanged); the LAN stays a network only when a machine joins it directly. New example: vlan-office.
 

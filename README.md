@@ -70,7 +70,8 @@ From source: `cargo install --git https://github.com/isoloom/isoloom isoloom`.
 
 ```
 isoloom validate [DIR]    # mistakes, with the exact field and what to do (--json)
-isoloom targets [DIR]     # where it can run, and why not elsewhere
+isoloom targets [DIR]     # where it can run, and why not elsewhere (--host: can this machine?)
+isoloom doctor            # what this machine can run: tools and credentials found, and missing
 isoloom resources [DIR]   # machines, CPUs, memory, disk
 isoloom generate [DIR]    # each target's files under .isoloom/ (--target, --images FILE)
 isoloom check [DIR]       # fails when .isoloom/ doesn't match the spec (for CI)

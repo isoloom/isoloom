@@ -101,13 +101,15 @@ fn probe(e: &Entry) -> String {
     if !out.is_dir() {
         return "stale (folder gone)".into();
     }
+    // Bounded: a wedged hypervisor service must not hang `status`.
     let run = |program: &str, args: &[&str], wd: &Path| -> Result<String, String> {
-        match Command::new(program).args(args).current_dir(wd).stderr(Stdio::null()).output() {
-            Ok(o) if o.status.success() => Ok(String::from_utf8_lossy(&o.stdout).to_string()),
-            Ok(_) => Err(format!("{program} failed")),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(format!("{program} not installed")),
-            Err(err) => Err(err.to_string()),
+        let cwd = std::env::current_dir().ok();
+        let _ = std::env::set_current_dir(wd);
+        let out = core::host::run_limited(program, args, 30);
+        if let Some(c) = cwd {
+            let _ = std::env::set_current_dir(c);
         }
+        out?.ok_or_else(|| format!("{program} failed"))
     };
     let counted = |running: usize, total: usize| match (running, total) {
         (_, 0) => "stopped".to_string(),

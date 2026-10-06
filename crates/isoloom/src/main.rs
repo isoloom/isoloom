@@ -39,6 +39,17 @@ enum Command {
         dir: PathBuf,
         #[arg(long)]
         json: bool,
+        /// Also say whether this machine can run each target (tools installed, credentials
+        /// present), and what is missing.
+        #[arg(long)]
+        host: bool,
+    },
+    /// What this machine can run: for every target, the tools and credentials found and the ones
+    /// missing. No spec needed.
+    Doctor {
+        /// Machine-readable output.
+        #[arg(long)]
+        json: bool,
     },
     /// Add up the machines, CPUs, memory and disk the spec needs.
     Resources {
@@ -448,22 +459,72 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(if problems.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE })
         }
-        Command::Targets { dir, json } => {
+        Command::Doctor { json } => {
+            let all = core::host::all();
+            if json {
+                let list: Vec<serde_json::Value> = all
+                    .iter()
+                    .map(|r| serde_json::json!({ "target": r.target.id(), "cloud": r.cloud, "ready": r.ready, "notes": r.notes }))
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&list)?);
+                return Ok(ExitCode::SUCCESS);
+            }
+            for r in &all {
+                let name = match &r.cloud {
+                    Some(c) => format!("{} ({c})", r.target.id()),
+                    None => r.target.id().to_string(),
+                };
+                println!("{} {name:<22} {}", if r.ready { "✓" } else { "✗" }, r.summary());
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::Targets { dir, json, host } => {
             let spec = core::load(&dir)?;
             let effective = core::effective(&spec);
             // A target can be possible by its machines' editions and still be refused by its
             // generator (a Windows machine on Proxmox, say). A ✓ here means `generate` really
             // produces it; a refusal shows as ✗ with the generator's reason.
             let refused = |t: core::Target| core::refusal(&spec, t);
+            // With --host, whether this machine has what each target needs (one line per cloud).
+            let on_host = |t: core::Target| -> Vec<core::host::Readiness> {
+                if !host {
+                    return vec![];
+                }
+                match t {
+                    core::Target::CloudDocker | core::Target::CloudVm => core::host::CLOUDS.iter().map(|c| core::host::check(t, Some(c))).collect(),
+                    _ => vec![core::host::check(t, None)],
+                }
+            };
             if json {
-                let ids: Vec<&str> = effective.iter().copied().filter(|t| refused(*t).is_none()).map(|t| t.id()).collect();
-                println!("{}", serde_json::to_string_pretty(&ids)?);
+                let ready: Vec<core::Target> = effective.iter().copied().filter(|t| refused(*t).is_none()).collect();
+                if host {
+                    let list: Vec<serde_json::Value> = ready
+                        .iter()
+                        .map(|t| {
+                            let checks: Vec<serde_json::Value> = on_host(*t)
+                                .iter()
+                                .map(|r| serde_json::json!({ "cloud": r.cloud, "ready": r.ready, "notes": r.notes }))
+                                .collect();
+                            serde_json::json!({ "target": t.id(), "host": checks })
+                        })
+                        .collect();
+                    println!("{}", serde_json::to_string_pretty(&list)?);
+                } else {
+                    let ids: Vec<&str> = ready.iter().map(|t| t.id()).collect();
+                    println!("{}", serde_json::to_string_pretty(&ids)?);
+                }
                 return Ok(ExitCode::SUCCESS);
             }
             for t in core::Target::ALL {
                 if effective.contains(&t) {
                     match refused(t) {
-                        None => println!("✓ {}", t.id()),
+                        None => {
+                            println!("✓ {}", t.id());
+                            for r in on_host(t) {
+                                let label = r.cloud.as_deref().map(|c| format!(" {c}")).unwrap_or_default();
+                                println!("    host{label}: {}", r.summary());
+                            }
+                        }
                         Some(why) => println!("✗ {} ({why})", t.id()),
                     }
                 } else {
@@ -920,6 +981,17 @@ fn run_cmd(
 ) -> Result<ExitCode, Box<dyn std::error::Error>> {
     let (spec, dir, t, defaults) = prepare(dir, target, images, instance, sets)?;
     let dir = &dir;
+    if !down {
+        let ready = core::host::check(t, cloud.or((t == core::Target::CloudVm).then_some("aws")));
+        if !ready.ready {
+            return Err(format!(
+                "this machine can't run `{}` yet: {} (see `isoloom doctor`)",
+                t.id(),
+                ready.summary().trim_start_matches("not ready: ")
+            )
+            .into());
+        }
+    }
     let (program, mut args, wd) = bring_up(dir, t, cloud, instance, down)?;
     // The preferred Vagrant provider, from the defaults.
     if !down

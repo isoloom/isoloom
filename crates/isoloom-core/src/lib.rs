@@ -12,6 +12,7 @@ pub mod coverage;
 pub mod defaults;
 pub mod generate;
 pub mod groups;
+pub mod host;
 pub mod images;
 pub mod import;
 pub mod instance;
