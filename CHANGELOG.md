@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
+
+The operating model around the spec: derived checks and `isoloom test`, the resolved snapshot, a registry with `status`/`connect`/`exec`/`capture`, instances, defaults, shared fields, clones, host readiness, `graph`/`report`, `message`, link impairment, the `external` target and tools. Every feature below landed between 0.7.2 and this release.
 
 ### `tools:` observers beside the environment
 - `tools:` attaches observers on every network at reserved addresses (just below the controller's), outside the contract: no `reach` rule, check or resource total names them, and the environment behaves the same without them. `shell` is a built-in toolbox (tcpdump, nmap, curl, dig, netcat: netshoot on Docker, a Debian VM on local VMs); any other name is a container image with an optional `command`, `port` and `publish`. `isoloom connect <tool>` reaches it; the snapshot lists them. Validation reserves the tool addresses and checks names, recipes and ports.

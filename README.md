@@ -60,7 +60,7 @@ Release binaries for macOS, Linux (x86_64, arm64) and Windows are on the
 [releases page](https://github.com/isoloom/isoloom/releases). In GitHub Actions:
 
 ```yaml
-- uses: isoloom/isoloom@v0.6.0
+- uses: isoloom/isoloom@v0.8.0
 - run: isoloom check
 ```
 
@@ -119,7 +119,7 @@ nowhere else; offline networks stay offline), **declared** (`http`, `tcp`, `exec
 
 ## Status
 
-v0.6. Generators: **Docker Compose**, **Kubernetes** (manifests, NetworkPolicies for networks
+v0.8. Generators: **Docker Compose**, **Kubernetes** (manifests, NetworkPolicies for networks
 and `reach`), **Vagrant** (VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, ESXi),
 **Docker on one VM** (Vagrant, Proxmox), **Proxmox** (one VM per Linux machine, its own SDN
 network and router) and **Docker on one cloud VM** (AWS, Azure, Google Cloud, DigitalOcean,
