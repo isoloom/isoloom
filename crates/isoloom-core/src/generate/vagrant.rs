@@ -134,7 +134,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         let _ = writeln!(
             out,
-            "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
+            "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
             rb(&label)
         );
         let _ = writeln!(
@@ -144,7 +144,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         );
         let _ = writeln!(
             out,
-            "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
+            "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
             rb(&label)
         );
         // Apple Silicon Macs: UTM and QEMU (besides VMware Fusion and Parallels above).
@@ -401,7 +401,7 @@ fn router_vm(spec: &Spec, out: &mut String) {
     let label = format!("{} · router", spec.name);
     let _ = writeln!(
         out,
-        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 512\n    end",
+        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 512\n    end",
         rb(&label)
     );
     let _ = writeln!(
@@ -411,7 +411,7 @@ fn router_vm(spec: &Spec, out: &mut String) {
     );
     let _ = writeln!(
         out,
-        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 512\n    end",
+        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 512\n    end",
         rb(&label)
     );
     let _ = writeln!(
@@ -526,7 +526,7 @@ fn controller_vm(spec: &Spec, out: &mut String) {
     let label = format!("{} · controller", spec.name);
     let _ = writeln!(
         out,
-        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 1024\n    end",
+        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 1024\n    end",
         rb(&label)
     );
     let _ = writeln!(
@@ -536,7 +536,7 @@ fn controller_vm(spec: &Spec, out: &mut String) {
     );
     let _ = writeln!(
         out,
-        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 1024\n    end",
+        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 1024\n    end",
         rb(&label)
     );
     let _ = writeln!(
@@ -680,7 +680,14 @@ fn inventory(spec: &Spec) -> String {
 /// the inventory at /etc/isoloom/inventory.ini plus each step's own files. Shared with the
 /// cloud output.
 pub(super) fn ansible_runs(spec: &Spec) -> String {
-    let mut script = String::from("set -e\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False\n");
+    // Performance: gather facts once and cache them (the WinRM `setup` module is slow and the
+    // environment playbooks re-run across many imported plays), fan out across hosts (default
+    // forks is 5, too few for a multi-DC range), and pipeline SSH steps (a no-op over WinRM).
+    let mut script = String::from(
+        "set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False \
+         ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
+         ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n",
+    );
     for step in &spec.provision {
         let dir = step.ansible.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
         let file = step.ansible.rsplit('/').next().unwrap_or(&step.ansible);

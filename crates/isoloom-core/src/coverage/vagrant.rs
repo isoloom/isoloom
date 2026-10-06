@@ -47,6 +47,9 @@ const IMAGE_BOOTS: Support = Planned {
 const LINKED_CLONE: Support = Tooling {
     note: "faster starts from one image: no change in behavior",
 };
+const LINKED_CLONE_ON: Support = Emitted {
+    from: "(a differencing disk, so a clone is instant instead of copying the whole box)",
+};
 const DISK: Support = Planned {
     note: "machines.*.resources.disk_gb",
 };
@@ -281,7 +284,7 @@ fn virtualbox(s: &str) -> Option<Support> {
     Some(match s {
         "cpus" | "memory" => RESOURCES,
         "name" => VM_NAME,
-        "linked_clone" => LINKED_CLONE,
+        "linked_clone" => LINKED_CLONE_ON,
         "customize" | "customizations" => PROVIDER_SPECIFIC,
         "network_adapter" | "network_adapters" => PRIVATE_NETWORKS,
         "auto_nat_dns_proxy" | "default_nic_type" => HOST_TUNING,
@@ -319,7 +322,7 @@ fn parallels(s: &str) -> Option<Support> {
     Some(match s {
         "cpus" | "memory" => RESOURCES,
         "name" => VM_NAME,
-        "linked_clone" => LINKED_CLONE,
+        "linked_clone" => LINKED_CLONE_ON,
         "customize" | "customizations" => PROVIDER_SPECIFIC,
         "network_adapter" | "network_adapters" => PRIVATE_NETWORKS,
         "optimize_power_consumption" => HOST_TUNING,

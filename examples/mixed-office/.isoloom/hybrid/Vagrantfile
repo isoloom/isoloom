@@ -34,6 +34,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.58.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "mixed-office · files01"
+      v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
     end
@@ -44,6 +45,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "mixed-office · files01"
+      v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
     end
@@ -81,6 +83,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.58.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "mixed-office · controller"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -91,6 +94,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "mixed-office · controller"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end

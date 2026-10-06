@@ -26,6 +26,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-access", libvirt__network_name: "isoloom-pivot-dmz-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · router"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
@@ -36,6 +37,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "pivot-dmz · router"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
@@ -86,6 +88,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · gateway"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -96,6 +99,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "pivot-dmz · gateway"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -175,6 +179,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · app"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -185,6 +190,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "pivot-dmz · app"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -298,6 +304,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.20.30", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · db"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -308,6 +315,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "pivot-dmz · db"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -421,6 +429,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-access", libvirt__network_name: "isoloom-pivot-dmz-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · user"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -431,6 +440,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "pivot-dmz · user"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end

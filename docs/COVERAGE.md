@@ -12,9 +12,9 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [Docker Compose](#docker-compose) | 82% | 56 | 42 | 8 | 6 |
 | [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
-| [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 5 | 5 | 0 | 0 |
+| [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
-| [Vagrant: Parallels](#vagrant-parallels) | 100% | 5 | 5 | 0 | 0 |
+| [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: libvirt](#vagrant-libvirt) | 10% | 19 | 2 | 0 | 17 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 25% | 4 | 1 | 0 | 3 |
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
@@ -263,7 +263,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: VirtualBox
 
-100% of 5 portable features (5 done, 0 partly, 0 to do; 15 features in all). From Vagrant 2.4.9 (the provider's config class).
+100% of 6 portable features (6 done, 0 partly, 0 to do; 15 features in all). From Vagrant 2.4.9 (the provider's config class).
 
 ### Settings
 
@@ -278,7 +278,7 @@ when a table disagrees with what Isoloom really generates.
 | `destroy_unused_network_interfaces` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `functional_vboxsf` | n/a | No | Shared folders are off: the project is copied into each VM |
 | `gui` | No | No | Display, input and host devices: containers and cloud VMs have none |
-| `linked_clone` | n/a | No | Faster starts from one image: no change in behavior |
+| `linked_clone` | Yes | Yes | A differencing disk, so a clone is instant instead of copying the whole box |
 | `linked_clone_snapshot` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `memory` | Yes | Yes | From `machines.*.resources` |
 | `name` | Yes | Yes | The environment and machine names, as the VM's display name |
@@ -320,7 +320,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: Parallels
 
-100% of 5 portable features (5 done, 0 partly, 0 to do; 15 features in all). From vagrant-parallels 2.4.7 (its config class).
+100% of 6 portable features (6 done, 0 partly, 0 to do; 15 features in all). From vagrant-parallels 2.4.7 (its config class).
 
 ### Settings
 
@@ -332,7 +332,7 @@ when a table disagrees with what Isoloom really generates.
 | `customize` | No | No | Raw commands for one hypervisor: no other target understands them |
 | `destroy_unused_network_interfaces` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `functional_psf` | n/a | No | Shared folders are off: the project is copied into each VM |
-| `linked_clone` | n/a | No | Faster starts from one image: no change in behavior |
+| `linked_clone` | Yes | Yes | A differencing disk, so a clone is instant instead of copying the whole box |
 | `linked_clone_snapshot` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `memory` | Yes | Yes | From `machines.*.resources` |
 | `name` | Yes | Yes | The environment and machine names, as the VM's display name |

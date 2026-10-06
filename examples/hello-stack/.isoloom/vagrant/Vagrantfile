@@ -24,6 +24,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.60.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "hello-stack · cache"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -34,6 +35,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "hello-stack · cache"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -111,6 +113,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
     m.vm.provider "virtualbox" do |v|
       v.name = "hello-stack · web"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -121,6 +124,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "hello-stack · web"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -197,6 +201,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.60.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "hello-stack · controller"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -207,6 +212,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "hello-stack · controller"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end

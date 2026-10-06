@@ -24,6 +24,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.63.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "ansible-pair · web"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -34,6 +35,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "ansible-pair · web"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -71,6 +73,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.63.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "ansible-pair · cache"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -81,6 +84,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "ansible-pair · cache"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -118,6 +122,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "ansible-pair · controller"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -128,6 +133,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "parallels" do |v|
       v.name = "ansible-pair · controller"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
@@ -189,7 +195,8 @@ Vagrant.configure("2") do |config|
     SH
     m.vm.provision "shell", name: "ansible", inline: <<~'SH'
       set -e
-      export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False
+      mkdir -p /tmp/isoloom-facts
+      export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200
       cd /opt/isoloom/ansible
       ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml
       ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible"}' site.yml
