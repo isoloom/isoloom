@@ -104,10 +104,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             if let Some(Value::Sequence(ports)) = svc.get_mut("ports") {
                 for p in ports.iter_mut() {
                     let Some(text) = p.as_str() else { continue };
-                    // `${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:<host>:<port>`: on every address
-                    // of the Docker host, which Vagrant forwards to this machine's loopback.
-                    let mut parts = text.rsplitn(3, ':');
-                    let (Some(port), Some(host)) = (parts.next(), parts.next()) else { continue };
+                    // `${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+<host>}:<port>`:
+                    // pin the fixed host port here (published on every address of the Docker host),
+                    // which Vagrant forwards to this machine's loopback.
+                    let Some((rest, port)) = text.rsplit_once(':') else { continue };
+                    let host = rest.rsplit_once(":+").and_then(|(_, h)| h.strip_suffix('}')).unwrap_or(rest);
                     published.push(host.to_string());
                     *p = Value::String(format!("{host}:{port}"));
                 }

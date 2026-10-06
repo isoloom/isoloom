@@ -71,7 +71,7 @@ services:
       app:
         ipv4_address: 10.60.0.10
     ports:
-    - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:8080:80
+    - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+8080}:80
     healthcheck:
       test:
       - CMD-SHELL

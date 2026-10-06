@@ -15,9 +15,11 @@
 //!   machines that list them.
 //! - Checks run in a `check` profile: `docker compose --profile check run --rm isoloom-check`.
 //!
-//! - A service's `publish` port is published on the host's loopback (127.0.0.1) only, unless
-//!   ISOLOOM_PUBLISH_ADDRESS says otherwise (inside the docker-vm target's VM, which is itself
-//!   only forwarded from the host's loopback).
+//! - A service's `publish` port is published on the host's loopback (127.0.0.1) only, on an
+//!   ephemeral host port Docker picks, so two labs publishing the same port never collide; the
+//!   runner reads the real port back from `docker compose ps`. ISOLOOM_PUBLISH_ADDRESS overrides
+//!   the address and ISOLOOM_PUBLISH_FIXED pins the host port to `publish` (both set inside the
+//!   docker-vm/cloud VMs, where the lab is alone and that fixed port is forwarded from loopback).
 //! - `volumes:` become named volumes: they survive re-creating a container, and go with
 //!   `docker compose down -v`.
 //!
@@ -176,7 +178,16 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         let ports: Vec<Value> = m
             .services
             .iter()
-            .filter_map(|svc| svc.publish.map(|p| s(format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{p}:{}", svc.port))))
+            .filter_map(|svc| {
+                // Ephemeral loopback host port by default (no collisions); ISOLOOM_PUBLISH_FIXED
+                // pins it to `publish` inside the docker-vm/cloud VMs that forward it.
+                svc.publish.map(|p| {
+                    s(format!(
+                        "${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{ISOLOOM_PUBLISH_FIXED:+{p}}}:{port}",
+                        port = svc.port
+                    ))
+                })
+            })
             .collect();
         if !ports.is_empty() {
             svc.insert(s("ports"), Value::Sequence(ports));
