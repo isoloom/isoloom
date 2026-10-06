@@ -614,12 +614,18 @@ fn bring_up(dir: &std::path::Path, t: core::Target, cloud: Option<&str>, down: b
         }
         core::Target::Proxmox => tf_run(down, out.join("proxmox")),
         core::Target::CloudVm => {
-            // Only AWS is generated for cloud-vm so far; accept --cloud aws, reject anything else
-            // rather than silently running AWS for it.
-            if let Some(c) = cloud.filter(|c| *c != "aws") {
-                return Err(format!("`cloud-vm` only supports --cloud aws so far, not `{c}`").into());
+            // AWS is always generated; the others only for the specs they support, so --cloud
+            // picks the module and defaults to aws. A cloud with no module for this lab (its
+            // driver declined the spec) has no directory, and Terraform says so.
+            let cloud = cloud.unwrap_or("aws");
+            let dir = out.join("cloud-vm").join(cloud);
+            if !dir.exists() {
+                return Err(format!(
+                    "`cloud-vm` has no `{cloud}` module for this lab (either the cloud is unknown or its driver can't run this spec); run `isoloom generate` and check .isoloom/cloud-vm/"
+                )
+                .into());
             }
-            tf_run(down, out.join("cloud-vm/aws"))
+            tf_run(down, dir)
         }
         core::Target::CloudDocker => {
             let cloud = cloud.ok_or("`cloud-docker` needs --cloud (aws, azure, gcp, digitalocean, linode, oci)")?;

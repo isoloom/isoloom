@@ -14,9 +14,21 @@ use crate::model::Spec;
 
 use super::GeneratedFile;
 
+mod azure;
+mod digitalocean;
+mod gcp;
+mod linode;
+mod oci;
+
 type Build = fn(&Spec) -> GeneratedFile;
 type Refusal = fn(&Spec) -> Option<String>;
 
-/// Every non-AWS cloud driver: its subdirectory, how to build it, and when it bows out. Filled in
-/// cloud by cloud; empty means only AWS is emitted.
-pub(super) const DRIVERS: &[(&str, Build, Refusal)] = &[];
+/// Every non-AWS cloud driver: its subdirectory, how to build it, and when it bows out. A cloud's
+/// `refusal` drops only that cloud's module for a spec it can't model, best-effort.
+pub(super) const DRIVERS: &[(&str, Build, Refusal)] = &[
+    ("azure", azure::build, azure::refusal),
+    ("gcp", gcp::build, gcp::refusal),
+    ("digitalocean", digitalocean::build, digitalocean::refusal),
+    ("linode", linode::build, linode::refusal),
+    ("oci", oci::build, oci::refusal),
+];
