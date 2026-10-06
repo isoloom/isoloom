@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# One Linux web server, as a container or a native VM: the page answers on web:80.
+# A single machine on a single network, so every cloud-vm driver can take it (DigitalOcean
+# and Linode included); the richer examples are multi-machine and those two decline them.
+version: 1
+name: solo-web
+
+networks:
+  app: { cidr: 10.80.0.0/24, internet: true }
+
+machines:
+  web:
+    networks: { app: 10 }
+    services: [{ port: 80, http: true, publish: 8080 }]
+    docker:
+      build: build/web
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
+
+checks:
+  - checks/web-answers.sh
