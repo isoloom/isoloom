@@ -11,6 +11,11 @@ terraform {
       source  = "bpg/proxmox"
       version = "~> 0.115"
     }
+    # The controller's SSH key (environment-level provisioning).
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 

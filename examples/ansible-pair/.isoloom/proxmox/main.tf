@@ -123,11 +123,11 @@ locals {
     encoding = "b64"
     content  = filebase64("${local.root}/${f}")
   }]
-  users = var.ssh_public_key == "" ? [] : [{
+  users = [{
     name                = "isoloom"
     sudo                = "ALL=(ALL) NOPASSWD:ALL"
     shell               = "/bin/bash"
-    ssh_authorized_keys = [var.ssh_public_key]
+    ssh_authorized_keys = compact([var.ssh_public_key, trimspace(tls_private_key.controller.public_key_openssh)])
   }]
 }
 
@@ -137,7 +137,12 @@ resource "proxmox_sdn_zone_simple" "env" {
   nodes = [var.node]
 }
 
-# Network `lab`: 192.168.62.0/24
+# The controller's own key: it runs the playbooks over SSH on every machine.
+resource "tls_private_key" "controller" {
+  algorithm = "ED25519"
+}
+
+# Network `lab`: 10.63.0.0/24
 resource "proxmox_sdn_vnet" "lab" {
   id   = "i${var.slot}n0"
   zone = proxmox_sdn_zone_simple.env.id
@@ -170,9 +175,9 @@ resource "proxmox_virtual_environment_file" "router" {
       packages = ["nftables", "qemu-guest-agent"]
       write_files = [
         { path = "/etc/systemd/network/10-wan.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:00:00:00", var.slot)}", "", "[Network]", "DHCP=yes"]) },
-        { path = "/etc/nftables.conf", content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr { 192.168.62.0/24 } ip daddr != { 192.168.62.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 192.168.62.0/24 } ip daddr != { 192.168.62.0/24 } masquerade\n  }\n}\n" },
+        { path = "/etc/nftables.conf", content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr { 10.63.0.0/24 } ip daddr != { 10.63.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.63.0.0/24 } ip daddr != { 10.63.0.0/24 } masquerade\n  }\n}\n" },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
-        { path = "/etc/systemd/network/20-lab.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}", "", "[Network]", "Address=192.168.62.254/24", "ConfigureWithoutCarrier=yes"]) }
+        { path = "/etc/systemd/network/20-lab.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}", "", "[Network]", "Address=10.63.0.254/24", "ConfigureWithoutCarrier=yes"]) }
       ]
       runcmd = [
         ["sysctl", "-p", "/etc/sysctl.d/90-isoloom.conf"],
@@ -189,7 +194,7 @@ resource "proxmox_virtual_environment_file" "router" {
 resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
-  tags      = ["isoloom", "air-gapped"]
+  tags      = ["isoloom", "ansible-pair"]
   on_boot   = false
   # Its uplink address (DHCP), for the published ports.
   agent {
@@ -232,32 +237,30 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   depends_on = [proxmox_sdn_applier.env]
 }
 
-# Machine `store`.
-resource "proxmox_virtual_environment_file" "store" {
+# Machine `web`.
+resource "proxmox_virtual_environment_file" "web" {
   node_name    = var.node
   datastore_id = var.snippets_datastore
   content_type = "snippets"
   source_raw {
-    file_name = "iso${var.slot}-store.yaml"
+    file_name = "iso${var.slot}-web.yaml"
     data = "#cloud-config\n${yamlencode({
-      hostname    = "store"
+      hostname    = "web"
       users       = local.users
       packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = local.project_files
+      write_files = []
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '192.168.62.10 app' >> /etc/hosts"],
-        ["sh", "-c", "cd /opt/isoloom && sh provision/store.sh"],
-        ["sh", "-c", "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 192.168.62.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"],
+        ["sh", "-c", "printf '%s\\n' '10.63.0.20 cache' >> /etc/hosts"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
   }
 }
 
-resource "proxmox_virtual_environment_vm" "store" {
-  name      = "iso${var.slot}-store"
+resource "proxmox_virtual_environment_vm" "web" {
+  name      = "iso${var.slot}-web"
   node_name = var.node
-  tags      = ["isoloom", "air-gapped"]
+  tags      = ["isoloom", "ansible-pair"]
   on_boot   = false
   cpu {
     cores = 1
@@ -277,14 +280,14 @@ resource "proxmox_virtual_environment_vm" "store" {
   }
   initialization {
     datastore_id      = var.datastore
-    user_data_file_id = proxmox_virtual_environment_file.store.id
+    user_data_file_id = proxmox_virtual_environment_file.web.id
     dns {
       servers = ["1.1.1.1"]
     }
     ip_config {
       ipv4 {
-        address = "192.168.62.20/24"
-        gateway = "192.168.62.254"
+        address = "10.63.0.10/24"
+        gateway = "10.63.0.254"
       }
     }
   }
@@ -295,33 +298,30 @@ resource "proxmox_virtual_environment_vm" "store" {
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
 }
 
-# Machine `app`.
-resource "proxmox_virtual_environment_file" "app" {
+# Machine `cache`.
+resource "proxmox_virtual_environment_file" "cache" {
   node_name    = var.node
   datastore_id = var.snippets_datastore
   content_type = "snippets"
   source_raw {
-    file_name = "iso${var.slot}-app.yaml"
+    file_name = "iso${var.slot}-cache.yaml"
     data = "#cloud-config\n${yamlencode({
-      hostname    = "app"
+      hostname    = "cache"
       users       = local.users
       packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = local.project_files
+      write_files = []
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '192.168.62.20 store' >> /etc/hosts"],
-        ["sh", "-c", "i=0; until (bash -c '</dev/tcp/store/6379' 2>/dev/null || nc -z -w 2 store 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 600 ]; then echo \"store didn't answer within 600s\" >&2; exit 1; fi; sleep 2; done; echo \"store answers\""],
-        ["sh", "-c", "cd /opt/isoloom && sh provision/app.sh"],
-        ["sh", "-c", "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 192.168.62.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"],
+        ["sh", "-c", "printf '%s\\n' '10.63.0.10 web' >> /etc/hosts"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
   }
 }
 
-resource "proxmox_virtual_environment_vm" "app" {
-  name      = "iso${var.slot}-app"
+resource "proxmox_virtual_environment_vm" "cache" {
+  name      = "iso${var.slot}-cache"
   node_name = var.node
-  tags      = ["isoloom", "air-gapped"]
+  tags      = ["isoloom", "ansible-pair"]
   on_boot   = false
   cpu {
     cores = 1
@@ -341,14 +341,14 @@ resource "proxmox_virtual_environment_vm" "app" {
   }
   initialization {
     datastore_id      = var.datastore
-    user_data_file_id = proxmox_virtual_environment_file.app.id
+    user_data_file_id = proxmox_virtual_environment_file.cache.id
     dns {
       servers = ["1.1.1.1"]
     }
     ip_config {
       ipv4 {
-        address = "192.168.62.10/24"
-        gateway = "192.168.62.254"
+        address = "10.63.0.20/24"
+        gateway = "10.63.0.254"
       }
     }
   }
@@ -356,11 +356,83 @@ resource "proxmox_virtual_environment_vm" "app" {
     type = "l26"
   }
   serial_device {}
-  depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.store]
+  depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# The controller: runs the environment's playbooks once every machine is up.
+resource "proxmox_virtual_environment_file" "controller" {
+  node_name    = var.node
+  datastore_id = var.snippets_datastore
+  content_type = "snippets"
+  source_raw {
+    file_name = "iso${var.slot}-controller.yaml"
+    data = "#cloud-config\n${yamlencode({
+      hostname    = "isoloom-controller"
+      users       = local.users
+      packages    = ["python3-venv", "curl", "netcat-openbsd", "openssh-client"]
+      write_files = concat(local.project_files, [{ path = "/etc/isoloom/id_ed25519", permissions = "0600", content = tls_private_key.controller.private_key_openssh }, { path = "/etc/isoloom/inventory.ini", permissions = "0644", content = "[linux]\nweb ansible_host=10.63.0.10 ansible_user=isoloom\ncache ansible_host=10.63.0.20 ansible_user=isoloom\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n" }])
+      runcmd = [
+        ["sh", "-c", "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' >> /etc/hosts"],
+        ["sh", "-c", "python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm"],
+        ["sh", "-c", "i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.63.0.10 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo 'web not ready'; exit 1; }; sleep 5; done"],
+        ["sh", "-c", "i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.63.0.20 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo 'cache not ready'; exit 1; }; sleep 5; done"],
+        ["sh", "-c", "sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\ncd /opt/isoloom/ansible\nansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\"}'\\'' site.yml\n'"],
+        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
+      ]
+    })}"
+  }
+}
+
+resource "proxmox_virtual_environment_vm" "isoloom_controller" {
+  name      = "iso${var.slot}-controller"
+  node_name = var.node
+  tags      = ["isoloom", "ansible-pair"]
+  on_boot   = false
+  cpu {
+    cores = 1
+    type  = "host"
+  }
+  memory {
+    dedicated = 1024
+  }
+  disk {
+    datastore_id = var.datastore
+    file_id      = proxmox_download_file.debian_12.id
+    interface    = "virtio0"
+    size         = 8
+  }
+  network_device {
+    bridge = var.uplink_bridge
+  }
+  network_device {
+    bridge = proxmox_sdn_vnet.lab.id
+  }
+  initialization {
+    datastore_id      = var.datastore
+    user_data_file_id = proxmox_virtual_environment_file.controller.id
+    dns {
+      servers = ["1.1.1.1"]
+    }
+    ip_config {
+      ipv4 {
+        address = "dhcp"
+      }
+    }
+    ip_config {
+      ipv4 {
+        address = "10.63.0.253/24"
+      }
+    }
+  }
+  operating_system {
+    type = "l26"
+  }
+  serial_device {}
+  depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.web, proxmox_virtual_environment_vm.cache]
 }
 
 locals {
-  router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["192.168.62.254"], a)][0]
+  router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.63.0.254"], a)][0]
 }
 
 output "address" {

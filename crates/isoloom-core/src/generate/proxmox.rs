@@ -57,9 +57,8 @@ fn unsupported(spec: &Spec) -> Option<String> {
     if let Some(name) = super::arm64_machine(spec) {
         return Some(format!("machine `{name}`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts)"));
     }
-    if !spec.provision.is_empty() {
-        return Some("environment-level provisioning (`provision:`) on Proxmox comes later".into());
-    }
+    // Environment-level `provision:` runs from a controller VM (see `controller`), as on Vagrant
+    // and the clouds; it is no longer refused here.
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine on Proxmox come later".into());
     }
@@ -93,6 +92,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     proxmox = {
       source  = "bpg/proxmox"
       version = "~> 0.115"
+    }
+    # The controller's SSH key (environment-level provisioning).
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
     }
   }
 }
@@ -209,21 +213,27 @@ locals {
     encoding = "b64"
     content  = filebase64("${local.root}/${f}")
   }]
-  users = var.ssh_public_key == "" ? [] : [{
-    name                = "isoloom"
-    sudo                = "ALL=(ALL) NOPASSWD:ALL"
-    shell               = "/bin/bash"
-    ssh_authorized_keys = [var.ssh_public_key]
-  }]
-}
-
-# The environment's networks: an SDN simple zone, a VNet per network.
-resource "proxmox_sdn_zone_simple" "env" {
-  id    = local.zone
-  nodes = [var.node]
-}
 "#,
     );
+    // The `isoloom` user on every VM: the operator's key and, with a controller, the controller's
+    // own key too, so it can run the environment's playbooks over SSH.
+    if super::cloud_vm::needs_controller(spec) {
+        tf.push_str(
+            "  users = [{\n    name                = \"isoloom\"\n    sudo                = \"ALL=(ALL) NOPASSWD:ALL\"\n    shell               = \"/bin/bash\"\n    ssh_authorized_keys = compact([var.ssh_public_key, trimspace(tls_private_key.controller.public_key_openssh)])\n  }]\n}\n",
+        );
+    } else {
+        tf.push_str(
+            "  users = var.ssh_public_key == \"\" ? [] : [{\n    name                = \"isoloom\"\n    sudo                = \"ALL=(ALL) NOPASSWD:ALL\"\n    shell               = \"/bin/bash\"\n    ssh_authorized_keys = [var.ssh_public_key]\n  }]\n}\n",
+        );
+    }
+    tf.push_str(
+        "\n# The environment's networks: an SDN simple zone, a VNet per network.\nresource \"proxmox_sdn_zone_simple\" \"env\" {\n  id    = local.zone\n  nodes = [var.node]\n}\n",
+    );
+    if super::cloud_vm::needs_controller(spec) {
+        tf.push_str(
+            "\n# The controller's own key: it runs the playbooks over SSH on every machine.\nresource \"tls_private_key\" \"controller\" {\n  algorithm = \"ED25519\"\n}\n",
+        );
+    }
     for (i, net) in nets.iter().enumerate() {
         let _ = writeln!(
             tf,
@@ -449,6 +459,11 @@ resource "proxmox_sdn_zone_simple" "env" {
         );
     }
 
+    // Environment-level `provision:`: a controller runs the playbooks once every machine is up.
+    if super::cloud_vm::needs_controller(spec) {
+        controller(spec, &mut tf, &nets);
+    }
+
     // Where the environment is reached from outside: the router's uplink address (the guest
     // agent reports it), and each published service there.
     let lab_addrs: Vec<String> = nets.iter().map(|n| format!("\"{}\"", router::address(spec, n))).collect();
@@ -469,6 +484,103 @@ resource "proxmox_sdn_zone_simple" "env" {
         path: format!("{OUTPUT_DIR}/{DIR}/main.tf"),
         contents: tf,
     }])
+}
+
+/// The controller: a Debian VM that runs the environment's playbooks once every machine is up,
+/// as on Vagrant and the clouds. It sits on the uplink bridge (DHCP: internet, to install
+/// Ansible) and on every network at the controller address. Its cloud-init carries the project,
+/// its own key and the inventory; it then waits for each machine's ready marker over SSH and
+/// runs the playbooks.
+fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
+    let env = &spec.name;
+    let mut runcmd: Vec<String> = Vec::new();
+    // /etc/hosts: every machine at its first address.
+    let hosts: Vec<String> = spec
+        .machines
+        .iter()
+        .filter_map(|(o, om)| om.networks.first().map(|(n, oc)| format!("'{} {o}'", address(spec, n, *oc))))
+        .collect();
+    if !hosts.is_empty() {
+        runcmd.push(format!("printf '%s\\n' {} >> /etc/hosts", hosts.join(" ")));
+    }
+    // Ansible in a venv (pywinrm for the Windows machines, when Proxmox learns them).
+    runcmd.push("python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm".into());
+    // Each Linux machine's own set-up must be done (its ready marker) before the playbooks run.
+    for (name, m) in &spec.machines {
+        let Some(vm) = &m.vm else { continue };
+        if images::is_windows(&vm.os) {
+            continue;
+        }
+        let Some((net, octet)) = m.networks.first() else { continue };
+        runcmd.push(format!(
+            "i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@{a} test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done",
+            a = address(spec, net, *octet)
+        ));
+    }
+    runcmd.push(format!("sh -c {}", super::cloud_vm::sh_quote(&super::vagrant::ansible_runs(spec))));
+    runcmd.push("mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready".into());
+    let runcmd_hcl = runcmd.iter().map(|c| format!("[\"sh\", \"-c\", {}]", hcl(c))).collect::<Vec<_>>().join(",\n        ");
+    // Its files: the project, its key, the inventory.
+    let write_files = format!(
+        "concat(local.project_files, [{{ path = \"/etc/isoloom/id_ed25519\", permissions = \"0600\", content = tls_private_key.controller.private_key_openssh }}, {{ path = \"/etc/isoloom/inventory.ini\", permissions = \"0644\", content = {} }}])",
+        hcl(&inventory(spec))
+    );
+    let _ = writeln!(
+        tf,
+        "\n# The controller: runs the environment's playbooks once every machine is up.\nresource \"proxmox_virtual_environment_file\" \"controller\" {{\n  node_name    = var.node\n  datastore_id = var.snippets_datastore\n  content_type = \"snippets\"\n  source_raw {{\n    file_name = \"iso${{var.slot}}-controller.yaml\"\n    data = \"#cloud-config\\n${{yamlencode({{\n      hostname    = \"isoloom-controller\"\n      users       = local.users\n      packages    = [\"python3-venv\", \"curl\", \"netcat-openbsd\", \"openssh-client\"]\n      write_files = {write_files}\n      runcmd = [\n        {runcmd_hcl}\n      ]\n    }})}}\"\n  }}\n}}"
+    );
+    // NICs: the uplink (DHCP, its route out) first, then every network at the controller address.
+    let mut nics = String::from("  network_device {\n    bridge = var.uplink_bridge\n  }\n");
+    let mut ipcfg = String::from("    ip_config {\n      ipv4 {\n        address = \"dhcp\"\n      }\n    }\n");
+    for net in nets {
+        let c = cidr(spec, net);
+        let _ = writeln!(nics, "  network_device {{\n    bridge = proxmox_sdn_vnet.{}.id\n  }}", res(net));
+        let _ = writeln!(ipcfg, "    ip_config {{\n      ipv4 {{\n        address = \"{}/{}\"\n      }}\n    }}", c.controller(), c.len);
+    }
+    let deps: String = spec
+        .machines
+        .iter()
+        .filter(|(_, m)| m.vm.is_some())
+        .map(|(n, _)| format!(", proxmox_virtual_environment_vm.{}", res(n)))
+        .collect();
+    let _ = writeln!(
+        tf,
+        "\nresource \"proxmox_virtual_environment_vm\" \"isoloom_controller\" {{\n  name      = \"iso${{var.slot}}-controller\"\n  node_name = var.node\n  tags      = [\"isoloom\", \"{env}\"]\n  on_boot   = false\n  cpu {{\n    cores = 1\n    type  = \"host\"\n  }}\n  memory {{\n    dedicated = 1024\n  }}\n  disk {{\n    datastore_id = var.datastore\n    file_id      = proxmox_download_file.{img}.id\n    interface    = \"virtio0\"\n    size         = 8\n  }}\n{nics}  initialization {{\n    datastore_id      = var.datastore\n    user_data_file_id = proxmox_virtual_environment_file.controller.id\n    dns {{\n      servers = [\"1.1.1.1\"]\n    }}\n{ipcfg}  }}\n  operating_system {{\n    type = \"l26\"\n  }}\n  serial_device {{}}\n  depends_on = [proxmox_virtual_environment_vm.isoloom_router{deps}]\n}}",
+        img = res(super::cloud_vm::CONTROLLER_OS),
+    );
+}
+
+/// The controller's inventory: every machine at its first address, as the `isoloom` user with
+/// the controller's key (cloud-init made that user on each VM); then the spec's groups.
+fn inventory(spec: &Spec) -> String {
+    let (mut linux, mut windows) = (String::new(), String::new());
+    for (name, m) in &spec.machines {
+        let Some(vm) = &m.vm else { continue };
+        let Some((net, octet)) = m.networks.first() else { continue };
+        if images::is_windows(&vm.os) {
+            let _ = writeln!(windows, "{name} ansible_host={}", address(spec, net, *octet));
+        } else {
+            let _ = writeln!(linux, "{name} ansible_host={} ansible_user=isoloom", address(spec, net, *octet));
+        }
+    }
+    let mut inv = format!(
+        "[linux]\n{linux}\n[windows]\n{windows}\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n"
+    );
+    let mut groups: indexmap::IndexMap<&str, Vec<&str>> = indexmap::IndexMap::new();
+    for step in &spec.provision {
+        for (g, members) in &step.groups {
+            let e = groups.entry(g.as_str()).or_default();
+            for mbr in members {
+                if !e.contains(&mbr.as_str()) {
+                    e.push(mbr);
+                }
+            }
+        }
+    }
+    for (g, members) in groups {
+        let _ = write!(inv, "\n[{g}]\n{}\n", members.join("\n"));
+    }
+    inv
 }
 
 /// A Terraform resource name from a machine, network or OS name.

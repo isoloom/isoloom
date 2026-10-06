@@ -48,9 +48,9 @@ fn refusal_reports_what_a_generator_would_refuse() {
     let (_, windows) = example("windows-hello");
     let why = isoloom_core::refusal(&windows, Target::Proxmox).expect("Windows has no Proxmox image yet");
     assert!(why.contains("Proxmox image"), "{why}");
+    // Environment-level provisioning runs from a controller on Proxmox now, so it is not refused.
     let (_, ansible) = example("ansible-pair");
-    let why = isoloom_core::refusal(&ansible, Target::Proxmox).expect("environment provisioning on Proxmox is refused");
-    assert!(why.contains("provisioning"), "{why}");
+    assert_eq!(isoloom_core::refusal(&ansible, Target::Proxmox), None);
     // A plain Linux lab is generated: nothing to refuse.
     let (_, plain) = example("hello-stack");
     assert_eq!(isoloom_core::refusal(&plain, Target::Proxmox), None);
