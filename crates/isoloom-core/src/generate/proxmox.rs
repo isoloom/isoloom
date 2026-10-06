@@ -423,9 +423,22 @@ resource "proxmox_sdn_zone_simple" "env" {
                 c.len
             );
         }
+        // Honour the machine's resolver when it sets one (an AD member points at the domain
+        // controller); otherwise a public resolver so it can still install software.
+        let servers = match m.dns.as_ref().filter(|d| !d.servers.is_empty()) {
+            Some(d) => d.servers.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
+            None => "\"1.1.1.1\"".into(),
+        };
+        let domain = m
+            .dns
+            .as_ref()
+            .and_then(|d| d.domain.as_deref())
+            .map(|d| format!("      domain = \"{d}\"\n"))
+            .unwrap_or_default();
+        let dns = format!("    dns {{\n      servers = [{servers}]\n{domain}    }}\n");
         let _ = writeln!(
             tf,
-            "\nresource \"proxmox_virtual_environment_vm\" \"{id}\" {{\n  name      = \"iso${{var.slot}}-{name}\"\n  node_name = var.node\n  tags      = [\"isoloom\", \"{env}\"]\n  on_boot   = false\n  cpu {{\n    cores = {cpus}\n    type  = \"host\"\n  }}\n  memory {{\n    dedicated = {mem}\n  }}\n  disk {{\n    datastore_id = var.datastore\n    file_id      = proxmox_download_file.{img}.id\n    interface    = \"virtio0\"\n    size         = {disk}\n  }}\n{nics}  initialization {{\n    datastore_id      = var.datastore\n    user_data_file_id = proxmox_virtual_environment_file.{id}.id\n    dns {{\n      servers = [\"1.1.1.1\"]\n    }}\n{ipcfg}  }}\n  operating_system {{\n    type = \"l26\"\n  }}\n  serial_device {{}}\n  depends_on = [proxmox_virtual_environment_vm.isoloom_router{deps}]\n}}",
+            "\nresource \"proxmox_virtual_environment_vm\" \"{id}\" {{\n  name      = \"iso${{var.slot}}-{name}\"\n  node_name = var.node\n  tags      = [\"isoloom\", \"{env}\"]\n  on_boot   = false\n  cpu {{\n    cores = {cpus}\n    type  = \"host\"\n  }}\n  memory {{\n    dedicated = {mem}\n  }}\n  disk {{\n    datastore_id = var.datastore\n    file_id      = proxmox_download_file.{img}.id\n    interface    = \"virtio0\"\n    size         = {disk}\n  }}\n{nics}  initialization {{\n    datastore_id      = var.datastore\n    user_data_file_id = proxmox_virtual_environment_file.{id}.id\n{dns}{ipcfg}  }}\n  operating_system {{\n    type = \"l26\"\n  }}\n  serial_device {{}}\n  depends_on = [proxmox_virtual_environment_vm.isoloom_router{deps}]\n}}",
             env = spec.name,
             img = res(&vm.os),
             deps = m

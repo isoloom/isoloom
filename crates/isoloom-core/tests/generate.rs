@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use isoloom_core::{GenerateError, Target, generate, generate_all, load};
+use isoloom_core::{GenerateError, Target, generate, generate_all, load, parse};
 
 fn example(name: &str) -> (PathBuf, isoloom_core::Spec) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples").join(name);
@@ -317,6 +317,21 @@ fn proxmox_forwards_published_ports_from_the_router() {
 }
 
 #[test]
+fn proxmox_cloud_init_uses_the_machines_declared_resolver() {
+    // A machine that points at the lab's own resolver (e.g. an AD member at the domain
+    // controller) must get that in cloud-init, not a forced public resolver.
+    let spec = parse(
+        "version: 1\nname: dns-lab\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  member:\n    networks: { lab: 10 }\n    dns: { servers: [10.60.0.2], domain: arm.lab }\n    vm: { os: debian-12, provision: [p.sh] }\n  plain:\n    networks: { lab: 11 }\n    vm: { os: debian-12, provision: [p.sh] }\n",
+    )
+    .expect("parses");
+    let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
+    assert!(tf.contains("servers = [\"10.60.0.2\"]"), "{tf}");
+    assert!(tf.contains("domain = \"arm.lab\""), "{tf}");
+    // The machine with no resolver of its own still gets a public one so it can install software.
+    assert!(tf.contains("servers = [\"1.1.1.1\"]"), "{tf}");
+}
+
+#[test]
 fn kubernetes_turns_networks_and_reach_into_network_policies() {
     let (_, spec) = example("segmented");
     let files = generate(&spec, Target::Kubernetes).unwrap();
@@ -324,8 +339,9 @@ fn kubernetes_turns_networks_and_reach_into_network_policies() {
     // Deny by default, each network's machines together, then the reach rules (with ports).
     assert!(env.contains("name: isoloom-default-deny"));
     assert!(env.contains("name: net-back"));
-    assert!(env.contains("name: reach-access-front"));
-    assert!(env.contains("name: reach-front-back"));
+    // Reach policies carry their index so a dash in a network name can't collide two of them.
+    assert!(env.contains("name: reach-0-access-front"));
+    assert!(env.contains("name: reach-1-front-back"));
     assert!(env.contains("port: 6379"));
     // Names resolve as everywhere else: a hostname and a Service per serving machine.
     assert!(env.contains("hostname: web") && env.contains("kind: Service\nmetadata:\n  name: web"));

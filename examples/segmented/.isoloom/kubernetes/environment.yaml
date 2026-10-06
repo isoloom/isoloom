@@ -212,7 +212,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: reach-access-front
+  name: reach-0-access-front
 spec:
   podSelector:
     matchLabels:
@@ -226,7 +226,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: reach-front-back
+  name: reach-1-front-back
 spec:
   podSelector:
     matchLabels:

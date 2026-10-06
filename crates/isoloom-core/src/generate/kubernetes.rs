@@ -461,7 +461,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             )],
         ));
     }
-    for r in &spec.reach {
+    for (i, r) in spec.reach.iter().enumerate() {
         let mut rule = Mapping::new();
         rule.insert(
             s("from"),
@@ -481,7 +481,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         docs.push(doc(
             "NetworkPolicy",
             "networking.k8s.io/v1",
-            &format!("reach-{}-{}", r.from, r.to),
+            // The index keeps the name unique: `reach-{from}-{to}` alone collides when a network
+            // name contains a dash (reach a-b→c and a→b-c would both be `reach-a-b-c`).
+            &format!("reach-{i}-{}-{}", r.from, r.to),
             vec![(
                 "spec",
                 map([

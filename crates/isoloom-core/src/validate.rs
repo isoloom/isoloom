@@ -129,6 +129,10 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     }
     if !kebab(&spec.name) {
         add("name", "use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)".into());
+    } else if spec.name.len() > 55 {
+        // The name becomes the Kubernetes namespace `isoloom-<name>`, which must be a 63-character
+        // DNS label; 8 characters are the prefix.
+        add("name", "at most 55 characters: it becomes the Kubernetes namespace `isoloom-<name>`".into());
     }
 
     // Networks: valid, private, sized /24 to /29, not overlapping each other.
@@ -229,6 +233,10 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         let at = format!("machines.{name}");
         if !dns_label(name) {
             add(&at, "machine names are DNS names: kebab-case, starting with a letter".into());
+        } else if name.len() > 53 {
+            // The machine's published entry point is the Kubernetes Service `<name>-published`,
+            // a 63-character DNS label; 10 characters are the suffix.
+            add(&at, "at most 53 characters: it becomes the Kubernetes Service `<name>-published`".into());
         }
         if m.networks.is_empty() {
             add(&format!("{at}.networks"), "attach the machine to at least one network".into());
@@ -266,11 +274,19 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             let vat = format!("{at}.volumes.{v}");
             if !kebab(v) {
                 add(&vat, "volume names are kebab-case: lowercase letters, digits and dashes".into());
-            }
-            if !path.starts_with('/') || path == "/" || path.split('/').any(|s| s == "..") {
+            } else if name.len() + 1 + v.len() > 63 {
+                // The volume's Kubernetes claim is named `<machine>-<volume>`, a 63-character label.
                 add(
                     &vat,
-                    format!("`{path}` isn't an absolute path inside the machine, like /var/lib/postgresql/data"),
+                    "machine name and volume name together are at most 62 characters: the Kubernetes claim is `<machine>-<volume>`".into(),
+                );
+            }
+            // No spaces or ':' : the Docker short mount syntax (`<vol>:<path>`) and the `mkdir -p`
+            // the VM/Proxmox provisioners run both split on those, so either would corrupt the mount.
+            if !path.starts_with('/') || path == "/" || path.split('/').any(|s| s == "..") || path.contains([':', ' ', '\t']) {
+                add(
+                    &vat,
+                    format!("`{path}` isn't a safe absolute path inside the machine (no spaces or ':'), like /var/lib/postgresql/data"),
                 );
             } else if !paths.insert(path.trim_end_matches('/')) {
                 add(&vat, format!("`{path}` is already a volume of this machine"));

@@ -173,9 +173,31 @@ fn machines_behind_a_gateway_start_after_it() {
 #[test]
 fn volumes_are_absolute_paths_named_in_kebab_case() {
     let p = problems(&format!(
-        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, volumes: {{ data: /data, Bad: /x, rel: data/x, twice: /data/ }}, docker: {{ image: x }} }}\n"
+        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, volumes: {{ data: /data, Bad: /x, rel: data/x, twice: /data/, spaced: \"/var/my data\", coloned: \"/var/a:b\" }}, docker: {{ image: x }} }}\n"
     ));
     assert!(p.iter().any(|m| m.starts_with("machines.a.volumes.Bad: volume names are kebab-case")), "{p:?}");
-    assert!(p.iter().any(|m| m.contains("`data/x` isn't an absolute path")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("`data/x` isn't a safe absolute path")), "{p:?}");
     assert!(p.iter().any(|m| m.contains("`/data/` is already a volume")), "{p:?}");
+    // Spaces and ':' corrupt the Docker short mount syntax and the provisioners' `mkdir -p`.
+    assert!(p.iter().any(|m| m.contains("`/var/my data` isn't a safe absolute path")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("`/var/a:b` isn't a safe absolute path")), "{p:?}");
+}
+
+#[test]
+fn names_leave_room_for_the_kubernetes_affixes() {
+    // The name becomes `isoloom-<name>` (namespace): 56 characters overflows the 63-char label.
+    let long = "a".repeat(56);
+    let p = problems(&format!(
+        "version: 1\nname: {long}\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  a: {{ networks: {{ lab: 5 }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m.contains("name: at most 55 characters")), "{p:?}");
+
+    // A 54-char machine name overflows `<name>-published`; a machine+volume pair overflows the claim.
+    let m54 = "m".repeat(54);
+    let v60 = "v".repeat(63);
+    let p = problems(&format!(
+        "{BASE}machines:\n  {m54}: {{ networks: {{ lab: 5 }}, docker: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, volumes: {{ {v60}: /data }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m.contains("at most 53 characters")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("at most 62 characters")), "{p:?}");
 }
