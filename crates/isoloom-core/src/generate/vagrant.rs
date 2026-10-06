@@ -96,7 +96,13 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         if m.arch != Arch::Amd64 {
             let _ = writeln!(out, "    m.vm.box_architecture = {}", rb(m.arch.id()));
         }
-        let _ = writeln!(out, "    m.vm.hostname = {}", rb(name));
+        // Windows: don't set the hostname here. Vagrant renames the Windows guest from it over
+        // WinRM, which is unreliable (it fails on some boxes with a misleading "not a valid name"
+        // error even for a valid name, e.g. mayfly/windows10); the machine's name is set by its
+        // provisioning (the lab's Ansible, or the controller) instead. Linux keeps it.
+        if !windows {
+            let _ = writeln!(out, "    m.vm.hostname = {}", rb(name));
+        }
         if windows {
             // The box's own account, over WinRM (Windows has no SSH by default).
             // The box forwards RDP to every interface of the host: off (publish a service to

@@ -21,7 +21,6 @@ Vagrant.configure("2") do |config|
   config.vm.define "web01" do |m|
     m.vm.box = "StefanScherer/windows_2019"
     m.vm.box_version = "2021.05.15"
-    m.vm.hostname = "web01"
     m.vm.network "forwarded_port", guest: 3389, host: 3389, id: "rdp", disabled: true
     m.vm.guest = :windows
     m.vm.communicator = "winrm"
