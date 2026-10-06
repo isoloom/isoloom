@@ -6,3 +6,4 @@
 .terraform.lock.hcl
 *.tfstate
 *.tfstate.*
+.claude/

@@ -125,7 +125,10 @@ pub fn generate_all(spec: &Spec) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
 fn arm64_machine(spec: &Spec) -> Option<&str> {
     spec.machines
         .iter()
-        .filter(|(_, m)| !m.access)
+        // Only machines the cloud actually builds: an access machine with no implementation isn't
+        // instantiated, so its arch is moot, but one that declares a container or VM is built and
+        // must not be silently given an x86 image.
+        .filter(|(_, m)| m.docker.is_some() || m.vm.is_some())
         .find(|(_, m)| m.arch == crate::model::Arch::Arm64)
         .map(|(n, _)| n.as_str())
 }

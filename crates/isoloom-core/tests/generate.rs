@@ -152,6 +152,20 @@ fn unsupported_features_are_refused_with_the_reason() {
 }
 
 #[test]
+fn an_arm64_access_machine_that_is_actually_built_is_still_refused_on_the_cloud() {
+    // An access machine with no implementation isn't instantiated, so its arch is moot. One that
+    // declares a VM is built, so arm64 must still be caught (the cloud images are x86-64 only).
+    let spec = parse(
+        "version: 1\nname: arm-access\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  kali:\n    networks: { lab: 10 }\n    access: true\n    arch: arm64\n    vm: { os: debian-12, provision: [p.sh] }\n",
+    )
+    .expect("parses");
+    assert!(
+        matches!(generate(&spec, Target::CloudVm), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("arm64")),
+        "an arm64 access machine with a VM must not slip past the cloud refusal"
+    );
+}
+
+#[test]
 fn a_gateway_routes_its_networks_instead_of_the_router() {
     let (_, spec) = example("edge-firewall");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
