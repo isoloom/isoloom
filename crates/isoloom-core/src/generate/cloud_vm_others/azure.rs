@@ -73,14 +73,19 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
   required_providers {{
     azurerm = {{
       source  = "hashicorp/azurerm"
-      version = "~> 4.0"
+      version = "~> 5.0"
     }}{providers}
   }}
 }}
 
-variable "location" {{
+variable "subscription_id" {{
+  type        = string
+  default     = null
+  description = "Default: ARM_SUBSCRIPTION_ID from the environment"
+}}
+variable "region" {{
   type    = string
-  default = "westeurope"
+  default = "swedencentral"
 }}
 variable "allowed_cidr" {{
   type        = string
@@ -110,6 +115,7 @@ variable "auto_stop_minutes" {{
         r#"
 provider "azurerm" {{
   features {{}}
+  subscription_id = var.subscription_id
 }}
 
 resource "terraform_data" "id" {{
@@ -127,7 +133,7 @@ locals {{
 
 resource "azurerm_resource_group" "env" {{
   name     = local.name
-  location = var.location
+  location = var.region
   tags     = local.tags
 }}
 
@@ -135,7 +141,7 @@ resource "azurerm_resource_group" "env" {{
 resource "azurerm_virtual_network" "env" {{
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   address_space       = [{spaces}]
   tags                = local.tags
 }}
@@ -183,7 +189,7 @@ resource "azurerm_virtual_network" "env" {{
         // Who may reach it: its own networks, what `reach` opens, SSH and the published ports
         // from allowed_cidr. Azure numbers the rules; names are unique within the group.
         let mut sg = format!(
-            "\n# Machine `{name}`: what may reach it.\nresource \"azurerm_network_security_group\" \"{id}\" {{\n  name                = \"${{local.name}}-{name}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.location\n  tags                = local.tags\n"
+            "\n# Machine `{name}`: what may reach it.\nresource \"azurerm_network_security_group\" \"{id}\" {{\n  name                = \"${{local.name}}-{name}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.region\n  tags                = local.tags\n"
         );
         let mut prio = 100;
         for n in m.networks.keys() {
@@ -242,7 +248,7 @@ resource "azurerm_virtual_network" "env" {{
         let (publisher, offer, sku) = azure_image(&vm.os).expect("checked");
         let _ = writeln!(
             tf,
-            "\nresource \"azurerm_linux_virtual_machine\" \"{id}\" {{\n  name                  = \"${{local.name}}-{name}\"\n  resource_group_name   = azurerm_resource_group.env.name\n  location              = var.location\n  size                  = \"{size}\"\n  admin_username        = \"{USER}\"\n  network_interface_ids = [{nic_ids}]\n  custom_data           = var.auto_stop_minutes > 0 ? base64encode(\"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\") : null\n  admin_ssh_key {{\n    username   = \"{USER}\"\n    public_key = var.ssh_public_key\n  }}\n  os_disk {{\n    caching              = \"ReadWrite\"\n    storage_account_type = \"StandardSSD_LRS\"\n    disk_size_gb         = {disk}\n  }}\n  source_image_reference {{\n    publisher = \"{publisher}\"\n    offer     = \"{offer}\"\n    sku       = \"{sku}\"\n    version   = \"latest\"\n  }}\n  tags = local.tags\n}}",
+            "\nresource \"azurerm_linux_virtual_machine\" \"{id}\" {{\n  name                  = \"${{local.name}}-{name}\"\n  resource_group_name   = azurerm_resource_group.env.name\n  location              = var.region\n  size                  = \"{size}\"\n  admin_username        = \"{USER}\"\n  network_interface_ids = [{nic_ids}]\n  custom_data           = var.auto_stop_minutes > 0 ? base64encode(\"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\") : null\n  admin_ssh_key {{\n    username   = \"{USER}\"\n    public_key = var.ssh_public_key\n  }}\n  os_disk {{\n    caching              = \"ReadWrite\"\n    storage_account_type = \"StandardSSD_LRS\"\n    disk_size_gb         = {disk}\n  }}\n  source_image_reference {{\n    publisher = \"{publisher}\"\n    offer     = \"{offer}\"\n    sku       = \"{sku}\"\n    version   = \"latest\"\n  }}\n  tags = local.tags\n}}",
             size = azure_size(mem),
             disk = disk.max(30),
         );
@@ -319,7 +325,7 @@ fn outbound_allow(sg: &mut String, prio: u32) {
 fn public_ip(tf: &mut String, id: &str, name: &str) {
     let _ = writeln!(
         tf,
-        "\nresource \"azurerm_public_ip\" \"{id}\" {{\n  name                = \"${{local.name}}-{name}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.location\n  allocation_method   = \"Static\"\n  sku                 = \"Standard\"\n  tags                = local.tags\n}}"
+        "\nresource \"azurerm_public_ip\" \"{id}\" {{\n  name                = \"${{local.name}}-{name}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.region\n  allocation_method   = \"Static\"\n  sku                 = \"Standard\"\n  tags                = local.tags\n}}"
     );
 }
 
@@ -335,7 +341,7 @@ fn nic(tf: &mut String, id: &str, name: &str, net: &str, addr: std::net::Ipv4Add
     let fwd = if forwarding { "\n  ip_forwarding_enabled = true" } else { "" };
     let _ = writeln!(
         tf,
-        "\nresource \"azurerm_network_interface\" \"{id}_{nid}\" {{\n  name                = \"${{local.name}}-{name}-{net}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.location\n  tags                = local.tags{fwd}\n  ip_configuration {{\n    name                          = \"primary\"\n    subnet_id                     = azurerm_subnet.{nid}.id\n    private_ip_address_allocation = \"Static\"\n    private_ip_address            = \"{addr}\"{public}\n  }}\n}}\n\nresource \"azurerm_network_interface_security_group_association\" \"{id}_{nid}\" {{\n  network_interface_id      = azurerm_network_interface.{id}_{nid}.id\n  network_security_group_id = azurerm_network_security_group.{id}.id\n}}"
+        "\nresource \"azurerm_network_interface\" \"{id}_{nid}\" {{\n  name                = \"${{local.name}}-{name}-{net}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.region\n  tags                = local.tags{fwd}\n  ip_configuration {{\n    name                          = \"primary\"\n    subnet_id                     = azurerm_subnet.{nid}.id\n    private_ip_address_allocation = \"Static\"\n    private_ip_address            = \"{addr}\"{public}\n  }}\n}}\n\nresource \"azurerm_network_interface_security_group_association\" \"{id}_{nid}\" {{\n  network_interface_id      = azurerm_network_interface.{id}_{nid}.id\n  network_security_group_id = azurerm_network_security_group.{id}.id\n}}"
     );
 }
 
@@ -380,7 +386,7 @@ fn provision(spec: &Spec, id: &str, pip: &str, user: &str, m: &crate::model::Mac
 fn controller(spec: &Spec, tf: &mut String) {
     let nets: Vec<&String> = spec.networks.keys().collect();
     let mut sg = String::from(
-        "\n# The controller (Ansible): every network may reach it, and SSH from allowed_cidr.\nresource \"azurerm_network_security_group\" \"isoloom_controller\" {\n  name                = \"${local.name}-controller\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.location\n  tags                = local.tags\n",
+        "\n# The controller (Ansible): every network may reach it, and SSH from allowed_cidr.\nresource \"azurerm_network_security_group\" \"isoloom_controller\" {\n  name                = \"${local.name}-controller\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.region\n  tags                = local.tags\n",
     );
     let mut prio = 100;
     for n in &nets {
@@ -403,7 +409,7 @@ fn controller(spec: &Spec, tf: &mut String) {
     for (i, n) in nets.iter().enumerate() {
         let _ = writeln!(
             tf,
-            "\nresource \"azurerm_network_interface\" \"isoloom_controller_{nid}\" {{\n  name                = \"${{local.name}}-controller-{n}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.location\n  tags                = local.tags{fwd}\n  ip_configuration {{\n    name                          = \"primary\"\n    subnet_id                     = azurerm_subnet.{nid}.id\n    private_ip_address_allocation = \"Static\"\n    private_ip_address            = \"{a}\"{public}\n  }}\n}}\n\nresource \"azurerm_network_interface_security_group_association\" \"isoloom_controller_{nid}\" {{\n  network_interface_id      = azurerm_network_interface.isoloom_controller_{nid}.id\n  network_security_group_id = azurerm_network_security_group.isoloom_controller.id\n}}",
+            "\nresource \"azurerm_network_interface\" \"isoloom_controller_{nid}\" {{\n  name                = \"${{local.name}}-controller-{n}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.region\n  tags                = local.tags{fwd}\n  ip_configuration {{\n    name                          = \"primary\"\n    subnet_id                     = azurerm_subnet.{nid}.id\n    private_ip_address_allocation = \"Static\"\n    private_ip_address            = \"{a}\"{public}\n  }}\n}}\n\nresource \"azurerm_network_interface_security_group_association\" \"isoloom_controller_{nid}\" {{\n  network_interface_id      = azurerm_network_interface.isoloom_controller_{nid}.id\n  network_security_group_id = azurerm_network_security_group.isoloom_controller.id\n}}",
             nid = res(n),
             a = cidr(spec, n).controller(),
             fwd = if multi { "\n  ip_forwarding_enabled = true" } else { "" },
@@ -422,7 +428,7 @@ fn controller(spec: &Spec, tf: &mut String) {
     let (publisher, offer, sku) = azure_image(CONTROLLER_OS).expect("controller image");
     let _ = writeln!(
         tf,
-        "\nresource \"azurerm_linux_virtual_machine\" \"isoloom_controller\" {{\n  name                  = \"${{local.name}}-controller\"\n  resource_group_name   = azurerm_resource_group.env.name\n  location              = var.location\n  size                  = \"Standard_B1ms\"\n  admin_username        = \"{USER}\"\n  network_interface_ids = [{nic_ids}]\n  custom_data           = var.auto_stop_minutes > 0 ? base64encode(\"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\") : null\n  admin_ssh_key {{\n    username   = \"{USER}\"\n    public_key = var.ssh_public_key\n  }}\n  os_disk {{\n    caching              = \"ReadWrite\"\n    storage_account_type = \"StandardSSD_LRS\"\n    disk_size_gb         = 30\n  }}\n  source_image_reference {{\n    publisher = \"{publisher}\"\n    offer     = \"{offer}\"\n    sku       = \"{sku}\"\n    version   = \"latest\"\n  }}\n  tags = local.tags\n}}"
+        "\nresource \"azurerm_linux_virtual_machine\" \"isoloom_controller\" {{\n  name                  = \"${{local.name}}-controller\"\n  resource_group_name   = azurerm_resource_group.env.name\n  location              = var.region\n  size                  = \"Standard_B1ms\"\n  admin_username        = \"{USER}\"\n  network_interface_ids = [{nic_ids}]\n  custom_data           = var.auto_stop_minutes > 0 ? base64encode(\"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\") : null\n  admin_ssh_key {{\n    username   = \"{USER}\"\n    public_key = var.ssh_public_key\n  }}\n  os_disk {{\n    caching              = \"ReadWrite\"\n    storage_account_type = \"StandardSSD_LRS\"\n    disk_size_gb         = 30\n  }}\n  source_image_reference {{\n    publisher = \"{publisher}\"\n    offer     = \"{offer}\"\n    sku       = \"{sku}\"\n    version   = \"latest\"\n  }}\n  tags = local.tags\n}}"
     );
 
     // Its set-up: interfaces, names, the project, its key, Ansible, the inventory, the playbooks.
@@ -495,7 +501,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
     let host: String = name.chars().take(15).collect();
 
     let mut sg = format!(
-        "\n# Machine `{name}` (Windows): what may reach it.\nresource \"azurerm_network_security_group\" \"{id}\" {{\n  name                = \"${{local.name}}-{name}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.location\n  tags                = local.tags\n"
+        "\n# Machine `{name}` (Windows): what may reach it.\nresource \"azurerm_network_security_group\" \"{id}\" {{\n  name                = \"${{local.name}}-{name}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.region\n  tags                = local.tags\n"
     );
     let mut prio = 100;
     inbound(
@@ -545,14 +551,14 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
     // One network (the global gate refuses Windows on several), so the NIC carries the public IP.
     let _ = writeln!(
         tf,
-        "\nresource \"azurerm_network_interface\" \"{id}_{nid}\" {{\n  name                = \"${{local.name}}-{name}-{net}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.location\n  tags                = local.tags\n  ip_configuration {{\n    name                          = \"primary\"\n    subnet_id                     = azurerm_subnet.{nid}.id\n    private_ip_address_allocation = \"Static\"\n    private_ip_address            = \"{addr}\"\n    public_ip_address_id          = azurerm_public_ip.{id}.id\n  }}\n}}\n\nresource \"azurerm_network_interface_security_group_association\" \"{id}_{nid}\" {{\n  network_interface_id      = azurerm_network_interface.{id}_{nid}.id\n  network_security_group_id = azurerm_network_security_group.{id}.id\n}}",
+        "\nresource \"azurerm_network_interface\" \"{id}_{nid}\" {{\n  name                = \"${{local.name}}-{name}-{net}\"\n  resource_group_name = azurerm_resource_group.env.name\n  location            = var.region\n  tags                = local.tags\n  ip_configuration {{\n    name                          = \"primary\"\n    subnet_id                     = azurerm_subnet.{nid}.id\n    private_ip_address_allocation = \"Static\"\n    private_ip_address            = \"{addr}\"\n    public_ip_address_id          = azurerm_public_ip.{id}.id\n  }}\n}}\n\nresource \"azurerm_network_interface_security_group_association\" \"{id}_{nid}\" {{\n  network_interface_id      = azurerm_network_interface.{id}_{nid}.id\n  network_security_group_id = azurerm_network_security_group.{id}.id\n}}",
         nid = res(net),
     );
 
     let (publisher, offer, sku) = azure_image(&vm.os).expect("checked");
     let _ = writeln!(
         tf,
-        "\nresource \"azurerm_windows_virtual_machine\" \"{id}\" {{\n  name                  = \"${{local.name}}-{name}\"\n  computer_name         = \"{host}\"\n  resource_group_name   = azurerm_resource_group.env.name\n  location              = var.location\n  size                  = \"{size}\"\n  admin_username        = \"{USER}\"\n  admin_password        = random_password.windows.result\n  network_interface_ids = [azurerm_network_interface.{id}_{nid}.id]\n  winrm_listener {{\n    protocol = \"Http\"\n  }}\n  os_disk {{\n    caching              = \"ReadWrite\"\n    storage_account_type = \"StandardSSD_LRS\"\n    disk_size_gb         = {disk}\n  }}\n  source_image_reference {{\n    publisher = \"{publisher}\"\n    offer     = \"{offer}\"\n    sku       = \"{sku}\"\n    version   = \"latest\"\n  }}\n  tags = local.tags\n}}",
+        "\nresource \"azurerm_windows_virtual_machine\" \"{id}\" {{\n  name                  = \"${{local.name}}-{name}\"\n  computer_name         = \"{host}\"\n  resource_group_name   = azurerm_resource_group.env.name\n  location              = var.region\n  size                  = \"{size}\"\n  admin_username        = \"{USER}\"\n  admin_password        = random_password.windows.result\n  network_interface_ids = [azurerm_network_interface.{id}_{nid}.id]\n  winrm_listener {{\n    protocol = \"Http\"\n  }}\n  os_disk {{\n    caching              = \"ReadWrite\"\n    storage_account_type = \"StandardSSD_LRS\"\n    disk_size_gb         = {disk}\n  }}\n  source_image_reference {{\n    publisher = \"{publisher}\"\n    offer     = \"{offer}\"\n    sku       = \"{sku}\"\n    version   = \"latest\"\n  }}\n  tags = local.tags\n}}",
         size = azure_size(mem),
         nid = res(net),
         disk = disk.max(127),

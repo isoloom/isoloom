@@ -10,14 +10,19 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.0"
+      version = "~> 5.0"
     }
   }
 }
 
-variable "location" {
+variable "subscription_id" {
+  type        = string
+  default     = null
+  description = "Default: ARM_SUBSCRIPTION_ID from the environment"
+}
+variable "region" {
   type    = string
-  default = "westeurope"
+  default = "swedencentral"
 }
 variable "allowed_cidr" {
   type        = string
@@ -38,6 +43,7 @@ variable "auto_stop_minutes" {
 
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
 }
 
 resource "terraform_data" "id" {
@@ -55,7 +61,7 @@ locals {
 
 resource "azurerm_resource_group" "env" {
   name     = local.name
-  location = var.location
+  location = var.region
   tags     = local.tags
 }
 
@@ -63,7 +69,7 @@ resource "azurerm_resource_group" "env" {
 resource "azurerm_virtual_network" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   address_space       = ["10.61.10.0/24", "10.61.20.0/24", "10.61.99.0/24"]
   tags                = local.tags
 }
@@ -93,7 +99,7 @@ resource "azurerm_subnet" "access" {
 resource "azurerm_network_security_group" "cache" {
   name                = "${local.name}-cache"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   security_rule {
     name                       = "net-back"
@@ -155,7 +161,7 @@ resource "azurerm_network_security_group" "cache" {
 resource "azurerm_public_ip" "cache" {
   name                = "${local.name}-cache"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = local.tags
@@ -164,7 +170,7 @@ resource "azurerm_public_ip" "cache" {
 resource "azurerm_network_interface" "cache_back" {
   name                = "${local.name}-cache-back"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   ip_configuration {
     name                          = "primary"
@@ -183,7 +189,7 @@ resource "azurerm_network_interface_security_group_association" "cache_back" {
 resource "azurerm_linux_virtual_machine" "cache" {
   name                  = "${local.name}-cache"
   resource_group_name   = azurerm_resource_group.env.name
-  location              = var.location
+  location              = var.region
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.cache_back.id]
@@ -244,7 +250,7 @@ resource "terraform_data" "cache" {
 resource "azurerm_network_security_group" "web" {
   name                = "${local.name}-web"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   security_rule {
     name                       = "net-front"
@@ -295,7 +301,7 @@ resource "azurerm_network_security_group" "web" {
 resource "azurerm_public_ip" "web" {
   name                = "${local.name}-web"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = local.tags
@@ -304,7 +310,7 @@ resource "azurerm_public_ip" "web" {
 resource "azurerm_network_interface" "web_front" {
   name                = "${local.name}-web-front"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   ip_configuration {
     name                          = "primary"
@@ -323,7 +329,7 @@ resource "azurerm_network_interface_security_group_association" "web_front" {
 resource "azurerm_linux_virtual_machine" "web" {
   name                  = "${local.name}-web"
   resource_group_name   = azurerm_resource_group.env.name
-  location              = var.location
+  location              = var.region
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.web_front.id]
@@ -383,7 +389,7 @@ resource "terraform_data" "web" {
 resource "azurerm_network_security_group" "user" {
   name                = "${local.name}-user"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   security_rule {
     name                       = "net-access"
@@ -423,7 +429,7 @@ resource "azurerm_network_security_group" "user" {
 resource "azurerm_public_ip" "user" {
   name                = "${local.name}-user"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = local.tags
@@ -432,7 +438,7 @@ resource "azurerm_public_ip" "user" {
 resource "azurerm_network_interface" "user_access" {
   name                = "${local.name}-user-access"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   ip_configuration {
     name                          = "primary"
@@ -451,7 +457,7 @@ resource "azurerm_network_interface_security_group_association" "user_access" {
 resource "azurerm_linux_virtual_machine" "user" {
   name                  = "${local.name}-user"
   resource_group_name   = azurerm_resource_group.env.name
-  location              = var.location
+  location              = var.region
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.user_access.id]

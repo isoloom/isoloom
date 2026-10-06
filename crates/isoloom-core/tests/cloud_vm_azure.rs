@@ -24,7 +24,13 @@ fn azure_uses_azurerm_with_static_addresses_and_the_shared_outputs() {
     let tf = azure(&example("hello-stack"));
     // The azurerm provider and an Azure VM, not an AWS instance.
     assert!(tf.contains("source  = \"hashicorp/azurerm\""), "{tf}");
+    assert!(tf.contains("version = \"~> 5.0\""), "{tf}");
     assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"web\""));
+    // The launcher contract: a `region` var and ARM_SUBSCRIPTION_ID from the environment.
+    assert!(tf.contains("variable \"region\""), "{tf}");
+    assert!(tf.contains("subscription_id = var.subscription_id"), "{tf}");
+    assert!(tf.contains("location            = var.region"), "{tf}");
+    assert!(!tf.contains("var.location"), "{tf}");
     // Every address of the spec is kept: a static private IP at the spec's octet.
     assert!(tf.contains("private_ip_address_allocation = \"Static\""));
     assert!(tf.contains("private_ip_address            = \"10.60.0.10\""), "{tf}");

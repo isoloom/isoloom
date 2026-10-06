@@ -76,7 +76,7 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
 
     let mut tf = header("#");
     tf.push_str(
-        "# Start:  terraform -chdir=.isoloom/cloud-vm/gcp init && terraform -chdir=.isoloom/cloud-vm/gcp apply \\\n#           -var project=<id> -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/gcp destroy (same variables)\n\n",
+        "# Start:  terraform -chdir=.isoloom/cloud-vm/gcp init && terraform -chdir=.isoloom/cloud-vm/gcp apply \\\n#           -var billing_account=<id> -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/gcp destroy (same variables)\n\n",
     );
     let _ = write!(
         tf,
@@ -86,22 +86,28 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
   required_providers {{
     google = {{
       source  = "hashicorp/google"
-      version = "~> 6.0"
+      version = "~> 8.0"
     }}{tls}
   }}
 }}
 
 variable "project" {{
   type        = string
-  description = "The Google Cloud project to build in"
+  default     = ""
+  description = "An existing project; or leave empty and give billing_account for a project of its own"
+}}
+variable "billing_account" {{
+  type        = string
+  default     = ""
+  description = "With no project: create one for this environment, billed here, deleted with it"
+}}
+variable "org_id" {{
+  type    = string
+  default = ""
 }}
 variable "region" {{
   type    = string
   default = "europe-west1"
-}}
-variable "zone" {{
-  type    = string
-  default = "europe-west1-b"
 }}
 variable "allowed_cidr" {{
   type        = string
@@ -135,9 +141,25 @@ variable "auto_stop_minutes" {{
         tf,
         r#"
 provider "google" {{
-  project = var.project
-  region  = var.region
-  zone    = var.zone
+  region = var.region
+}}
+
+# A project of its own when none is given: everything goes when the environment is destroyed.
+resource "google_project" "env" {{
+  count               = var.project == "" ? 1 : 0
+  name                = "isoloom-{env}"
+  project_id          = "isoloom-${{terraform_data.id.output}}"
+  billing_account     = var.billing_account
+  org_id              = var.org_id == "" ? null : var.org_id
+  deletion_policy     = "DELETE"
+  auto_create_network = false
+}}
+
+resource "google_project_service" "compute" {{
+  count              = var.project == "" ? 1 : 0
+  project            = google_project.env[0].project_id
+  service            = "compute.googleapis.com"
+  disable_on_destroy = false
 }}
 
 resource "terraform_data" "id" {{
@@ -148,12 +170,15 @@ resource "terraform_data" "id" {{
 }}
 
 locals {{
-  name = "isoloom-{env}-${{terraform_data.id.output}}"
-  root = abspath("${{path.module}}/../../..")
+  name    = "isoloom-{env}-${{terraform_data.id.output}}"
+  root    = abspath("${{path.module}}/../../..")
+  project = var.project != "" ? var.project : google_project_service.compute[0].project
+  zone    = "${{var.region}}-a"
 }}
 
 # The environment's networks: one VPC, a subnetwork per network with its exact range.
 resource "google_compute_network" "env" {{
+  project                 = local.project
   name                    = local.name
   auto_create_subnetworks = false
 }}
@@ -163,7 +188,7 @@ resource "google_compute_network" "env" {{
     for net in &nets {
         let _ = writeln!(
             tf,
-            "\nresource \"google_compute_subnetwork\" \"{id}\" {{\n  name          = \"${{local.name}}-{net}\"\n  network       = google_compute_network.env.id\n  ip_cidr_range = \"{c}\"\n  region        = var.region\n}}",
+            "\nresource \"google_compute_subnetwork\" \"{id}\" {{\n  project       = local.project\n  name          = \"${{local.name}}-{net}\"\n  network       = google_compute_network.env.id\n  ip_cidr_range = \"{c}\"\n  region        = var.region\n}}",
             id = res(net),
             c = spec.networks[net.as_str()].cidr,
         );
@@ -193,7 +218,7 @@ resource "google_compute_network" "env" {{
         // instance by its tag; each distinct source gets its own rule (one source set per rule).
         let _ = write!(
             tf,
-            "\n# Machine `{name}`: what may reach it.\nresource \"google_compute_firewall\" \"{id}_net\" {{\n  name          = \"${{local.name}}-{name}-net\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [\"{c}\"]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"all\"\n  }}\n}}\n\nresource \"google_compute_firewall\" \"{id}_ssh\" {{\n  name          = \"${{local.name}}-{name}-ssh\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [var.allowed_cidr]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [\"22\"]\n  }}\n}}\n",
+            "\n# Machine `{name}`: what may reach it.\nresource \"google_compute_firewall\" \"{id}_net\" {{\n  project       = local.project\n  name          = \"${{local.name}}-{name}-net\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [\"{c}\"]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"all\"\n  }}\n}}\n\nresource \"google_compute_firewall\" \"{id}_ssh\" {{\n  project       = local.project\n  name          = \"${{local.name}}-{name}-ssh\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [var.allowed_cidr]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [\"22\"]\n  }}\n}}\n",
             c = spec.networks[net.as_str()].cidr,
         );
         for r in spec
@@ -205,7 +230,7 @@ resource "google_compute_network" "env" {{
             if r.ports.is_empty() {
                 let _ = write!(
                     tf,
-                    "\nresource \"google_compute_firewall\" \"{id}_reach_{rf}\" {{\n  name          = \"${{local.name}}-{name}-reach-{f}\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [\"{from}\"]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"all\"\n  }}\n}}\n",
+                    "\nresource \"google_compute_firewall\" \"{id}_reach_{rf}\" {{\n  project       = local.project\n  name          = \"${{local.name}}-{name}-reach-{f}\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [\"{from}\"]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"all\"\n  }}\n}}\n",
                     rf = res(&r.from),
                     f = r.from,
                 );
@@ -213,7 +238,7 @@ resource "google_compute_network" "env" {{
                 let ports = r.ports.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
                 let _ = write!(
                     tf,
-                    "\nresource \"google_compute_firewall\" \"{id}_reach_{rf}\" {{\n  name          = \"${{local.name}}-{name}-reach-{f}\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [\"{from}\"]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [{ports}]\n  }}\n  allow {{\n    protocol = \"udp\"\n    ports    = [{ports}]\n  }}\n}}\n",
+                    "\nresource \"google_compute_firewall\" \"{id}_reach_{rf}\" {{\n  project       = local.project\n  name          = \"${{local.name}}-{name}-reach-{f}\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [\"{from}\"]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [{ports}]\n  }}\n  allow {{\n    protocol = \"udp\"\n    ports    = [{ports}]\n  }}\n}}\n",
                     rf = res(&r.from),
                     f = r.from,
                 );
@@ -235,13 +260,13 @@ resource "google_compute_network" "env" {{
             let ports = pub_ports.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
             let _ = write!(
                 tf,
-                "\nresource \"google_compute_firewall\" \"{id}_published\" {{\n  name          = \"${{local.name}}-{name}-published\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [var.allowed_cidr]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [{ports}]\n  }}\n}}\n",
+                "\nresource \"google_compute_firewall\" \"{id}_published\" {{\n  project       = local.project\n  name          = \"${{local.name}}-{name}-published\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [var.allowed_cidr]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [{ports}]\n  }}\n}}\n",
             );
         }
 
         let _ = writeln!(
             tf,
-            "\nresource \"google_compute_instance\" \"{id}\" {{\n  name         = \"${{local.name}}-{name}\"\n  machine_type = \"{itype}\"\n  zone         = var.zone\n  tags         = [\"{tag}\"]\n  boot_disk {{\n    initialize_params {{\n      image = \"{image}\"\n      size  = {disk}\n    }}\n  }}\n  network_interface {{\n    subnetwork = google_compute_subnetwork.{netid}.id\n    network_ip = \"{addr}\"\n    access_config {{}}\n  }}\n  metadata = {{\n    ssh-keys = \"{user}:${{var.ssh_public_key}}\"\n  }}\n  metadata_startup_script = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  labels = {{\n    \"isoloom-environment\" = \"{env}\"\n    \"managed-by\"          = \"isoloom\"\n  }}\n}}",
+            "\nresource \"google_compute_instance\" \"{id}\" {{\n  project      = local.project\n  name         = \"${{local.name}}-{name}\"\n  machine_type = \"{itype}\"\n  zone         = local.zone\n  tags         = [\"{tag}\"]\n  boot_disk {{\n    initialize_params {{\n      image = \"{image}\"\n      size  = {disk}\n    }}\n  }}\n  network_interface {{\n    subnetwork = google_compute_subnetwork.{netid}.id\n    network_ip = \"{addr}\"\n    access_config {{}}\n  }}\n  metadata = {{\n    ssh-keys = \"{user}:${{var.ssh_public_key}}\"\n  }}\n  metadata_startup_script = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  labels = {{\n    \"isoloom-environment\" = \"{env}\"\n    \"managed-by\"          = \"isoloom\"\n  }}\n}}",
             itype = gcp_type(mem),
             netid = res(net),
             env = spec.name,
@@ -398,12 +423,12 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
     let c = cidr(spec, first);
     let _ = write!(
         tf,
-        "\n# The controller (Ansible): its network may reach it, and SSH from allowed_cidr.\nresource \"google_compute_firewall\" \"isoloom_controller_net\" {{\n  name          = \"${{local.name}}-controller-net\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [\"{cidr}\"]\n  target_tags   = [\"${{local.name}}-controller\"]\n  allow {{\n    protocol = \"all\"\n  }}\n}}\n\nresource \"google_compute_firewall\" \"isoloom_controller_ssh\" {{\n  name          = \"${{local.name}}-controller-ssh\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [var.allowed_cidr]\n  target_tags   = [\"${{local.name}}-controller\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [\"22\"]\n  }}\n}}\n",
+        "\n# The controller (Ansible): its network may reach it, and SSH from allowed_cidr.\nresource \"google_compute_firewall\" \"isoloom_controller_net\" {{\n  project       = local.project\n  name          = \"${{local.name}}-controller-net\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [\"{cidr}\"]\n  target_tags   = [\"${{local.name}}-controller\"]\n  allow {{\n    protocol = \"all\"\n  }}\n}}\n\nresource \"google_compute_firewall\" \"isoloom_controller_ssh\" {{\n  project       = local.project\n  name          = \"${{local.name}}-controller-ssh\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [var.allowed_cidr]\n  target_tags   = [\"${{local.name}}-controller\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [\"22\"]\n  }}\n}}\n",
         cidr = spec.networks[first.as_str()].cidr,
     );
     let _ = writeln!(
         tf,
-        "\nresource \"google_compute_instance\" \"isoloom_controller\" {{\n  name         = \"${{local.name}}-controller\"\n  machine_type = \"e2-small\"\n  zone         = var.zone\n  tags         = [\"${{local.name}}-controller\"]\n  boot_disk {{\n    initialize_params {{\n      image = \"{image}\"\n    }}\n  }}\n  network_interface {{\n    subnetwork = google_compute_subnetwork.{fid}.id\n    network_ip = \"{addr}\"\n    access_config {{}}\n  }}\n  metadata = {{\n    ssh-keys = \"{user}:${{var.ssh_public_key}}\"\n  }}\n  metadata_startup_script = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n}}",
+        "\nresource \"google_compute_instance\" \"isoloom_controller\" {{\n  project      = local.project\n  name         = \"${{local.name}}-controller\"\n  machine_type = \"e2-small\"\n  zone         = local.zone\n  tags         = [\"${{local.name}}-controller\"]\n  boot_disk {{\n    initialize_params {{\n      image = \"{image}\"\n    }}\n  }}\n  network_interface {{\n    subnetwork = google_compute_subnetwork.{fid}.id\n    network_ip = \"{addr}\"\n    access_config {{}}\n  }}\n  metadata = {{\n    ssh-keys = \"{user}:${{var.ssh_public_key}}\"\n  }}\n  metadata_startup_script = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n}}",
         addr = c.controller(),
     );
     // Its set-up: names, the project, its key, Ansible, the inventory, the playbooks.

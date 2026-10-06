@@ -3,9 +3,9 @@
 //! baked /etc/hosts holds. Single-network Linux labs only for now (see `refusal`): no secondary
 //! VNICs, no Windows, no Ansible controller.
 //!
-//! OCI images are region- and tenancy-specific OCIDs, so the image isn't looked up: the user
-//! gives one `image_ocid`; the SSH login still follows the OS (opc for Oracle Linux, ubuntu for
-//! Ubuntu, admin for Debian).
+//! The image is looked up, not given: a `data "oci_core_images"` finds the newest Canonical
+//! Ubuntu for the shape, as the cloud-docker driver does. Oracle Cloud ships no Debian platform
+//! image, so Debian labs run on Ubuntu too; the SSH login is `ubuntu` either way.
 
 use std::fmt::Write;
 
@@ -31,15 +31,20 @@ pub(super) fn refusal(spec: &Spec) -> Option<String> {
     None
 }
 
-/// The SSH login OCI images ship with, by OS family.
-fn ssh_user(os: &str) -> &'static str {
-    if os.starts_with("ubuntu") {
-        "ubuntu"
-    } else if os.starts_with("debian") {
-        "admin"
-    } else {
-        "opc"
+/// The Ubuntu version to look up and the SSH login for an OS. Oracle Cloud has no Debian image,
+/// so Debian labs fall back to the newest Ubuntu LTS, as cloud-docker does; the login is always
+/// `ubuntu`.
+fn oci_image(os: &str) -> (&'static str, &'static str) {
+    // (operating_system_version, ssh user)
+    match os {
+        "ubuntu-22.04" => ("22.04", "ubuntu"),
+        _ => ("24.04", "ubuntu"),
     }
+}
+
+/// The Terraform-safe name of the `oci_core_images` data source for an Ubuntu version.
+fn image_ds(version: &str) -> String {
+    format!("ubuntu_{}", version.replace('.', ""))
 }
 
 /// VM.Standard.E4.Flex sizing for a machine's memory: whole GB (at least 1), one OCPU per 8 GB.
@@ -56,7 +61,7 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
 
     let mut tf = header("#");
     tf.push_str(
-        "# Start:  terraform -chdir=.isoloom/cloud-vm/oci init && terraform -chdir=.isoloom/cloud-vm/oci apply \\\n#           -var compartment_ocid=<compartment ocid> -var availability_domain=<AD name> -var image_ocid=<image ocid> \\\n#           -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/oci destroy (same variables)\n\n",
+        "# Start:  terraform -chdir=.isoloom/cloud-vm/oci init && terraform -chdir=.isoloom/cloud-vm/oci apply \\\n#           -var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/oci destroy (same variables)\n# Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.\n\n",
     );
     tf.push_str(
         r#"terraform {
@@ -70,17 +75,14 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
   }
 }
 
-variable "compartment_ocid" {
+variable "compartment_id" {
   type        = string
   description = "The compartment the environment goes in"
 }
-variable "availability_domain" {
+variable "region" {
   type        = string
-  description = "An availability domain's name, e.g. the output of `oci iam availability-domain list`"
-}
-variable "image_ocid" {
-  type        = string
-  description = "The OS image's OCID (region- and tenancy-specific): Linux the login follows (opc/ubuntu/admin)"
+  default     = "eu-paris-1"
+  description = "The OCI region to launch in"
 }
 variable "allowed_cidr" {
   type        = string
@@ -108,7 +110,9 @@ variable "auto_stop_minutes" {
     let _ = write!(
         tf,
         r#"
-provider "oci" {{}}
+provider "oci" {{
+  region = var.region
+}}
 
 resource "terraform_data" "id" {{
   input = substr(replace(uuid(), "-", ""), 0, 8)
@@ -122,21 +126,49 @@ locals {{
   root = abspath("${{path.module}}/../../..")
 }}
 
+# The compartment's availability domains; the instances land in the first.
+data "oci_identity_availability_domains" "ads" {{
+  compartment_id = var.compartment_id
+}}
+"#,
+        env = spec.name,
+    );
+
+    // The OS images, looked up (no OCID given): the newest Canonical Ubuntu for the shape, one
+    // data source per Ubuntu version the lab uses. Oracle Cloud ships no Debian image.
+    let mut versions: Vec<&'static str> = start_order(spec)
+        .iter()
+        .filter_map(|n| spec.machines[*n].vm.as_ref())
+        .map(|vm| oci_image(&vm.os).0)
+        .collect();
+    versions.sort_unstable();
+    versions.dedup();
+    for v in &versions {
+        let _ = write!(
+            tf,
+            "\n# Ubuntu {v}: Oracle Cloud has no Debian image of its own.\ndata \"oci_core_images\" \"{ds}\" {{\n  compartment_id           = var.compartment_id\n  operating_system         = \"Canonical Ubuntu\"\n  operating_system_version = \"{v}\"\n  shape                    = \"VM.Standard.E4.Flex\"\n  sort_by                  = \"TIMECREATED\"\n  sort_order               = \"DESC\"\n}}\n",
+            ds = image_ds(v),
+        );
+    }
+
+    let _ = write!(
+        tf,
+        r#"
 # The environment's one network: a VCN with the spec's range, routed to the internet.
 resource "oci_core_vcn" "env" {{
-  compartment_id = var.compartment_ocid
+  compartment_id = var.compartment_id
   cidr_block     = "{net_cidr}"
   display_name   = local.name
 }}
 
 resource "oci_core_internet_gateway" "env" {{
-  compartment_id = var.compartment_ocid
+  compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
 }}
 
 resource "oci_core_route_table" "env" {{
-  compartment_id = var.compartment_ocid
+  compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
   route_rules {{
@@ -148,7 +180,7 @@ resource "oci_core_route_table" "env" {{
 # What may reach the machines: everything inside the VCN, SSH and the published ports from
 # allowed_cidr; egress open.
 resource "oci_core_security_list" "env" {{
-  compartment_id = var.compartment_ocid
+  compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
   egress_security_rules {{
@@ -170,7 +202,6 @@ resource "oci_core_security_list" "env" {{
     }}
   }}
 "#,
-        env = spec.name,
     );
     let mut published_ports: Vec<u16> = spec.machines.values().flat_map(|m| m.services.iter().filter_map(|s| s.publish)).collect();
     published_ports.sort_unstable();
@@ -186,7 +217,7 @@ resource "oci_core_security_list" "env" {{
         r#"}}
 
 resource "oci_core_subnet" "env" {{
-  compartment_id    = var.compartment_ocid
+  compartment_id    = var.compartment_id
   vcn_id            = oci_core_vcn.env.id
   cidr_block        = "{net_cidr}"
   display_name      = local.name
@@ -203,7 +234,7 @@ resource "oci_core_subnet" "env" {{
     for name in start_order(spec) {
         let m = &spec.machines[name];
         let Some(vm) = &m.vm else { continue };
-        let user = ssh_user(&vm.os);
+        let (version, user) = oci_image(&vm.os);
         let (net, octet) = m.networks.first().expect("validated: every machine is on a network");
         let id = res(name);
         let addr = address(spec, net, *octet);
@@ -213,6 +244,7 @@ resource "oci_core_subnet" "env" {{
         let (ocpus, mem_gb) = oci_shape(mem);
         // OCI boot volumes start at 50 GB.
         let boot = disk.max(50);
+        let ds = image_ds(version);
 
         for sv in &m.services {
             if let Some(h) = sv.publish {
@@ -226,8 +258,8 @@ resource "oci_core_subnet" "env" {{
             r##"
 # Machine `{name}`, at its fixed address {addr}.
 resource "oci_core_instance" "{id}" {{
-  compartment_id      = var.compartment_ocid
-  availability_domain = var.availability_domain
+  compartment_id      = var.compartment_id
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${{local.name}}-{name}"
   shape               = "VM.Standard.E4.Flex"
   shape_config {{
@@ -236,7 +268,7 @@ resource "oci_core_instance" "{id}" {{
   }}
   source_details {{
     source_type             = "image"
-    source_id               = var.image_ocid
+    source_id               = data.oci_core_images.{ds}.images[0].id
     boot_volume_size_in_gbs = {boot}
   }}
   create_vnic_details {{

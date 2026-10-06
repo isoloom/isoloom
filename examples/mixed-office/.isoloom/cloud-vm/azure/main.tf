@@ -10,7 +10,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.0"
+      version = "~> 5.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -19,9 +19,14 @@ terraform {
   }
 }
 
-variable "location" {
+variable "subscription_id" {
+  type        = string
+  default     = null
+  description = "Default: ARM_SUBSCRIPTION_ID from the environment"
+}
+variable "region" {
   type    = string
-  default = "westeurope"
+  default = "swedencentral"
 }
 variable "allowed_cidr" {
   type        = string
@@ -42,6 +47,7 @@ variable "auto_stop_minutes" {
 
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
 }
 
 resource "terraform_data" "id" {
@@ -59,7 +65,7 @@ locals {
 
 resource "azurerm_resource_group" "env" {
   name     = local.name
-  location = var.location
+  location = var.region
   tags     = local.tags
 }
 
@@ -67,7 +73,7 @@ resource "azurerm_resource_group" "env" {
 resource "azurerm_virtual_network" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   address_space       = ["192.168.58.0/24"]
   tags                = local.tags
 }
@@ -92,7 +98,7 @@ resource "random_password" "windows" {
 resource "azurerm_network_security_group" "files01" {
   name                = "${local.name}-files01"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   security_rule {
     name                       = "net-office"
@@ -132,7 +138,7 @@ resource "azurerm_network_security_group" "files01" {
 resource "azurerm_public_ip" "files01" {
   name                = "${local.name}-files01"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = local.tags
@@ -141,7 +147,7 @@ resource "azurerm_public_ip" "files01" {
 resource "azurerm_network_interface" "files01_office" {
   name                = "${local.name}-files01-office"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   ip_configuration {
     name                          = "primary"
@@ -161,7 +167,7 @@ resource "azurerm_windows_virtual_machine" "files01" {
   name                  = "${local.name}-files01"
   computer_name         = "files01"
   resource_group_name   = azurerm_resource_group.env.name
-  location              = var.location
+  location              = var.region
   size                  = "Standard_B2s"
   admin_username        = "isoloom"
   admin_password        = random_password.windows.result
@@ -214,7 +220,7 @@ resource "terraform_data" "files01" {
 resource "azurerm_network_security_group" "intranet" {
   name                = "${local.name}-intranet"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   security_rule {
     name                       = "net-office"
@@ -265,7 +271,7 @@ resource "azurerm_network_security_group" "intranet" {
 resource "azurerm_public_ip" "intranet" {
   name                = "${local.name}-intranet"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = local.tags
@@ -274,7 +280,7 @@ resource "azurerm_public_ip" "intranet" {
 resource "azurerm_network_interface" "intranet_office" {
   name                = "${local.name}-intranet-office"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   ip_configuration {
     name                          = "primary"
@@ -293,7 +299,7 @@ resource "azurerm_network_interface_security_group_association" "intranet_office
 resource "azurerm_linux_virtual_machine" "intranet" {
   name                  = "${local.name}-intranet"
   resource_group_name   = azurerm_resource_group.env.name
-  location              = var.location
+  location              = var.region
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.intranet_office.id]

@@ -10,7 +10,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.0"
+      version = "~> 5.0"
     }
     tls = {
       source  = "hashicorp/tls"
@@ -23,9 +23,14 @@ terraform {
   }
 }
 
-variable "location" {
+variable "subscription_id" {
+  type        = string
+  default     = null
+  description = "Default: ARM_SUBSCRIPTION_ID from the environment"
+}
+variable "region" {
   type    = string
-  default = "westeurope"
+  default = "swedencentral"
 }
 variable "allowed_cidr" {
   type        = string
@@ -46,6 +51,7 @@ variable "auto_stop_minutes" {
 
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
 }
 
 resource "terraform_data" "id" {
@@ -63,7 +69,7 @@ locals {
 
 resource "azurerm_resource_group" "env" {
   name     = local.name
-  location = var.location
+  location = var.region
   tags     = local.tags
 }
 
@@ -71,7 +77,7 @@ resource "azurerm_resource_group" "env" {
 resource "azurerm_virtual_network" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   address_space       = ["192.168.57.0/24"]
   tags                = local.tags
 }
@@ -101,7 +107,7 @@ resource "tls_private_key" "controller" {
 resource "azurerm_network_security_group" "web01" {
   name                = "${local.name}-web01"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   security_rule {
     name                       = "net-lab"
@@ -152,7 +158,7 @@ resource "azurerm_network_security_group" "web01" {
 resource "azurerm_public_ip" "web01" {
   name                = "${local.name}-web01"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = local.tags
@@ -161,7 +167,7 @@ resource "azurerm_public_ip" "web01" {
 resource "azurerm_network_interface" "web01_lab" {
   name                = "${local.name}-web01-lab"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   ip_configuration {
     name                          = "primary"
@@ -181,7 +187,7 @@ resource "azurerm_windows_virtual_machine" "web01" {
   name                  = "${local.name}-web01"
   computer_name         = "web01"
   resource_group_name   = azurerm_resource_group.env.name
-  location              = var.location
+  location              = var.region
   size                  = "Standard_B2s"
   admin_username        = "isoloom"
   admin_password        = random_password.windows.result
@@ -234,7 +240,7 @@ resource "terraform_data" "web01" {
 resource "azurerm_network_security_group" "isoloom_controller" {
   name                = "${local.name}-controller"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   security_rule {
     name                       = "net-lab"
@@ -274,7 +280,7 @@ resource "azurerm_network_security_group" "isoloom_controller" {
 resource "azurerm_public_ip" "isoloom_controller" {
   name                = "${local.name}-controller"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = local.tags
@@ -283,7 +289,7 @@ resource "azurerm_public_ip" "isoloom_controller" {
 resource "azurerm_network_interface" "isoloom_controller_lab" {
   name                = "${local.name}-controller-lab"
   resource_group_name = azurerm_resource_group.env.name
-  location            = var.location
+  location            = var.region
   tags                = local.tags
   ip_configuration {
     name                          = "primary"
@@ -302,7 +308,7 @@ resource "azurerm_network_interface_security_group_association" "isoloom_control
 resource "azurerm_linux_virtual_machine" "isoloom_controller" {
   name                  = "${local.name}-controller"
   resource_group_name   = azurerm_resource_group.env.name
-  location              = var.location
+  location              = var.region
   size                  = "Standard_B1ms"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.isoloom_controller_lab.id]

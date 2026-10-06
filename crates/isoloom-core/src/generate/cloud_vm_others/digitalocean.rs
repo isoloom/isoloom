@@ -82,7 +82,7 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
 
     let mut tf = header("#");
     tf.push_str(
-        "# Start:  terraform -chdir=.isoloom/cloud-vm/digitalocean init && terraform -chdir=.isoloom/cloud-vm/digitalocean apply \\\n#           -var do_token=<token> -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/digitalocean destroy (same variables)\n\n",
+        "# Auth:   export DIGITALOCEAN_TOKEN=<token>\n# Start:  terraform -chdir=.isoloom/cloud-vm/digitalocean init && terraform -chdir=.isoloom/cloud-vm/digitalocean apply \\\n#           -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/digitalocean destroy (same variables)\n\n",
     );
     tf.push_str(
         r#"terraform {
@@ -96,11 +96,6 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
   }
 }
 
-variable "do_token" {
-  type        = string
-  sensitive   = true
-  description = "A DigitalOcean API token"
-}
 variable "region" {
   type    = string
   default = "fra1"
@@ -131,9 +126,7 @@ variable "auto_stop_minutes" {
     let _ = write!(
         tf,
         r##"
-provider "digitalocean" {{
-  token = var.do_token
-}}
+provider "digitalocean" {{}}
 
 resource "terraform_data" "id" {{
   input = substr(replace(uuid(), "-", ""), 0, 8)

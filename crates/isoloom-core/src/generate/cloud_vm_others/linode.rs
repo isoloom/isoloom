@@ -52,7 +52,7 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
 
     let mut tf = header("#");
     tf.push_str(
-        "# Start:  terraform -chdir=.isoloom/cloud-vm/linode init && terraform -chdir=.isoloom/cloud-vm/linode apply \\\n#           -var linode_token=<token> -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/linode destroy (same variables)\n\n",
+        "# Auth:   export LINODE_TOKEN=<token> (the provider reads it).\n# Start:  terraform -chdir=.isoloom/cloud-vm/linode init && terraform -chdir=.isoloom/cloud-vm/linode apply \\\n#           -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/linode destroy (same variables)\n\n",
     );
     let _ = write!(
         tf,
@@ -74,11 +74,6 @@ pub(super) fn build(spec: &Spec) -> GeneratedFile {
 variable "region" {{
   type    = string
   default = "eu-central"
-}}
-variable "linode_token" {{
-  type        = string
-  sensitive   = true
-  description = "A Linode API token (Akamai Cloud)"
 }}
 variable "allowed_cidr" {{
   type        = string
@@ -106,9 +101,7 @@ variable "auto_stop_minutes" {{
     let _ = write!(
         tf,
         r#"
-provider "linode" {{
-  token = var.linode_token
-}}
+provider "linode" {{}}
 
 resource "terraform_data" "id" {{
   input = substr(replace(uuid(), "-", ""), 0, 8)
