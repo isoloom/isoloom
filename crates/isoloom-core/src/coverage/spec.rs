@@ -487,6 +487,12 @@ fn base_table() -> Vec<Row> {
             }),
         },
         Row {
+            path: "message",
+            outputs: all(Status::Descriptive {
+                note: "printed by `isoloom run` and `isoloom message`, placeholders filled from the snapshot",
+            }),
+        },
+        Row {
             path: "machines.*.count",
             outputs: all(Status::Core {
                 note: "expanded into clones before generation",

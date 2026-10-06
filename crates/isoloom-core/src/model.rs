@@ -42,6 +42,11 @@ pub struct Spec {
     /// Narrows the targets derived from the implementations (e.g. not tested on Proxmox yet).
     #[serde(default)]
     pub targets: Option<Vec<Target>>,
+    /// Shown once the environment is up (`isoloom run`, `isoloom message`): how to start, in
+    /// Markdown. `{{ machines.web.addresses.front }}`-style placeholders take any value of the
+    /// resolved snapshot (`isoloom inspect` shows the paths).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
     /// Base machine name -> its clones, for machines that had a `count`. Filled when parsing.
     #[serde(skip)]
     #[schemars(skip)]

@@ -35,3 +35,8 @@ checks:
   - name: the page greets
     http: http://web/
     expect: 200
+
+message: |
+  The page answers at http://localhost:{{ machines.web.services.0.publish }}/ (and at
+  http://web/ from inside). The cache at {{ machines.cache.addresses.app }}:6379 holds the
+  greeting seeded at start; nothing here reaches the internet.

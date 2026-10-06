@@ -49,6 +49,7 @@ common: { resources: { cpus: 1 } }
 groups: { g: { members: [fw], arch: amd64 } }
 checks: [c.sh, { name: n, from: fw, http: "http://x/", tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]
 targets: [docker]
+message: hello
 "#;
 
 #[test]

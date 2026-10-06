@@ -215,7 +215,7 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
         })
         .collect();
 
-    json!({
+    let mut out = json!({
         "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
         "resolved_version": RESOLVED_VERSION,
         "name": spec.name,
@@ -240,7 +240,47 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
             "default_position": default_pos.id(),
             "positions": positions,
         },
-    })
+    });
+    // The message, with its placeholders filled from everything above.
+    if let Some(m) = &spec.message {
+        let filled = fill(m, &out).ok();
+        if let Value::Object(map) = &mut out {
+            map.insert("message".into(), filled.map(Value::String).unwrap_or(Value::Null));
+        }
+    }
+    out
+}
+
+/// The spec's `message` with its `{{ path }}` placeholders filled from the snapshot; an error
+/// names a placeholder that points at nothing.
+pub fn render_message(spec: &Spec, instance: Option<u8>) -> Result<Option<String>, String> {
+    let Some(m) = &spec.message else { return Ok(None) };
+    let snapshot = resolve_with(spec, instance);
+    fill(m, &snapshot).map(Some)
+}
+
+/// Fills `{{ dotted.path }}` placeholders from a snapshot. Scalars print plainly; lists and
+/// maps as compact JSON.
+pub fn fill(text: &str, snapshot: &Value) -> Result<String, String> {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("{{") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        let Some(end) = after.find("}}") else {
+            return Err("message: a `{{` without its `}}`".into());
+        };
+        let path = after[..end].trim();
+        let value = lookup(snapshot, path).ok_or_else(|| format!("message: `{{{{ {path} }}}}` points at nothing in the snapshot (see `isoloom inspect`)"))?;
+        match value {
+            Value::String(s) => out.push_str(s),
+            Value::Null => {}
+            other => out.push_str(&other.to_string()),
+        }
+        rest = &after[end + 2..];
+    }
+    out.push_str(rest);
+    Ok(out)
 }
 
 /// A dotted path into the snapshot (`machines.web.addresses`, `checks.positions.0.runner`).

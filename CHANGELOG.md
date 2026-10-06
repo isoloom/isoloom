@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `message:` once the environment is up
+- A top-level `message:` (Markdown) printed by `isoloom run` when the environment is up and by `isoloom message` any time; `{{ machines.web.services.0.publish }}`-style placeholders take any value of the resolved snapshot (addresses, published ports, the instance). The snapshot carries the rendered text for embedders. Validation catches unbalanced or empty placeholders; one pointing at nothing is an error naming it.
+
 ### `isoloom graph` and `isoloom report`
 - `isoloom graph [--format d2|dot] [-o file]` draws the environment from the resolved snapshot: networks (block, offline), machines (services; the access machine as a person, gateways as diamonds), membership edges with the last octet, `reach` rules as dashed arrows with their ports, Isoloom's router. `-o lab.svg` / `.png` renders with `d2` or `dot` when installed, keeping the source beside it.
 - `isoloom report addressing|services|wiring|resources [--md]`: tables from the same snapshot; `services` says from which networks each port may be reached.

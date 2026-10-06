@@ -387,6 +387,26 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         }
     }
 
+    // The message: balanced placeholders with a path inside.
+    if let Some(m) = &spec.message {
+        let mut rest = m.as_str();
+        while let Some(i) = rest.find("{{") {
+            match rest[i + 2..].find("}}") {
+                None => {
+                    add("message", "a `{{` without its `}}`".into());
+                    break;
+                }
+                Some(j) => {
+                    let path = rest[i + 2..i + 2 + j].trim();
+                    if path.is_empty() || path.split('.').any(|p| p.is_empty()) {
+                        add("message", format!("`{{{{ {path} }}}}` isn't a path like machines.web.addresses.front"));
+                    }
+                    rest = &rest[i + 2 + j + 2..];
+                }
+            }
+        }
+    }
+
     // Groups: names and members.
     for (at, message) in crate::groups::problems(spec) {
         add(&at, message);

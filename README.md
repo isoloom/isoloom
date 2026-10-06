@@ -76,6 +76,7 @@ isoloom resources [DIR]   # machines, CPUs, memory, disk
 isoloom generate [DIR]    # each target's files under .isoloom/ (--target, --images FILE)
 isoloom check [DIR]       # fails when .isoloom/ doesn't match the spec (for CI)
 isoloom inspect [PATH]    # the resolved snapshot (.isoloom/resolved.json), or one part of it
+isoloom message           # how to use the environment (the spec's message, placeholders filled)
 isoloom graph -o lab.svg  # the environment as a diagram (D2 or Graphviz)
 isoloom report services   # tables: addressing, services, wiring, resources
 isoloom defaults          # the defaults in effect (images, Vagrant provider, cloud regions) and their sources

@@ -277,6 +277,17 @@ enum Command {
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
     },
+    /// Print the spec's `message` (how to use the environment), its placeholders filled.
+    Message {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// The message of instance N.
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
+        /// Overrides, as for `generate`.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
+    },
     /// Show the resolved snapshot (what `.isoloom/resolved.json` holds): every address, routes,
     /// targets and checks, worked out from the spec. A dotted path narrows it:
     /// `isoloom inspect machines.web.addresses`, `isoloom inspect targets`.
@@ -701,6 +712,25 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             instance,
             args,
         } => lifecycle::capture(&abs(&dir)?, target.as_deref(), instance, &machine, &network, &args, ssh_key.as_deref()),
+        Command::Message { dir, instance, sets } => {
+            let (spec, _) = load_settings(&dir, None, &sets)?;
+            let problems = core::validate(&spec);
+            if !problems.is_empty() {
+                for p in &problems {
+                    eprintln!("✗ {p}");
+                }
+                return Err("fix the spec first (`isoloom validate`)".into());
+            }
+            let spec = match instance {
+                Some(n) => core::instance::apply(&spec, n)?,
+                None => spec,
+            };
+            match core::resolved::render_message(&spec, instance)? {
+                Some(m) => println!("{}", m.trim_end()),
+                None => eprintln!("the spec has no `message:`"),
+            }
+            Ok(ExitCode::SUCCESS)
+        }
         Command::Graph {
             dir,
             format,
@@ -1122,6 +1152,10 @@ fn run_cmd(
             });
             if let Err(e) = recorded {
                 eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
+            }
+            // The spec's message, now that the environment is up.
+            if !down && let Ok(Some(m)) = core::resolved::render_message(&spec, instance) {
+                println!("\n{}", m.trim_end());
             }
             Ok(ExitCode::SUCCESS)
         }
