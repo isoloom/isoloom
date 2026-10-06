@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.2
+
+### cloud-vm on every cloud
+- `cloud-vm` (one VM per machine) now generates for Azure, Google Cloud, DigitalOcean, Linode and Oracle Cloud, not only AWS. Each cloud is a driver that builds what it can model and declines the rest with a reason (the lab still runs on the clouds that fit it).
+- Azure is faithful to the AWS model: static private addresses, several networks per machine, Windows over WinRM, the Ansible controller.
+- Google Cloud takes single-NIC Linux with the controller; multi-NIC and Windows come later.
+- DigitalOcean takes a single-network single-VM lab; Linode and Oracle Cloud take single-network Linux with static private addresses.
+- Every cloud module matches its `cloud-docker` counterpart's variables and authentication (region, env-based cloud tokens, Azure subscription, Google project creation, Oracle compartment), so one launcher drives both.
+
+### Hardening
+- Volume mount paths reject spaces and `:` (they would corrupt the Docker short mount syntax and the provisioners' `mkdir -p`).
+- Kubernetes `reach` NetworkPolicies are indexed, so a dash in a network name can no longer collide two of them.
+- Spec validation enforces the Kubernetes name-length budget (the `isoloom-<name>` namespace, the `<machine>-published` Service, the `<machine>-<volume>` claim).
+- Proxmox honours a machine's declared DNS servers and domain instead of forcing a public resolver.
+- arm64 is caught on a built access machine (it would otherwise be given an x86-64 cloud image).
+
 ## 0.7.0
 
 ### New targets and commands
