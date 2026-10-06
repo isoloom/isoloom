@@ -63,7 +63,7 @@ fn a_closed_path_to_a_multihomed_machine_is_not_asserted() {
 fn windows_machines_are_not_vantage_points() {
     let derived = checks::derived(&example("corp-ad-basics"));
     assert!(derived.iter().all(|c| c.position != Position::Machine("dc01".into())));
-    assert!(derived.iter().all(|c| c.position != Position::Machine("ws01".into())));
+    assert!(derived.iter().all(|c| c.position != Position::Machine("ws-01".into())));
     // The access machine (no implementation) still is: the runner supplies it.
     assert!(!names(&derived, "user").is_empty());
 }

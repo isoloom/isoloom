@@ -68,7 +68,7 @@ fn groups_become_inventory_groups_and_snapshot_entries() {
     let r = isoloom_core::resolved::resolve(&ad);
     assert_eq!(
         isoloom_core::resolved::lookup(&r, "groups.domain").unwrap(),
-        &serde_json::json!(["dc01", "ws01"])
+        &serde_json::json!(["dc01", "ws-01", "ws-02"])
     );
     // ansible-pair: `vm: {}` completed by common's os; the group lands in the inventory.
     let pair = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ansible-pair")).unwrap();
