@@ -63,9 +63,10 @@ fn azure_gives_a_machine_on_several_networks_an_interface_on_each() {
     assert!(tf.contains("resource \"azurerm_network_interface\" \"gateway_internal\""));
     assert!(tf.contains("ip_forwarding_enabled = true"));
     // Its extra interface is found by MAC: Azure reports it dash-separated and uppercase, so it
-    // is lowered and colon-joined, and interpolated into the set-up (not left a literal).
+    // is lowered and colon-joined, and interpolated into the set-up (not left a literal). Inside
+    // the interpolation the quotes are HCL's own, not escaped (terraform rejects `\"` there).
     assert!(
-        tf.contains("${lower(replace(azurerm_network_interface.gateway_internal.mac_address, \\\"-\\\", \\\":\\\"))}"),
+        tf.contains("${lower(replace(azurerm_network_interface.gateway_internal.mac_address, \"-\", \":\"))}"),
         "{tf}"
     );
     assert!(!tf.contains("$${lower("));
