@@ -928,9 +928,27 @@ pub(super) fn tf_expr(expr: &str) -> String {
     format!("\u{1}{expr}\u{2}")
 }
 
-/// A set-up command as an HCL string, its `tf` expressions interpolated.
+/// A set-up command as an HCL string, its `tf` expressions interpolated. Only the text around
+/// them is escaped: an expression's own quotes (`replace(x, "-", ":")`) stay HCL.
 pub(super) fn hcl_cmd(c: &str) -> String {
-    hcl(c).replace('\u{1}', "${").replace('\u{2}', "}")
+    let mut out = String::new();
+    let mut rest = c;
+    while let Some(start) = rest.find('\u{1}') {
+        let end = rest[start..].find('\u{2}').map(|e| start + e).unwrap_or(rest.len());
+        out.push_str(&hcl_inner(&rest[..start]));
+        out.push_str("${");
+        out.push_str(&rest[start + 1..end]);
+        out.push('}');
+        rest = rest.get(end + 1..).unwrap_or("");
+    }
+    out.push_str(&hcl_inner(rest));
+    format!("\"{out}\"")
+}
+
+/// `hcl` without its surrounding quotes.
+fn hcl_inner(s: &str) -> String {
+    let q = hcl(s);
+    q[1..q.len() - 1].to_string()
 }
 
 /// A single-quoted shell word.

@@ -648,7 +648,7 @@ resource "terraform_data" "admin" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "IF=$(ip -o link | grep -i \"${lower(replace(azurerm_network_interface.admin_office_vlan20.mac_address, \"-\", \":\"))}\" | awk -F': ' '{print $2}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q 10.70.20.50/ || sudo ip addr add 10.70.20.50/24 dev \"$IF\")",
+      "IF=$(ip -o link | grep -i \"${lower(replace(azurerm_network_interface.admin_office_vlan20.mac_address, "-", ":"))}\" | awk -F': ' '{print $2}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q 10.70.20.50/ || sudo ip addr add 10.70.20.50/24 dev \"$IF\")",
       "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' '10.70.20.10 guest' | sudo tee -a /etc/hosts >/dev/null",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/guest.sh'",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
