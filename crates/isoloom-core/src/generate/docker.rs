@@ -217,8 +217,9 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         }
         // A network appliance: its files, its start, its interfaces in the order it expects.
         if let Some(kind) = d.appliance {
+            let w = appliances::wiring(spec, name, m, kind, |n, o| address(spec, n, o));
             let mut mounts = Vec::new();
-            for (file, inside, contents) in appliances::files(spec, name, m, kind, |n, o| address(spec, n, o)) {
+            for (file, inside, contents) in w.files {
                 appliance_files.push(GeneratedFile {
                     path: format!("{OUTPUT_DIR}/{DIR}/appliances/{name}/{file}"),
                     contents,
@@ -226,19 +227,41 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                 mounts.push(s(format!("./appliances/{name}/{file}:{inside}:ro")));
             }
             if let Some(own) = &d.config {
-                mounts.push(s(format!("{ROOT}/{own}:/iol/own.txt:ro")));
+                mounts.push(s(format!("{ROOT}/{own}:{}:ro", w.own_config)));
+            }
+            if let (Some(fw), Some(inside)) = (&d.firmware, w.firmware) {
+                mounts.push(s(format!("{ROOT}/{fw}:{inside}:ro")));
             }
             svc.insert(s("volumes"), Value::Sequence(mounts));
-            svc.insert(s("entrypoint"), list(appliances::entrypoint(kind).into_iter().map(s)));
+            // An emulator Isoloom builds itself (its Dockerfile next to the Compose file).
+            if let Some(dockerfile) = w.build {
+                appliance_files.push(GeneratedFile {
+                    path: format!("{OUTPUT_DIR}/{DIR}/appliances/{name}/build/Dockerfile"),
+                    contents: dockerfile,
+                });
+                svc.remove(s("image"));
+                svc.insert(s("build"), map([("context", s(format!("./appliances/{name}/build")))]));
+            }
+            // `$$`: the script's own variables, not Compose's interpolation.
+            svc.insert(s("entrypoint"), list(w.entrypoint.into_iter().map(|e| s(e.replace('$', "$$")))));
             let mut env = Mapping::new();
-            env.insert(s("IOL_PID"), s(appliances::iol_pid(spec, name).to_string()));
+            for (k, v) in w.environment {
+                env.insert(s(k), s(v));
+            }
             svc.insert(s("environment"), Value::Mapping(env));
-            svc.insert(s("cap_add"), list([s("NET_ADMIN"), s("NET_RAW")]));
+            if w.privileged {
+                svc.insert(s("privileged"), Value::Bool(true));
+            } else {
+                svc.insert(s("cap_add"), list([s("NET_ADMIN"), s("NET_RAW")]));
+            }
             let mut nets = Mapping::new();
             nets.insert(
                 s(appliances::MGMT_NETWORK),
+                // The interface names the image expects, set outright (Compose 2.36+, Docker 28.1+):
+                // the order Docker attaches networks in isn't theirs to rely on.
                 map([
                     ("ipv4_address", s(appliances::mgmt_address(spec, name).to_string())),
+                    ("interface_name", s("eth0")),
                     ("priority", Value::Number(1000.into())),
                 ]),
             );
@@ -247,6 +270,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                     s(net.as_str()),
                     map([
                         ("ipv4_address", s(address(spec, net, *octet).to_string())),
+                        ("interface_name", s(format!("eth{}", k + 1))),
                         ("priority", Value::Number((999 - k as u64).into())),
                     ]),
                 );

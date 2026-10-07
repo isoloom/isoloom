@@ -66,6 +66,7 @@ impl Table {
                     idle: false,
                     appliance: None,
                     config: None,
+                    firmware: None,
                 });
                 m.supplied = true;
             }

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### More network appliances: Cisco QEMU images and Dynamips
+- `appliance: cisco-vios | cisco-viosl2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
+- `appliance: cisco-dynamips` with `docker.firmware: <your IOS .bin>`: a Cisco 7200 emulated by Dynamips, in a container Isoloom builds (Ubuntu's `dynamips`); the data interfaces bind to `FastEthernet0/0`, then `1/0`, `1/1`, `2/0`... on PA-2FE-TX adapters. No KVM needed. Example: cisco-dynamips.
+- Appliances' interfaces are named outright (`interface_name`, Compose 2.36+ / Docker 28.1+): Docker's own attach order turned out not to follow `priority`.
+
 ### Network appliances: Cisco IOL
 - `docker: { image, appliance: cisco-iol | cisco-iol-l2, config }`: a router or switch OS in a container, wired the way its image expects. For Cisco IOL as vrnetlab packages it (`vrnetlab/cisco_iol:<version>`): the management port (`Ethernet0/0`, its own VRF) on Isoloom's management network (10.255.255.0/24), the machine's networks in order as `Ethernet0/1`, `0/2`, `0/3`, `1/0`..., the NETMAP and iouyap files, `IOL_PID`, and a startup configuration with the hostname, `admin`/`admin` over SSH and each interface's address from the spec, followed by the machine's own `config` (OSPF, ACLs). The container gives its data addresses to IOS. Docker targets only; an appliance can't be the access machine or run checks. Isoloom ships no images: build them with vrnetlab from a release you're licensed for. Example: cisco-iol (two sites with OSPF).
 

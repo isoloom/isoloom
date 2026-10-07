@@ -415,6 +415,12 @@ fn base_table() -> Vec<Row> {
             NOT_A_CONTAINER,
         ),
         row(
+            "machines.*.docker.firmware",
+            done("the IOS image a Dynamips 7200 boots, in a container Isoloom builds", "cisco-dynamips"),
+            NOT_A_CONTAINER,
+            NOT_A_CONTAINER,
+        ),
+        row(
             "machines.*.docker.config",
             done("added to the generated startup configuration when the container starts", "cisco-iol"),
             NOT_A_CONTAINER,

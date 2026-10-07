@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Two classic Cisco 7200 routers emulated by Dynamips, each the gateway of its site, OSPF
+# between them. Isoloom builds the emulator's container (Debian's dynamips); the IOS image is
+# yours: replace images/c7200.bin (an empty placeholder here) with a 7200 IOS image you're
+# licensed for. No KVM needed; Dynamips is slow but light.
+version: 1
+name: cisco-dynamips
+
+networks:
+  site-a: { cidr: 10.93.1.0/24, gateway: r1 }
+  site-b: { cidr: 10.93.2.0/24, gateway: r2 }
+  wan:    { cidr: 10.93.0.0/29, internet: false }
+
+machines:
+  r1:
+    networks: { site-a: 1, wan: 2 }      # FastEthernet0/0, 1/0
+    docker:
+      appliance: cisco-dynamips
+      firmware: images/c7200.bin
+      config: configs/r1.cfg
+
+  r2:
+    networks: { site-b: 1, wan: 3 }
+    docker:
+      appliance: cisco-dynamips
+      firmware: images/c7200.bin
+      config: configs/r2.cfg
+
+  host-a:
+    networks: { site-a: 10 }
+    docker: { image: "alpine:3.20", idle: true }
+
+  host-b:
+    networks: { site-b: 10 }
+    services: [{ port: 80, http: true }]
+    docker: { image: "nginx:1.27-alpine" }
+
+checks:
+  - name: site A reaches site B through both routers
+    from: host-a
+    http: http://host-b/
+    expect: 200
+    wait: 600
