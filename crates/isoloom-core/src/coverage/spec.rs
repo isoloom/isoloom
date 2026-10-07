@@ -234,8 +234,14 @@ fn base_table() -> Vec<Row> {
                 "a Compose network per VLAN (`<lan>-vlan<id>`); a machine on several VLANs of the LAN gets one 802.1Q trunk (`<lan>.<id>` subinterfaces) through a switch container",
                 "vlan-office",
             ),
-            done("a private network per VLAN", "vlan-office"),
-            done("an SDN VNet per VLAN", "vlan-office"),
+            done(
+                "a private network per VLAN; a VM on several VLANs of the LAN gets an 802.1Q trunk inside it (`<lan>.<id>`)",
+                "vlan-office",
+            ),
+            done(
+                "an SDN VNet per VLAN; a VM on several VLANs of the LAN gets an 802.1Q trunk inside it (`<lan>.<id>`)",
+                "vlan-office",
+            ),
         ),
         row(
             "networks.*.vlans.*.internet",

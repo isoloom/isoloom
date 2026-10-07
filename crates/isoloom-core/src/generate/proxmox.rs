@@ -18,7 +18,7 @@
 
 use std::fmt::Write;
 
-use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, header, router, start_order};
+use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, header, router, start_order, trunks};
 use crate::checks::{self, Position, Probe};
 use crate::images;
 use crate::model::{Spec, Target};
@@ -359,6 +359,9 @@ locals {
         let disk = m.resources.and_then(|r| r.disk_gb).unwrap_or(crate::DEFAULT_DISK_GB);
 
         let mut runcmd: Vec<String> = Vec::new();
+        // Its 802.1Q trunks, in the VM (see `trunks`; Proxmox's bridges learn the trunk's MAC).
+        let vm_trunks = trunks::vm_trunks(spec);
+        runcmd.extend(trunks::of(&vm_trunks, name).flat_map(|t| trunks::vm_commands(spec, t, |n, o| address(spec, n, o))));
         let hosts: Vec<String> = spec
             .machines
             .keys()

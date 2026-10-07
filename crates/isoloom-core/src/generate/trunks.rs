@@ -179,3 +179,69 @@ pub fn machine_ready(t: &Trunk) -> String {
         .collect::<Vec<_>>()
         .join(" && ")
 }
+
+// VMs: the trunk inside the machine. The hypervisor carries each VLAN on its own network, one
+// NIC each, as for any network; inside, a veth pair stands for the trunk: its end named after
+// the LAN holds the addresses on `<lan>.<id>`, the other end's `.<id>` joins a bridge with the
+// VLAN's NIC. Tagged frames cross the veth (a capture on `<lan>` shows them). Each `<lan>.<id>`
+// takes its NIC's MAC address and the NIC, now only a bridge port, a local one, so the
+// hypervisor still sees only the MAC it gave the VM (no promiscuous mode, on every provider).
+
+/// The trunks of VM machines: a Linux VM on two or more VLANs of the same LAN.
+pub fn vm_trunks(spec: &Spec) -> Vec<Trunk> {
+    let mut out: Vec<Trunk> = Vec::new();
+    for (name, m) in &spec.machines {
+        if m.vm.as_ref().is_none_or(|v| v.os.starts_with("windows")) {
+            continue;
+        }
+        for (net, octet) in &m.networks {
+            let Some((lan, id)) = &spec.networks[net].vlan else { continue };
+            match out.iter_mut().find(|t| &t.machine == name && &t.lan == lan) {
+                Some(t) => t.vlans.push((net.clone(), *id, *octet)),
+                None => out.push(Trunk {
+                    lan: lan.clone(),
+                    machine: name.clone(),
+                    vlans: vec![(net.clone(), *id, *octet)],
+                }),
+            }
+        }
+    }
+    out.retain(|t| t.vlans.len() >= 2);
+    out
+}
+
+/// The veth's other end, inside the VM (8 characters of the LAN, `-s`, then `.<id>` fits 15).
+fn vm_peer(lan: &str) -> String {
+    format!("{}-s", lan.chars().take(8).collect::<String>().trim_end_matches('-'))
+}
+
+/// Commands that build a VM's trunk (once per boot: they do nothing when it's there).
+pub fn vm_commands(spec: &Spec, t: &Trunk, address: impl Fn(&str, u8) -> std::net::Ipv4Addr) -> Vec<String> {
+    let name = interface(&t.lan);
+    let peer = vm_peer(&t.lan);
+    let mut steps = vec![
+        format!("ip link add {name} type veth peer name {peer}"),
+        format!("ip link set {name} up"),
+        format!("ip link set {peer} up"),
+    ];
+    for (net, id, octet) in &t.vlans {
+        let addr = address(net, *octet);
+        let len = Cidr::parse(&spec.networks[net].cidr).expect("validated cidr").len;
+        // The NIC keeps a local MAC; `<lan>.<id>` takes the one the hypervisor gave it.
+        let local = format!("02:1f:{}", addr.octets().map(|o| format!("{o:02x}")).join(":"));
+        steps.push(format!(
+            "{} && MAC=$(cat /sys/class/net/$IF/address) && ip addr flush dev $IF && ip link set $IF address {local}",
+            find_by_address(addr)
+        ));
+        steps.push(format!(
+            "ip link add br{id} type bridge && ip link set $IF master br{id} && ip link set br{id} up"
+        ));
+        steps.push(format!(
+            "ip link add link {peer} name {peer}.{id} type vlan id {id} && ip link set {peer}.{id} master br{id} && ip link set {peer}.{id} up"
+        ));
+        steps.push(format!(
+            "ip link add link {name} name {name}.{id} address $MAC type vlan id {id} && ip addr add {addr}/{len} dev {name}.{id} && ip link set {name}.{id} up"
+        ));
+    }
+    vec![format!("ip link show {name} >/dev/null 2>&1 || {{ {}; }}", steps.join(" && "))]
+}
