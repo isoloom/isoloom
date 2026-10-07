@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.1
 
 ### Proxmox: checks and a way in
 - `isoloom test proxmox` runs the checks: a runner per position in `.isoloom/proxmox/checks/<position>.sh`, piped over SSH to the machine it stands for through the router (`ssh -J isoloom@<address>`), the controller or the first machine for positions that aren't a VM. A machine whose runner runs a `script:` gets the project in cloud-init even without provisioning. The module gains `machines` (each VM's first address), `ssh_user` and `checks` outputs.
