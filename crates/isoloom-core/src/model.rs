@@ -305,6 +305,27 @@ pub struct DockerImpl {
     /// exits at once): keep the container running idle, as a machine to work from.
     #[serde(default)]
     pub idle: bool,
+    /// The image is a network appliance Isoloom knows how to wire (a router or switch OS in a
+    /// container): its management port, interface order and startup configuration are set the
+    /// way the image expects, its addresses go into that configuration. Docker only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub appliance: Option<Appliance>,
+    /// An appliance's own configuration (a file in the project), added to the one Isoloom
+    /// generates (hostname, credentials, interfaces and their addresses).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<String>,
+}
+
+/// A network appliance image (see [`DockerImpl::appliance`]). The images aren't Isoloom's to
+/// ship: the user builds them from software they are licensed for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Appliance {
+    /// Cisco IOL (IOS on Linux, from Cisco Modeling Labs) as vrnetlab packages it
+    /// (`vrnetlab/cisco_iol:<version>`): a router.
+    CiscoIol,
+    /// Cisco IOL-L2 (`vrnetlab/cisco_iol:L2-<version>`): a switch.
+    CiscoIolL2,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

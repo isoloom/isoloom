@@ -2,6 +2,9 @@
 //! of the spec (no file system access), so `isoloom check` can regenerate in memory and
 //! compare with what's committed. Output lives under `.isoloom/<target>/` in the project.
 
+mod appliances;
+/// The network appliances' management network (see `docker.appliance`).
+pub const APPLIANCE_MGMT_CIDR: &str = appliances::MGMT_CIDR;
 mod cloud_docker;
 mod cloud_vm;
 mod cloud_vm_others;
@@ -104,6 +107,15 @@ pub fn generate_instance(spec: &Spec, target: Target, n: u8) -> Result<Vec<Gener
 fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
     if !effective(spec).contains(&target) {
         return Err(GenerateError::NotPossible(target));
+    }
+    // Network appliances run on Docker Compose only (their wiring is Docker's).
+    if !matches!(target, Target::Docker | Target::Hosted | Target::CloudDocker | Target::DockerVm)
+        && let Some((name, _, _)) = appliances::appliances(spec).first()
+    {
+        return Err(GenerateError::Unsupported {
+            target,
+            what: format!("machine `{name}` is a network appliance (`docker.appliance`), which runs on the Docker targets"),
+        });
     }
     match target {
         // A hosting service runs the same Compose file.

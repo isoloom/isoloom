@@ -266,7 +266,8 @@ fn declared(d: &Declared, default: &Position) -> Option<Resolved> {
 
 /// Whether a machine can run checks: Linux (or supplied by the runner), not Windows.
 pub fn can_run_checks(m: &Machine) -> bool {
-    !m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os))
+    // An appliance's container isn't where its traffic is (that's the OS inside it).
+    !m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os)) && m.docker.as_ref().is_none_or(|d| d.appliance.is_none())
 }
 
 /// Whether `from` may open connections to `to`'s address on `network`, port `port`: they share

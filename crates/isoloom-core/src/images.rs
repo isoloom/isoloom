@@ -64,6 +64,8 @@ impl Table {
                     build: None,
                     init: Vec::new(),
                     idle: false,
+                    appliance: None,
+                    config: None,
                 });
                 m.supplied = true;
             }

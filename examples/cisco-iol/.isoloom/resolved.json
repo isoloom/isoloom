@@ -1,0 +1,251 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "cisco-iol",
+  "instance": null,
+  "inputs": [],
+  "networks": {
+    "site-a": {
+      "cidr": "10.91.1.0/24",
+      "docker_cidr": "10.91.1.0/24",
+      "internet": true,
+      "gateway": "r1",
+      "gateway_address": "10.91.1.1",
+      "router": null,
+      "controller": "10.91.1.253"
+    },
+    "site-b": {
+      "cidr": "10.91.2.0/24",
+      "docker_cidr": "10.91.2.0/24",
+      "internet": true,
+      "gateway": "r2",
+      "gateway_address": "10.91.2.1",
+      "router": null,
+      "controller": "10.91.2.253"
+    },
+    "wan": {
+      "cidr": "10.91.0.0/29",
+      "docker_cidr": "10.91.0.0/29",
+      "internet": false,
+      "gateway": null,
+      "gateway_address": "10.91.0.1",
+      "router": null,
+      "controller": "10.91.0.5"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "r1": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker"
+      ],
+      "arch": "amd64",
+      "os": null,
+      "windows": false,
+      "addresses": {
+        "site-a": "10.91.1.1",
+        "wan": "10.91.0.2"
+      },
+      "docker_addresses": {
+        "site-a": "10.91.1.1",
+        "wan": "10.91.0.2"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [
+        "site-a"
+      ],
+      "routes": [
+        {
+          "to": "10.91.2.0/24",
+          "via": "10.91.0.3"
+        }
+      ],
+      "default_gateway": null,
+      "offline": false
+    },
+    "r2": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker"
+      ],
+      "arch": "amd64",
+      "os": null,
+      "windows": false,
+      "addresses": {
+        "site-b": "10.91.2.1",
+        "wan": "10.91.0.3"
+      },
+      "docker_addresses": {
+        "site-b": "10.91.2.1",
+        "wan": "10.91.0.3"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [
+        "site-b"
+      ],
+      "routes": [
+        {
+          "to": "10.91.1.0/24",
+          "via": "10.91.0.2"
+        }
+      ],
+      "default_gateway": null,
+      "offline": false
+    },
+    "host-a": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker"
+      ],
+      "arch": "amd64",
+      "os": null,
+      "windows": false,
+      "addresses": {
+        "site-a": "10.91.1.10"
+      },
+      "docker_addresses": {
+        "site-a": "10.91.1.10"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": "10.91.1.1",
+      "offline": false
+    },
+    "host-b": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker"
+      ],
+      "arch": "amd64",
+      "os": null,
+      "windows": false,
+      "addresses": {
+        "site-b": "10.91.2.10"
+      },
+      "docker_addresses": {
+        "site-b": "10.91.2.10"
+      },
+      "services": [
+        {
+          "port": 80,
+          "name": null,
+          "http": true,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": "10.91.2.1",
+      "offline": false
+    }
+  },
+  "start_order": [
+    "r1",
+    "r2",
+    "host-a",
+    "host-b"
+  ],
+  "clones": {},
+  "tools": {},
+  "groups": {},
+  "router": null,
+  "controller": {
+    "addresses": {
+      "site-a": "10.91.1.253",
+      "site-b": "10.91.2.253",
+      "wan": "10.91.0.5"
+    }
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes"
+    ],
+    "generated": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker"
+    ],
+    "refused": {
+      "kubernetes": "machine `r1` is a network appliance (`docker.appliance`), which runs on the Docker targets"
+    },
+    "not_possible": {
+      "hybrid": "only when some machines are containers and others are VMs",
+      "vagrant": "needs `vm:` on r1, r2, host-a, host-b",
+      "proxmox": "needs `vm:` on r1, r2, host-a, host-b",
+      "cloud-vm": "needs `vm:` on r1, r2, host-a, host-b",
+      "external": "needs `external:` on r1, r2, host-a, host-b"
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "host-a",
+        "machine": "host-a",
+        "runner": "isoloom-check-host-a",
+        "checks": [
+          {
+            "name": "site A reaches site B through both routers",
+            "derived": false,
+            "kind": "http",
+            "target": "http://host-b/",
+            "expect": "200",
+            "wait": 180
+          },
+          {
+            "name": "host-b:80 blocked from host-a",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.91.2.10:80",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      }
+    ]
+  }
+}
