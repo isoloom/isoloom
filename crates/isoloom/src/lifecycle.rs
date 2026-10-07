@@ -635,8 +635,9 @@ pub fn capture(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: 
     Ok(if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE })
 }
 
-/// `isoloom tc show|set|disable|reset <network>`: netem on the router's interface into the
-/// network, on a running environment (Docker and local VMs, where Isoloom's router exists).
+/// `isoloom tc show|set|disable|reset <network>`: netem on a running environment (Docker and
+/// local VMs), wherever the spec's `tc` applies: the router's interface into the network and
+/// each machine's own interface on it.
 pub fn tc(dir: &Path, target: Option<&str>, instance: Option<u8>, action: &str, network: &str, wanted: core::Tc) -> Res<ExitCode> {
     let spec = load_as(dir, instance)?;
     let (t, _) = pick(dir, target, instance, &spec)?;
@@ -644,37 +645,66 @@ pub fn tc(dir: &Path, target: Option<&str>, instance: Option<u8>, action: &str, 
     if let Some(gw) = &net.gateway {
         return Err(format!("`{network}` is routed by its gateway machine `{gw}`, not by Isoloom's router").into());
     }
+    let docker = matches!(t, Target::Docker | Target::Hosted);
+    if !docker && !matches!(t, Target::Vagrant | Target::Hybrid) {
+        return Err(format!("`tc` on {} comes next (Docker and local VMs today)", t.id()).into());
+    }
     let r = core::resolved::resolve_with(&spec, instance);
-    let addr = core::resolved::lookup(&r, &format!("networks.{network}.router"))
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| format!("Isoloom's router isn't on `{network}` (no `reach` rule touches it)"))?
-        .to_string();
-    let find = format!(
-        "IF=$(ip -o -4 addr show | awk '$4 ~ /^{}\\//{{print $2}}' | head -n 1); [ -n \"$IF\" ] || {{ echo 'no interface on {network}' >&2; exit 1; }}",
-        addr.replace('.', "\\.")
-    );
-    let command = match action {
-        "show" => format!("{find}; tc qdisc show dev \"$IF\""),
-        "disable" => format!("{find}; tc qdisc del dev \"$IF\" root 2>/dev/null; echo \"{network}: impairment off\""),
-        "set" => {
-            let netem = wanted.netem();
-            if netem.is_empty() {
-                return Err("`set` takes --delay, --jitter, --loss and/or --rate".into());
-            }
-            format!("{find}; tc qdisc replace dev \"$IF\" root netem {netem} && echo \"{network}: {netem}\"")
+    // Where: (who, the address its interface on the network has, how to run a command there).
+    let mut at: Vec<(String, String, String)> = Vec::new();
+    if let Some(a) = core::resolved::lookup(&r, &format!("networks.{network}.router")).and_then(|v| v.as_str()) {
+        at.push((
+            core::generate::router_name().to_string(),
+            a.to_string(),
+            core::generate::router_name().to_string(),
+        ));
+    }
+    for (name, m) in &spec.machines {
+        let windows = m.docker.is_none() && m.vm.as_ref().is_some_and(|v| v.os.starts_with("windows"));
+        if !m.networks.contains_key(network) || windows {
+            continue;
         }
-        "reset" => match &net.tc {
-            Some(tc) => format!(
-                "{find}; tc qdisc replace dev \"$IF\" root netem {0} && echo \"{network}: {0} (the spec's)\"",
-                tc.netem()
-            ),
-            None => format!("{find}; tc qdisc del dev \"$IF\" root 2>/dev/null; echo \"{network}: the spec sets no impairment; off\""),
-        },
-        other => return Err(format!("unknown action `{other}`: show, set, disable or reset").into()),
-    };
+        let key = if docker { "docker_addresses" } else { "addresses" };
+        let Some(a) = core::resolved::lookup(&r, &format!("machines.{name}.{key}.{network}")).and_then(|v| v.as_str()) else {
+            continue;
+        };
+        // On Docker, the machine's network sidecar has `tc` and the right to use it.
+        let host = if docker { format!("{name}-routes") } else { name.clone() };
+        if docker && m.docker.is_none() {
+            continue;
+        }
+        at.push((name.clone(), a.to_string(), host));
+    }
+    if at.is_empty() {
+        return Err(format!("nothing on `{network}` to impair").into());
+    }
     let out = dir.join(core::instance::output_dir(instance));
-    let mut c = match t {
-        Target::Docker | Target::Hosted => {
+    let mut ok = true;
+    for (who, addr, host) in at {
+        let find = format!(
+            "IF=$(ip -o -4 addr show | awk '$4 ~ /^{}\\//{{print $2}}' | head -n 1); [ -n \"$IF\" ] || {{ echo 'no interface on {network}' >&2; exit 1; }}",
+            addr.replace('.', "\\.")
+        );
+        let command = match action {
+            "show" => format!("{find}; echo \"{who}:\"; tc qdisc show dev \"$IF\""),
+            "disable" => format!("{find}; tc qdisc del dev \"$IF\" root 2>/dev/null; echo \"{who} on {network}: impairment off\""),
+            "set" => {
+                let netem = wanted.netem();
+                if netem.is_empty() {
+                    return Err("`set` takes --delay, --jitter, --loss and/or --rate".into());
+                }
+                format!("{find}; tc qdisc replace dev \"$IF\" root netem {netem} && echo \"{who} on {network}: {netem}\"")
+            }
+            "reset" => match &net.tc {
+                Some(tc) => format!(
+                    "{find}; tc qdisc replace dev \"$IF\" root netem {0} && echo \"{who} on {network}: {0} (the spec's)\"",
+                    tc.netem()
+                ),
+                None => format!("{find}; tc qdisc del dev \"$IF\" root 2>/dev/null; echo \"{who} on {network}: the spec sets no impairment; off\""),
+            },
+            other => return Err(format!("unknown action `{other}`: show, set, disable or reset").into()),
+        };
+        let mut c = if docker {
             let mut c = Command::new("docker");
             c.args([
                 "compose",
@@ -684,25 +714,23 @@ pub fn tc(dir: &Path, target: Option<&str>, instance: Option<u8>, action: &str, 
                 &out.join("docker/compose.yml").display().to_string(),
                 "exec",
                 "-T",
-                core::generate::router_name(),
+                &host,
                 "sh",
                 "-c",
                 &command,
             ]);
             c.current_dir(dir);
             c
-        }
-        Target::Vagrant | Target::Hybrid => {
+        } else {
             let sub = if t == Target::Vagrant { "vagrant" } else { "hybrid" };
             let mut c = Command::new("vagrant");
             c.current_dir(out.join(sub));
-            c.args(["ssh", "isoloom-router", "-c", &format!("sudo sh -c {}", sq(&command))]);
+            c.args(["ssh", &host, "-c", &format!("sudo sh -c {}", sq(&command))]);
             c
-        }
-        other => return Err(format!("`tc` on {} comes next (Isoloom's router exists on Docker and local VMs)", other.id()).into()),
-    };
-    let status = c.status().map_err(|e| tool_error(&c, e))?;
-    Ok(if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+        };
+        ok &= c.status().map_err(|e| tool_error(&c, e))?.success();
+    }
+    Ok(if ok { ExitCode::SUCCESS } else { ExitCode::FAILURE })
 }
 
 /// An external machine's SSH endpoint, as `.isoloom/external/machines.json` records it.

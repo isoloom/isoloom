@@ -1,4 +1,5 @@
-//! `networks.*.tc`: link impairment on Isoloom's router, validated and generated.
+//! `networks.*.tc`: link impairment on Isoloom's router and on the machines' own interfaces,
+//! validated and generated.
 
 use std::path::Path;
 
@@ -28,7 +29,7 @@ fn the_router_applies_netem_on_its_interface_into_the_network() {
 }
 
 #[test]
-fn impairment_is_checked_and_needs_the_router() {
+fn impairment_is_checked() {
     let p = |nets: &str, reach: &str| -> Vec<String> {
         let yaml = format!(
             "version: 1\nname: t\nnetworks:\n{nets}{reach}machines:\n  a: {{ networks: {{ x: 5 }}, services: [{{ port: 80 }}], docker: {{ image: x }} }}\n  b: {{ networks: {{ y: 5 }}, docker: {{ image: x }} }}\n"
@@ -45,6 +46,31 @@ fn impairment_is_checked_and_needs_the_router() {
     assert!(p("  x: { cidr: 10.9.0.0/24, tc: { rate: 10mbps2 } }\n  y: { cidr: 10.9.1.0/24 }\n", reach)[0].contains("isn't a rate"));
     assert!(p("  x: { cidr: 10.9.0.0/24, tc: { loss: 120 } }\n  y: { cidr: 10.9.1.0/24 }\n", reach)[0].contains("0 to 100"));
     assert!(p("  x: { cidr: 10.9.0.0/24, tc: {} }\n  y: { cidr: 10.9.1.0/24 }\n", reach)[0].contains("say what to impair"));
-    // Without a reach rule there is no router on the network.
-    assert!(p("  x: { cidr: 10.9.0.0/24, tc: { delay: 50ms } }\n  y: { cidr: 10.9.1.0/24 }\n", "")[0].contains("router isn't on"));
+    // Without a reach rule there is no router on the network: the machines' own interfaces
+    // carry it (a direct link between two machines).
+    assert_eq!(
+        p("  x: { cidr: 10.9.0.0/24, tc: { delay: 50ms } }\n  y: { cidr: 10.9.1.0/24 }\n", ""),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn machines_apply_netem_on_their_own_interface() {
+    let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/slow-link")).unwrap();
+    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    // `web` is on `far`: its network sidecar has `tc` (netshoot) and shapes its interface there.
+    let sidecar = compose.split("\n  web-routes:\n").nth(1).expect("web has a network sidecar");
+    assert!(sidecar.contains("netshoot"), "{sidecar}");
+    assert!(
+        sidecar.contains("10\\.75\\.2\\.10") && sidecar.contains("netem delay 80ms 10ms loss 1% rate 10mbit"),
+        "{sidecar}"
+    );
+    assert!(sidecar.contains("tc qdisc show | grep -q netem"));
+    let vf = generate(&spec, Target::Vagrant)
+        .unwrap()
+        .into_iter()
+        .find(|f| f.path.ends_with("Vagrantfile"))
+        .unwrap()
+        .contents;
+    assert!(vf.contains("name: \"tc\"") && vf.contains("this machine's interfaces"), "{vf}");
 }

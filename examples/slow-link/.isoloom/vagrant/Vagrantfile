@@ -150,6 +150,32 @@ Vagrant.configure("2") do |config|
       v.memory = 1024
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.75.1.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "tc", inline: <<~'SH'
+      mkdir -p /etc/isoloom
+      cat > /etc/isoloom/tc.sh <<'TC'
+      #!/bin/sh
+      # Link impairment (networks.*.tc) on this machine's interfaces.
+      IF=$(ip -o -4 addr show | awk '$4 ~ /^10\.75\.2\.10\//{print $2}' | head -n 1); [ -n "$IF" ] && tc qdisc replace dev "$IF" root netem delay 80ms 10ms loss 1% rate 10mbit
+      TC
+      chmod +x /etc/isoloom/tc.sh
+      cat > /etc/systemd/system/isoloom-tc.service <<'UNIT'
+      [Unit]
+      Description=Link impairment on the isoloom machine
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/etc/isoloom/tc.sh
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+      systemctl daemon-reload
+      systemctl enable isoloom-tc.service
+      systemctl restart isoloom-tc.service
+    SH
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/routes.sh <<'ROUTES'

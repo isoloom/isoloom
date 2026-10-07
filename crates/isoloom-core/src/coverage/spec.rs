@@ -189,23 +189,35 @@ fn base_table() -> Vec<Row> {
         ),
         common(
             "networks.*.tc.delay",
-            done("netem on the router's interface into the network", "slow-link"),
-            done("netem on the router VM, re-applied at boot", "slow-link"),
+            done(
+                "netem on the router's interface into the network and each machine's own (its network sidecar)",
+                "slow-link",
+            ),
+            done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
         ),
         common(
             "networks.*.tc.jitter",
-            done("netem on the router's interface into the network", "slow-link"),
-            done("netem on the router VM, re-applied at boot", "slow-link"),
+            done(
+                "netem on the router's interface into the network and each machine's own (its network sidecar)",
+                "slow-link",
+            ),
+            done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
         ),
         common(
             "networks.*.tc.loss",
-            done("netem on the router's interface into the network", "slow-link"),
-            done("netem on the router VM, re-applied at boot", "slow-link"),
+            done(
+                "netem on the router's interface into the network and each machine's own (its network sidecar)",
+                "slow-link",
+            ),
+            done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
         ),
         common(
             "networks.*.tc.rate",
-            done("netem on the router's interface into the network", "slow-link"),
-            done("netem on the router VM, re-applied at boot", "slow-link"),
+            done(
+                "netem on the router's interface into the network and each machine's own (its network sidecar)",
+                "slow-link",
+            ),
+            done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
         ),
         row(
             "networks.*.docker.cidr",

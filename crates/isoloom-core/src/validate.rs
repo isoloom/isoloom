@@ -470,7 +470,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         }
     }
 
-    // Link impairment: well-formed, and on a network Isoloom's router is on.
+    // Link impairment: well-formed. It applies on the machines' interfaces and the router's.
     for (name, net) in &spec.networks {
         let Some(tc) = &net.tc else { continue };
         let at = format!("networks.{name}.tc");
@@ -511,15 +511,6 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             add(
                 &at,
                 format!("`{name}` is routed by its gateway machine, which owns its link; `tc` applies on Isoloom's router"),
-            );
-        } else if !spec.reach.iter().any(|r| {
-            (r.from == *name || r.to == *name)
-                && spec.networks.get(&r.from).is_some_and(|n| n.gateway.is_none())
-                && spec.networks.get(&r.to).is_some_and(|n| n.gateway.is_none())
-        }) {
-            add(
-                &at,
-                format!("Isoloom's router isn't on `{name}`: add a `reach` rule to or from it (impairment applies to traffic entering through the router)"),
             );
         }
     }

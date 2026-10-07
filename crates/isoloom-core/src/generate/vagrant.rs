@@ -233,6 +233,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             );
         }
 
+        // Link impairment on its own interfaces, so traffic within a network with `tc` is
+        // impaired too (the router covers what it forwards into it).
+        if let Some(script) = router::machine_tc_script(spec, m, |n, o| address(spec, n, o)) {
+            let _ = writeln!(
+                out,
+                "    m.vm.provision \"shell\", name: \"tc\", inline: <<~'SH'\n{}    SH",
+                indent(&tc_unit(&script, "machine"), 6)
+            );
+        }
+
         // Routes to the other networks through the router and gateways, as a boot-time
         // service. The default route through a gateway comes after provisioning (below).
         let cmds = router::route_commands(spec, name, m, false);
@@ -490,10 +500,11 @@ fn tool_vm(spec: &Spec, index: usize, out: &mut String) {
     out.push_str("  end\n");
 }
 
-/// Link impairment on the router, re-applied at every boot (netem doesn't survive one).
-fn tc_unit(script: &str) -> String {
+/// Link impairment on a VM's interfaces (the router's, or a machine's own), re-applied at every
+/// boot (netem doesn't survive one).
+fn tc_unit(script: &str, whose: &str) -> String {
     format!(
-        "mkdir -p /etc/isoloom\ncat > /etc/isoloom/tc.sh <<'TC'\n#!/bin/sh\n# Link impairment (networks.*.tc) on this router's interfaces.\n{script}TC\nchmod +x /etc/isoloom/tc.sh\ncat > /etc/systemd/system/isoloom-tc.service <<'UNIT'\n[Unit]\nDescription=Link impairment on the isoloom router\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/tc.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-tc.service\nsystemctl restart isoloom-tc.service\n"
+        "mkdir -p /etc/isoloom\ncat > /etc/isoloom/tc.sh <<'TC'\n#!/bin/sh\n# Link impairment (networks.*.tc) on this {whose}'s interfaces.\n{script}TC\nchmod +x /etc/isoloom/tc.sh\ncat > /etc/systemd/system/isoloom-tc.service <<'UNIT'\n[Unit]\nDescription=Link impairment on the isoloom {whose}\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/tc.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-tc.service\nsystemctl restart isoloom-tc.service\n"
     )
 }
 
@@ -561,7 +572,7 @@ fn router_vm(spec: &Spec, out: &mut String) {
     let script = format!(
         "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{}",
         router::nftables(spec),
-        router::tc_script(spec).map(|t| tc_unit(&t)).unwrap_or_default()
+        router::tc_script(spec).map(|t| tc_unit(&t, "router")).unwrap_or_default()
     );
     let _ = writeln!(
         out,

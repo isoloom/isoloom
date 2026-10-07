@@ -559,7 +559,20 @@ fn route_commands(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
     if offline(spec, name, m) && m.networks.keys().any(|n| !internal(spec, n)) {
         cmds.push("(ip route del default 2>/dev/null || true)".into());
     }
+    // `tc` on its own interfaces, one subshell per line (`$$`: not Compose's interpolation).
+    if let Some(script) = router::machine_tc_script(spec, m, |n, o| address(spec, n, o)) {
+        cmds.extend(script.lines().map(|l| format!("({})", l.replace('$', "$$"))));
+    }
     cmds
+}
+
+/// The sidecar image of a machine on a network with `tc`: one with `tc` (the utility image has
+/// none, and an offline machine couldn't install it).
+const TC_IMAGE: &str = "nicolaka/netshoot:v0.13";
+
+/// Whether a machine is on a network with `tc`.
+fn impaired(spec: &Spec, m: &Machine) -> bool {
+    m.networks.keys().any(|n| spec.networks[n].tc.is_some())
 }
 
 /// Whether a network is Docker's internal network: offline, nothing routes, and no machine
@@ -588,7 +601,7 @@ fn own_default(spec: &Spec, name: &str, m: &Machine) -> Option<std::net::Ipv4Add
 /// A container in `host`'s network namespace that sets the routes of machine `name`.
 fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     let mut r = Mapping::new();
-    r.insert(s("image"), s(UTILITY_IMAGE));
+    r.insert(s("image"), s(if impaired(spec, m) { TC_IMAGE } else { UTILITY_IMAGE }));
     r.insert(s("network_mode"), s(format!("service:{host}")));
     r.insert(s("cap_add"), list([s("NET_ADMIN")]));
     // Sets the routes, then stays (idle) so the healthcheck can confirm them and `up --wait`
@@ -607,6 +620,9 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     }
     if offline(spec, name, m) && m.networks.keys().any(|n| !internal(spec, n)) {
         ready.push("! ip route | grep -q '^default'".into());
+    }
+    if impaired(spec, m) {
+        ready.push("tc qdisc show | grep -q netem".into());
     }
     r.insert(
         s("healthcheck"),

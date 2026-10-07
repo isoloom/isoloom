@@ -65,18 +65,18 @@ services:
       isoloom.service.80: http:80
     restart: unless-stopped
   web-routes:
-    image: alpine:3.20
+    image: nicolaka/netshoot:v0.13
     network_mode: service:web
     cap_add:
     - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.75.1.0/24 via 10.75.2.254 && exec sleep infinity
+    - ip route replace 10.75.1.0/24 via 10.75.2.254 && (IF=$$(ip -o -4 addr show | awk '$$4 ~ /^10\.75\.2\.10\//{print $$2}' | head -n 1); [ -n "$$IF" ] && tc qdisc replace dev "$$IF" root netem delay 80ms 10ms loss 1% rate 10mbit) && exec sleep infinity
     healthcheck:
       test:
       - CMD-SHELL
-      - ip route show 10.75.1.0/24 | grep -q via
+      - ip route show 10.75.1.0/24 | grep -q via && tc qdisc show | grep -q netem
       interval: 2s
       timeout: 2s
       retries: 30

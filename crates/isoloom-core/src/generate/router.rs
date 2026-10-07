@@ -121,10 +121,22 @@ pub fn nftables(spec: &Spec) -> String {
 /// Shell that applies each network's `tc` on the router's interface into it (found by the
 /// router's address there), or `None` when no network asks for it. Idempotent (`replace`).
 pub fn tc_script(spec: &Spec) -> Option<String> {
-    let lines: Vec<String> = networks(spec)
-        .filter_map(|n| spec.networks[n].tc.as_ref().map(|t| (n, t)))
-        .map(|(n, t)| {
-            let addr = address(spec, n).to_string().replace('.', "\\.");
+    netem_script(spec, networks(spec).map(|n| (n.as_str(), address(spec, n))))
+}
+
+/// The same on a machine's own interfaces (`addr`: its address on a network), so traffic
+/// between machines of one network (a direct cable, a LAN) is impaired too, not only what the
+/// router forwards into it: each end delays what it sends, `delay` is one-way.
+pub fn machine_tc_script(spec: &Spec, m: &Machine, addr: impl Fn(&str, u8) -> Ipv4Addr) -> Option<String> {
+    netem_script(spec, m.networks.iter().map(|(n, octet)| (n.as_str(), addr(n, *octet))))
+}
+
+/// One line per interface (found by its address) on a network with `tc`.
+fn netem_script<'a>(spec: &Spec, at: impl Iterator<Item = (&'a str, Ipv4Addr)>) -> Option<String> {
+    let lines: Vec<String> = at
+        .filter_map(|(n, a)| spec.networks[n].tc.as_ref().map(|t| (a, t)))
+        .map(|(a, t)| {
+            let addr = a.to_string().replace('.', "\\.");
             format!(
                 "IF=$(ip -o -4 addr show | awk '$4 ~ /^{addr}\\//{{print $2}}' | head -n 1); [ -n \"$IF\" ] && tc qdisc replace dev \"$IF\" root netem {}",
                 t.netem()

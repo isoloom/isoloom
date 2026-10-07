@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Link impairment on the machines too
+- `networks.*.tc` now also applies on every machine's own interface on the network, not only on the router's interface into it: traffic between two machines of the network (a direct link with no router, or a LAN) is impaired too, and `delay` is the one-way latency in both directions (80 ms gives a 160 ms round trip through the router). Docker: the machine's network sidecar runs `tc` (netshoot, which has it; the utility image doesn't). Local VMs: a oneshot unit on each Linux VM, re-applied at boot. A network no longer needs the router on it to take `tc`.
+- `isoloom tc show|set|disable|reset` acts on the router and on every machine of the network.
+
 ## 0.8.1
 
 ### Proxmox: checks and a way in
