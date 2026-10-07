@@ -52,6 +52,13 @@ pub(crate) fn controller_size(spec: &Spec) -> (u32, u32, Option<u32>) {
     )
 }
 
+/// The controller's script that runs the environment's playbooks (`provision:`), as it runs
+/// when the environment comes up; with `limit`, only against those machines. `isoloom provision`
+/// runs it again on a running environment.
+pub fn provision_script(spec: &Spec, limit: &[String]) -> String {
+    vagrant::ansible_runs(spec, limit)
+}
+
 pub fn router_name() -> &'static str {
     router::NAME
 }

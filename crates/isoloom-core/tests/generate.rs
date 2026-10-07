@@ -566,3 +566,12 @@ fn the_resolved_snapshot_tells_infra_from_targets() {
     assert_eq!(resolved["controller"]["role"], "infra");
     assert_eq!(resolved["controller"]["keep_running"], false);
 }
+
+#[test]
+fn the_provision_script_can_be_limited_to_machines() {
+    let (_, spec) = example("ansible-pair");
+    let all = isoloom_core::generate::provision_script(&spec, &[]);
+    assert!(!all.contains("--limit"));
+    let some = isoloom_core::generate::provision_script(&spec, &["web".into(), "cache".into()]);
+    assert!(some.contains(" --limit 'web,cache' "), "{some}");
+}

@@ -602,7 +602,7 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
             a = address(spec, net, *octet)
         ));
     }
-    runcmd.push(format!("sh -c {}", super::cloud_vm::sh_quote(&super::vagrant::ansible_runs(spec))));
+    runcmd.push(format!("sh -c {}", super::cloud_vm::sh_quote(&super::vagrant::ansible_runs(spec, &[]))));
     runcmd.push("mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready".into());
     let runcmd_hcl = runcmd
         .iter()
