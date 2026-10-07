@@ -872,9 +872,14 @@ pub(super) fn inventory(spec: &Spec) -> String {
         let Some((net, octet)) = m.networks.first() else { continue };
         let user = image(&vm.os).map(|i| i.2).unwrap_or("admin");
         if crate::images::is_windows(&vm.os) {
-            let _ = writeln!(windows, "{name} ansible_host={}", address(spec, net, *octet));
+            let _ = writeln!(windows, "{name} ansible_host={}{}", address(spec, net, *octet), super::host_vars(spec, name));
         } else {
-            let _ = writeln!(linux, "{name} ansible_host={} ansible_user={user}", address(spec, net, *octet));
+            let _ = writeln!(
+                linux,
+                "{name} ansible_host={} ansible_user={user}{}",
+                address(spec, net, *octet),
+                super::host_vars(spec, name)
+            );
         }
     }
     let mut inv = format!("[linux]\n{linux}\n[windows]\n{windows}\n");

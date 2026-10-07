@@ -652,9 +652,14 @@ fn inventory(spec: &Spec) -> String {
         let Some(vm) = &m.vm else { continue };
         let Some((net, octet)) = m.networks.first() else { continue };
         if images::is_windows(&vm.os) {
-            let _ = writeln!(windows, "{name} ansible_host={}", address(spec, net, *octet));
+            let _ = writeln!(windows, "{name} ansible_host={}{}", address(spec, net, *octet), super::host_vars(spec, name));
         } else {
-            let _ = writeln!(linux, "{name} ansible_host={} ansible_user=isoloom", address(spec, net, *octet));
+            let _ = writeln!(
+                linux,
+                "{name} ansible_host={} ansible_user=isoloom{}",
+                address(spec, net, *octet),
+                super::host_vars(spec, name)
+            );
         }
     }
     let mut inv = format!("[linux]\n{linux}\n[windows]\n{windows}\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n");

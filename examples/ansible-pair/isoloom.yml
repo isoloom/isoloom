@@ -38,6 +38,9 @@ provision:
       caches: [cache]
     vars:
       greeting: hello from ansible
+    # Per machine, on its inventory line.
+    host_vars:
+      cache: { maxmemory: 64mb }
 
 checks:
   - checks/web-answers.sh

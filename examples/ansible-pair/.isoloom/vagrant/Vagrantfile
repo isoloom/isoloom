@@ -170,7 +170,7 @@ Vagrant.configure("2") do |config|
       cat > /etc/isoloom/inventory.ini <<'INV'
       [linux]
       web ansible_host=10.63.0.10
-      cache ansible_host=10.63.0.20
+      cache ansible_host=10.63.0.20 maxmemory='"64mb"'
 
       [windows]
 

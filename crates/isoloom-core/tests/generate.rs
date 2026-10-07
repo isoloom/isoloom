@@ -509,3 +509,39 @@ fn an_idle_container_is_kept_running() {
         "{k8s}"
     );
 }
+
+#[test]
+fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
+    let (_, spec) = example("ansible-pair");
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(vagrantfile.contains("cache ansible_host=10.63.0.20 maxmemory='\"64mb\"'"), "{vagrantfile}");
+    assert!(vagrantfile.contains("web ansible_host=10.63.0.10\n"), "{vagrantfile}");
+    // Python literals, single-quoted: Ansible reads these back with their types (checked with
+    // ansible-inventory 2.x).
+    let spec = isoloom_core::parse(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      a: { code: \"10\", quote: \"it's\", n: 3, on: true, none: null, l: [x, 1], m: { k: v } }\n",
+    )
+    .unwrap();
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(
+        vagrantfile.contains(r#"a ansible_host=10.9.0.10 code='"10"' quote='"it'"'"'s"' n='3' on='True' none='None' l='["x", 1]' m='{"k": "v"}'"#),
+        "{vagrantfile}"
+    );
+}
+
+#[test]
+fn host_vars_name_machines_and_variables() {
+    let spec = isoloom_core::parse(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      ghost: { x: 1 }\n      a: { \"bad name\": 1, 2go: 1, ok_1: 1 }\n",
+    )
+    .unwrap();
+    let problems: Vec<String> = isoloom_core::validate(&spec).iter().map(|p| p.to_string()).collect();
+    assert_eq!(problems.len(), 3, "{problems:?}");
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("provision[0].host_vars.ghost") && p.contains("no machine named `ghost`"))
+    );
+    assert!(problems.iter().any(|p| p.contains("host_vars.a.bad name")));
+    assert!(problems.iter().any(|p| p.contains("host_vars.a.2go")));
+}

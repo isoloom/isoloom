@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Per-machine inventory variables
+- `provision[].host_vars`: a machine's name -> its variables, written on its line of the inventory Isoloom generates (local VMs, Proxmox, cloud VMs, external machines), for playbooks that key on per-host values (its domain, a role flag). Values keep their types: each is written as a Python literal, which Ansible's INI inventory reads back (a quoted `"10"` stays a string; lists, maps, booleans and `null` as they are). Validation: every key names a machine, every variable is a valid name. With `groups:` and `vars:`, a spec can now hold a whole Ansible inventory without an inventory file. Example: ansible-pair's cache gets its `maxmemory`.
+
 ### More network appliances: Cisco QEMU images and Dynamips
 - `appliance: cisco-vios | cisco-viosl2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
 - `appliance: cisco-dynamips` with `docker.firmware: <your IOS .bin>`: a Cisco 7200 emulated by Dynamips, in a container Isoloom builds (Ubuntu's `dynamips`); the data interfaces bind to `FastEthernet0/0`, then `1/0`, `1/1`, `2/0`... on PA-2FE-TX adapters. No KVM needed. Example: cisco-dynamips.

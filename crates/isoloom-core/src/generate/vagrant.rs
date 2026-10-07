@@ -774,15 +774,16 @@ fn inventory(spec: &Spec) -> String {
         let Some(vm) = &m.vm else { continue };
         let Some((net, octet)) = m.networks.first() else { continue };
         let mut line = format!("{name} ansible_host={}", address(spec, net, *octet));
+        let vars = super::host_vars(spec, name);
         if images::is_windows(&vm.os) {
             // WinRM transport per host, so a lab can mix plain-HTTP and HTTPS Windows boxes.
             line.push_str(match images::winrm(vm) {
                 crate::model::Winrm::Ssl => " ansible_port=5986 ansible_winrm_scheme=https ansible_winrm_transport=ntlm",
                 crate::model::Winrm::Plaintext => " ansible_port=5985 ansible_winrm_scheme=http ansible_winrm_transport=basic",
             });
-            windows.push(line)
+            windows.push(line + &vars)
         } else {
-            linux.push(line)
+            linux.push(line + &vars)
         }
     }
     let mut inv = String::new();

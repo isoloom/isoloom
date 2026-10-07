@@ -5,6 +5,8 @@
       ansible.builtin.apt: { name: redis-server, update_cache: true }
     - name: Listen on the environment's network
       ansible.builtin.lineinfile: { path: /etc/redis/redis.conf, regexp: "^bind ", line: "bind 0.0.0.0" }
+    - name: Its memory limit (a host variable)
+      ansible.builtin.lineinfile: { path: /etc/redis/redis.conf, regexp: "^maxmemory ", line: "maxmemory {{ maxmemory }}" }
     - name: No protected mode
       ansible.builtin.lineinfile: { path: /etc/redis/redis.conf, regexp: "^protected-mode ", line: "protected-mode no" }
     - name: Restart
