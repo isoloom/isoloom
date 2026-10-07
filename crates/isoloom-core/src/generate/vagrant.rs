@@ -845,7 +845,7 @@ pub(super) fn ansible_runs(spec: &Spec) -> String {
         let vars = if step.vars.is_empty() {
             String::new()
         } else {
-            format!(" -e {}", shell_quote(&serde_json::to_string(&step.vars).expect("strings serialize")))
+            format!(" -e {}", shell_quote(&serde_json::to_string(&step.vars).expect("JSON values serialize")))
         };
         let requirements = match &step.requirements {
             Some(r) => format!("ansible-galaxy install -r /opt/isoloom/{r}\n"),

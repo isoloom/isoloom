@@ -12,9 +12,11 @@
 
 - hosts: webservers
   tasks:
+    - name: Tools (a list from vars)
+      ansible.builtin.apt: { name: "{{ tools }}" }
     - name: nginx
       ansible.builtin.apt: { name: nginx, update_cache: true }
     - name: A page that knows the cache
       ansible.builtin.copy:
         dest: /var/www/html/index.html
-        content: "<h1>{{ site_title }}</h1><p>{{ greeting }}, cache at {{ hostvars['cache'].ansible_host }}</p>\n"
+        content: "<h1>{{ site_title }}</h1><p>{{ greeting }}, cache at {{ hostvars['cache'].ansible_host }}:{{ cache_port + 0 }}</p>\n"

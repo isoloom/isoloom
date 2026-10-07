@@ -449,6 +449,19 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() {
 }
 
 #[test]
+fn playbook_vars_keep_their_types() {
+    let (_, spec) = example("ansible-pair");
+    let vars = &spec.provision[0].vars;
+    assert_eq!(vars["tools"], serde_json::json!(["curl", "jq"]));
+    assert_eq!(vars["cache_port"], serde_json::json!(6379));
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(
+        vagrantfile.contains(r#"-e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}'"#),
+        "{vagrantfile}"
+    );
+}
+
+#[test]
 fn cloud_vm_runs_windows_over_winrm_with_its_name() {
     let (_, spec) = example("windows-hello");
     let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");

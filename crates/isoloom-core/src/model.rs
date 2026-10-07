@@ -414,9 +414,10 @@ pub struct Provision {
     /// Inventory groups: a name -> the machines in it.
     #[serde(default)]
     pub groups: IndexMap<String, Vec<String>>,
-    /// Extra variables for the playbook.
+    /// Extra variables for the playbook, of any YAML type (strings, numbers, booleans, lists,
+    /// maps): passed as JSON (`-e`), which keeps their types.
     #[serde(default)]
-    pub vars: IndexMap<String, String>,
+    pub vars: IndexMap<String, serde_json::Value>,
     /// The Ansible Galaxy requirements to install first (collections, roles); by default
     /// `requirements.yml` next to the playbook, when there is one.
     #[serde(default)]

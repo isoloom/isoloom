@@ -38,6 +38,9 @@ provision:
       caches: [cache]
     vars:
       greeting: hello from ansible
+      # Any YAML value: lists, numbers and booleans keep their types.
+      tools: [curl, jq]
+      cache_port: 6379
 
 checks:
   - checks/web-answers.sh
