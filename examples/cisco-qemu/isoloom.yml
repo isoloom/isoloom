@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Cisco IOSv and CSR1000v (IOS XE) in QEMU, as vrnetlab packages them: two sites, each behind
+# its router, OSPF between them (their own configuration). The images come from Cisco Modeling
+# Labs and aren't Isoloom's to ship: build them with vrnetlab (cisco/vios, cisco/csr1000v) from
+# releases you're licensed for. QEMU needs /dev/kvm on the Docker host, and IOS XE takes minutes
+# to boot.
+version: 1
+name: cisco-qemu
+
+networks:
+  site-a: { cidr: 10.92.1.0/24, gateway: vios }
+  site-b: { cidr: 10.92.2.0/24, gateway: csr }
+  wan:    { cidr: 10.92.0.0/29, internet: false }
+
+machines:
+  vios:
+    networks: { site-a: 1, wan: 2 }      # GigabitEthernet0/1, 0/2
+    docker:
+      image: "vrnetlab/cisco_vios:15.9.3M6"
+      appliance: cisco-vios
+      config: configs/vios.cfg
+
+  csr:
+    networks: { site-b: 1, wan: 3 }      # GigabitEthernet2, 3
+    docker:
+      image: "vrnetlab/cisco_csr1000v:17.03.08"
+      appliance: cisco-csr1000v
+      config: configs/csr.cfg
+
+  host-a:
+    networks: { site-a: 10 }
+    docker: { image: "alpine:3.20", idle: true }
+
+  host-b:
+    networks: { site-b: 10 }
+    services: [{ port: 80, http: true }]
+    docker: { image: "nginx:1.27-alpine" }
+
+checks:
+  - name: site A reaches site B through both routers
+    from: host-a
+    http: http://host-b/
+    expect: 200
+    wait: 900

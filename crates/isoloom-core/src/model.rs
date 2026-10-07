@@ -314,6 +314,10 @@ pub struct DockerImpl {
     /// generates (hostname, credentials, interfaces and their addresses).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<String>,
+    /// The firmware an emulator boots (a file in the project): the IOS `.bin` of a Dynamips
+    /// router. Isoloom builds the emulator's container itself, so no `image` then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub firmware: Option<String>,
 }
 
 /// A network appliance image (see [`DockerImpl::appliance`]). The images aren't Isoloom's to
@@ -326,6 +330,16 @@ pub enum Appliance {
     CiscoIol,
     /// Cisco IOL-L2 (`vrnetlab/cisco_iol:L2-<version>`): a switch.
     CiscoIolL2,
+    /// Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router.
+    CiscoVios,
+    /// Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch.
+    CiscoViosL2,
+    /// Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm).
+    CiscoCsr1000v,
+    /// Cisco Catalyst 8000v (IOS XE) in QEMU (`vrnetlab/cisco_c8000v:<version>`, needs /dev/kvm).
+    CiscoC8000v,
+    /// A classic Cisco 7200 router emulated by Dynamips, booting the IOS `.bin` in `firmware`.
+    CiscoDynamips,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

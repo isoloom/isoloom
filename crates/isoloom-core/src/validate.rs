@@ -377,7 +377,26 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             add(&at, "give the machine at least one implementation: `docker:` and/or `vm:`".into());
         }
         if let Some(d) = &m.docker {
+            // A Dynamips router: Isoloom builds the emulator; the IOS image is the firmware.
+            let emulated = d.appliance == Some(crate::model::Appliance::CiscoDynamips);
+            if emulated {
+                if d.image.is_some() || d.build.is_some() {
+                    add(
+                        &format!("{at}.docker"),
+                        "a Dynamips router's container is Isoloom's: give its IOS image as `firmware`, not `image` or `build`".into(),
+                    );
+                }
+                if d.firmware.is_none() {
+                    add(&format!("{at}.docker.firmware"), "the IOS image (.bin) to boot, a file in the project".into());
+                }
+            } else if d.firmware.is_some() {
+                add(
+                    &format!("{at}.docker.firmware"),
+                    "only a Dynamips router (`appliance: cisco-dynamips`) boots a firmware".into(),
+                );
+            }
             match (&d.image, &d.build) {
+                _ if emulated => {}
                 (Some(_), Some(_)) => add(&format!("{at}.docker"), "use `image` or `build`, not both".into()),
                 (None, None) => add(
                     &format!("{at}.docker"),
@@ -690,6 +709,12 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
         if let Some(d) = &m.docker {
             if let Some(b) = &d.build {
                 check(format!("machines.{name}.docker.build"), b);
+            }
+            if let Some(c) = &d.config {
+                check(format!("machines.{name}.docker.config"), c);
+            }
+            if let Some(f) = &d.firmware {
+                check(format!("machines.{name}.docker.firmware"), f);
             }
             for (i, s) in d.init.iter().enumerate() {
                 check(format!("machines.{name}.docker.init[{i}]"), s);

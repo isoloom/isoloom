@@ -65,3 +65,74 @@ fn appliances_are_docker_only_and_checked() {
     );
     assert!(p.contains("management network"), "{p}");
 }
+
+fn compose_of(example: &str) -> (String, Vec<isoloom_core::GeneratedFile>) {
+    let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/{example}"))).unwrap();
+    assert_eq!(validate(&spec), vec![]);
+    let files = generate(&spec, Target::Docker).unwrap();
+    (files.iter().find(|f| f.path.ends_with("compose.yml")).unwrap().contents.clone(), files)
+}
+
+#[test]
+fn interfaces_are_named_outright_in_the_order_the_image_expects() {
+    // Docker's own attach order isn't reliable: each network names its interface.
+    let (c, _) = compose_of("cisco-qemu");
+    let csr = &c[c.find("\n  csr:\n").unwrap()..];
+    let pos = |s: &str| csr.find(s).unwrap_or_else(|| panic!("no {s}"));
+    assert!(pos("interface_name: eth0") < pos("interface_name: eth1") && pos("interface_name: eth1") < pos("interface_name: eth2"));
+    assert!(
+        csr.contains("isoloom-mgmt:\n        ipv4_address: 10.255.255.11\n        interface_name: eth0"),
+        "{csr}"
+    );
+}
+
+#[test]
+fn qemu_images_get_launch_py_their_startup_config_and_kvm() {
+    let (c, files) = compose_of("cisco-qemu");
+    let file = |p: &str| files.iter().find(|f| f.path.ends_with(p)).unwrap().contents.clone();
+    assert!(file("appliances/vios/base.cfg").contains("interface GigabitEthernet0/1\n description site-a\n ip address 10.92.1.1"));
+    assert!(file("appliances/csr/base.cfg").contains("interface GigabitEthernet2\n description site-b\n ip address 10.92.2.1"));
+    let csr = &c[c.find("\n  csr:\n").unwrap()..];
+    assert!(
+        csr.contains("privileged: true") && csr.contains("CLAB_INTFS: '2'") && csr.contains("CONNECTION_MODE: tc"),
+        "{csr}"
+    );
+    assert!(csr.contains("exec uv run /launch.py --username admin --password admin --hostname csr --connection-mode tc"));
+    assert!(csr.contains("../../configs/csr.cfg:/config/own.cfg:ro"));
+    let vios = &c[c.find("\n  vios:\n").unwrap()..];
+    assert!(vios.contains("CLAB_MGMT_PASSTHROUGH: 'true'"));
+}
+
+#[test]
+fn dynamips_builds_its_emulator_and_boots_the_firmware() {
+    let (c, files) = compose_of("cisco-dynamips");
+    let r1 = &c[c.find("\n  r1:\n").unwrap()..];
+    assert!(
+        r1.contains("build:\n      context: ./appliances/r1/build") && !r1.split("\n  r1-routes:").next().unwrap().contains("image:"),
+        "{r1}"
+    );
+    assert!(r1.contains("../../images/c7200.bin:/firmware/ios.bin:ro"));
+    assert!(r1.contains("-p 1:PA-2FE-TX -s 0:0:linux_eth:eth1 -s 1:0:linux_eth:eth2"), "{r1}");
+    assert!(
+        r1.contains("exec dynamips $$DYNAMIPS_ARGS /firmware/ios.bin"),
+        "Compose mustn't interpolate the script's variable"
+    );
+    let dockerfile = files.iter().find(|f| f.path.ends_with("appliances/r1/build/Dockerfile")).unwrap();
+    assert!(dockerfile.contents.contains("dynamips"));
+    assert!(
+        files
+            .iter()
+            .any(|f| f.path.ends_with("appliances/r1/base.cfg") && f.contents.contains("interface FastEthernet1/0\n description wan"))
+    );
+    let problems = |yaml: &str| {
+        validate(&parse(yaml).unwrap())
+            .into_iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let p = problems(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  r: { networks: { lan: 1 }, docker: { appliance: cisco-dynamips, image: x } }\n",
+    );
+    assert!(p.contains("not `image` or `build`") && p.contains("firmware"), "{p}");
+}
