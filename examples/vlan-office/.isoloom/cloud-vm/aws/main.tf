@@ -222,7 +222,7 @@ resource "terraform_data" "intranet" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.70.10.10 staff' '10.70.20.10 guest' | sudo tee -a /etc/hosts >/dev/null",
+      "printf '%s\\n' '10.70.10.10 staff' '10.70.20.10 guest' '10.70.10.50 admin' | sudo tee -a /etc/hosts >/dev/null",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/intranet.sh'",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
@@ -296,7 +296,7 @@ resource "terraform_data" "staff" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.70.99.10 intranet' '10.70.20.10 guest' | sudo tee -a /etc/hosts >/dev/null",
+      "printf '%s\\n' '10.70.99.10 intranet' '10.70.20.10 guest' '10.70.10.50 admin' | sudo tee -a /etc/hosts >/dev/null",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
@@ -369,7 +369,113 @@ resource "terraform_data" "guest" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' | sudo tee -a /etc/hosts >/dev/null",
+      "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' '10.70.20.50 admin' | sudo tee -a /etc/hosts >/dev/null",
+      "cd /opt/isoloom && sudo -E sh -c 'sh provision/guest.sh'",
+      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+    ]
+  }
+}
+
+# Machine `admin`: what may reach it.
+resource "aws_security_group" "admin" {
+  name   = "${local.name}-admin"
+  vpc_id = aws_vpc.env.id
+  ingress {
+    description = "its network (office-vlan10)"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["10.70.10.0/24"]
+  }
+  ingress {
+    description = "its network (office-vlan20)"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["10.70.20.0/24"]
+  }
+  ingress {
+    description = "SSH from allowed_cidr"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_cidr]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_network_interface" "admin_office_vlan10" {
+  subnet_id         = aws_subnet.office_vlan10.id
+  private_ips       = ["10.70.10.50"]
+  security_groups   = [aws_security_group.admin.id]
+  source_dest_check = false
+  tags              = { Name = "${local.name}-admin-office-vlan10" }
+}
+
+resource "aws_network_interface" "admin_office_vlan20" {
+  subnet_id         = aws_subnet.office_vlan20.id
+  private_ips       = ["10.70.20.50"]
+  security_groups   = [aws_security_group.admin.id]
+  source_dest_check = false
+  tags              = { Name = "${local.name}-admin-office-vlan20" }
+}
+
+resource "aws_instance" "admin" {
+  ami           = data.aws_ami.debian_12.id
+  instance_type = "t3.micro"
+  key_name      = aws_key_pair.env.key_name
+  user_data     = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
+  primary_network_interface {
+    network_interface_id = aws_network_interface.admin_office_vlan10.id
+  }
+  root_block_device {
+    volume_size = 20
+  }
+  tags = { Name = "${local.name}-admin" }
+}
+
+resource "aws_network_interface_attachment" "admin_office_vlan20" {
+  instance_id          = aws_instance.admin.id
+  network_interface_id = aws_network_interface.admin_office_vlan20.id
+  device_index         = 1
+}
+
+resource "aws_eip" "admin" {
+  network_interface = aws_network_interface.admin_office_vlan10.id
+  depends_on        = [aws_internet_gateway.env]
+}
+
+resource "terraform_data" "admin" {
+  triggers_replace = [aws_instance.admin.id]
+  connection {
+    type        = "ssh"
+    host        = aws_eip.admin.public_ip
+    user        = "admin"
+    private_key = file(pathexpand(var.ssh_private_key_file))
+    timeout     = "10m"
+  }
+  provisioner "remote-exec" {
+    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
+  }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-admin.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+  }
+  provisioner "file" {
+    source      = "${path.module}/.isoloom-project-admin.tgz"
+    destination = "/tmp/isoloom-project.tgz"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
+      "IF=$(ip -o link | grep -i \"${lower(aws_network_interface.admin_office_vlan20.mac_address)}\" | awk -F': ' '{print $2}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q 10.70.20.50/ || sudo ip addr add 10.70.20.50/24 dev \"$IF\")",
+      "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' '10.70.20.10 guest' | sudo tee -a /etc/hosts >/dev/null",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/guest.sh'",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
     ]
@@ -381,6 +487,7 @@ output "machines" {
     intranet = aws_instance.intranet.public_ip
     staff    = aws_instance.staff.public_ip
     guest    = aws_instance.guest.public_ip
+    admin    = aws_eip.admin.public_ip
   }
 }
 
@@ -389,6 +496,7 @@ output "ssh_users" {
     intranet = "admin"
     staff    = "admin"
     guest    = "admin"
+    admin    = "admin"
   }
 }
 
@@ -405,6 +513,7 @@ output "checks" {
   value = [
     { position = "staff", machine = "staff", host = aws_instance.staff.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/staff.sh" },
     { position = "intranet", machine = "intranet", host = aws_instance.intranet.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/intranet.sh" },
-    { position = "guest", machine = "guest", host = aws_instance.guest.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/guest.sh" }
+    { position = "guest", machine = "guest", host = aws_instance.guest.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/guest.sh" },
+    { position = "admin", machine = "admin", host = aws_eip.admin.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/admin.sh" }
   ]
 }

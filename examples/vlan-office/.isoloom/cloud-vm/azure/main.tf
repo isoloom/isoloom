@@ -236,7 +236,7 @@ resource "terraform_data" "intranet" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.70.10.10 staff' '10.70.20.10 guest' | sudo tee -a /etc/hosts >/dev/null",
+      "printf '%s\\n' '10.70.10.10 staff' '10.70.20.10 guest' '10.70.10.50 admin' | sudo tee -a /etc/hosts >/dev/null",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/intranet.sh'",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
@@ -364,7 +364,7 @@ resource "terraform_data" "staff" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.70.99.10 intranet' '10.70.20.10 guest' | sudo tee -a /etc/hosts >/dev/null",
+      "printf '%s\\n' '10.70.99.10 intranet' '10.70.20.10 guest' '10.70.10.50 admin' | sudo tee -a /etc/hosts >/dev/null",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
@@ -491,7 +491,165 @@ resource "terraform_data" "guest" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' | sudo tee -a /etc/hosts >/dev/null",
+      "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' '10.70.20.50 admin' | sudo tee -a /etc/hosts >/dev/null",
+      "cd /opt/isoloom && sudo -E sh -c 'sh provision/guest.sh'",
+      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+    ]
+  }
+}
+
+# Machine `admin`: what may reach it.
+resource "azurerm_network_security_group" "admin" {
+  name                = "${local.name}-admin"
+  resource_group_name = azurerm_resource_group.env.name
+  location            = var.region
+  tags                = local.tags
+  security_rule {
+    name                       = "net-office-vlan10"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "10.70.10.0/24"
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "net-office-vlan20"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "10.70.20.0/24"
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "ssh"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = var.allowed_cidr
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "outbound"
+    priority                   = 100
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_public_ip" "admin" {
+  name                = "${local.name}-admin"
+  resource_group_name = azurerm_resource_group.env.name
+  location            = var.region
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  tags                = local.tags
+}
+
+resource "azurerm_network_interface" "admin_office_vlan10" {
+  name                = "${local.name}-admin-office-vlan10"
+  resource_group_name = azurerm_resource_group.env.name
+  location            = var.region
+  tags                = local.tags
+  ip_forwarding_enabled = true
+  ip_configuration {
+    name                          = "primary"
+    subnet_id                     = azurerm_subnet.office_vlan10.id
+    private_ip_address_allocation = "Static"
+    private_ip_address            = "10.70.10.50"
+    public_ip_address_id          = azurerm_public_ip.admin.id
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "admin_office_vlan10" {
+  network_interface_id      = azurerm_network_interface.admin_office_vlan10.id
+  network_security_group_id = azurerm_network_security_group.admin.id
+}
+
+resource "azurerm_network_interface" "admin_office_vlan20" {
+  name                = "${local.name}-admin-office-vlan20"
+  resource_group_name = azurerm_resource_group.env.name
+  location            = var.region
+  tags                = local.tags
+  ip_forwarding_enabled = true
+  ip_configuration {
+    name                          = "primary"
+    subnet_id                     = azurerm_subnet.office_vlan20.id
+    private_ip_address_allocation = "Static"
+    private_ip_address            = "10.70.20.50"
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "admin_office_vlan20" {
+  network_interface_id      = azurerm_network_interface.admin_office_vlan20.id
+  network_security_group_id = azurerm_network_security_group.admin.id
+}
+
+resource "azurerm_linux_virtual_machine" "admin" {
+  name                  = "${local.name}-admin"
+  resource_group_name   = azurerm_resource_group.env.name
+  location              = var.region
+  size                  = "Standard_B1s"
+  admin_username        = "isoloom"
+  network_interface_ids = [azurerm_network_interface.admin_office_vlan10.id, azurerm_network_interface.admin_office_vlan20.id]
+  custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
+  admin_ssh_key {
+    username   = "isoloom"
+    public_key = var.ssh_public_key
+  }
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "StandardSSD_LRS"
+    disk_size_gb         = 30
+  }
+  source_image_reference {
+    publisher = "Debian"
+    offer     = "debian-12"
+    sku       = "12-gen2"
+    version   = "latest"
+  }
+  tags = local.tags
+}
+
+resource "terraform_data" "admin" {
+  triggers_replace = [azurerm_linux_virtual_machine.admin.id]
+  connection {
+    type        = "ssh"
+    host        = azurerm_public_ip.admin.ip_address
+    user        = "isoloom"
+    private_key = file(pathexpand(var.ssh_private_key_file))
+    timeout     = "10m"
+  }
+  provisioner "remote-exec" {
+    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom"]
+  }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-admin.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+  }
+  provisioner "file" {
+    source      = "${path.module}/.isoloom-project-admin.tgz"
+    destination = "/tmp/isoloom-project.tgz"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
+      "IF=$(ip -o link | grep -i \"${lower(replace(azurerm_network_interface.admin_office_vlan20.mac_address, "-", ":"))}\" | awk -F': ' '{print $2}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q 10.70.20.50/ || sudo ip addr add 10.70.20.50/24 dev \"$IF\")",
+      "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' '10.70.20.10 guest' | sudo tee -a /etc/hosts >/dev/null",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/guest.sh'",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
     ]
@@ -503,6 +661,7 @@ output "machines" {
     intranet = azurerm_public_ip.intranet.ip_address
     staff    = azurerm_public_ip.staff.ip_address
     guest    = azurerm_public_ip.guest.ip_address
+    admin    = azurerm_public_ip.admin.ip_address
   }
 }
 
@@ -511,6 +670,7 @@ output "ssh_users" {
     intranet = "isoloom"
     staff    = "isoloom"
     guest    = "isoloom"
+    admin    = "isoloom"
   }
 }
 
@@ -527,6 +687,7 @@ output "checks" {
   value = [
     { position = "staff", machine = "staff", host = azurerm_public_ip.staff.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/staff.sh" },
     { position = "intranet", machine = "intranet", host = azurerm_public_ip.intranet.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/intranet.sh" },
-    { position = "guest", machine = "guest", host = azurerm_public_ip.guest.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/guest.sh" }
+    { position = "guest", machine = "guest", host = azurerm_public_ip.guest.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/guest.sh" },
+    { position = "admin", machine = "admin", host = azurerm_public_ip.admin.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/admin.sh" }
   ]
 }

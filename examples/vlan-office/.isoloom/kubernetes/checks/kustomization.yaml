@@ -13,3 +13,4 @@ configMapGenerator:
       - staff.sh
       - intranet.sh
       - guest.sh
+      - admin.sh

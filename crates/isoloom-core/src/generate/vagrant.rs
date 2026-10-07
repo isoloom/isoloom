@@ -13,7 +13,7 @@
 
 use std::fmt::Write;
 
-use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, netmask, router, start_order};
+use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, netmask, router, start_order, trunks};
 use indexmap::IndexMap;
 
 use crate::checks;
@@ -101,6 +101,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         playbook: Some(&run_playbook),
     };
 
+    let vm_trunks = trunks::vm_trunks(spec);
     for name in start_order(spec) {
         let m = &spec.machines[name];
         let Some(vm) = &m.vm else { continue };
@@ -244,8 +245,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
 
         // Routes to the other networks through the router and gateways, as a boot-time
-        // service. The default route through a gateway comes after provisioning (below).
-        let cmds = router::route_commands(spec, name, m, false);
+        // service, after its 802.1Q trunks (built in the VM, see `trunks`). The default route
+        // through a gateway comes after provisioning (below).
+        let trunk_cmds: Vec<String> = trunks::of(&vm_trunks, name)
+            .flat_map(|t| trunks::vm_commands(spec, t, |n, o| address(spec, n, o)))
+            .collect();
+        let cmds: Vec<String> = trunk_cmds.iter().cloned().chain(router::route_commands(spec, name, m, false)).collect();
         if !cmds.is_empty() {
             let _ = writeln!(
                 out,
@@ -345,7 +350,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             let _ = writeln!(
                 out,
                 "    m.vm.provision \"shell\", name: \"default route\", inline: <<~'SH'\n{}    SH",
-                indent(&routes_unit(&router::route_commands(spec, name, m, true)), 6)
+                indent(
+                    &routes_unit(
+                        &trunk_cmds
+                            .iter()
+                            .cloned()
+                            .chain(router::route_commands(spec, name, m, true))
+                            .collect::<Vec<_>>()
+                    ),
+                    6
+                )
             );
         }
         // This machine's checks, on demand (`vagrant provision --provision-with checks`): the

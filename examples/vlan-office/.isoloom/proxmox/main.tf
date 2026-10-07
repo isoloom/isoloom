@@ -267,7 +267,7 @@ resource "proxmox_virtual_environment_file" "intranet" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.70.10.10 staff' '10.70.20.10 guest' >> /etc/hosts"],
+        ["sh", "-c", "printf '%s\\n' '10.70.10.10 staff' '10.70.20.10 guest' '10.70.10.50 admin' >> /etc/hosts"],
         ["sh", "-c", "cd /opt/isoloom && sh provision/intranet.sh"],
         ["sh", "-c", "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
@@ -330,7 +330,7 @@ resource "proxmox_virtual_environment_file" "staff" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = []
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.70.99.10 intranet' '10.70.20.10 guest' >> /etc/hosts"],
+        ["sh", "-c", "printf '%s\\n' '10.70.99.10 intranet' '10.70.20.10 guest' '10.70.10.50 admin' >> /etc/hosts"],
         ["sh", "-c", "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
@@ -392,7 +392,7 @@ resource "proxmox_virtual_environment_file" "guest" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' >> /etc/hosts"],
+        ["sh", "-c", "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' '10.70.20.50 admin' >> /etc/hosts"],
         ["sh", "-c", "cd /opt/isoloom && sh provision/guest.sh"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
@@ -441,6 +441,77 @@ resource "proxmox_virtual_environment_vm" "guest" {
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
 }
 
+# Machine `admin`.
+resource "proxmox_virtual_environment_file" "admin" {
+  node_name    = var.node
+  datastore_id = var.snippets_datastore
+  content_type = "snippets"
+  source_raw {
+    file_name = "iso${var.slot}-admin.yaml"
+    data = "#cloud-config\n${yamlencode({
+      hostname    = "admin"
+      users       = local.users
+      packages    = ["nftables", "curl", "netcat-openbsd"]
+      write_files = local.project_files
+      runcmd = [
+        ["sh", "-c", "ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s && ip link set office up && ip link set office-s up && IF=$(ip -o -4 addr show | awk '$4 ~ /^10\\.70\\.10\\.50\\//{print $2}' | head -n 1) && MAC=$(cat /sys/class/net/$IF/address) && ip addr flush dev $IF && ip link set $IF address 02:1f:0a:46:0a:32 && ip link add br10 type bridge && ip link set $IF master br10 && ip link set br10 up && ip link add link office-s name office-s.10 type vlan id 10 && ip link set office-s.10 master br10 && ip link set office-s.10 up && ip link add link office name office.10 address $MAC type vlan id 10 && ip addr add 10.70.10.50/24 dev office.10 && ip link set office.10 up && IF=$(ip -o -4 addr show | awk '$4 ~ /^10\\.70\\.20\\.50\\//{print $2}' | head -n 1) && MAC=$(cat /sys/class/net/$IF/address) && ip addr flush dev $IF && ip link set $IF address 02:1f:0a:46:14:32 && ip link add br20 type bridge && ip link set $IF master br20 && ip link set br20 up && ip link add link office-s name office-s.20 type vlan id 20 && ip link set office-s.20 master br20 && ip link set office-s.20 up && ip link add link office name office.20 address $MAC type vlan id 20 && ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up; }"],
+        ["sh", "-c", "printf '%s\\n' '10.70.99.10 intranet' '10.70.10.10 staff' '10.70.20.10 guest' >> /etc/hosts"],
+        ["sh", "-c", "cd /opt/isoloom && sh provision/guest.sh"],
+        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
+      ]
+    })}"
+  }
+}
+
+resource "proxmox_virtual_environment_vm" "admin" {
+  name      = "iso${var.slot}-admin"
+  node_name = var.node
+  tags      = ["isoloom", "vlan-office"]
+  on_boot   = false
+  cpu {
+    cores = 1
+    type  = "host"
+  }
+  memory {
+    dedicated = 1024
+  }
+  disk {
+    datastore_id = var.datastore
+    file_id      = proxmox_download_file.debian_12.id
+    interface    = "virtio0"
+    size         = 20
+  }
+  network_device {
+    bridge = proxmox_sdn_vnet.office_vlan10.id
+  }
+  network_device {
+    bridge = proxmox_sdn_vnet.office_vlan20.id
+  }
+  initialization {
+    datastore_id      = var.datastore
+    user_data_file_id = proxmox_virtual_environment_file.admin.id
+    dns {
+      servers = ["1.1.1.1"]
+    }
+    ip_config {
+      ipv4 {
+        address = "10.70.10.50/24"
+        gateway = "10.70.10.254"
+      }
+    }
+    ip_config {
+      ipv4 {
+        address = "10.70.20.50/24"
+      }
+    }
+  }
+  operating_system {
+    type = "l26"
+  }
+  serial_device {}
+  depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
 locals {
   router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.70.10.254", "10.70.20.254", "10.70.99.254"], a)][0]
 }
@@ -455,6 +526,7 @@ output "machines" {
     "intranet" = "10.70.99.10"
     "staff"    = "10.70.10.10"
     "guest"    = "10.70.20.10"
+    "admin"    = "10.70.10.50"
   }
 }
 
@@ -467,6 +539,7 @@ output "checks" {
   value = [
     { position = "staff", machine = "staff", host = "10.70.10.10", user = "isoloom", script = ".isoloom/proxmox/checks/staff.sh" },
     { position = "intranet", machine = "intranet", host = "10.70.99.10", user = "isoloom", script = ".isoloom/proxmox/checks/intranet.sh" },
-    { position = "guest", machine = "guest", host = "10.70.20.10", user = "isoloom", script = ".isoloom/proxmox/checks/guest.sh" }
+    { position = "guest", machine = "guest", host = "10.70.20.10", user = "isoloom", script = ".isoloom/proxmox/checks/guest.sh" },
+    { position = "admin", machine = "admin", host = "10.70.10.50", user = "isoloom", script = ".isoloom/proxmox/checks/admin.sh" }
   ]
 }

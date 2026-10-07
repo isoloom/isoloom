@@ -107,6 +107,7 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, String> {
                     vlans: IndexMap::new(),
                     // A VLAN carries no impairment of its own (set it on a network the router is on).
                     tc: None,
+                    vlan: Some((lan.clone(), *id)),
                 },
             );
             covers.insert(format!("{lan}.vlan{id}"), vec![flat.clone()]);

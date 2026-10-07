@@ -81,6 +81,11 @@ pub struct Network {
     /// `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub vlans: IndexMap<u16, Vlan>,
+    /// Set by parsing on the networks a LAN's VLANs become: that LAN and the VLAN's id, so a
+    /// target can carry them on one 802.1Q segment (a machine on several of them gets a trunk).
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub vlan: Option<(String, u16)>,
     /// Link impairment on traffic entering this network through Isoloom's router (a slow or
     /// lossy link): delay, jitter, loss, rate. Needs the router on the network (a `reach` rule
     /// touching it, no `gateway` machine).

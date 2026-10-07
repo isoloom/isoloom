@@ -107,6 +107,35 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      isoloom.com/machine: admin
+  template:
+    metadata:
+      labels:
+        isoloom.com/machine: admin
+        net.isoloom.com/office-vlan10: member
+        net.isoloom.com/office-vlan20: member
+    spec:
+      hostname: admin
+      containers:
+      - name: admin
+        image: alpine:3.20
+        imagePullPolicy: IfNotPresent
+        command:
+        - sleep
+        - infinity
+      nodeSelector:
+        kubernetes.io/arch: amd64
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
