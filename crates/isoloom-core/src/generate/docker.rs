@@ -28,7 +28,7 @@
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, router};
+use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, router, trunks};
 use crate::checks;
 use crate::model::{Machine, Spec, Target};
 
@@ -118,6 +118,14 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
     if router::needed(spec) {
         services.insert(s(router::NAME), router_service(spec));
     }
+    // 802.1Q: a switch per LAN with trunks (see `trunks`).
+    let ts = trunks::trunks(spec);
+    let mut lans: Vec<&str> = ts.iter().map(|t| t.lan.as_str()).collect();
+    lans.dedup();
+    for lan in &lans {
+        let of_lan: Vec<&trunks::Trunk> = ts.iter().filter(|t| t.lan == *lan).collect();
+        services.insert(s(trunks::switch_name(lan)), switch_service(spec, &of_lan));
+    }
 
     // Machines that get a network sidecar (routes via the router or gateways, the default
     // route through a gateway, no default route when offline), so dependents can wait for it.
@@ -163,7 +171,15 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             svc.insert(s("entrypoint"), list([s("sleep"), s("infinity")]));
         }
         svc.insert(s("hostname"), s(name.as_str()));
-        svc.insert(s("networks"), networks_of(m, spec, true));
+        let mut nets = networks_of(m, spec, true);
+        if let Value::Mapping(map) = &mut nets {
+            // A VLAN it reaches through a trunk isn't an interface of its own: the trunk is.
+            map.retain(|k, _| !trunks::carried(&ts, name, k.as_str().unwrap_or_default()));
+            for t in trunks::of(&ts, name) {
+                map.insert(s(trunks::link_network(t)), map_mac(&trunks::mac(t, 0)));
+            }
+        }
+        svc.insert(s("networks"), nets);
         if router::is_gateway(spec, name) {
             // It routes: forwarding on, and the right to set its own firewall rules.
             svc.insert(s("cap_add"), list([s("NET_ADMIN")]));
@@ -441,6 +457,10 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         networks.insert(s(net.as_str()), Value::Mapping(v));
     }
 
+    for t in &ts {
+        networks.insert(s(trunks::link_network(t)), map([("internal", Value::Bool(true))]));
+    }
+
     let mut volumes = Mapping::new();
     for (name, m) in &spec.machines {
         if m.docker.is_some() {
@@ -496,13 +516,57 @@ pub(super) const UTILITY_IMAGE: &str = "alpine:3.20";
 /// machines on shared networks); they're reached through the router.
 fn extra_hosts(spec: &Spec, name: &str) -> Option<Value> {
     let m = &spec.machines[name];
+    let ts = trunks::trunks(spec);
     let hosts: Vec<Value> = spec
         .machines
         .iter()
-        .filter(|(o, om)| o.as_str() != name && !om.networks.keys().any(|n| m.networks.contains_key(n)))
+        // Docker's own names only reach across a network both are attached to: not one a trunk
+        // carries.
+        .filter(|(o, om)| {
+            o.as_str() != name
+                && !om
+                    .networks
+                    .keys()
+                    .any(|n| m.networks.contains_key(n) && !trunks::carried(&ts, name, n) && !trunks::carried(&ts, o, n))
+        })
         .map(|(o, _)| s(format!("{o}:{}", address_for(spec, name, o))))
         .collect();
     (!hosts.is_empty()).then_some(Value::Sequence(hosts))
+}
+
+/// A network attachment with a fixed MAC address (a trunk's end, found by it).
+fn map_mac(mac: &str) -> Value {
+    map([("mac_address", s(mac))])
+}
+
+/// A LAN's switch: on each of its VLAN networks and on each trunk to it, bridging them per VLAN.
+fn switch_service(spec: &Spec, trunks: &[&trunks::Trunk]) -> Value {
+    let mut nets = Mapping::new();
+    for t in trunks {
+        for (net, _, _) in &t.vlans {
+            nets.insert(s(net.as_str()), map([("ipv4_address", s(trunks::switch_address(spec, net).to_string()))]));
+        }
+        nets.insert(s(trunks::link_network(t)), map_mac(&trunks::mac(t, 1)));
+    }
+    let mut r = Mapping::new();
+    r.insert(s("image"), s(TC_IMAGE));
+    r.insert(s("cap_add"), list([s("NET_ADMIN")]));
+    r.insert(s("networks"), Value::Mapping(nets));
+    r.insert(
+        s("entrypoint"),
+        list([s("/bin/sh"), s("-c"), s(trunks::switch_script(spec, trunks).replace('$', "$$"))]),
+    );
+    r.insert(
+        s("healthcheck"),
+        map([
+            ("test", list([s("CMD-SHELL"), s(trunks::switch_ready(trunks))])),
+            ("interval", s("2s")),
+            ("timeout", s("2s")),
+            ("retries", Value::Number(30.into())),
+        ]),
+    );
+    r.insert(s("restart"), s("unless-stopped"));
+    Value::Mapping(r)
 }
 
 /// The router: on every network at its last address, forwarding with the `reach` rules.
@@ -552,7 +616,13 @@ fn router_service(spec: &Spec) -> Value {
 /// route through its gateway (or, for a gateway, out through Docker on a network with
 /// internet), and no default route when the machine is offline.
 fn route_commands(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
-    let mut cmds = router::route_commands(spec, name, m, true);
+    // Its trunks first: the routes below may go through addresses only they carry.
+    let ts = trunks::trunks(spec);
+    let mut cmds: Vec<String> = trunks::of(&ts, name)
+        .flat_map(|t| trunks::machine_commands(spec, m, t, |n, o| address(spec, n, o), |n| super::host_address(spec, n)))
+        .map(|c| c.replace('$', "$$"))
+        .collect();
+    cmds.extend(router::route_commands(spec, name, m, true));
     if let Some(out) = own_default(spec, name, m) {
         cmds.push(format!("ip route replace default via {out}"));
     }
@@ -570,9 +640,11 @@ fn route_commands(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
 /// none, and an offline machine couldn't install it).
 const TC_IMAGE: &str = "nicolaka/netshoot:v0.13";
 
-/// Whether a machine is on a network with `tc`.
+/// Whether a machine's sidecar needs `tc` or 802.1Q (`ip link ... type vlan`): on a network
+/// with `tc`, or on a trunk.
 fn impaired(spec: &Spec, m: &Machine) -> bool {
     m.networks.keys().any(|n| spec.networks[n].tc.is_some())
+        || m.networks.keys().filter(|n| spec.networks[*n].vlan.is_some()).count() >= 2 && m.docker.is_some()
 }
 
 /// Whether a network is Docker's internal network: offline, nothing routes, and no machine
@@ -621,8 +693,12 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     if offline(spec, name, m) && m.networks.keys().any(|n| !internal(spec, n)) {
         ready.push("! ip route | grep -q '^default'".into());
     }
-    if impaired(spec, m) {
+    if m.networks.keys().any(|n| spec.networks[n].tc.is_some()) {
         ready.push("tc qdisc show | grep -q netem".into());
+    }
+    let ts = trunks::trunks(spec);
+    for t in trunks::of(&ts, name) {
+        ready.push(trunks::machine_ready(t));
     }
     r.insert(
         s("healthcheck"),
@@ -635,6 +711,9 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     );
     let mut deps = Mapping::new();
     deps.insert(s(host), map([("condition", s("service_started"))]));
+    for t in trunks::of(&ts, name) {
+        deps.insert(s(trunks::switch_name(&t.lan)), map([("condition", s("service_healthy"))]));
+    }
     if router::needed(spec) && m.networks.keys().any(|n| router::plain(spec, n)) {
         deps.insert(s(router::NAME), map([("condition", s("service_healthy"))]));
     }

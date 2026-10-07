@@ -165,12 +165,50 @@
       ],
       "default_gateway": null,
       "offline": false
+    },
+    "admin": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker",
+        "vm"
+      ],
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "office-vlan10": "10.70.10.50",
+        "office-vlan20": "10.70.20.50"
+      },
+      "docker_addresses": {
+        "office-vlan10": "10.70.10.50",
+        "office-vlan20": "10.70.20.50"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [
+        {
+          "to": "10.70.99.0/24",
+          "via": "10.70.10.254"
+        }
+      ],
+      "default_gateway": null,
+      "offline": false
     }
   },
   "start_order": [
     "intranet",
     "staff",
-    "guest"
+    "guest",
+    "admin"
   ],
   "clones": {},
   "tools": {},
@@ -219,7 +257,7 @@
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on intranet, guest"
+      "external": "needs `external:` on intranet, guest, admin"
     }
   },
   "checks": {
@@ -291,6 +329,29 @@
             "target": "10.70.99.10:80",
             "expect": "blocked",
             "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "admin",
+        "machine": "admin",
+        "runner": "isoloom-check-admin",
+        "checks": [
+          {
+            "name": "the admin box reaches the intranet over its trunk",
+            "derived": false,
+            "kind": "http",
+            "target": "http://intranet/",
+            "expect": "200",
+            "wait": 60
+          },
+          {
+            "name": "intranet:80 from admin",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.70.99.10:80/",
+            "expect": "any",
+            "wait": 30
           }
         ]
       }

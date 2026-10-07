@@ -148,11 +148,11 @@ resource "proxmox_virtual_environment_vm" "env" {
     enabled = true
   }
   cpu {
-    cores = 2
+    cores = 3
     type  = "host"
   }
   memory {
-    dedicated = 2048
+    dedicated = 2560
   }
   disk {
     datastore_id = var.datastore

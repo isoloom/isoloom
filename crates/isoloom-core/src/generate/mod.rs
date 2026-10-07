@@ -13,6 +13,7 @@ mod kubernetes;
 mod proxmox;
 pub mod resolved;
 mod router;
+mod trunks;
 mod vagrant;
 
 use std::fmt;

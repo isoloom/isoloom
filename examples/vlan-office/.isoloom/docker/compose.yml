@@ -42,6 +42,29 @@ services:
       timeout: 3s
       retries: 60
     restart: unless-stopped
+  isoloom-switch-office:
+    image: nicolaka/netshoot:v0.13
+    cap_add:
+    - NET_ADMIN
+    networks:
+      office-vlan10:
+        ipv4_address: 10.70.10.253
+      office-vlan20:
+        ipv4_address: 10.70.20.253
+      isoloom-trunk-office-admin:
+        mac_address: 02:1e:1d:38:30:39
+    entrypoint:
+    - /bin/sh
+    - -c
+    - 'IF=$$(ip -o -4 addr show | awk ''$$4 ~ /^10\.70\.10\.253\//{print $$2}'' | head -n 1) && ip addr flush dev $$IF && ip link add br10 type bridge && ip link set $$IF master br10 && ip link set br10 up && IF=$$(ip -o -4 addr show | awk ''$$4 ~ /^10\.70\.20\.253\//{print $$2}'' | head -n 1) && ip addr flush dev $$IF && ip link add br20 type bridge && ip link set $$IF master br20 && ip link set br20 up && IF=$$(ip -o link | awk ''tolower($$0) ~ /02:1e:1d:38:30:39/ {print $$2}'' | cut -d@ -f1 | tr -d : | head -n 1) && ip addr flush dev $$IF && ip link set $$IF up && ip link add link $$IF name $$IF.10 type vlan id 10 && ip link set $$IF.10 master br10 && ip link set $$IF.10 up && ip link add link $$IF name $$IF.20 type vlan id 20 && ip link set $$IF.20 master br20 && ip link set $$IF.20 up && exec sleep infinity'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - ip link show br10 | grep -q 'state UP' && ip link show br20 | grep -q 'state UP'
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    restart: unless-stopped
   intranet:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -52,6 +75,7 @@ services:
     extra_hosts:
     - staff:10.70.10.10
     - guest:10.70.20.10
+    - admin:10.70.10.50
     healthcheck:
       test:
       - CMD-SHELL
@@ -98,6 +122,7 @@ services:
     extra_hosts:
     - intranet:10.70.99.10
     - staff:10.70.10.10
+    - admin:10.70.20.50
     restart: unless-stopped
   guest-routes:
     image: alpine:3.20
@@ -121,6 +146,45 @@ services:
       isoloom-router:
         condition: service_healthy
     restart: unless-stopped
+  admin:
+    image: alpine:3.20
+    platform: linux/amd64
+    entrypoint:
+    - sleep
+    - infinity
+    hostname: admin
+    networks:
+      isoloom-trunk-office-admin:
+        mac_address: 02:1e:1d:38:30:38
+    extra_hosts:
+    - intranet:10.70.99.10
+    - staff:10.70.10.10
+    - guest:10.70.20.10
+    restart: unless-stopped
+  admin-routes:
+    image: nicolaka/netshoot:v0.13
+    network_mode: service:admin
+    cap_add:
+    - NET_ADMIN
+    entrypoint:
+    - /bin/sh
+    - -c
+    - 'IF=$$(ip -o link | awk ''tolower($$0) ~ /02:1e:1d:38:30:38/ {print $$2}'' | cut -d@ -f1 | tr -d : | head -n 1) && ip addr flush dev $$IF && ip link set $$IF down && ip link set $$IF name office && ip link set office up && ip link add link office name office.10 type vlan id 10 && ip addr add 10.70.10.50/24 dev office.10 && ip link set office.10 up && ip link add link office name office.20 type vlan id 20 && ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up && ip route replace default via 10.70.20.1 && ip route replace 10.70.99.0/24 via 10.70.10.254 && exec sleep infinity'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - ip route show 10.70.99.0/24 | grep -q via && ip link show office.10 | grep -q 'UP' && ip link show office.20 | grep -q 'UP'
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      admin:
+        condition: service_started
+      isoloom-switch-office:
+        condition: service_healthy
+      isoloom-router:
+        condition: service_healthy
+    restart: unless-stopped
   isoloom-access:
     image: alpine:3.20
     hostname: staff
@@ -130,6 +194,7 @@ services:
     extra_hosts:
     - intranet:10.70.99.10
     - guest:10.70.20.10
+    - admin:10.70.10.50
     entrypoint:
     - sleep
     - infinity
@@ -176,6 +241,8 @@ services:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
+      admin-routes:
+        condition: service_healthy
       isoloom-access:
         condition: service_started
       isoloom-access-routes:
@@ -197,6 +264,8 @@ services:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
+      admin-routes:
+        condition: service_healthy
   isoloom-check-guest:
     image: curlimages/curl:8.11.1
     profiles:
@@ -214,7 +283,30 @@ services:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
+      admin-routes:
+        condition: service_healthy
       guest:
+        condition: service_started
+  isoloom-check-admin:
+    image: curlimages/curl:8.11.1
+    profiles:
+    - check
+    entrypoint:
+    - /bin/sh
+    - /isoloom/run.sh
+    volumes:
+    - ./checks/admin.sh:/isoloom/run.sh:ro
+    network_mode: service:admin
+    depends_on:
+      intranet:
+        condition: service_healthy
+      intranet-routes:
+        condition: service_healthy
+      guest-routes:
+        condition: service_healthy
+      admin-routes:
+        condition: service_healthy
+      admin:
         condition: service_started
 networks:
   office-vlan10:
@@ -232,3 +324,5 @@ networks:
       config:
       - subnet: 10.70.99.0/24
         gateway: 10.70.99.1
+  isoloom-trunk-office-admin:
+    internal: true

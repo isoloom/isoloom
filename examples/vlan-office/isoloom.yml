@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # An office LAN split into two VLANs, as a switch would: staff on VLAN 10, guests on VLAN 20.
 # Staff may reach the intranet server; guests only the internet. Each VLAN becomes a network
-# of its own (`office-vlan10`, `office-vlan20`); machines join them as `office.vlan10`.
+# of its own (`office-vlan10`, `office-vlan20`); machines join them as `office.vlan10`. The
+# admin box is on both: on Docker it gets one 802.1Q trunk (`office.10`, `office.20`).
 version: 1
 name: vlan-office
 
@@ -42,6 +43,15 @@ machines:
       os: debian-12
       provision: [provision/guest.sh]
 
+  admin:
+    networks: { office.vlan10: 50, office.vlan20: 50 }
+    docker:
+      image: "alpine:3.20"
+      idle: true
+    vm:
+      os: debian-12
+      provision: [provision/guest.sh]
+
 checks:
   - name: staff reach the intranet
     from: staff
@@ -52,3 +62,8 @@ checks:
     from: guest
     tcp: intranet:80
     expect: blocked
+  - name: the admin box reaches the intranet over its trunk
+    from: admin
+    http: http://intranet/
+    expect: 200
+    wait: 60

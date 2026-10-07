@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### 802.1Q trunks
+- A machine on several VLANs of one LAN gets one tagged link instead of one interface per VLAN, as a router-on-a-stick or a server on a trunk port has: on Docker, its interface is named after the LAN with its addresses on `<lan>.<id>` subinterfaces (`office.10`, `office.20`), and frames cross the trunk with their 802.1Q tag (a capture on it shows them). A switch container per LAN (`isoloom-switch-<lan>`, at the controller address of each VLAN, unused on Docker) bridges each VLAN's network to the trunks' subinterfaces. Machines on one VLAN, the router, the internet and the checks are as before. Example: vlan-office's admin box.
+
 ### Link impairment on the machines too
 - `networks.*.tc` now also applies on every machine's own interface on the network, not only on the router's interface into it: traffic between two machines of the network (a direct link with no router, or a LAN) is impaired too, and `delay` is the one-way latency in both directions (80 ms gives a 160 ms round trip through the router). Docker: the machine's network sidecar runs `tc` (netshoot, which has it; the utility image doesn't). Local VMs: a oneshot unit on each Linux VM, re-applied at boot. A network no longer needs the router on it to take `tc`.
 - `isoloom tc show|set|disable|reset` acts on the router and on every machine of the network.
