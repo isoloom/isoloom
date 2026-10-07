@@ -637,9 +637,11 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
         .filter(|(_, m)| m.vm.is_some())
         .map(|(n, _)| format!(", proxmox_virtual_environment_vm.{}", res(n)))
         .collect();
+    let (ctl_cpus, ctl_mem, ctl_disk) = super::controller_size(spec);
+    let ctl_disk = ctl_disk.unwrap_or(8);
     let _ = writeln!(
         tf,
-        "\nresource \"proxmox_virtual_environment_vm\" \"isoloom_controller\" {{\n  name      = \"iso${{var.slot}}-controller\"\n  node_name = var.node\n  tags      = [\"isoloom\", \"{env}\"]\n  on_boot   = false\n  cpu {{\n    cores = 1\n    type  = \"host\"\n  }}\n  memory {{\n    dedicated = 1024\n  }}\n  disk {{\n    datastore_id = var.datastore\n    file_id      = proxmox_download_file.{img}.id\n    interface    = \"virtio0\"\n    size         = 8\n  }}\n{nics}  initialization {{\n    datastore_id      = var.datastore\n    user_data_file_id = proxmox_virtual_environment_file.controller.id\n    dns {{\n      servers = [\"1.1.1.1\"]\n    }}\n{ipcfg}  }}\n  operating_system {{\n    type = \"l26\"\n  }}\n  serial_device {{}}\n  depends_on = [proxmox_virtual_environment_vm.isoloom_router{deps}]\n}}",
+        "\nresource \"proxmox_virtual_environment_vm\" \"isoloom_controller\" {{\n  name      = \"iso${{var.slot}}-controller\"\n  node_name = var.node\n  tags      = [\"isoloom\", \"{env}\"]\n  on_boot   = false\n  cpu {{\n    cores = {ctl_cpus}\n    type  = \"host\"\n  }}\n  memory {{\n    dedicated = {ctl_mem}\n  }}\n  disk {{\n    datastore_id = var.datastore\n    file_id      = proxmox_download_file.{img}.id\n    interface    = \"virtio0\"\n    size         = {ctl_disk}\n  }}\n{nics}  initialization {{\n    datastore_id      = var.datastore\n    user_data_file_id = proxmox_virtual_environment_file.controller.id\n    dns {{\n      servers = [\"1.1.1.1\"]\n    }}\n{ipcfg}  }}\n  operating_system {{\n    type = \"l26\"\n  }}\n  serial_device {{}}\n  depends_on = [proxmox_virtual_environment_vm.isoloom_router{deps}]\n}}",
         img = res(super::cloud_vm::CONTROLLER_OS),
     );
 }

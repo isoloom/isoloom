@@ -198,30 +198,29 @@ Vagrant.configure("2") do |config|
   end
 
   config.vm.define "isoloom-controller" do |m|
-    m.vm.box = "bento/debian-12"
+    m.vm.box = "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
     m.vm.network "private_network", ip: "10.60.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "hello-stack · controller"
       v.linked_clone = true
       v.cpus = 1
-      v.memory = 1024
+      v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
       v.vmx["displayName"] = "hello-stack · controller"
       v.vmx["numvcpus"] = "1"
-      v.vmx["memsize"] = "1024"
+      v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
       v.name = "hello-stack · controller"
       v.linked_clone = true
       v.cpus = 1
-      v.memory = 1024
+      v.memory = 512
     end
-    m.vm.provider "libvirt" do |v, o|
-      o.vm.box = "generic/debian12"
+    m.vm.provider "libvirt" do |v|
       v.cpus = 1
-      v.memory = 1024
+      v.memory = 512
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -232,7 +231,7 @@ Vagrant.configure("2") do |config|
       v.esxi_virtual_network = esxi_networks(["app"])
       v.guest_name = "hello-stack-controller"
       v.guest_numvcpus = 1
-      v.guest_memsize = 1024
+      v.guest_memsize = 512
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.60.0.20 cache' '10.60.0.10 web'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     PROJECT.each do |entry|
@@ -241,9 +240,13 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "controller", inline: <<~'SH'
       set -e
-      export DEBIAN_FRONTEND=noninteractive
-      apt-get update -qq
-      apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null
+      if command -v apk >/dev/null; then
+        apk add -q --no-cache python3 sshpass curl netcat-openbsd
+      else
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -qq
+        apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null
+      fi
       [ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/inventory.ini <<'INV'

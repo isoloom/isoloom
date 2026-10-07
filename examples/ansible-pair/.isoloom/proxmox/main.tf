@@ -393,7 +393,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_controller" {
     type  = "host"
   }
   memory {
-    dedicated = 1024
+    dedicated = 768
   }
   disk {
     datastore_id = var.datastore

@@ -13,12 +13,15 @@ services:
     networks:
       isoloom-mgmt:
         ipv4_address: 10.255.255.10
+        interface_name: eth0
         priority: 1000
       site-a:
         ipv4_address: 10.91.1.1
+        interface_name: eth1
         priority: 999
       wan:
         ipv4_address: 10.91.0.2
+        interface_name: eth2
         priority: 998
     cap_add:
     - NET_ADMIN
@@ -66,12 +69,15 @@ services:
     networks:
       isoloom-mgmt:
         ipv4_address: 10.255.255.11
+        interface_name: eth0
         priority: 1000
       site-b:
         ipv4_address: 10.91.2.1
+        interface_name: eth1
         priority: 999
       wan:
         ipv4_address: 10.91.0.3
+        interface_name: eth2
         priority: 998
     cap_add:
     - NET_ADMIN

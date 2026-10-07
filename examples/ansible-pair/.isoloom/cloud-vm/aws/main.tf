@@ -295,7 +295,7 @@ resource "aws_network_interface" "isoloom_controller_lab" {
 
 resource "aws_instance" "isoloom_controller" {
   ami           = data.aws_ami.debian_12.id
-  instance_type = "t3.small"
+  instance_type = "t3.micro"
   key_name      = aws_key_pair.env.key_name
   user_data     = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
   primary_network_interface {

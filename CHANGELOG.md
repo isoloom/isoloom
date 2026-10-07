@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### A lighter controller, sized by the spec
+- The controller that runs `provision:` playbooks defaults to 1 CPU and 512 MB on every target (it was 1 GB). On local VMs its box is `generic/alpine319` (about 100 MB to download instead of 675 MB, for VirtualBox, libvirt, VMware and Parallels alike): Python, ansible-core and pywinrm install in seconds. Proxmox and the clouds keep their Debian images, at the new size (AWS `t3.micro`, Azure `Standard_B1s`, GCP `e2-small`).
+- `controller:` (top level) sets it like a machine: `image: { vagrant, vagrant_version }` for a box of your own (its setup handles Alpine and Debian), `resources: { cpus, memory_mb, disk_gb }` (disk on Proxmox) for many forks against a large environment. Example: ansible-pair gives it 768 MB.
+
 ### More network appliances: Cisco QEMU images and Dynamips
 - `appliance: cisco-vios | cisco-viosl2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
 - `appliance: cisco-dynamips` with `docker.firmware: <your IOS .bin>`: a Cisco 7200 emulated by Dynamips, in a container Isoloom builds (Ubuntu's `dynamips`); the data interfaces bind to `FastEthernet0/0`, then `1/0`, `1/1`, `2/0`... on PA-2FE-TX adapters. No KVM needed. Example: cisco-dynamips.

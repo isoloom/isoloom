@@ -662,9 +662,10 @@ fn controller(spec: &Spec, tf: &mut String, lab: &str) {
         );
     }
     let first = res(nets[0]);
+    let ctl_size = instance_type(super::controller_size(spec).1);
     let _ = writeln!(
         tf,
-        "\nresource \"aws_instance\" \"isoloom_controller\" {{\n  ami           = data.aws_ami.{os}.id\n  instance_type = \"t3.small\"\n  key_name      = aws_key_pair.env.key_name\n  user_data     = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  primary_network_interface {{\n    network_interface_id = aws_network_interface.isoloom_controller_{first}.id\n  }}\n  tags = {{ Name = \"${{local.name}}-controller\" }}\n}}\n\nresource \"aws_eip\" \"isoloom_controller\" {{\n  network_interface = aws_network_interface.isoloom_controller_{first}.id\n  depends_on        = [aws_internet_gateway.env]\n}}",
+        "\nresource \"aws_instance\" \"isoloom_controller\" {{\n  ami           = data.aws_ami.{os}.id\n  instance_type = \"{ctl_size}\"\n  key_name      = aws_key_pair.env.key_name\n  user_data     = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  primary_network_interface {{\n    network_interface_id = aws_network_interface.isoloom_controller_{first}.id\n  }}\n  tags = {{ Name = \"${{local.name}}-controller\" }}\n}}\n\nresource \"aws_eip\" \"isoloom_controller\" {{\n  network_interface = aws_network_interface.isoloom_controller_{first}.id\n  depends_on        = [aws_internet_gateway.env]\n}}",
         os = res(CONTROLLER_OS),
     );
     for (i, n) in nets.iter().enumerate().skip(1) {

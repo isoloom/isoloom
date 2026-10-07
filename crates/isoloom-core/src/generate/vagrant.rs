@@ -671,10 +671,19 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
 
 /// The controller: a Debian VM on every network at its controller address, started after every
 /// machine. It writes the inventory and runs the environment-level Ansible playbooks.
+/// What the controller installs before Ansible: Python's venv, sshpass (password SSH), curl and
+/// netcat (checks). Alpine's packages (the default box), or Debian's (a `controller.image`).
+const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add -q --no-cache python3 sshpass curl netcat-openbsd\nelse\n  export DEBIAN_FRONTEND=noninteractive\n  apt-get update -qq\n  apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\nfi\n";
+
 fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
     let _ = writeln!(out, "\n  config.vm.define \"isoloom-controller\" do |m|");
-    let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
+    let (bx, version) = super::controller_box(spec);
+    let (cpus, mem, _) = super::controller_size(spec);
+    let _ = writeln!(out, "    m.vm.box = {}", rb(bx));
+    if let Some(v) = version {
+        let _ = writeln!(out, "    m.vm.box_version = {}", rb(v));
+    }
     let _ = writeln!(out, "    m.vm.hostname = \"isoloom-controller\"");
     for net in spec.networks.keys() {
         let netname = format!("isoloom-{}-{net}", spec.name);
@@ -690,25 +699,25 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
     let label = format!("{} · controller", spec.name);
     let _ = writeln!(
         out,
-        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 1024\n    end",
+        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
         rb(&label)
     );
     let _ = writeln!(
         out,
-        "    m.vm.provider \"vmware_desktop\" do |v|\n      v.vmx[\"displayName\"] = {}\n      v.vmx[\"numvcpus\"] = \"1\"\n      v.vmx[\"memsize\"] = \"1024\"\n    end",
+        "    m.vm.provider \"vmware_desktop\" do |v|\n      v.vmx[\"displayName\"] = {}\n      v.vmx[\"numvcpus\"] = \"{cpus}\"\n      v.vmx[\"memsize\"] = \"{mem}\"\n    end",
         rb(&label)
     );
     let _ = writeln!(
         out,
-        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 1024\n    end",
+        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
         rb(&label)
     );
     let _ = writeln!(
         out,
-        "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 1024\n    end"
+        "    m.vm.provider \"libvirt\" do |v|\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
     );
     let all: Vec<&str> = spec.networks.keys().map(String::as_str).collect();
-    esxi(out, &format!("{}-controller", spec.name), 1, 1024, &all);
+    esxi(out, &format!("{}-controller", spec.name), cpus, mem, &all);
     // Every machine by name, at its address on its first network (the controller is on all).
     let hosts: Vec<String> = spec
         .machines
@@ -730,7 +739,7 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
     );
     out.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
     let script = format!(
-        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\n[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
+        "set -e\n{CONTROLLER_PACKAGES}[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
         inventory(spec)
     );
     let _ = writeln!(

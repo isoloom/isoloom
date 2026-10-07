@@ -309,7 +309,7 @@ resource "azurerm_linux_virtual_machine" "isoloom_controller" {
   name                  = "${local.name}-controller"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
-  size                  = "Standard_B1ms"
+  size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.isoloom_controller_lab.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
