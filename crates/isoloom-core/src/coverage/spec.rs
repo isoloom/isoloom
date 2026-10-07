@@ -406,6 +406,21 @@ fn base_table() -> Vec<Row> {
             NOT_A_CONTAINER,
         ),
         row(
+            "machines.*.docker.appliance",
+            done(
+                "Cisco IOL as vrnetlab packages it: the management port first, the networks as Ethernet0/1..., NETMAP and iouyap, a startup configuration with the addresses",
+                "cisco-iol",
+            ),
+            NOT_A_CONTAINER,
+            NOT_A_CONTAINER,
+        ),
+        row(
+            "machines.*.docker.config",
+            done("added to the generated startup configuration when the container starts", "cisco-iol"),
+            NOT_A_CONTAINER,
+            NOT_A_CONTAINER,
+        ),
+        row(
             "machines.*.docker.idle",
             done("kept running idle (`entrypoint: [sleep, infinity]`), a machine to work from", "workbench"),
             NOT_A_CONTAINER,

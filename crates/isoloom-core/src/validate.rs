@@ -235,6 +235,42 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     if access.len() > 1 {
         add("machines", format!("only one machine can be the access machine (found {})", access.len()));
     }
+    // Network appliances (`docker.appliance`): Docker machines Isoloom wires as their image expects.
+    let mgmt = Cidr::parse(crate::generate::APPLIANCE_MGMT_CIDR).expect("constant");
+    let any_appliance = spec.machines.values().any(|m| m.docker.as_ref().is_some_and(|d| d.appliance.is_some()));
+    for (name, m) in &spec.machines {
+        let Some(d) = m.docker.as_ref().filter(|d| d.appliance.is_some()) else {
+            continue;
+        };
+        let at = format!("machines.{name}");
+        if m.vm.is_some() {
+            add(
+                &format!("{at}.vm"),
+                "a network appliance runs on the Docker targets only: leave `vm` out".into(),
+            );
+        }
+        if m.access {
+            add(&format!("{at}.access"), "a network appliance can't be the access machine".into());
+        }
+        if d.idle || !d.init.is_empty() {
+            add(&format!("{at}.docker"), "a network appliance runs its own OS: no `idle` or `init`".into());
+        }
+        if let Some(c) = &d.config
+            && (c.starts_with('/') || c.split('/').any(|p| p == ".."))
+        {
+            add(&format!("{at}.docker.config"), "a path in the project".into());
+        }
+    }
+    if any_appliance {
+        for (net, n) in &spec.networks {
+            if Cidr::parse(&n.cidr).is_some_and(|c| c.overlaps(mgmt)) {
+                add(
+                    &format!("networks.{net}.cidr"),
+                    format!("overlaps {}, the network appliances' management network", crate::generate::APPLIANCE_MGMT_CIDR),
+                );
+            }
+        }
+    }
     for (name, m) in &spec.machines {
         let at = format!("machines.{name}");
         if !dns_label(name) {
@@ -707,6 +743,10 @@ fn validate_check(spec: &Spec, i: usize, d: &crate::model::Declared, add: &mut d
     match &d.from {
         Some(f) => match spec.machines.get(f) {
             None => add(&format!("{at}.from"), format!("no machine named `{f}`")),
+            Some(m) if m.docker.as_ref().is_some_and(|d| d.appliance.is_some()) => add(
+                &format!("{at}.from"),
+                format!("`{f}` is a network appliance: checks run from the machines around it"),
+            ),
             Some(m) if !crate::checks::can_run_checks(m) => add(&format!("{at}.from"), format!("`{f}` runs Windows; checks run from Linux machines for now")),
             Some(_) => {}
         },

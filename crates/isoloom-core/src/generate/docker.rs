@@ -28,7 +28,7 @@
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, router, trunks};
+use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, appliances, common_unsupported, header, router, trunks};
 use crate::checks;
 use crate::model::{Machine, Spec, Target};
 
@@ -114,6 +114,7 @@ pub(super) fn file_name(path: &str) -> &str {
 pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     common_unsupported(spec, Target::Docker)?;
 
+    let mut appliance_files: Vec<GeneratedFile> = Vec::new();
     let mut services = Mapping::new();
     if router::needed(spec) {
         services.insert(s(router::NAME), router_service(spec));
@@ -213,6 +214,44 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         if !m.volumes.is_empty() {
             let mounts = m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", volume_name(name, v)))).collect();
             svc.insert(s("volumes"), Value::Sequence(mounts));
+        }
+        // A network appliance: its files, its start, its interfaces in the order it expects.
+        if let Some(kind) = d.appliance {
+            let mut mounts = Vec::new();
+            for (file, inside, contents) in appliances::files(spec, name, m, kind, |n, o| address(spec, n, o)) {
+                appliance_files.push(GeneratedFile {
+                    path: format!("{OUTPUT_DIR}/{DIR}/appliances/{name}/{file}"),
+                    contents,
+                });
+                mounts.push(s(format!("./appliances/{name}/{file}:{inside}:ro")));
+            }
+            if let Some(own) = &d.config {
+                mounts.push(s(format!("{ROOT}/{own}:/iol/own.txt:ro")));
+            }
+            svc.insert(s("volumes"), Value::Sequence(mounts));
+            svc.insert(s("entrypoint"), list(appliances::entrypoint(kind).into_iter().map(s)));
+            let mut env = Mapping::new();
+            env.insert(s("IOL_PID"), s(appliances::iol_pid(spec, name).to_string()));
+            svc.insert(s("environment"), Value::Mapping(env));
+            svc.insert(s("cap_add"), list([s("NET_ADMIN"), s("NET_RAW")]));
+            let mut nets = Mapping::new();
+            nets.insert(
+                s(appliances::MGMT_NETWORK),
+                map([
+                    ("ipv4_address", s(appliances::mgmt_address(spec, name).to_string())),
+                    ("priority", Value::Number(1000.into())),
+                ]),
+            );
+            for (k, (net, octet)) in m.networks.iter().enumerate() {
+                nets.insert(
+                    s(net.as_str()),
+                    map([
+                        ("ipv4_address", s(address(spec, net, *octet).to_string())),
+                        ("priority", Value::Number((999 - k as u64).into())),
+                    ]),
+                );
+            }
+            svc.insert(s("networks"), Value::Mapping(nets));
         }
         if !m.services.is_empty() {
             svc.insert(
@@ -460,6 +499,12 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
     for t in &ts {
         networks.insert(s(trunks::link_network(t)), map([("internal", Value::Bool(true))]));
     }
+    if !appliances::appliances(spec).is_empty() {
+        networks.insert(
+            s(appliances::MGMT_NETWORK),
+            map([("ipam", map([("config", list([map([("subnet", s(appliances::MGMT_CIDR))])]))]))]),
+        );
+    }
 
     let mut volumes = Mapping::new();
     for (name, m) in &spec.machines {
@@ -496,6 +541,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         contents: format!("{}{usage}{moved}\n{yaml}", header("#")),
     }];
     files.extend(runner_files);
+    files.extend(appliance_files);
     Ok(files)
 }
 
@@ -616,6 +662,10 @@ fn router_service(spec: &Spec) -> Value {
 /// route through its gateway (or, for a gateway, out through Docker on a network with
 /// internet), and no default route when the machine is offline.
 fn route_commands(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
+    // An appliance routes itself (IOS): its sidecar only hands the data addresses over to it.
+    if m.docker.as_ref().is_some_and(|d| d.appliance.is_some()) {
+        return appliances::sidecar_commands(m);
+    }
     // Its trunks first: the routes below may go through addresses only they carry.
     let ts = trunks::trunks(spec);
     let mut cmds: Vec<String> = trunks::of(&ts, name)
@@ -699,6 +749,10 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     let ts = trunks::trunks(spec);
     for t in trunks::of(&ts, name) {
         ready.push(trunks::machine_ready(t));
+    }
+    // An appliance's sidecar only hands its data addresses over: ready once they're gone.
+    if m.docker.as_ref().is_some_and(|d| d.appliance.is_some()) {
+        ready = vec!["! ip -o -4 addr show | grep -q ' eth[1-9]'".into()];
     }
     r.insert(
         s("healthcheck"),

@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 
 pub use generate::resolved;
 pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, generate_instance, refusal};
-pub use model::{Arch, Check, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target, Tc, Vlan};
+pub use model::{Appliance, Arch, Check, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target, Tc, Vlan};
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};
 
