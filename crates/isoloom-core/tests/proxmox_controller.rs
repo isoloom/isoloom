@@ -27,7 +27,7 @@ fn proxmox_runs_environment_playbooks_from_a_controller() {
     assert!(tf.contains("ansible_ssh_private_key_file=/etc/isoloom/id_ed25519"));
     // It waits for each machine's own set-up to finish, then runs the playbooks.
     assert!(tf.contains("test -f /var/lib/isoloom/ready"));
-    assert!(tf.contains("ansible-playbook -i /etc/isoloom/inventory.ini"));
+    assert!(tf.contains("isoloom_play site.yml -i /etc/isoloom/inventory.ini"), "{tf}");
     // It starts after every machine exists.
     assert!(tf.contains("depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm."));
 }

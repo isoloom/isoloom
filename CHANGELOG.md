@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Playbooks retried on unreachable hosts
+- The controller retries a `provision:` playbook whose only failures are unreachable hosts (a Windows host that drops WinRM for a minute after a reboot or a domain join): after 60 s, on those hosts alone (Ansible's retry file), up to 3 attempts, each logged. The play recap decides: a failed task is never retried. On every target with a controller (local VMs, Proxmox, cloud VMs).
+
 ### More network appliances: Cisco QEMU images and Dynamips
 - `appliance: cisco-vios | cisco-viosl2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
 - `appliance: cisco-dynamips` with `docker.firmware: <your IOS .bin>`: a Cisco 7200 emulated by Dynamips, in a container Isoloom builds (Ubuntu's `dynamips`); the data interfaces bind to `FastEthernet0/0`, then `1/0`, `1/1`, `2/0`... on PA-2FE-TX adapters. No KVM needed. Example: cisco-dynamips.

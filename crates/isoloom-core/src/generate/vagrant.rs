@@ -825,6 +825,33 @@ fn inventory(spec: &Spec) -> String {
     inv
 }
 
+/// `isoloom_play <playbook> <args>`: runs a playbook, and when its only failures are unreachable
+/// hosts (a Windows host dropping WinRM for a minute after a reboot), runs it again on those
+/// hosts alone (Ansible's retry file) after a wait, up to 3 attempts. The play recap tells:
+/// `ansible-playbook` exits with 2 for unreachable hosts as for failed tasks. A failed task is
+/// never retried.
+const RETRY_UNREACHABLE: &str = r#"isoloom_play() {
+  play=$1; shift
+  retry=/tmp/isoloom-retry/${play%.*}.retry; log=/tmp/isoloom-retry/${play%.*}.log
+  mkdir -p /tmp/isoloom-retry; rm -f "$retry"
+  attempt=1; limit=
+  while :; do
+    { rc=0; ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry ansible-playbook "$@" $limit "$play" || rc=$?; echo "$rc" > "$log.rc"; } 2>&1 | tee "$log"
+    rc=$(cat "$log.rc")
+    [ "$rc" -eq 0 ] && return 0
+    recap=$(grep -E ' : ok=[0-9]+ ' "$log" || true)
+    if echo "$recap" | grep -Eq 'failed=[1-9]' || ! echo "$recap" | grep -Eq 'unreachable=[1-9]' || [ "$attempt" -ge 3 ] || [ ! -s "$retry" ]; then
+      echo "isoloom: $play failed (exit $rc, attempt $attempt of 3)" >&2
+      return "$rc"
+    fi
+    echo "isoloom: $play: unreachable hosts ($(tr '\n' ' ' < "$retry")), attempt $attempt of 3: trying them again in 60 s" >&2
+    sleep 60
+    attempt=$((attempt + 1))
+    cp "$retry" "$retry.limit"; limit="--limit @$retry.limit"
+  done
+}
+"#;
+
 /// The controller's script running the environment's playbooks (`provision:`), in order, with
 /// the inventory at /etc/isoloom/inventory.ini plus each step's own files. Shared with the
 /// cloud output.
@@ -837,6 +864,7 @@ pub(super) fn ansible_runs(spec: &Spec) -> String {
          ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
          ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n",
     );
+    script.push_str(RETRY_UNREACHABLE);
     for step in &spec.provision {
         let dir = step.ansible.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
         let file = step.ansible.rsplit('/').next().unwrap_or(&step.ansible);
@@ -852,7 +880,7 @@ pub(super) fn ansible_runs(spec: &Spec) -> String {
             None => "[ ! -f requirements.yml ] || ansible-galaxy install -r requirements.yml\n".into(),
         };
         script.push_str(&format!(
-            "cd /opt/isoloom/{dir}\n{requirements}ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars} {file}\n"
+            "cd /opt/isoloom/{dir}\n{requirements}isoloom_play {file} -i /etc/isoloom/inventory.ini{extra}{vars}\n"
         ));
     }
     script
