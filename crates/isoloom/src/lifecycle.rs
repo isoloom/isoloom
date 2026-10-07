@@ -143,11 +143,13 @@ fn probe(e: &Entry) -> String {
                 _ => "hybrid",
             };
             run("vagrant", &["status", "--machine-readable"], &out.join(sub)).map(|text| {
+                // The spec's machines: Isoloom's own (router, controller, tools) are infra, and a
+                // halted controller is its normal state once provisioning is done.
                 let states: Vec<&str> = text
                     .lines()
                     .filter_map(|l| {
                         let f: Vec<&str> = l.split(',').collect();
-                        (f.len() >= 4 && f[2] == "state").then_some(f[3])
+                        (f.len() >= 4 && f[2] == "state" && !f[1].starts_with("isoloom-")).then_some(f[3])
                     })
                     .collect();
                 counted(states.iter().filter(|s| **s == "running").count(), states.len())

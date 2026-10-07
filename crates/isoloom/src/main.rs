@@ -1475,6 +1475,12 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
         }
     }
 
+    // A controller halted after provisioning runs checks again: booted for them, halted after.
+    let _rehalt = match t {
+        core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid => wake_controller(&out, t, json)?,
+        _ => None,
+    };
+
     // Run each, reading the PASS/FAIL lines (whatever prefix the tool adds), streaming the rest.
     let mut outcomes: Vec<Outcome> = Vec::new();
     let mut finished = 0usize;
@@ -1607,6 +1613,84 @@ fn terraform_output(module: &std::path::Path) -> Result<serde_json::Value, Box<d
 }
 
 /// `kubectl kustomize` of a folder, as text.
+/// Halts the controller again when dropped (it was booted for the checks).
+struct Rehalt(PathBuf);
+
+impl Drop for Rehalt {
+    fn drop(&mut self) {
+        let _ = std::process::Command::new("vagrant")
+            .args(["halt", CONTROLLER])
+            .current_dir(&self.0)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+}
+
+const CONTROLLER: &str = "isoloom-controller";
+
+/// Boots the controller of a Vagrant output when it is halted (as it is after provisioning);
+/// the guard halts it again.
+fn wake_controller(out: &std::path::Path, t: core::Target, quiet: bool) -> Result<Option<Rehalt>, Box<dyn std::error::Error>> {
+    let wd = out.join(match t {
+        core::Target::Vagrant => "vagrant",
+        core::Target::DockerVm => "docker-vm",
+        _ => "hybrid",
+    });
+    let vagrantfile = std::fs::read_to_string(wd.join("Vagrantfile")).unwrap_or_default();
+    if !vagrantfile.contains(&format!("config.vm.define \"{CONTROLLER}\"")) {
+        return Ok(None);
+    }
+    let state = |wd: &std::path::Path| -> Result<bool, Box<dyn std::error::Error>> {
+        let out = std::process::Command::new("vagrant")
+            .args(["status", CONTROLLER, "--machine-readable"])
+            .current_dir(wd)
+            .output()?;
+        Ok(controller_running(&String::from_utf8_lossy(&out.stdout)))
+    };
+    if state(&wd)? {
+        // Running, unless it's about to halt (provisioning just ended): then wait for it.
+        let halting = std::process::Command::new("vagrant")
+            .args(["ssh", CONTROLLER, "-c", "test -e /run/isoloom-halting"])
+            .current_dir(&wd)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success());
+        if !halting {
+            return Ok(None);
+        }
+        for _ in 0..60 {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            if !state(&wd)? {
+                break;
+            }
+        }
+    }
+    if !quiet {
+        println!("booting the controller for the checks (it halts after provisioning)");
+    }
+    let ok = std::process::Command::new("vagrant")
+        .args(["up", CONTROLLER, "--no-provision"])
+        .current_dir(&wd)
+        .stdout(if quiet { std::process::Stdio::null() } else { std::process::Stdio::inherit() })
+        .status()?
+        .success();
+    if !ok {
+        return Err("couldn't boot the controller (vagrant up isoloom-controller)".into());
+    }
+    Ok(Some(Rehalt(wd)))
+}
+
+/// Whether `vagrant status --machine-readable` says the controller runs.
+fn controller_running(machine_readable: &str) -> bool {
+    // `time,machine,state,<state>` lines.
+    machine_readable.lines().any(|l| {
+        let f: Vec<&str> = l.split(',').collect();
+        f.len() >= 4 && f[1] == CONTROLLER && f[2] == "state" && f[3] == "running"
+    })
+}
+
 fn kubectl_kustomize(dir: &str) -> Result<String, Box<dyn std::error::Error>> {
     let out = std::process::Command::new("kubectl")
         .args(["kustomize", "--load-restrictor", "LoadRestrictionsNone", dir])
@@ -1785,5 +1869,16 @@ mod tests {
         assert_eq!(out.matches("ISOLOOM_DERIVED").count(), 1, "{out}");
         assert!(out.contains("value: '0'") || out.contains("value: \"0\""), "{out}");
         assert!(out.contains("kind: ConfigMap") && out.contains("k: v"), "{out}");
+    }
+}
+
+#[cfg(test)]
+mod controller_tests {
+    #[test]
+    fn the_controllers_state_comes_from_its_status_line() {
+        let up = "1700000000,isoloom-controller,metadata,provider,libvirt\n1700000000,isoloom-controller,state,running\n";
+        let down = "1700000000,isoloom-controller,state,shutoff\n1700000000,web,state,running\n";
+        assert!(super::controller_running(up));
+        assert!(!super::controller_running(down));
     }
 }

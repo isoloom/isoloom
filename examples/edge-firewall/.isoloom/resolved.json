@@ -57,6 +57,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -101,6 +102,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -143,6 +145,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -184,6 +187,7 @@
       "shapes": [
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -228,6 +232,8 @@
   "groups": {},
   "router": null,
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "outside": "10.70.0.253",
       "dmz": "10.70.10.253",

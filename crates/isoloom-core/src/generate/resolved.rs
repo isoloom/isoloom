@@ -92,6 +92,7 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                 "access": m.access,
                 "supplied": m.supplied,
                 "shapes": shapes,
+                "role": "target",
                 "arch": m.arch.id(),
                 "os": m.vm.as_ref().map(|v| v.os.clone()),
                 "windows": m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os)),
@@ -122,6 +123,8 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
         })
     });
     let controller = json!({
+        "role": "infra",
+        "keep_running": spec.controller.as_ref().is_some_and(|c| c.keep_running),
         "addresses": spec.networks.keys().map(|n| (n.clone(), json!(cidr(n).controller().to_string()))).collect::<Map<_, _>>(),
     });
 

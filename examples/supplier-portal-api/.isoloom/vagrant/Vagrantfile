@@ -209,6 +209,7 @@ Vagrant.configure("2") do |config|
       ansible_winrm_read_timeout_sec=500
       INV
     SH
+    m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/controller.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
