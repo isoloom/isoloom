@@ -1281,6 +1281,8 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
     let s = |x: &str| x.to_string();
 
     let mut runners: Vec<Runner> = Vec::new();
+    // A manifest written for this run (Kubernetes with --no-derived), removed at the end.
+    let mut temp: Option<PathBuf> = None;
     match t {
         core::Target::Docker | core::Target::Hosted => {
             let f = out.join("docker/compose.yml").display().to_string();
@@ -1326,17 +1328,28 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
             runners.push(r);
         }
         core::Target::Kubernetes => {
-            if no_derived {
-                return Err("--no-derived isn't available on Kubernetes yet (the Jobs are static manifests)".into());
-            }
             let ns = format!("isoloom-{}", spec.name);
             let kdir = out.join("kubernetes/checks").display().to_string();
             let names: Vec<String> = groups.iter().map(|(p, _)| runner_name(p)).collect();
+            // The Jobs are static manifests: with --no-derived they are rendered here, every
+            // runner gets ISOLOOM_DERIVED=0, and that is what gets applied.
+            let manifests = if no_derived {
+                let patched = derived_off(&kubectl_kustomize(&kdir)?)?;
+                let nonce = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0);
+                let dir = std::env::temp_dir().join(format!("isoloom-k8s-{}-{nonce:x}", std::process::id()));
+                std::fs::create_dir(&dir)?;
+                let file = dir.join("checks.yaml");
+                std::fs::write(&file, patched)?;
+                temp = Some(dir);
+                format!("kubectl apply -f {} >/dev/null", core::checks::sq(&file.display().to_string()))
+            } else {
+                format!("kubectl kustomize --load-restrictor LoadRestrictionsNone {kdir} | kubectl apply -f - >/dev/null")
+            };
             // Fresh Jobs (a Job can't be re-run), then each one's logs once it has finished either way.
-            let apply = format!(
-                "kubectl -n {ns} delete job {} --ignore-not-found >/dev/null && kubectl kustomize --load-restrictor LoadRestrictionsNone {kdir} | kubectl apply -f - >/dev/null",
-                names.join(" ")
-            );
+            let apply = format!("kubectl -n {ns} delete job {} --ignore-not-found >/dev/null && {manifests}", names.join(" "));
             runners.push(Runner {
                 label: "starting the check Jobs".into(),
                 program: s("sh"),
@@ -1527,6 +1540,9 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
         }
     }
     let _ = finished;
+    if let Some(d) = temp {
+        let _ = std::fs::remove_dir_all(d);
+    }
     let passed = outcomes.iter().filter(|o| o.ok).count();
     let failed = outcomes.iter().filter(|o| !o.ok).count();
     if json {
@@ -1588,6 +1604,57 @@ fn terraform_output(module: &std::path::Path) -> Result<serde_json::Value, Box<d
         }
     }
     Ok(serde_json::Value::Object(map))
+}
+
+/// `kubectl kustomize` of a folder, as text.
+fn kubectl_kustomize(dir: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let out = std::process::Command::new("kubectl")
+        .args(["kustomize", "--load-restrictor", "LoadRestrictionsNone", dir])
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "`kubectl` isn't installed".to_string()
+            } else {
+                e.to_string()
+            }
+        })?;
+    if !out.status.success() {
+        return Err(format!("kubectl kustomize failed: {}", String::from_utf8_lossy(&out.stderr).trim()).into());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// The rendered check manifests with `ISOLOOM_DERIVED=0` in every Job's containers, so the
+/// runners skip the derived checks. Other documents (the ConfigMaps) pass through.
+fn derived_off(yaml: &str) -> Result<String, Box<dyn std::error::Error>> {
+    use serde::Deserialize;
+    use serde_yaml_ng::Value;
+    let mut docs = Vec::new();
+    for doc in serde_yaml_ng::Deserializer::from_str(yaml) {
+        let mut v = Value::deserialize(doc)?;
+        if v.get("kind").and_then(Value::as_str) == Some("Job")
+            && let Some(containers) = v
+                .get_mut("spec")
+                .and_then(|s| s.get_mut("template"))
+                .and_then(|t| t.get_mut("spec"))
+                .and_then(|s| s.get_mut("containers"))
+                .and_then(Value::as_sequence_mut)
+        {
+            for c in containers.iter_mut() {
+                let env: Value = serde_yaml_ng::from_str("name: ISOLOOM_DERIVED\nvalue: \"0\"\n")?;
+                match c.get_mut("env").and_then(Value::as_sequence_mut) {
+                    Some(list) => list.push(env),
+                    None => {
+                        if let Some(m) = c.as_mapping_mut() {
+                            m.insert(Value::from("env"), Value::Sequence(vec![env]));
+                        }
+                    }
+                }
+            }
+        }
+        docs.push(serde_yaml_ng::to_string(&v)?);
+    }
+    Ok(docs.join("---\n"))
 }
 
 /// A check runner reached over SSH (the cloud targets).
@@ -1707,4 +1774,16 @@ fn tf_run(down: bool, module: PathBuf) -> (String, Vec<String>, PathBuf) {
         "terraform init -input=false && terraform apply -auto-approve".to_string()
     };
     ("sh".to_string(), vec!["-c".to_string(), script], module)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn derived_off_reaches_every_job_and_leaves_the_rest() {
+        let yaml = "apiVersion: batch/v1\nkind: Job\nmetadata:\n  name: a\nspec:\n  template:\n    spec:\n      containers:\n      - name: check\n        image: x\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: m\ndata:\n  k: v\n";
+        let out = super::derived_off(yaml).unwrap();
+        assert_eq!(out.matches("ISOLOOM_DERIVED").count(), 1, "{out}");
+        assert!(out.contains("value: '0'") || out.contains("value: \"0\""), "{out}");
+        assert!(out.contains("kind: ConfigMap") && out.contains("k: v"), "{out}");
+    }
 }
