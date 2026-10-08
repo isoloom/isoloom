@@ -17,6 +17,9 @@ end
 Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 900
+  config.vm.provider "libvirt" do |v|
+    v.default_prefix = "hello-stack_"
+  end
 
   config.vm.define "cache" do |m|
     m.vm.box = "bento/debian-12"
@@ -198,7 +201,7 @@ Vagrant.configure("2") do |config|
   end
 
   config.vm.define "isoloom-controller" do |m|
-    m.vm.box = "generic/alpine319"
+    m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
     m.vm.network "private_network", ip: "10.60.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
@@ -218,9 +221,14 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "libvirt" do |v|
+    m.vm.provider "utm" do |v|
+      v.name = "hello-stack · controller"
       v.cpus = 1
       v.memory = 512
+    end
+    m.vm.provider "qemu" do |v|
+      v.smp = "cpus=1"
+      v.memory = "512M"
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -232,6 +240,11 @@ Vagrant.configure("2") do |config|
       v.guest_name = "hello-stack-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
+    end
+    m.vm.provider "libvirt" do |v, o|
+      o.vm.box = "generic/alpine319"
+      v.cpus = 1
+      v.memory = 512
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.60.0.20 cache' '10.60.0.10 web'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     PROJECT.each do |entry|
@@ -305,6 +318,6 @@ Vagrant.configure("2") do |config|
       systemctl restart isoloom-egress.service
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", path: "checks/controller.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/cache-seeded.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end

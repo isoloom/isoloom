@@ -38,6 +38,8 @@ struct Machine {
     volumes: Vec<(String, String)>,
     image: Option<String>,
     build: Option<String>,
+    dockerfile: Option<String>,
+    args: Vec<(String, String)>,
 }
 
 /// Turns a Compose name into a DNS label (`my_app` -> `my-app`).
@@ -91,11 +93,10 @@ fn variables(s: &str) -> Vec<String> {
     found
 }
 
-/// An input name (UPPER_SNAKE_CASE) from an environment variable name.
+/// An input name from an environment variable name, as written (the shell reads it by that name).
 fn input_name(s: &str) -> Option<String> {
-    let up = s.to_ascii_uppercase();
-    let ok = !up.is_empty() && up.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') && !up.starts_with(|c: char| c.is_ascii_digit());
-    ok.then_some(up)
+    let ok = !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !s.starts_with(|c: char| c.is_ascii_digit());
+    ok.then(|| s.to_string())
 }
 
 /// Container ports from Compose `ports` (`"8080:80"`, `"127.0.0.1:8080:80/tcp"`, `80`,
@@ -416,6 +417,8 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
             volumes: Vec::new(),
             image: None,
             build: None,
+            dockerfile: None,
+            args: Vec::new(),
         };
         if m.name != svc_name {
             // Other services may reach it by its old name (in their settings): list where.
@@ -520,8 +523,8 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
                             b.get("context").and_then(str_of).unwrap_or_else(|| ".".into()),
                             b.iter()
                                 .filter_map(|(k, v)| Some((k.as_str()?, v)))
-                                // `dockerfile: Dockerfile` is the default: nothing lost.
-                                .filter(|(k, v)| *k != "context" && !(*k == "dockerfile" && str_of(v).as_deref() == Some("Dockerfile")))
+                                // The context, the Dockerfile and fixed build args carry over.
+                                .filter(|(k, _)| !matches!(*k, "context" | "dockerfile" | "args"))
                                 .map(|(k, _)| k.to_string())
                                 .collect::<Vec<_>>(),
                         ),
@@ -544,6 +547,59 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
                             NoteKind::InImage,
                             format!("only the context is kept, not: {} (build settings belong in the Dockerfile)", extra.join(", ")),
                         );
+                    }
+                    if let Value::Mapping(b) = v {
+                        if let Some(f) = b.get("dockerfile").and_then(str_of)
+                            && f != "Dockerfile"
+                        {
+                            // Compose reads it relative to the context; the spec, from the project.
+                            let joined = if context == "." { f.clone() } else { format!("{context}/{f}") };
+                            // `src/../docker/x` -> `docker/x`: a path in the project.
+                            let mut parts: Vec<&str> = Vec::new();
+                            for c in joined.split('/') {
+                                match c {
+                                    "" | "." => {}
+                                    ".." if parts.last().is_some_and(|p| *p != "..") => {
+                                        parts.pop();
+                                    }
+                                    c => parts.push(c),
+                                }
+                            }
+                            m.dockerfile = Some(parts.join("/"));
+                        }
+                        let mut shell = Vec::new();
+                        let mut add_arg = |k: String, val: String| {
+                            if val.contains('$') {
+                                shell.push(k);
+                            } else {
+                                m.args.push((k, val));
+                            }
+                        };
+                        match b.get("args") {
+                            Some(Value::Mapping(a)) => {
+                                for (k, val) in a {
+                                    if let (Some(k), Some(val)) = (k.as_str(), str_of(val)) {
+                                        add_arg(k.to_string(), val);
+                                    }
+                                }
+                            }
+                            Some(Value::Sequence(a)) => {
+                                for item in a.iter().filter_map(str_of) {
+                                    if let Some((k, val)) = item.split_once('=') {
+                                        add_arg(k.to_string(), val.to_string());
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                        if !shell.is_empty() {
+                            note(
+                                &mut notes,
+                                format!("{at}.build.args"),
+                                NoteKind::InImage,
+                                format!("read from the shell, left out: {} (give fixed values)", shell.join(", ")),
+                            );
+                        }
                     }
                     m.build = Some(context);
                     if s.contains_key("image") {
@@ -808,6 +864,13 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         match (&m.build, &m.image) {
             (Some(b), _) => {
                 let _ = writeln!(y, "    docker:\n      build: {}", yaml_str(b));
+                if let Some(f) = &m.dockerfile {
+                    let _ = writeln!(y, "      dockerfile: {}", yaml_str(f));
+                }
+                if !m.args.is_empty() {
+                    let args = m.args.iter().map(|(k, v)| format!("{k}: {}", yaml_str(v))).collect::<Vec<_>>().join(", ");
+                    let _ = writeln!(y, "      args: {{ {args} }}");
+                }
             }
             (None, Some(img)) => {
                 let _ = writeln!(y, "    docker:\n      image: {}", yaml_str(img));

@@ -27,6 +27,16 @@ spec:
         net.isoloom.com/servers: member
     spec:
       hostname: intranet
+      initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       containers:
       - name: intranet
         image: nginx:1.27-alpine
@@ -36,13 +46,21 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 80 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/80' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80
           periodSeconds: 5
           failureThreshold: 60
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       nodeSelector:
         kubernetes.io/arch: amd64
+      volumes:
+      - name: isoloom-probe
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

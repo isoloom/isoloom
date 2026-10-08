@@ -27,6 +27,16 @@ spec:
         net.isoloom.com/lab: member
     spec:
       hostname: web
+      initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       containers:
       - name: web
         image: nginx:1.27
@@ -39,9 +49,10 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 80 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/80' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80
           periodSeconds: 5
           failureThreshold: 60
         volumeMounts:
@@ -51,6 +62,9 @@ spec:
           mountPath: /var/cache/nginx
         - name: dshm
           mountPath: /dev/shm
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       nodeSelector:
         kubernetes.io/arch: arm64
       dnsPolicy: None
@@ -60,6 +74,8 @@ spec:
         searches:
         - arm.lab
       volumes:
+      - name: isoloom-probe
+        emptyDir: {}
       - name: tmpfs-0
         emptyDir:
           medium: Memory

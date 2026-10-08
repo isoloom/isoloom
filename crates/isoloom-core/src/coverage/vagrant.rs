@@ -449,9 +449,11 @@ fn libvirt(s: &str) -> Option<Support> {
         "boot" | "boot_order" | "kernel" | "cmd_line" | "initrd" | "dtb" | "loader" | "nvram" => IMAGE_BOOTS,
         "uri" | "driver" | "host" | "port" | "connect_via_ssh" | "socket" | "username" | "password" | "id_ssh_key_file" | "proxy_command" | "system_uri"
         | "qemu_use_session" | "storage_pool_name" | "storage_pool_path" | "snapshot_pool_name" | "emulator_path" => USER_SETUP,
+        "default_prefix" => Emitted {
+            from: "name (the environment's, so labs' domains don't collide)",
+        },
         "forward_ssh_port"
         | "random_hostname"
-        | "default_prefix"
         | "title"
         | "description"
         | "uuid"

@@ -31,6 +31,16 @@ spec:
         net.isoloom.com/lab: member
     spec:
       hostname: database
+      initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       containers:
       - name: database
         image: mysql:8.0
@@ -40,9 +50,10 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 3207 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/3207' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207
           periodSeconds: 5
           failureThreshold: 60
         env:
@@ -62,13 +73,17 @@ spec:
           limits:
             cpu: '1'
             memory: 1024Mi
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       - name: init
         image: mysql:8.0
         imagePullPolicy: IfNotPresent
         command:
         - sh
         - -c
-        - until (nc -z 127.0.0.1 3207 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/3207' 2>/dev/null); do sleep 2; done && sh /isoloom/scripts/build__database__seed.sh && exec sleep infinity
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207; do sleep 2; done && sh /isoloom/scripts/build__database__seed.sh && exec sleep infinity
         env:
         - name: API_URL
           valueFrom:
@@ -83,6 +98,9 @@ spec:
               key: LAUNCH_TOKEN
               optional: true
         volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
         - name: scripts
           mountPath: /isoloom/scripts
       nodeSelector:
@@ -92,6 +110,8 @@ spec:
         configMap:
           name: isoloom-scripts
           defaultMode: 493
+      - name: isoloom-probe
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -124,6 +144,15 @@ spec:
     spec:
       hostname: web
       initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       - name: wait-database
         image: alpine:3.20
         command:
@@ -139,17 +168,25 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 3206 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/3206' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3206
           periodSeconds: 5
           failureThreshold: 60
         resources:
           limits:
             cpu: '1'
             memory: 1024Mi
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       nodeSelector:
         kubernetes.io/arch: amd64
+      volumes:
+      - name: isoloom-probe
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

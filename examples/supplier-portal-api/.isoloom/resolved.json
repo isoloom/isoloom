@@ -83,7 +83,8 @@
           "port": 3206,
           "name": "portal",
           "http": true,
-          "publish": 3206
+          "publish": 3206,
+          "fixed": true
         }
       ],
       "depends_on": [
