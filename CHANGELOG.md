@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `import compose` reads keys set twice
+- A key set twice in one mapping (secDevLabs camplake-api's `environment` sets `MONGO_PORT` twice) no longer stops `isoloom import compose` with `duplicate entry`: the last value is kept, as Compose does, and the draft's "Changed on the way in" notes say which key, where, and the value kept. (#68)
+
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
 
