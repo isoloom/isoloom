@@ -551,7 +551,10 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() {
     let (_, spec) = example("ansible-pair");
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
-    assert!(ctl.contains("m.vm.box = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"bento/debian-12\" : \"generic/alpine319\""), "{ctl}");
+    assert!(
+        ctl.contains("m.vm.box = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"bento/debian-12\" : \"generic/alpine319\""),
+        "{ctl}"
+    );
     assert!(ctl.contains("o.vm.box = \"generic/alpine319\""), "libvirt has Alpine on both architectures");
     assert!(ctl.contains("v.memory = 768"));
     assert!(ctl.contains("command -v apk"));
