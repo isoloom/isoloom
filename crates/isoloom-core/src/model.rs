@@ -416,6 +416,10 @@ pub struct VmImage {
     /// The box version to pin.
     #[serde(default)]
     pub vagrant_version: Option<String>,
+    /// The box Vagrant's QEMU provider boots instead (libvirt format), when `vagrant` has none
+    /// (e.g. `peru/windows-server-2019-standard-x64-eval`).
+    #[serde(default)]
+    pub qemu: Option<String>,
     /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
     #[serde(default)]
     pub winrm: Option<Winrm>,

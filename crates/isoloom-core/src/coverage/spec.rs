@@ -474,6 +474,13 @@ fn base_table() -> Vec<Row> {
         ),
         vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
         vm_field(
+            "machines.*.vm.image.qemu",
+            done(
+                "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
+                "windows-hello",
+            ),
+        ),
+        vm_field(
             "machines.*.vm.image.winrm",
             done(
                 "how the Windows box answers WinRM: `plaintext` (HTTP 5985, the default) or `ssl` (HTTPS 5986)",

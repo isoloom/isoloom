@@ -10,8 +10,13 @@
 //!   other, so a machine's services are installed before the machines depending on it start.
 //! - Inputs are read from the environment (empty when unset), passed only to the machines
 //!   that list them.
+//! - On QEMU (vagrant-qemu), a machine boots its libvirt-format box with its own CPU, emulated
+//!   when the host's is another (x86 Windows on an Apple Silicon Mac: slow, so longer timeouts).
+//!   Without root, QEMU links exactly two VMs per network (a socket listen/connect pair), each
+//!   on one network; see [`qemu_refusal`].
 
 use std::fmt::Write;
+use std::net::Ipv4Addr;
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, netmask, router, start_order, trunks};
 use indexmap::IndexMap;
@@ -53,9 +58,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 
     let mut out = header("#");
     out.push_str("# Start:  cd .isoloom/vagrant && vagrant up\n# Stop:   cd .isoloom/vagrant && vagrant destroy -f\n\n");
+    // Machines start one after the other, in dependency order: a machine's services are up
+    // before the ones depending on it boot, the controller comes last, and on QEMU the VM that
+    // listens on a network's link is up before the one that connects. QEMU and libvirt declare
+    // themselves parallel, so Vagrant would otherwise boot them all at once.
+    out.push_str("# One machine at a time, in order (QEMU and libvirt would boot them all at once).\nENV[\"VAGRANT_NO_PARALLEL\"] = \"1\"\n");
     out.push_str("ROOT = File.expand_path(\"../..\", __dir__)\n");
     out.push_str("# Copied into each VM: the project, without version control or generated files.\n");
     out.push_str("PROJECT = Dir.children(ROOT).reject { |e| [\".git\", \".vagrant\"].include?(e) || e.start_with?(\".isoloom\") }.sort\n");
+    out.push_str("# This host's CPU as QEMU names it: a machine built for another one runs emulated there.\n");
+    out.push_str("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"aarch64\" : \"x86_64\"\n");
     if !spec.inputs.is_empty() {
         out.push_str("# Values provided at launch (empty when unset).\nINPUTS = {\n");
         for i in &spec.inputs {
@@ -84,13 +96,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         "  config.vm.provider \"libvirt\" do |v|\n    v.default_prefix = {}\n  end",
         rb(&format!("{}_", spec.name))
     );
+    // The checks, resolved early: they decide whether there is a controller VM.
+    let plan = checks::plan(spec);
+    let on_controller = controller_checks(spec, &plan);
+    let links = qemu_links(spec, !spec.provision.is_empty() || !on_controller.is_empty());
     if router::needed(spec) {
-        router_vm(spec, &mut out);
+        router_vm(spec, &mut out, &links);
     }
 
     // The checks, resolved: a runner script per machine that has some (uploaded by its
     // provisioner), and one for the controller.
-    let plan = checks::plan(spec);
     let groups = checks::by_position(spec, &plan);
     let mut check_files: Vec<GeneratedFile> = Vec::new();
     let host = |h: &checks::Host, _: &checks::Position| -> String {
@@ -178,7 +193,18 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             }
         }
         let nets: Vec<&str> = m.networks.keys().map(String::as_str).collect();
-        providers(&mut out, &label, &format!("{}-{name}", spec.name), cpus, mem, &nets, libvirt_box);
+        let qemu = Qemu {
+            boxed: image.qemu.as_deref(),
+            arch: Some(m.arch),
+            link: &links[name],
+            // No cloud-init on Windows: its lab address is set from PowerShell.
+            windows_address: m
+                .networks
+                .first()
+                .filter(|_| windows)
+                .map(|(net, octet)| (address(spec, net, *octet), cidr_len(spec, net))),
+        };
+        providers(&mut out, &label, &format!("{}-{name}", spec.name), cpus, mem, &nets, libvirt_box, &qemu);
 
         if windows {
             windows_steps(spec, name, m, vm, &mut out);
@@ -347,7 +373,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     }
     for (i, (name, tool)) in spec.tools.iter().enumerate() {
         if name == "shell" {
-            tool_vm(spec, i, &mut out);
+            tool_vm(spec, i, &mut out, &links);
         } else {
             let _ = writeln!(
                 out,
@@ -356,7 +382,6 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             );
         }
     }
-    let on_controller = controller_checks(spec, &plan);
     if !spec.provision.is_empty() || !on_controller.is_empty() {
         if !on_controller.is_empty() {
             check_files.push(GeneratedFile {
@@ -364,7 +389,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 contents: checks::script(&checks::Position::Networks, &on_controller, &render),
             });
         }
-        controller_vm(spec, &mut out, !on_controller.is_empty());
+        controller_vm(spec, &mut out, !on_controller.is_empty(), &links);
     }
     out.push_str("end\n");
 
@@ -456,10 +481,10 @@ fn routes_unit(cmds: &[String]) -> String {
 
 /// The `shell` tool: a Debian VM on every network at the tool's address, with the usual
 /// observation tools, outside the environment's contract.
-fn tool_vm(spec: &Spec, index: usize, out: &mut String) {
+fn tool_vm(spec: &Spec, index: usize, out: &mut String, links: &IndexMap<String, Link>) {
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
     let _ = writeln!(out, "\n  # Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).");
-    let _ = writeln!(out, "  config.vm.define \"isoloom-tool-shell\" do |m|");
+    let _ = writeln!(out, "  config.vm.define {} do |m|", rb(TOOL_SHELL));
     let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
     let _ = writeln!(out, "    m.vm.hostname = \"shell\"");
     for net in spec.networks.keys() {
@@ -482,6 +507,7 @@ fn tool_vm(spec: &Spec, index: usize, out: &mut String) {
         512,
         &all,
         Some(HELPER_LIBVIRT_BOX),
+        &Qemu::helper(&links[TOOL_SHELL]),
     );
     let hosts: Vec<String> = spec
         .machines
@@ -538,8 +564,9 @@ const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
 /// Every provider's block for one VM, the same set for the lab's machines and Isoloom's own
 /// (router, controller, tool shell), so a provider added here reaches all of them: `label` is
 /// its display name, `guest` its ESXi guest name, `nets` the networks it is on, `libvirt_box`
-/// the box libvirt uses instead of the VirtualBox one (if any).
-fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, nets: &[&str], libvirt_box: Option<&str>) {
+/// the box libvirt uses instead of the VirtualBox one (if any), `qemu` how QEMU runs it.
+#[allow(clippy::too_many_arguments)]
+fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, nets: &[&str], libvirt_box: Option<&str>, qemu: &Qemu) {
     let label = rb(label);
     let _ = writeln!(
         out,
@@ -558,10 +585,7 @@ fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, ne
         out,
         "    m.vm.provider \"utm\" do |v|\n      v.name = {label}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
     );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"qemu\" do |v|\n      v.smp = \"cpus={cpus}\"\n      v.memory = \"{mem}M\"\n    end"
-    );
+    qemu_block(out, cpus, mem, qemu);
     esxi(out, guest, cpus, mem, nets);
     match libvirt_box {
         Some(b) => {
@@ -580,6 +604,187 @@ fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, ne
     }
 }
 
+/// The define names of Isoloom's own VMs (the router's is [`router::NAME`]).
+const CONTROLLER: &str = "isoloom-controller";
+const TOOL_SHELL: &str = "isoloom-tool-shell";
+
+/// A VM's link on its private network under QEMU.
+#[derive(Debug, Clone, PartialEq)]
+enum Link {
+    /// On no network.
+    None,
+    /// QEMU's `socket` netdev options: `listen=` for the first VM of the pair, `connect=` for
+    /// the second.
+    Socket(String),
+    /// Why QEMU can't give it its network (the VM then has none there).
+    Refused(String),
+}
+
+/// How a VM runs under Vagrant's QEMU provider.
+struct Qemu<'a> {
+    /// The libvirt-format box QEMU boots instead of the main one.
+    boxed: Option<&'a str>,
+    /// The machine's CPU; `None` for Isoloom's own VMs, which run on the host's.
+    arch: Option<Arch>,
+    link: &'a Link,
+    /// A Windows machine's lab address and prefix length (no cloud-init to set it).
+    windows_address: Option<(Ipv4Addr, u8)>,
+}
+
+impl<'a> Qemu<'a> {
+    /// Isoloom's own Debian VMs (router, controller, tool shell): the host's CPU.
+    fn helper(link: &'a Link) -> Self {
+        Qemu {
+            boxed: Some(images::QEMU_DEBIAN_12),
+            arch: None,
+            link,
+            windows_address: None,
+        }
+    }
+}
+
+/// The QEMU (vagrant-qemu) provider block.
+fn qemu_block(out: &mut String, cpus: u32, mem: u32, q: &Qemu) {
+    out.push_str("    m.vm.provider \"qemu\" do |v, o|\n");
+    if let Some(b) = q.boxed {
+        // A box of its own: the main box's version pin isn't one of its versions.
+        let _ = writeln!(out, "      o.vm.box = {}\n      o.vm.box_version = \">= 0\"", rb(b));
+    }
+    let qemu_arch = q.arch.map(|a| match a {
+        Arch::Amd64 => "x86_64",
+        Arch::Arm64 => "aarch64",
+    });
+    if let (Some(a), Some(qa)) = (q.arch, qemu_arch) {
+        // Its own CPU, whatever the host's (Vagrant otherwise picks the box for the host's).
+        let _ = writeln!(out, "      o.vm.box_architecture = {}\n      v.arch = {}", rb(a.id()), rb(qa));
+    }
+    let _ = writeln!(out, "      v.smp = \"cpus={cpus}\"\n      v.memory = \"{mem}M\"");
+    // Each VM forwards SSH from its own host port (the plugin's default is one fixed port).
+    out.push_str("      v.ssh_auto_correct = true\n");
+    match q.link {
+        Link::None => {}
+        Link::Socket(opts) => {
+            let _ = writeln!(
+                out,
+                "      v.advanced_network = true\n      v.net_mode = :socket\n      v.socket_opts = {}",
+                rb(opts)
+            );
+        }
+        Link::Refused(why) => {
+            let _ = writeln!(out, "      # No private network on QEMU: {why}.");
+        }
+    }
+    if let Some(qa) = qemu_arch {
+        // Emulated (another CPU than the host's) runs many times slower: booting and WinRM get
+        // far longer to answer.
+        let winrm = if q.windows_address.is_some() {
+            "\n        o.winrm.retry_limit = 180\n        o.winrm.timeout = 1800"
+        } else {
+            ""
+        };
+        let _ = writeln!(out, "      if {} != HOST_ARCH\n        o.vm.boot_timeout = 3600{winrm}\n      end", rb(qa));
+    }
+    if let Some((ip, len)) = q.windows_address {
+        let _ = writeln!(
+            out,
+            "      o.vm.provision \"shell\", name: \"lab network\", inline: {}",
+            rb(&windows_lab_address(ip, len))
+        );
+    }
+    out.push_str("    end\n");
+}
+
+/// PowerShell setting a Windows VM's lab address on QEMU's second adapter: the one without a
+/// default gateway (the first is QEMU's user-mode NAT, through which Vagrant reaches it).
+fn windows_lab_address(ip: Ipv4Addr, len: u8) -> String {
+    format!(
+        "$a = Get-NetAdapter | Where-Object {{ -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway }} | Select-Object -First 1; \
+         if (-not $a) {{ throw 'no second network adapter for the lab network' }}; \
+         if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress {ip} -ErrorAction SilentlyContinue)) {{ \
+         Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; \
+         New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress {ip} -PrefixLength {len} | Out-Null }}; \
+         Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \
+         \"lab network: {ip}/{len} on $($a.Name)\""
+    )
+}
+
+/// A network's prefix length.
+fn cidr_len(spec: &Spec, net: &str) -> u8 {
+    crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr").len
+}
+
+/// Every VM of the Vagrantfile in the order it is defined (and started), with its networks:
+/// the router, the machines, the tool shell, the controller.
+fn vms_and_networks(spec: &Spec, with_controller: bool) -> Vec<(String, Vec<&str>)> {
+    let all: Vec<&str> = spec.networks.keys().map(String::as_str).collect();
+    let mut vms = Vec::new();
+    if router::needed(spec) {
+        vms.push((router::NAME.to_string(), router::networks(spec).map(String::as_str).collect()));
+    }
+    for name in start_order(spec) {
+        let m = &spec.machines[name];
+        if m.vm.is_some() {
+            vms.push((name.to_string(), m.networks.keys().map(String::as_str).collect()));
+        }
+    }
+    if spec.tools.contains_key("shell") {
+        vms.push((TOOL_SHELL.to_string(), all.clone()));
+    }
+    if with_controller {
+        vms.push((CONTROLLER.to_string(), all));
+    }
+    vms
+}
+
+/// Each VM's link under QEMU. Without root, QEMU's `socket` netdev joins exactly two VMs (one
+/// listens, the other connects, on a loopback port of the host), and the plugin gives a VM one
+/// private network.
+fn qemu_links(spec: &Spec, with_controller: bool) -> IndexMap<String, Link> {
+    let vms = vms_and_networks(spec, with_controller);
+    let members = |net: &str| -> Vec<&str> { vms.iter().filter(|(_, nets)| nets.contains(&net)).map(|(n, _)| n.as_str()).collect() };
+    vms.iter()
+        .map(|(name, nets)| {
+            let link = match nets.as_slice() {
+                [] => Link::None,
+                [net] => {
+                    let on = members(net);
+                    if on.len() != 2 {
+                        Link::Refused(format!("network `{net}` has {} VMs, and QEMU links exactly two without root", on.len()))
+                    } else {
+                        let side = if on[0] == name { "listen" } else { "connect" };
+                        Link::Socket(format!("{side}=127.0.0.1:{}", qemu_port(&spec.name, net)))
+                    }
+                }
+                more => Link::Refused(format!("`{name}` is on {} networks, and QEMU gives a VM one", more.len())),
+            };
+            (name.clone(), link)
+        })
+        .collect()
+}
+
+/// The host port a network's QEMU link uses: stable for the environment and network, in
+/// 20000-39999.
+fn qemu_port(env: &str, net: &str) -> u16 {
+    // FNV-1a: stable across builds and platforms (unlike std's hasher).
+    let mut h: u32 = 0x811c_9dc5;
+    for b in format!("{env}/{net}").bytes() {
+        h ^= u32::from(b);
+        h = h.wrapping_mul(0x0100_0193);
+    }
+    20000 + (h % 20000) as u16
+}
+
+/// Why this environment's VMs can't all have their networks under Vagrant's QEMU provider, if
+/// they can't: a launcher asks before offering QEMU.
+pub fn qemu_refusal(spec: &Spec) -> Option<String> {
+    let plan = checks::plan(spec);
+    let with_controller = !spec.provision.is_empty() || !controller_checks(spec, &plan).is_empty();
+    qemu_links(spec, with_controller).into_values().find_map(|l| match l {
+        Link::Refused(why) => Some(why),
+        _ => None,
+    })
+}
+
 /// The vagrant-vmware-esxi provider block: the host from ESXI_* variables, a port group per NIC.
 fn esxi(out: &mut String, guest: &str, cpus: u32, mem: u32, nets: &[&str]) {
     let nets = nets.iter().map(|n| rb(n)).collect::<Vec<_>>().join(", ");
@@ -591,7 +796,7 @@ fn esxi(out: &mut String, guest: &str, cpus: u32, mem: u32, nets: &[&str]) {
 }
 
 /// The router VM: on every network at its last address, forwarding with the `reach` rules.
-fn router_vm(spec: &Spec, out: &mut String) {
+fn router_vm(spec: &Spec, out: &mut String, links: &IndexMap<String, Link>) {
     let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(router::NAME));
     let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
     let _ = writeln!(out, "    m.vm.hostname = {}", rb(router::NAME));
@@ -615,6 +820,7 @@ fn router_vm(spec: &Spec, out: &mut String) {
         512,
         &router_nets,
         Some(HELPER_LIBVIRT_BOX),
+        &Qemu::helper(&links[router::NAME]),
     );
     let script = format!(
         "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{}",
@@ -704,9 +910,9 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
 
 /// The controller: a Debian VM on every network at its controller address, started after every
 /// machine. It writes the inventory and runs the environment-level Ansible playbooks.
-fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
+fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool, links: &IndexMap<String, Link>) {
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
-    let _ = writeln!(out, "\n  config.vm.define \"isoloom-controller\" do |m|");
+    let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(CONTROLLER));
     let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
     let _ = writeln!(out, "    m.vm.hostname = \"isoloom-controller\"");
     for net in spec.networks.keys() {
@@ -729,6 +935,7 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
         1024,
         &all,
         Some(HELPER_LIBVIRT_BOX),
+        &Qemu::helper(&links[CONTROLLER]),
     );
     // Every machine by name, at its address on its first network (the controller is on all).
     let hosts: Vec<String> = spec
