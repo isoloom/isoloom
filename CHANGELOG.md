@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0
 
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
