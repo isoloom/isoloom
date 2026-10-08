@@ -182,7 +182,7 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                 .iter()
                 .map(|c| {
                     let (kind, target, expect) = match &c.probe {
-                        Probe::Http { url, expect } => (
+                        Probe::Http { url, expect, .. } => (
                             "http",
                             url.render(&host(&url.host)),
                             match expect {

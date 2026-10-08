@@ -166,6 +166,22 @@
             "target": "http://web/",
             "expect": "200",
             "wait": 30
+          },
+          {
+            "name": "the page says hello",
+            "derived": false,
+            "kind": "http",
+            "target": "http://web/",
+            "expect": "200",
+            "wait": 30
+          },
+          {
+            "name": "the static page refuses a POST",
+            "derived": false,
+            "kind": "http",
+            "target": "http://web/",
+            "expect": "405",
+            "wait": 30
           }
         ]
       },

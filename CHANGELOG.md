@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Richer `http` checks
+- `http` checks take `method`, `headers`, `body` and `contains` (text the response body must contain): a login, an authenticated API call or a page's content without a script. Rendered as one curl call (the runner says so where curl is missing); a plain GET keeps curl, then wget, then bash. hello-stack checks its page's text and that a POST gets 405. (#51)
+
 ### Small containers
 - The 256 MB / 5 GB floor on `resources` is a VM's: it now applies only to machines with `vm:`. A container-only machine needs at least 1 cpu and 16 MB (crAPI's services run at 50 to 192 MB). (#49)
 

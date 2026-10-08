@@ -524,6 +524,18 @@ fn base_table() -> Vec<Row> {
             done("nc (else bash) from the position", "segmented"),
             done("nc (else bash) from the machine", "segmented"),
         ),
+        common("checks[].method", done("curl -X", "hello-stack"), done("curl -X", "hello-stack")),
+        common("checks[].headers", done("curl -H", "hello-stack"), done("curl -H", "hello-stack")),
+        common(
+            "checks[].body",
+            done("curl --data-binary", "hello-stack"),
+            done("curl --data-binary", "hello-stack"),
+        ),
+        common(
+            "checks[].contains",
+            done("the response body, searched for the text (curl)", "hello-stack"),
+            done("the response body, searched for the text (curl)", "hello-stack"),
+        ),
         row(
             "checks[].exec",
             done(
@@ -636,6 +648,7 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "checks[].headers",
     "machines.*.docker.args",
     "provision[].groups",
     "provision[].vars",

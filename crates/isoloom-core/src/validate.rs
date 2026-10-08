@@ -795,6 +795,21 @@ fn validate_check(spec: &Spec, i: usize, d: &crate::model::Declared, add: &mut d
     {
         add(&format!("{at}.wait"), "at most 3600 seconds".into());
     }
+    let extras = d.method.is_some() || !d.headers.is_empty() || d.body.is_some() || d.contains.is_some();
+    if extras && d.http.is_none() {
+        add(&at, "`method`, `headers`, `body` and `contains` go with `http`".into());
+    }
+    if extras && matches!(&d.expect, Some(Expect::Text(t)) if t == "blocked") {
+        add(
+            &at,
+            "a `blocked` check sends nothing to look at: leave out `method`, `headers`, `body` and `contains`".into(),
+        );
+    }
+    if let Some(m) = &d.method
+        && (m.is_empty() || !m.chars().all(|c| c.is_ascii_alphabetic()))
+    {
+        add(&format!("{at}.method"), format!("`{m}` isn't an HTTP method like GET or POST"));
+    }
     if let Some(u) = &d.http {
         if Url::parse(u).is_none() {
             add(&format!("{at}.http"), format!("`{u}` isn't a URL like http://web:8080/path"));
