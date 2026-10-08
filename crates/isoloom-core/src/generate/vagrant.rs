@@ -165,48 +165,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 );
             }
         }
-        let _ = writeln!(
-            out,
-            "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
-            rb(&label)
-        );
-        let _ = writeln!(
-            out,
-            "    m.vm.provider \"vmware_desktop\" do |v|\n      v.vmx[\"displayName\"] = {}\n      v.vmx[\"numvcpus\"] = \"{cpus}\"\n      v.vmx[\"memsize\"] = \"{mem}\"\n    end",
-            rb(&label)
-        );
-        let _ = writeln!(
-            out,
-            "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
-            rb(&label)
-        );
-        // Apple Silicon Macs: UTM and QEMU (besides VMware Fusion and Parallels above).
-        let _ = writeln!(
-            out,
-            "    m.vm.provider \"utm\" do |v|\n      v.name = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
-            rb(&label)
-        );
-        let _ = writeln!(
-            out,
-            "    m.vm.provider \"qemu\" do |v|\n      v.smp = \"cpus={cpus}\"\n      v.memory = \"{mem}M\"\n    end"
-        );
         let nets: Vec<&str> = m.networks.keys().map(String::as_str).collect();
-        esxi(&mut out, &format!("{}-{name}", spec.name), cpus, mem, &nets);
-        match libvirt_box {
-            Some(b) => {
-                let _ = writeln!(
-                    out,
-                    "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
-                    rb(b)
-                );
-            }
-            None => {
-                let _ = writeln!(
-                    out,
-                    "    m.vm.provider \"libvirt\" do |v|\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
-                );
-            }
-        }
+        providers(&mut out, &label, &format!("{}-{name}", spec.name), cpus, mem, &nets, libvirt_box);
 
         if windows {
             windows_steps(spec, name, m, vm, &mut out);
@@ -426,7 +386,7 @@ fn runs_on_vm(spec: &Spec, pos: &checks::Position) -> bool {
 fn controller_checks<'a>(spec: &Spec, plan: &'a [checks::Resolved]) -> Vec<&'a checks::Resolved> {
     plan.iter()
         .filter(|c| {
-            matches!(c.probe, checks::Probe::Playbook { .. }) || (!runs_on_vm(spec, &c.position) && !(c.derived && c.position != checks::Position::Networks))
+            matches!(c.probe, checks::Probe::Playbook { .. }) || (!runs_on_vm(spec, &c.position) && (!c.derived || c.position == checks::Position::Networks))
         })
         .collect()
 }
@@ -479,18 +439,16 @@ fn tool_vm(spec: &Spec, index: usize, out: &mut String) {
             rb(&netname),
         );
     }
-    let label = format!("{} · tool shell", spec.name);
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 512\n    end",
-        rb(&label)
-    );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 512\n    end"
-    );
     let all: Vec<&str> = spec.networks.keys().map(String::as_str).collect();
-    esxi(out, &format!("{}-tool-shell", spec.name), 1, 512, &all);
+    providers(
+        out,
+        &format!("{} · tool shell", spec.name),
+        &format!("{}-tool-shell", spec.name),
+        1,
+        512,
+        &all,
+        Some(HELPER_LIBVIRT_BOX),
+    );
     let hosts: Vec<String> = spec
         .machines
         .iter()
@@ -535,6 +493,55 @@ fn indent(script: &str, spaces: usize) -> String {
 /// RHEL family: Rocky, AlmaLinux, CentOS, Fedora).
 const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }";
 
+/// The libvirt box of Isoloom's own Debian VMs (router, controller, tool shell): libvirt can't
+/// run `bento/debian-12`.
+const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
+
+/// Every provider's block for one VM, the same set for the lab's machines and Isoloom's own
+/// (router, controller, tool shell), so a provider added here reaches all of them: `label` is
+/// its display name, `guest` its ESXi guest name, `nets` the networks it is on, `libvirt_box`
+/// the box libvirt uses instead of the VirtualBox one (if any).
+fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, nets: &[&str], libvirt_box: Option<&str>) {
+    let label = rb(label);
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {label}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"vmware_desktop\" do |v|\n      v.vmx[\"displayName\"] = {label}\n      v.vmx[\"numvcpus\"] = \"{cpus}\"\n      v.vmx[\"memsize\"] = \"{mem}\"\n    end"
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"parallels\" do |v|\n      v.name = {label}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
+    );
+    // Apple Silicon Macs: UTM and QEMU (besides VMware Fusion and Parallels above).
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"utm\" do |v|\n      v.name = {label}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
+    );
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"qemu\" do |v|\n      v.smp = \"cpus={cpus}\"\n      v.memory = \"{mem}M\"\n    end"
+    );
+    esxi(out, guest, cpus, mem, nets);
+    match libvirt_box {
+        Some(b) => {
+            let _ = writeln!(
+                out,
+                "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
+                rb(b)
+            );
+        }
+        None => {
+            let _ = writeln!(
+                out,
+                "    m.vm.provider \"libvirt\" do |v|\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
+            );
+        }
+    }
+}
+
 /// The vagrant-vmware-esxi provider block: the host from ESXI_* variables, a port group per NIC.
 fn esxi(out: &mut String, guest: &str, cpus: u32, mem: u32, nets: &[&str]) {
     let nets = nets.iter().map(|n| rb(n)).collect::<Vec<_>>().join(", ");
@@ -561,28 +568,16 @@ fn router_vm(spec: &Spec, out: &mut String) {
             rb(&netname),
         );
     }
-    let label = format!("{} · router", spec.name);
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 512\n    end",
-        rb(&label)
-    );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"vmware_desktop\" do |v|\n      v.vmx[\"displayName\"] = {}\n      v.vmx[\"numvcpus\"] = \"1\"\n      v.vmx[\"memsize\"] = \"512\"\n    end",
-        rb(&label)
-    );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 512\n    end",
-        rb(&label)
-    );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 512\n    end"
-    );
     let router_nets: Vec<&str> = router::networks(spec).map(String::as_str).collect();
-    esxi(out, &format!("{}-router", spec.name), 1, 512, &router_nets);
+    providers(
+        out,
+        &format!("{} · router", spec.name),
+        &format!("{}-router", spec.name),
+        1,
+        512,
+        &router_nets,
+        Some(HELPER_LIBVIRT_BOX),
+    );
     let script = format!(
         "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{}",
         router::nftables(spec),
@@ -687,38 +682,16 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
             rb(&netname),
         );
     }
-    let label = format!("{} · controller", spec.name);
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 1024\n    end",
-        rb(&label)
-    );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"vmware_desktop\" do |v|\n      v.vmx[\"displayName\"] = {}\n      v.vmx[\"numvcpus\"] = \"1\"\n      v.vmx[\"memsize\"] = \"1024\"\n    end",
-        rb(&label)
-    );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 1024\n    end",
-        rb(&label)
-    );
-    // Apple Silicon Macs, as for the lab's machines.
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"utm\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 1024\n    end",
-        rb(&label)
-    );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"qemu\" do |v|\n      v.smp = \"cpus=1\"\n      v.memory = \"1024M\"\n    end"
-    );
-    let _ = writeln!(
-        out,
-        "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 1024\n    end"
-    );
     let all: Vec<&str> = spec.networks.keys().map(String::as_str).collect();
-    esxi(out, &format!("{}-controller", spec.name), 1, 1024, &all);
+    providers(
+        out,
+        &format!("{} · controller", spec.name),
+        &format!("{}-controller", spec.name),
+        1,
+        1024,
+        &all,
+        Some(HELPER_LIBVIRT_BOX),
+    );
     // Every machine by name, at its address on its first network (the controller is on all).
     let hosts: Vec<String> = spec
         .machines
