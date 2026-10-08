@@ -140,6 +140,19 @@ fn vagrant_orders_machines_and_names_them() {
 }
 
 #[test]
+fn libvirt_domains_are_named_after_the_environment() {
+    // Unset, vagrant-libvirt prefixes the folder's name ("vagrant_web"), the same for every lab.
+    let (_, spec) = example("hello-stack");
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    assert!(vf.contains("v.default_prefix = \"hello-stack_\""), "{vf}");
+    let two = isoloom_core::instance::apply(&spec, 2).unwrap();
+    let vf = &generate(&two, Target::Vagrant).unwrap()[0].contents;
+    assert!(vf.contains("v.default_prefix = \"hello-stack-2_\""));
+    let dvm = contents(&generate(&spec, Target::DockerVm).unwrap(), ".isoloom/docker-vm/Vagrantfile");
+    assert!(dvm.contains("v.default_prefix = \"hello-stack_\""));
+}
+
+#[test]
 fn the_controller_gets_every_provider_block_the_machines_get() {
     let (_, spec) = example("ansible-pair");
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
