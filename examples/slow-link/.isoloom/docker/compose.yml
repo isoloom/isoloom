@@ -83,7 +83,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.75.1.0/24 via 10.75.2.254 && (IF=$$(ip -o -4 addr show | awk '$$4 ~ /^10\.75\.2\.10\//{print $$2}' | head -n 1); [ -n "$$IF" ] && tc qdisc replace dev "$$IF" root netem delay 80ms 10ms loss 1% rate 10mbit) && exec sleep infinity
+    - ip route replace 10.75.1.0/24 via 10.75.2.254 && (IF=$$(ip -o -4 addr show | awk '$$4 ~ /^10\.75\.2\.10\//{print $$2}' | head -n 1); [ -n "$$IF" ] && tc qdisc replace dev "$$IF" root netem delay 80ms 10ms loss 1% rate 10mbit) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -118,7 +118,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.75.2.0/24 via 10.75.1.254 && exec sleep infinity
+    - ip route replace 10.75.2.0/24 via 10.75.1.254 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL

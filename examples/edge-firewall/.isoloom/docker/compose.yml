@@ -50,7 +50,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace default via 10.70.0.1 && exec sleep infinity
+    - ip route replace default via 10.70.0.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -103,7 +103,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.20.0/24 via 10.70.10.1 && ip route replace default via 10.70.10.1 && exec sleep infinity
+    - ip route replace 10.70.20.0/24 via 10.70.10.1 && ip route replace default via 10.70.10.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -155,7 +155,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.10.0/24 via 10.70.20.1 && ip route replace default via 10.70.20.1 && exec sleep infinity
+    - ip route replace 10.70.10.0/24 via 10.70.20.1 && ip route replace default via 10.70.20.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -192,7 +192,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.10.0/24 via 10.70.0.2 && ip route replace 10.70.20.0/24 via 10.70.0.2 && exec sleep infinity
+    - ip route replace 10.70.10.0/24 via 10.70.0.2 && ip route replace 10.70.20.0/24 via 10.70.0.2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
