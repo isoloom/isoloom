@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### A Dockerfile outside the build folder, and build arguments
+- `docker.dockerfile`: the Dockerfile, a file anywhere in the project (default: `Dockerfile` in `build`), so an image of your own can wrap a vendored project's source without moving it into your build folder. `docker.args`: build arguments, fixed values. Compose gets `build: { context, dockerfile, args }`; `isoloom import compose` now carries `dockerfile` and literal `args` over (shell-read ones are reported). Example: slow-link. (#40)
+
 ### Healthchecks without a shell in the image
 - A machine's healthcheck no longer borrows the image's tools (`sh`, then `nc` or `bash`), so distroless, `scratch` and minimal images turn healthy too (OWASP Juice Shop ships on distroless Node). Isoloom brings a static busybox (`busybox:1.37.0-musl`): on Docker a one-shot `isoloom-probe-<arch>` copies it into a volume each machine with services mounts read-only at `/.isoloom-probe`, and the healthcheck runs it in exec form; on Kubernetes an init container copies it into an `emptyDir` for the readiness probe. `init:` jobs still run with the image's own `sh`. (#37)
 

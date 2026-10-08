@@ -88,6 +88,35 @@ pub(super) fn probe_command(m: &Machine) -> Vec<Value> {
     vec![s(format!("{PROBE_DIR}/busybox")), s("sh"), s("-c"), s(probe(m))]
 }
 
+/// A machine's Compose `build`: its context, and the Dockerfile (Compose reads it relative to
+/// the context) and build arguments when the spec gives them.
+fn build_of(build: &str, d: &crate::model::DockerImpl) -> Value {
+    let mut b = Mapping::new();
+    b.insert(s("context"), s(format!("{ROOT}/{build}")));
+    if let Some(f) = &d.dockerfile {
+        b.insert(s("dockerfile"), s(relative_to(build, f)));
+    }
+    if !d.args.is_empty() {
+        let mut args = Mapping::new();
+        for (k, v) in &d.args {
+            // `$$`: a literal value, not Compose's interpolation.
+            args.insert(s(k.as_str()), s(v.replace('$', "$$")));
+        }
+        b.insert(s("args"), Value::Mapping(args));
+    }
+    Value::Mapping(b)
+}
+
+/// `path` (from the project folder) as seen from the folder `from` (also from the project).
+pub(super) fn relative_to(from: &str, path: &str) -> String {
+    let clean = |p: &str| -> Vec<String> { p.split('/').filter(|c| !c.is_empty() && *c != ".").map(String::from).collect() };
+    let (f, p) = (clean(from), clean(path));
+    let common = f.iter().zip(&p).take_while(|(a, b)| a == b).count();
+    let mut out: Vec<String> = std::iter::repeat_n("..".to_string(), f.len() - common).collect();
+    out.extend(p[common..].iter().cloned());
+    out.join("/")
+}
+
 fn environment(m: &Machine) -> Option<Value> {
     if m.inputs.is_empty() {
         return None;
@@ -153,7 +182,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         let mut svc = Mapping::new();
         let image = image_of(spec, name, m);
         if let Some(build) = &d.build {
-            svc.insert(s("build"), map([("context", s(format!("{ROOT}/{build}")))]));
+            svc.insert(s("build"), build_of(build, d));
         }
         svc.insert(s("image"), s(image.clone()));
         // Pin the architecture so the machine runs the same on an x86-64 or an ARM host.
@@ -873,4 +902,15 @@ fn stand_in(spec: &Spec, name: &str, m: &Machine) -> Value {
 /// decides for it.
 pub(super) fn offline(spec: &Spec, name: &str, m: &Machine) -> bool {
     !m.networks.keys().any(|n| spec.networks[n].internet) && router::default_gateway(spec, name, m).is_none()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_path_relative_to_a_folder() {
+        assert_eq!(super::relative_to("app", "build/shop/Dockerfile"), "../build/shop/Dockerfile");
+        assert_eq!(super::relative_to("build/web", "build/web/Dockerfile.dev"), "Dockerfile.dev");
+        assert_eq!(super::relative_to(".", "docker/Dockerfile"), "docker/Dockerfile");
+        assert_eq!(super::relative_to("./src/", "Dockerfile"), "../Dockerfile");
+    }
 }

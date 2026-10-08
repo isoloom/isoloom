@@ -62,6 +62,8 @@ impl Table {
                 m.docker = Some(DockerImpl {
                     image: Some(image.clone()),
                     build: None,
+                    dockerfile: None,
+                    args: IndexMap::new(),
                     init: Vec::new(),
                     idle: false,
                     appliance: None,

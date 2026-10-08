@@ -45,7 +45,7 @@ machines:
   h:
     count: 2
     networks: { out: 10 }
-    docker: { build: h }
+    docker: { build: h, dockerfile: h.Dockerfile, args: { A: b } }
 provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, requirements: req.yml }]
 common: { resources: { cpus: 1 } }
 groups: { g: { members: [fw], arch: amd64 } }

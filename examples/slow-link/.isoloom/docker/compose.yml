@@ -45,6 +45,9 @@ services:
   web:
     build:
       context: ../../build/web
+      dockerfile: ../web.Dockerfile
+      args:
+        NGINX_TAG: 1.27-alpine
     image: isoloom/slow-link-web
     platform: linux/amd64
     hostname: web

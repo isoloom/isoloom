@@ -400,6 +400,18 @@ fn base_table() -> Vec<Row> {
             NOT_A_CONTAINER,
         ),
         row(
+            "machines.*.docker.dockerfile",
+            done("the build's `dockerfile`, relative to its context", "slow-link"),
+            NOT_A_CONTAINER,
+            NOT_A_CONTAINER,
+        ),
+        row(
+            "machines.*.docker.args",
+            done("the build's `args`", "slow-link"),
+            NOT_A_CONTAINER,
+            NOT_A_CONTAINER,
+        ),
+        row(
             "machines.*.docker.init",
             done("one-shot jobs in its network namespace, after it answers", "hello-stack"),
             NOT_A_CONTAINER,
@@ -621,6 +633,7 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "machines.*.docker.args",
     "provision[].groups",
     "provision[].vars",
 ];
