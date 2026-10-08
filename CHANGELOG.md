@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Windows steps can use the project's files
+- A Windows machine's `.ps1` steps were uploaded one by one, so a step couldn't reach the project's other files (vendored tools, scripts). The project now goes to `C:\isoloom` once, before the steps, and each step runs from there (`-File C:\isoloom\<step>`, in that folder), as Linux steps run from /opt/isoloom. Vagrant: the `project` step uploads its archive over WinRM; cloud-vm (AWS, Azure): the host's archive, as a Linux machine's, with the set-up script now in `C:\ProgramData\isoloom`. The archive is unpacked by PowerShell over .NET's GZipStream (PowerShell 2.0 and later; Windows Server 2016 and older have no tar.exe); symbolic links are left out, and a name Windows can't take is skipped with a warning. `.isoloomignore` keeps the copy small. (#59)
+
 ### `.isoloomignore`
 - An `.isoloomignore` at the project's root lists what the machines don't get when the project is copied into them, gitignore-style: `#` comments, `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the middle anchors a pattern at the root (otherwise it matches at any depth), `*`, `?`, `[abc]`, `**`; the last pattern matching a path, or a folder it is in, decides. Every copy honors it, read when the copy is made: Vagrant's `project` step (vagrant, hybrid, docker-vm), Proxmox's cloud-init, the cloud modules' archive (cloud-vm, cloud-docker, docker-vm on Proxmox: `tar -X` with the list Terraform computes, the archive's top folder stripped when unpacked) and `isoloom run external`. Each reads a pattern as the same regular expression. Proxmox also leaves out `.vagrant` and `.terraform` folders at any depth now. (#61)
 
