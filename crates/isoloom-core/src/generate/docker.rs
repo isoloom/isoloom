@@ -543,7 +543,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         let (execs, group): (Vec<&checks::Resolved>, Vec<&checks::Resolved>) = group.into_iter().partition(|c| matches!(c.probe, checks::Probe::Exec { .. }));
         if !execs.is_empty() {
             runner_files.push(GeneratedFile {
-                path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", exec_runner(&id)),
+                path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", exec_runner(id)),
                 contents: checks::script(&pos, &execs, &render),
             });
         }

@@ -559,7 +559,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 group.into_iter().partition(|c| matches!(c.probe, checks::Probe::Exec { .. }));
             if !execs.is_empty() {
                 check_files.push(GeneratedFile {
-                    path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", super::docker::exec_runner(&id)),
+                    path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", super::docker::exec_runner(id)),
                     contents: checks::script(&pos, &execs, &render),
                 });
             }
