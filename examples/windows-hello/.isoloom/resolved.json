@@ -111,6 +111,14 @@
             "target": "checks/web01-answers.sh",
             "expect": "",
             "wait": 0
+          },
+          {
+            "name": "web01:80 from the networks",
+            "derived": true,
+            "kind": "http",
+            "target": "http://192.168.57.10:80/",
+            "expect": "any",
+            "wait": 30
           }
         ]
       }

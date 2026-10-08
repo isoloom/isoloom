@@ -46,5 +46,9 @@ _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)"
 echo '== checks/web01-answers.sh'
 if _retry 0 sh -c 'cd /opt/isoloom && sh checks/web01-answers.sh'; then pass 'checks/web01-answers.sh'; else fail 'checks/web01-answers.sh' "checks/web01-answers.sh exited non-zero"; fi
 
+if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
+if _retry 30 _http_any 'http://192.168.57.10:80/'; then pass 'web01:80 from the networks'; else fail 'web01:80 from the networks' "nothing answers at http://192.168.57.10:80/"; fi
+fi
+
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

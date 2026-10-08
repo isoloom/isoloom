@@ -46,5 +46,13 @@ _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)"
 echo '== checks/both-answer.sh'
 if _retry 0 sh -c 'cd /opt/isoloom && sh checks/both-answer.sh'; then pass 'checks/both-answer.sh'; else fail 'checks/both-answer.sh' "checks/both-answer.sh exited non-zero"; fi
 
+if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
+if _retry 30 _tcp '192.168.58.10' 445; then pass 'files01:445 from the networks'; else fail 'files01:445 from the networks' "nothing listens at 192.168.58.10:445"; fi
+fi
+
+if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
+if _retry 30 _http_any 'http://192.168.58.20:80/'; then pass 'intranet:80 from the networks'; else fail 'intranet:80 from the networks' "nothing answers at http://192.168.58.20:80/"; fi
+fi
+
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
