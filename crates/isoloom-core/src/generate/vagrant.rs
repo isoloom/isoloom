@@ -72,6 +72,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("\nVagrant.configure(\"2\") do |config|\n");
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n");
     out.push_str("  config.vm.boot_timeout = 900\n");
+    // libvirt names a domain <prefix><machine>, the prefix defaulting to this folder's name
+    // ("vagrant_"): every lab's `web` was `vagrant_web`, so two labs collided and a leftover
+    // couldn't be told apart. The environment's name keeps them apart (instances included).
+    let _ = writeln!(
+        out,
+        "  config.vm.provider \"libvirt\" do |v|\n    v.default_prefix = {}\n  end",
+        rb(&format!("{}_", spec.name))
+    );
     if router::needed(spec) {
         router_vm(spec, &mut out);
     }

@@ -51,6 +51,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("  config.vm.box = \"bento/debian-12\"\n");
     let _ = writeln!(out, "  config.vm.hostname = {}", rb(&spec.name));
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n  config.vm.boot_timeout = 600\n");
+    // libvirt's domain name: the environment's, not this folder's ("docker-vm_default").
+    let _ = writeln!(
+        out,
+        "  config.vm.provider \"libvirt\" do |v|\n    v.default_prefix = {}\n  end",
+        rb(&format!("{}_", spec.name))
+    );
     for m in spec.machines.values().filter(|m| m.docker.is_some()) {
         for svc in &m.services {
             if let Some(host) = svc.publish {
