@@ -51,6 +51,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("  config.vm.box = \"bento/debian-12\"\n");
     let _ = writeln!(out, "  config.vm.hostname = {}", rb(&spec.name));
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n  config.vm.boot_timeout = 600\n");
+    // A tool that can't reach the machines itself (macOS keeps third-party tools off the local
+    // network) sets ISOLOOM_SSH_PROXY_COMMAND, e.g. "/usr/bin/nc %h %p", and Vagrant's SSH goes
+    // through it. Unset: Vagrant connects directly, as before.
+    out.push_str("  config.ssh.proxy_command = ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"] if ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"]\n");
     // libvirt's domain name: the environment's, not this folder's ("docker-vm_default").
     let _ = writeln!(
         out,
