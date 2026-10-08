@@ -337,11 +337,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 path: format!("{OUTPUT_DIR}/{DIR}/checks/{name}.sh"),
                 contents: checks::script(&checks::Position::Machine(name.to_string()), group, &render),
             });
-            let _ = writeln!(
-                out,
-                "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", path: {}{CHECK_ENV}",
-                rb(&format!("checks/{name}.sh"))
-            );
+            let _ = writeln!(out, "{}", checks_provisioner(&format!("checks/{name}.sh"), group));
         }
         out.push_str("  end\n");
     }
@@ -377,6 +373,32 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 }
 
 /// The derived-checks switch, read from the host's environment when Vagrant runs.
+/// A position's checks, on demand (`vagrant provision --provision-with checks`). The Vagrantfile
+/// is read on every `vagrant` command, so the project's check scripts are read then and written
+/// over the VM's copy first: an edited script runs at the next `isoloom test`, not the copy made
+/// when the VM was provisioned. Then the runner itself.
+fn checks_provisioner(runner: &str, group: &[&checks::Resolved]) -> String {
+    let mut scripts: Vec<&str> = group
+        .iter()
+        .filter_map(|c| match &c.probe {
+            checks::Probe::Script { path } => Some(path.as_str()),
+            _ => None,
+        })
+        .collect();
+    scripts.dedup();
+    if scripts.is_empty() {
+        return format!(
+            "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", path: {}{CHECK_ENV}",
+            rb(runner)
+        );
+    }
+    let list = scripts.iter().map(|p| rb(p)).collect::<Vec<_>>().join(", ");
+    format!(
+        "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: [{list}].map {{ |p| \"mkdir -p /opt/isoloom/#{{File.dirname(p)}} && cat > /opt/isoloom/#{{p}} <<'ISOLOOM_EOF'\\n#{{File.read(File.join(ROOT, p))}}\\nISOLOOM_EOF\\n\" }}.join + File.read(File.join(__dir__, {})){CHECK_ENV}",
+        rb(runner)
+    )
+}
+
 const CHECK_ENV: &str = ", env: { \"ISOLOOM_DERIVED\" => ENV.fetch(\"ISOLOOM_DERIVED\", \"1\") }";
 
 /// Whether a position's checks run on that machine itself: a Linux VM of the environment.
@@ -756,10 +778,9 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
     }
     // Its checks, on demand (`vagrant provision --provision-with checks`).
     if with_checks {
-        let _ = writeln!(
-            out,
-            "    m.vm.provision \"shell\", name: \"checks\", run: \"never\", path: \"checks/controller.sh\"{CHECK_ENV}"
-        );
+        let plan = checks::plan(spec);
+        let scripts = controller_checks(spec, &plan);
+        let _ = writeln!(out, "{}", checks_provisioner("checks/controller.sh", &scripts));
     }
     out.push_str("  end\n");
 }
