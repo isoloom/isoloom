@@ -41,7 +41,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - (ip route del default 2>/dev/null || true) && exec sleep infinity
+    - (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -112,7 +112,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - (ip route del default 2>/dev/null || true) && exec sleep infinity
+    - (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL

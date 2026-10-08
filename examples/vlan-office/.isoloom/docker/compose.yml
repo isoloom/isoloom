@@ -103,7 +103,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.10.0/24 via 10.70.99.254 && ip route replace 10.70.20.0/24 via 10.70.99.254 && (ip route del default 2>/dev/null || true) && exec sleep infinity
+    - ip route replace 10.70.10.0/24 via 10.70.99.254 && ip route replace 10.70.20.0/24 via 10.70.99.254 && (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -140,7 +140,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.10.0/24 via 10.70.20.254 && ip route replace 10.70.99.0/24 via 10.70.20.254 && exec sleep infinity
+    - ip route replace 10.70.10.0/24 via 10.70.20.254 && ip route replace 10.70.99.0/24 via 10.70.20.254 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -177,7 +177,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - 'IF=$$(ip -o link | awk ''tolower($$0) ~ /02:1e:1d:38:30:38/ {print $$2}'' | cut -d@ -f1 | tr -d : | head -n 1) && ip addr flush dev $$IF && ip link set $$IF down && ip link set $$IF name office && ip link set office up && ip link add link office name office.10 type vlan id 10 && ip addr add 10.70.10.50/24 dev office.10 && ip link set office.10 up && ip link add link office name office.20 type vlan id 20 && ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up && ip route replace default via 10.70.20.1 && ip route replace 10.70.99.0/24 via 10.70.10.254 && exec sleep infinity'
+    - 'IF=$$(ip -o link | awk ''tolower($$0) ~ /02:1e:1d:38:30:38/ {print $$2}'' | cut -d@ -f1 | tr -d : | head -n 1) && ip addr flush dev $$IF && ip link set $$IF down && ip link set $$IF name office && ip link set office up && ip link add link office name office.10 type vlan id 10 && ip addr add 10.70.10.50/24 dev office.10 && ip link set office.10 up && ip link add link office name office.20 type vlan id 20 && ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up && ip route replace default via 10.70.20.1 && ip route replace 10.70.99.0/24 via 10.70.10.254 && while ip -o -4 addr show | grep -qv '' lo ''; do sleep 2; done; exit 1'
     healthcheck:
       test:
       - CMD-SHELL
@@ -216,7 +216,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.20.0/24 via 10.70.10.254 && ip route replace 10.70.99.0/24 via 10.70.10.254 && (ip route del default 2>/dev/null || true) && exec sleep infinity
+    - ip route replace 10.70.20.0/24 via 10.70.10.254 && ip route replace 10.70.99.0/24 via 10.70.10.254 && (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL

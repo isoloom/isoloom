@@ -931,12 +931,22 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     r.insert(s("image"), s(if impaired(spec, m) { TC_IMAGE } else { UTILITY_IMAGE }));
     r.insert(s("network_mode"), s(format!("service:{host}")));
     r.insert(s("cap_add"), list([s("NET_ADMIN")]));
-    // Sets the routes, then stays (idle) so the healthcheck can confirm them and `up --wait`
-    // treats it as running rather than exited.
+    // Sets the routes, then stays so the healthcheck can confirm them and `up --wait` treats it
+    // as running rather than exited. When the machine's container restarts (a crash), Docker
+    // gives it a new network namespace with the default routes back, and this sidecar is left in
+    // the old one, its addresses gone: it exits then, and its restart joins the new namespace
+    // and sets the routes again (an offline machine stays offline).
     let cmds = route_commands(spec, name, m);
     r.insert(
         s("entrypoint"),
-        list([s("/bin/sh"), s("-c"), s(format!("{} && exec sleep infinity", cmds.join(" && ")))]),
+        list([
+            s("/bin/sh"),
+            s("-c"),
+            s(format!(
+                "{} && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1",
+                cmds.join(" && ")
+            )),
+        ]),
     );
     let mut ready = Vec::new();
     if let Some((first, _)) = router::routes(spec, name, m).first() {

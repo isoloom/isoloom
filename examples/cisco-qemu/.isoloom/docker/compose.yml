@@ -50,7 +50,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip addr flush dev eth1 && ip addr flush dev eth2 && exec sleep infinity
+    - ip addr flush dev eth1 && ip addr flush dev eth2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -105,7 +105,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip addr flush dev eth1 && ip addr flush dev eth2 && exec sleep infinity
+    - ip addr flush dev eth1 && ip addr flush dev eth2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -139,7 +139,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace default via 10.92.1.1 && exec sleep infinity
+    - ip route replace default via 10.92.1.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -190,7 +190,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace default via 10.92.2.1 && exec sleep infinity
+    - ip route replace default via 10.92.2.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
