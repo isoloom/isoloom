@@ -173,20 +173,39 @@ fn runner_scripts_print_lines_the_cli_reads_back() {
 }
 
 #[test]
-fn containers_refuse_exec_checks_and_vms_run_them() {
+fn exec_checks_run_inside_the_machine_on_docker_and_kubernetes() {
     let spec = example("arm-vm");
     assert_eq!(
         isoloom_core::refusal(&spec, isoloom_core::Target::Vagrant),
         None,
         "a VM runs exec checks on the machine itself"
     );
-    let with_docker = parse(&format!("{BASE}checks:\n  - {{ from: web, exec: id }}\n")).unwrap();
-    assert_eq!(
-        isoloom_core::refusal(&with_docker, isoloom_core::Target::Docker).as_deref(),
-        Some("`exec` checks run on VM targets for now")
-    );
-    assert_eq!(
-        isoloom_core::refusal(&with_docker, isoloom_core::Target::Kubernetes).as_deref(),
-        Some("`exec` checks run on VM targets for now")
-    );
+    let with_docker = parse(&format!("{BASE}checks:\n  - {{ from: web, exec: id, expect: uid }}\n")).unwrap();
+    assert_eq!(isoloom_core::refusal(&with_docker, isoloom_core::Target::Docker), None);
+    assert_eq!(isoloom_core::refusal(&with_docker, isoloom_core::Target::Kubernetes), None);
+    // From where no container of its own stands, there's nothing to run it inside.
+    let from_user = parse(&format!("{BASE}checks:\n  - {{ exec: id }}\n")).unwrap();
+    assert!(isoloom_core::refusal(&from_user, isoloom_core::Target::Docker).is_some_and(|r| r.contains("needs `from:`")));
+    // Its own runner, piped into the machine; the runner beside it doesn't run it.
+    let files = isoloom_core::generate(&with_docker, isoloom_core::Target::Docker).unwrap();
+    let exec = files
+        .iter()
+        .find(|f| f.path.ends_with("docker/checks/exec-web.sh"))
+        .expect("an exec runner for web");
+    assert!(exec.contents.contains("_exec 'id' 'uid'"));
+    let beside = files.iter().find(|f| f.path.ends_with("docker/checks/web.sh")).unwrap();
+    assert!(!beside.contents.contains("_exec 'id'"));
+}
+
+/// A TLS service's derived check goes over HTTPS.
+#[test]
+fn a_tls_service_is_probed_over_https() {
+    let spec = parse(&BASE.replace("http: true }", "http: true, tls: true }")).unwrap();
+    let plan = checks::plan(&spec);
+    let derived = plan
+        .iter()
+        .find(|c| c.derived && matches!(&c.probe, checks::Probe::Http { .. }))
+        .expect("a derived http check");
+    let checks::Probe::Http { url, .. } = &derived.probe else { unreachable!() };
+    assert!(url.https);
 }

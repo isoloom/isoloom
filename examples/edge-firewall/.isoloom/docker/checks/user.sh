@@ -19,6 +19,18 @@ _http() {
   echo "${c:-000}"
 }
 _http_is() { [ "$(_http "$1")" = "$2" ]; }
+# _req STATUS|any TEXT CURL-ARGS... -> 0 when the request gets that status (any answer for `any`)
+# and its body contains TEXT (if any); $out says why not. Needs curl.
+_req() {
+  want=$1; text=$2; shift 2
+  command -v curl >/dev/null 2>&1 || { out="curl is needed for this check"; return 1; }
+  b=$(mktemp); c=$(curl -sk -m 10 -o "$b" -w '%{http_code}' "$@" 2>/dev/null); c=${c:-000}; r=0
+  if [ "$want" = any ]; then [ "$c" != 000 ] || r=1; else [ "$c" = "$want" ] || r=1; fi
+  if [ $r = 1 ]; then out="expected HTTP $want, got $c"
+  elif [ -n "$text" ] && ! grep -qF -- "$text" "$b"; then r=1; out="HTTP $c, but the response doesn't contain the expected text"
+  fi
+  rm -f "$b"; return $r
+}
 _http_any() { [ "$(_http "$1")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
@@ -33,6 +45,8 @@ _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)"
 
 echo '== checks/web-through-firewall.sh'
 if _retry 0 sh -c 'cd /isoloom/project && sh checks/web-through-firewall.sh'; then pass 'the web page answers through the firewall'; else fail 'the web page answers through the firewall' "checks/web-through-firewall.sh exited non-zero"; fi
+
+if _retry 30 _http_is 'http://www.edge.test/' 200; then pass 'the web server answers by its other name'; else fail 'the web server answers by its other name' "expected HTTP 200 from http://www.edge.test/, got $(_http 'http://www.edge.test/')"; fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 if _retry 30 _http_any 'http://10.70.0.2:8080/'; then pass 'fw:8080 on outside from user'; else fail 'fw:8080 on outside from user' "nothing answers at http://10.70.0.2:8080/"; fi

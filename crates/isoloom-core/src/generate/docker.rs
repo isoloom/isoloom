@@ -8,7 +8,9 @@
 //! - Each machine becomes a service with its fixed address on every network; services find
 //!   each other by name (Compose DNS).
 //! - Machines with services get a healthcheck (TCP probe), so `depends_on` waits for them
-//!   to answer and `docker compose up --wait` means "everything answers".
+//!   to answer and `docker compose up --wait` means "everything answers". The probe is
+//!   Isoloom's own static busybox (a one-shot `isoloom-probe-<arch>` copies it into a volume),
+//!   so it needs nothing from the image: distroless and `scratch` machines work too.
 //! - `init:` scripts run once, in one-shot containers of the machine's image on its networks,
 //!   after it answers; machines depending on it wait for them to finish.
 //! - Inputs become environment variables read from the shell (`${NAME:-}`), only on the
@@ -30,7 +32,7 @@ use serde_yaml_ng::{Mapping, Value};
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, appliances, common_unsupported, header, router, trunks};
 use crate::checks;
-use crate::model::{Machine, Spec, Target};
+use crate::model::{Arch, Machine, Spec, Target};
 
 const DIR: &str = "docker";
 /// From `.isoloom/docker/` back to the project folder.
@@ -61,18 +63,58 @@ pub(super) fn image_of(spec: &Spec, name: &str, m: &Machine) -> String {
     d.image.clone().unwrap_or_else(|| format!("isoloom/{}-{}", spec.name, name))
 }
 
-/// A TCP probe for each service port that works in most images: busybox/BSD `nc`, else bash.
+/// A static busybox Isoloom brings into every machine with services, so its probe needs
+/// nothing from the machine's image (distroless and `scratch` images have no shell).
+pub(super) const PROBE_IMAGE: &str = "busybox:1.37.0-musl";
+/// Where a machine sees that busybox (read-only).
+pub(super) const PROBE_DIR: &str = "/.isoloom-probe";
+
+/// The one-shot service (Compose) that copies the probe for machines of this architecture.
+pub(super) fn probe_service(arch: Arch) -> String {
+    format!("isoloom-probe-{}", arch.id())
+}
+
+/// A TCP probe for each service port, run by Isoloom's own busybox (see [`PROBE_IMAGE`]).
 pub(super) fn probe(m: &Machine) -> String {
     m.services
         .iter()
-        .map(|svc| {
-            format!(
-                "(nc -z 127.0.0.1 {p} 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/{p}' 2>/dev/null)",
-                p = svc.port
-            )
-        })
+        .map(|svc| format!("{PROBE_DIR}/busybox nc -z -w 2 127.0.0.1 {}", svc.port))
         .collect::<Vec<_>>()
         .join(" && ")
+}
+
+/// The probe as an exec-form command: no shell from the image.
+pub(super) fn probe_command(m: &Machine) -> Vec<Value> {
+    vec![s(format!("{PROBE_DIR}/busybox")), s("sh"), s("-c"), s(probe(m))]
+}
+
+/// A machine's Compose `build`: its context, and the Dockerfile (Compose reads it relative to
+/// the context) and build arguments when the spec gives them.
+fn build_of(build: &str, d: &crate::model::DockerImpl) -> Value {
+    let mut b = Mapping::new();
+    b.insert(s("context"), s(format!("{ROOT}/{build}")));
+    if let Some(f) = &d.dockerfile {
+        b.insert(s("dockerfile"), s(relative_to(build, f)));
+    }
+    if !d.args.is_empty() {
+        let mut args = Mapping::new();
+        for (k, v) in &d.args {
+            // `$$`: a literal value, not Compose's interpolation.
+            args.insert(s(k.as_str()), s(v.replace('$', "$$")));
+        }
+        b.insert(s("args"), Value::Mapping(args));
+    }
+    Value::Mapping(b)
+}
+
+/// `path` (from the project folder) as seen from the folder `from` (also from the project).
+pub(super) fn relative_to(from: &str, path: &str) -> String {
+    let clean = |p: &str| -> Vec<String> { p.split('/').filter(|c| !c.is_empty() && *c != ".").map(String::from).collect() };
+    let (f, p) = (clean(from), clean(path));
+    let common = f.iter().zip(&p).take_while(|(a, b)| a == b).count();
+    let mut out: Vec<String> = std::iter::repeat_n("..".to_string(), f.len() - common).collect();
+    out.extend(p[common..].iter().cloned());
+    out.join("/")
 }
 
 fn environment(m: &Machine) -> Option<Value> {
@@ -90,13 +132,108 @@ fn networks_of(m: &Machine, spec: &Spec, with_address: bool) -> Value {
     let mut nets = Mapping::new();
     for (net, octet) in &m.networks {
         let v = if with_address {
-            map([("ipv4_address", s(address(spec, net, *octet).to_string()))])
+            let mut a = Mapping::new();
+            a.insert(s("ipv4_address"), s(address(spec, net, *octet).to_string()));
+            // Its other names, resolved by Compose DNS on this network.
+            if !m.aliases.is_empty() {
+                a.insert(s("aliases"), list(m.aliases.iter().map(|x| s(x.as_str()))));
+            }
+            Value::Mapping(a)
         } else {
             Value::Null
         };
         nets.insert(s(net.as_str()), v);
     }
     Value::Mapping(nets)
+}
+
+/// The one-shot `init:` jobs no running service waits for: those of machines nothing depends
+/// on. Compose's `up --wait` fails when such a job exits, even with 0, so starters bring the
+/// rest up with `--wait` first, then run these attached, in order (see [`start_commands`]).
+pub fn leaf_jobs(spec: &Spec) -> Vec<String> {
+    spec.machines
+        .iter()
+        .filter(|(name, m)| m.docker.is_some() && !spec.machines.values().any(|o| o.docker.is_some() && o.depends_on.iter().any(|d| d == *name)))
+        .flat_map(|(name, m)| init_names(name, m))
+        .collect()
+}
+
+/// How to start a Compose file: `wait` for everything but `jobs` (`up -d --wait`), then run
+/// each of `jobs` attached, in order, failing on its exit code. Read from the Compose file, so
+/// an embedder holding only `.isoloom/docker/compose.yml` gets the same plan as Isoloom.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct StartPlan {
+    /// Services to bring up with `docker compose up -d --wait` (empty: all of them).
+    pub wait: Vec<String>,
+    /// One-shot jobs nothing running waits for, to run after `wait`, in order.
+    pub jobs: Vec<String>,
+}
+
+/// The [`StartPlan`] of a Compose file: one-shots (`restart: "no"`) outside profiles that no
+/// other started service depends on are jobs; when there are none, `wait` is empty (start all).
+pub fn start_plan(compose_yaml: &str) -> Result<StartPlan, String> {
+    let doc: Value = serde_yaml_ng::from_str(compose_yaml).map_err(|e| e.to_string())?;
+    let Some(Value::Mapping(services)) = doc.get("services") else {
+        return Ok(StartPlan::default());
+    };
+    let started: Vec<(&str, &Mapping)> = services
+        .iter()
+        .filter_map(|(k, v)| Some((k.as_str()?, v.as_mapping()?)))
+        .filter(|(_, v)| v.get("profiles").is_none())
+        .collect();
+    let deps_of = |v: &Mapping| -> Vec<String> {
+        match v.get("depends_on") {
+            Some(Value::Mapping(d)) => d.keys().filter_map(|k| k.as_str().map(String::from)).collect(),
+            Some(Value::Sequence(d)) => d.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
+            _ => Vec::new(),
+        }
+    };
+    let one_shot = |v: &Mapping| v.get("restart").and_then(Value::as_str) == Some("no");
+    // What the long-running services need, through chains of one-shots: `--wait` accepts those
+    // exiting. The other one-shots are the jobs.
+    let mut needed: Vec<String> = Vec::new();
+    let mut todo: Vec<String> = started.iter().filter(|(_, v)| !one_shot(v)).flat_map(|(_, v)| deps_of(v)).collect();
+    while let Some(n) = todo.pop() {
+        if needed.contains(&n) {
+            continue;
+        }
+        if let Some((_, v)) = started.iter().find(|(k, _)| *k == n) {
+            todo.extend(deps_of(v));
+        }
+        needed.push(n);
+    }
+    let jobs: Vec<String> = started
+        .iter()
+        .filter(|(n, v)| one_shot(v) && !needed.iter().any(|x| x == n))
+        .map(|(n, _)| n.to_string())
+        .collect();
+    if jobs.is_empty() {
+        return Ok(StartPlan::default());
+    }
+    let wait = started.iter().map(|(n, _)| n.to_string()).filter(|n| !jobs.contains(n)).collect();
+    Ok(StartPlan { wait, jobs })
+}
+
+/// The shell command that starts a Compose project with `compose` (e.g. `docker compose -f x`):
+/// plain `up -d --build --wait` when no job is left over, else the two steps of [`StartPlan`].
+/// `jobs` are the leaf jobs ([`leaf_jobs`]); the services to wait for are listed at run time.
+pub fn start_commands(compose: &str, jobs: &[String], wait_timeout: Option<u32>) -> String {
+    let timeout = wait_timeout.map(|t| format!(" --wait-timeout {t}")).unwrap_or_default();
+    if jobs.is_empty() {
+        return format!("{compose} up -d --build --wait{timeout}");
+    }
+    let exclude: String = jobs.iter().map(|j| format!(" -e {j}")).collect();
+    let mut cmd = format!("{compose} up -d --build --wait{timeout} $({compose} config --services | grep -vx{exclude})");
+    for j in jobs {
+        cmd.push_str(&format!(" && {compose} up --no-deps --exit-code-from {j} {j}"));
+    }
+    cmd
+}
+
+/// The runner of a machine's `exec` checks, in `.isoloom/docker/checks/`: piped into the
+/// machine (`docker compose exec -T <machine> sh -s < exec-<machine>.sh`).
+pub fn exec_runner(machine: &str) -> String {
+    format!("exec-{machine}.sh")
 }
 
 /// Init job service names for a machine.
@@ -116,6 +253,8 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
 
     let mut appliance_files: Vec<GeneratedFile> = Vec::new();
     let mut services = Mapping::new();
+    // The architectures of machines that need the probe: one copy job (and volume) each.
+    let mut probe_archs: Vec<Arch> = Vec::new();
     if router::needed(spec) {
         services.insert(s(router::NAME), router_service(spec));
     }
@@ -138,7 +277,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         let mut svc = Mapping::new();
         let image = image_of(spec, name, m);
         if let Some(build) = &d.build {
-            svc.insert(s("build"), map([("context", s(format!("{ROOT}/{build}")))]));
+            svc.insert(s("build"), build_of(build, d));
         }
         svc.insert(s("image"), s(image.clone()));
         // Pin the architecture so the machine runs the same on an x86-64 or an ARM host.
@@ -201,10 +340,14 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                 // Ephemeral loopback host port by default (no collisions); ISOLOOM_PUBLISH_FIXED
                 // pins it to `publish` inside the docker-vm/cloud VMs that forward it.
                 svc.publish.map(|p| {
-                    s(format!(
-                        "${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{ISOLOOM_PUBLISH_FIXED:+{p}}}:{port}",
-                        port = svc.port
-                    ))
+                    if svc.fixed {
+                        s(format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{p}:{port}", port = svc.port))
+                    } else {
+                        s(format!(
+                            "${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{ISOLOOM_PUBLISH_FIXED:+{p}}}:{port}",
+                            port = svc.port
+                        ))
+                    }
                 })
             })
             .collect();
@@ -281,7 +424,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             svc.insert(
                 s("healthcheck"),
                 map([
-                    ("test", list([s("CMD-SHELL"), s(probe(m))])),
+                    ("test", list(std::iter::once(s("CMD")).chain(probe_command(m)))),
                     ("interval", s("5s")),
                     ("timeout", s("3s")),
                     ("retries", Value::Number(60.into())),
@@ -290,6 +433,21 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             );
         }
         let mut deps = Mapping::new();
+        if !m.services.is_empty() {
+            // Isoloom's own probe, copied into a volume before the machine starts.
+            let probe_svc = probe_service(m.arch);
+            let mount = s(format!("{probe_svc}:{PROBE_DIR}:ro"));
+            match svc.get_mut(s("volumes")) {
+                Some(Value::Sequence(v)) => v.push(mount),
+                _ => {
+                    svc.insert(s("volumes"), list([mount]));
+                }
+            }
+            deps.insert(s(probe_svc.as_str()), map([("condition", s("service_completed_successfully"))]));
+            if !probe_archs.contains(&m.arch) {
+                probe_archs.push(m.arch);
+            }
+        }
         for dep in &m.depends_on {
             let dm = &spec.machines[dep];
             deps.insert(s(dep.as_str()), map([("condition", s("service_healthy"))]));
@@ -390,6 +548,15 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         } else {
             format!("isoloom-check-{id}")
         };
+        // `exec` checks run inside the machine itself, not in the runner beside it (which shares
+        // only its network): their own script, piped to `docker compose exec -T <machine> sh -s`.
+        let (execs, group): (Vec<&checks::Resolved>, Vec<&checks::Resolved>) = group.into_iter().partition(|c| matches!(c.probe, checks::Probe::Exec { .. }));
+        if !execs.is_empty() {
+            runner_files.push(GeneratedFile {
+                path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", exec_runner(id)),
+                contents: checks::script(&pos, &execs, &render),
+            });
+        }
         runner_files.push(GeneratedFile {
             path: format!("{OUTPUT_DIR}/{DIR}/checks/{id}.sh"),
             contents: checks::script(&pos, &group, &render),
@@ -539,6 +706,19 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         }
     }
 
+    for arch in &probe_archs {
+        let name = probe_service(*arch);
+        let mut p = Mapping::new();
+        p.insert(s("image"), s(PROBE_IMAGE));
+        p.insert(s("platform"), s(arch.docker_platform()));
+        p.insert(s("entrypoint"), list([s("/bin/cp"), s("/bin/busybox"), s("/probe/busybox")]));
+        p.insert(s("volumes"), list([s(format!("{name}:/probe"))]));
+        p.insert(s("network_mode"), s("none"));
+        p.insert(s("restart"), s("no"));
+        services.insert(s(name.as_str()), Value::Mapping(p));
+        volumes.insert(s(name.as_str()), Value::Mapping(Mapping::new()));
+    }
+
     let mut root = Mapping::new();
     root.insert(s("name"), s(spec.name.as_str()));
     root.insert(s("services"), Value::Mapping(services));
@@ -599,7 +779,12 @@ fn extra_hosts(spec: &Spec, name: &str) -> Option<Value> {
                     .keys()
                     .any(|n| m.networks.contains_key(n) && !trunks::carried(&ts, name, n) && !trunks::carried(&ts, o, n))
         })
-        .map(|(o, _)| s(format!("{o}:{}", address_for(spec, name, o))))
+        .flat_map(|(o, om)| {
+            let a = address_for(spec, name, o);
+            std::iter::once(o.as_str())
+                .chain(om.aliases.iter().map(String::as_str))
+                .map(move |n| s(format!("{n}:{a}")))
+        })
         .collect();
     (!hosts.is_empty()).then_some(Value::Sequence(hosts))
 }
@@ -750,12 +935,22 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     r.insert(s("image"), s(if impaired(spec, m) { TC_IMAGE } else { UTILITY_IMAGE }));
     r.insert(s("network_mode"), s(format!("service:{host}")));
     r.insert(s("cap_add"), list([s("NET_ADMIN")]));
-    // Sets the routes, then stays (idle) so the healthcheck can confirm them and `up --wait`
-    // treats it as running rather than exited.
+    // Sets the routes, then stays so the healthcheck can confirm them and `up --wait` treats it
+    // as running rather than exited. When the machine's container restarts (a crash), Docker
+    // gives it a new network namespace with the default routes back, and this sidecar is left in
+    // the old one, its addresses gone: it exits then, and its restart joins the new namespace
+    // and sets the routes again (an offline machine stays offline).
     let cmds = route_commands(spec, name, m);
     r.insert(
         s("entrypoint"),
-        list([s("/bin/sh"), s("-c"), s(format!("{} && exec sleep infinity", cmds.join(" && ")))]),
+        list([
+            s("/bin/sh"),
+            s("-c"),
+            s(format!(
+                "{} && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1",
+                cmds.join(" && ")
+            )),
+        ]),
     );
     let mut ready = Vec::new();
     if let Some((first, _)) = router::routes(spec, name, m).first() {
@@ -830,4 +1025,15 @@ fn stand_in(spec: &Spec, name: &str, m: &Machine) -> Value {
 /// decides for it.
 pub(super) fn offline(spec: &Spec, name: &str, m: &Machine) -> bool {
     !m.networks.keys().any(|n| spec.networks[n].internet) && router::default_gateway(spec, name, m).is_none()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_path_relative_to_a_folder() {
+        assert_eq!(super::relative_to("app", "build/shop/Dockerfile"), "../build/shop/Dockerfile");
+        assert_eq!(super::relative_to("build/web", "build/web/Dockerfile.dev"), "Dockerfile.dev");
+        assert_eq!(super::relative_to(".", "docker/Dockerfile"), "docker/Dockerfile");
+        assert_eq!(super::relative_to("./src/", "Dockerfile"), "../Dockerfile");
+    }
 }

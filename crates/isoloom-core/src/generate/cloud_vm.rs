@@ -585,7 +585,7 @@ pub(super) fn linux_setup_cmds(
         .machines
         .keys()
         .filter(|o| o.as_str() != name)
-        .map(|o| format!("{} {o}", super::address_for(spec, name, o)))
+        .map(|o| format!("{} {}", super::address_for(spec, name, o), super::names_of(spec, o)))
         .collect();
     if !hosts.is_empty() {
         cmds.push(format!(
@@ -693,7 +693,11 @@ fn controller(spec: &Spec, tf: &mut String, lab: &str) {
     let hosts: Vec<String> = spec
         .machines
         .iter()
-        .filter_map(|(o, om)| om.networks.first().map(|(n, oc)| format!("'{} {o}'", address(spec, n, *oc))))
+        .filter_map(|(o, om)| {
+            om.networks
+                .first()
+                .map(|(n, oc)| format!("'{} {}'", address(spec, n, *oc), super::names_of(spec, o)))
+        })
         .collect();
     if !hosts.is_empty() {
         cmds.push(format!("printf '%s\\n' {} | sudo tee -a /etc/hosts >/dev/null", hosts.join(" ")));
@@ -804,7 +808,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
         .machines
         .keys()
         .filter(|o| o.as_str() != name)
-        .map(|o| format!("{} {o}", super::address_for(spec, name, o)))
+        .map(|o| format!("{} {}", super::address_for(spec, name, o), super::names_of(spec, o)))
         .collect();
     if !hosts.is_empty() {
         ps.push(format!(

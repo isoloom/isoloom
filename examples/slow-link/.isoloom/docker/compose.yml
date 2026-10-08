@@ -45,6 +45,9 @@ services:
   web:
     build:
       context: ../../build/web
+      dockerfile: ../web.Dockerfile
+      args:
+        NGINX_TAG: 1.27-alpine
     image: isoloom/slow-link-web
     platform: linux/amd64
     hostname: web
@@ -55,12 +58,20 @@ services:
     - user:10.75.1.10
     healthcheck:
       test:
-      - CMD-SHELL
-      - (nc -z 127.0.0.1 80 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/80' 2>/dev/null)
+      - CMD
+      - /.isoloom-probe/busybox
+      - sh
+      - -c
+      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80
       interval: 5s
       timeout: 3s
       retries: 60
       start_period: 10s
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
+    depends_on:
+      isoloom-probe-amd64:
+        condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
     restart: unless-stopped
@@ -72,7 +83,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.75.1.0/24 via 10.75.2.254 && (IF=$$(ip -o -4 addr show | awk '$$4 ~ /^10\.75\.2\.10\//{print $$2}' | head -n 1); [ -n "$$IF" ] && tc qdisc replace dev "$$IF" root netem delay 80ms 10ms loss 1% rate 10mbit) && exec sleep infinity
+    - ip route replace 10.75.1.0/24 via 10.75.2.254 && (IF=$$(ip -o -4 addr show | awk '$$4 ~ /^10\.75\.2\.10\//{print $$2}' | head -n 1); [ -n "$$IF" ] && tc qdisc replace dev "$$IF" root netem delay 80ms 10ms loss 1% rate 10mbit) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -107,7 +118,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.75.2.0/24 via 10.75.1.254 && exec sleep infinity
+    - ip route replace 10.75.2.0/24 via 10.75.1.254 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -158,6 +169,17 @@ services:
       far:
         ipv4_address: 10.75.2.252
     restart: unless-stopped
+  isoloom-probe-amd64:
+    image: busybox:1.37.0-musl
+    platform: linux/amd64
+    entrypoint:
+    - /bin/cp
+    - /bin/busybox
+    - /probe/busybox
+    volumes:
+    - isoloom-probe-amd64:/probe
+    network_mode: none
+    restart: no
 networks:
   branch:
     ipam:
@@ -169,3 +191,5 @@ networks:
       config:
       - subnet: 10.75.2.0/24
         gateway: 10.75.2.1
+volumes:
+  isoloom-probe-amd64: {}

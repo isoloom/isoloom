@@ -9,6 +9,7 @@ mod cloud_docker;
 mod cloud_vm;
 mod cloud_vm_others;
 mod docker;
+pub use docker::{StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
 mod docker_vm;
 mod external;
 mod hybrid;
@@ -251,16 +252,36 @@ fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> 
 }
 
 /// What the container outputs (Compose, Kubernetes) can't run as checks yet: Ansible playbooks
-/// (they run from the VM targets' controller) and `exec` (the runner shares a machine's network,
-/// not its filesystem).
+/// (they run from the VM targets' controller) and `exec` from a machine with no container of its
+/// own (`exec` checks are piped into the machine: `docker compose exec`, `kubectl exec`).
 pub(crate) fn container_checks_unsupported(spec: &Spec) -> Option<String> {
     if spec.checks.iter().any(|c| c.is_playbook()) {
         return Some("Ansible checks (.yml) run on VM targets for now".into());
     }
-    if spec.checks.iter().any(|c| matches!(c, crate::model::Check::Declared(d) if d.exec.is_some())) {
-        return Some("`exec` checks run on VM targets for now".into());
+    for c in crate::checks::plan(spec) {
+        if !matches!(c.probe, crate::checks::Probe::Exec { .. }) {
+            continue;
+        }
+        let in_container = match &c.position {
+            crate::checks::Position::Machine(m) => spec.machines.get(m).is_some_and(|m| m.docker.is_some() && !m.supplied),
+            _ => false,
+        };
+        if !in_container {
+            return Some(format!(
+                "`exec` check \"{}\" needs `from:` a machine with its own container (it runs inside it)",
+                c.name
+            ));
+        }
     }
     None
+}
+
+/// A machine's names for a hosts line: its own, then its `aliases`.
+pub(crate) fn names_of(spec: &Spec, name: &str) -> String {
+    std::iter::once(name)
+        .chain(spec.machines.get(name).map(|m| m.aliases.iter().map(String::as_str)).into_iter().flatten())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Machines in start order: each after the machines it depends on (validated: no cycles).

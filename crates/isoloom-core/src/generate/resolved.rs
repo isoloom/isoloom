@@ -97,7 +97,16 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                 "windows": m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os)),
                 "addresses": addresses,
                 "docker_addresses": docker_addresses,
-                "services": m.services.iter().map(|s| json!({ "port": s.port, "name": s.name, "http": s.http, "publish": s.publish })).collect::<Vec<_>>(),
+                "services": m.services.iter().map(|s| {
+                    let mut v = json!({ "port": s.port, "name": s.name, "http": s.http, "publish": s.publish });
+                    if s.tls {
+                        v["tls"] = json!(true);
+                    }
+                    if s.fixed {
+                        v["fixed"] = json!(true);
+                    }
+                    v
+                }).collect::<Vec<_>>(),
                 "depends_on": m.depends_on,
                 "inputs": m.inputs,
                 "volumes": m.volumes,
@@ -182,7 +191,7 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                 .iter()
                 .map(|c| {
                     let (kind, target, expect) = match &c.probe {
-                        Probe::Http { url, expect } => (
+                        Probe::Http { url, expect, .. } => (
                             "http",
                             url.render(&host(&url.host)),
                             match expect {
@@ -266,6 +275,55 @@ pub fn render_message(spec: &Spec, instance: Option<u8>) -> Result<Option<String
     let Some(m) = &spec.message else { return Ok(None) };
     let snapshot = resolve_with(spec, instance);
     fill(m, &snapshot).map(Some)
+}
+
+/// The message as it reads where the environment runs on `target`: on the targets that run
+/// the Compose file, machines are at their Docker addresses, so `machines.<m>.addresses` is
+/// filled with those (see [`on_target`]).
+pub fn render_message_on(spec: &Spec, instance: Option<u8>, target: Target) -> Result<Option<String>, String> {
+    render_message_at(spec, instance, target, &[])
+}
+
+/// [`render_message_on`] with the host ports the environment really got, as (machine, port,
+/// host port): local Docker publishes on free ports unless `ISOLOOM_PUBLISH_FIXED` is set, so
+/// `{{ machines.web.services.0.publish }}` must say where it answers (see [`with_published`]).
+pub fn render_message_at(spec: &Spec, instance: Option<u8>, target: Target, published: &[(String, u16, u16)]) -> Result<Option<String>, String> {
+    let Some(m) = &spec.message else { return Ok(None) };
+    fill(m, &with_published(on_target(resolve_with(spec, instance), target), published)).map(Some)
+}
+
+/// The snapshot with the host ports the environment really got, as (machine, port, host
+/// port): each service's `publish` and the `published` list's `host_port`.
+pub fn with_published(mut snapshot: Value, published: &[(String, u16, u16)]) -> Value {
+    for (machine, port, host) in published {
+        let services = snapshot.pointer_mut(&format!("/machines/{machine}/services")).and_then(Value::as_array_mut);
+        for s in services.into_iter().flatten().filter(|s| s["port"] == *port) {
+            s["publish"] = (*host).into();
+        }
+        let listed = snapshot.get_mut("published").and_then(Value::as_array_mut);
+        for p in listed.into_iter().flatten().filter(|p| p["machine"] == machine.as_str() && p["port"] == *port) {
+            p["host_port"] = (*host).into();
+        }
+    }
+    snapshot
+}
+
+/// The snapshot as seen on `target`: on the Compose targets (Docker, a hosting service, Docker
+/// on a VM or a cloud VM) each machine's `addresses` are its `docker_addresses`, the ones it
+/// really has there (they differ when the spec's networks are outside 10.0.0.0/8, or for an
+/// instance); elsewhere the snapshot is unchanged.
+pub fn on_target(mut snapshot: Value, target: Target) -> Value {
+    if !matches!(target, Target::Docker | Target::Hosted | Target::CloudDocker | Target::DockerVm) {
+        return snapshot;
+    }
+    if let Some(machines) = snapshot.get_mut("machines").and_then(Value::as_object_mut) {
+        for m in machines.values_mut() {
+            if let Some(docker) = m.get("docker_addresses").cloned() {
+                m["addresses"] = docker;
+            }
+        }
+    }
+    snapshot
 }
 
 /// Fills `{{ dotted.path }}` placeholders from a snapshot. Scalars print plainly; lists and

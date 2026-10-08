@@ -36,7 +36,7 @@ pub fn schema() -> Value {
     set(&mut s, &["properties", "name"], "pattern", json!("^[a-z0-9]+(-[a-z0-9]+)*$"));
     set(&mut s, &["properties", "networks"], "propertyNames", json!({ "pattern": kebab }));
     set(&mut s, &["properties", "machines"], "propertyNames", json!({ "pattern": kebab }));
-    set(&mut s, &["properties", "inputs", "items"], "pattern", json!("^[A-Z_][A-Z0-9_]*$"));
+    set(&mut s, &["properties", "inputs", "items"], "pattern", json!("^[A-Za-z_][A-Za-z0-9_]*$"));
     // A network is a /24 to /29; a LAN split into VLANs may be larger (from /8), its VLANs are
     // the /24 to /29 networks.
     let private = r"^(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}";

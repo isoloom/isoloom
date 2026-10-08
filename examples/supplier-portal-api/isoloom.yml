@@ -24,7 +24,7 @@ machines:
 
   web:
     networks: { lab: 31 }
-    services: [{ port: 3206, name: portal, http: true, publish: 3206 }]
+    services: [{ port: 3206, name: portal, http: true, publish: 3206, fixed: true }]
     depends_on: [database]
     resources: { cpus: 1, memory_mb: 1024 }
     docker:

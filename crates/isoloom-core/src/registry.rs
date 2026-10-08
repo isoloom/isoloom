@@ -23,6 +23,11 @@ pub struct Entry {
     /// The cloud module, for the cloud targets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<String>,
+    /// The Compose project name, when a tool embedding Isoloom ran the Compose file under its
+    /// own (`docker compose -p`); else the file's `name:`. `status`, `connect`, `exec` and
+    /// `capture` pass it, or Compose would look for an environment that isn't there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
     /// When `run` finished, as RFC 3339 (UTC).
     pub started: String,
 }
@@ -70,7 +75,46 @@ pub fn save(r: &Registry) -> Result<(), String> {
         "# Environments `isoloom run` brought up on this host. Written by `isoloom run` and `isoloom down`;\n# `isoloom status` reads it.\n{}",
         serde_yaml_ng::to_string(r).map_err(|e| e.to_string())?
     );
-    std::fs::write(&p, text).map_err(|e| format!("can't write {}: {e}", p.display()))
+    // Whole or not at all: a reader never sees a half-written file.
+    let tmp = p.with_extension(format!("yml.{}.tmp", std::process::id()));
+    std::fs::write(&tmp, text).map_err(|e| format!("can't write {}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, &p).map_err(|e| format!("can't write {}: {e}", p.display()))
+}
+
+/// Reads, changes and writes the registry as one step: `run`, `down` and tools embedding
+/// Isoloom (a launcher and its background workers) write it at the same time, and a plain
+/// load-then-save lets one of two writers drop the other's entry. Held by a lock file beside
+/// it; one left by a process that died is taken over after 30 seconds.
+pub fn update(f: impl FnOnce(&mut Registry)) -> Result<(), String> {
+    let lock = home().join("status.lock");
+    if let Some(parent) = lock.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("can't create {}: {e}", parent.display()))?;
+    }
+    let started = std::time::Instant::now();
+    loop {
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&lock) {
+            Ok(_) => break,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let stale = std::fs::metadata(&lock)
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.elapsed().ok())
+                    .is_some_and(|age| age > std::time::Duration::from_secs(30));
+                if stale || started.elapsed() > std::time::Duration::from_secs(10) {
+                    let _ = std::fs::remove_file(&lock);
+                    continue;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+            Err(e) => return Err(format!("can't lock {}: {e}", lock.display())),
+        }
+    }
+    let result = load().and_then(|mut reg| {
+        f(&mut reg);
+        save(&reg)
+    });
+    let _ = std::fs::remove_file(&lock);
+    result
 }
 
 impl Registry {
@@ -141,6 +185,7 @@ mod tests {
             target: t,
             instance: None,
             cloud: None,
+            project: None,
             started: rfc3339(0),
         };
         r.upsert(e(Target::Docker));
@@ -150,5 +195,52 @@ mod tests {
         assert!(r.remove(Path::new("/p"), Target::Docker, None));
         assert!(!r.remove(Path::new("/p"), Target::Docker, None));
         assert_eq!(r.for_dir(Path::new("/p")).len(), 1);
+    }
+
+    #[test]
+    fn concurrent_updates_keep_every_entry() {
+        let home = std::env::temp_dir().join(format!("isoloom-reg-{}", std::process::id()));
+        // SAFETY: the only test touching ISOLOOM_HOME.
+        unsafe { std::env::set_var("ISOLOOM_HOME", &home) };
+        let threads: Vec<_> = (0..16)
+            .map(|i| {
+                std::thread::spawn(move || {
+                    update(|r| {
+                        r.upsert(Entry {
+                            name: format!("e{i}"),
+                            dir: PathBuf::from(format!("/p{i}")),
+                            target: Target::Docker,
+                            instance: None,
+                            cloud: None,
+                            project: None,
+                            started: rfc3339(0),
+                        })
+                    })
+                    .unwrap()
+                })
+            })
+            .collect();
+        for t in threads {
+            t.join().unwrap();
+        }
+        assert_eq!(load().unwrap().environments.len(), 16);
+        assert!(!home.join("status.lock").exists());
+        unsafe { std::env::remove_var("ISOLOOM_HOME") };
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn a_tools_compose_project_is_kept_and_older_files_still_read() {
+        let old = "environments:\n- name: x\n  dir: /p\n  target: docker\n  started: 1970-01-01T00:00:00Z\n";
+        let r: Registry = serde_yaml_ng::from_str(old).unwrap();
+        assert_eq!(r.environments[0].project, None);
+        let mut e = r.environments[0].clone();
+        e.project = Some("cyberctf-abc".into());
+        let text = serde_yaml_ng::to_string(&Registry { environments: vec![e] }).unwrap();
+        assert!(text.contains("project: cyberctf-abc"), "{text}");
+        assert_eq!(
+            serde_yaml_ng::from_str::<Registry>(&text).unwrap().environments[0].project.as_deref(),
+            Some("cyberctf-abc")
+        );
     }
 }
