@@ -23,6 +23,11 @@ pub struct Entry {
     /// The cloud module, for the cloud targets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<String>,
+    /// The Compose project name, when a tool embedding Isoloom ran the Compose file under its
+    /// own (`docker compose -p`); else the file's `name:`. `status`, `connect`, `exec` and
+    /// `capture` pass it, or Compose would look for an environment that isn't there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
     /// When `run` finished, as RFC 3339 (UTC).
     pub started: String,
 }
@@ -141,6 +146,7 @@ mod tests {
             target: t,
             instance: None,
             cloud: None,
+            project: None,
             started: rfc3339(0),
         };
         r.upsert(e(Target::Docker));
@@ -150,5 +156,20 @@ mod tests {
         assert!(r.remove(Path::new("/p"), Target::Docker, None));
         assert!(!r.remove(Path::new("/p"), Target::Docker, None));
         assert_eq!(r.for_dir(Path::new("/p")).len(), 1);
+    }
+
+    #[test]
+    fn a_tools_compose_project_is_kept_and_older_files_still_read() {
+        let old = "environments:\n- name: x\n  dir: /p\n  target: docker\n  started: 1970-01-01T00:00:00Z\n";
+        let r: Registry = serde_yaml_ng::from_str(old).unwrap();
+        assert_eq!(r.environments[0].project, None);
+        let mut e = r.environments[0].clone();
+        e.project = Some("cyberctf-abc".into());
+        let text = serde_yaml_ng::to_string(&Registry { environments: vec![e] }).unwrap();
+        assert!(text.contains("project: cyberctf-abc"), "{text}");
+        assert_eq!(
+            serde_yaml_ng::from_str::<Registry>(&text).unwrap().environments[0].project.as_deref(),
+            Some("cyberctf-abc")
+        );
     }
 }

@@ -94,14 +94,33 @@ fn target_label(e: &Entry) -> String {
     label
 }
 
+/// The Compose project name the registry recorded for an environment on Docker: set when a
+/// tool embedding Isoloom ran its Compose file under its own name.
+pub fn compose_project(dir: &Path, instance: Option<u8>) -> Option<String> {
+    let reg = registry::load().ok()?;
+    reg.for_dir(dir)
+        .into_iter()
+        .find(|e| e.instance == instance && matches!(e.target, Target::Docker | Target::Hosted))
+        .and_then(|e| e.project.clone())
+}
+
+/// `[-p <project>] -f <compose file>` for an environment's Compose file, under the project
+/// name it runs as (see [`compose_project`]).
+pub fn compose_files(dir: &Path, instance: Option<u8>) -> Vec<String> {
+    let f = dir.join(core::instance::output_dir(instance)).join("docker/compose.yml").display().to_string();
+    match compose_project(dir, instance) {
+        Some(p) => vec!["-p".into(), p, "-f".into(), f],
+        None => vec!["-f".into(), f],
+    }
+}
+
 /// The host ports a local Docker environment really got, as (machine, port, host port): its
 /// Compose file publishes on free loopback ports unless `ISOLOOM_PUBLISH_FIXED` is set, so the
 /// spec's `publish:` values aren't where it answers. Empty when Compose can't say.
 pub fn docker_published(dir: &Path, instance: Option<u8>) -> Vec<(String, u16, u16)> {
-    let f = dir.join(core::instance::output_dir(instance)).join("docker/compose.yml");
     let Ok(out) = Command::new("docker")
-        .args(["compose", "-f"])
-        .arg(&f)
+        .arg("compose")
+        .args(compose_files(dir, instance))
         .args(["ps", "--format", "json"])
         .current_dir(dir)
         .stderr(Stdio::null())
@@ -159,8 +178,19 @@ fn probe(e: &Entry) -> String {
     };
     let result = match e.target {
         Target::Docker | Target::Hosted => {
-            let f = out.join("docker/compose.yml").display().to_string();
-            run("docker", &["compose", "-f", &f, "ps", "--format", "json"], &e.dir).map(|text| {
+            let mut args = vec!["compose".to_string()];
+            if let Some(p) = &e.project {
+                args.extend(["-p".to_string(), p.clone()]);
+            }
+            args.extend([
+                "-f".to_string(),
+                out.join("docker/compose.yml").display().to_string(),
+                "ps".into(),
+                "--format".into(),
+                "json".into(),
+            ]);
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            run("docker", &args, &e.dir).map(|text| {
                 // Compose prints one JSON object per line (older versions: one array).
                 let items: Vec<serde_json::Value> = serde_json::from_str::<Vec<serde_json::Value>>(&text)
                     .unwrap_or_else(|_| text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect());
@@ -311,14 +341,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         match target {
             Target::Docker | Target::Hosted => {
                 c = Command::new("docker");
-                c.args([
-                    "compose",
-                    "--progress",
-                    "quiet",
-                    "-f",
-                    &out.join("docker/compose.yml").display().to_string(),
-                    "exec",
-                ]);
+                c.args(["compose", "--progress", "quiet"]).args(compose_files(dir, instance)).arg("exec");
                 c.arg(if tty { "-it" } else { "-T" });
                 c.args([unit.as_str(), "sh", "-c", &inner]);
                 c.current_dir(dir);
@@ -357,14 +380,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         Target::Docker | Target::Hosted => {
             container_only("Docker")?;
             c = Command::new("docker");
-            c.args([
-                "compose",
-                "--progress",
-                "quiet",
-                "-f",
-                &out.join("docker/compose.yml").display().to_string(),
-                "exec",
-            ]);
+            c.args(["compose", "--progress", "quiet"]).args(compose_files(dir, instance)).arg("exec");
             c.arg(if tty { "-it" } else { "-T" });
             c.args([machine, "sh", "-c", &inner]);
             c.current_dir(dir);
@@ -630,9 +646,10 @@ pub fn capture(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: 
             if m.docker.is_none() {
                 return Err(format!("`{machine}` has no `docker:`: on Docker it is supplied by the runner").into());
             }
-            let f = dir.join(core::instance::output_dir(instance)).join("docker/compose.yml").display().to_string();
             let id = Command::new("docker")
-                .args(["compose", "-f", &f, "ps", "-q", machine])
+                .arg("compose")
+                .args(compose_files(dir, instance))
+                .args(["ps", "-q", machine])
                 .current_dir(dir)
                 .output()
                 .map_err(|e| format!("docker: {e}"))?;
@@ -746,19 +763,9 @@ pub fn tc(dir: &Path, target: Option<&str>, instance: Option<u8>, action: &str, 
         };
         let mut c = if docker {
             let mut c = Command::new("docker");
-            c.args([
-                "compose",
-                "--progress",
-                "quiet",
-                "-f",
-                &out.join("docker/compose.yml").display().to_string(),
-                "exec",
-                "-T",
-                &host,
-                "sh",
-                "-c",
-                &command,
-            ]);
+            c.args(["compose", "--progress", "quiet"])
+                .args(compose_files(dir, instance))
+                .args(["exec", "-T", &host, "sh", "-c", &command]);
             c.current_dir(dir);
             c
         } else {
