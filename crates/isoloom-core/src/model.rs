@@ -437,6 +437,10 @@ pub struct Provision {
     /// Extra variables for the playbook.
     #[serde(default)]
     pub vars: IndexMap<String, String>,
+    /// Variables per machine (a machine's name -> its variables), on its line of the inventory
+    /// Isoloom writes: what a playbook keys on per host (its domain, a role flag).
+    #[serde(default)]
+    pub host_vars: IndexMap<String, IndexMap<String, serde_json::Value>>,
     /// The Ansible Galaxy requirements to install first (collections, roles); by default
     /// `requirements.yml` next to the playbook, when there is one.
     #[serde(default)]

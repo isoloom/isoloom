@@ -370,7 +370,7 @@ resource "proxmox_virtual_environment_file" "controller" {
       hostname    = "isoloom-controller"
       users       = local.users
       packages    = ["python3-venv", "curl", "netcat-openbsd", "openssh-client"]
-      write_files = concat(local.project_files, [{ path = "/etc/isoloom/id_ed25519", permissions = "0600", content = tls_private_key.controller.private_key_openssh }, { path = "/etc/isoloom/inventory.ini", permissions = "0644", content = "[linux]\nweb ansible_host=10.63.0.10 ansible_user=isoloom\ncache ansible_host=10.63.0.20 ansible_user=isoloom\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n" }])
+      write_files = concat(local.project_files, [{ path = "/etc/isoloom/id_ed25519", permissions = "0600", content = tls_private_key.controller.private_key_openssh }, { path = "/etc/isoloom/inventory.ini", permissions = "0644", content = "[linux]\nweb ansible_host=10.63.0.10 ansible_user=isoloom\ncache ansible_host=10.63.0.20 ansible_user=isoloom maxmemory='\"64mb\"'\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n" }])
       runcmd = [
         ["sh", "-c", "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' >> /etc/hosts"],
         ["sh", "-c", "python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm"],

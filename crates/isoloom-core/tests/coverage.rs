@@ -47,7 +47,7 @@ machines:
     count: 2
     networks: { out: 10 }
     docker: { build: h, dockerfile: h.Dockerfile, args: { A: b } }
-provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, requirements: req.yml }]
+provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, host_vars: { fw: { a: b } }, requirements: req.yml }]
 common: { resources: { cpus: 1 } }
 groups: { g: { members: [fw], arch: amd64 } }
 checks: [c.sh, { name: n, from: fw, http: "http://x/", method: POST, headers: { A: b }, body: x, contains: y, tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]

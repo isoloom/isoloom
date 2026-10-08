@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Per-machine inventory variables
+- `provision[].host_vars`: a machine's name -> its variables, written on its line of the inventory Isoloom generates (local VMs, Proxmox, cloud VMs, external machines), for playbooks that key on per-host values (its domain, a role flag). Values keep their types: each is written as a Python literal, which Ansible's INI inventory reads back (a quoted `"10"` stays a string; lists, maps, booleans and `null` as they are). Validation: every key names a machine, every variable is a valid name. With `groups:` and `vars:`, a spec can now hold a whole Ansible inventory without an inventory file. Example: ansible-pair's cache gets its `maxmemory`.
+
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
 

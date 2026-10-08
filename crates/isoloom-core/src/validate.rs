@@ -483,6 +483,20 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 }
             }
         }
+        for (machine, vars) in &step.host_vars {
+            if !spec.machines.contains_key(machine) {
+                add(&format!("provision[{i}].host_vars.{machine}"), format!("no machine named `{machine}`"));
+            }
+            for k in vars.keys() {
+                let ident = k.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+                if !ident {
+                    add(
+                        &format!("provision[{i}].host_vars.{machine}.{k}"),
+                        "a variable name: letters, digits and `_`, not starting with a digit".into(),
+                    );
+                }
+            }
+        }
     }
 
     // Tools take the addresses just below the controller on every network: no machine there.

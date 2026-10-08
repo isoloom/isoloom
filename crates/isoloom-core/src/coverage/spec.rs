@@ -502,6 +502,11 @@ fn base_table() -> Vec<Row> {
             done("extra variables (`-e`)", "ansible-pair"),
         ),
         common(
+            "provision[].host_vars",
+            planned("with environment-level provisioning on containers"),
+            done("on each machine's line of the inventory Isoloom writes", "ansible-pair"),
+        ),
+        common(
             "provision[].requirements",
             planned("with environment-level provisioning on containers"),
             done("Galaxy collections and roles installed first", "ansible-pair"),
@@ -655,7 +660,7 @@ fn base_table() -> Vec<Row> {
 }
 
 /// Fields counted as one feature whatever they hold.
-const WHOLE: &[&str] = &["common", "groups", "tools"];
+const WHOLE: &[&str] = &["common", "groups", "tools", "provision[].host_vars"];
 
 /// Where in the spec names are chosen by the author (map keys become `*`).
 const NAMED: &[&str] = &[

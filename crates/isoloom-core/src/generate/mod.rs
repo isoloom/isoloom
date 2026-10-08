@@ -30,6 +30,37 @@ use crate::targets::effective;
 use crate::validate::Cidr;
 
 /// The name of the router Isoloom adds (a Compose service, a VM) when `reach` rules need one.
+/// The `provision[].host_vars` of `machine`, as ` key='value'` pairs for its inventory line.
+/// Ansible splits a host line like a shell and reads each value as a Python literal, so every
+/// value is written as one (a string quoted, so `"10"` stays a string; `True`, `None`, lists and
+/// dicts as Python spells them), then single-quoted for the split.
+pub(crate) fn host_vars(spec: &Spec, machine: &str) -> String {
+    fn py(v: &serde_json::Value) -> String {
+        use serde_json::Value;
+        match v {
+            Value::Null => "None".into(),
+            Value::Bool(b) => if *b { "True" } else { "False" }.into(),
+            Value::Number(n) => n.to_string(),
+            Value::String(s) => serde_json::to_string(s).expect("a string serializes"),
+            Value::Array(a) => format!("[{}]", a.iter().map(py).collect::<Vec<_>>().join(", ")),
+            Value::Object(o) => format!(
+                "{{{}}}",
+                o.iter()
+                    .map(|(k, v)| format!("{}: {}", serde_json::to_string(k).expect("a string serializes"), py(v)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        }
+    }
+    let mut out = String::new();
+    for step in &spec.provision {
+        for (k, v) in step.host_vars.get(machine).into_iter().flatten() {
+            out.push_str(&format!(" {k}='{}'", py(v).replace('\'', "'\"'\"'")));
+        }
+    }
+    out
+}
+
 pub fn router_name() -> &'static str {
     router::NAME
 }
