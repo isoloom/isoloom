@@ -242,9 +242,41 @@ Vagrant.configure("2") do |config|
       set -e
       mkdir -p /tmp/isoloom-facts
       export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200
+      _isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'
+      _isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
+      retry_download() {
+        _isoloom_n=1
+        until "$@"; do
+          [ "$_isoloom_n" -lt 5 ] || return 1
+          echo "isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)"
+          sleep $((_isoloom_n * _isoloom_pause))
+          _isoloom_n=$((_isoloom_n + 1))
+        done
+      }
+      run_play() {
+        _isoloom_n=1
+        _isoloom_log=$(mktemp)
+        _isoloom_rcf=$(mktemp)
+        while :; do
+          { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
+          _isoloom_rc=$(cat "$_isoloom_rcf")
+          if [ "$_isoloom_rc" -eq 0 ]; then
+            rm -f "$_isoloom_log" "$_isoloom_rcf"
+            return 0
+          fi
+          if [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log"; then
+            echo "isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)"
+            sleep $((2 * _isoloom_pause))
+            _isoloom_n=$((_isoloom_n + 1))
+          else
+            rm -f "$_isoloom_log" "$_isoloom_rcf"
+            return "$_isoloom_rc"
+          fi
+        done
+      }
       cd /opt/isoloom/ansible
-      ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml
-      ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible"}' site.yml
+      retry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml
+      run_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible"}' site.yml
     SH
     m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/web-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
