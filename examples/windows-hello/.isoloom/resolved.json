@@ -23,6 +23,7 @@
       "shapes": [
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "windows-server-2019",
       "windows": true,
@@ -62,6 +63,8 @@
   "groups": {},
   "router": null,
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "lab": "192.168.57.253"
     }

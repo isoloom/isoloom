@@ -795,6 +795,14 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
             indent(&egress(false), 6)
         );
     }
+    // Done: it halts (its disk kept) unless the spec keeps it running. Detached, so that the
+    // provisioner returns before the VM goes; `isoloom test` boots it again for the checks.
+    if !spec.controller.as_ref().is_some_and(|c| c.keep_running) {
+        let _ = writeln!(
+            out,
+            "    m.vm.provision \"shell\", name: \"halt\", inline: \"touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &\""
+        );
+    }
     // Its checks, on demand (`vagrant provision --provision-with checks`).
     if with_checks {
         let plan = checks::plan(spec);

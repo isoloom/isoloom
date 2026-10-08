@@ -435,6 +435,10 @@ pub struct Controller {
     /// CPUs, memory (and disk on Proxmox), for many forks against a large environment.
     #[serde(default)]
     pub resources: Option<Resources>,
+    /// Keep it running once provisioning is done (to use it as a jump host). By default it
+    /// halts, keeping its disk: `isoloom test` and `isoloom provision` boot it when they need it.
+    #[serde(default)]
+    pub keep_running: bool,
 }
 
 /// One environment-level provisioning step.

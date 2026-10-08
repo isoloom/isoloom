@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### The controller halts after provisioning
+- On local VMs (Vagrant, and the Docker-on-a-VM and hybrid outputs), the controller halts once its provisioning is done, keeping its disk: it no longer holds memory for the life of the environment. `isoloom test` boots it for the checks (waiting out a halt that's just starting) and halts it again. `controller: { keep_running: true }` keeps it up, as a jump host. Proxmox and the clouds keep it running for now.
+- Roles: in the resolved snapshot, each machine has `role: target` and the controller `role: infra` (with `keep_running`). `isoloom status` counts the spec's machines only on Vagrant outputs: a halted controller (or Isoloom's router and tools) never reads as a machine down.
+
 ### A lighter controller, sized by the spec
 - The controller that runs `provision:` playbooks defaults to 1 CPU and 512 MB on every target (it was 1 GB). On local VMs its box is `generic/alpine319` (about 100 MB to download instead of 675 MB, for VirtualBox, libvirt, VMware and Parallels alike): Python, ansible-core and pywinrm install in seconds. Proxmox and the clouds keep their Debian images, at the new size (AWS `t3.micro`, Azure `Standard_B1s`, GCP `e2-small`).
 - `controller:` (top level) sets it like a machine: `image: { vagrant, vagrant_version }` for a box of your own (its setup handles Alpine and Debian), `resources: { cpus, memory_mb, disk_gb }` (disk on Proxmox) for many forks against a large environment. Example: ansible-pair gives it 768 MB.
