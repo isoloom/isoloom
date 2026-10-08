@@ -78,12 +78,20 @@ services:
     - admin:10.70.10.50
     healthcheck:
       test:
-      - CMD-SHELL
-      - (nc -z 127.0.0.1 80 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/80' 2>/dev/null)
+      - CMD
+      - /.isoloom-probe/busybox
+      - sh
+      - -c
+      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80
       interval: 5s
       timeout: 3s
       retries: 60
       start_period: 10s
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
+    depends_on:
+      isoloom-probe-amd64:
+        condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
     restart: unless-stopped
@@ -308,6 +316,17 @@ services:
         condition: service_healthy
       admin:
         condition: service_started
+  isoloom-probe-amd64:
+    image: busybox:1.37.0-musl
+    platform: linux/amd64
+    entrypoint:
+    - /bin/cp
+    - /bin/busybox
+    - /probe/busybox
+    volumes:
+    - isoloom-probe-amd64:/probe
+    network_mode: none
+    restart: no
 networks:
   office-vlan10:
     ipam:
@@ -326,3 +345,5 @@ networks:
         gateway: 10.70.99.1
   isoloom-trunk-office-admin:
     internal: true
+volumes:
+  isoloom-probe-amd64: {}

@@ -99,7 +99,11 @@ fn compose_has_addresses_healthchecks_init_and_checks() {
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(compose.contains("ipv4_address: 10.60.0.20"));
     assert!(compose.contains("gateway: 10.60.0.1"));
-    assert!(compose.contains("nc -z 127.0.0.1 6379"));
+    // The healthcheck runs Isoloom's own busybox (exec form): no shell needed in the image.
+    assert!(compose.contains("/.isoloom-probe/busybox nc -z -w 2 127.0.0.1 6379"));
+    assert!(compose.contains("- CMD\n"));
+    assert!(compose.contains("isoloom-probe-amd64:/.isoloom-probe:ro"));
+    assert!(compose.contains("image: busybox:1.37.0-musl"));
     assert!(compose.contains("cache-init-1:"));
     assert!(compose.contains("condition: service_completed_successfully"));
     assert!(compose.contains("isoloom-check:"));
