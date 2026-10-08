@@ -8,6 +8,9 @@
 //! machine; inside, a bridge per VLAN joins the VLAN network and the trunks' `.<id>`
 //! subinterfaces, so frames cross the trunk tagged. The trunk machine's network sidecar names
 //! its end after the LAN and puts its addresses on `<lan>.<id>`.
+//!
+//! A LAN with a `switch` of its own (a switch appliance) gets no switch container: the appliance
+//! takes its place on the same networks (see `appliances`), and the trunk machines' end is the same.
 
 use std::fmt::Write;
 

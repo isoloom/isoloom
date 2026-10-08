@@ -264,6 +264,52 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             add(&format!("{at}.docker.config"), "a path in the project".into());
         }
     }
+    // A LAN's `switch`: a switch appliance whose ports the LAN gives it.
+    let mut switched: Vec<(&str, &str)> = Vec::new();
+    for (net, n) in &spec.networks {
+        let Some(sw) = n.switch.as_deref() else { continue };
+        let Some((lan, _)) = &n.vlan else {
+            let message = if crate::vlans::of_lan(spec, net).next().is_some() {
+                format!("machines join `{net}` directly (its untagged part), which the switch doesn't carry: put them on one of its VLANs")
+            } else {
+                "only a LAN split into `vlans` has a switch".to_string()
+            };
+            add(&format!("networks.{net}.switch"), message);
+            continue;
+        };
+        if switched.iter().any(|(l, _)| l == lan) {
+            continue;
+        }
+        let at = format!("networks.{lan}.switch");
+        let Some(m) = spec.machines.get(sw) else {
+            add(&at, format!("no machine named `{sw}`"));
+            continue;
+        };
+        if !m.docker.as_ref().and_then(|d| d.appliance).is_some_and(crate::generate::is_switch_appliance) {
+            add(
+                &at,
+                format!("`{sw}` isn't a switch: give it `docker.appliance: cisco-iol-l2` or `cisco-vios-l2`"),
+            );
+        }
+        if let Some((other, _)) = switched.iter().find(|(_, s)| *s == sw) {
+            add(&at, format!("`{sw}` already switches LAN `{other}`: a switch serves one LAN"));
+        }
+        if !m.networks.is_empty() {
+            add(
+                &format!("machines.{sw}.networks"),
+                format!(
+                    "`{sw}` switches LAN `{lan}`: its ports come from the LAN (an access port per VLAN, a trunk per machine on several of its VLANs); leave `networks` out"
+                ),
+            );
+        }
+        if !m.services.is_empty() || !m.aliases.is_empty() {
+            add(
+                &format!("machines.{sw}"),
+                format!("`{sw}` switches LAN `{lan}` and has no address on the environment's networks: no `services` or `aliases`"),
+            );
+        }
+        switched.push((lan, sw));
+    }
     if any_appliance {
         for (net, n) in &spec.networks {
             if Cidr::parse(&n.cidr).is_some_and(|c| c.overlaps(mgmt)) {
@@ -283,7 +329,8 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             // a 63-character DNS label; 10 characters are the suffix.
             add(&at, "at most 53 characters: it becomes the Kubernetes Service `<name>-published`".into());
         }
-        if m.networks.is_empty() {
+        // A LAN's switch takes its ports from the LAN (checked above).
+        if m.networks.is_empty() && crate::vlans::switched_by(spec, name).is_none() {
             add(&format!("{at}.networks"), "attach the machine to at least one network".into());
         }
         for (net, octet) in &m.networks {

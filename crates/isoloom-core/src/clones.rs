@@ -142,17 +142,19 @@ pub fn expand(doc: &mut Value) -> Result<IndexMap<String, Vec<String>>, String> 
         }
         *checks = out;
     }
-    // A gateway is one machine.
+    // A gateway, or a LAN's switch, is one machine.
     if let Some(Value::Mapping(nets)) = top.get(key("networks")) {
         for (n, net) in nets {
-            if let Value::Mapping(net) = net
-                && let Some(gw) = net.get(key("gateway")).and_then(Value::as_str)
-                && clones.contains_key(gw)
-            {
-                return Err(format!(
-                    "networks.{}.gateway: `{gw}` has a count; a gateway is one machine",
-                    n.as_str().unwrap_or_default()
-                ));
+            for field in ["gateway", "switch"] {
+                if let Value::Mapping(net) = net
+                    && let Some(m) = net.get(key(field)).and_then(Value::as_str)
+                    && clones.contains_key(m)
+                {
+                    return Err(format!(
+                        "networks.{}.{field}: `{m}` has a count; a {field} is one machine",
+                        n.as_str().unwrap_or_default()
+                    ));
+                }
             }
         }
     }

@@ -81,6 +81,12 @@ pub struct Network {
     /// `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub vlans: IndexMap<u16, Vlan>,
+    /// On a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance:
+    /// cisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch.
+    /// Its ports are derived, so the machine lists no `networks`: an access port per VLAN, then
+    /// a trunk per machine on several of the LAN's VLANs. Docker targets only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub switch: Option<String>,
     /// Set by parsing on the networks a LAN's VLANs become: that LAN and the VLAN's id, so a
     /// target can carry them on one 802.1Q segment (a machine on several of them gets a trunk).
     #[serde(skip)]
@@ -199,7 +205,9 @@ impl Arch {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Machine {
-    /// Network name -> last octet of the machine's address on it.
+    /// Network name -> last octet of the machine's address on it. Every machine has one, but a
+    /// LAN's `switch`, whose ports the LAN gives it.
+    #[serde(default)]
     pub networks: IndexMap<String, u8>,
     /// How many of this machine (2 to 99): clones named `<name>-01`, `<name>-02`, ..., each one
     /// address further along on every network. Where the spec names this machine, it means

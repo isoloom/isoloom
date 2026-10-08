@@ -244,6 +244,15 @@ fn base_table() -> Vec<Row> {
             ),
         ),
         row(
+            "networks.*.switch",
+            done(
+                "the LAN's switch appliance instead of the Linux switch container: an access port per VLAN network, a trunk port per trunk link, VLANs and port modes in its startup configuration",
+                "cisco-switch",
+            ),
+            na("switch appliances run on the Docker targets only"),
+            na("switch appliances run on the Docker targets only"),
+        ),
+        row(
             "networks.*.vlans.*.internet",
             done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
             done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),

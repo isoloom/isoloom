@@ -5,6 +5,10 @@
 mod appliances;
 /// The network appliances' management network (see `docker.appliance`).
 pub const APPLIANCE_MGMT_CIDR: &str = appliances::MGMT_CIDR;
+/// Whether an appliance kind is a switch (it can be a LAN's `switch`).
+pub fn is_switch_appliance(kind: crate::model::Appliance) -> bool {
+    appliances::is_switch(kind)
+}
 mod cloud_docker;
 mod cloud_vm;
 mod cloud_vm_others;

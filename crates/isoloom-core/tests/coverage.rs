@@ -21,7 +21,7 @@ networks:
   out: { cidr: 10.1.0.0/24, internet: true, docker: { cidr: 10.1.0.0/24 } }
   dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw, docker: { cidr: 10.1.1.0/24 } }
   far: { cidr: 10.1.2.0/24, tc: { delay: 50ms, jitter: 5ms, loss: 0.5, rate: 10mbit } }
-  office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
+  office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, switch: fw, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
 reach: [{ from: out, to: dmz, ports: [80] }]
 inputs: [TOKEN]
 machines:
