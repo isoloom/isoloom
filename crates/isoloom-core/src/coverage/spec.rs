@@ -303,6 +303,12 @@ fn base_table() -> Vec<Row> {
             done("a forwarded port, on the host's loopback", "supplier-portal-api"),
         ),
         Row {
+            path: "machines.*.services[].tls",
+            outputs: all(Status::Descriptive {
+                note: "derived checks reach it over TLS (HTTPS for an `http` service)",
+            }),
+        },
+        Row {
             path: "machines.*.services[].http",
             outputs: all(Status::Descriptive {
                 note: "tells runners they can open it in a browser",
@@ -312,6 +318,11 @@ fn base_table() -> Vec<Row> {
             "machines.*.inputs",
             done("environment of that machine and its init jobs only", "supplier-portal-api"),
             done("environment of that machine's provisioning only", "supplier-portal-api"),
+        ),
+        common(
+            "machines.*.aliases",
+            done("network aliases (and extra_hosts across the router)", "edge-firewall"),
+            done("in every Linux VM's /etc/hosts, after the machine's name", "edge-firewall"),
         ),
         common(
             "machines.*.arch",

@@ -97,7 +97,13 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                 "windows": m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os)),
                 "addresses": addresses,
                 "docker_addresses": docker_addresses,
-                "services": m.services.iter().map(|s| json!({ "port": s.port, "name": s.name, "http": s.http, "publish": s.publish })).collect::<Vec<_>>(),
+                "services": m.services.iter().map(|s| {
+                    let mut v = json!({ "port": s.port, "name": s.name, "http": s.http, "publish": s.publish });
+                    if s.tls {
+                        v["tls"] = json!(true);
+                    }
+                    v
+                }).collect::<Vec<_>>(),
                 "depends_on": m.depends_on,
                 "inputs": m.inputs,
                 "volumes": m.volumes,

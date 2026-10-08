@@ -71,6 +71,8 @@ services:
     networks:
       dmz:
         ipv4_address: 10.70.10.10
+        aliases:
+        - www.edge.test
     extra_hosts:
     - cache:10.70.20.20
     - user:10.70.0.10
@@ -124,6 +126,7 @@ services:
         ipv4_address: 10.70.20.20
     extra_hosts:
     - web:10.70.10.10
+    - www.edge.test:10.70.10.10
     - user:10.70.0.10
     healthcheck:
       test:
@@ -174,6 +177,7 @@ services:
         ipv4_address: 10.70.0.10
     extra_hosts:
     - web:10.70.10.10
+    - www.edge.test:10.70.10.10
     - cache:10.70.20.20
     entrypoint:
     - sleep

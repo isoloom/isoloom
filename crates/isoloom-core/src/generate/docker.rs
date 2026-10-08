@@ -132,7 +132,13 @@ fn networks_of(m: &Machine, spec: &Spec, with_address: bool) -> Value {
     let mut nets = Mapping::new();
     for (net, octet) in &m.networks {
         let v = if with_address {
-            map([("ipv4_address", s(address(spec, net, *octet).to_string()))])
+            let mut a = Mapping::new();
+            a.insert(s("ipv4_address"), s(address(spec, net, *octet).to_string()));
+            // Its other names, resolved by Compose DNS on this network.
+            if !m.aliases.is_empty() {
+                a.insert(s("aliases"), list(m.aliases.iter().map(|x| s(x.as_str()))));
+            }
+            Value::Mapping(a)
         } else {
             Value::Null
         };
@@ -769,7 +775,12 @@ fn extra_hosts(spec: &Spec, name: &str) -> Option<Value> {
                     .keys()
                     .any(|n| m.networks.contains_key(n) && !trunks::carried(&ts, name, n) && !trunks::carried(&ts, o, n))
         })
-        .map(|(o, _)| s(format!("{o}:{}", address_for(spec, name, o))))
+        .flat_map(|(o, om)| {
+            let a = address_for(spec, name, o);
+            std::iter::once(o.as_str())
+                .chain(om.aliases.iter().map(String::as_str))
+                .map(move |n| s(format!("{n}:{a}")))
+        })
         .collect();
     (!hosts.is_empty()).then_some(Value::Sequence(hosts))
 }

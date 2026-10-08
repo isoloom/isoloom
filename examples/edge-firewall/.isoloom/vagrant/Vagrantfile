@@ -69,7 +69,7 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.10.10 web' '10.70.20.20 cache' '10.70.0.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.10.10 web www.edge.test' '10.70.20.20 cache' '10.70.0.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "forwarding", inline: "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf && sysctl -q -p /etc/sysctl.d/90-isoloom.conf"
     PROJECT.each do |entry|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
@@ -274,7 +274,7 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.20.1 fw' '10.70.10.10 web' '10.70.0.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.20.1 fw' '10.70.10.10 web www.edge.test' '10.70.0.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/routes.sh <<'ROUTES'
@@ -423,7 +423,7 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.0.2 fw' '10.70.10.10 web' '10.70.20.20 cache'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.70.0.2 fw' '10.70.10.10 web www.edge.test' '10.70.20.20 cache'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/routes.sh <<'ROUTES'

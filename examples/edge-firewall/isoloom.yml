@@ -26,6 +26,7 @@ machines:
 
   web:
     networks: { dmz: 10 }
+    aliases: [www.edge.test]
     services: [{ port: 80, http: true }]
     docker:
       build: build/web
@@ -52,3 +53,6 @@ checks:
   - name: the web page answers through the firewall
     from: user
     script: checks/web-through-firewall.sh
+  - name: the web server answers by its other name
+    from: user
+    http: http://www.edge.test/

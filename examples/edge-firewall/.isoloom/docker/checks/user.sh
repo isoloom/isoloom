@@ -46,6 +46,8 @@ _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)"
 echo '== checks/web-through-firewall.sh'
 if _retry 0 sh -c 'cd /isoloom/project && sh checks/web-through-firewall.sh'; then pass 'the web page answers through the firewall'; else fail 'the web page answers through the firewall' "checks/web-through-firewall.sh exited non-zero"; fi
 
+if _retry 30 _http_is 'http://www.edge.test/' 200; then pass 'the web server answers by its other name'; else fail 'the web server answers by its other name' "expected HTTP 200 from http://www.edge.test/, got $(_http 'http://www.edge.test/')"; fi
+
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 if _retry 30 _http_any 'http://10.70.0.2:8080/'; then pass 'fw:8080 on outside from user'; else fail 'fw:8080 on outside from user' "nothing answers at http://10.70.0.2:8080/"; fi
 fi

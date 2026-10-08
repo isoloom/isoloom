@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Inputs, TLS services, aliases
+- `inputs` take any environment variable name (DVLA reads `model_name`); `import compose` keeps the name as written. (#53)
+- `tls: true` on a service: derived checks reach it over TLS (https for `http` services). The Compose service label is unchanged. (#54)
+- `aliases` on a machine: more DNS names (`api.example.com`), as Compose network aliases and in every Linux VM's `/etc/hosts`. Not on Kubernetes. Example: edge-firewall's web answers as www.edge.test. (#55)
+
 ### Richer `http` checks
 - `http` checks take `method`, `headers`, `body` and `contains` (text the response body must contain): a login, an authenticated API call or a page's content without a script. Rendered as one curl call (the runner says so where curl is missing); a plain GET keeps curl, then wget, then bash. hello-stack checks its page's text and that a POST gets 405. (#51)
 

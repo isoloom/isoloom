@@ -253,6 +253,14 @@ pub(crate) fn container_checks_unsupported(spec: &Spec) -> Option<String> {
     None
 }
 
+/// A machine's names for a hosts line: its own, then its `aliases`.
+pub(crate) fn names_of(spec: &Spec, name: &str) -> String {
+    std::iter::once(name)
+        .chain(spec.machines.get(name).map(|m| m.aliases.iter().map(String::as_str)).into_iter().flatten())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Machines in start order: each after the machines it depends on (validated: no cycles).
 fn start_order(spec: &Spec) -> Vec<&str> {
     let mut order: Vec<&str> = Vec::new();

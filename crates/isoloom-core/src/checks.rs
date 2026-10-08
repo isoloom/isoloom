@@ -355,7 +355,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                     let probe = if svc.http {
                         Probe::Http {
                             url: Url {
-                                https: false,
+                                https: svc.tls,
                                 host,
                                 port: Some(svc.port),
                                 path: "/".into(),

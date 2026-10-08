@@ -93,11 +93,10 @@ fn variables(s: &str) -> Vec<String> {
     found
 }
 
-/// An input name (UPPER_SNAKE_CASE) from an environment variable name.
+/// An input name from an environment variable name, as written (the shell reads it by that name).
 fn input_name(s: &str) -> Option<String> {
-    let up = s.to_ascii_uppercase();
-    let ok = !up.is_empty() && up.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') && !up.starts_with(|c: char| c.is_ascii_digit());
-    ok.then_some(up)
+    let ok = !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !s.starts_with(|c: char| c.is_ascii_digit());
+    ok.then(|| s.to_string())
 }
 
 /// Container ports from Compose `ports` (`"8080:80"`, `"127.0.0.1:8080:80/tcp"`, `80`,
