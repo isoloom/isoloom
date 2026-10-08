@@ -913,6 +913,117 @@ fn tool_error(c: &Command, e: std::io::Error) -> String {
     }
 }
 
+/// `docker <args>`, its stdout lines (empty when Docker isn't there or fails).
+fn docker_lines(args: &[&str]) -> Vec<String> {
+    Command::new("docker")
+        .args(args)
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// See `isoloom gc`.
+pub fn gc(remove: bool, images: bool) -> Res<ExitCode> {
+    let managed = format!("label={}=true", core::generate::MANAGED_LABEL);
+    let env_label = core::generate::ENVIRONMENT_LABEL;
+    // Compose projects that still have a container, in any state: never collected (a parked
+    // environment keeps its volumes, with the user's progress in them).
+    let alive: std::collections::BTreeSet<String> = docker_lines(&["ps", "-a", "--format", "{{.Label \"com.docker.compose.project\"}}"])
+        .into_iter()
+        .collect();
+    let orphans = |kind: &str| -> Vec<(String, String)> {
+        docker_lines(&[
+            kind,
+            "ls",
+            "--filter",
+            &managed,
+            "--format",
+            &format!("{{{{.Name}}}}\t{{{{.Label \"com.docker.compose.project\"}}}}\t{{{{.Label \"{env_label}\"}}}}"),
+        ])
+        .into_iter()
+        .filter_map(|l| {
+            let mut p = l.split('\t');
+            let (name, project, env) = (p.next()?.to_string(), p.next().unwrap_or("").to_string(), p.next().unwrap_or("").to_string());
+            (!alive.contains(&project)).then_some((name, if env.is_empty() { project } else { env }))
+        })
+        .collect()
+    };
+    let networks = orphans("network");
+    let volumes = orphans("volume");
+    let mut unused_images: Vec<(String, String)> = Vec::new();
+    if images {
+        let used: std::collections::BTreeSet<String> = {
+            let ids = docker_lines(&["ps", "-aq"]);
+            let mut args = vec!["inspect", "-f", "{{.Image}}"];
+            args.extend(ids.iter().map(String::as_str));
+            if ids.is_empty() {
+                Default::default()
+            } else {
+                docker_lines(&args).into_iter().collect()
+            }
+        };
+        // `docker images` has no `.Label` field: the name says which environment built it.
+        unused_images = docker_lines(&["images", "--no-trunc", "--filter", &managed, "--format", "{{.ID}}\t{{.Repository}}:{{.Tag}}"])
+            .into_iter()
+            .filter_map(|l| {
+                let (id, name) = l.split_once('\t')?;
+                (!used.contains(id)).then(|| (id.to_string(), name.to_string()))
+            })
+            .collect();
+    }
+    if networks.is_empty() && volumes.is_empty() && unused_images.is_empty() {
+        println!("nothing to collect");
+        return Ok(ExitCode::SUCCESS);
+    }
+    for (kind, list) in [("network", &networks), ("volume", &volumes)] {
+        for (name, env) in list {
+            println!("{kind} {name} ({env})");
+        }
+    }
+    for (_, what) in &unused_images {
+        println!("image {what}");
+    }
+    if !remove {
+        println!(
+            "\n{} left over; `isoloom gc --yes{}` removes them",
+            networks.len() + volumes.len() + unused_images.len(),
+            if images { " --images" } else { "" }
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+    let mut failed = 0;
+    let mut rm = |args: &[&str]| {
+        if !Command::new("docker").args(args).stdout(Stdio::null()).status().is_ok_and(|s| s.success()) {
+            failed += 1;
+        }
+    };
+    for (n, _) in &networks {
+        rm(&["network", "rm", n]);
+    }
+    for (n, _) in &volumes {
+        rm(&["volume", "rm", n]);
+    }
+    for (id, _) in &unused_images {
+        rm(&["image", "rm", id]);
+    }
+    if failed > 0 {
+        eprintln!("✗ {failed} could not be removed (in use?)");
+        return Ok(ExitCode::from(1));
+    }
+    println!("removed");
+    Ok(ExitCode::SUCCESS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -171,6 +171,17 @@ enum Command {
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
     },
+    /// Docker leftovers of environments: networks and volumes labelled by Isoloom whose Compose
+    /// project has no container left, and (with --images) built images no container uses.
+    /// Lists them; `--yes` removes them. Never touches containers or unlabelled resources.
+    Gc {
+        /// Remove what is listed.
+        #[arg(long)]
+        yes: bool,
+        /// Also built images that no container uses (they are rebuilt or pulled on the next run).
+        #[arg(long)]
+        images: bool,
+    },
     /// The environments `run` brought up on this host, with their live state.
     Status {
         /// Machine-readable output.
@@ -720,6 +731,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             },
         ),
         Command::Status { json, cleanup } => lifecycle::status(json, cleanup.as_deref(), None),
+        Command::Gc { yes, images } => lifecycle::gc(yes, images),
         Command::Connect {
             machine,
             dir,

@@ -9,7 +9,7 @@ mod cloud_docker;
 mod cloud_vm;
 mod cloud_vm_others;
 mod docker;
-pub use docker::{StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
+pub use docker::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
 mod docker_vm;
 mod external;
 mod hybrid;

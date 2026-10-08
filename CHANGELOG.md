@@ -7,6 +7,12 @@
 - Machines start one at a time, in dependency order, on every provider (`VAGRANT_NO_PARALLEL` in the Vagrantfile): QEMU and libvirt declare themselves parallel, so the controller ran its play before the machines were up.
 - Private networks on QEMU without root: a network of exactly two VMs is a `socket` listen/connect pair on a loopback port. A Windows machine's lab address is set from PowerShell (no cloud-init). `qemu_refusal` says when a spec doesn't fit (more than two VMs on a network, a VM on several), so a launcher can decline QEMU up front.
 
+## Unreleased
+
+### Labels on everything, and `isoloom gc`
+- On Docker, every container, built image, network and volume an environment creates carries `isoloom.managed=true` and `isoloom.environment=<name>`.
+- `isoloom gc` lists Docker leftovers of environments: labelled networks and volumes whose Compose project has no container left (a crashed run, a killed launcher), and with `--images` the built images no container uses; `--yes` removes them. It never touches containers (a parked environment keeps its volumes) or anything unlabelled. Cloud tags follow. (#88)
+
 ## 0.9.0
 
 ### Fixed published ports
