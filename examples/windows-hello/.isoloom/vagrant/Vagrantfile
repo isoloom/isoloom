@@ -106,11 +106,6 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
     end
-    m.vm.provider "libvirt" do |v, o|
-      o.vm.box = "generic/debian12"
-      v.cpus = 1
-      v.memory = 1024
-    end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
       v.esxi_hostport = ENV.fetch("ESXI_HOSTPORT", "22").to_i
@@ -121,6 +116,11 @@ Vagrant.configure("2") do |config|
       v.guest_name = "windows-hello-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
+    end
+    m.vm.provider "libvirt" do |v, o|
+      o.vm.box = "generic/debian12"
+      v.cpus = 1
+      v.memory = 1024
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '192.168.57.10 web01'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     PROJECT.each do |entry|

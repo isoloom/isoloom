@@ -76,6 +76,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         "  config.vm.provider \"parallels\" do |v|\n    v.name = {}\n    v.cpus = {cpus}\n    v.memory = {mem}\n  end",
         rb(&label)
     );
+    // Apple Silicon Macs: UTM and QEMU, as for the VMs of the Vagrant target.
+    let _ = writeln!(
+        out,
+        "  config.vm.provider \"utm\" do |v|\n    v.name = {}\n    v.cpus = {cpus}\n    v.memory = {mem}\n  end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "  config.vm.provider \"qemu\" do |v|\n    v.smp = \"cpus={cpus}\"\n    v.memory = \"{mem}M\"\n  end"
+    );
     let _ = writeln!(
         out,
         "  config.vm.provider \"libvirt\" do |v, o|\n    o.vm.box = \"generic/debian12\"\n    v.cpus = {cpus}\n    v.memory = {mem}\n  end"

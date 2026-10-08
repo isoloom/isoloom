@@ -42,6 +42,11 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("slow-link");
     assert_committed("existing-hosts");
     assert_committed("workbench");
+    assert_committed("vlan-office");
+    assert_committed("cisco-iol");
+    assert_committed("cisco-dynamips");
+    assert_committed("cisco-qemu");
+    assert_committed("solo-web");
 }
 
 #[test]

@@ -28,6 +28,15 @@ Vagrant.configure("2") do |config|
     v.cpus = 3
     v.memory = 2560
   end
+  config.vm.provider "utm" do |v|
+    v.name = "pivot-dmz · docker"
+    v.cpus = 3
+    v.memory = 2560
+  end
+  config.vm.provider "qemu" do |v|
+    v.smp = "cpus=3"
+    v.memory = "2560M"
+  end
   config.vm.provider "libvirt" do |v, o|
     o.vm.box = "generic/debian12"
     v.cpus = 3
