@@ -15,7 +15,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
-| [Vagrant: libvirt](#vagrant-libvirt) | 10% | 19 | 2 | 0 | 17 |
+| [Vagrant: libvirt](#vagrant-libvirt) | 15% | 20 | 3 | 0 | 17 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 25% | 4 | 1 | 0 | 3 |
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
 | [Vagrant: QEMU](#vagrant-qemu) | 14% | 14 | 2 | 0 | 12 |
@@ -344,7 +344,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: libvirt
 
-10% of 19 portable features (2 done, 0 partly, 17 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
+15% of 20 portable features (3 done, 0 partly, 17 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
 
 ### Settings
 
@@ -376,7 +376,7 @@ when a table disagrees with what Isoloom really generates.
 | `cpus` | Yes | Yes | From `machines.*.resources` |
 | `cpuset` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `cputopology` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `default_prefix` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `default_prefix` | Yes | Yes | From `name` (the environment's, so labs' domains don't collide) |
 | `description` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `disk_address_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `disk_bus` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |

@@ -312,6 +312,10 @@ enum Command {
         /// The message of instance N.
         #[arg(long, value_name = "N")]
         instance: Option<u8>,
+        /// The target it runs on, for the addresses machines have there (default: what `run`
+        /// recorded for the folder, else the spec's single target, else the spec's addresses).
+        #[arg(long)]
+        target: Option<String>,
         /// Overrides, as for `generate`.
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
@@ -758,7 +762,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             &network,
             core::Tc { delay, jitter, loss, rate },
         ),
-        Command::Message { dir, instance, sets } => {
+        Command::Message { dir, instance, target, sets } => {
             let (spec, _) = load_settings(&dir, None, &sets)?;
             let problems = core::validate(&spec);
             if !problems.is_empty() {
@@ -771,7 +775,18 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 Some(n) => core::instance::apply(&spec, n)?,
                 None => spec,
             };
-            match core::resolved::render_message(&spec, instance)? {
+            // Where it runs decides the addresses (Docker blocks on the Compose targets); a named
+            // target that doesn't exist is an error, an unknown one falls back to the spec's.
+            let on = match lifecycle::pick(&abs(&dir)?, target.as_deref(), instance, &spec) {
+                Ok((t, _)) => Some(t),
+                Err(e) if target.is_some() => return Err(e),
+                Err(_) => None,
+            };
+            let message = match on {
+                Some(t) => core::resolved::render_message_at(&spec, instance, t, &real_ports(&abs(&dir)?, t, instance))?,
+                None => core::resolved::render_message(&spec, instance)?,
+            };
+            match message {
                 Some(m) => println!("{}", m.trim_end()),
                 None => eprintln!("the spec has no `message:`"),
             }
@@ -1171,6 +1186,10 @@ fn run_cmd(
     if t == core::Target::External && !down {
         lifecycle::external_up(dir, &spec, instance)?;
     }
+    // A project name a tool recorded for this environment stays with it.
+    let project = matches!(t, core::Target::Docker | core::Target::Hosted)
+        .then(|| lifecycle::compose_project(dir, instance))
+        .flatten();
     let (program, mut args, wd) = bring_up(dir, t, cloud, instance, down)?;
     // The preferred Vagrant provider, from the defaults.
     if !down
@@ -1184,7 +1203,7 @@ fn run_cmd(
     match status {
         Ok(s) if s.success() => {
             // Remember what is up on this host, for status / connect / exec / capture.
-            let recorded = core::registry::load().and_then(|mut reg| {
+            let recorded = core::registry::update(|reg| {
                 if down {
                     reg.remove(dir, t, instance);
                 } else {
@@ -1194,16 +1213,16 @@ fn run_cmd(
                         target: t,
                         instance,
                         cloud: cloud.map(str::to_string),
+                        project: project.clone(),
                         started: core::registry::now(),
                     });
                 }
-                core::registry::save(&reg)
             });
             if let Err(e) = recorded {
                 eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
             }
             // The spec's message, now that the environment is up.
-            if !down && let Ok(Some(m)) = core::resolved::render_message(&spec, instance) {
+            if !down && let Ok(Some(m)) = core::resolved::render_message_at(&spec, instance, t, &real_ports(dir, t, instance)) {
                 println!("\n{}", m.trim_end());
             }
             Ok(ExitCode::SUCCESS)
@@ -1285,19 +1304,34 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
     let mut temp: Option<PathBuf> = None;
     match t {
         core::Target::Docker | core::Target::Hosted => {
-            let f = out.join("docker/compose.yml").display().to_string();
+            let files = lifecycle::compose_files(&dir, instance);
+            // The runners run with --no-deps: the environment is up, and `compose run` would
+            // otherwise run its completed init jobs again (they are dependencies of the machines
+            // the runners wait for), re-seeding it on every test. A stand-in for a supplied access
+            // machine isn't up yet: start it (and its routes) first.
+            let compose = std::fs::read_to_string(out.join("docker/compose.yml")).unwrap_or_default();
+            let stand_ins: Vec<String> = ["isoloom-access", "isoloom-access-routes"]
+                .iter()
+                .filter(|n| compose.contains(&format!("\n  {n}:\n")))
+                .map(|n| n.to_string())
+                .collect();
+            if !stand_ins.is_empty() {
+                let status = std::process::Command::new("docker")
+                    .arg("compose")
+                    .args(["--progress", "quiet"])
+                    .args(&files)
+                    .args(["--profile", "check", "up", "-d", "--wait", "--no-deps"])
+                    .args(&stand_ins)
+                    .current_dir(&dir)
+                    .status()?;
+                if !status.success() {
+                    return Err("couldn't start the access machine's stand-in".into());
+                }
+            }
             for (pos, _) in &groups {
-                let mut args = vec![
-                    s("compose"),
-                    s("--progress"),
-                    s("quiet"),
-                    s("-f"),
-                    f.clone(),
-                    s("--profile"),
-                    s("check"),
-                    s("run"),
-                    s("--rm"),
-                ];
+                let mut args = vec![s("compose"), s("--progress"), s("quiet")];
+                args.extend(files.iter().cloned());
+                args.extend([s("--profile"), s("check"), s("run"), s("--rm"), s("--no-deps")]);
                 if no_derived {
                     args.extend([s("-e"), s("ISOLOOM_DERIVED=0")]);
                 }
@@ -1309,6 +1343,29 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                     wd: dir.clone(),
                     env: vec![],
                 });
+                // `exec` checks: their own runner, piped into the machine itself.
+                if let Position::Machine(m) = pos {
+                    let file = out.join("docker/checks").join(core::generate::exec_runner(m));
+                    if file.exists() {
+                        let q = |a: &str| format!("'{}'", a.replace('\'', "'\\''"));
+                        let compose: Vec<String> = files.iter().map(|f| q(f)).collect();
+                        runners.push(Runner {
+                            label: format!("inside {m}"),
+                            program: s("sh"),
+                            args: vec![
+                                s("-c"),
+                                format!(
+                                    "docker compose {} exec -T {} sh -s < {}",
+                                    compose.join(" "),
+                                    q(m),
+                                    q(&file.display().to_string())
+                                ),
+                            ],
+                            wd: dir.clone(),
+                            env: vec![],
+                        });
+                    }
+                }
             }
         }
         core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid => {
@@ -1369,6 +1426,25 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                     wd: dir.clone(),
                     env: vec![],
                 });
+                // `exec` checks: their own runner, piped into the machine's container.
+                if let Position::Machine(m) = pos {
+                    let file = out.join("kubernetes/checks").join(core::generate::exec_runner(m));
+                    if file.exists() {
+                        runners.push(Runner {
+                            label: format!("inside {m}"),
+                            program: s("sh"),
+                            args: vec![
+                                s("-c"),
+                                format!(
+                                    "kubectl -n {ns} exec -i deploy/{m} -c {m} -- sh -s < {}",
+                                    core::checks::sq(&file.display().to_string())
+                                ),
+                            ],
+                            wd: dir.clone(),
+                            env: vec![],
+                        });
+                    }
+                }
             }
         }
         core::Target::CloudVm => {
@@ -1697,6 +1773,15 @@ fn snapshot_of(dir: &std::path::Path, instance: Option<u8>, sets: &[String]) -> 
     Ok(core::resolved::resolve_with(&spec, instance))
 }
 
+/// The host ports an environment really got, for its message: local Docker publishes on free
+/// ports unless `ISOLOOM_PUBLISH_FIXED` pins them to the spec's; the other targets keep them.
+fn real_ports(dir: &std::path::Path, t: core::Target, instance: Option<u8>) -> Vec<(String, u16, u16)> {
+    if t != core::Target::Docker || std::env::var_os("ISOLOOM_PUBLISH_FIXED").is_some_and(|v| !v.is_empty()) {
+        return Vec::new();
+    }
+    lifecycle::docker_published(dir, instance)
+}
+
 /// A project folder as an absolute path (the registry and the tools' working directories need one).
 fn abs(dir: &std::path::Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
     std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()).into())
@@ -1714,14 +1799,33 @@ fn bring_up(
     let out = dir.join(core::instance::output_dir(instance));
     Ok(match t {
         core::Target::Docker | core::Target::Hosted => {
-            let f = out.join("docker/compose.yml");
-            // Down with the `check` profile too, so the runners' stand-ins go as well.
-            let args = if down {
-                vec![s("compose"), s("-f"), f.display().to_string(), s("--profile"), s("check"), s("down"), s("-v")]
+            // Under the project name it runs as (a tool's own, from the registry), so `down`
+            // finds it. Down with the `check` profile too, so the runners' stand-ins go as well.
+            let mut args = vec![s("compose")];
+            args.extend(lifecycle::compose_files(dir, instance));
+            if down {
+                args.extend([s("--profile"), s("check"), s("down"), s("-v")]);
+                return Ok((s("docker"), args, dir.to_path_buf()));
+            }
+            // One-shot jobs nothing running waits for fail `up --wait`: wait for the rest,
+            // then run them attached, in order (see core::generate::start_plan).
+            let compose = std::fs::read_to_string(out.join("docker/compose.yml")).unwrap_or_default();
+            let plan = core::generate::start_plan(&compose).unwrap_or_default();
+            if plan.jobs.is_empty() {
+                args.extend([s("up"), s("-d"), s("--build"), s("--wait")]);
+                (s("docker"), args, dir.to_path_buf())
             } else {
-                vec![s("compose"), s("-f"), f.display().to_string(), s("up"), s("-d"), s("--build"), s("--wait")]
-            };
-            (s("docker"), args, dir.to_path_buf())
+                let q = |a: &str| format!("'{}'", a.replace('\'', "'\\''"));
+                let prefix = std::iter::once("docker".to_string())
+                    .chain(args.iter().map(|a| q(a)))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let mut script = format!("{prefix} up -d --build --wait {}", plan.wait.iter().map(|w| q(w)).collect::<Vec<_>>().join(" "));
+                for j in &plan.jobs {
+                    script.push_str(&format!(" && {prefix} up --no-deps --exit-code-from {j} {j}", j = q(j)));
+                }
+                (s("sh"), vec![s("-c"), script], dir.to_path_buf())
+            }
         }
         core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid => {
             let sub = match t {

@@ -111,7 +111,7 @@ fn dns_label(s: &str) -> bool {
 }
 
 fn input_name(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') && !s.starts_with(|c: char| c.is_ascii_digit())
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !s.starts_with(|c: char| c.is_ascii_digit())
 }
 
 /// The private ranges a network can use (RFC 1918).
@@ -221,7 +221,10 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
 
     for (i, input) in spec.inputs.iter().enumerate() {
         if !input_name(input) {
-            add(&format!("inputs[{i}]"), format!("`{input}`: inputs are UPPER_SNAKE_CASE environment names"));
+            add(
+                &format!("inputs[{i}]"),
+                format!("`{input}`: inputs are environment variable names (letters, digits and `_`, not starting with a digit)"),
+            );
         }
     }
 
@@ -348,6 +351,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                         add(&format!("{at}.services[{i}].publish"), format!("port {p} is already published by `{other}`"));
                     }
                 }
+                None if s.fixed => add(&format!("{at}.services[{i}].fixed"), "`fixed` keeps the `publish` port: give one".into()),
                 None => {}
             }
         }
@@ -369,9 +373,39 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             }
         }
         if let Some(r) = m.resources {
-            if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < 256) || r.disk_gb.is_some_and(|v| v < 5) {
-                add(&format!("{at}.resources"), "too small: at least 1 cpu, 256 MB and 5 GB".into());
+            // A VM needs room to boot; a container only what its process uses (a Go service
+            // capped at 64 MB is common), so the VM floor applies to machines that can be VMs.
+            if m.vm.is_some() {
+                if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < 256) || r.disk_gb.is_some_and(|v| v < 5) {
+                    add(&format!("{at}.resources"), "too small for a VM: at least 1 cpu, 256 MB and 5 GB".into());
+                }
+            } else if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < 16) {
+                add(&format!("{at}.resources"), "too small: at least 1 cpu and 16 MB".into());
             }
+        }
+        for (i, a) in m.aliases.iter().enumerate() {
+            let ok = a.len() <= 253
+                && a.split('.').all(|l| {
+                    !l.is_empty()
+                        && l.len() <= 63
+                        && l.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                        && !l.starts_with('-')
+                        && !l.ends_with('-')
+                });
+            if !ok {
+                add(
+                    &format!("{at}.aliases[{i}]"),
+                    format!("`{a}` isn't a DNS name like api.example.com (lowercase)"),
+                );
+            } else if spec.machines.contains_key(a) || spec.machines.iter().any(|(o, om)| o != name && om.aliases.contains(a)) {
+                add(&format!("{at}.aliases[{i}]"), format!("`{a}` already names another machine"));
+            }
+        }
+        if !m.aliases.is_empty() && m.count.is_some() {
+            add(
+                &format!("{at}.aliases"),
+                "clones (`count`) can't share names: give aliases to single machines".into(),
+            );
         }
         if m.docker.is_none() && m.vm.is_none() && !m.access {
             add(&at, "give the machine at least one implementation: `docker:` and/or `vm:`".into());
@@ -403,6 +437,9 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                     "set `image` (a published image) or `build` (a folder in the project)".into(),
                 ),
                 _ => {}
+            }
+            if d.build.is_none() && (d.dockerfile.is_some() || !d.args.is_empty()) {
+                add(&format!("{at}.docker"), "`dockerfile` and `args` go with `build` (the context)".into());
             }
         }
         if let Some(v) = &m.vm {
@@ -710,6 +747,9 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
             if let Some(b) = &d.build {
                 check(format!("machines.{name}.docker.build"), b);
             }
+            if let Some(f) = &d.dockerfile {
+                check(format!("machines.{name}.docker.dockerfile"), f);
+            }
             if let Some(c) = &d.config {
                 check(format!("machines.{name}.docker.config"), c);
             }
@@ -782,6 +822,21 @@ fn validate_check(spec: &Spec, i: usize, d: &crate::model::Declared, add: &mut d
         && w > 3600
     {
         add(&format!("{at}.wait"), "at most 3600 seconds".into());
+    }
+    let extras = d.method.is_some() || !d.headers.is_empty() || d.body.is_some() || d.contains.is_some();
+    if extras && d.http.is_none() {
+        add(&at, "`method`, `headers`, `body` and `contains` go with `http`".into());
+    }
+    if extras && matches!(&d.expect, Some(Expect::Text(t)) if t == "blocked") {
+        add(
+            &at,
+            "a `blocked` check sends nothing to look at: leave out `method`, `headers`, `body` and `contains`".into(),
+        );
+    }
+    if let Some(m) = &d.method
+        && (m.is_empty() || !m.chars().all(|c| c.is_ascii_alphabetic()))
+    {
+        add(&format!("{at}.method"), format!("`{m}` isn't an HTTP method like GET or POST"));
     }
     if let Some(u) = &d.http {
         if Url::parse(u).is_none() {

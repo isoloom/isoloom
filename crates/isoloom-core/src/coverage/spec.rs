@@ -302,6 +302,17 @@ fn base_table() -> Vec<Row> {
             done("a published port, on the host's loopback", "supplier-portal-api"),
             done("a forwarded port, on the host's loopback", "supplier-portal-api"),
         ),
+        common(
+            "machines.*.services[].fixed",
+            done("the `publish` port itself on the host, not a free one", "supplier-portal-api"),
+            done("Vagrant forwards `publish` as is", "supplier-portal-api"),
+        ),
+        Row {
+            path: "machines.*.services[].tls",
+            outputs: all(Status::Descriptive {
+                note: "derived checks reach it over TLS (HTTPS for an `http` service)",
+            }),
+        },
         Row {
             path: "machines.*.services[].http",
             outputs: all(Status::Descriptive {
@@ -312,6 +323,11 @@ fn base_table() -> Vec<Row> {
             "machines.*.inputs",
             done("environment of that machine and its init jobs only", "supplier-portal-api"),
             done("environment of that machine's provisioning only", "supplier-portal-api"),
+        ),
+        common(
+            "machines.*.aliases",
+            done("network aliases (and extra_hosts across the router)", "edge-firewall"),
+            done("in every Linux VM's /etc/hosts, after the machine's name", "edge-firewall"),
         ),
         common(
             "machines.*.arch",
@@ -396,6 +412,18 @@ fn base_table() -> Vec<Row> {
         row(
             "machines.*.docker.build",
             done("a build from the project folder", "segmented"),
+            NOT_A_CONTAINER,
+            NOT_A_CONTAINER,
+        ),
+        row(
+            "machines.*.docker.dockerfile",
+            done("the build's `dockerfile`, relative to its context", "slow-link"),
+            NOT_A_CONTAINER,
+            NOT_A_CONTAINER,
+        ),
+        row(
+            "machines.*.docker.args",
+            done("the build's `args`", "slow-link"),
             NOT_A_CONTAINER,
             NOT_A_CONTAINER,
         ),
@@ -512,9 +540,24 @@ fn base_table() -> Vec<Row> {
             done("nc (else bash) from the position", "segmented"),
             done("nc (else bash) from the machine", "segmented"),
         ),
+        common("checks[].method", done("curl -X", "hello-stack"), done("curl -X", "hello-stack")),
+        common("checks[].headers", done("curl -H", "hello-stack"), done("curl -H", "hello-stack")),
+        common(
+            "checks[].body",
+            done("curl --data-binary", "hello-stack"),
+            done("curl --data-binary", "hello-stack"),
+        ),
+        common(
+            "checks[].contains",
+            done("the response body, searched for the text (curl)", "hello-stack"),
+            done("the response body, searched for the text (curl)", "hello-stack"),
+        ),
         row(
             "checks[].exec",
-            planned("the runner shares the machine's network, not its filesystem"),
+            done(
+                "in the machine itself: its own runner piped to `docker compose exec -T <machine> sh -s`",
+                "hello-stack",
+            ),
             done("the command in the machine's own shell", "arm-vm"),
             VM_PLANNED,
         ),
@@ -621,6 +664,8 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "checks[].headers",
+    "machines.*.docker.args",
     "provision[].groups",
     "provision[].vars",
 ];

@@ -5,6 +5,42 @@
 ### Typed playbook variables
 - `provision[].vars` takes any YAML value: strings as before, and numbers, booleans, lists and maps, passed to `ansible-playbook` as JSON (`-e`) with their types (a list stays a list, not a string to iterate over). `isoloom run`'s own playbook runs pass them as JSON too (they split values on spaces before). Example: ansible-pair's `tools: [curl, jq]` and `cache_port: 6379`.
 
+### Fixed published ports
+- `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
+
+### Routes survive a machine's restart
+- On Docker, a machine whose container restarted got a new network namespace with Docker's default route back (internet regained, router routes lost), its route sidecar left in the old one. The sidecar now exits once its namespace has no addresses left, and its restart sets the routes in the new one. segmented passes all its checks after every machine is restarted. (#65)
+
+### Older systems, fresh check scripts on VMs
+- OS names `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `windows-server-2008r2` and `windows-server-2012r2`, for labs about older systems (Metasploitable 3): built-in Vagrant boxes, Proxmox images for 16.04 and 18.04; targets without an image decline them, saying why. (#57)
+- `isoloom test` on Vagrant runs the check scripts as they are in the project now: the `checks` provisioner writes them over the VM's copy before the runner. (#58)
+
+### Inputs, TLS services, aliases
+- `inputs` take any environment variable name (DVLA reads `model_name`); `import compose` keeps the name as written. (#53)
+- `tls: true` on a service: derived checks reach it over TLS (https for `http` services). The Compose service label is unchanged. (#54)
+- `aliases` on a machine: more DNS names (`api.example.com`), as Compose network aliases and in every Linux VM's `/etc/hosts`. Not on Kubernetes. Example: edge-firewall's web answers as www.edge.test. (#55)
+
+### Richer `http` checks
+- `http` checks take `method`, `headers`, `body` and `contains` (text the response body must contain): a login, an authenticated API call or a page's content without a script. Rendered as one curl call (the runner says so where curl is missing); a plain GET keeps curl, then wget, then bash. hello-stack checks its page's text and that a POST gets 405. (#51)
+
+### Small containers
+- The 256 MB / 5 GB floor on `resources` is a VM's: it now applies only to machines with `vm:`. A container-only machine needs at least 1 cpu and 16 MB (crAPI's services run at 50 to 192 MB). (#49)
+
+### `exec` checks on Docker and Kubernetes
+- An `exec` check no longer makes the container targets refuse the spec: each machine's `exec` checks get their own runner (`.isoloom/<docker|kubernetes>/checks/exec-<machine>.sh`), which `isoloom test` pipes into the machine itself (`docker compose exec -T <machine> sh -s`, `kubectl exec -i deploy/<machine> -- sh -s`); the docker-vm `checks` provisioner too. hello-stack reads its seeded greeting with `redis-cli` inside the cache. An `exec` check from a machine without a container of its own is refused, saying so.
+
+### Checks don't re-run init jobs
+- `isoloom test` (and the docker-vm `checks` provisioner) ran each runner with `docker compose run`, which starts its dependencies again, and completed `init:` jobs count as not running: every test re-seeded the environment. Runners now run with `--no-deps` (the environment is up); a stand-in for a supplied access machine is started first. (#47)
+
+### Init jobs on a machine nothing depends on
+- `docker compose up --wait` fails when a one-shot exits (even with 0) unless a running service depends on it, so an `init:` on a machine nothing depends on (a single-machine lab seeding itself) failed `isoloom run docker` although everything worked. Starting is now two steps when such leaf jobs exist: `up -d --build --wait` on everything else, then each job attached, in order (`up --no-deps --exit-code-from <job> <job>`), failing on its exit code. `isoloom run`, the docker-vm Vagrantfile and the cloud-docker modules do it; files without leaf jobs keep their single `up --wait`. Embedders get the same rule from `generate::start_plan(compose_yaml)` (or `leaf_jobs(spec)` and `start_commands`). (#42)
+
+### A Dockerfile outside the build folder, and build arguments
+- `docker.dockerfile`: the Dockerfile, a file anywhere in the project (default: `Dockerfile` in `build`), so an image of your own can wrap a vendored project's source without moving it into your build folder. `docker.args`: build arguments, fixed values. Compose gets `build: { context, dockerfile, args }`; `isoloom import compose` now carries `dockerfile` and literal `args` over (shell-read ones are reported). Example: slow-link. (#40)
+
+### Healthchecks without a shell in the image
+- A machine's healthcheck no longer borrows the image's tools (`sh`, then `nc` or `bash`), so distroless, `scratch` and minimal images turn healthy too (OWASP Juice Shop ships on distroless Node). Isoloom brings a static busybox (`busybox:1.37.0-musl`): on Docker a one-shot `isoloom-probe-<arch>` copies it into a volume each machine with services mounts read-only at `/.isoloom-probe`, and the healthcheck runs it in exec form; on Kubernetes an init container copies it into an `emptyDir` for the readiness probe. `init:` jobs still run with the image's own `sh`. (#37)
+
 ### More network appliances: Cisco QEMU images and Dynamips
 - `appliance: cisco-vios | cisco-viosl2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
 - `appliance: cisco-dynamips` with `docker.firmware: <your IOS .bin>`: a Cisco 7200 emulated by Dynamips, in a container Isoloom builds (Ubuntu's `dynamips`); the data interfaces bind to `FastEthernet0/0`, then `1/0`, `1/1`, `2/0`... on PA-2FE-TX adapters. No KVM needed. Example: cisco-dynamips.

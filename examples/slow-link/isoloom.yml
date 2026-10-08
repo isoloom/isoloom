@@ -20,6 +20,8 @@ machines:
     services: [{ port: 80, http: true }]
     docker:
       build: build/web
+      dockerfile: build/web.Dockerfile
+      args: { NGINX_TAG: 1.27-alpine }
     vm:
       os: debian-12
       provision: [provision/web.sh]

@@ -128,12 +128,30 @@ pub enum TcpExpect {
     Blocked,
 }
 
+/// What an `http` check sends and looks for beyond a GET and its status (all optional).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HttpRequest {
+    pub method: Option<String>,
+    pub headers: Vec<(String, String)>,
+    pub body: Option<String>,
+    /// Text the response body must contain.
+    pub contains: Option<String>,
+}
+
+impl HttpRequest {
+    fn is_plain(&self) -> bool {
+        *self == HttpRequest::default()
+    }
+}
+
 /// One resolved probe.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Probe {
     Http {
         url: Url,
         expect: HttpExpect,
+        /// A method, headers, a body, text to find: empty for a plain GET.
+        request: HttpRequest,
     },
     Tcp {
         host: Host,
@@ -213,11 +231,18 @@ fn declared(d: &Declared, default: &Position) -> Option<Resolved> {
             Some(Expect::Text(_)) => return None,
         };
         let wait = if expect == HttpExpect::Blocked { 0 } else { 30 };
-        let what = match expect {
-            HttpExpect::Blocked => format!("{u} blocked"),
+        let request = HttpRequest {
+            method: d.method.clone(),
+            headers: d.headers.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            body: d.body.clone(),
+            contains: d.contains.clone(),
+        };
+        let what = match (&expect, &request.method) {
+            (HttpExpect::Blocked, _) => format!("{u} blocked"),
+            (_, Some(m)) => format!("{} {u}", m.to_uppercase()),
             _ => u.to_string(),
         };
-        (Probe::Http { url, expect }, wait, what)
+        (Probe::Http { url, expect, request }, wait, what)
     } else if let Some(t) = &d.tcp {
         let (host, port) = t.rsplit_once(':')?;
         let port: u16 = port.parse().ok().filter(|p| *p > 0)?;
@@ -330,12 +355,13 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                     let probe = if svc.http {
                         Probe::Http {
                             url: Url {
-                                https: false,
+                                https: svc.tls,
                                 host,
                                 port: Some(svc.port),
                                 path: "/".into(),
                             },
                             expect: HttpExpect::Any,
+                            request: HttpRequest::default(),
                         }
                     } else {
                         Probe::Tcp {
@@ -361,6 +387,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                 probe: Probe::Http {
                     url: Url::parse("http://1.1.1.1/").expect("a URL"),
                     expect: HttpExpect::Blocked,
+                    request: HttpRequest::default(),
                 },
                 wait: 0,
                 derived: true,
@@ -429,7 +456,30 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
         }
         let n = sq(&c.name);
         let body = match &c.probe {
-            Probe::Http { url, expect } => {
+            Probe::Http { url, expect, request } if !request.is_plain() && *expect != HttpExpect::Blocked => {
+                let text = url.render(&(r.host)(&url.host, position));
+                let mut args = String::new();
+                if let Some(m) = &request.method {
+                    args.push_str(&format!(" -X {}", sq(&m.to_uppercase())));
+                }
+                for (k, v) in &request.headers {
+                    args.push_str(&format!(" -H {}", sq(&format!("{k}: {v}"))));
+                }
+                if let Some(b) = &request.body {
+                    args.push_str(&format!(" --data-binary {}", sq(b)));
+                }
+                let want = match expect {
+                    HttpExpect::Status(code) => code.to_string(),
+                    _ => "any".to_string(),
+                };
+                format!(
+                    "if _retry {w} _req {want} {t}{args} {u}; then pass {n}; else fail {n} \"$out\"; fi\n",
+                    w = c.wait,
+                    t = sq(request.contains.as_deref().unwrap_or("")),
+                    u = sq(&text),
+                )
+            }
+            Probe::Http { url, expect, .. } => {
                 let text = url.render(&(r.host)(&url.host, position));
                 let (u, ut) = (sq(&text), dq(&text));
                 match expect {
@@ -510,6 +560,18 @@ _http() {
   echo "${c:-000}"
 }
 _http_is() { [ "$(_http "$1")" = "$2" ]; }
+# _req STATUS|any TEXT CURL-ARGS... -> 0 when the request gets that status (any answer for `any`)
+# and its body contains TEXT (if any); $out says why not. Needs curl.
+_req() {
+  want=$1; text=$2; shift 2
+  command -v curl >/dev/null 2>&1 || { out="curl is needed for this check"; return 1; }
+  b=$(mktemp); c=$(curl -sk -m 10 -o "$b" -w '%{http_code}' "$@" 2>/dev/null); c=${c:-000}; r=0
+  if [ "$want" = any ]; then [ "$c" != 000 ] || r=1; else [ "$c" = "$want" ] || r=1; fi
+  if [ $r = 1 ]; then out="expected HTTP $want, got $c"
+  elif [ -n "$text" ] && ! grep -qF -- "$text" "$b"; then r=1; out="HTTP $c, but the response doesn't contain the expected text"
+  fi
+  rm -f "$b"; return $r
+}
 _http_any() { [ "$(_http "$1")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
