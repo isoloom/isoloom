@@ -111,7 +111,7 @@ fn dns_label(s: &str) -> bool {
 }
 
 fn input_name(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') && !s.starts_with(|c: char| c.is_ascii_digit())
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !s.starts_with(|c: char| c.is_ascii_digit())
 }
 
 /// The private ranges a network can use (RFC 1918).
@@ -221,7 +221,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
 
     for (i, input) in spec.inputs.iter().enumerate() {
         if !input_name(input) {
-            add(&format!("inputs[{i}]"), format!("`{input}`: inputs are UPPER_SNAKE_CASE environment names"));
+            add(&format!("inputs[{i}]"), format!("`{input}`: inputs are environment variable names (letters, digits and `_`, not starting with a digit)"));
         }
     }
 
