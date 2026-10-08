@@ -39,6 +39,10 @@ checks:
     from: cache
     exec: redis-cli get greeting
     expect: hello from isoloom
+  - name: the cache answers a PING
+    tcp: cache:6379
+    send: PING
+    contains: +PONG
   - name: the page says hello
     http: http://web/
     headers: { Accept: text/html }

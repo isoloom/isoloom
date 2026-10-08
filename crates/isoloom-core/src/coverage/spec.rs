@@ -549,8 +549,19 @@ fn base_table() -> Vec<Row> {
         ),
         common(
             "checks[].contains",
-            done("the response body, searched for the text (curl)", "hello-stack"),
-            done("the response body, searched for the text (curl)", "hello-stack"),
+            done(
+                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+                "hello-stack",
+            ),
+            done(
+                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+                "hello-stack",
+            ),
+        ),
+        common(
+            "checks[].send",
+            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
+            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
         ),
         row(
             "checks[].exec",

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `tcp` checks read a greeting
+- `tcp` checks take `contains` (text the bytes read in the first 5 seconds of the connection must contain: a banner, a prompt) and `send` (a line written first, a newline added; end it with `\r` for CRLF), retried for `wait` like any check: proving the right service answers no longer needs a `(sleep 4) | curl telnet://...` script. Rendered with `nc` (busybox in the runner image, the VM's own nc whatever its flavor), else bash's `/dev/tcp`; stdin stays open while reading and nc is stopped after 5 seconds, so nc flavors that quit at the end of stdin or never quit behave the same. hello-stack sends the cache a `PING` and expects `+PONG`. (#73)
+
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
 
