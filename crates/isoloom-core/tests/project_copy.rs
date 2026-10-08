@@ -211,3 +211,74 @@ fn terraform_outputs_read_isoloomignore() {
         assert!(tf.contains("--strip-components=1"), "{path}");
     }
 }
+
+#[test]
+fn windows_machines_get_the_project_before_their_steps() {
+    let spec = example("windows-hello");
+    for path in ["cloud-vm/aws/main.tf", "cloud-vm/azure/main.tf"] {
+        let tf = file(&spec, Target::CloudVm, path);
+        // The host's archive (as a Linux machine's), uploaded once, unpacked by the set-up
+        // script (no longer in C:\isoloom, which the project replaces) before the steps.
+        assert!(tf.contains("destination = \"C:/Windows/Temp/isoloom-project.tgz\""), "{path}");
+        assert!(!tf.contains("destination = \"C:/isoloom/"), "{path}: a step uploaded on its own");
+        assert!(tf.contains("-File C:/ProgramData/isoloom/setup.ps1"), "{path}");
+        let unpack = tf.find("$dest = 'C:\\\\isoloom'; $strip = 1").expect("the project unpacked");
+        let step = tf.find("-File 'C:\\\\isoloom\\\\provision\\\\iis.ps1'").expect("the step");
+        assert!(unpack < step, "{path}");
+    }
+}
+
+/// The Windows extractor (`untar.ps1`), run by PowerShell where it's installed (GitHub's runners
+/// have `pwsh`): the Vagrantfile Ruby's archive, and a host tar's with a top folder to strip.
+#[test]
+fn the_windows_extractor_unpacks_the_archive() {
+    if !have("ruby") || !have("tar") || !have("pwsh") {
+        eprintln!("skipped: needs ruby, tar and pwsh");
+        return;
+    }
+    let dir = scratch("untar");
+    let root = dir.join("project");
+    let long = format!("{}/{}.txt", "d".repeat(120), "f".repeat(110));
+    for (f, text) in [
+        ("a.txt", "a"),
+        ("sub/b c.txt", "b"),
+        ("ünï.txt", "u"),
+        (long.as_str(), "long"),
+        ("skip.log", "x"),
+    ] {
+        std::fs::create_dir_all(root.join(f).parent().unwrap()).unwrap();
+        std::fs::write(root.join(f), text).unwrap();
+    }
+    std::fs::create_dir_all(root.join("empty")).unwrap();
+    std::fs::write(root.join(".isoloomignore"), "*.log\n").unwrap();
+    archive(&dir, &root, false, "ruby.tgz");
+    // A host's tar, as the cloud modules run it (GNU tar's long names, here).
+    let st = Command::new("tar")
+        .arg("-czf")
+        .arg(dir.join("host.tgz"))
+        .arg("-C")
+        .arg(&dir)
+        .arg("project")
+        .status()
+        .unwrap();
+    assert!(st.success());
+    let ps1 = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/generate/untar.ps1");
+    for (name, strip) in [("ruby", 0), ("host", 1)] {
+        let dest = dir.join(format!("{name}-out"));
+        let script = format!(
+            "$archive = '{}'; $dest = '{}'; $strip = {strip}; . '{}'",
+            dir.join(format!("{name}.tgz")).display(),
+            dest.display(),
+            ps1.display()
+        );
+        let out = Command::new("pwsh").args(["-NoProfile", "-Command", &script]).output().unwrap();
+        assert!(out.status.success(), "{name}: {}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(std::fs::read_to_string(dest.join("sub/b c.txt")).unwrap(), "b", "{name}");
+        assert_eq!(std::fs::read_to_string(dest.join("ünï.txt")).unwrap(), "u", "{name}");
+        assert_eq!(std::fs::read_to_string(dest.join(&long)).unwrap(), "long", "{name}");
+        assert!(dest.join("empty").is_dir(), "{name}");
+        assert_eq!(dest.join("skip.log").exists(), name == "host", "{name}: .isoloomignore");
+        assert!(!dir.join(format!("{name}.tgz")).exists(), "{name}: the archive stays");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

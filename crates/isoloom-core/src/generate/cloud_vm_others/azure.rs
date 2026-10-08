@@ -593,11 +593,11 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
         prov,
         "  provisioner \"remote-exec\" {{\n    inline = [var.auto_stop_minutes > 0 ? \"powershell -NoProfile -Command \\\"Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(${{var.auto_stop_minutes}})) -User SYSTEM -RunLevel Highest -Force\\\"\" : \"cmd /c ver\"]\n  }}\n"
     );
-    for step in &vm.provision {
-        let _ = write!(
-            prov,
-            "  provisioner \"file\" {{\n    source      = \"${{local.root}}/{step}\"\n    destination = \"C:/isoloom/{step}\"\n  }}\n"
-        );
+    // The project in C:\isoloom (as a Linux machine's archive), then the steps, run from there.
+    let (project_tf, project_ps) = crate::generate::cloud_vm::windows_project(&id);
+    if !vm.provision.is_empty() {
+        prov.push_str(&project_tf);
+        ps.extend(project_ps);
     }
     for step in &vm.provision {
         ps.push(format!(
@@ -607,7 +607,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
     }
     let _ = write!(
         prov,
-        "  provisioner \"file\" {{\n    content     = {}\n    destination = \"C:/isoloom/setup.ps1\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"powershell -NoProfile -ExecutionPolicy Bypass -File C:/isoloom/setup.ps1\"]\n  }}\n",
+        "  provisioner \"file\" {{\n    content     = {}\n    destination = \"C:/ProgramData/isoloom/setup.ps1\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"powershell -NoProfile -ExecutionPolicy Bypass -File C:/ProgramData/isoloom/setup.ps1\"]\n  }}\n",
         hcl(&(ps.join("\n") + "\n"))
     );
     let deps: Vec<String> = m

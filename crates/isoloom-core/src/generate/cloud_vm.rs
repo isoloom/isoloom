@@ -826,6 +826,11 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
             ));
         }
     }
+    // The project in C:\isoloom (as a Linux machine's archive), then the steps, run from there.
+    let (project_tf, project_ps) = windows_project(&id);
+    if !vm.provision.is_empty() {
+        ps.extend(project_ps);
+    }
     for step in &vm.provision {
         ps.push(format!(
             "& powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\isoloom\\{}'; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
@@ -844,15 +849,12 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
         up = host.to_uppercase(),
     );
     let mut prov = format!("\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [aws_instance.{id}.id]\n{conn}");
-    for step in &vm.provision {
-        let _ = write!(
-            prov,
-            "  provisioner \"file\" {{\n    source      = \"${{local.root}}/{step}\"\n    destination = \"C:/isoloom/{step}\"\n  }}\n"
-        );
+    if !vm.provision.is_empty() {
+        prov.push_str(&project_tf);
     }
     let _ = write!(
         prov,
-        "  provisioner \"file\" {{\n    content     = {}\n    destination = \"C:/isoloom/setup.ps1\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"powershell -NoProfile -ExecutionPolicy Bypass -File C:/isoloom/setup.ps1\"]\n  }}\n",
+        "  provisioner \"file\" {{\n    content     = {}\n    destination = \"C:/ProgramData/isoloom/setup.ps1\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"powershell -NoProfile -ExecutionPolicy Bypass -File C:/ProgramData/isoloom/setup.ps1\"]\n  }}\n",
         hcl(&(ps.join("\n") + "\n"))
     );
     let mut deps: Vec<String> = vec![format!("time_sleep.{id}_restart")];
@@ -865,6 +867,23 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
     let _ = writeln!(prov, "  depends_on = [{}]", deps.join(", "));
     prov.push_str("}\n");
     tf.push_str(&prov);
+}
+
+/// A Windows machine's project, for its steps: the host's archive of the project (as a Linux
+/// machine's: `.isoloomignore` honored, the top folder stripped) uploaded over WinRM, and the
+/// PowerShell unpacking it in C:\\isoloom (no tar.exe before Windows Server 2019) and stepping in.
+pub(super) fn windows_project(id: &str) -> (String, Vec<String>) {
+    let tf = format!(
+        "  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \\\"${{abspath(local_file.isoloom_project.filename)}}\\\" -C \\\"${{dirname(local.root)}}\\\" \\\"${{basename(local.root)}}\\\"\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"C:/Windows/Temp/isoloom-project.tgz\"\n  }}\n"
+    );
+    let ps = vec![
+        format!(
+            "$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n{}",
+            super::vagrant::UNTAR_PS1.trim_end()
+        ),
+        "Set-Location C:\\isoloom".to_string(),
+    ];
+    (tf, ps)
 }
 
 /// The controller's inventory: every machine at its address, with its SSH user and the

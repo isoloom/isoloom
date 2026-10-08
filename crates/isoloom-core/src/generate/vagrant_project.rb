@@ -149,18 +149,30 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
       end
     end
 
-    # Builds the archive, uploads it, unpacks it in /opt/isoloom (replacing an older copy).
+    # Builds the archive, uploads it, unpacks it in /opt/isoloom (C:\isoloom on Windows, over
+    # WinRM, with UNTAR_PS1), replacing an older copy.
     class Provisioner < Vagrant.plugin("2", :provisioner)
       def provision
+        windows = @machine.config.vm.communicator.to_s == "winrm"
         Tempfile.create(["isoloom-project", ".tgz"]) do |f|
           f.binmode
           IsoloomProject.write(ROOT, f, generated: config.generated, extra: config.extra)
           f.close
-          @machine.ui.info("The project, #{(File.size(f.path) / 1024.0).ceil} KB compressed, to /opt/isoloom")
+          dest = windows ? "C:\\isoloom" : "/opt/isoloom"
+          @machine.ui.info("The project, #{(File.size(f.path) / 1024.0).ceil} KB compressed, to #{dest}")
           comm = @machine.communicate
-          comm.upload(f.path, "/tmp/isoloom-project.tgz")
-          comm.execute("rm -rf /tmp/isoloom-project && mkdir /tmp/isoloom-project && tar -xzf /tmp/isoloom-project.tgz -C /tmp/isoloom-project && rm -f /tmp/isoloom-project.tgz")
-          comm.sudo("rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom")
+          if windows
+            archive = "C:\\Windows\\Temp\\isoloom-project.tgz"
+            comm.upload(f.path, archive)
+            script = "$archive = '#{archive}'; $dest = '#{dest}'; $strip = 0\n#{UNTAR_PS1}"
+            comm.execute(script, elevated: true) do |type, data|
+              @machine.ui.info(data.chomp) if type == :stdout && !data.strip.empty?
+            end
+          else
+            comm.upload(f.path, "/tmp/isoloom-project.tgz")
+            comm.execute("rm -rf /tmp/isoloom-project && mkdir /tmp/isoloom-project && tar -xzf /tmp/isoloom-project.tgz -C /tmp/isoloom-project && rm -f /tmp/isoloom-project.tgz")
+            comm.sudo("rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom")
+          end
         end
       end
     end

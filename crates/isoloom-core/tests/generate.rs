@@ -309,7 +309,12 @@ fn windows_machines_use_winrm_and_powershell() {
     assert!(dc.contains("m.vm.box_version = \"2021.05.15\""));
     assert!(dc.contains("m.vm.communicator = \"winrm\""));
     assert!(dc.contains("drivers\\\\etc\\\\hosts"), "the Windows hosts file: {dc}");
-    assert!(dc.contains("path: File.join(ROOT, \"provision/dc.ps1\")"));
+    // The project in C:\isoloom first, then each step run from there.
+    let project = dc.find("m.vm.provision \"isoloom_project\", name: \"project\"").expect("the project step");
+    let step = dc
+        .find("name: \"provision/dc.ps1\", inline: \"Set-Location C:\\\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\\\isoloom\\\\provision\\\\dc.ps1'; exit $LASTEXITCODE\"")
+        .expect("the step, from the project");
+    assert!(project < step);
     let web = &vf[vf.find("config.vm.define \"web\"").unwrap()..];
     assert!(web.contains("m.vm.box = \"example/win2019\""), "the spec's image wins");
     assert!(web.contains("m.vm.box_version = \"1.0\""));
