@@ -221,7 +221,10 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
 
     for (i, input) in spec.inputs.iter().enumerate() {
         if !input_name(input) {
-            add(&format!("inputs[{i}]"), format!("`{input}`: inputs are environment variable names (letters, digits and `_`, not starting with a digit)"));
+            add(
+                &format!("inputs[{i}]"),
+                format!("`{input}`: inputs are environment variable names (letters, digits and `_`, not starting with a digit)"),
+            );
         }
     }
 

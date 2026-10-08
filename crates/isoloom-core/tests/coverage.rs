@@ -27,7 +27,7 @@ inputs: [TOKEN]
 machines:
   fw:
     networks: { out: 2, dmz: 1 }
-    services: [{ port: 80, name: web, http: true, publish: 8080 }]
+    services: [{ port: 80, name: web, http: true, tls: true, publish: 8080 }]
     inputs: [TOKEN]
     arch: amd64
     privileged: true

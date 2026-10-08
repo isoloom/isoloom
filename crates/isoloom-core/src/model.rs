@@ -272,6 +272,10 @@ pub struct Service {
     pub name: Option<String>,
     #[serde(default)]
     pub http: bool,
+    /// It speaks TLS (HTTPS for an `http` service): probes and checks use TLS, certificates
+    /// unchecked (lab services sign their own).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tls: bool,
     /// Reachable from the user's machine on this port (loopback only), besides the
     /// environment's own networks.
     #[serde(default)]

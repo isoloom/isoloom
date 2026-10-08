@@ -196,3 +196,16 @@ fn exec_checks_run_inside_the_machine_on_docker_and_kubernetes() {
     let beside = files.iter().find(|f| f.path.ends_with("docker/checks/web.sh")).unwrap();
     assert!(!beside.contents.contains("_exec 'id'"));
 }
+
+/// A TLS service's derived check goes over HTTPS.
+#[test]
+fn a_tls_service_is_probed_over_https() {
+    let spec = parse(&BASE.replace("http: true }", "http: true, tls: true }")).unwrap();
+    let plan = checks::plan(&spec);
+    let derived = plan
+        .iter()
+        .find(|c| c.derived && matches!(&c.probe, checks::Probe::Http { .. }))
+        .expect("a derived http check");
+    let checks::Probe::Http { url, .. } = &derived.probe else { unreachable!() };
+    assert!(url.https);
+}
