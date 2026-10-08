@@ -131,7 +131,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             out,
             "  config.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: {}{env}",
             rb(
-                "cd /opt/isoloom && failed=0; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit $failed"
+                "cd /opt/isoloom && failed=0; sa=$(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); [ -z \"$sa\" ] || docker compose -f .isoloom/docker/compose.yml --profile check up -d --wait --no-deps $sa; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit $failed"
             )
         );
     }

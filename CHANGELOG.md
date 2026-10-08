@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Checks don't re-run init jobs
+- `isoloom test` (and the docker-vm `checks` provisioner) ran each runner with `docker compose run`, which starts its dependencies again, and completed `init:` jobs count as not running: every test re-seeded the environment. Runners now run with `--no-deps` (the environment is up); a stand-in for a supplied access machine is started first. (#47)
+
 ### Init jobs on a machine nothing depends on
 - `docker compose up --wait` fails when a one-shot exits (even with 0) unless a running service depends on it, so an `init:` on a machine nothing depends on (a single-machine lab seeding itself) failed `isoloom run docker` although everything worked. Starting is now two steps when such leaf jobs exist: `up -d --build --wait` on everything else, then each job attached, in order (`up --no-deps --exit-code-from <job> <job>`), failing on its exit code. `isoloom run`, the docker-vm Vagrantfile and the cloud-docker modules do it; files without leaf jobs keep their single `up --wait`. Embedders get the same rule from `generate::start_plan(compose_yaml)` (or `leaf_jobs(spec)` and `start_commands`). (#42)
 

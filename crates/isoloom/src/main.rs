@@ -1305,10 +1305,33 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
     match t {
         core::Target::Docker | core::Target::Hosted => {
             let files = lifecycle::compose_files(&dir, instance);
+            // The runners run with --no-deps: the environment is up, and `compose run` would
+            // otherwise run its completed init jobs again (they are dependencies of the machines
+            // the runners wait for), re-seeding it on every test. A stand-in for a supplied access
+            // machine isn't up yet: start it (and its routes) first.
+            let compose = std::fs::read_to_string(out.join("docker/compose.yml")).unwrap_or_default();
+            let stand_ins: Vec<String> = ["isoloom-access", "isoloom-access-routes"]
+                .iter()
+                .filter(|n| compose.contains(&format!("\n  {n}:\n")))
+                .map(|n| n.to_string())
+                .collect();
+            if !stand_ins.is_empty() {
+                let status = std::process::Command::new("docker")
+                    .arg("compose")
+                    .args(["--progress", "quiet"])
+                    .args(&files)
+                    .args(["--profile", "check", "up", "-d", "--wait", "--no-deps"])
+                    .args(&stand_ins)
+                    .current_dir(&dir)
+                    .status()?;
+                if !status.success() {
+                    return Err("couldn't start the access machine's stand-in".into());
+                }
+            }
             for (pos, _) in &groups {
                 let mut args = vec![s("compose"), s("--progress"), s("quiet")];
                 args.extend(files.iter().cloned());
-                args.extend([s("--profile"), s("check"), s("run"), s("--rm")]);
+                args.extend([s("--profile"), s("check"), s("run"), s("--rm"), s("--no-deps")]);
                 if no_derived {
                     args.extend([s("-e"), s("ISOLOOM_DERIVED=0")]);
                 }
