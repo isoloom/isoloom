@@ -366,7 +366,7 @@ locals {
             .machines
             .keys()
             .filter(|o| o.as_str() != name)
-            .map(|o| format!("{} {o}", address_for(spec, name, o)))
+            .map(|o| format!("{} {}", address_for(spec, name, o), super::names_of(spec, o)))
             .collect();
         if !hosts.is_empty() {
             runcmd.push(format!(
@@ -583,7 +583,11 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
     let hosts: Vec<String> = spec
         .machines
         .iter()
-        .filter_map(|(o, om)| om.networks.first().map(|(n, oc)| format!("'{} {o}'", address(spec, n, *oc))))
+        .filter_map(|(o, om)| {
+            om.networks
+                .first()
+                .map(|(n, oc)| format!("'{} {}'", address(spec, n, *oc), super::names_of(spec, o)))
+        })
         .collect();
     if !hosts.is_empty() {
         runcmd.push(format!("printf '%s\\n' {} >> /etc/hosts", hosts.join(" ")));

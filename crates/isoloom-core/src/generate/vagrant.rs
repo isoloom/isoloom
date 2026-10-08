@@ -189,7 +189,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             .machines
             .keys()
             .filter(|o| o.as_str() != name && !is_windows_machine(spec, o))
-            .map(|o| format!("{} {o}", address_for(spec, name, o)))
+            .map(|o| format!("{} {}", address_for(spec, name, o), super::names_of(spec, o)))
             .collect();
         if !hosts.is_empty() {
             let _ = writeln!(
@@ -460,7 +460,11 @@ fn tool_vm(spec: &Spec, index: usize, out: &mut String) {
     let hosts: Vec<String> = spec
         .machines
         .iter()
-        .filter_map(|(n, m)| m.networks.first().map(|(net, o)| format!("'{} {n}'", address(spec, net, *o))))
+        .filter_map(|(n, m)| {
+            m.networks
+                .first()
+                .map(|(net, o)| format!("'{} {}'", address(spec, net, *o), super::names_of(spec, n)))
+        })
         .collect();
     if !hosts.is_empty() {
         let _ = writeln!(
@@ -704,7 +708,11 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
     let hosts: Vec<String> = spec
         .machines
         .iter()
-        .filter_map(|(n, m)| m.networks.first().map(|(net, o)| format!("'{} {n}'", address(spec, net, *o))))
+        .filter_map(|(n, m)| {
+            m.networks
+                .first()
+                .map(|(net, o)| format!("'{} {}'", address(spec, net, *o), super::names_of(spec, n)))
+        })
         .collect();
     if !hosts.is_empty() {
         let _ = writeln!(

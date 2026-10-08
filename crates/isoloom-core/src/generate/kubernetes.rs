@@ -145,6 +145,9 @@ fn unsupported(spec: &Spec) -> Option<String> {
     if let Some(what) = super::container_checks_unsupported(spec) {
         return Some(what);
     }
+    if spec.machines.values().any(|m| !m.aliases.is_empty()) {
+        return Some("machine `aliases` (dotted DNS names) aren't Kubernetes Service names".into());
+    }
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine on Kubernetes come later".into());
     }

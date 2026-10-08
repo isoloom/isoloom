@@ -320,6 +320,11 @@ fn base_table() -> Vec<Row> {
             done("environment of that machine's provisioning only", "supplier-portal-api"),
         ),
         common(
+            "machines.*.aliases",
+            done("network aliases (and extra_hosts across the router)", "edge-firewall"),
+            done("in every Linux VM's /etc/hosts, after the machine's name", "edge-firewall"),
+        ),
+        common(
             "machines.*.arch",
             done("`platform` on the container and a node selector on Kubernetes (amd64/arm64)", "arm-lab"),
             done("`box_architecture` on the VM", "segmented"),

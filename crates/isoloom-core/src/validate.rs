@@ -382,6 +382,30 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 add(&format!("{at}.resources"), "too small: at least 1 cpu and 16 MB".into());
             }
         }
+        for (i, a) in m.aliases.iter().enumerate() {
+            let ok = a.len() <= 253
+                && a.split('.').all(|l| {
+                    !l.is_empty()
+                        && l.len() <= 63
+                        && l.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                        && !l.starts_with('-')
+                        && !l.ends_with('-')
+                });
+            if !ok {
+                add(
+                    &format!("{at}.aliases[{i}]"),
+                    format!("`{a}` isn't a DNS name like api.example.com (lowercase)"),
+                );
+            } else if spec.machines.contains_key(a) || spec.machines.iter().any(|(o, om)| o != name && om.aliases.contains(a)) {
+                add(&format!("{at}.aliases[{i}]"), format!("`{a}` already names another machine"));
+            }
+        }
+        if !m.aliases.is_empty() && m.count.is_some() {
+            add(
+                &format!("{at}.aliases"),
+                "clones (`count`) can't share names: give aliases to single machines".into(),
+            );
+        }
         if m.docker.is_none() && m.vm.is_none() && !m.access {
             add(&at, "give the machine at least one implementation: `docker:` and/or `vm:`".into());
         }
