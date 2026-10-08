@@ -224,6 +224,12 @@ pub fn start_commands(compose: &str, jobs: &[String], wait_timeout: Option<u32>)
     cmd
 }
 
+/// The runner of a machine's `exec` checks, in `.isoloom/docker/checks/`: piped into the
+/// machine (`docker compose exec -T <machine> sh -s < exec-<machine>.sh`).
+pub fn exec_runner(machine: &str) -> String {
+    format!("exec-{machine}.sh")
+}
+
 /// Init job service names for a machine.
 fn init_names(name: &str, m: &Machine) -> Vec<String> {
     let n = m.docker.as_ref().map(|d| d.init.len()).unwrap_or(0);
@@ -532,6 +538,15 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         } else {
             format!("isoloom-check-{id}")
         };
+        // `exec` checks run inside the machine itself, not in the runner beside it (which shares
+        // only its network): their own script, piped to `docker compose exec -T <machine> sh -s`.
+        let (execs, group): (Vec<&checks::Resolved>, Vec<&checks::Resolved>) = group.into_iter().partition(|c| matches!(c.probe, checks::Probe::Exec { .. }));
+        if !execs.is_empty() {
+            runner_files.push(GeneratedFile {
+                path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", exec_runner(&id)),
+                contents: checks::script(&pos, &execs, &render),
+            });
+        }
         runner_files.push(GeneratedFile {
             path: format!("{OUTPUT_DIR}/{DIR}/checks/{id}.sh"),
             contents: checks::script(&pos, &group, &render),

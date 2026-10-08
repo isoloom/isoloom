@@ -175,6 +175,14 @@
         "runner": "isoloom-check-cache",
         "checks": [
           {
+            "name": "the cache holds the greeting, read inside it",
+            "derived": false,
+            "kind": "exec",
+            "target": "redis-cli get greeting",
+            "expect": "hello from isoloom",
+            "wait": 0
+          },
+          {
             "name": "web:80 from cache",
             "derived": true,
             "kind": "http",

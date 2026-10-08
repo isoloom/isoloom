@@ -526,7 +526,10 @@ fn base_table() -> Vec<Row> {
         ),
         row(
             "checks[].exec",
-            planned("the runner shares the machine's network, not its filesystem"),
+            done(
+                "in the machine itself: its own runner piped to `docker compose exec -T <machine> sh -s`",
+                "hello-stack",
+            ),
             done("the command in the machine's own shell", "arm-vm"),
             VM_PLANNED,
         ),
