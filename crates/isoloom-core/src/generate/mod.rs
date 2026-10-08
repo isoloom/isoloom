@@ -9,6 +9,7 @@ mod cloud_docker;
 mod cloud_vm;
 mod cloud_vm_others;
 mod docker;
+pub use docker::{StartPlan, leaf_jobs, start_commands, start_plan};
 mod docker_vm;
 mod external;
 mod hybrid;

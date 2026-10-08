@@ -1740,10 +1740,27 @@ fn bring_up(
             args.extend(lifecycle::compose_files(dir, instance));
             if down {
                 args.extend([s("--profile"), s("check"), s("down"), s("-v")]);
-            } else {
-                args.extend([s("up"), s("-d"), s("--build"), s("--wait")]);
+                return Ok((s("docker"), args, dir.to_path_buf()));
             }
-            (s("docker"), args, dir.to_path_buf())
+            // One-shot jobs nothing running waits for fail `up --wait`: wait for the rest,
+            // then run them attached, in order (see core::generate::start_plan).
+            let compose = std::fs::read_to_string(out.join("docker/compose.yml")).unwrap_or_default();
+            let plan = core::generate::start_plan(&compose).unwrap_or_default();
+            if plan.jobs.is_empty() {
+                args.extend([s("up"), s("-d"), s("--build"), s("--wait")]);
+                (s("docker"), args, dir.to_path_buf())
+            } else {
+                let q = |a: &str| format!("'{}'", a.replace('\'', "'\\''"));
+                let prefix = std::iter::once("docker".to_string())
+                    .chain(args.iter().map(|a| q(a)))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let mut script = format!("{prefix} up -d --build --wait {}", plan.wait.iter().map(|w| q(w)).collect::<Vec<_>>().join(" "));
+                for j in &plan.jobs {
+                    script.push_str(&format!(" && {prefix} up --no-deps --exit-code-from {j} {j}", j = q(j)));
+                }
+                (s("sh"), vec![s("-c"), script], dir.to_path_buf())
+            }
         }
         core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid => {
             let sub = match t {

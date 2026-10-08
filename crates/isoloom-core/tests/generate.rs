@@ -531,3 +531,49 @@ fn an_idle_container_is_kept_running() {
         "{k8s}"
     );
 }
+
+/// An init job on a machine nothing depends on is a leaf job: `up --wait` would fail on its exit,
+/// so the start plan waits for the rest and runs it after (#42).
+#[test]
+fn leaf_init_jobs_run_after_the_wait() {
+    let spec = isoloom_core::parse(
+        r#"
+version: 1
+name: leaf
+networks: { lan: { cidr: 10.70.0.0/24 } }
+machines:
+  db:
+    networks: { lan: 20 }
+    services: [{ port: 5432 }]
+    docker: { image: "postgres:17", init: [seed.sh] }
+  web:
+    networks: { lan: 10 }
+    services: [{ port: 80 }]
+    depends_on: [db]
+    docker: { image: "nginx:1.27-alpine", init: [setup.sh, warm.sh] }
+"#,
+    )
+    .unwrap();
+    // db's job is waited for by web; web's two jobs by nothing.
+    assert_eq!(isoloom_core::generate::leaf_jobs(&spec), ["web-init-1", "web-init-2"]);
+    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    let plan = isoloom_core::generate::start_plan(compose).unwrap();
+    assert_eq!(plan.jobs, ["web-init-1", "web-init-2"]);
+    assert!(plan.wait.contains(&"web".to_string()) && plan.wait.contains(&"db-init-1".to_string()));
+    assert!(!plan.wait.iter().any(|w| w.starts_with("isoloom-check")), "profile services aren't started");
+    let cmd = isoloom_core::generate::start_commands("docker compose", &plan.jobs, Some(900));
+    assert_eq!(
+        cmd,
+        "docker compose up -d --build --wait --wait-timeout 900 $(docker compose config --services | grep -vx -e web-init-1 -e web-init-2) \
+         && docker compose up --no-deps --exit-code-from web-init-1 web-init-1 \
+         && docker compose up --no-deps --exit-code-from web-init-2 web-init-2"
+    );
+    // Nothing left over: the one command it always was.
+    assert_eq!(
+        isoloom_core::generate::start_commands("docker compose", &[], None),
+        "docker compose up -d --build --wait"
+    );
+    let (_, hello) = example("hello-stack");
+    let compose = &generate(&hello, Target::Docker).unwrap()[0].contents;
+    assert_eq!(isoloom_core::generate::start_plan(compose).unwrap(), Default::default());
+}
