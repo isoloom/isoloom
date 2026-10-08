@@ -131,6 +131,16 @@ fn vagrant_orders_machines_and_names_them() {
 }
 
 #[test]
+fn the_controller_gets_every_provider_block_the_machines_get() {
+    let (_, spec) = example("ansible-pair");
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    let controller = vf.split("config.vm.define \"isoloom-controller\"").nth(1).unwrap();
+    for provider in ["virtualbox", "vmware_desktop", "parallels", "utm", "qemu", "vmware_esxi", "libvirt"] {
+        assert!(controller.contains(&format!("m.vm.provider \"{provider}\"")), "controller has no {provider} block");
+    }
+}
+
+#[test]
 fn reach_rules_add_a_router_with_matching_rules() {
     let (_, spec) = example("segmented");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;

@@ -703,6 +703,13 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
         "    m.vm.provider \"parallels\" do |v|\n      v.name = {}\n      v.linked_clone = true\n      v.cpus = 1\n      v.memory = 1024\n    end",
         rb(&label)
     );
+    // Apple Silicon Macs, as for the lab's machines.
+    let _ = writeln!(
+        out,
+        "    m.vm.provider \"utm\" do |v|\n      v.name = {}\n      v.cpus = 1\n      v.memory = 1024\n    end",
+        rb(&label)
+    );
+    let _ = writeln!(out, "    m.vm.provider \"qemu\" do |v|\n      v.smp = \"cpus=1\"\n      v.memory = \"1024M\"\n    end");
     let _ = writeln!(
         out,
         "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      v.cpus = 1\n      v.memory = 1024\n    end"
