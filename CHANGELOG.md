@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### The project goes into VMs as an archive
+- The Vagrant outputs (vagrant, hybrid, docker-vm) copied the project with one `file` provisioner per top-level entry, listed when the Vagrantfile loaded: the copy followed symbolic links, so a vendored tree with a link loop failed it (`Too many levels of symbolic links`) and Vagrant destroyed the VM, and an entry deleted during `vagrant up` failed it too. A VM's `project` step is now Isoloom's own provisioner (`isoloom_project`, defined in the Vagrantfile): a tar.gz of the project as it is when the step runs, written by Vagrant's own Ruby (no `tar` needed on the host, Windows included), symbolic links kept as links, unpacked in /opt/isoloom. `.git`, `.vagrant` and `.terraform` stay out at any depth (a `.vagrant` holds private keys). (#67, #63)
+
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
 

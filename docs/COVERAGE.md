@@ -11,7 +11,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [Docker Compose](#docker-compose) | 82% | 56 | 42 | 8 | 6 |
-| [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
+| [Vagrant](#vagrant) | 83% | 36 | 30 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
@@ -178,7 +178,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant
 
-82% of 35 portable features (29 done, 0 partly, 6 to do; 61 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
+83% of 36 portable features (30 done, 0 partly, 6 to do; 62 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
 
 ### Machine settings (config.vm)
 
@@ -240,7 +240,8 @@ when a table disagrees with what Isoloom really generates.
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `shell` | Yes | Yes | From `machines.*.vm.provision` (.sh), and Isoloom's own steps |
-| `file` | Yes | Yes | The project, copied into each VM |
+| `file` | Yes | Another way | Via `isoloom_project` (below) copies the project; a file provisioner follows symlinks and lists files when the Vagrantfile loads |
+| `isoloom_project` | Yes | Yes | Isoloom's own provisioner, defined in the Vagrantfile: the project into each VM as a tar.gz built when the step runs, symlinks kept as links |
 | `ansible_local` | Yes | Yes | From `machines.*.vm.provision` (.yml, .yaml) |
 | `ansible` | Yes | Another way | Via ansible_local: the same playbooks, run inside the VM |
 | `chef` | Yes | Another way | Via a `.sh` provisioning step can run any tool |

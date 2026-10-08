@@ -216,13 +216,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         rb(&format!("{} · containers", spec.name))
     ));
     host.push_str("    m.vm.provision \"shell\", name: \"docker\", inline: \"command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh\"\n");
-    host.push_str(
-        "    PROJECT.each do |entry|\n      m.vm.provision \"file\", source: File.join(ROOT, entry), destination: \"/tmp/isoloom-project/#{entry}\"\n    end\n",
-    );
-    host.push_str(
-        "    m.vm.provision \"file\", source: File.join(__dir__, \"compose.yml\"), destination: \"/tmp/isoloom-project/.isoloom/hybrid/compose.yml\"\n",
-    );
-    host.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
+    // The project, with this Compose file from Isoloom's outputs.
+    host.push_str("    m.vm.provision \"isoloom_project\", name: \"project\", extra: [\".isoloom/hybrid/compose.yml\"]\n");
     let _ = writeln!(
         host,
         "    m.vm.provision \"shell\", name: \"networks\", inline: <<~'SH'\n{}    SH",
