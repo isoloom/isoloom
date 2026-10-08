@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Older systems, fresh check scripts on VMs
+- OS names `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `windows-server-2008r2` and `windows-server-2012r2`, for labs about older systems (Metasploitable 3): built-in Vagrant boxes, Proxmox images for 16.04 and 18.04; targets without an image decline them, saying why. (#57)
+- `isoloom test` on Vagrant runs the check scripts as they are in the project now: the `checks` provisioner writes them over the VM's copy before the runner. (#58)
+
 ### Inputs, TLS services, aliases
 - `inputs` take any environment variable name (DVLA reads `model_name`); `import compose` keeps the name as written. (#53)
 - `tls: true` on a service: derived checks reach it over TLS (https for `http` services). The Compose service label is unchanged. (#54)

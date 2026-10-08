@@ -32,6 +32,9 @@ fn image_url(os: &str) -> Option<&'static str> {
         "debian-11" => "https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-genericcloud-amd64.qcow2",
         "debian-12" => "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2",
         "debian-13" => "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2",
+        // End of life, still published. 14.04's cloud-init (0.7.5) is too old for the snippet.
+        "ubuntu-16.04" => "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img",
+        "ubuntu-18.04" => "https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img",
         "ubuntu-20.04" => "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img",
         "ubuntu-22.04" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
         "ubuntu-24.04" => "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img",
@@ -736,8 +739,8 @@ checks:
     }
 
     #[test]
-    fn every_linux_os_has_a_cloud_image_but_kali_and_fedora() {
-        for os in KNOWN_OS.iter().filter(|o| !is_windows(o) && !["kali", "fedora-42"].contains(o)) {
+    fn every_linux_os_has_a_cloud_image_but_kali_fedora_and_trusty() {
+        for os in KNOWN_OS.iter().filter(|o| !is_windows(o) && !["kali", "fedora-42", "ubuntu-14.04"].contains(o)) {
             assert!(image_url(os).is_some(), "no Proxmox cloud image for `{os}`");
         }
     }

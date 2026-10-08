@@ -112,6 +112,11 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "debian-11" => b("bento/debian-11", None, Some("generic/debian11")),
         "debian-12" => b("bento/debian-12", None, Some("generic/debian12")),
         "debian-13" => b("bento/debian-13", None, None),
+        // End of life: for labs about older systems (Metasploitable 3 runs on 14.04). No cloud
+        // or Proxmox image is mapped for these, so those targets decline them.
+        "ubuntu-14.04" => b("ubuntu/trusty64", None, None),
+        "ubuntu-16.04" => b("bento/ubuntu-16.04", None, Some("generic/ubuntu1604")),
+        "ubuntu-18.04" => b("bento/ubuntu-18.04", None, Some("generic/ubuntu1804")),
         "ubuntu-20.04" => b("bento/ubuntu-20.04", None, Some("generic/ubuntu2004")),
         "ubuntu-22.04" => b("bento/ubuntu-22.04", None, Some("generic/ubuntu2204")),
         "ubuntu-24.04" => b("bento/ubuntu-24.04", None, None),
@@ -122,6 +127,10 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "fedora-42" => b("bento/fedora-42", None, None),
         "kali" => b("kalilinux/rolling", None, None),
         "windows-10" => b("gusztavvargadr/windows-10", Some("2511.0.0"), None),
+        // End of life, evaluation boxes (Ansible's own test boxes), pinned: for labs about
+        // older Windows. No cloud or Proxmox image is mapped for these.
+        "windows-server-2008r2" => b("jborean93/WindowsServer2008R2", Some("0.7.0"), None),
+        "windows-server-2012r2" => b("jborean93/WindowsServer2012R2", Some("1.2.0"), None),
         "windows-server-2016" => b("StefanScherer/windows_2016", Some("2019.02.14"), None),
         // The box GOAD uses (VirtualBox, VMware, Hyper-V), pinned to its known-good version.
         "windows-server-2019" => b("StefanScherer/windows_2019", Some("2021.05.15"), None),
