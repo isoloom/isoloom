@@ -8,7 +8,9 @@
 //! - Each machine becomes a service with its fixed address on every network; services find
 //!   each other by name (Compose DNS).
 //! - Machines with services get a healthcheck (TCP probe), so `depends_on` waits for them
-//!   to answer and `docker compose up --wait` means "everything answers".
+//!   to answer and `docker compose up --wait` means "everything answers". The probe is
+//!   Isoloom's own static busybox (a one-shot `isoloom-probe-<arch>` copies it into a volume),
+//!   so it needs nothing from the image: distroless and `scratch` machines work too.
 //! - `init:` scripts run once, in one-shot containers of the machine's image on its networks,
 //!   after it answers; machines depending on it wait for them to finish.
 //! - Inputs become environment variables read from the shell (`${NAME:-}`), only on the
@@ -30,7 +32,7 @@ use serde_yaml_ng::{Mapping, Value};
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, appliances, common_unsupported, header, router, trunks};
 use crate::checks;
-use crate::model::{Machine, Spec, Target};
+use crate::model::{Arch, Machine, Spec, Target};
 
 const DIR: &str = "docker";
 /// From `.isoloom/docker/` back to the project folder.
@@ -61,18 +63,29 @@ pub(super) fn image_of(spec: &Spec, name: &str, m: &Machine) -> String {
     d.image.clone().unwrap_or_else(|| format!("isoloom/{}-{}", spec.name, name))
 }
 
-/// A TCP probe for each service port that works in most images: busybox/BSD `nc`, else bash.
+/// A static busybox Isoloom brings into every machine with services, so its probe needs
+/// nothing from the machine's image (distroless and `scratch` images have no shell).
+pub(super) const PROBE_IMAGE: &str = "busybox:1.37.0-musl";
+/// Where a machine sees that busybox (read-only).
+pub(super) const PROBE_DIR: &str = "/.isoloom-probe";
+
+/// The one-shot service (Compose) that copies the probe for machines of this architecture.
+pub(super) fn probe_service(arch: Arch) -> String {
+    format!("isoloom-probe-{}", arch.id())
+}
+
+/// A TCP probe for each service port, run by Isoloom's own busybox (see [`PROBE_IMAGE`]).
 pub(super) fn probe(m: &Machine) -> String {
     m.services
         .iter()
-        .map(|svc| {
-            format!(
-                "(nc -z 127.0.0.1 {p} 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/{p}' 2>/dev/null)",
-                p = svc.port
-            )
-        })
+        .map(|svc| format!("{PROBE_DIR}/busybox nc -z -w 2 127.0.0.1 {}", svc.port))
         .collect::<Vec<_>>()
         .join(" && ")
+}
+
+/// The probe as an exec-form command: no shell from the image.
+pub(super) fn probe_command(m: &Machine) -> Vec<Value> {
+    vec![s(format!("{PROBE_DIR}/busybox")), s("sh"), s("-c"), s(probe(m))]
 }
 
 fn environment(m: &Machine) -> Option<Value> {
@@ -116,6 +129,8 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
 
     let mut appliance_files: Vec<GeneratedFile> = Vec::new();
     let mut services = Mapping::new();
+    // The architectures of machines that need the probe: one copy job (and volume) each.
+    let mut probe_archs: Vec<Arch> = Vec::new();
     if router::needed(spec) {
         services.insert(s(router::NAME), router_service(spec));
     }
@@ -281,7 +296,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             svc.insert(
                 s("healthcheck"),
                 map([
-                    ("test", list([s("CMD-SHELL"), s(probe(m))])),
+                    ("test", list(std::iter::once(s("CMD")).chain(probe_command(m)))),
                     ("interval", s("5s")),
                     ("timeout", s("3s")),
                     ("retries", Value::Number(60.into())),
@@ -290,6 +305,21 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             );
         }
         let mut deps = Mapping::new();
+        if !m.services.is_empty() {
+            // Isoloom's own probe, copied into a volume before the machine starts.
+            let probe_svc = probe_service(m.arch);
+            let mount = s(format!("{probe_svc}:{PROBE_DIR}:ro"));
+            match svc.get_mut(s("volumes")) {
+                Some(Value::Sequence(v)) => v.push(mount),
+                _ => {
+                    svc.insert(s("volumes"), list([mount]));
+                }
+            }
+            deps.insert(s(probe_svc.as_str()), map([("condition", s("service_completed_successfully"))]));
+            if !probe_archs.contains(&m.arch) {
+                probe_archs.push(m.arch);
+            }
+        }
         for dep in &m.depends_on {
             let dm = &spec.machines[dep];
             deps.insert(s(dep.as_str()), map([("condition", s("service_healthy"))]));
@@ -537,6 +567,19 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                 volumes.insert(s(volume_name(name, v)), Value::Mapping(Mapping::new()));
             }
         }
+    }
+
+    for arch in &probe_archs {
+        let name = probe_service(*arch);
+        let mut p = Mapping::new();
+        p.insert(s("image"), s(PROBE_IMAGE));
+        p.insert(s("platform"), s(arch.docker_platform()));
+        p.insert(s("entrypoint"), list([s("/bin/cp"), s("/bin/busybox"), s("/probe/busybox")]));
+        p.insert(s("volumes"), list([s(format!("{name}:/probe"))]));
+        p.insert(s("network_mode"), s("none"));
+        p.insert(s("restart"), s("no"));
+        services.insert(s(name.as_str()), Value::Mapping(p));
+        volumes.insert(s(name.as_str()), Value::Mapping(Mapping::new()));
     }
 
     let mut root = Mapping::new();

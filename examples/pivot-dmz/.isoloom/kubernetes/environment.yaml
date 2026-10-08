@@ -32,6 +32,16 @@ spec:
         net.isoloom.com/internal: member
     spec:
       hostname: gateway
+      initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       containers:
       - name: gateway
         image: isoloom/pivot-dmz-gateway
@@ -42,13 +52,21 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 80 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/80' 2>/dev/null) && (nc -z 127.0.0.1 22 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/22' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80 && /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 22
           periodSeconds: 5
           failureThreshold: 60
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       nodeSelector:
         kubernetes.io/arch: amd64
+      volumes:
+      - name: isoloom-probe
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -83,6 +101,16 @@ spec:
         net.isoloom.com/internal: member
     spec:
       hostname: app
+      initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       containers:
       - name: app
         image: isoloom/pivot-dmz-app
@@ -92,13 +120,21 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 8080 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8080
           periodSeconds: 5
           failureThreshold: 60
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       nodeSelector:
         kubernetes.io/arch: amd64
+      volumes:
+      - name: isoloom-probe
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -153,6 +189,16 @@ spec:
         net.isoloom.com/internal: member
     spec:
       hostname: db
+      initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       containers:
       - name: db
         image: postgres:16
@@ -162,13 +208,21 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 5432 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/5432' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 5432
           periodSeconds: 5
           failureThreshold: 60
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       nodeSelector:
         kubernetes.io/arch: amd64
+      volumes:
+      - name: isoloom-probe
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
