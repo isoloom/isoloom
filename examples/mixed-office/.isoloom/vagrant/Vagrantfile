@@ -135,34 +135,34 @@ Vagrant.configure("2") do |config|
   end
 
   config.vm.define "isoloom-controller" do |m|
-    m.vm.box = "bento/debian-12"
+    m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
     m.vm.network "private_network", ip: "192.168.58.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "mixed-office · controller"
       v.linked_clone = true
       v.cpus = 1
-      v.memory = 1024
+      v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
       v.vmx["displayName"] = "mixed-office · controller"
       v.vmx["numvcpus"] = "1"
-      v.vmx["memsize"] = "1024"
+      v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
       v.name = "mixed-office · controller"
       v.linked_clone = true
       v.cpus = 1
-      v.memory = 1024
+      v.memory = 512
     end
     m.vm.provider "utm" do |v|
       v.name = "mixed-office · controller"
       v.cpus = 1
-      v.memory = 1024
+      v.memory = 512
     end
     m.vm.provider "qemu" do |v|
       v.smp = "cpus=1"
-      v.memory = "1024M"
+      v.memory = "512M"
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -173,12 +173,12 @@ Vagrant.configure("2") do |config|
       v.esxi_virtual_network = esxi_networks(["office"])
       v.guest_name = "mixed-office-controller"
       v.guest_numvcpus = 1
-      v.guest_memsize = 1024
+      v.guest_memsize = 512
     end
     m.vm.provider "libvirt" do |v, o|
-      o.vm.box = "generic/debian12"
+      o.vm.box = "generic/alpine319"
       v.cpus = 1
-      v.memory = 1024
+      v.memory = 512
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '192.168.58.10 files01' '192.168.58.20 intranet'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     PROJECT.each do |entry|
@@ -187,9 +187,13 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "controller", inline: <<~'SH'
       set -e
-      export DEBIAN_FRONTEND=noninteractive
-      apt-get update -qq
-      apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null
+      if command -v apk >/dev/null; then
+        apk add -q --no-cache python3 sshpass curl netcat-openbsd
+      else
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -qq
+        apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null
+      fi
       [ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/inventory.ini <<'INV'

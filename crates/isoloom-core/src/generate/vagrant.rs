@@ -700,10 +700,27 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
 
 /// The controller: a Debian VM on every network at its controller address, started after every
 /// machine. It writes the inventory and runs the environment-level Ansible playbooks.
+/// What the controller installs before Ansible: Python's venv, sshpass (password SSH), curl and
+/// netcat (checks). Alpine's packages (the default box), or Debian's (a `controller.image`).
+const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add -q --no-cache python3 sshpass curl netcat-openbsd\nelse\n  export DEBIAN_FRONTEND=noninteractive\n  apt-get update -qq\n  apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\nfi\n";
+
 fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
     let _ = writeln!(out, "\n  config.vm.define \"isoloom-controller\" do |m|");
-    let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
+    let (bx, version) = super::controller_box(spec);
+    let (cpus, mem, _) = super::controller_size(spec);
+    if bx == super::CONTROLLER_BOX && version.is_none() {
+        let _ = writeln!(
+            out,
+            "    m.vm.box = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"bento/debian-12\" : {}",
+            rb(bx)
+        );
+    } else {
+        let _ = writeln!(out, "    m.vm.box = {}", rb(bx));
+    }
+    if let Some(v) = version {
+        let _ = writeln!(out, "    m.vm.box_version = {}", rb(v));
+    }
     let _ = writeln!(out, "    m.vm.hostname = \"isoloom-controller\"");
     for net in spec.networks.keys() {
         let netname = format!("isoloom-{}-{net}", spec.name);
@@ -716,15 +733,17 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
             rb(&netname),
         );
     }
+    // The default box (Alpine) has amd64 everywhere but arm64 only for libvirt and QEMU: an
+    // arm64 host (Apple Silicon) on Parallels, VMware or VirtualBox gets Debian's instead.
     let all: Vec<&str> = spec.networks.keys().map(String::as_str).collect();
     providers(
         out,
         &format!("{} · controller", spec.name),
         &format!("{}-controller", spec.name),
-        1,
-        1024,
+        cpus,
+        mem,
         &all,
-        Some(HELPER_LIBVIRT_BOX),
+        (bx == super::CONTROLLER_BOX).then_some(super::CONTROLLER_BOX),
     );
     // Every machine by name, at its address on its first network (the controller is on all).
     let hosts: Vec<String> = spec
@@ -751,7 +770,7 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
     );
     out.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
     let script = format!(
-        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\n[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
+        "set -e\n{CONTROLLER_PACKAGES}[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
         inventory(spec)
     );
     let _ = writeln!(

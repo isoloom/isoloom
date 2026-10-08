@@ -545,6 +545,44 @@ fn an_idle_container_is_kept_running() {
     );
 }
 
+#[test]
+fn the_controller_is_small_by_default_and_sized_by_the_spec() {
+    // ansible-pair asks for 768 MB.
+    let (_, spec) = example("ansible-pair");
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
+    assert!(
+        ctl.contains("m.vm.box = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"bento/debian-12\" : \"generic/alpine319\""),
+        "{ctl}"
+    );
+    assert!(ctl.contains("o.vm.box = \"generic/alpine319\""), "libvirt has Alpine on both architectures");
+    assert!(ctl.contains("v.memory = 768"));
+    assert!(ctl.contains("command -v apk"));
+    // Without `controller:`: 1 CPU, 512 MB, on every target with a controller.
+    let mut spec = spec;
+    spec.controller = None;
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
+    assert!(ctl.contains("v.cpus = 1\n      v.memory = 512"), "{ctl}");
+    assert!(ctl.contains("v.guest_memsize = 512"));
+    let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
+    assert!(
+        tf.contains("instance_type = \"t3.micro\"\n  key_name      = aws_key_pair.env.key_name\n  user_data"),
+        "{tf}"
+    );
+    let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
+    assert!(tf.contains("dedicated = 512"));
+    // A box of one's own, pinned.
+    spec.controller = isoloom_core::parse(
+        "version: 1\nname: t\nnetworks: {}\nmachines: {}\ncontroller: { image: { vagrant: bento/debian-12, vagrant_version: \"202407.22.0\" }, resources: { cpus: 2 } }\n",
+    )
+    .unwrap()
+    .controller;
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(vagrantfile.contains("m.vm.box = \"bento/debian-12\"\n    m.vm.box_version = \"202407.22.0\""));
+    assert!(vagrantfile.contains("v.cpus = 2"));
+}
+
 /// An init job on a machine nothing depends on is a leaf job: `up --wait` would fail on its exit,
 /// so the start plan waits for the rest and runs it after (#42).
 #[test]

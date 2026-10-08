@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### A lighter controller, sized by the spec
+- The controller that runs `provision:` playbooks defaults to 1 CPU and 512 MB on every target (it was 1 GB). On local VMs its box is `generic/alpine319` (about 100 MB to download instead of 675 MB, for VirtualBox, libvirt, VMware and Parallels alike): Python, ansible-core and pywinrm install in seconds. Proxmox and the clouds keep their Debian images, at the new size (AWS `t3.micro`, Azure `Standard_B1s`, GCP `e2-small`).
+- `controller:` (top level) sets it like a machine: `image: { vagrant, vagrant_version }` for a box of your own (its setup handles Alpine and Debian), `resources: { cpus, memory_mb, disk_gb }` (disk on Proxmox) for many forks against a large environment. Example: ansible-pair gives it 768 MB.
+
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
 

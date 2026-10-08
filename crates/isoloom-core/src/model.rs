@@ -34,6 +34,10 @@ pub struct Spec {
     /// controller on the environment's networks, with an inventory Isoloom writes.
     #[serde(default)]
     pub provision: Vec<Provision>,
+    /// The controller Isoloom adds for `provision:` (and checks run from it): a small VM, sized
+    /// and boxed like a machine. By default 1 CPU, 512 MB and a minimal Alpine box on Vagrant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub controller: Option<Controller>,
     /// Black-box checks that prove the behavior on every target: scripts, or declared probes
     /// (`http`, `tcp`, `exec`, `script`) run from a machine of the environment. Isoloom adds
     /// derived checks of its own from `services` and `reach`.
@@ -419,6 +423,18 @@ pub struct VmImage {
     /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
     #[serde(default)]
     pub winrm: Option<Winrm>,
+}
+
+/// The controller's settings (`controller:`), the fields a machine uses for the same things.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Controller {
+    /// The box to use instead of Isoloom's (Vagrant): a specific Ansible version, a mirror.
+    #[serde(default)]
+    pub image: Option<VmImage>,
+    /// CPUs, memory (and disk on Proxmox), for many forks against a large environment.
+    #[serde(default)]
+    pub resources: Option<Resources>,
 }
 
 /// One environment-level provisioning step.

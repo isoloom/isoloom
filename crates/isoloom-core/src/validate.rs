@@ -468,6 +468,21 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         add("machines", format!("depends_on forms a cycle: {}{hint}", cycle.join(" -> ")));
     }
 
+    // The controller is a Linux VM Isoloom drives over SSH.
+    if let Some(c) = &spec.controller {
+        if c.image.as_ref().is_some_and(|i| i.winrm.is_some()) {
+            add("controller.image.winrm", "the controller is a Linux VM: no WinRM".into());
+        }
+        if let Some(r) = &c.resources {
+            if r.memory_mb.is_some_and(|m| m < 256) {
+                add("controller.resources.memory_mb", "at least 256 MB (Ansible and Python)".into());
+            }
+            if r.cpus == Some(0) {
+                add("controller.resources.cpus", "at least 1".into());
+            }
+        }
+    }
+
     // Environment-level provisioning: its groups name machines that have a VM form.
     for (i, step) in spec.provision.iter().enumerate() {
         if !(step.ansible.ends_with(".yml") || step.ansible.ends_with(".yaml")) {

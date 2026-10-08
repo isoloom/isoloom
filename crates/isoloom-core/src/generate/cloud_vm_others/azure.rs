@@ -420,9 +420,10 @@ fn controller(spec: &Spec, tf: &mut String) {
         .collect::<Vec<_>>()
         .join(", ");
     let (publisher, offer, sku) = azure_image(CONTROLLER_OS).expect("controller image");
+    let ctl_size = azure_size(crate::generate::controller_size(spec).1);
     let _ = writeln!(
         tf,
-        "\nresource \"azurerm_linux_virtual_machine\" \"isoloom_controller\" {{\n  name                  = \"${{local.name}}-controller\"\n  resource_group_name   = azurerm_resource_group.env.name\n  location              = var.region\n  size                  = \"Standard_B1ms\"\n  admin_username        = \"{USER}\"\n  network_interface_ids = [{nic_ids}]\n  custom_data           = var.auto_stop_minutes > 0 ? base64encode(\"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\") : null\n  admin_ssh_key {{\n    username   = \"{USER}\"\n    public_key = var.ssh_public_key\n  }}\n  os_disk {{\n    caching              = \"ReadWrite\"\n    storage_account_type = \"StandardSSD_LRS\"\n    disk_size_gb         = 30\n  }}\n  source_image_reference {{\n    publisher = \"{publisher}\"\n    offer     = \"{offer}\"\n    sku       = \"{sku}\"\n    version   = \"latest\"\n  }}\n  tags = local.tags\n}}"
+        "\nresource \"azurerm_linux_virtual_machine\" \"isoloom_controller\" {{\n  name                  = \"${{local.name}}-controller\"\n  resource_group_name   = azurerm_resource_group.env.name\n  location              = var.region\n  size                  = \"{ctl_size}\"\n  admin_username        = \"{USER}\"\n  network_interface_ids = [{nic_ids}]\n  custom_data           = var.auto_stop_minutes > 0 ? base64encode(\"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\") : null\n  admin_ssh_key {{\n    username   = \"{USER}\"\n    public_key = var.ssh_public_key\n  }}\n  os_disk {{\n    caching              = \"ReadWrite\"\n    storage_account_type = \"StandardSSD_LRS\"\n    disk_size_gb         = 30\n  }}\n  source_image_reference {{\n    publisher = \"{publisher}\"\n    offer     = \"{offer}\"\n    sku       = \"{sku}\"\n    version   = \"latest\"\n  }}\n  tags = local.tags\n}}"
     );
 
     // Its set-up: interfaces, names, the project, its key, Ansible, the inventory, the playbooks.

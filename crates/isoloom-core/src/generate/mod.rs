@@ -30,6 +30,29 @@ use crate::targets::effective;
 use crate::validate::Cidr;
 
 /// The name of the router Isoloom adds (a Compose service, a VM) when `reach` rules need one.
+/// The controller's Vagrant box by default: Alpine, about 100 MB (Python, ansible-core and
+/// pywinrm run fine on it), for VirtualBox, libvirt, VMware and Parallels alike.
+pub(crate) const CONTROLLER_BOX: &str = "generic/alpine319";
+
+/// The controller's box: `controller.image.vagrant`, else [`CONTROLLER_BOX`].
+pub(crate) fn controller_box(spec: &Spec) -> (&str, Option<&str>) {
+    let image = spec.controller.as_ref().and_then(|c| c.image.as_ref());
+    match image.and_then(|i| i.vagrant.as_deref()) {
+        Some(b) => (b, image.and_then(|i| i.vagrant_version.as_deref())),
+        None => (CONTROLLER_BOX, None),
+    }
+}
+
+/// The controller's (CPUs, memory in MB, disk in GB if set): 1 CPU and 512 MB by default.
+pub(crate) fn controller_size(spec: &Spec) -> (u32, u32, Option<u32>) {
+    let r = spec.controller.as_ref().and_then(|c| c.resources.as_ref());
+    (
+        r.and_then(|r| r.cpus).unwrap_or(1),
+        r.and_then(|r| r.memory_mb).unwrap_or(512),
+        r.and_then(|r| r.disk_gb),
+    )
+}
+
 pub fn router_name() -> &'static str {
     router::NAME
 }
