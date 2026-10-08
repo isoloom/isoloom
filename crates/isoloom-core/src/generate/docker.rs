@@ -340,10 +340,14 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                 // Ephemeral loopback host port by default (no collisions); ISOLOOM_PUBLISH_FIXED
                 // pins it to `publish` inside the docker-vm/cloud VMs that forward it.
                 svc.publish.map(|p| {
-                    s(format!(
-                        "${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{ISOLOOM_PUBLISH_FIXED:+{p}}}:{port}",
-                        port = svc.port
-                    ))
+                    if svc.fixed {
+                        s(format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{p}:{port}", port = svc.port))
+                    } else {
+                        s(format!(
+                            "${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{ISOLOOM_PUBLISH_FIXED:+{p}}}:{port}",
+                            port = svc.port
+                        ))
+                    }
                 })
             })
             .collect();

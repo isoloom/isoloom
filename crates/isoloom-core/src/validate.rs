@@ -351,6 +351,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                         add(&format!("{at}.services[{i}].publish"), format!("port {p} is already published by `{other}`"));
                     }
                 }
+                None if s.fixed => add(&format!("{at}.services[{i}].fixed"), "`fixed` keeps the `publish` port: give one".into()),
                 None => {}
             }
         }

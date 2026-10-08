@@ -65,7 +65,7 @@ services:
       lab:
         ipv4_address: 10.20.0.31
     ports:
-    - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+3206}:3206
+    - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:3206:3206
     healthcheck:
       test:
       - CMD

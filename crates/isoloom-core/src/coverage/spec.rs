@@ -302,6 +302,11 @@ fn base_table() -> Vec<Row> {
             done("a published port, on the host's loopback", "supplier-portal-api"),
             done("a forwarded port, on the host's loopback", "supplier-portal-api"),
         ),
+        common(
+            "machines.*.services[].fixed",
+            done("the `publish` port itself on the host, not a free one", "supplier-portal-api"),
+            done("Vagrant forwards `publish` as is", "supplier-portal-api"),
+        ),
         Row {
             path: "machines.*.services[].tls",
             outputs: all(Status::Descriptive {

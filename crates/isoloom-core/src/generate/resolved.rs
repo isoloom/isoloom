@@ -102,6 +102,9 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                     if s.tls {
                         v["tls"] = json!(true);
                     }
+                    if s.fixed {
+                        v["fixed"] = json!(true);
+                    }
                     v
                 }).collect::<Vec<_>>(),
                 "depends_on": m.depends_on,
