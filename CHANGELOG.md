@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Setup that survives a flaky connection
+- The environment's playbooks run again when a dropped connection cut them (WinRM's shell crashing mid-task, an SSH reset, a host briefly unreachable), up to 4 runs in all: the setup is idempotent, so a run picks up where the last stopped. A task that fails on its own still stops the setup at once. Under x86 emulation on an Apple Silicon Mac, Windows' PowerShell host crashes now and then (an illegal-instruction fault in .NET), which stopped GOAD-Mini's setup twice in one build.
+- Role downloads (`ansible-galaxy install`, from GitHub) are tried 5 times with a growing pause (`ISOLOOM_RETRY_PAUSE`, 15 s by default).
+
 ### x86 machines on an Apple Silicon Mac, with QEMU
 - On Vagrant's QEMU provider (vagrant-qemu), each machine runs with its own CPU (`v.arch` from `arch`), emulated when the host's is another: an x86 Windows DC boots on an Apple Silicon Mac, slowly, so emulated machines get an hour to boot and a longer WinRM budget. A QEMU box can be given per image (`vm.image.qemu`, libvirt format); `windows-server-2019` and `debian-12` have one built in, and Isoloom's own VMs (controller, router, tool shell) use `cloud-image/debian-12` there.
 - Machines start one at a time, in dependency order, on every provider (`VAGRANT_NO_PARALLEL` in the Vagrantfile): QEMU and libvirt declare themselves parallel, so the controller ran its play before the machines were up.
