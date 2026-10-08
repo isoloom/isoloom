@@ -106,7 +106,8 @@ kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | k
 
 Checks come in three kinds, and `isoloom test` runs them all from inside the environment:
 **derived** from the spec (every service answers from the machines `reach` lets through and from
-nowhere else; offline networks stay offline), **declared** (`http`, `tcp`, `exec`, with `from`,
+nowhere else; offline networks stay offline; without a Linux machine to run them, every service
+answers from the controller), **declared** (`http`, `tcp`, `exec`, with `from`,
 `expect` and `wait`), and **scripts**.
 
 ## Layout

@@ -66,6 +66,94 @@ fn windows_machines_are_not_vantage_points() {
     assert!(derived.iter().all(|c| c.position != Position::Machine("ws-01".into())));
     // The access machine (no implementation) still is: the runner supplies it.
     assert!(!names(&derived, "user").is_empty());
+    // A machine can run them, so nothing stands on the networks instead.
+    assert!(derived.iter().all(|c| c.position != Position::Networks));
+}
+
+/// Windows only: a domain controller on two networks and a workstation, no `checks:` of their
+/// own.
+const WINDOWS_ONLY: &str = "version: 1\nname: win\nnetworks:\n  corp: { cidr: 10.9.0.0/24 }\n  vault: { cidr: 10.9.1.0/24 }\nmachines:\n  dc: { networks: { corp: 10, vault: 10 }, services: [{ port: 389 }], vm: { os: windows-server-2022, provision: [p.ps1] } }\n  ws: { networks: { corp: 20 }, services: [{ port: 443, http: true, tls: true }], vm: { os: windows-server-2025, provision: [p.ps1] } }\n";
+
+#[test]
+fn without_a_machine_to_run_them_derived_checks_stand_on_the_networks() {
+    // With an offline network too: nothing stands there to say the internet doesn't answer.
+    let spec = parse(&WINDOWS_ONLY.replace("10.9.1.0/24 }", "10.9.1.0/24, internet: false }")).unwrap();
+    assert_eq!(validate(&spec), vec![]);
+    let derived = checks::derived(&spec);
+    // Every service at each of its addresses; nothing blocked or offline to assert from there.
+    let names: Vec<&str> = derived.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "dc:389 on corp from the networks",
+            "dc:389 on vault from the networks",
+            "ws:443 from the networks"
+        ]
+    );
+    assert!(derived.iter().all(|c| c.derived && c.position == Position::Networks && c.wait == 30));
+    assert!(
+        matches!(&derived[1].probe, Probe::Tcp { host: checks::Host::Machine { name, network }, port: 389, expect: TcpExpect::Open } if name == "dc" && network == "vault")
+    );
+    assert!(matches!(&derived[2].probe, Probe::Http { url, expect: HttpExpect::Any, .. } if url.https));
+
+    // windows-hello: its page, besides the author's script.
+    let plan = checks::plan(&example("windows-hello"));
+    let derived: Vec<&str> = plan.iter().filter(|c| c.derived).map(|c| c.name.as_str()).collect();
+    assert_eq!(derived, ["web01:80 from the networks"]);
+}
+
+#[test]
+fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() {
+    use isoloom_core::{Target, generate};
+    let spec = parse(WINDOWS_ONLY).unwrap();
+    let file = |files: &[isoloom_core::GeneratedFile], path: &str| files.iter().find(|f| f.path == path).map(|f| f.contents.clone());
+
+    // Vagrant: a controller VM with the runner (there was none: no playbooks, no checks).
+    let files = generate(&spec, Target::Vagrant).unwrap();
+    let vf = file(&files, ".isoloom/vagrant/Vagrantfile").unwrap();
+    assert!(vf.contains("config.vm.define \"isoloom-controller\""));
+    assert!(vf.contains("checks/controller.sh"));
+    let runner = file(&files, ".isoloom/vagrant/checks/controller.sh").expect("the controller's runner");
+    assert!(runner.contains("_retry 30 _tcp '10.9.1.10' 389"), "{runner}");
+    assert!(runner.contains("_http_any 'https://10.9.0.20:443/'"), "{runner}");
+
+    // AWS and Azure (a Windows machine on one network there): a controller, and the runner on it.
+    let one_net = parse(&WINDOWS_ONLY.replace("corp: 10, vault: 10", "vault: 10")).unwrap();
+    let files = generate(&one_net, Target::CloudVm).unwrap();
+    let runner = file(&files, ".isoloom/cloud-vm/checks/networks.sh").expect("the networks' runner");
+    assert!(runner.contains("_retry 30 _tcp '10.9.1.10' 389"), "{runner}");
+    for (cloud, host) in [
+        ("aws", "aws_eip.isoloom_controller.public_ip"),
+        ("azure", "azurerm_public_ip.isoloom_controller.ip_address"),
+    ] {
+        let tf = file(&files, &format!(".isoloom/cloud-vm/{cloud}/main.tf")).unwrap();
+        assert!(tf.contains("isoloom_controller"), "{cloud}");
+        assert!(
+            tf.contains(&format!("{{ position = \"networks\", machine = \"controller\", host = {host}")),
+            "{cloud}: {tf}"
+        );
+    }
+}
+
+#[test]
+fn hybrid_checks_from_the_controller_when_only_containers_could() {
+    use isoloom_core::{Target, generate};
+    let runner = |spec: &isoloom_core::Spec, dir: &str, target| {
+        generate(spec, target)
+            .unwrap()
+            .into_iter()
+            .find(|f| f.path == format!(".isoloom/{dir}/checks/controller.sh"))
+            .map(|f| f.contents)
+    };
+    // mixed-office: a Windows VM and a Linux container. The container's derived checks don't run
+    // on hybrid (the checks run from the VM side), so the controller checks both services.
+    let spec = example("mixed-office");
+    let hybrid = runner(&spec, "hybrid", Target::Hybrid).expect("the controller's runner");
+    assert!(hybrid.contains("pass 'files01:445 from the networks'"), "{hybrid}");
+    assert!(hybrid.contains("pass 'intranet:80 from the networks'"), "{hybrid}");
+    // On Vagrant the intranet is a Linux VM and runs them: nothing changes there.
+    let vagrant = runner(&spec, "vagrant", Target::Vagrant).expect("the controller's runner");
+    assert!(!vagrant.contains("from the networks"), "{vagrant}");
 }
 
 const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, services: [{ port: 80, http: true }], docker: { image: nginx } }\n  user: { access: true, networks: { lab: 20 } }\n";
