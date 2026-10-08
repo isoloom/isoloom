@@ -547,7 +547,7 @@ pub enum Check {
     /// when the behavior holds), or an Ansible playbook (`.yml`) run from the controller.
     Script(String),
     /// A probe Isoloom runs itself, from a machine of the environment.
-    Declared(Declared),
+    Declared(Box<Declared>),
 }
 
 impl Check {
@@ -579,7 +579,7 @@ impl<'de> Deserialize<'de> for Check {
                 Ok(Check::Script(v.to_string()))
             }
             fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<Check, A::Error> {
-                Declared::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(Check::Declared)
+                Declared::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(|d| Check::Declared(Box::new(d)))
             }
         }
         d.deserialize_any(V)
@@ -602,6 +602,18 @@ pub struct Declared {
     /// of any status), or `blocked` (nothing answers).
     #[serde(default)]
     pub http: Option<String>,
+    /// With `http`: the request method (default GET).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
+    /// With `http`: request headers.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub headers: IndexMap<String, String>,
+    /// With `http`: the request body, sent as is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    /// With `http`: text the response body must contain.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contains: Option<String>,
     /// A TCP connection to `host:port`. `expect`: `open` (default) or `blocked`.
     #[serde(default)]
     pub tcp: Option<String>,
