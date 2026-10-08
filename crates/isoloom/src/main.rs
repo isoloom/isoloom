@@ -171,6 +171,27 @@ enum Command {
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
     },
+    /// Run the environment's provisioning again on a running environment, in place: after a
+    /// step failed or was interrupted (a host that stopped answering), without a rebuild. With
+    /// `provision:` steps, the controller runs them again (booted if halted, halted after),
+    /// limited to the named machines; without, the named machines' own `vm.provision` steps run
+    /// again. Steps are meant to be idempotent. Local VMs (vagrant, docker-vm, hybrid) for now.
+    Provision {
+        /// Only these machines (all when none).
+        machines: Vec<String>,
+        /// The target the environment is running on (as for `run`).
+        #[arg(long)]
+        target: Option<String>,
+        /// The project folder (holding isoloom.yml).
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
+        /// As instance N of the spec (as for `run`).
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
+        /// Override a value for this command (as for `run`). Repeatable.
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
+    },
     /// The environments `run` brought up on this host, with their live state.
     Status {
         /// Machine-readable output.
@@ -719,6 +740,13 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 sets: &sets,
             },
         ),
+        Command::Provision {
+            machines,
+            target,
+            dir,
+            instance,
+            sets,
+        } => provision_cmd(&dir, target.as_deref(), &machines, instance, &sets),
         Command::Status { json, cleanup } => lifecycle::status(json, cleanup.as_deref(), None),
         Command::Connect {
             machine,
@@ -1689,6 +1717,71 @@ fn terraform_output(module: &std::path::Path) -> Result<serde_json::Value, Box<d
 }
 
 /// `kubectl kustomize` of a folder, as text.
+/// `isoloom provision`: the environment's provisioning again, in place (see the command's help).
+fn provision_cmd(
+    dir: &std::path::Path,
+    target: Option<&str>,
+    machines: &[String],
+    instance: Option<u8>,
+    sets: &[String],
+) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let (spec, dir, t, _) = prepare(dir, target, None, instance, sets)?;
+    if let Some(m) = machines.iter().find(|m| !spec.machines.contains_key(*m)) {
+        return Err(format!("no machine named `{m}` in the spec").into());
+    }
+    let sub = match t {
+        core::Target::Vagrant => "vagrant",
+        core::Target::DockerVm => "docker-vm",
+        core::Target::Hybrid => "hybrid",
+        other => {
+            return Err(format!(
+                "`isoloom provision` runs on local VMs (vagrant, docker-vm, hybrid) for now, not `{}`",
+                other.id()
+            )
+            .into());
+        }
+    };
+    let out = dir.join(core::instance::output_dir(instance));
+    let wd = out.join(sub);
+    if !wd.join(".vagrant").is_dir() {
+        return Err(format!("nothing runs here yet: `isoloom run {}` first", t.id()).into());
+    }
+    let vagrant = |args: &[&str]| -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(std::process::Command::new("vagrant").args(args).current_dir(&wd).status()?.success())
+    };
+    if spec.provision.is_empty() {
+        // No controller steps: each machine's own, again.
+        let mut args = vec!["provision"];
+        args.extend(machines.iter().map(String::as_str));
+        return Ok(if vagrant(&args)? { ExitCode::SUCCESS } else { ExitCode::FAILURE });
+    }
+    let _rehalt = wake_controller(&out, t, false)?;
+    // The project's current files (playbooks edited since), then the playbooks.
+    if !vagrant(&["provision", CONTROLLER, "--provision-with", "file,project"])? {
+        return Err("couldn't copy the project to the controller".into());
+    }
+    println!(
+        "provisioning {} from the controller",
+        if machines.is_empty() {
+            "every machine".to_string()
+        } else {
+            machines.join(", ")
+        }
+    );
+    // The script on stdin: no quoting through the host's shell, whatever the host.
+    let mut child = std::process::Command::new("vagrant")
+        .args(["ssh", CONTROLLER, "-c", "sudo sh -s"])
+        .current_dir(&wd)
+        .stdin(std::process::Stdio::piped())
+        .spawn()?;
+    {
+        use std::io::Write;
+        let mut stdin = child.stdin.take().expect("piped");
+        stdin.write_all(core::generate::provision_script(&spec, machines).as_bytes())?;
+    }
+    Ok(if child.wait()?.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+}
+
 /// Halts the controller again when dropped (it was booted for the checks).
 struct Rehalt(PathBuf);
 
@@ -1984,5 +2077,30 @@ mod controller_tests {
         let down = "1700000000,isoloom-controller,state,shutoff\n1700000000,web,state,running\n";
         assert!(super::controller_running(up));
         assert!(!super::controller_running(down));
+    }
+}
+
+#[cfg(test)]
+mod provision_tests {
+    fn example() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ansible-pair")
+    }
+
+    #[test]
+    fn provision_names_machines_of_the_spec() {
+        let e = super::provision_cmd(&example(), Some("vagrant"), &["ghost".into()], None, &[]).unwrap_err();
+        assert!(e.to_string().contains("no machine named `ghost`"), "{e}");
+    }
+
+    #[test]
+    fn provision_runs_on_local_vms_for_now() {
+        let e = super::provision_cmd(&example(), Some("proxmox"), &[], None, &[]).unwrap_err();
+        assert!(e.to_string().contains("local VMs"), "{e}");
+    }
+
+    #[test]
+    fn provision_needs_a_running_environment() {
+        let e = super::provision_cmd(&example(), Some("vagrant"), &["web".into()], None, &[]).unwrap_err();
+        assert!(e.to_string().contains("isoloom run vagrant"), "{e}");
     }
 }

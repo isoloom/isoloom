@@ -778,7 +778,7 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
         "    m.vm.provision \"shell\", name: \"controller\", inline: <<~'SH'\n{}    SH",
         indent(&script, 6)
     );
-    let script = ansible_runs(spec);
+    let script = ansible_runs(spec, &[]);
     if !spec.provision.is_empty() {
         let _ = writeln!(
             out,
@@ -875,7 +875,14 @@ fn inventory(spec: &Spec) -> String {
 /// The controller's script running the environment's playbooks (`provision:`), in order, with
 /// the inventory at /etc/isoloom/inventory.ini plus each step's own files. Shared with the
 /// cloud output.
-pub(super) fn ansible_runs(spec: &Spec) -> String {
+///
+/// `limit`: only these machines (`isoloom provision web`); every machine when empty.
+pub(super) fn ansible_runs(spec: &Spec, limit: &[String]) -> String {
+    let limit = if limit.is_empty() {
+        String::new()
+    } else {
+        format!(" --limit {}", shell_quote(&limit.join(",")))
+    };
     // Performance: gather facts once and cache them (the WinRM `setup` module is slow and the
     // environment playbooks re-run across many imported plays), fan out across hosts (default
     // forks is 5, too few for a multi-DC range), and pipeline SSH steps (a no-op over WinRM).
@@ -899,7 +906,7 @@ pub(super) fn ansible_runs(spec: &Spec) -> String {
             None => "[ ! -f requirements.yml ] || ansible-galaxy install -r requirements.yml\n".into(),
         };
         script.push_str(&format!(
-            "cd /opt/isoloom/{dir}\n{requirements}ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars} {file}\n"
+            "cd /opt/isoloom/{dir}\n{requirements}ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars}{limit} {file}\n"
         ));
     }
     script

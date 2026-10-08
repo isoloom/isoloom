@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `isoloom provision`
+- `isoloom provision [machine...] [--target t]`: the environment's provisioning again, on a running environment, in place, for a step that failed or was interrupted (a host that stopped answering) without an hour of rebuild. With `provision:` steps, the controller (booted if halted, halted again after) gets the project's current files and runs the playbooks again, limited to the named machines (`--limit`); without, the named machines' own `vm.provision` steps run again (`vagrant provision`). Steps are meant to be idempotent. Local VMs (vagrant, docker-vm, hybrid) for now.
+
 ### The controller halts after provisioning
 - On local VMs (Vagrant, and the Docker-on-a-VM and hybrid outputs), the controller halts once its provisioning is done, keeping its disk: it no longer holds memory for the life of the environment. `isoloom test` boots it for the checks (waiting out a halt that's just starting) and halts it again. `controller: { keep_running: true }` keeps it up, as a jump host. Proxmox and the clouds keep it running for now.
 - Roles: in the resolved snapshot, each machine has `role: target` and the controller `role: infra` (with `keep_running`). `isoloom status` counts the spec's machines only on Vagrant outputs: a halted controller (or Isoloom's router and tools) never reads as a machine down.

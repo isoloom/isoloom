@@ -714,7 +714,7 @@ fn controller(spec: &Spec, tf: &mut String, lab: &str) {
         "printf '%s' {} | sudo tee /etc/isoloom/inventory.ini >/dev/null",
         sh_quote(&inventory(spec))
     ));
-    cmds.push(format!("sudo sh -c {}", sh_quote(&super::vagrant::ansible_runs(spec))));
+    cmds.push(format!("sudo sh -c {}", sh_quote(&super::vagrant::ansible_runs(spec, &[]))));
     cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
     let deps: Vec<String> = spec
         .machines
