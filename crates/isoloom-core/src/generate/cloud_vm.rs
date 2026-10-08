@@ -8,7 +8,8 @@
 //! - Each machine is an instance at its address, set up over SSH from where Terraform runs: the
 //!   project copied to /opt/isoloom, other machines' names, volumes, waits for `depends_on`,
 //!   then its steps. Offline machines stop reaching outside the environment once provisioned,
-//!   as on local VMs.
+//!   as on local VMs. A `reboot` step restarts the instance between two `remote-exec`
+//!   provisioners (see `remote_exec`).
 //! - Published services: open to `allowed_cidr` on the instance's public address.
 //! - Checks: run on demand over SSH from the access machine (else the first), where a user
 //!   stands: the `checks` output gives the machine and the commands.
@@ -25,7 +26,7 @@ use std::fmt::Write;
 
 use super::proxmox::{hcl, res};
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, header, router, start_order};
-use crate::model::{Spec, Target};
+use crate::model::{Spec, Target, is_reboot};
 use crate::validate::Cidr;
 
 const DIR: &str = "cloud-vm";
@@ -463,11 +464,7 @@ resource "aws_vpc" "env" {{
                 lines.join(", ")
             );
         }
-        let _ = write!(
-            prov,
-            "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
-            cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
-        );
+        prov.push_str(&remote_exec(&cmds));
         if !deps.is_empty() {
             let _ = writeln!(prov, "  depends_on = [{}]", deps.join(", "));
         }
@@ -570,16 +567,18 @@ pub(super) fn linux_setup_cmds(
             tf_expr("trimspace(tls_private_key.controller.public_key_openssh)")
         ));
     }
-    // Its other interfaces, found by MAC address, at their addresses.
+    // Its other interfaces, found by MAC address, at their addresses (again after a reboot).
+    let mut interfaces: Vec<String> = Vec::new();
     for (n, o) in m.networks.iter().skip(1) {
         let c = cidr(spec, n);
-        cmds.push(format!(
+        interfaces.push(format!(
             "IF=$(ip -o link | grep -i \"{mac}\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")",
             mac = mac_expr(&res(n)),
             a = address(spec, n, *o),
             len = c.len,
         ));
     }
+    cmds.extend(interfaces.iter().cloned());
     // The others by name, at their address on a network both are on (else their first).
     let hosts: Vec<String> = spec
         .machines
@@ -602,13 +601,30 @@ pub(super) fn linux_setup_cmds(
             cmds.push(format!("sh -c {}", sh_quote(&router::wait_for(dep, &ports, 900))));
         }
     }
-    let env = if m.inputs.is_empty() {
-        ""
-    } else {
-        "set -a; . /tmp/isoloom-inputs.env; set +a; "
+    // The inputs, uploaded to /tmp: kept out of it when a reboot comes (/tmp is emptied at boot).
+    let reboots = vm.provision.iter().any(|s| is_reboot(s));
+    let env = match (m.inputs.is_empty(), reboots) {
+        (true, _) => "",
+        (false, false) => "set -a; . /tmp/isoloom-inputs.env; set +a; ",
+        (false, true) => {
+            cmds.push("sudo mkdir -p /var/lib/isoloom && sudo install -m 600 /tmp/isoloom-inputs.env /var/lib/isoloom/inputs.env".into());
+            "set -a; . /var/lib/isoloom/inputs.env; set +a; "
+        }
     };
     for step in &vm.provision {
-        if step.ends_with(".sh") {
+        if is_reboot(step) {
+            // The provisioner ends here; the machine restarts (see `remote_exec`) and the next
+            // one goes on once it's back, its interfaces up again.
+            cmds.push(format!("sudo mkdir -p /var/lib/isoloom && sudo cp {BOOT_ID} /var/lib/isoloom/boot-id"));
+            cmds.push(REBOOT_MARK.into());
+            cmds.push("set -e".into());
+            cmds.push(format!(
+                "if [ \"$(cat {BOOT_ID})\" = \"$(cat /var/lib/isoloom/boot-id)\" ]; then echo 'the reboot step: the machine did not restart' >&2; exit 1; fi"
+            ));
+            // The auto-stop scheduled at first boot didn't survive the restart: again, from now.
+            cmds.push(tf_expr("var.auto_stop_minutes > 0 ? \"sudo shutdown -h +${var.auto_stop_minutes}\" : \"true\""));
+            cmds.extend(interfaces.iter().cloned());
+        } else if step.ends_with(".sh") {
             cmds.push(format!("cd /opt/isoloom && sudo -E sh -c {}", sh_quote(&format!("{env}sh {step}"))));
         } else {
             cmds.push("command -v ansible-playbook >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)".into());
@@ -634,6 +650,33 @@ pub(super) fn linux_setup_cmds(
     }
     cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
     cmds
+}
+
+/// This boot's id: it changes at each boot.
+const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
+
+/// Where a `reboot` step ends a machine's set-up commands (see [`remote_exec`]).
+pub(super) const REBOOT_MARK: &str = "\u{3}reboot";
+
+/// A machine's set-up commands as `remote-exec` provisioners: one, or one per part between its
+/// `reboot` steps. Between two parts, a provisioner restarts the machine. New SSH connections
+/// are refused first (logins closed with `/run/nologin`, gone at boot, and the SSH listener
+/// stopped; the open session stays), so Terraform's next connection waits for the machine to
+/// be back rather than reaching it on its way down. The dropped connection is expected
+/// (`on_failure = continue`); the next part checks the boot changed.
+pub(super) fn remote_exec(cmds: &[String]) -> String {
+    let mut out = String::new();
+    for (i, part) in cmds.split(|c| c == REBOOT_MARK).enumerate() {
+        if i > 0 {
+            out.push_str("  # The reboot step: the connection drops as the machine goes down.\n  provisioner \"remote-exec\" {\n    inline     = [\"sudo touch /run/nologin\", \"sudo systemctl stop ssh.socket ssh.service sshd.service 2>/dev/null || true\", \"sudo systemctl --no-block reboot\", \"sleep 600\"]\n    on_failure = continue\n  }\n");
+        }
+        let _ = write!(
+            out,
+            "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
+            part.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
+        );
+    }
+    out
 }
 
 /// The controller: a Debian instance with an interface on every network at the controller

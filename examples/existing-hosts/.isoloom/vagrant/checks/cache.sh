@@ -43,6 +43,8 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 # _retry SECONDS COMMAND... -> keeps trying every 2s until it passes or the time is up.
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
+if _retry 0 _exec 'cat /sys/kernel/mm/transparent_hugepage/enabled' '[never]'; then pass 'the cache came back with transparent hugepages off'; else fail 'the cache came back with transparent hugepages off' "$(printf '%s' "$out" | tail -n 1)"; fi
+
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 if _retry 30 _http_any 'http://192.168.1.20:80/'; then pass 'web:80 from cache'; else fail 'web:80 from cache' "nothing answers at http://192.168.1.20:80/"; fi
 fi

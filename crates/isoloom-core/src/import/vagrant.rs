@@ -236,22 +236,37 @@ pub fn draft(recorded: &Value, fallback_name: &str, source: &str) -> Result<Draf
                         );
                     }
                 }
-                ("provision", "shell") => match (text(opt("path")), opt("inline")) {
-                    (Some(path), _) if path.ends_with(".sh") || path.ends_with(".ps1") => m.provision.push(path.trim_start_matches("./").into()),
-                    (Some(path), _) => note(
-                        &mut notes,
-                        format!("{at}.vm.provision"),
-                        NoteKind::Changed,
-                        format!("`{path}`: steps are .sh (Linux) or .ps1 (Windows) files"),
-                    ),
-                    (None, Some(_)) => note(
-                        &mut notes,
-                        format!("{at}.vm.provision"),
-                        NoteKind::InImage,
-                        "an inline script: put it in a file and list it in `vm.provision`".into(),
-                    ),
-                    _ => {}
-                },
+                ("provision", "shell") => {
+                    match (text(opt("path")), opt("inline")) {
+                        (Some(path), _) if path.ends_with(".sh") || path.ends_with(".ps1") => m.provision.push(path.trim_start_matches("./").into()),
+                        (Some(path), _) => note(
+                            &mut notes,
+                            format!("{at}.vm.provision"),
+                            NoteKind::Changed,
+                            format!("`{path}`: steps are .sh (Linux) or .ps1 (Windows) files"),
+                        ),
+                        (None, Some(_)) => note(
+                            &mut notes,
+                            format!("{at}.vm.provision"),
+                            NoteKind::InImage,
+                            "an inline script: put it in a file and list it in `vm.provision`".into(),
+                        ),
+                        _ => {}
+                    }
+                    // `reboot: true`: Vagrant restarts the guest after the script (if any).
+                    if opt("reboot").and_then(Value::as_bool) == Some(true) {
+                        if crate::images::is_windows(&m.os) {
+                            note(
+                                &mut notes,
+                                format!("{at}.vm.provision"),
+                                NoteKind::Changed,
+                                "`reboot: true` on Windows: restart it from the environment's playbooks (`ansible.windows.win_reboot`)".into(),
+                            );
+                        } else {
+                            m.provision.push(crate::model::REBOOT_STEP.into());
+                        }
+                    }
+                }
                 ("provision", "ansible_local") => match text(opt("playbook")) {
                     Some(p) => m.provision.push(p.trim_start_matches("./").into()),
                     None => note(

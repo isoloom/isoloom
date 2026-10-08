@@ -151,6 +151,14 @@
         "runner": "isoloom-check-cache",
         "checks": [
           {
+            "name": "the cache came back with transparent hugepages off",
+            "derived": false,
+            "kind": "exec",
+            "target": "cat /sys/kernel/mm/transparent_hugepage/enabled",
+            "expect": "[never]",
+            "wait": 0
+          },
+          {
             "name": "web:80 from cache",
             "derived": true,
             "kind": "http",

@@ -239,7 +239,7 @@ when a table disagrees with what Isoloom really generates.
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `shell` | Yes | Yes | From `machines.*.vm.provision` (.sh), and Isoloom's own steps |
+| `shell` | Yes | Yes | From `machines.*.vm.provision` (.sh, `reboot`), and Isoloom's own steps |
 | `file` | Yes | Yes | The project, copied into each VM |
 | `ansible_local` | Yes | Yes | From `machines.*.vm.provision` (.yml, .yaml) |
 | `ansible` | Yes | Another way | Via ansible_local: the same playbooks, run inside the VM |

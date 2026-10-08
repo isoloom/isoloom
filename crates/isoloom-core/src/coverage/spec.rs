@@ -152,7 +152,13 @@ pub fn table() -> Vec<Row> {
                 proof: "segmented",
             },
         ),
-        ("machines.*.vm.provision", done("cloud-init writes the project and runs the steps", "segmented")),
+        (
+            "machines.*.vm.provision",
+            done(
+                "cloud-init writes the project and runs the steps; after a `reboot`, a unit runs the rest at the next boot",
+                "existing-hosts",
+            ),
+        ),
         ("machines.*.volumes", done("the VM's own disk keeps the data; the path is created", "segmented")),
     ];
     for (path, status) in proxmox {
@@ -480,7 +486,13 @@ fn base_table() -> Vec<Row> {
                 "windows-hello",
             ),
         ),
-        vm_field("machines.*.vm.provision", done("`.sh` steps, and Ansible run inside the VM", "hello-stack")),
+        vm_field(
+            "machines.*.vm.provision",
+            done(
+                "`.sh` steps, Ansible run inside the VM, and `reboot` (Vagrant restarts the VM)",
+                "existing-hosts",
+            ),
+        ),
         common(
             "provision[].ansible",
             planned("environment-level provisioning on containers (a controller container)"),

@@ -8,7 +8,9 @@
 //! - Each machine is a VM from a cloud image, with its fixed address on each network and the
 //!   router as its gateway. cloud-init writes the project to /opt/isoloom, then runs the
 //!   machine's steps: other machines' names, its volumes, waiting for its dependencies, its
-//!   provisioning, and, offline, a block on new connections leaving the environment.
+//!   provisioning, and, offline, a block on new connections leaving the environment. After a
+//!   `reboot` step, cloud-init restarts the machine (`power_state`) and a unit runs the rest at
+//!   the next boot (see `reboot_files`).
 //! - The connection, the node, the datastores and a `slot` (unique per environment on the
 //!   server: SDN ids are short) are variables.
 //! - Machines are reached through the router (`ssh -J isoloom@<address>`, the `isoloom` user
@@ -21,7 +23,7 @@ use std::fmt::Write;
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, header, router, start_order, trunks};
 use crate::checks::{self, Position, Probe};
 use crate::images;
-use crate::model::{Spec, Target};
+use crate::model::{Spec, Target, is_reboot};
 use crate::validate::Cidr;
 
 const DIR: &str = "proxmox";
@@ -364,7 +366,12 @@ locals {
         let mut runcmd: Vec<String> = Vec::new();
         // Its 802.1Q trunks, in the VM (see `trunks`; Proxmox's bridges learn the trunk's MAC).
         let vm_trunks = trunks::vm_trunks(spec);
-        runcmd.extend(trunks::of(&vm_trunks, name).flat_map(|t| trunks::vm_commands(spec, t, |n, o| address(spec, n, o))));
+        let trunk_cmds: Vec<String> = trunks::of(&vm_trunks, name)
+            .flat_map(|t| trunks::vm_commands(spec, t, |n, o| address(spec, n, o)))
+            .collect();
+        runcmd.extend(trunk_cmds.iter().cloned());
+        // The commands after each `reboot` step: run by a unit at the next boot (see `reboot_files`).
+        let mut after_reboots: Vec<Vec<String>> = Vec::new();
         let hosts: Vec<String> = spec
             .machines
             .keys()
@@ -391,26 +398,38 @@ locals {
         };
         let mut ansible = false;
         for step in &vm.provision {
+            if is_reboot(step) {
+                // The trunks are rebuilt at each boot, before the next steps.
+                after_reboots.push(trunk_cmds.clone());
+                continue;
+            }
+            let cmds = after_reboots.last_mut().unwrap_or(&mut runcmd);
             if step.ends_with(".sh") {
-                runcmd.push(format!("cd /opt/isoloom && {env}sh {step}"));
+                cmds.push(format!("cd /opt/isoloom && {env}sh {step}"));
             } else {
                 if !ansible {
-                    runcmd.push(
+                    cmds.push(
                         "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)"
                             .into(),
                     );
                     ansible = true;
                 }
-                runcmd.push(format!("cd /opt/isoloom && {env}ansible-playbook -c local -i localhost, {step}"));
+                cmds.push(format!("cd /opt/isoloom && {env}ansible-playbook -c local -i localhost, {step}"));
             }
         }
+        if !after_reboots.is_empty() {
+            runcmd.push(format!(
+                "mkdir -p {REBOOT_DIR} && echo 1 > {REBOOT_DIR}/next-boot && systemctl enable isoloom-steps.service"
+            ));
+        }
+        let cmds = after_reboots.last_mut().unwrap_or(&mut runcmd);
         // Offline: no new connections leaving the environment, once provisioned.
         if !m.networks.keys().any(|n| spec.networks[n].internet) {
-            runcmd.push(format!(
+            cmds.push(format!(
                 "printf '%s\\n' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    ip daddr != {lab} ct state new drop' '  }}' '}}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft && echo 'nft -f /etc/isoloom-egress.nft' > /etc/rc.local && chmod +x /etc/rc.local"
             ));
         }
-        runcmd.push("mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready".into());
+        cmds.push("mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready".into());
 
         let mut files = Vec::new();
         if !vm.provision.is_empty() || runs_script.contains(&name) {
@@ -422,6 +441,9 @@ locals {
                 "[{{ path = \"/etc/isoloom/inputs.env\", permissions = \"0600\", content = join(\"\\n\", [{}]) }}]",
                 lines.join(", ")
             ));
+        }
+        if !after_reboots.is_empty() {
+            files.push(reboot_files(&after_reboots));
         }
         let write_files = if files.is_empty() {
             "[]".to_string()
@@ -438,7 +460,8 @@ locals {
         let id = res(name);
         let _ = writeln!(
             tf,
-            "\n# Machine `{name}`.\nresource \"proxmox_virtual_environment_file\" \"{id}\" {{\n  node_name    = var.node\n  datastore_id = var.snippets_datastore\n  content_type = \"snippets\"\n  source_raw {{\n    file_name = \"iso${{var.slot}}-{name}.yaml\"\n    data = \"#cloud-config\\n${{yamlencode({{\n      hostname    = \"{name}\"\n      users       = local.users\n      packages    = [\"nftables\", \"curl\", \"netcat-openbsd\"]\n      write_files = {write_files}\n      runcmd = [\n        {runcmd_hcl}\n      ]\n    }})}}\"\n  }}\n}}"
+            "\n# Machine `{name}`.\nresource \"proxmox_virtual_environment_file\" \"{id}\" {{\n  node_name    = var.node\n  datastore_id = var.snippets_datastore\n  content_type = \"snippets\"\n  source_raw {{\n    file_name = \"iso${{var.slot}}-{name}.yaml\"\n    data = \"#cloud-config\\n${{yamlencode({{\n      hostname    = \"{name}\"\n      users       = local.users\n      packages    = [\"nftables\", \"curl\", \"netcat-openbsd\"]\n      write_files = {write_files}\n      runcmd = [\n        {runcmd_hcl}\n      ]{power_state}\n    }})}}\"\n  }}\n}}",
+            power_state = if after_reboots.is_empty() { "" } else { REBOOT_POWER_STATE }
         );
         let mut nics = String::new();
         let mut ipcfg = String::new();
@@ -572,6 +595,50 @@ locals {
         });
     }
     Ok(files)
+}
+
+/// Where a machine with `reboot` steps keeps its continuation: `next-boot` (the part to run at
+/// the next boot), `steps.sh` and `boot-<n>.sh`.
+const REBOOT_DIR: &str = "/var/lib/isoloom";
+
+/// cloud-init restarts the machine once it has run everything, when a `reboot` step left a part
+/// for the next boot (rebooting from `runcmd` would cut cloud-init short).
+const REBOOT_POWER_STATE: &str =
+    "\n      power_state = { mode = \"reboot\", message = \"isoloom: the reboot step\", condition = \"test -f /var/lib/isoloom/next-boot\" }";
+
+/// The files of a machine's `reboot` steps, as an HCL list for `write_files`: a unit run at
+/// each boot while `next-boot` names a part, the script it runs, and each part after a reboot
+/// (`boot-1.sh` after the first): its commands, then either the next reboot or the unit's end.
+/// A part stops at its first failing command: no ready marker then (`journalctl -u
+/// isoloom-steps` says why).
+fn reboot_files(parts: &[Vec<String>]) -> String {
+    let unit = "[Unit]\nDescription=Isoloom: the provisioning steps after a reboot\nWants=network-online.target\nAfter=network-online.target\nConditionPathExists=/var/lib/isoloom/next-boot\n\n[Service]\nType=oneshot\nExecStart=/bin/sh /var/lib/isoloom/steps.sh\nStandardOutput=journal+console\nTimeoutStartSec=0\n\n[Install]\nWantedBy=multi-user.target\n";
+    let steps = format!("#!/bin/sh\nset -e\nn=$(cat {REBOOT_DIR}/next-boot)\nrm -f {REBOOT_DIR}/next-boot\nexec sh -e {REBOOT_DIR}/boot-$n.sh\n");
+    let mut files = vec![
+        format!(
+            "{{ path = \"/etc/systemd/system/isoloom-steps.service\", permissions = \"0644\", content = {} }}",
+            hcl(unit)
+        ),
+        format!("{{ path = \"{REBOOT_DIR}/steps.sh\", permissions = \"0700\", content = {} }}", hcl(&steps)),
+    ];
+    for (i, cmds) in parts.iter().enumerate() {
+        let n = i + 1;
+        let mut script = String::from("#!/bin/sh\nset -e\n");
+        for c in cmds {
+            script.push_str(c);
+            script.push('\n');
+        }
+        if n < parts.len() {
+            let _ = writeln!(script, "echo {} > {REBOOT_DIR}/next-boot\nsystemctl --no-block reboot", n + 1);
+        } else {
+            script.push_str("systemctl disable isoloom-steps.service\n");
+        }
+        files.push(format!(
+            "{{ path = \"{REBOOT_DIR}/boot-{n}.sh\", permissions = \"0700\", content = {} }}",
+            hcl(&script)
+        ));
+    }
+    format!("[{}]", files.join(", "))
 }
 
 /// The controller: a Debian VM that runs the environment's playbooks once every machine is up,

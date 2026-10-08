@@ -5,7 +5,7 @@
 
 use std::fmt::Write;
 
-use crate::generate::cloud_vm::{aligned, hcl_cmd, linux_setup_cmds, needs_controller, redirects};
+use crate::generate::cloud_vm::{aligned, linux_setup_cmds, needs_controller, redirects, remote_exec};
 use crate::generate::proxmox::res;
 use crate::generate::{GeneratedFile, OUTPUT_DIR, address, header, start_order};
 use crate::model::Spec;
@@ -218,11 +218,7 @@ resource "linode_vpc_subnet" "env" {{
                 lines.join(", ")
             );
         }
-        let _ = write!(
-            prov,
-            "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
-            cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
-        );
+        prov.push_str(&remote_exec(&cmds));
         let _ = writeln!(prov, "  depends_on = [{}]", deps.join(", "));
         prov.push_str("}\n");
         tf.push_str(&prov);

@@ -137,7 +137,7 @@ fn core() -> Format {
         (
             "config.vm.provision shell",
             Emitted {
-                from: "machines.*.vm.provision (.sh), and Isoloom's own steps",
+                from: "machines.*.vm.provision (.sh, `reboot`), and Isoloom's own steps",
             },
         ),
         (

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### A reboot step for Linux VMs
+- `reboot` in a Linux machine's `vm.provision` (`[kernel.sh, reboot, app.sh]`) restarts it and goes on with the next step once it's back: a new kernel or a boot option takes effect before the steps that need it. Vagrant restarts the VM itself (the shell provisioner's `reboot: true`). On Proxmox, cloud-init restarts the machine once it has run the steps before it (`power_state`), and a unit runs the rest at the next boot, then writes the ready marker. On the clouds, the set-up splits into one `remote-exec` per part: between two, the instance restarts (new SSH logins closed first, so Terraform reconnects only once it's back), the next part checks the boot changed, brings extra interfaces up again and schedules the auto-stop again; inputs move from `/tmp` to `/var/lib/isoloom` first. `isoloom run external` restarts the machine over SSH and waits for a new boot id. `isoloom import vagrant` reads `reboot: true`. Windows machines are refused with the reason: they restart from the environment's playbooks (`ansible.windows.win_reboot`). Example: existing-hosts' cache turns transparent hugepages off, restarts, then installs Redis, and a check proves the option took. (#62)
+
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
 
