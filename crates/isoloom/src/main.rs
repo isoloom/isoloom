@@ -1186,6 +1186,10 @@ fn run_cmd(
     if t == core::Target::External && !down {
         lifecycle::external_up(dir, &spec, instance)?;
     }
+    // A project name a tool recorded for this environment stays with it.
+    let project = matches!(t, core::Target::Docker | core::Target::Hosted)
+        .then(|| lifecycle::compose_project(dir, instance))
+        .flatten();
     let (program, mut args, wd) = bring_up(dir, t, cloud, instance, down)?;
     // The preferred Vagrant provider, from the defaults.
     if !down
@@ -1209,6 +1213,7 @@ fn run_cmd(
                         target: t,
                         instance,
                         cloud: cloud.map(str::to_string),
+                        project: project.clone(),
                         started: core::registry::now(),
                     });
                 }
@@ -1300,19 +1305,11 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
     let mut temp: Option<PathBuf> = None;
     match t {
         core::Target::Docker | core::Target::Hosted => {
-            let f = out.join("docker/compose.yml").display().to_string();
+            let files = lifecycle::compose_files(&dir, instance);
             for (pos, _) in &groups {
-                let mut args = vec![
-                    s("compose"),
-                    s("--progress"),
-                    s("quiet"),
-                    s("-f"),
-                    f.clone(),
-                    s("--profile"),
-                    s("check"),
-                    s("run"),
-                    s("--rm"),
-                ];
+                let mut args = vec![s("compose"), s("--progress"), s("quiet")];
+                args.extend(files.iter().cloned());
+                args.extend([s("--profile"), s("check"), s("run"), s("--rm")]);
                 if no_derived {
                     args.extend([s("-e"), s("ISOLOOM_DERIVED=0")]);
                 }
@@ -1738,13 +1735,15 @@ fn bring_up(
     let out = dir.join(core::instance::output_dir(instance));
     Ok(match t {
         core::Target::Docker | core::Target::Hosted => {
-            let f = out.join("docker/compose.yml");
-            // Down with the `check` profile too, so the runners' stand-ins go as well.
-            let args = if down {
-                vec![s("compose"), s("-f"), f.display().to_string(), s("--profile"), s("check"), s("down"), s("-v")]
+            // Under the project name it runs as (a tool's own, from the registry), so `down`
+            // finds it. Down with the `check` profile too, so the runners' stand-ins go as well.
+            let mut args = vec![s("compose")];
+            args.extend(lifecycle::compose_files(dir, instance));
+            if down {
+                args.extend([s("--profile"), s("check"), s("down"), s("-v")]);
             } else {
-                vec![s("compose"), s("-f"), f.display().to_string(), s("up"), s("-d"), s("--build"), s("--wait")]
-            };
+                args.extend([s("up"), s("-d"), s("--build"), s("--wait")]);
+            }
             (s("docker"), args, dir.to_path_buf())
         }
         core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid => {
