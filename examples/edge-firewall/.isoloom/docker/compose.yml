@@ -25,12 +25,20 @@ services:
       net.ipv4.ip_forward: '1'
     healthcheck:
       test:
-      - CMD-SHELL
-      - (nc -z 127.0.0.1 8080 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null)
+      - CMD
+      - /.isoloom-probe/busybox
+      - sh
+      - -c
+      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8080
       interval: 5s
       timeout: 3s
       retries: 60
       start_period: 10s
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
+    depends_on:
+      isoloom-probe-amd64:
+        condition: service_completed_successfully
     labels:
       isoloom.service.status: http:8080
     restart: unless-stopped
@@ -42,7 +50,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace default via 10.70.0.1 && exec sleep infinity
+    - ip route replace default via 10.70.0.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -63,17 +71,27 @@ services:
     networks:
       dmz:
         ipv4_address: 10.70.10.10
+        aliases:
+        - www.edge.test
     extra_hosts:
     - cache:10.70.20.20
     - user:10.70.0.10
     healthcheck:
       test:
-      - CMD-SHELL
-      - (nc -z 127.0.0.1 80 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/80' 2>/dev/null)
+      - CMD
+      - /.isoloom-probe/busybox
+      - sh
+      - -c
+      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80
       interval: 5s
       timeout: 3s
       retries: 60
       start_period: 10s
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
+    depends_on:
+      isoloom-probe-amd64:
+        condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
     restart: unless-stopped
@@ -85,7 +103,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.20.0/24 via 10.70.10.1 && ip route replace default via 10.70.10.1 && exec sleep infinity
+    - ip route replace 10.70.20.0/24 via 10.70.10.1 && ip route replace default via 10.70.10.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -108,15 +126,24 @@ services:
         ipv4_address: 10.70.20.20
     extra_hosts:
     - web:10.70.10.10
+    - www.edge.test:10.70.10.10
     - user:10.70.0.10
     healthcheck:
       test:
-      - CMD-SHELL
-      - (nc -z 127.0.0.1 6379 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/6379' 2>/dev/null)
+      - CMD
+      - /.isoloom-probe/busybox
+      - sh
+      - -c
+      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 6379
       interval: 5s
       timeout: 3s
       retries: 60
       start_period: 10s
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
+    depends_on:
+      isoloom-probe-amd64:
+        condition: service_completed_successfully
     labels:
       isoloom.service.redis: tcp:6379
     restart: unless-stopped
@@ -128,7 +155,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.10.0/24 via 10.70.20.1 && ip route replace default via 10.70.20.1 && exec sleep infinity
+    - ip route replace 10.70.10.0/24 via 10.70.20.1 && ip route replace default via 10.70.20.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -150,6 +177,7 @@ services:
         ipv4_address: 10.70.0.10
     extra_hosts:
     - web:10.70.10.10
+    - www.edge.test:10.70.10.10
     - cache:10.70.20.20
     entrypoint:
     - sleep
@@ -164,7 +192,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.10.0/24 via 10.70.0.2 && ip route replace 10.70.20.0/24 via 10.70.0.2 && exec sleep infinity
+    - ip route replace 10.70.10.0/24 via 10.70.0.2 && ip route replace 10.70.20.0/24 via 10.70.0.2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     healthcheck:
       test:
       - CMD-SHELL
@@ -275,6 +303,17 @@ services:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
+  isoloom-probe-amd64:
+    image: busybox:1.37.0-musl
+    platform: linux/amd64
+    entrypoint:
+    - /bin/cp
+    - /bin/busybox
+    - /probe/busybox
+    volumes:
+    - isoloom-probe-amd64:/probe
+    network_mode: none
+    restart: no
 networks:
   outside:
     ipam:
@@ -291,3 +330,5 @@ networks:
       config:
       - subnet: 10.70.20.0/24
         gateway: 10.70.20.254
+volumes:
+  isoloom-probe-amd64: {}

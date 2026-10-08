@@ -42,6 +42,11 @@ fn committed_outputs_are_up_to_date() {
     assert_committed("slow-link");
     assert_committed("existing-hosts");
     assert_committed("workbench");
+    assert_committed("vlan-office");
+    assert_committed("cisco-iol");
+    assert_committed("cisco-dynamips");
+    assert_committed("cisco-qemu");
+    assert_committed("solo-web");
 }
 
 #[test]
@@ -94,7 +99,11 @@ fn compose_has_addresses_healthchecks_init_and_checks() {
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(compose.contains("ipv4_address: 10.60.0.20"));
     assert!(compose.contains("gateway: 10.60.0.1"));
-    assert!(compose.contains("nc -z 127.0.0.1 6379"));
+    // The healthcheck runs Isoloom's own busybox (exec form): no shell needed in the image.
+    assert!(compose.contains("/.isoloom-probe/busybox nc -z -w 2 127.0.0.1 6379"));
+    assert!(compose.contains("- CMD\n"));
+    assert!(compose.contains("isoloom-probe-amd64:/.isoloom-probe:ro"));
+    assert!(compose.contains("image: busybox:1.37.0-musl"));
     assert!(compose.contains("cache-init-1:"));
     assert!(compose.contains("condition: service_completed_successfully"));
     assert!(compose.contains("isoloom-check:"));
@@ -128,6 +137,32 @@ fn vagrant_orders_machines_and_names_them() {
     assert!(cache < web, "cache starts before web, which depends on it");
     assert!(vf.contains("'10.60.0.10 web'"));
     assert!(vf.contains("virtualbox__intnet: \"isoloom-hello-stack-app\""));
+}
+
+#[test]
+fn libvirt_domains_are_named_after_the_environment() {
+    // Unset, vagrant-libvirt prefixes the folder's name ("vagrant_web"), the same for every lab.
+    let (_, spec) = example("hello-stack");
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    assert!(vf.contains("v.default_prefix = \"hello-stack_\""), "{vf}");
+    let two = isoloom_core::instance::apply(&spec, 2).unwrap();
+    let vf = &generate(&two, Target::Vagrant).unwrap()[0].contents;
+    assert!(vf.contains("v.default_prefix = \"hello-stack-2_\""));
+    let dvm = contents(&generate(&spec, Target::DockerVm).unwrap(), ".isoloom/docker-vm/Vagrantfile");
+    assert!(dvm.contains("v.default_prefix = \"hello-stack_\""));
+}
+
+#[test]
+fn the_controller_gets_every_provider_block_the_machines_get() {
+    let (_, spec) = example("ansible-pair");
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    let controller = vf.split("config.vm.define \"isoloom-controller\"").nth(1).unwrap();
+    for provider in ["virtualbox", "vmware_desktop", "parallels", "utm", "qemu", "vmware_esxi", "libvirt"] {
+        assert!(
+            controller.contains(&format!("m.vm.provider \"{provider}\"")),
+            "controller has no {provider} block"
+        );
+    }
 }
 
 #[test]
@@ -516,7 +551,8 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() {
     let (_, spec) = example("ansible-pair");
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
-    assert!(ctl.contains("m.vm.box = \"generic/alpine319\""), "{ctl}");
+    assert!(ctl.contains("m.vm.box = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"bento/debian-12\" : \"generic/alpine319\""), "{ctl}");
+    assert!(ctl.contains("o.vm.box = \"generic/alpine319\""), "libvirt has Alpine on both architectures");
     assert!(ctl.contains("v.memory = 768"));
     assert!(ctl.contains("command -v apk"));
     // Without `controller:`: 1 CPU, 512 MB, on every target with a controller.
@@ -565,4 +601,60 @@ fn the_resolved_snapshot_tells_infra_from_targets() {
     assert_eq!(resolved["machines"]["web"]["role"], "target");
     assert_eq!(resolved["controller"]["role"], "infra");
     assert_eq!(resolved["controller"]["keep_running"], false);
+}
+
+/// An init job on a machine nothing depends on is a leaf job: `up --wait` would fail on its exit,
+/// so the start plan waits for the rest and runs it after (#42).
+#[test]
+fn leaf_init_jobs_run_after_the_wait() {
+    let spec = isoloom_core::parse(
+        r#"
+version: 1
+name: leaf
+networks: { lan: { cidr: 10.70.0.0/24 } }
+machines:
+  db:
+    networks: { lan: 20 }
+    services: [{ port: 5432 }]
+    docker: { image: "postgres:17", init: [seed.sh] }
+  web:
+    networks: { lan: 10 }
+    services: [{ port: 80 }]
+    depends_on: [db]
+    docker: { image: "nginx:1.27-alpine", init: [setup.sh, warm.sh] }
+"#,
+    )
+    .unwrap();
+    // db's job is waited for by web; web's two jobs by nothing.
+    assert_eq!(isoloom_core::generate::leaf_jobs(&spec), ["web-init-1", "web-init-2"]);
+    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    let plan = isoloom_core::generate::start_plan(compose).unwrap();
+    assert_eq!(plan.jobs, ["web-init-1", "web-init-2"]);
+    assert!(plan.wait.contains(&"web".to_string()) && plan.wait.contains(&"db-init-1".to_string()));
+    assert!(!plan.wait.iter().any(|w| w.starts_with("isoloom-check")), "profile services aren't started");
+    let cmd = isoloom_core::generate::start_commands("docker compose", &plan.jobs, Some(900));
+    assert_eq!(
+        cmd,
+        "docker compose up -d --build --wait --wait-timeout 900 $(docker compose config --services | grep -vx -e web-init-1 -e web-init-2) \
+         && docker compose up --no-deps --exit-code-from web-init-1 web-init-1 \
+         && docker compose up --no-deps --exit-code-from web-init-2 web-init-2"
+    );
+    // Nothing left over: the one command it always was.
+    assert_eq!(
+        isoloom_core::generate::start_commands("docker compose", &[], None),
+        "docker compose up -d --build --wait"
+    );
+    let (_, hello) = example("hello-stack");
+    let compose = &generate(&hello, Target::Docker).unwrap()[0].contents;
+    assert_eq!(isoloom_core::generate::start_plan(compose).unwrap(), Default::default());
+}
+
+/// The check runners run with --no-deps: `compose run` would run completed init jobs again,
+/// re-seeding the environment on every test (#47).
+#[test]
+fn checks_on_the_docker_vm_never_rerun_init_jobs() {
+    let (_, spec) = example("hello-stack");
+    let files = generate(&spec, Target::DockerVm).unwrap();
+    let vf = files.iter().find(|f| f.path.ends_with("Vagrantfile")).unwrap();
+    assert!(vf.contents.contains("--profile check run --rm --no-deps"));
 }

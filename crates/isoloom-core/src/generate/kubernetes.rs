@@ -21,7 +21,7 @@ use std::fmt::Write;
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::docker::{CHECK_IMAGE, UTILITY_IMAGE, image_of, list, map, offline, probe, s};
+use super::docker::{CHECK_IMAGE, PROBE_DIR, PROBE_IMAGE, UTILITY_IMAGE, image_of, list, map, offline, probe, probe_command, s};
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
 use crate::checks;
 use crate::model::{Machine, Spec, Target};
@@ -145,6 +145,9 @@ fn unsupported(spec: &Spec) -> Option<String> {
     if let Some(what) = super::container_checks_unsupported(spec) {
         return Some(what);
     }
+    if spec.machines.values().any(|m| !m.aliases.is_empty()) {
+        return Some("machine `aliases` (dotted DNS names) aren't Kubernetes Service names".into());
+    }
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine on Kubernetes come later".into());
     }
@@ -153,6 +156,9 @@ fn unsupported(spec: &Spec) -> Option<String> {
     }
     None
 }
+
+/// The emptyDir holding Isoloom's probe, and the init container filling it.
+const PROBE_VOLUME: &str = "isoloom-probe";
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     if let Some(what) = unsupported(spec) {
@@ -171,7 +177,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let nets: Vec<&String> = m.networks.keys().collect();
         let image = image_of(spec, name, m);
         if let Some(b) = &d.build {
-            builds.push(format!("docker build -t {image} {b}"));
+            let mut cmd = format!("docker build -t {image}");
+            if let Some(f) = &d.dockerfile {
+                cmd.push_str(&format!(" -f {f}"));
+            }
+            for (k, v) in &d.args {
+                cmd.push_str(&format!(" --build-arg {}", super::cloud_vm::sh_quote(&format!("{k}={v}"))));
+            }
+            builds.push(format!("{cmd} {b}"));
         }
 
         // The machine itself.
@@ -197,7 +210,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             c.insert(
                 s("readinessProbe"),
                 map([
-                    ("exec", map([("command", list([s("sh"), s("-c"), s(probe(m))]))])),
+                    ("exec", map([("command", list(probe_command(m)))])),
                     ("periodSeconds", Value::from(5)),
                     ("failureThreshold", Value::from(60)),
                 ]),
@@ -229,6 +242,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         if m.shm_size.is_some() {
             mounts.push(map([("name", s("dshm")), ("mountPath", s("/dev/shm"))]));
+        }
+        // Isoloom's own probe (a static busybox an init container copies in): the readiness
+        // probe needs nothing from the image.
+        if !m.services.is_empty() {
+            mounts.push(map([("name", s(PROBE_VOLUME)), ("mountPath", s(PROBE_DIR)), ("readOnly", Value::Bool(true))]));
         }
         if !mounts.is_empty() {
             c.insert(s("volumeMounts"), Value::Sequence(mounts.clone()));
@@ -263,21 +281,26 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let mut pod = Mapping::new();
         pod.insert(s("hostname"), s(name.as_str()));
         // Wait for the machines it depends on: their services answer.
-        let waits: Vec<Value> = m
-            .depends_on
-            .iter()
-            .filter_map(|dep| {
-                let ports: Vec<u16> = spec.machines[dep].services.iter().map(|sv| sv.port).collect();
-                (!ports.is_empty()).then(|| {
-                    let cond = ports.iter().map(|p| format!("nc -z {dep} {p}")).collect::<Vec<_>>().join(" && ");
-                    map([
-                        ("name", s(format!("wait-{dep}"))),
-                        ("image", s(UTILITY_IMAGE)),
-                        ("command", list([s("sh"), s("-c"), s(format!("until {cond}; do sleep 2; done"))])),
-                    ])
-                })
+        let mut waits: Vec<Value> = Vec::new();
+        if !m.services.is_empty() {
+            waits.push(map([
+                ("name", s(PROBE_VOLUME)),
+                ("image", s(PROBE_IMAGE)),
+                ("command", list([s("/bin/cp"), s("/bin/busybox"), s("/probe/busybox")])),
+                ("volumeMounts", list([map([("name", s(PROBE_VOLUME)), ("mountPath", s("/probe"))])])),
+            ]));
+        }
+        waits.extend(m.depends_on.iter().filter_map(|dep| {
+            let ports: Vec<u16> = spec.machines[dep].services.iter().map(|sv| sv.port).collect();
+            (!ports.is_empty()).then(|| {
+                let cond = ports.iter().map(|p| format!("nc -z {dep} {p}")).collect::<Vec<_>>().join(" && ");
+                map([
+                    ("name", s(format!("wait-{dep}"))),
+                    ("image", s(UTILITY_IMAGE)),
+                    ("command", list([s("sh"), s("-c"), s(format!("until {cond}; do sleep 2; done"))])),
+                ])
             })
-            .collect();
+        }));
         if !waits.is_empty() {
             pod.insert(s("initContainers"), Value::Sequence(waits));
         }
@@ -313,6 +336,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 ("name", s("scripts")),
                 ("configMap", map([("name", s(SCRIPTS)), ("defaultMode", Value::from(0o755))])),
             ]));
+        }
+        if !m.services.is_empty() {
+            volumes.push(map([("name", s(PROBE_VOLUME)), ("emptyDir", Value::Mapping(Default::default()))]));
         }
         for (i, _) in m.tmpfs.iter().enumerate() {
             volumes.push(map([("name", s(format!("tmpfs-{i}"))), ("emptyDir", map([("medium", s("Memory"))]))]));
@@ -529,6 +555,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 if let checks::Probe::Script { path } = &c.probe {
                     scripts.push(path.clone());
                 }
+            }
+            // `exec` checks run inside the machine (`kubectl exec -i deploy/<machine> -- sh -s`),
+            // from their own runner; the Job beside it doesn't run them.
+            let (execs, group): (Vec<&checks::Resolved>, Vec<&checks::Resolved>) =
+                group.into_iter().partition(|c| matches!(c.probe, checks::Probe::Exec { .. }));
+            if !execs.is_empty() {
+                check_files.push(GeneratedFile {
+                    path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", super::docker::exec_runner(id)),
+                    contents: checks::script(&pos, &execs, &render),
+                });
             }
             check_files.push(GeneratedFile {
                 path: format!("{OUTPUT_DIR}/{DIR}/checks/{id}.sh"),

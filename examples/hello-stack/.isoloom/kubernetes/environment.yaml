@@ -30,6 +30,16 @@ spec:
         net.isoloom.com/app: member
     spec:
       hostname: cache
+      initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       containers:
       - name: cache
         image: redis:7-alpine
@@ -39,24 +49,31 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 6379 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/6379' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 6379
           periodSeconds: 5
           failureThreshold: 60
         volumeMounts:
         - name: vol-data
           mountPath: /data
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       - name: init
         image: redis:7-alpine
         imagePullPolicy: IfNotPresent
         command:
         - sh
         - -c
-        - until (nc -z 127.0.0.1 6379 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/6379' 2>/dev/null); do sleep 2; done && sh /isoloom/scripts/build__cache__seed.sh && exec sleep infinity
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 6379; do sleep 2; done && sh /isoloom/scripts/build__cache__seed.sh && exec sleep infinity
         volumeMounts:
         - name: vol-data
           mountPath: /data
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
         - name: scripts
           mountPath: /isoloom/scripts
       nodeSelector:
@@ -69,6 +86,8 @@ spec:
         configMap:
           name: isoloom-scripts
           defaultMode: 493
+      - name: isoloom-probe
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -135,6 +154,15 @@ spec:
     spec:
       hostname: web
       initContainers:
+      - name: isoloom-probe
+        image: busybox:1.37.0-musl
+        command:
+        - /bin/cp
+        - /bin/busybox
+        - /probe/busybox
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /probe
       - name: wait-cache
         image: alpine:3.20
         command:
@@ -150,13 +178,21 @@ spec:
         readinessProbe:
           exec:
             command:
+            - /.isoloom-probe/busybox
             - sh
             - -c
-            - (nc -z 127.0.0.1 80 2>/dev/null || bash -c '</dev/tcp/127.0.0.1/80' 2>/dev/null)
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80
           periodSeconds: 5
           failureThreshold: 60
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       nodeSelector:
         kubernetes.io/arch: amd64
+      volumes:
+      - name: isoloom-probe
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
