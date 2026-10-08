@@ -1316,17 +1316,17 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                 .map(|n| n.to_string())
                 .collect();
             if !stand_ins.is_empty() {
-                let mut args = vec![s("compose"), s("--progress"), s("quiet")];
-                args.extend(files.iter().cloned());
-                args.extend([s("--profile"), s("check"), s("up"), s("-d"), s("--wait"), s("--no-deps")]);
-                args.extend(stand_ins);
-                runners.push(Runner {
-                    label: "starting the access machine's stand-in".into(),
-                    program: s("docker"),
-                    args,
-                    wd: dir.clone(),
-                    env: vec![],
-                });
+                let status = std::process::Command::new("docker")
+                    .arg("compose")
+                    .args(["--progress", "quiet"])
+                    .args(&files)
+                    .args(["--profile", "check", "up", "-d", "--wait", "--no-deps"])
+                    .args(&stand_ins)
+                    .current_dir(&dir)
+                    .status()?;
+                if !status.success() {
+                    return Err("couldn't start the access machine's stand-in".into());
+                }
             }
             for (pos, _) in &groups {
                 let mut args = vec![s("compose"), s("--progress"), s("quiet")];
