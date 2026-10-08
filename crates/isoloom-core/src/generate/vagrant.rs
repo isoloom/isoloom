@@ -4,8 +4,9 @@
 //!   from the host's LAN) or a libvirt network, with the machine's fixed address on it.
 //! - Every VM gets the other machines' names in `/etc/hosts`, so provisioning uses names.
 //! - The project is copied into the VM at `/opt/isoloom` (no shared folders, works on every
-//!   host OS), then the `vm.provision` steps run there in order: `.sh` with sh, `.yml` /
-//!   `.yaml` with Ansible inside the VM (never on the user's machine).
+//!   host OS): a tar.gz built in Vagrant's own Ruby when the `project` step runs, symlinks kept
+//!   as links. Then the `vm.provision` steps run there in order: `.sh` with sh, `.yml` / `.yaml`
+//!   with Ansible inside the VM (never on the user's machine).
 //! - Machines start in dependency order; Vagrant boots and provisions them one after the
 //!   other, so a machine's services are installed before the machines depending on it start.
 //! - Inputs are read from the environment (empty when unset), passed only to the machines
@@ -21,6 +22,14 @@ use crate::images;
 use crate::model::{Arch, Machine, Spec, Target, VmImpl};
 
 const DIR: &str = "vagrant";
+
+/// The Ruby that copies the project into a VM (`vagrant_project.rb`): a tar.gz built when the
+/// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`. Every
+/// Vagrantfile Isoloom writes carries it, after `ROOT`.
+pub(super) const PROJECT_RB: &str = include_str!("vagrant_project.rb");
+
+/// A VM's `project` step: the project (without Isoloom's outputs) in /opt/isoloom.
+const PROJECT_STEP: &str = "    m.vm.provision \"isoloom_project\", name: \"project\"\n";
 
 /// Ruby double-quoted string.
 fn rb(s: &str) -> String {
@@ -54,8 +63,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     let mut out = header("#");
     out.push_str("# Start:  cd .isoloom/vagrant && vagrant up\n# Stop:   cd .isoloom/vagrant && vagrant destroy -f\n\n");
     out.push_str("ROOT = File.expand_path(\"../..\", __dir__)\n");
-    out.push_str("# Copied into each VM: the project, without version control or generated files.\n");
-    out.push_str("PROJECT = Dir.children(ROOT).reject { |e| [\".git\", \".vagrant\"].include?(e) || e.start_with?(\".isoloom\") }.sort\n");
+    out.push_str(PROJECT_RB);
+    out.push('\n');
     if !spec.inputs.is_empty() {
         out.push_str("# Values provided at launch (empty when unset).\nINPUTS = {\n");
         for i in &spec.inputs {
@@ -266,8 +275,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
 
         if !vm.provision.is_empty() {
-            out.push_str("    PROJECT.each do |entry|\n      m.vm.provision \"file\", source: File.join(ROOT, entry), destination: \"/tmp/isoloom-project/#{entry}\"\n    end\n");
-            out.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
+            out.push_str(PROJECT_STEP);
             let env = if m.inputs.is_empty() {
                 String::new()
             } else {
@@ -746,10 +754,7 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool) {
             ))
         );
     }
-    out.push_str(
-        "    PROJECT.each do |entry|\n      m.vm.provision \"file\", source: File.join(ROOT, entry), destination: \"/tmp/isoloom-project/#{entry}\"\n    end\n",
-    );
-    out.push_str("    m.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
+    out.push_str(PROJECT_STEP);
     let script = format!(
         "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\n[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
         inventory(spec)

@@ -115,7 +115,7 @@ fn core() -> Format {
         .into_iter()
         .map(|s| (format!("config.vm.{s}"), machine(s).unwrap_or(Unclassified)))
         .collect();
-    let extra: [(&str, Support); 19] = [
+    let extra: [(&str, Support); 20] = [
         (
             "config.vm.network private_network",
             Emitted {
@@ -142,8 +142,14 @@ fn core() -> Format {
         ),
         (
             "config.vm.provision file",
+            Equivalent {
+                via: "`isoloom_project` (below) copies the project; a file provisioner follows symlinks and lists files when the Vagrantfile loads",
+            },
+        ),
+        (
+            "config.vm.provision isoloom_project",
             Emitted {
-                from: "(the project, copied into each VM)",
+                from: "(Isoloom's own provisioner, defined in the Vagrantfile: the project into each VM as a tar.gz built when the step runs, symlinks kept as links)",
             },
         ),
         (
