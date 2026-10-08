@@ -268,6 +268,32 @@ pub fn render_message(spec: &Spec, instance: Option<u8>) -> Result<Option<String
     fill(m, &snapshot).map(Some)
 }
 
+/// The message as it reads where the environment runs on `target`: on the targets that run
+/// the Compose file, machines are at their Docker addresses, so `machines.<m>.addresses` is
+/// filled with those (see [`on_target`]).
+pub fn render_message_on(spec: &Spec, instance: Option<u8>, target: Target) -> Result<Option<String>, String> {
+    let Some(m) = &spec.message else { return Ok(None) };
+    fill(m, &on_target(resolve_with(spec, instance), target)).map(Some)
+}
+
+/// The snapshot as seen on `target`: on the Compose targets (Docker, a hosting service, Docker
+/// on a VM or a cloud VM) each machine's `addresses` are its `docker_addresses`, the ones it
+/// really has there (they differ when the spec's networks are outside 10.0.0.0/8, or for an
+/// instance); elsewhere the snapshot is unchanged.
+pub fn on_target(mut snapshot: Value, target: Target) -> Value {
+    if !matches!(target, Target::Docker | Target::Hosted | Target::CloudDocker | Target::DockerVm) {
+        return snapshot;
+    }
+    if let Some(machines) = snapshot.get_mut("machines").and_then(Value::as_object_mut) {
+        for m in machines.values_mut() {
+            if let Some(docker) = m.get("docker_addresses").cloned() {
+                m["addresses"] = docker;
+            }
+        }
+    }
+    snapshot
+}
+
 /// Fills `{{ dotted.path }}` placeholders from a snapshot. Scalars print plainly; lists and
 /// maps as compact JSON.
 pub fn fill(text: &str, snapshot: &Value) -> Result<String, String> {

@@ -312,6 +312,10 @@ enum Command {
         /// The message of instance N.
         #[arg(long, value_name = "N")]
         instance: Option<u8>,
+        /// The target it runs on, for the addresses machines have there (default: what `run`
+        /// recorded for the folder, else the spec's single target, else the spec's addresses).
+        #[arg(long)]
+        target: Option<String>,
         /// Overrides, as for `generate`.
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
@@ -758,7 +762,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             &network,
             core::Tc { delay, jitter, loss, rate },
         ),
-        Command::Message { dir, instance, sets } => {
+        Command::Message { dir, instance, target, sets } => {
             let (spec, _) = load_settings(&dir, None, &sets)?;
             let problems = core::validate(&spec);
             if !problems.is_empty() {
@@ -771,7 +775,18 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 Some(n) => core::instance::apply(&spec, n)?,
                 None => spec,
             };
-            match core::resolved::render_message(&spec, instance)? {
+            // Where it runs decides the addresses (Docker blocks on the Compose targets); a named
+            // target that doesn't exist is an error, an unknown one falls back to the spec's.
+            let on = match lifecycle::pick(&abs(&dir)?, target.as_deref(), instance, &spec) {
+                Ok((t, _)) => Some(t),
+                Err(e) if target.is_some() => return Err(e),
+                Err(_) => None,
+            };
+            let message = match on {
+                Some(t) => core::resolved::render_message_on(&spec, instance, t)?,
+                None => core::resolved::render_message(&spec, instance)?,
+            };
+            match message {
                 Some(m) => println!("{}", m.trim_end()),
                 None => eprintln!("the spec has no `message:`"),
             }
@@ -1203,7 +1218,7 @@ fn run_cmd(
                 eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
             }
             // The spec's message, now that the environment is up.
-            if !down && let Ok(Some(m)) = core::resolved::render_message(&spec, instance) {
+            if !down && let Ok(Some(m)) = core::resolved::render_message_on(&spec, instance, t) {
                 println!("\n{}", m.trim_end());
             }
             Ok(ExitCode::SUCCESS)

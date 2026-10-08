@@ -136,7 +136,10 @@ fn the_controller_gets_every_provider_block_the_machines_get() {
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     let controller = vf.split("config.vm.define \"isoloom-controller\"").nth(1).unwrap();
     for provider in ["virtualbox", "vmware_desktop", "parallels", "utm", "qemu", "vmware_esxi", "libvirt"] {
-        assert!(controller.contains(&format!("m.vm.provider \"{provider}\"")), "controller has no {provider} block");
+        assert!(
+            controller.contains(&format!("m.vm.provider \"{provider}\"")),
+            "controller has no {provider} block"
+        );
     }
 }
 
