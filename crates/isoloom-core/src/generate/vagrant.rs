@@ -72,6 +72,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("\nVagrant.configure(\"2\") do |config|\n");
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n");
     out.push_str("  config.vm.boot_timeout = 900\n");
+    // A tool that can't reach the machines itself (macOS keeps third-party tools off the local
+    // network) sets ISOLOOM_SSH_PROXY_COMMAND, e.g. "/usr/bin/nc %h %p", and Vagrant's SSH goes
+    // through it. Unset: Vagrant connects directly, as before.
+    out.push_str("  config.ssh.proxy_command = ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"] if ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"]\n");
     // libvirt names a domain <prefix><machine>, the prefix defaulting to this folder's name
     // ("vagrant_"): every lab's `web` was `vagrant_web`, so two labs collided and a leftover
     // couldn't be told apart. The environment's name keeps them apart (instances included).
