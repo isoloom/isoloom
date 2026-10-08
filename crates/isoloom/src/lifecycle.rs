@@ -14,13 +14,13 @@ type Res<T> = Result<T, Box<dyn std::error::Error>>;
 
 /// `isoloom status`: every environment in the registry, with its live state.
 pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<ExitCode> {
-    let mut reg = registry::load()?;
+    let reg = registry::load()?;
     if let Some(name) = cleanup {
         let targets: Vec<Entry> = reg.environments.iter().filter(|e| e.name == name || e.dir.ends_with(name)).cloned().collect();
         if targets.is_empty() {
             return Err(format!("no environment named `{name}` in {}", registry::path().display()).into());
         }
-        for e in targets {
+        for e in &targets {
             if e.dir.join(core::instance::output_dir(e.instance)).is_dir() {
                 let (program, args, wd) = super::bring_up(&e.dir, e.target, e.cloud.as_deref(), e.instance, true)?;
                 eprintln!("Tearing down {} on {} ({})", e.name, e.target.id(), wd.display());
@@ -36,9 +36,14 @@ pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<
             } else {
                 eprintln!("{}: folder gone, removing the entry", e.name);
             }
-            reg.remove(&e.dir, e.target, e.instance);
         }
-        registry::save(&reg)?;
+        // Removed only now, in one locked update: the teardowns take a while, and other runs
+        // may have changed the registry meanwhile.
+        registry::update(|r| {
+            for e in &targets {
+                r.remove(&e.dir, e.target, e.instance);
+            }
+        })?;
         let _ = ssh_key;
         return Ok(ExitCode::SUCCESS);
     }
@@ -94,6 +99,65 @@ fn target_label(e: &Entry) -> String {
     label
 }
 
+/// The Compose project name the registry recorded for an environment on Docker: set when a
+/// tool embedding Isoloom ran its Compose file under its own name.
+pub fn compose_project(dir: &Path, instance: Option<u8>) -> Option<String> {
+    let reg = registry::load().ok()?;
+    reg.for_dir(dir)
+        .into_iter()
+        .find(|e| e.instance == instance && matches!(e.target, Target::Docker | Target::Hosted))
+        .and_then(|e| e.project.clone())
+}
+
+/// `[-p <project>] -f <compose file>` for an environment's Compose file, under the project
+/// name it runs as (see [`compose_project`]).
+pub fn compose_files(dir: &Path, instance: Option<u8>) -> Vec<String> {
+    let f = dir.join(core::instance::output_dir(instance)).join("docker/compose.yml").display().to_string();
+    match compose_project(dir, instance) {
+        Some(p) => vec!["-p".into(), p, "-f".into(), f],
+        None => vec!["-f".into(), f],
+    }
+}
+
+/// The host ports a local Docker environment really got, as (machine, port, host port): its
+/// Compose file publishes on free loopback ports unless `ISOLOOM_PUBLISH_FIXED` is set, so the
+/// spec's `publish:` values aren't where it answers. Empty when Compose can't say.
+pub fn docker_published(dir: &Path, instance: Option<u8>) -> Vec<(String, u16, u16)> {
+    let Ok(out) = Command::new("docker")
+        .arg("compose")
+        .args(compose_files(dir, instance))
+        .args(["ps", "--format", "json"])
+        .current_dir(dir)
+        .stderr(Stdio::null())
+        .output()
+    else {
+        return Vec::new();
+    };
+    let text = String::from_utf8_lossy(&out.stdout);
+    // Compose prints one JSON object per line (older versions: one array).
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str::<Vec<serde_json::Value>>(&text).unwrap_or_else(|_| text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect());
+    published_of(&items)
+}
+
+/// (service, container port, host port) for each port `docker compose ps` lists as published.
+fn published_of(items: &[serde_json::Value]) -> Vec<(String, u16, u16)> {
+    let mut found = Vec::new();
+    for i in items {
+        let Some(service) = i["Service"].as_str() else { continue };
+        for p in i["Publishers"].as_array().into_iter().flatten() {
+            let port = p["TargetPort"].as_u64().and_then(|n| u16::try_from(n).ok());
+            let host = p["PublishedPort"].as_u64().and_then(|n| u16::try_from(n).ok()).filter(|h| *h != 0);
+            if let (Some(port), Some(host)) = (port, host)
+                && !found.iter().any(|(s, c, _): &(String, u16, u16)| s == service && *c == port)
+            {
+                found.push((service.to_string(), port, host));
+            }
+        }
+    }
+    found
+}
+
 /// What the target's tool says about an environment: `running (3/3)`, `partly (1/3)`,
 /// `stopped`, `applied (12 resources)`, or why it can't tell.
 fn probe(e: &Entry) -> String {
@@ -119,8 +183,19 @@ fn probe(e: &Entry) -> String {
     };
     let result = match e.target {
         Target::Docker | Target::Hosted => {
-            let f = out.join("docker/compose.yml").display().to_string();
-            run("docker", &["compose", "-f", &f, "ps", "--format", "json"], &e.dir).map(|text| {
+            let mut args = vec!["compose".to_string()];
+            if let Some(p) = &e.project {
+                args.extend(["-p".to_string(), p.clone()]);
+            }
+            args.extend([
+                "-f".to_string(),
+                out.join("docker/compose.yml").display().to_string(),
+                "ps".into(),
+                "--format".into(),
+                "json".into(),
+            ]);
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            run("docker", &args, &e.dir).map(|text| {
                 // Compose prints one JSON object per line (older versions: one array).
                 let items: Vec<serde_json::Value> = serde_json::from_str::<Vec<serde_json::Value>>(&text)
                     .unwrap_or_else(|_| text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect());
@@ -271,14 +346,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         match target {
             Target::Docker | Target::Hosted => {
                 c = Command::new("docker");
-                c.args([
-                    "compose",
-                    "--progress",
-                    "quiet",
-                    "-f",
-                    &out.join("docker/compose.yml").display().to_string(),
-                    "exec",
-                ]);
+                c.args(["compose", "--progress", "quiet"]).args(compose_files(dir, instance)).arg("exec");
                 c.arg(if tty { "-it" } else { "-T" });
                 c.args([unit.as_str(), "sh", "-c", &inner]);
                 c.current_dir(dir);
@@ -317,14 +385,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         Target::Docker | Target::Hosted => {
             container_only("Docker")?;
             c = Command::new("docker");
-            c.args([
-                "compose",
-                "--progress",
-                "quiet",
-                "-f",
-                &out.join("docker/compose.yml").display().to_string(),
-                "exec",
-            ]);
+            c.args(["compose", "--progress", "quiet"]).args(compose_files(dir, instance)).arg("exec");
             c.arg(if tty { "-it" } else { "-T" });
             c.args([machine, "sh", "-c", &inner]);
             c.current_dir(dir);
@@ -590,9 +651,10 @@ pub fn capture(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: 
             if m.docker.is_none() {
                 return Err(format!("`{machine}` has no `docker:`: on Docker it is supplied by the runner").into());
             }
-            let f = dir.join(core::instance::output_dir(instance)).join("docker/compose.yml").display().to_string();
             let id = Command::new("docker")
-                .args(["compose", "-f", &f, "ps", "-q", machine])
+                .arg("compose")
+                .args(compose_files(dir, instance))
+                .args(["ps", "-q", machine])
                 .current_dir(dir)
                 .output()
                 .map_err(|e| format!("docker: {e}"))?;
@@ -706,19 +768,9 @@ pub fn tc(dir: &Path, target: Option<&str>, instance: Option<u8>, action: &str, 
         };
         let mut c = if docker {
             let mut c = Command::new("docker");
-            c.args([
-                "compose",
-                "--progress",
-                "quiet",
-                "-f",
-                &out.join("docker/compose.yml").display().to_string(),
-                "exec",
-                "-T",
-                &host,
-                "sh",
-                "-c",
-                &command,
-            ]);
+            c.args(["compose", "--progress", "quiet"])
+                .args(compose_files(dir, instance))
+                .args(["exec", "-T", &host, "sh", "-c", &command]);
             c.current_dir(dir);
             c
         } else {
@@ -858,5 +910,21 @@ fn tool_error(c: &Command, e: std::io::Error) -> String {
         format!("`{program}` isn't installed")
     } else {
         format!("{program}: {e}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn published_ports_come_from_compose_ps() {
+        let items: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[{"Service":"web","Publishers":[{"URL":"127.0.0.1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"},{"URL":"::1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"}]},
+                {"Service":"cache","Publishers":[{"URL":"","TargetPort":6379,"PublishedPort":0,"Protocol":"tcp"}]},
+                {"Service":"isoloom-check"}]"#,
+        )
+        .unwrap();
+        assert_eq!(published_of(&items), [("web".to_string(), 80, 32772)]);
     }
 }

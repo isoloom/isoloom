@@ -254,7 +254,7 @@
       "vagrant"
     ],
     "refused": {
-      "kubernetes": "networks with a `gateway` machine on Kubernetes come later",
+      "kubernetes": "machine `aliases` (dotted DNS names) aren't Kubernetes Service names",
       "proxmox": "networks with a `gateway` machine on Proxmox come later",
       "cloud-vm": "networks with a `gateway` machine in the cloud come later"
     },
@@ -278,6 +278,14 @@
             "target": "checks/web-through-firewall.sh",
             "expect": "",
             "wait": 0
+          },
+          {
+            "name": "the web server answers by its other name",
+            "derived": false,
+            "kind": "http",
+            "target": "http://www.edge.test/",
+            "expect": "200",
+            "wait": 30
           },
           {
             "name": "fw:8080 on outside from user",

@@ -40,6 +40,8 @@ pub struct Host<'a> {
     pub run: &'a dyn Fn(&str, &[&str]) -> Option<String>,
     pub env: &'a dyn Fn(&str) -> Option<String>,
     pub exists: &'a dyn Fn(&Path) -> bool,
+    /// Whether a path opens for reading and writing (a device such as `/dev/kvm`).
+    pub opens: &'a dyn Fn(&Path) -> bool,
     pub home: PathBuf,
 }
 
@@ -91,21 +93,23 @@ pub fn real_host() -> (
     impl Fn(&str, &[&str]) -> Option<String>,
     impl Fn(&str) -> Option<String>,
     impl Fn(&Path) -> bool,
+    impl Fn(&Path) -> bool,
     PathBuf,
 ) {
     let run = |program: &str, args: &[&str]| -> Option<String> { run_limited(program, args, 20).ok().flatten() };
     let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
     let exists = |p: &Path| p.exists();
+    let opens = |p: &Path| std::fs::OpenOptions::new().read(true).write(true).open(p).is_ok();
     let home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(PathBuf::from)
         .unwrap_or_default();
-    (run, env, exists, home)
+    (run, env, exists, opens, home)
 }
 
 /// Checks a target against the real host.
 pub fn check(target: Target, cloud: Option<&str>) -> Readiness {
-    let (run, env, exists, home) = real_host();
+    let (run, env, exists, opens, home) = real_host();
     check_with(
         target,
         cloud,
@@ -113,6 +117,7 @@ pub fn check(target: Target, cloud: Option<&str>) -> Readiness {
             run: &run,
             env: &env,
             exists: &exists,
+            opens: &opens,
             home,
         },
     )
@@ -120,11 +125,12 @@ pub fn check(target: Target, cloud: Option<&str>) -> Readiness {
 
 /// Every target (each cloud for the cloud targets) against the real host.
 pub fn all() -> Vec<Readiness> {
-    let (run, env, exists, home) = real_host();
+    let (run, env, exists, opens, home) = real_host();
     let host = Host {
         run: &run,
         env: &env,
         exists: &exists,
+        opens: &opens,
         home,
     };
     let mut out = Vec::new();
@@ -142,6 +148,22 @@ pub fn all() -> Vec<Readiness> {
 }
 
 pub const CLOUDS: &[&str] = &["aws", "azure", "gcp", "digitalocean", "linode", "oci"];
+
+/// Why KVM can't be used here, on Linux: no `/dev/kvm` (virtualization off, or a VM without
+/// nested virtualization), or the user can't open it. None elsewhere (no such device to probe).
+fn kvm_problem(h: &Host) -> Option<String> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let dev = Path::new("/dev/kvm");
+    if !(h.exists)(dev) {
+        return Some("no /dev/kvm (turn on virtualization in the firmware, or nested virtualization in a VM)".into());
+    }
+    if !(h.opens)(dev) {
+        return Some("/dev/kvm isn't usable by this user (add it to the kvm and libvirt groups, then sign in again)".into());
+    }
+    None
+}
 
 /// Checks a target against a host.
 pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
@@ -183,8 +205,14 @@ pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
             if (h.run)("prlctl", &["--version"]).is_some() {
                 providers.push("Parallels".to_string());
             }
+            // libvirt runs its VMs on KVM: with the plugin and virsh but no usable /dev/kvm,
+            // `vagrant up` fails at boot, so it doesn't count (and the reason is given below).
+            let mut unusable = None;
             if plugins.contains("vagrant-libvirt") && (h.run)("virsh", &["--version"]).is_some() {
-                providers.push("libvirt".to_string());
+                match kvm_problem(h) {
+                    None => providers.push("libvirt".to_string()),
+                    Some(why) => unusable = Some(format!("libvirt can't run: {why}")),
+                }
             }
             if plugins.contains("vagrant_utm") {
                 providers.push("UTM".to_string());
@@ -203,7 +231,7 @@ pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
             } else {
                 need(
                     (!providers.is_empty()).then(|| format!("providers: {}", providers.join(", "))),
-                    "no Vagrant provider found (VirtualBox, VMware, Parallels, libvirt, UTM, QEMU or ESXi)",
+                    &unusable.unwrap_or_else(|| "no Vagrant provider found (VirtualBox, VMware, Parallels, libvirt, UTM, QEMU or ESXi)".to_string()),
                 );
             }
         }
@@ -317,6 +345,7 @@ mod tests {
                 run: &run,
                 env: &env,
                 exists: &exists,
+                opens: &exists,
                 home: PathBuf::new(),
             },
         );
@@ -329,6 +358,7 @@ mod tests {
                 run: &run,
                 env: &env,
                 exists: &exists,
+                opens: &exists,
                 home: PathBuf::new(),
             },
         );
@@ -345,6 +375,7 @@ mod tests {
                 run: &run,
                 env: &env,
                 exists: &exists,
+                opens: &exists,
                 home: PathBuf::new(),
             },
         );
@@ -357,6 +388,7 @@ mod tests {
                 run: &run,
                 env: &env,
                 exists: &exists,
+                opens: &exists,
                 home: PathBuf::new(),
             },
         );
@@ -368,10 +400,43 @@ mod tests {
                 run: &run,
                 env: &env,
                 exists: &exists,
+                opens: &exists,
                 home: PathBuf::new(),
             },
         );
         assert!(!r.ready && r.summary().contains("VirtualBox"));
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn libvirt_counts_only_with_a_usable_kvm() {
+        let run = |p: &str, a: &[&str]| match (p, a.first().copied()) {
+            ("vagrant", Some("plugin")) => Some("vagrant-libvirt (0.12.2, global)".to_string()),
+            ("vagrant", _) | ("virsh", _) => Some(format!("{p} 1.0")),
+            _ => None,
+        };
+        let env = |_: &str| None;
+        let probe = |kvm: bool, usable: bool| {
+            let exists = move |_: &Path| kvm;
+            let opens = move |_: &Path| usable;
+            check_with(
+                Target::Vagrant,
+                None,
+                &Host {
+                    run: &run,
+                    env: &env,
+                    exists: &exists,
+                    opens: &opens,
+                    home: PathBuf::new(),
+                },
+            )
+        };
+        let r = probe(true, true);
+        assert!(r.ready && r.summary().contains("libvirt"), "{r:?}");
+        let r = probe(false, false);
+        assert!(!r.ready && r.summary().contains("no /dev/kvm"), "{r:?}");
+        let r = probe(true, false);
+        assert!(!r.ready && r.summary().contains("kvm and libvirt groups"), "{r:?}");
     }
 
     #[test]
@@ -381,6 +446,7 @@ mod tests {
             run: &run,
             env: &env,
             exists: &exists,
+            opens: &exists,
             home: PathBuf::new(),
         };
         assert!(check_with(Target::CloudVm, Some("digitalocean"), &h).ready);

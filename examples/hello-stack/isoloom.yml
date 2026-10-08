@@ -35,6 +35,19 @@ checks:
   - name: the page greets
     http: http://web/
     expect: 200
+  - name: the cache holds the greeting, read inside it
+    from: cache
+    exec: redis-cli get greeting
+    expect: hello from isoloom
+  - name: the page says hello
+    http: http://web/
+    headers: { Accept: text/html }
+    contains: hello from isoloom
+  - name: the static page refuses a POST
+    http: http://web/
+    method: POST
+    body: "greeting=hi"
+    expect: 405
 
 message: |
   The page answers at http://localhost:{{ machines.web.services.0.publish }}/ (and at
