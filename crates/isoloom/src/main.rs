@@ -783,7 +783,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 Err(_) => None,
             };
             let message = match on {
-                Some(t) => core::resolved::render_message_on(&spec, instance, t)?,
+                Some(t) => core::resolved::render_message_at(&spec, instance, t, &real_ports(&abs(&dir)?, t, instance))?,
                 None => core::resolved::render_message(&spec, instance)?,
             };
             match message {
@@ -1218,7 +1218,7 @@ fn run_cmd(
                 eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
             }
             // The spec's message, now that the environment is up.
-            if !down && let Ok(Some(m)) = core::resolved::render_message_on(&spec, instance, t) {
+            if !down && let Ok(Some(m)) = core::resolved::render_message_at(&spec, instance, t, &real_ports(dir, t, instance)) {
                 println!("\n{}", m.trim_end());
             }
             Ok(ExitCode::SUCCESS)
@@ -1710,6 +1710,15 @@ fn snapshot_of(dir: &std::path::Path, instance: Option<u8>, sets: &[String]) -> 
         None => spec,
     };
     Ok(core::resolved::resolve_with(&spec, instance))
+}
+
+/// The host ports an environment really got, for its message: local Docker publishes on free
+/// ports unless `ISOLOOM_PUBLISH_FIXED` pins them to the spec's; the other targets keep them.
+fn real_ports(dir: &std::path::Path, t: core::Target, instance: Option<u8>) -> Vec<(String, u16, u16)> {
+    if t != core::Target::Docker || std::env::var_os("ISOLOOM_PUBLISH_FIXED").is_some_and(|v| !v.is_empty()) {
+        return Vec::new();
+    }
+    lifecycle::docker_published(dir, instance)
 }
 
 /// A project folder as an absolute path (the registry and the tools' working directories need one).

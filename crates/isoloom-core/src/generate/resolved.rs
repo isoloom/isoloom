@@ -272,8 +272,31 @@ pub fn render_message(spec: &Spec, instance: Option<u8>) -> Result<Option<String
 /// the Compose file, machines are at their Docker addresses, so `machines.<m>.addresses` is
 /// filled with those (see [`on_target`]).
 pub fn render_message_on(spec: &Spec, instance: Option<u8>, target: Target) -> Result<Option<String>, String> {
+    render_message_at(spec, instance, target, &[])
+}
+
+/// [`render_message_on`] with the host ports the environment really got, as (machine, port,
+/// host port): local Docker publishes on free ports unless `ISOLOOM_PUBLISH_FIXED` is set, so
+/// `{{ machines.web.services.0.publish }}` must say where it answers (see [`with_published`]).
+pub fn render_message_at(spec: &Spec, instance: Option<u8>, target: Target, published: &[(String, u16, u16)]) -> Result<Option<String>, String> {
     let Some(m) = &spec.message else { return Ok(None) };
-    fill(m, &on_target(resolve_with(spec, instance), target)).map(Some)
+    fill(m, &with_published(on_target(resolve_with(spec, instance), target), published)).map(Some)
+}
+
+/// The snapshot with the host ports the environment really got, as (machine, port, host
+/// port): each service's `publish` and the `published` list's `host_port`.
+pub fn with_published(mut snapshot: Value, published: &[(String, u16, u16)]) -> Value {
+    for (machine, port, host) in published {
+        let services = snapshot.pointer_mut(&format!("/machines/{machine}/services")).and_then(Value::as_array_mut);
+        for s in services.into_iter().flatten().filter(|s| s["port"] == *port) {
+            s["publish"] = (*host).into();
+        }
+        let listed = snapshot.get_mut("published").and_then(Value::as_array_mut);
+        for p in listed.into_iter().flatten().filter(|p| p["machine"] == machine.as_str() && p["port"] == *port) {
+            p["host_port"] = (*host).into();
+        }
+    }
+    snapshot
 }
 
 /// The snapshot as seen on `target`: on the Compose targets (Docker, a hosting service, Docker
