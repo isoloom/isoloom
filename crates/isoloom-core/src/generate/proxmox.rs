@@ -214,9 +214,8 @@ provider "proxmox" {
 locals {
   zone = "iso${var.slot}"
   # The project, written to /opt/isoloom in each machine that has steps.
-  root    = abspath("${path.module}/../..")
-  project = [for f in fileset(local.root, "**") : f if !startswith(f, ".git/") && !startswith(f, ".isoloom/") && !startswith(f, ".vagrant/")]
-  project_files = [for f in local.project : {
+  root = abspath("${path.module}/../..")
+  project_files = [for f in local.project_paths : {
     path     = "/opt/isoloom/${f}"
     encoding = "b64"
     content  = filebase64("${local.root}/${f}")

@@ -841,23 +841,27 @@ pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<(
             continue;
         }
         eprintln!("{name}: copying the project to {}:/opt/isoloom", m.address);
-        let tar = Command::new("tar")
-            .args([
-                "-czf",
-                "-",
-                "--exclude=.git",
-                "--exclude=.vagrant",
-                "--exclude=.terraform",
-                "-C",
-                &dir.display().to_string(),
-                ".",
-            ])
+        // The entries tar takes, listed here: without version control, the tools' state and
+        // what .isoloomignore lists; symbolic links as links.
+        let list: Vec<u8> = core::ignore::entries(dir, &core::ignore::Rules::read(dir))?
+            .into_iter()
+            .flat_map(|e| e.into_bytes().into_iter().chain([0]))
+            .collect();
+        let mut tar = Command::new("tar")
+            .args(["-czf", "-", "-C", &dir.display().to_string(), "--null", "--no-recursion", "-T", "-"])
+            .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .spawn()
             .map_err(|e| format!("tar: {e}"))?;
+        let mut stdin = tar.stdin.take().expect("piped");
+        let writer = std::thread::spawn(move || std::io::Write::write_all(&mut stdin, &list));
         let mut a = ssh_args(m);
         a.push("sudo mkdir -p /opt/isoloom && sudo chown \"$(id -un)\" /opt/isoloom && tar -xzf - -C /opt/isoloom".into());
-        run("ssh", &a, Some(std::process::Stdio::from(tar.stdout.expect("piped"))))?;
+        run("ssh", &a, Some(std::process::Stdio::from(tar.stdout.take().expect("piped"))))?;
+        writer.join().expect("the list writer").map_err(|e| format!("tar: {e}"))?;
+        if !tar.wait()?.success() {
+            return Err("tar failed".into());
+        }
         for step in &vm.provision {
             eprintln!("{name}: {step}");
             if step.ends_with(".sh") {

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `.isoloomignore`
+- An `.isoloomignore` at the project's root lists what the machines don't get when the project is copied into them, gitignore-style: `#` comments, `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the middle anchors a pattern at the root (otherwise it matches at any depth), `*`, `?`, `[abc]`, `**`; the last pattern matching a path, or a folder it is in, decides. Every copy honors it, read when the copy is made: Vagrant's `project` step (vagrant, hybrid, docker-vm), Proxmox's cloud-init, the cloud modules' archive (cloud-vm, cloud-docker, docker-vm on Proxmox: `tar -X` with the list Terraform computes, the archive's top folder stripped when unpacked) and `isoloom run external`. Each reads a pattern as the same regular expression. Proxmox also leaves out `.vagrant` and `.terraform` folders at any depth now. (#61)
+
 ### The project goes into VMs as an archive
 - The Vagrant outputs (vagrant, hybrid, docker-vm) copied the project with one `file` provisioner per top-level entry, listed when the Vagrantfile loaded: the copy followed symbolic links, so a vendored tree with a link loop failed it (`Too many levels of symbolic links`) and Vagrant destroyed the VM, and an entry deleted during `vagrant up` failed it too. A VM's `project` step is now Isoloom's own provisioner (`isoloom_project`, defined in the Vagrantfile): a tar.gz of the project as it is when the step runs, written by Vagrant's own Ruby (no `tar` needed on the host, Windows included), symbolic links kept as links, unpacked in /opt/isoloom. `.git`, `.vagrant` and `.terraform` stay out at any depth (a `.vagrant` holds private keys). (#67, #63)
 

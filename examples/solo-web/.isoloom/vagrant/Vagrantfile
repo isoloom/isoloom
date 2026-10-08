@@ -17,16 +17,47 @@ module IsoloomProject
 
   # Writes the archive of `root` to `io`, gzipped. `generated`: whether Isoloom's outputs (the
   # top-level `.isoloom*` folders) go in; `extra`: files in them that go in anyway (paths from
-  # `root`, with `/`).
+  # `root`, with `/`). What `.isoloomignore` lists stays out.
   def self.write(root, io, generated: false, extra: [])
     gz = Zlib::GzipWriter.new(io)
-    walk(root, nil, generated, extra) { |rel, st| entry(gz, root, rel, st) }
+    rules = ignore_rules(root)
+    walk(root, nil, generated, extra, rules) { |rel, st| entry(gz, root, rel, st) }
     gz.write("\0" * 1024)
     gz.finish
   end
 
+  # `.isoloomignore` at the project's root, gitignore-style: one pattern per line, `#` comments,
+  # `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the
+  # middle anchors the pattern at the root (otherwise it matches at any depth), `*`, `?`,
+  # `[abc]` and `**`. A pattern matching a folder matches everything in it, and the last pattern
+  # matching a path (or a folder it is in) decides. As [regexp, keep] pairs; the Terraform
+  # outputs translate the patterns the same way, so every target leaves out the same files.
+  def self.ignore_rules(root)
+    text = File.binread(File.join(root, ".isoloomignore")).force_encoding("UTF-8")
+    text.split("\n").filter_map do |line|
+      line = line.strip
+      next if line.empty? || line.start_with?("#")
+      keep = line.start_with?("!")
+      pat = keep ? line[1..] : line
+      glob = pat.delete_suffix("/").delete_suffix("/**").delete_suffix("/")
+      next if glob.empty?
+      anchored = glob.include?("/") ? glob.delete_prefix("/") : "**/#{glob}"
+      re = anchored.gsub(/[.+^$(){}|\\]/) { "\\#{$&}" }.gsub("[!", "[^")
+                   .gsub("**/", "\u0001").gsub("**", "\u0002").gsub("*", "[^/]*").gsub("?", "[^/]")
+                   .gsub("\u0001", "(.*/)?").gsub("\u0002", ".*")
+      [Regexp.new(glob == pat ? "^#{re}(/|$)" : "^#{re}/"), keep]
+    end
+  rescue Errno::ENOENT
+    []
+  end
+
+  # Whether the rules leave a path out (a folder's path ends with `/`).
+  def self.ignored?(rules, path)
+    rules.reduce(false) { |out, (re, keep)| re.match?(path) ? !keep : out }
+  end
+
   # Every entry under `dir` (relative to `root`), parents first, in name order.
-  def self.walk(root, dir, generated, extra, &block)
+  def self.walk(root, dir, generated, extra, rules, &block)
     names = begin
       Dir.children(dir ? File.join(root, dir) : root).sort
     rescue Errno::ENOENT, Errno::ENOTDIR
@@ -43,8 +74,11 @@ module IsoloomProject
       rescue Errno::ENOENT
         next
       end
-      yield rel, st
-      walk(root, rel, generated, extra, &block) if st.directory?
+      folder = st.directory?
+      out = ignored?(rules, folder ? "#{rel}/" : rel)
+      yield rel, st unless out
+      # An ignored folder is skipped, unless a `!` pattern may bring back something in it.
+      walk(root, rel, generated, extra, rules, &block) if folder && (!out || rules.any? { |_, keep| keep })
     end
   end
 

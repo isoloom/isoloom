@@ -1,7 +1,8 @@
-//! How the Vagrant outputs copy the project into a VM: Isoloom's own `project` step, a tar.gz
-//! built in Ruby when the step runs (not a list of top-level entries read when the Vagrantfile
-//! loads), symbolic links kept as links. The Ruby itself runs here when `ruby` and `tar` are on
-//! the PATH (CI has both), on a project with a symlink loop.
+//! How the outputs copy the project into the machines. Vagrant: Isoloom's own `project` step, a
+//! tar.gz built in Ruby when the step runs (not a list of top-level entries read when the
+//! Vagrantfile loads), symbolic links kept as links. The Ruby itself runs here when `ruby` and
+//! `tar` are on the PATH (CI has both), on a project with a symlink loop. Every output leaves
+//! out what `.isoloomignore` lists.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -44,6 +45,27 @@ fn have(tool: &str) -> bool {
     Command::new(tool).arg("--version").output().is_ok_and(|o| o.status.success())
 }
 
+/// Archives `root` with the Ruby of a generated Vagrantfile and lists the archive (`tar -tv`).
+fn archive(dir: &Path, root: &Path, generated: bool, out: &str) -> String {
+    let rb = dir.join("project.rb");
+    std::fs::write(&rb, file(&example("hello-stack"), Target::Vagrant, "vagrant/Vagrantfile")).unwrap();
+    let script = format!(
+        "eval(File.read(ARGV[0]).split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, generated: {generated}, extra: [\".isoloom/hybrid/compose.yml\"]) }}"
+    );
+    let st = Command::new("ruby")
+        .arg("-e")
+        .arg(script)
+        .arg(&rb)
+        .arg(root)
+        .arg(dir.join(out))
+        .status()
+        .unwrap();
+    assert!(st.success(), "the archive wasn't written");
+    let list = Command::new("tar").arg("-tvzf").arg(dir.join(out)).output().unwrap();
+    assert!(list.status.success(), "tar can't read it: {}", String::from_utf8_lossy(&list.stderr));
+    String::from_utf8(list.stdout).unwrap()
+}
+
 /// A fresh folder for one test.
 fn scratch(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("isoloom-{name}-{}", std::process::id()));
@@ -80,25 +102,7 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() {
     std::fs::create_dir_all(root.join(&long).parent().unwrap()).unwrap();
     std::fs::write(root.join(&long), "long").unwrap();
 
-    let rb = dir.join("project.rb");
-    std::fs::write(&rb, file(&example("hello-stack"), Target::Vagrant, "vagrant/Vagrantfile")).unwrap();
-    let run = |generated: bool, out: &str| {
-        let script = format!(
-            "eval(File.read(ARGV[0]).split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, generated: {generated}, extra: [\".isoloom/hybrid/compose.yml\"]) }}"
-        );
-        let st = Command::new("ruby")
-            .arg("-e")
-            .arg(script)
-            .arg(&rb)
-            .arg(&root)
-            .arg(dir.join(out))
-            .status()
-            .unwrap();
-        assert!(st.success(), "the archive wasn't written");
-        let out = Command::new("tar").arg("-tvzf").arg(dir.join(out)).output().unwrap();
-        assert!(out.status.success(), "tar can't read it: {}", String::from_utf8_lossy(&out.stderr));
-        String::from_utf8(out.stdout).unwrap()
-    };
+    let run = |generated: bool, out: &str| archive(&dir, &root, generated, out);
 
     let list = run(false, "project.tgz");
     let has = |l: &str, entry: &str| l.lines().any(|x| x.ends_with(entry));
@@ -129,4 +133,81 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() {
     assert_eq!(std::fs::read_link(out.join("vendor/goat/self")).unwrap(), Path::new("."));
     assert_eq!(std::fs::read_to_string(out.join(&long)).unwrap(), "long");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn isoloomignore_leaves_paths_out() {
+    if !have("ruby") || !have("tar") {
+        eprintln!("skipped: needs ruby and tar");
+        return;
+    }
+    let dir = scratch("isoloomignore");
+    let root = dir.join("project");
+    let files = [
+        "a.txt",
+        "logs/x.log",
+        "logs/keep.txt",
+        "src/app.py",
+        "src/deeper/z.py",
+        "src/build/out.o",
+        "build/top.o",
+        "docs/sub/deep.md",
+        "x.tmp",
+        "sub/x.tmp",
+        ".env",
+        "sub/.env",
+        "vendor/big/file.bin",
+        "vendor/small.txt",
+        "data.json",
+        "datazjson",
+        "w/a+b.txt",
+    ];
+    for f in files {
+        std::fs::create_dir_all(root.join(f).parent().unwrap()).unwrap();
+        std::fs::write(root.join(f), f).unwrap();
+    }
+    std::fs::write(
+        root.join(".isoloomignore"),
+        "# not copied into the VMs\n\nlogs/\n!logs/keep.txt\nbuild/\n/x.tmp\nsub/*.tmp\nvendor/big\n.env\ndocs/**\nsrc/*.py\ndata.js?n\nw/a+b.txt   \r\n",
+    )
+    .unwrap();
+    let list = archive(&dir, &root, false, "project.tgz");
+    let went: Vec<&str> = files.iter().copied().filter(|f| list.lines().any(|l| l.ends_with(&format!(" {f}")))).collect();
+    // `src/*.py` is anchored (a `/` in the middle): `src/deeper/z.py` stays; `.env` matches at any
+    // depth; `!logs/keep.txt` brings back a file of an ignored folder.
+    assert_eq!(went, ["a.txt", "logs/keep.txt", "src/deeper/z.py", "vendor/small.txt", "datazjson"], "{list}");
+    assert!(!list.contains("build/"), "an ignored folder's entry went in: {list}");
+    // Isoloom's own matcher (`isoloom run external`) agrees.
+    let rules = isoloom_core::ignore::Rules::read(&root);
+    let entries = isoloom_core::ignore::entries(&root, &rules).unwrap();
+    let own: Vec<&str> = files.iter().copied().filter(|f| entries.iter().any(|e| e == f)).collect();
+    assert_eq!(own, went);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn terraform_outputs_read_isoloomignore() {
+    let spec = example("hello-stack");
+    // Proxmox writes the files that go through cloud-init.
+    let proxmox = file(&spec, Target::Proxmox, "proxmox/main.tf");
+    assert!(proxmox.contains("project_files = [for f in local.project_paths : {"), "{proxmox}");
+    assert!(proxmox.contains("file(\"${local.root}/.isoloomignore\")"), "{proxmox}");
+    // The cloud modules' tar walks the project itself and leaves out the ignored files, from the
+    // archive's top folder (stripped when unpacked).
+    for (target, path) in [
+        (Target::CloudVm, "cloud-vm/aws/main.tf"),
+        (Target::CloudVm, "cloud-vm/gcp/main.tf"),
+        (Target::CloudDocker, "cloud-docker/aws/main.tf"),
+        (Target::CloudDocker, "cloud-docker/azure/main.tf"),
+        (Target::DockerVm, "docker-vm/proxmox/main.tf"),
+    ] {
+        let tf = file(&spec, target, path);
+        assert!(tf.contains("resource \"local_file\" \"isoloom_project\""), "{path}");
+        assert!(
+            tf.contains(r#"-X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""#),
+            "{path}"
+        );
+        assert!(!tf.contains("-C /opt/isoloom &&"), "{path}: unpacked without stripping the top folder");
+        assert!(tf.contains("--strip-components=1"), "{path}");
+    }
 }

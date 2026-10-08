@@ -14,6 +14,7 @@ mod docker_vm;
 mod external;
 mod hybrid;
 mod kubernetes;
+mod project;
 mod proxmox;
 pub mod resolved;
 mod router;
@@ -118,6 +119,14 @@ fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
             what: format!("machine `{name}` is a network appliance (`docker.appliance`), which runs on the Docker targets"),
         });
     }
+    let mut files = target_files_raw(spec, target)?;
+    for f in files.iter_mut().filter(|f| f.path.ends_with(".tf")) {
+        project::terraform(&mut f.contents);
+    }
+    Ok(files)
+}
+
+fn target_files_raw(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
     match target {
         // A hosting service runs the same Compose file.
         Target::Docker | Target::Hosted => docker::generate(&on_docker(spec), spec),

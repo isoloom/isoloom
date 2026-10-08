@@ -108,7 +108,7 @@ resource "terraform_data" "environment" {
   }
   # The project as an archive: a plain copy drops the executable bits (entrypoint scripts).
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project.tgz -C \"${local.root}\" ."
+    command = "tar -czf \"${path.module}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
     source      = "${path.module}/.isoloom-project.tgz"
@@ -117,7 +117,7 @@ resource "terraform_data" "environment" {
 __INPUTS_FILE__  provisioner "remote-exec" {
     inline = [
       "set -e",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
       "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
       "cd /opt/isoloom && __SOURCE_INPUTS____START__",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
@@ -965,7 +965,7 @@ resource "terraform_data" "environment" {{
   }}
   # The project as an archive: a plain copy drops the executable bits (entrypoint scripts).
   provisioner "local-exec" {{
-    command = "tar -czf \"${{path.module}}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project.tgz -C \"${{local.root}}\" ."
+    command = "tar -czf \"${{path.module}}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${{abspath(local_file.isoloom_project.filename)}}\" -C \"${{dirname(local.root)}}\" \"${{basename(local.root)}}\""
   }}
   provisioner "file" {{
     source      = "${{path.module}}/.isoloom-project.tgz"
@@ -974,7 +974,7 @@ resource "terraform_data" "environment" {{
 {inputs_file}  provisioner "remote-exec" {{
     inline = [
       "set -e",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
       "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
       "cd /opt/isoloom && {source_inputs}{start}",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
