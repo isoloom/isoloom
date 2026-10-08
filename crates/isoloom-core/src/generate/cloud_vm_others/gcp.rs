@@ -277,7 +277,7 @@ resource "google_compute_network" "env" {{
         let mut cmds: Vec<String> = vec![
             "set -e".into(),
             "cloud-init status --wait >/dev/null 2>&1 || true".into(),
-            "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
+            "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz".into(),
         ];
         if needs_controller(spec) {
             cmds.push(format!(
@@ -344,7 +344,7 @@ resource "google_compute_network" "env" {{
             .map(|d| format!("terraform_data.{}", res(d)))
             .collect();
         let mut prov = format!(
-            "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [google_compute_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \\\"${{local.root}}\\\" .\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
+            "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [google_compute_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \\\"${{abspath(local_file.isoloom_project.filename)}}\\\" -C \\\"${{dirname(local.root)}}\\\" \\\"${{basename(local.root)}}\\\"\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
         );
         if !m.inputs.is_empty() {
             let lines: Vec<String> = m
@@ -432,7 +432,7 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
     let mut cmds: Vec<String> = vec![
         "set -e".into(),
         "cloud-init status --wait >/dev/null 2>&1 || true".into(),
-        "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
+        "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz".into(),
     ];
     let hosts: Vec<String> = spec
         .machines
@@ -464,7 +464,7 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
         .collect();
     let _ = writeln!(
         tf,
-        "\nresource \"terraform_data\" \"isoloom_controller\" {{\n  triggers_replace = [google_compute_instance.isoloom_controller.id]\n  connection {{\n    type        = \"ssh\"\n    host        = google_compute_instance.isoloom_controller.network_interface[0].access_config[0].nat_ip\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-controller.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \\\"${{local.root}}\\\" .\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-controller.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n  provisioner \"file\" {{\n    content     = tls_private_key.controller.private_key_openssh\n    destination = \"/tmp/isoloom-controller-key\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n  depends_on = [{}]\n}}",
+        "\nresource \"terraform_data\" \"isoloom_controller\" {{\n  triggers_replace = [google_compute_instance.isoloom_controller.id]\n  connection {{\n    type        = \"ssh\"\n    host        = google_compute_instance.isoloom_controller.network_interface[0].access_config[0].nat_ip\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-controller.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \\\"${{abspath(local_file.isoloom_project.filename)}}\\\" -C \\\"${{dirname(local.root)}}\\\" \\\"${{basename(local.root)}}\\\"\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-controller.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n  provisioner \"file\" {{\n    content     = tls_private_key.controller.private_key_openssh\n    destination = \"/tmp/isoloom-controller-key\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n  depends_on = [{}]\n}}",
         cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n"),
         deps.join(", "),
     );
