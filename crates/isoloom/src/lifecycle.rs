@@ -880,8 +880,9 @@ pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<(
         for inv in &step.inventory {
             a.extend(["-i".to_string(), dir.join(inv).display().to_string()]);
         }
-        for (k, v) in &step.vars {
-            a.extend(["-e".to_string(), format!("{k}={v}")]);
+        // As JSON: `-e k=v` splits values on spaces and makes everything a string.
+        if !step.vars.is_empty() {
+            a.extend(["-e".to_string(), serde_json::to_string(&step.vars).expect("JSON values serialize")]);
         }
         a.push(dir.join(&step.ansible).display().to_string());
         run("ansible-playbook", &a, None)?;
