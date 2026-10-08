@@ -174,7 +174,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let nets: Vec<&String> = m.networks.keys().collect();
         let image = image_of(spec, name, m);
         if let Some(b) = &d.build {
-            builds.push(format!("docker build -t {image} {b}"));
+            let mut cmd = format!("docker build -t {image}");
+            if let Some(f) = &d.dockerfile {
+                cmd.push_str(&format!(" -f {f}"));
+            }
+            for (k, v) in &d.args {
+                cmd.push_str(&format!(" --build-arg {}", super::cloud_vm::sh_quote(&format!("{k}={v}"))));
+            }
+            builds.push(format!("{cmd} {b}"));
         }
 
         // The machine itself.

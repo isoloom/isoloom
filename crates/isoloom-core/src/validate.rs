@@ -404,6 +404,9 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 ),
                 _ => {}
             }
+            if d.build.is_none() && (d.dockerfile.is_some() || !d.args.is_empty()) {
+                add(&format!("{at}.docker"), "`dockerfile` and `args` go with `build` (the context)".into());
+            }
         }
         if let Some(v) = &m.vm {
             if v.os.is_empty() {
@@ -709,6 +712,9 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
         if let Some(d) = &m.docker {
             if let Some(b) = &d.build {
                 check(format!("machines.{name}.docker.build"), b);
+            }
+            if let Some(f) = &d.dockerfile {
+                check(format!("machines.{name}.docker.dockerfile"), f);
             }
             if let Some(c) = &d.config {
                 check(format!("machines.{name}.docker.config"), c);

@@ -298,6 +298,13 @@ pub struct DockerImpl {
     /// A build context in the project folder.
     #[serde(default)]
     pub build: Option<String>,
+    /// The Dockerfile, a file anywhere in the project (default: `Dockerfile` in `build`): an
+    /// image of your own around a vendored project's source, without moving that source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dockerfile: Option<String>,
+    /// Build arguments (`ARG`s of the Dockerfile), fixed values.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub args: IndexMap<String, String>,
     /// One-shot jobs (scripts or folders in the project) run before the machine counts as ready.
     #[serde(default)]
     pub init: Vec<String>,
