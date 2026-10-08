@@ -553,6 +553,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                     scripts.push(path.clone());
                 }
             }
+            // `exec` checks run inside the machine (`kubectl exec -i deploy/<machine> -- sh -s`),
+            // from their own runner; the Job beside it doesn't run them.
+            let (execs, group): (Vec<&checks::Resolved>, Vec<&checks::Resolved>) =
+                group.into_iter().partition(|c| matches!(c.probe, checks::Probe::Exec { .. }));
+            if !execs.is_empty() {
+                check_files.push(GeneratedFile {
+                    path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", super::docker::exec_runner(id)),
+                    contents: checks::script(&pos, &execs, &render),
+                });
+            }
             check_files.push(GeneratedFile {
                 path: format!("{OUTPUT_DIR}/{DIR}/checks/{id}.sh"),
                 contents: checks::script(&pos, &group, &render),

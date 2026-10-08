@@ -1343,6 +1343,29 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                     wd: dir.clone(),
                     env: vec![],
                 });
+                // `exec` checks: their own runner, piped into the machine itself.
+                if let Position::Machine(m) = pos {
+                    let file = out.join("docker/checks").join(core::generate::exec_runner(m));
+                    if file.exists() {
+                        let q = |a: &str| format!("'{}'", a.replace('\'', "'\\''"));
+                        let compose: Vec<String> = files.iter().map(|f| q(f)).collect();
+                        runners.push(Runner {
+                            label: format!("inside {m}"),
+                            program: s("sh"),
+                            args: vec![
+                                s("-c"),
+                                format!(
+                                    "docker compose {} exec -T {} sh -s < {}",
+                                    compose.join(" "),
+                                    q(m),
+                                    q(&file.display().to_string())
+                                ),
+                            ],
+                            wd: dir.clone(),
+                            env: vec![],
+                        });
+                    }
+                }
             }
         }
         core::Target::Vagrant | core::Target::DockerVm | core::Target::Hybrid => {
@@ -1403,6 +1426,25 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                     wd: dir.clone(),
                     env: vec![],
                 });
+                // `exec` checks: their own runner, piped into the machine's container.
+                if let Position::Machine(m) = pos {
+                    let file = out.join("kubernetes/checks").join(core::generate::exec_runner(m));
+                    if file.exists() {
+                        runners.push(Runner {
+                            label: format!("inside {m}"),
+                            program: s("sh"),
+                            args: vec![
+                                s("-c"),
+                                format!(
+                                    "kubectl -n {ns} exec -i deploy/{m} -c {m} -- sh -s < {}",
+                                    core::checks::sq(&file.display().to_string())
+                                ),
+                            ],
+                            wd: dir.clone(),
+                            env: vec![],
+                        });
+                    }
+                }
             }
         }
         core::Target::CloudVm => {

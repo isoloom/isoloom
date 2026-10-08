@@ -33,13 +33,5 @@ _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)"
 
 if _retry 0 _exec 'redis-cli get greeting' 'hello from isoloom'; then pass 'the cache holds the greeting, read inside it'; else fail 'the cache holds the greeting, read inside it' "$(printf '%s' "$out" | tail -n 1)"; fi
 
-if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _http_any 'http://10.60.0.10:80/'; then pass 'web:80 from cache'; else fail 'web:80 from cache' "nothing answers at http://10.60.0.10:80/"; fi
-fi
-
-if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-c=$(_http 'http://1.1.1.1/'); if [ "$c" = 000 ]; then pass 'no internet from cache'; else fail 'no internet from cache' "http://1.1.1.1/ answered (HTTP $c); it should be blocked"; fi
-fi
-
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

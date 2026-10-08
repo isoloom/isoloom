@@ -130,9 +130,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let _ = writeln!(
             out,
             "  config.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: {}{env}",
-            rb(
-                "cd /opt/isoloom && failed=0; sa=$(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); [ -z \"$sa\" ] || docker compose -f .isoloom/docker/compose.yml --profile check up -d --wait --no-deps $sa; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit $failed"
-            )
+            rb(&format!(
+                "cd /opt/isoloom && failed=0; sa=$(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); [ -z \"$sa\" ] || docker compose -f .isoloom/docker/compose.yml --profile check up -d --wait --no-deps $sa; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; {}exit $failed",
+                exec_runs(spec)
+            ))
         );
     }
     out.push_str("end\n");
@@ -143,4 +144,25 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         },
         super::cloud_docker::other_in(spec, DIR, "proxmox", super::cloud_docker::PROXMOX),
     ])
+}
+
+/// The `exec` checks' runners, piped into their machines (see `docker::exec_runner`).
+fn exec_runs(spec: &Spec) -> String {
+    let mut machines: Vec<String> = Vec::new();
+    for c in crate::checks::plan(spec) {
+        if let (crate::checks::Probe::Exec { .. }, crate::checks::Position::Machine(m)) = (&c.probe, &c.position)
+            && !machines.contains(m)
+        {
+            machines.push(m.clone());
+        }
+    }
+    machines
+        .iter()
+        .map(|m| {
+            format!(
+                "docker compose -f .isoloom/docker/compose.yml exec -T {m} sh -s < .isoloom/docker/checks/{} || failed=1; ",
+                super::docker::exec_runner(m)
+            )
+        })
+        .collect()
 }

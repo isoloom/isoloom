@@ -35,6 +35,10 @@ checks:
   - name: the page greets
     http: http://web/
     expect: 200
+  - name: the cache holds the greeting, read inside it
+    from: cache
+    exec: redis-cli get greeting
+    expect: hello from isoloom
 
 message: |
   The page answers at http://localhost:{{ machines.web.services.0.publish }}/ (and at
