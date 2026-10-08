@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Small containers
+- The 256 MB / 5 GB floor on `resources` is a VM's: it now applies only to machines with `vm:`. A container-only machine needs at least 1 cpu and 16 MB (crAPI's services run at 50 to 192 MB). (#49)
+
 ### `exec` checks on Docker and Kubernetes
 - An `exec` check no longer makes the container targets refuse the spec: each machine's `exec` checks get their own runner (`.isoloom/<docker|kubernetes>/checks/exec-<machine>.sh`), which `isoloom test` pipes into the machine itself (`docker compose exec -T <machine> sh -s`, `kubectl exec -i deploy/<machine> -- sh -s`); the docker-vm `checks` provisioner too. hello-stack reads its seeded greeting with `redis-cli` inside the cache. An `exec` check from a machine without a container of its own is refused, saying so.
 
