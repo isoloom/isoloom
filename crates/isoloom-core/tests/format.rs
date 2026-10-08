@@ -202,3 +202,18 @@ fn names_leave_room_for_the_kubernetes_affixes() {
     assert!(p.iter().any(|m| m.contains("at most 53 characters")), "{p:?}");
     assert!(p.iter().any(|m| m.contains("at most 62 characters")), "{p:?}");
 }
+
+/// A container can be small (a Go service capped at 64 MB); a VM needs room to boot.
+#[test]
+fn the_size_floor_is_a_vms() {
+    let spec = |impls: &str| {
+        format!(
+            "version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  svc:\n    networks: {{ lan: 10 }}\n    resources: {{ cpus: 1, memory_mb: 64 }}\n{impls}"
+        )
+    };
+    assert!(problems(&spec("    docker: { image: nginx }\n")).is_empty());
+    let both = problems(&spec("    docker: { image: nginx }\n    vm: { os: debian-12, provision: [x.sh] }\n"));
+    assert!(both.iter().any(|p| p.contains("too small for a VM")), "{both:?}");
+    let tiny = problems(&spec("    docker: { image: nginx }\n").replace("memory_mb: 64", "memory_mb: 8"));
+    assert!(tiny.iter().any(|p| p.contains("at least 1 cpu and 16 MB")), "{tiny:?}");
+}

@@ -25,7 +25,10 @@ jobs:
           for e in examples/*/; do cargo run -q -- validate "$e" --skip-files; cargo run -q -- targets "$e"; done
       - name: Generated files are up to date
         run: |
-          for e in examples/hello-stack examples/supplier-portal-api examples/segmented examples/pivot-dmz examples/edge-firewall examples/air-gapped examples/slow-link examples/existing-hosts; do cargo run -q -- check "$e"; done
+          # Every example with committed outputs (a stale one fails here, not in someone's run).
+          for e in examples/*/; do
+            if [ -d "$e.isoloom" ]; then cargo run -q -- check "$e"; fi
+          done
 
   # The generated Compose files, run for real: everything answers, and `isoloom test` passes
   # (the spec's checks and the ones derived from its services and reach rules).

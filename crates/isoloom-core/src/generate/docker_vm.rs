@@ -51,6 +51,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("  config.vm.box = \"bento/debian-12\"\n");
     let _ = writeln!(out, "  config.vm.hostname = {}", rb(&spec.name));
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n  config.vm.boot_timeout = 600\n");
+    // libvirt's domain name: the environment's, not this folder's ("docker-vm_default").
+    let _ = writeln!(
+        out,
+        "  config.vm.provider \"libvirt\" do |v|\n    v.default_prefix = {}\n  end",
+        rb(&format!("{}_", spec.name))
+    );
     for m in spec.machines.values().filter(|m| m.docker.is_some()) {
         for svc in &m.services {
             if let Some(host) = svc.publish {
@@ -76,6 +82,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         "  config.vm.provider \"parallels\" do |v|\n    v.name = {}\n    v.cpus = {cpus}\n    v.memory = {mem}\n  end",
         rb(&label)
     );
+    // Apple Silicon Macs: UTM and QEMU, as for the VMs of the Vagrant target.
+    let _ = writeln!(
+        out,
+        "  config.vm.provider \"utm\" do |v|\n    v.name = {}\n    v.cpus = {cpus}\n    v.memory = {mem}\n  end",
+        rb(&label)
+    );
+    let _ = writeln!(
+        out,
+        "  config.vm.provider \"qemu\" do |v|\n    v.smp = \"cpus={cpus}\"\n    v.memory = \"{mem}M\"\n  end"
+    );
     let _ = writeln!(
         out,
         "  config.vm.provider \"libvirt\" do |v, o|\n    o.vm.box = \"generic/debian12\"\n    v.cpus = {cpus}\n    v.memory = {mem}\n  end"
@@ -94,9 +110,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     let _ = writeln!(
         out,
         "  config.vm.provision \"shell\", name: \"environment\", inline: {}{env}",
-        rb(
-            "cd /opt/isoloom && ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
-        )
+        rb(&format!(
+            "cd /opt/isoloom && {} && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready",
+            super::docker::start_commands(
+                "ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml",
+                &super::docker::leaf_jobs(spec),
+                Some(900)
+            )
+        ))
     );
     // Checks on demand: every runner of the Compose `check` profile (one per position), the
     // derived checks switched off with ISOLOOM_DERIVED=0 on the host.
@@ -109,9 +130,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let _ = writeln!(
             out,
             "  config.vm.provision \"shell\", name: \"checks\", run: \"never\", inline: {}{env}",
-            rb(
-                "cd /opt/isoloom && failed=0; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit $failed"
-            )
+            rb(&format!(
+                "cd /opt/isoloom && failed=0; sa=$(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); [ -z \"$sa\" ] || docker compose -f .isoloom/docker/compose.yml --profile check up -d --wait --no-deps $sa; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; {}exit $failed",
+                exec_runs(spec)
+            ))
         );
     }
     out.push_str("end\n");
@@ -122,4 +144,25 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         },
         super::cloud_docker::other_in(spec, DIR, "proxmox", super::cloud_docker::PROXMOX),
     ])
+}
+
+/// The `exec` checks' runners, piped into their machines (see `docker::exec_runner`).
+fn exec_runs(spec: &Spec) -> String {
+    let mut machines: Vec<String> = Vec::new();
+    for c in crate::checks::plan(spec) {
+        if let (crate::checks::Probe::Exec { .. }, crate::checks::Position::Machine(m)) = (&c.probe, &c.position)
+            && !machines.contains(m)
+        {
+            machines.push(m.clone());
+        }
+    }
+    machines
+        .iter()
+        .map(|m| {
+            format!(
+                "docker compose -f .isoloom/docker/compose.yml exec -T {m} sh -s < .isoloom/docker/checks/{} || failed=1; ",
+                super::docker::exec_runner(m)
+            )
+        })
+        .collect()
 }

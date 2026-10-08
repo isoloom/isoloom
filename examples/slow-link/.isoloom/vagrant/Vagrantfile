@@ -17,6 +17,9 @@ end
 Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 900
+  config.vm.provider "libvirt" do |v|
+    v.default_prefix = "slow-link_"
+  end
 
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
@@ -40,10 +43,14 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "libvirt" do |v, o|
-      o.vm.box = "generic/debian12"
+    m.vm.provider "utm" do |v|
+      v.name = "slow-link · router"
       v.cpus = 1
       v.memory = 512
+    end
+    m.vm.provider "qemu" do |v|
+      v.smp = "cpus=1"
+      v.memory = "512M"
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -55,6 +62,11 @@ Vagrant.configure("2") do |config|
       v.guest_name = "slow-link-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
+    end
+    m.vm.provider "libvirt" do |v, o|
+      o.vm.box = "generic/debian12"
+      v.cpus = 1
+      v.memory = 512
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -288,7 +300,7 @@ Vagrant.configure("2") do |config|
       systemctl enable isoloom-routes.service
       systemctl restart isoloom-routes.service
     SH
-    m.vm.provision "shell", name: "checks", run: "never", path: "checks/user.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/slow-but-there.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/user.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   # Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).
@@ -303,10 +315,25 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "libvirt" do |v, o|
-      o.vm.box = "generic/debian12"
+    m.vm.provider "vmware_desktop" do |v|
+      v.vmx["displayName"] = "slow-link · tool shell"
+      v.vmx["numvcpus"] = "1"
+      v.vmx["memsize"] = "512"
+    end
+    m.vm.provider "parallels" do |v|
+      v.name = "slow-link · tool shell"
+      v.linked_clone = true
       v.cpus = 1
       v.memory = 512
+    end
+    m.vm.provider "utm" do |v|
+      v.name = "slow-link · tool shell"
+      v.cpus = 1
+      v.memory = 512
+    end
+    m.vm.provider "qemu" do |v|
+      v.smp = "cpus=1"
+      v.memory = "512M"
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -318,6 +345,11 @@ Vagrant.configure("2") do |config|
       v.guest_name = "slow-link-tool-shell"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
+    end
+    m.vm.provider "libvirt" do |v, o|
+      o.vm.box = "generic/debian12"
+      v.cpus = 1
+      v.memory = 512
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.75.2.10 web' '10.75.1.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "toolbox", inline: "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq tcpdump nmap curl dnsutils netcat-openbsd iproute2 >/dev/null"

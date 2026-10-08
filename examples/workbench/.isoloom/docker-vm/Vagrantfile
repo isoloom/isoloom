@@ -13,6 +13,9 @@ Vagrant.configure("2") do |config|
   config.vm.hostname = "workbench"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
+  config.vm.provider "libvirt" do |v|
+    v.default_prefix = "workbench_"
+  end
   config.vm.provider "virtualbox" do |v|
     v.name = "workbench · docker"
     v.cpus = 2
@@ -27,6 +30,15 @@ Vagrant.configure("2") do |config|
     v.name = "workbench · docker"
     v.cpus = 2
     v.memory = 2048
+  end
+  config.vm.provider "utm" do |v|
+    v.name = "workbench · docker"
+    v.cpus = 2
+    v.memory = 2048
+  end
+  config.vm.provider "qemu" do |v|
+    v.smp = "cpus=2"
+    v.memory = "2048M"
   end
   config.vm.provider "libvirt" do |v, o|
     o.vm.box = "generic/debian12"
@@ -50,5 +62,5 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
   config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
-  config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit $failed", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+  config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; sa=$(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); [ -z \"$sa\" ] || docker compose -f .isoloom/docker/compose.yml --profile check up -d --wait --no-deps $sa; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit $failed", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
 end

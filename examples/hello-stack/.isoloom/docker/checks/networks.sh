@@ -19,6 +19,18 @@ _http() {
   echo "${c:-000}"
 }
 _http_is() { [ "$(_http "$1")" = "$2" ]; }
+# _req STATUS|any TEXT CURL-ARGS... -> 0 when the request gets that status (any answer for `any`)
+# and its body contains TEXT (if any); $out says why not. Needs curl.
+_req() {
+  want=$1; text=$2; shift 2
+  command -v curl >/dev/null 2>&1 || { out="curl is needed for this check"; return 1; }
+  b=$(mktemp); c=$(curl -sk -m 10 -o "$b" -w '%{http_code}' "$@" 2>/dev/null); c=${c:-000}; r=0
+  if [ "$want" = any ]; then [ "$c" != 000 ] || r=1; else [ "$c" = "$want" ] || r=1; fi
+  if [ $r = 1 ]; then out="expected HTTP $want, got $c"
+  elif [ -n "$text" ] && ! grep -qF -- "$text" "$b"; then r=1; out="HTTP $c, but the response doesn't contain the expected text"
+  fi
+  rm -f "$b"; return $r
+}
 _http_any() { [ "$(_http "$1")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
@@ -35,6 +47,10 @@ echo '== checks/cache-seeded.sh'
 if _retry 0 sh -c 'cd /isoloom/project && sh checks/cache-seeded.sh'; then pass 'checks/cache-seeded.sh'; else fail 'checks/cache-seeded.sh' "checks/cache-seeded.sh exited non-zero"; fi
 
 if _retry 30 _http_is 'http://web/' 200; then pass 'the page greets'; else fail 'the page greets' "expected HTTP 200 from http://web/, got $(_http 'http://web/')"; fi
+
+if _retry 30 _req 200 'hello from isoloom' -H 'Accept: text/html' 'http://web/'; then pass 'the page says hello'; else fail 'the page says hello' "$out"; fi
+
+if _retry 30 _req 405 '' -X 'POST' --data-binary 'greeting=hi' 'http://web/'; then pass 'the static page refuses a POST'; else fail 'the static page refuses a POST' "$out"; fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
