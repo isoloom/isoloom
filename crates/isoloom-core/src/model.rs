@@ -361,6 +361,8 @@ pub enum Appliance {
     /// Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router.
     CiscoVios,
     /// Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch.
+    /// `cisco-viosl2`, as the image is named, is read too.
+    #[serde(alias = "cisco-viosl2")]
     CiscoViosL2,
     /// Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm).
     CiscoCsr1000v,

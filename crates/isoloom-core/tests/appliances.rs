@@ -204,6 +204,11 @@ fn a_lans_switch_is_checked() {
         problems(&spec(&format!("switch: sw, {vlans}"), "{ docker: { image: x, appliance: cisco-vios-l2 } }")),
         ""
     );
+    // The image's own spelling, as the changelog had it.
+    assert_eq!(
+        problems(&spec(&format!("switch: sw, {vlans}"), "{ docker: { image: x, appliance: cisco-viosl2 } }")),
+        ""
+    );
     // Not a switch appliance.
     let p = problems(&spec(&format!("switch: sw, {vlans}"), "{ docker: { image: x, appliance: cisco-iol } }"));
     assert!(p.contains("networks.office.switch: `sw` isn't a switch"), "{p}");
