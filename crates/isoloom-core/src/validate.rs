@@ -370,6 +370,11 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                     &format!("{at}.depends_on[{i}]"),
                     format!("`{dep}` has no services, so there's nothing to wait for; give it a service"),
                 );
+            } else if spec.machines[dep].ready_ports().is_empty() {
+                add(
+                    &format!("{at}.depends_on[{i}]"),
+                    format!("`{dep}`'s services are all dormant (they answer later), so there's nothing to wait for"),
+                );
             }
         }
         if let Some(r) = m.resources {

@@ -140,6 +140,10 @@ pub fn table() -> Vec<Row> {
             "machines.*.services[].port",
             done("machines depending on it wait until it answers", "segmented"),
         ),
+        (
+            "machines.*.services[].dormant",
+            done("left out of the dependency waits; no derived check expects it to answer", "segmented"),
+        ),
         ("machines.*.resources.cpus", done("the VM's cores", "segmented")),
         ("machines.*.resources.memory_mb", done("the VM's memory", "segmented")),
         ("machines.*.resources.disk_gb", done("the VM's disk size", "segmented")),
@@ -306,6 +310,17 @@ fn base_table() -> Vec<Row> {
             "machines.*.services[].fixed",
             done("the `publish` port itself on the host, not a free one", "supplier-portal-api"),
             done("Vagrant forwards `publish` as is", "supplier-portal-api"),
+        ),
+        common(
+            "machines.*.services[].dormant",
+            done(
+                "left out of the healthcheck (so `depends_on` and `up --wait` don't wait for it) and of the derived checks that expect an answer; still published and opened by `reach`",
+                "segmented",
+            ),
+            done(
+                "left out of the dependency waits and of the derived checks that expect an answer; still forwarded and opened by `reach`",
+                "segmented",
+            ),
         ),
         Row {
             path: "machines.*.services[].tls",

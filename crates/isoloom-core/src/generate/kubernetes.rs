@@ -207,6 +207,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         if !m.services.is_empty() {
             c.insert(s("ports"), list(m.services.iter().map(|sv| map([("containerPort", Value::from(sv.port))]))));
+        }
+        // Ready when its services answer (dormant ones aren't waited for).
+        if !m.ready_ports().is_empty() {
             c.insert(
                 s("readinessProbe"),
                 map([
@@ -245,7 +248,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         }
         // Isoloom's own probe (a static busybox an init container copies in): the readiness
         // probe needs nothing from the image.
-        if !m.services.is_empty() {
+        if !m.ready_ports().is_empty() {
             mounts.push(map([("name", s(PROBE_VOLUME)), ("mountPath", s(PROBE_DIR)), ("readOnly", Value::Bool(true))]));
         }
         if !mounts.is_empty() {
@@ -256,7 +259,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         // Its init jobs, in order, once it answers: a second container of the same pod.
         if !d.init.is_empty() {
             let mut steps = Vec::new();
-            if !m.services.is_empty() {
+            if !m.ready_ports().is_empty() {
                 steps.push(format!("until {}; do sleep 2; done", probe(m)));
             }
             for script in &d.init {
@@ -282,7 +285,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         pod.insert(s("hostname"), s(name.as_str()));
         // Wait for the machines it depends on: their services answer.
         let mut waits: Vec<Value> = Vec::new();
-        if !m.services.is_empty() {
+        if !m.ready_ports().is_empty() {
             waits.push(map([
                 ("name", s(PROBE_VOLUME)),
                 ("image", s(PROBE_IMAGE)),
@@ -291,7 +294,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             ]));
         }
         waits.extend(m.depends_on.iter().filter_map(|dep| {
-            let ports: Vec<u16> = spec.machines[dep].services.iter().map(|sv| sv.port).collect();
+            let ports: Vec<u16> = spec.machines[dep].ready_ports();
             (!ports.is_empty()).then(|| {
                 let cond = ports.iter().map(|p| format!("nc -z {dep} {p}")).collect::<Vec<_>>().join(" && ");
                 map([
@@ -337,7 +340,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 ("configMap", map([("name", s(SCRIPTS)), ("defaultMode", Value::from(0o755))])),
             ]));
         }
-        if !m.services.is_empty() {
+        if !m.ready_ports().is_empty() {
             volumes.push(map([("name", s(PROBE_VOLUME)), ("emptyDir", Value::Mapping(Default::default()))]));
         }
         for (i, _) in m.tmpfs.iter().enumerate() {

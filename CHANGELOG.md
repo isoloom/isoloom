@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Dormant services: a port that answers only later
+- `dormant: true` on a service: a port that only answers once something wakes it (the bind shell an exploit opens). It is declared, published if asked and opened by `reach` like any service, but nothing waits for it: left out of the Docker healthcheck (so `depends_on` and `up --wait` don't wait for it), the Kubernetes readiness probe and init-job wait, and the dependency waits on the VM targets (Vagrant, Proxmox, the clouds); no derived check expects it to answer (the `blocked` ones still apply). A machine whose services are all dormant has no healthcheck; `depends_on` such a machine is refused (nothing to wait for). The snapshot says `dormant: true`. segmented's web server has a dormant 4444. (#69)
+
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
 

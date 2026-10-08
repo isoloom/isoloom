@@ -74,13 +74,20 @@ pub(super) fn probe_service(arch: Arch) -> String {
     format!("isoloom-probe-{}", arch.id())
 }
 
-/// A TCP probe for each service port, run by Isoloom's own busybox (see [`PROBE_IMAGE`]).
+/// A TCP probe for each service port but the dormant ones, run by Isoloom's own busybox (see
+/// [`PROBE_IMAGE`]).
 pub(super) fn probe(m: &Machine) -> String {
-    m.services
+    m.ready_ports()
         .iter()
-        .map(|svc| format!("{PROBE_DIR}/busybox nc -z -w 2 127.0.0.1 {}", svc.port))
+        .map(|port| format!("{PROBE_DIR}/busybox nc -z -w 2 127.0.0.1 {port}"))
         .collect::<Vec<_>>()
         .join(" && ")
+}
+
+/// What a machine that waits for `m` waits for: healthy (its probe passes) when it has a port
+/// to probe, else started.
+pub(super) fn ready_condition(m: &Machine) -> &'static str {
+    if m.ready_ports().is_empty() { "service_started" } else { "service_healthy" }
 }
 
 /// The probe as an exec-form command: no shell from the image.
@@ -420,7 +427,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             }
             svc.insert(s("networks"), Value::Mapping(nets));
         }
-        if !m.services.is_empty() {
+        if !m.ready_ports().is_empty() {
             svc.insert(
                 s("healthcheck"),
                 map([
@@ -433,7 +440,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             );
         }
         let mut deps = Mapping::new();
-        if !m.services.is_empty() {
+        if !m.ready_ports().is_empty() {
             // Isoloom's own probe, copied into a volume before the machine starts.
             let probe_svc = probe_service(m.arch);
             let mount = s(format!("{probe_svc}:{PROBE_DIR}:ro"));
@@ -450,7 +457,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         }
         for dep in &m.depends_on {
             let dm = &spec.machines[dep];
-            deps.insert(s(dep.as_str()), map([("condition", s("service_healthy"))]));
+            deps.insert(s(dep.as_str()), map([("condition", s(ready_condition(dm)))]));
             for init in init_names(dep, dm) {
                 deps.insert(s(init), map([("condition", s("service_completed_successfully"))]));
             }
@@ -508,7 +515,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                 j.insert(s("environment"), env);
             }
             let mut deps = Mapping::new();
-            deps.insert(s(name.as_str()), map([("condition", s("service_healthy"))]));
+            deps.insert(s(name.as_str()), map([("condition", s(ready_condition(m)))]));
             if needs_routes(name, m) {
                 deps.insert(s(format!("{name}-routes")), map([("condition", s("service_healthy"))]));
             }
@@ -571,7 +578,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             if m.docker.is_none() {
                 continue;
             }
-            if !m.services.is_empty() {
+            if !m.ready_ports().is_empty() {
                 deps.insert(s(name.as_str()), map([("condition", s("service_healthy"))]));
             }
             for init in init_names(name, m) {
@@ -590,7 +597,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             checks::Position::Machine(name) => {
                 let m = &spec.machines[name];
                 let ns = if m.docker.is_some() {
-                    if m.services.is_empty() {
+                    if m.ready_ports().is_empty() {
                         deps.insert(s(name.as_str()), map([("condition", s("service_started"))]));
                     }
                     name.clone()
@@ -995,12 +1002,7 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
         if m.depends_on.iter().any(|d| d == gw) || !router::is_gateway(spec, gw) || spec.machines[gw].docker.is_none() {
             continue;
         }
-        let ready = if spec.machines[gw].services.is_empty() {
-            "service_started"
-        } else {
-            "service_healthy"
-        };
-        deps.insert(s(gw), map([("condition", s(ready))]));
+        deps.insert(s(gw), map([("condition", s(ready_condition(&spec.machines[gw])))]));
     }
     r.insert(s("depends_on"), Value::Mapping(deps));
     r.insert(s("restart"), s("unless-stopped"));

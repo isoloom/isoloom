@@ -251,7 +251,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         // dependency is waited on by address, not name: it's left out of this Linux machine's
         // /etc/hosts (so it doesn't shadow AD DNS), so only its address resolves.
         for dep in &m.depends_on {
-            let ports: Vec<u16> = spec.machines[dep].services.iter().map(|svc| svc.port).collect();
+            let ports: Vec<u16> = spec.machines[dep].ready_ports();
             let target = if is_windows_machine(spec, dep) {
                 address_for(spec, name, dep).to_string()
             } else {
@@ -670,7 +670,7 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
         let _ = writeln!(out, "    m.vm.provision \"shell\", name: \"hosts\", inline: {}", rb(&script));
     }
     for dep in &m.depends_on {
-        let ports: Vec<String> = spec.machines[dep].services.iter().map(|svc| svc.port.to_string()).collect();
+        let ports: Vec<String> = spec.machines[dep].ready_ports().iter().map(u16::to_string).collect();
         let script = format!(
             "$t = (Get-Date).AddSeconds(300); foreach ($p in @({ports})) {{ while (-not (Test-NetConnection {dep} -Port $p -WarningAction SilentlyContinue).TcpTestSucceeded) {{ if ((Get-Date) -gt $t) {{ throw \"{dep} didn't answer on $p\" }}; Start-Sleep 5 }} }}; \"{dep} answers\"",
             ports = ports.join(", ")

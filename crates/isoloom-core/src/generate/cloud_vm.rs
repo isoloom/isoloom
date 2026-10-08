@@ -597,7 +597,7 @@ pub(super) fn linux_setup_cmds(
         cmds.push(format!("sudo mkdir -p {}", m.volumes.values().cloned().collect::<Vec<_>>().join(" ")));
     }
     for dep in &m.depends_on {
-        let ports: Vec<u16> = spec.machines[dep].services.iter().map(|s| s.port).collect();
+        let ports: Vec<u16> = spec.machines[dep].ready_ports();
         if !ports.is_empty() {
             cmds.push(format!("sh -c {}", sh_quote(&router::wait_for(dep, &ports, 900))));
         }
