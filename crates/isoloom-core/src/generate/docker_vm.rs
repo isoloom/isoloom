@@ -110,9 +110,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     let _ = writeln!(
         out,
         "  config.vm.provision \"shell\", name: \"environment\", inline: {}{env}",
-        rb(
-            "cd /opt/isoloom && ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
-        )
+        rb(&format!(
+            "cd /opt/isoloom && {} && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready",
+            super::docker::start_commands(
+                "ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml",
+                &super::docker::leaf_jobs(spec),
+                Some(900)
+            )
+        ))
     );
     // Checks on demand: every runner of the Compose `check` profile (one per position), the
     // derived checks switched off with ISOLOOM_DERIVED=0 on the host.

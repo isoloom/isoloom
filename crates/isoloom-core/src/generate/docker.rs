@@ -141,6 +141,89 @@ fn networks_of(m: &Machine, spec: &Spec, with_address: bool) -> Value {
     Value::Mapping(nets)
 }
 
+/// The one-shot `init:` jobs no running service waits for: those of machines nothing depends
+/// on. Compose's `up --wait` fails when such a job exits, even with 0, so starters bring the
+/// rest up with `--wait` first, then run these attached, in order (see [`start_commands`]).
+pub fn leaf_jobs(spec: &Spec) -> Vec<String> {
+    spec.machines
+        .iter()
+        .filter(|(name, m)| m.docker.is_some() && !spec.machines.values().any(|o| o.docker.is_some() && o.depends_on.iter().any(|d| d == *name)))
+        .flat_map(|(name, m)| init_names(name, m))
+        .collect()
+}
+
+/// How to start a Compose file: `wait` for everything but `jobs` (`up -d --wait`), then run
+/// each of `jobs` attached, in order, failing on its exit code. Read from the Compose file, so
+/// an embedder holding only `.isoloom/docker/compose.yml` gets the same plan as Isoloom.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct StartPlan {
+    /// Services to bring up with `docker compose up -d --wait` (empty: all of them).
+    pub wait: Vec<String>,
+    /// One-shot jobs nothing running waits for, to run after `wait`, in order.
+    pub jobs: Vec<String>,
+}
+
+/// The [`StartPlan`] of a Compose file: one-shots (`restart: "no"`) outside profiles that no
+/// other started service depends on are jobs; when there are none, `wait` is empty (start all).
+pub fn start_plan(compose_yaml: &str) -> Result<StartPlan, String> {
+    let doc: Value = serde_yaml_ng::from_str(compose_yaml).map_err(|e| e.to_string())?;
+    let Some(Value::Mapping(services)) = doc.get("services") else {
+        return Ok(StartPlan::default());
+    };
+    let started: Vec<(&str, &Mapping)> = services
+        .iter()
+        .filter_map(|(k, v)| Some((k.as_str()?, v.as_mapping()?)))
+        .filter(|(_, v)| v.get("profiles").is_none())
+        .collect();
+    let deps_of = |v: &Mapping| -> Vec<String> {
+        match v.get("depends_on") {
+            Some(Value::Mapping(d)) => d.keys().filter_map(|k| k.as_str().map(String::from)).collect(),
+            Some(Value::Sequence(d)) => d.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
+            _ => Vec::new(),
+        }
+    };
+    let one_shot = |v: &Mapping| v.get("restart").and_then(Value::as_str) == Some("no");
+    // What the long-running services need, through chains of one-shots: `--wait` accepts those
+    // exiting. The other one-shots are the jobs.
+    let mut needed: Vec<String> = Vec::new();
+    let mut todo: Vec<String> = started.iter().filter(|(_, v)| !one_shot(v)).flat_map(|(_, v)| deps_of(v)).collect();
+    while let Some(n) = todo.pop() {
+        if needed.contains(&n) {
+            continue;
+        }
+        if let Some((_, v)) = started.iter().find(|(k, _)| *k == n) {
+            todo.extend(deps_of(v));
+        }
+        needed.push(n);
+    }
+    let jobs: Vec<String> = started
+        .iter()
+        .filter(|(n, v)| one_shot(v) && !needed.iter().any(|x| x == n))
+        .map(|(n, _)| n.to_string())
+        .collect();
+    if jobs.is_empty() {
+        return Ok(StartPlan::default());
+    }
+    let wait = started.iter().map(|(n, _)| n.to_string()).filter(|n| !jobs.contains(n)).collect();
+    Ok(StartPlan { wait, jobs })
+}
+
+/// The shell command that starts a Compose project with `compose` (e.g. `docker compose -f x`):
+/// plain `up -d --build --wait` when no job is left over, else the two steps of [`StartPlan`].
+/// `jobs` are the leaf jobs ([`leaf_jobs`]); the services to wait for are listed at run time.
+pub fn start_commands(compose: &str, jobs: &[String], wait_timeout: Option<u32>) -> String {
+    let timeout = wait_timeout.map(|t| format!(" --wait-timeout {t}")).unwrap_or_default();
+    if jobs.is_empty() {
+        return format!("{compose} up -d --build --wait{timeout}");
+    }
+    let exclude: String = jobs.iter().map(|j| format!(" -e {j}")).collect();
+    let mut cmd = format!("{compose} up -d --build --wait{timeout} $({compose} config --services | grep -vx{exclude})");
+    for j in jobs {
+        cmd.push_str(&format!(" && {compose} up --no-deps --exit-code-from {j} {j}"));
+    }
+    cmd
+}
+
 /// Init job service names for a machine.
 fn init_names(name: &str, m: &Machine) -> Vec<String> {
     let n = m.docker.as_ref().map(|d| d.init.len()).unwrap_or(0);

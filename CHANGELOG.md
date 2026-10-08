@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Init jobs on a machine nothing depends on
+- `docker compose up --wait` fails when a one-shot exits (even with 0) unless a running service depends on it, so an `init:` on a machine nothing depends on (a single-machine lab seeding itself) failed `isoloom run docker` although everything worked. Starting is now two steps when such leaf jobs exist: `up -d --build --wait` on everything else, then each job attached, in order (`up --no-deps --exit-code-from <job> <job>`), failing on its exit code. `isoloom run`, the docker-vm Vagrantfile and the cloud-docker modules do it; files without leaf jobs keep their single `up --wait`. Embedders get the same rule from `generate::start_plan(compose_yaml)` (or `leaf_jobs(spec)` and `start_commands`). (#42)
+
 ### A Dockerfile outside the build folder, and build arguments
 - `docker.dockerfile`: the Dockerfile, a file anywhere in the project (default: `Dockerfile` in `build`), so an image of your own can wrap a vendored project's source without moving it into your build folder. `docker.args`: build arguments, fixed values. Compose gets `build: { context, dockerfile, args }`; `isoloom import compose` now carries `dockerfile` and literal `args` over (shell-read ones are reported). Example: slow-link. (#40)
 

@@ -119,7 +119,7 @@ __INPUTS_FILE__  provisioner "remote-exec" {
       "set -e",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
-      "cd /opt/isoloom && __SOURCE_INPUTS__sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
+      "cd /opt/isoloom && __SOURCE_INPUTS____START__",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
     ]
   }
@@ -235,7 +235,8 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
             .replace("__USER__", user)
             .replace("__ID__", id)
             .replace("__INPUTS_FILE__", &inputs_file)
-            .replace("__SOURCE_INPUTS__", source_inputs),
+            .replace("__SOURCE_INPUTS__", source_inputs)
+            .replace("__START__", &start(spec)),
     );
     GeneratedFile {
         path: format!("{OUTPUT_DIR}/{dir}/{cloud}/main.tf"),
@@ -918,6 +919,7 @@ resource "aws_security_group" "env" {{
     } else {
         "set -a; . /tmp/isoloom-inputs.env; set +a; "
     };
+    let start = start(spec);
     let _ = write!(
         tf,
         r##"  egress {{
@@ -974,7 +976,7 @@ resource "terraform_data" "environment" {{
       "set -e",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
-      "cd /opt/isoloom && {source_inputs}sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
+      "cd /opt/isoloom && {source_inputs}{start}",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
     ]
   }}
@@ -1174,3 +1176,12 @@ resource "proxmox_virtual_environment_vm" "env" {
 }
 
 "##;
+
+/// Starts the environment on the VM (see [`super::docker::start_commands`]).
+fn start(spec: &Spec) -> String {
+    super::docker::start_commands(
+        "sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml",
+        &super::docker::leaf_jobs(spec),
+        Some(900),
+    )
+}
