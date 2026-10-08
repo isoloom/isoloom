@@ -369,8 +369,14 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             }
         }
         if let Some(r) = m.resources {
-            if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < 256) || r.disk_gb.is_some_and(|v| v < 5) {
-                add(&format!("{at}.resources"), "too small: at least 1 cpu, 256 MB and 5 GB".into());
+            // A VM needs room to boot; a container only what its process uses (a Go service
+            // capped at 64 MB is common), so the VM floor applies to machines that can be VMs.
+            if m.vm.is_some() {
+                if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < 256) || r.disk_gb.is_some_and(|v| v < 5) {
+                    add(&format!("{at}.resources"), "too small for a VM: at least 1 cpu, 256 MB and 5 GB".into());
+                }
+            } else if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < 16) {
+                add(&format!("{at}.resources"), "too small: at least 1 cpu and 16 MB".into());
             }
         }
         if m.docker.is_none() && m.vm.is_none() && !m.access {
