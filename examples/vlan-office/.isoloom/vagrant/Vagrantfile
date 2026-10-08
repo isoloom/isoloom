@@ -3,6 +3,8 @@
 # Start:  cd .isoloom/vagrant && vagrant up
 # Stop:   cd .isoloom/vagrant && vagrant destroy -f
 
+# One machine at a time, in order (QEMU and libvirt would boot them all at once).
+ENV["VAGRANT_NO_PARALLEL"] = "1"
 ROOT = File.expand_path("../..", __dir__)
 # Copied into each VM: the project, without version control or generated files.
 PROJECT = Dir.children(ROOT).reject { |e| [".git", ".vagrant"].include?(e) || e.start_with?(".isoloom") }.sort

@@ -619,6 +619,9 @@ fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
     assert_eq!(isoloom_core::qemu_refusal(&spec), None);
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     assert!(vf.contains("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"]"));
+    // QEMU boots machines in parallel unless told not to: the controller would run its play
+    // before the DC is up, and the connecting side of the link could start before the listener.
+    assert!(vf.contains("ENV[\"VAGRANT_NO_PARALLEL\"] = \"1\""));
 
     let dc = provider_block(vf, "dc01", "qemu");
     assert!(dc.contains("o.vm.box = \"peru/windows-server-2019-standard-x64-eval\""), "{dc}");

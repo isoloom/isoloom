@@ -58,6 +58,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 
     let mut out = header("#");
     out.push_str("# Start:  cd .isoloom/vagrant && vagrant up\n# Stop:   cd .isoloom/vagrant && vagrant destroy -f\n\n");
+    // Machines start one after the other, in dependency order: a machine's services are up
+    // before the ones depending on it boot, the controller comes last, and on QEMU the VM that
+    // listens on a network's link is up before the one that connects. QEMU and libvirt declare
+    // themselves parallel, so Vagrant would otherwise boot them all at once.
+    out.push_str("# One machine at a time, in order (QEMU and libvirt would boot them all at once).\nENV[\"VAGRANT_NO_PARALLEL\"] = \"1\"\n");
     out.push_str("ROOT = File.expand_path(\"../..\", __dir__)\n");
     out.push_str("# Copied into each VM: the project, without version control or generated files.\n");
     out.push_str("PROJECT = Dir.children(ROOT).reject { |e| [\".git\", \".vagrant\"].include?(e) || e.start_with?(\".isoloom\") }.sort\n");
