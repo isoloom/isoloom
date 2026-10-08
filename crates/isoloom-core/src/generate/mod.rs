@@ -19,6 +19,7 @@ pub mod resolved;
 mod router;
 mod trunks;
 mod vagrant;
+pub use vagrant::qemu_refusal;
 
 use std::fmt;
 use std::net::Ipv4Addr;
