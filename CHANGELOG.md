@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed published ports
+- \`fixed: true\` on a service keeps its \`publish\` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call \`localhost:<port>\` themselves. Launchers that pin ports keep a fixed one as is. (#70)
+
 ### Routes survive a machine's restart
 - On Docker, a machine whose container restarted got a new network namespace with Docker's default route back (internet regained, router routes lost), its route sidecar left in the old one. The sidecar now exits once its namespace has no addresses left, and its restart sets the routes in the new one. segmented passes all its checks after every machine is restarted. (#65)
 

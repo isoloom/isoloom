@@ -284,6 +284,11 @@ pub struct Service {
     /// environment's own networks.
     #[serde(default)]
     pub publish: Option<u16>,
+    /// Keep `publish` as the host port on local Docker too (normally a free one is picked, so
+    /// labs never collide): for apps whose pages call `localhost:<that port>` themselves. The
+    /// environment can't start while another holds that port.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fixed: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
