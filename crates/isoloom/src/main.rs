@@ -1203,7 +1203,7 @@ fn run_cmd(
     match status {
         Ok(s) if s.success() => {
             // Remember what is up on this host, for status / connect / exec / capture.
-            let recorded = core::registry::load().and_then(|mut reg| {
+            let recorded = core::registry::update(|reg| {
                 if down {
                     reg.remove(dir, t, instance);
                 } else {
@@ -1217,7 +1217,6 @@ fn run_cmd(
                         started: core::registry::now(),
                     });
                 }
-                core::registry::save(&reg)
             });
             if let Err(e) = recorded {
                 eprintln!("note: couldn't update {}: {e}", core::registry::path().display());

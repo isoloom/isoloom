@@ -14,13 +14,13 @@ type Res<T> = Result<T, Box<dyn std::error::Error>>;
 
 /// `isoloom status`: every environment in the registry, with its live state.
 pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<ExitCode> {
-    let mut reg = registry::load()?;
+    let reg = registry::load()?;
     if let Some(name) = cleanup {
         let targets: Vec<Entry> = reg.environments.iter().filter(|e| e.name == name || e.dir.ends_with(name)).cloned().collect();
         if targets.is_empty() {
             return Err(format!("no environment named `{name}` in {}", registry::path().display()).into());
         }
-        for e in targets {
+        for e in &targets {
             if e.dir.join(core::instance::output_dir(e.instance)).is_dir() {
                 let (program, args, wd) = super::bring_up(&e.dir, e.target, e.cloud.as_deref(), e.instance, true)?;
                 eprintln!("Tearing down {} on {} ({})", e.name, e.target.id(), wd.display());
@@ -36,9 +36,14 @@ pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<
             } else {
                 eprintln!("{}: folder gone, removing the entry", e.name);
             }
-            reg.remove(&e.dir, e.target, e.instance);
         }
-        registry::save(&reg)?;
+        // Removed only now, in one locked update: the teardowns take a while, and other runs
+        // may have changed the registry meanwhile.
+        registry::update(|r| {
+            for e in &targets {
+                r.remove(&e.dir, e.target, e.instance);
+            }
+        })?;
         let _ = ssh_key;
         return Ok(ExitCode::SUCCESS);
     }
