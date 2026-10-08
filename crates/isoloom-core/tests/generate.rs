@@ -590,3 +590,13 @@ machines:
     let compose = &generate(&hello, Target::Docker).unwrap()[0].contents;
     assert_eq!(isoloom_core::generate::start_plan(compose).unwrap(), Default::default());
 }
+
+/// The check runners run with --no-deps: `compose run` would run completed init jobs again,
+/// re-seeding the environment on every test (#47).
+#[test]
+fn checks_on_the_docker_vm_never_rerun_init_jobs() {
+    let (_, spec) = example("hello-stack");
+    let files = generate(&spec, Target::DockerVm).unwrap();
+    let vf = files.iter().find(|f| f.path.ends_with("Vagrantfile")).unwrap();
+    assert!(vf.contents.contains("--profile check run --rm --no-deps"));
+}
