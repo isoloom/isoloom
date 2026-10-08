@@ -94,6 +94,46 @@ fn target_label(e: &Entry) -> String {
     label
 }
 
+/// The host ports a local Docker environment really got, as (machine, port, host port): its
+/// Compose file publishes on free loopback ports unless `ISOLOOM_PUBLISH_FIXED` is set, so the
+/// spec's `publish:` values aren't where it answers. Empty when Compose can't say.
+pub fn docker_published(dir: &Path, instance: Option<u8>) -> Vec<(String, u16, u16)> {
+    let f = dir.join(core::instance::output_dir(instance)).join("docker/compose.yml");
+    let Ok(out) = Command::new("docker")
+        .args(["compose", "-f"])
+        .arg(&f)
+        .args(["ps", "--format", "json"])
+        .current_dir(dir)
+        .stderr(Stdio::null())
+        .output()
+    else {
+        return Vec::new();
+    };
+    let text = String::from_utf8_lossy(&out.stdout);
+    // Compose prints one JSON object per line (older versions: one array).
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str::<Vec<serde_json::Value>>(&text).unwrap_or_else(|_| text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect());
+    published_of(&items)
+}
+
+/// (service, container port, host port) for each port `docker compose ps` lists as published.
+fn published_of(items: &[serde_json::Value]) -> Vec<(String, u16, u16)> {
+    let mut found = Vec::new();
+    for i in items {
+        let Some(service) = i["Service"].as_str() else { continue };
+        for p in i["Publishers"].as_array().into_iter().flatten() {
+            let port = p["TargetPort"].as_u64().and_then(|n| u16::try_from(n).ok());
+            let host = p["PublishedPort"].as_u64().and_then(|n| u16::try_from(n).ok()).filter(|h| *h != 0);
+            if let (Some(port), Some(host)) = (port, host)
+                && !found.iter().any(|(s, c, _): &(String, u16, u16)| s == service && *c == port)
+            {
+                found.push((service.to_string(), port, host));
+            }
+        }
+    }
+    found
+}
+
 /// What the target's tool says about an environment: `running (3/3)`, `partly (1/3)`,
 /// `stopped`, `applied (12 resources)`, or why it can't tell.
 fn probe(e: &Entry) -> String {
@@ -858,5 +898,21 @@ fn tool_error(c: &Command, e: std::io::Error) -> String {
         format!("`{program}` isn't installed")
     } else {
         format!("{program}: {e}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn published_ports_come_from_compose_ps() {
+        let items: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[{"Service":"web","Publishers":[{"URL":"127.0.0.1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"},{"URL":"::1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"}]},
+                {"Service":"cache","Publishers":[{"URL":"","TargetPort":6379,"PublishedPort":0,"Protocol":"tcp"}]},
+                {"Service":"isoloom-check"}]"#,
+        )
+        .unwrap();
+        assert_eq!(published_of(&items), [("web".to_string(), 80, 32772)]);
     }
 }
