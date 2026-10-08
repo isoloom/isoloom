@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Playbooks retried on unreachable hosts
+- The controller retries a `provision:` playbook whose only failures are unreachable hosts (a Windows host that drops WinRM for a minute after a reboot or a domain join): after 60 s, on those hosts alone (Ansible's retry file), up to 3 attempts, each logged. The play recap decides: a failed task is never retried. On every target with a controller (local VMs, Proxmox, cloud VMs).
+
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)
 

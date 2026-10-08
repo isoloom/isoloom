@@ -479,8 +479,22 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() {
     assert!(tf.contains("private_ips       = [\"10.63.0.253\"]"));
     // After every machine is set up, it runs the playbook with the groups and vars.
     assert!(tf.contains("depends_on = [terraform_data.web, terraform_data.cache]") || tf.contains("depends_on = [terraform_data.cache, terraform_data.web]"));
-    assert!(tf.contains("ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini"));
+    assert!(
+        tf.contains("isoloom_play site.yml -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini"),
+        "{tf}"
+    );
     assert!(tf.contains("[webservers]"));
+}
+
+#[test]
+fn the_controller_retries_playbooks_on_unreachable_hosts_only() {
+    let (_, spec) = example("ansible-pair");
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    // Defined once, used for each step; the play recap decides (a failed task is never retried).
+    assert!(vagrantfile.contains("isoloom_play() {"));
+    assert!(vagrantfile.contains("isoloom_play site.yml -i /etc/isoloom/inventory.ini"));
+    assert!(vagrantfile.contains("grep -Eq 'failed=[1-9]'"));
+    assert!(vagrantfile.contains("--limit @$retry.limit"));
 }
 
 #[test]
