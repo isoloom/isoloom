@@ -600,3 +600,61 @@ fn checks_on_the_docker_vm_never_rerun_init_jobs() {
     let vf = files.iter().find(|f| f.path.ends_with("Vagrantfile")).unwrap();
     assert!(vf.contents.contains("--profile check run --rm --no-deps"));
 }
+
+#[test]
+fn a_dormant_service_is_declared_but_never_waited_for() {
+    // 4444 is the shell an exploit opens: `shell` has nothing else, `web` serves 80 too.
+    let spec = parse(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
+         shell: { networks: { lab: 5 }, services: [{ port: 4444, dormant: true, publish: 4444 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
+         web: { networks: { lab: 10 }, services: [{ port: 80 }, { port: 4444, dormant: true }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
+         app: { networks: { lab: 20 }, depends_on: [web], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+    )
+    .unwrap();
+    assert_eq!(isoloom_core::validate(&spec), vec![]);
+
+    // Docker: the healthcheck probes 80 only; a machine with only dormant services has none,
+    // so whatever waits for it waits for it to start.
+    let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents(&generate(&spec, Target::Docker).unwrap(), ".isoloom/docker/compose.yml")).unwrap();
+    let svc = |n: &str| compose["services"][n].clone();
+    let probe = serde_yaml_ng::to_string(&svc("web")["healthcheck"]).unwrap();
+    assert!(probe.contains("127.0.0.1 80") && !probe.contains("4444"), "{probe}");
+    assert!(svc("shell").get("healthcheck").is_none());
+    assert!(
+        serde_yaml_ng::to_string(&svc("shell")).unwrap().contains(":4444"),
+        "still published: {:?}",
+        svc("shell")
+    );
+    assert_eq!(svc("app")["depends_on"]["web"]["condition"].as_str(), Some("service_healthy"));
+    let check = serde_yaml_ng::to_string(&svc("isoloom-check-app")["depends_on"]).unwrap();
+    assert!(check.contains("web:") && !check.contains("shell:"), "{check}");
+
+    // Kubernetes: the port is declared and in the Service, but not in the readiness probe or
+    // the wait of the machines depending on it.
+    let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
+    assert!(env.contains("containerPort: 4444") && env.contains("name: p4444"), "{env}");
+    assert!(env.contains("until nc -z web 80; do sleep 2; done"), "{env}");
+    assert!(!env.contains("127.0.0.1 4444"), "{env}");
+
+    // VMs: app waits for web on 80 only.
+    let vf = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(vf.contains("</dev/tcp/web/80") && !vf.contains("/dev/tcp/web/4444"), "{vf}");
+
+    // No derived check expects it to answer.
+    let plan = isoloom_core::checks::plan(&spec);
+    assert!(plan.iter().any(|c| c.name == "web:80 from app"));
+    assert!(
+        !plan.iter().any(|c| c.name.contains(":4444")),
+        "{:?}",
+        plan.iter().map(|c| &c.name).collect::<Vec<_>>()
+    );
+
+    // Depending on a machine whose services are all dormant waits for nothing: refused.
+    let mut bad = spec.clone();
+    bad.machines.get_mut("app").unwrap().depends_on = vec!["shell".into()];
+    let problems: Vec<String> = isoloom_core::validate(&bad).iter().map(|p| p.to_string()).collect();
+    assert_eq!(
+        problems,
+        ["machines.app.depends_on[0]: `shell`'s services are all dormant (they answer later), so there's nothing to wait for"]
+    );
+}

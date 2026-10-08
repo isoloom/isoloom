@@ -48,6 +48,10 @@ if _tcp '10.61.10.10' 80; then fail 'web:80 blocked from cache' "10.61.10.10:80 
 fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
+if _tcp '10.61.10.10' 4444; then fail 'web:4444 blocked from cache' "10.61.10.10:4444 answered; it should be blocked"; else pass 'web:4444 blocked from cache'; fi
+fi
+
+if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 c=$(_http 'http://1.1.1.1/'); if [ "$c" = 000 ]; then pass 'no internet from cache'; else fail 'no internet from cache' "http://1.1.1.1/ answered (HTTP $c); it should be blocked"; fi
 fi
 

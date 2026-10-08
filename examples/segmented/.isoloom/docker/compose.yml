@@ -134,6 +134,7 @@ services:
         condition: service_healthy
     labels:
       isoloom.service.80: http:80
+      isoloom.service.shell: tcp:4444
     restart: unless-stopped
   web-routes:
     image: alpine:3.20

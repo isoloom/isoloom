@@ -289,6 +289,19 @@ pub struct Service {
     /// environment can't start while another holds that port.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fixed: bool,
+    /// Only answers later, once something wakes it (the bind shell an exploit opens): declared,
+    /// published and opened by `reach` like any service, but nothing waits for it (healthcheck,
+    /// readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dormant: bool,
+}
+
+impl Machine {
+    /// The ports Isoloom waits for before the machine counts as ready: its services but the
+    /// dormant ones. Empty: nothing to probe (no healthcheck, no readiness probe).
+    pub fn ready_ports(&self) -> Vec<u16> {
+        self.services.iter().filter(|s| !s.dormant).map(|s| s.port).collect()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

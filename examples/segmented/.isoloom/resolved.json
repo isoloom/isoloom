@@ -118,6 +118,13 @@
           "name": null,
           "http": true,
           "publish": null
+        },
+        {
+          "port": 4444,
+          "name": "shell",
+          "http": false,
+          "publish": null,
+          "dormant": true
         }
       ],
       "depends_on": [
@@ -290,6 +297,14 @@
             "derived": true,
             "kind": "tcp",
             "target": "10.61.10.10:80",
+            "expect": "blocked",
+            "wait": 0
+          },
+          {
+            "name": "web:4444 blocked from cache",
+            "derived": true,
+            "kind": "tcp",
+            "target": "10.61.10.10:4444",
             "expect": "blocked",
             "wait": 0
           },
