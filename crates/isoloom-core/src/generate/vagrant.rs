@@ -24,9 +24,18 @@ use crate::model::{Arch, Machine, Spec, Target, VmImpl};
 const DIR: &str = "vagrant";
 
 /// The Ruby that copies the project into a VM (`vagrant_project.rb`): a tar.gz built when the
-/// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`. Every
-/// Vagrantfile Isoloom writes carries it, after `ROOT`.
-pub(super) const PROJECT_RB: &str = include_str!("vagrant_project.rb");
+/// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`; on Windows
+/// unpacked by PowerShell (`untar.ps1`, as `IsoloomProject::UNTAR_PS1`). Every Vagrantfile
+/// Isoloom writes carries it, after `ROOT`.
+pub(super) const PROJECT_RB: &str = concat!(
+    include_str!("vagrant_project.rb"),
+    "\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n",
+    include_str!("untar.ps1"),
+    "PS1\n"
+);
+
+/// Unpacks the project's tar.gz on Windows (`$archive`, `$dest`, `$strip` set before it).
+pub(super) const UNTAR_PS1: &str = include_str!("untar.ps1");
 
 /// A VM's `project` step: the project (without Isoloom's outputs) in /opt/isoloom.
 const PROJECT_STEP: &str = "    m.vm.provision \"isoloom_project\", name: \"project\"\n";
@@ -690,7 +699,13 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
             rb(&script)
         );
     }
-    // Each step is uploaded and run on its own: copying the project over WinRM is slow.
+    // The project in C:\isoloom (once: over WinRM, a copy is slow; `.isoloomignore` keeps it
+    // small), then each step run from there, as on Linux: its own PowerShell, so it exits as a
+    // script run on its own would, in the project's folder.
+    if vm.provision.is_empty() {
+        return;
+    }
+    out.push_str(PROJECT_STEP);
     let env = if m.inputs.is_empty() {
         String::new()
     } else {
@@ -699,11 +714,19 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
     for step in &vm.provision {
         let _ = writeln!(
             out,
-            "    m.vm.provision \"shell\", name: {}, path: File.join(ROOT, {}){env}",
+            "    m.vm.provision \"shell\", name: {}, inline: {}{env}",
             rb(step),
-            rb(step)
+            rb(&windows_step(step))
         );
     }
+}
+
+/// Runs a step of the project copied in C:\\isoloom, from there, in its own PowerShell.
+pub(super) fn windows_step(step: &str) -> String {
+    format!(
+        "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\isoloom\\{}'; exit $LASTEXITCODE",
+        step.replace('/', "\\").replace('\'', "''")
+    )
 }
 
 /// The controller: a Debian VM on every network at its controller address, started after every
