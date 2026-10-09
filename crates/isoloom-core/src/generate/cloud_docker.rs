@@ -86,6 +86,15 @@ variable "auto_stop_minutes" {
 }
 "#;
 
+/// Proxmox: reach the lab VM through the node when its bridge isn't routable from where
+/// Terraform runs (a host-internal NAT bridge, an isolated lab network). Off unless
+/// `ssh_via_node`; the node's SSH login is the one the snippet upload already uses.
+const PROXMOX_BASTION: &str = r#"    bastion_host        = var.ssh_via_node ? (var.proxmox_ssh_address != "" ? var.proxmox_ssh_address : join("", compact(regex("^https?://(?:\\[([^]]+)\\]|([^/:]+))", var.proxmox_endpoint)))) : null
+    bastion_user        = var.ssh_via_node ? var.proxmox_ssh_username : null
+    bastion_password    = var.ssh_via_node && var.proxmox_ssh_private_key_file == "" ? var.proxmox_password : null
+    bastion_private_key = var.ssh_via_node && var.proxmox_ssh_private_key_file != "" ? file(var.proxmox_ssh_private_key_file) : null
+"#;
+
 /// The environment over SSH, on any cloud: the project, Docker, the Compose file, the ready
 /// marker. `__HOST__`, `__USER__` and `__ID__` are the VM's address, login and id expressions.
 const ENVIRONMENT: &str = r#"
@@ -98,7 +107,7 @@ resource "terraform_data" "environment" {
     user        = "__USER__"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
-  }
+__BASTION__  }
   provisioner "remote-exec" {
     inline = [
       "cloud-init status --wait >/dev/null 2>&1 || true",
@@ -236,7 +245,8 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
             .replace("__ID__", id)
             .replace("__INPUTS_FILE__", &inputs_file)
             .replace("__SOURCE_INPUTS__", source_inputs)
-            .replace("__START__", &start(spec)),
+            .replace("__START__", &start(spec))
+            .replace("__BASTION__", if cloud == "proxmox" { PROXMOX_BASTION } else { "" }),
     );
     GeneratedFile {
         path: format!("{OUTPUT_DIR}/{dir}/{cloud}/main.tf"),
@@ -1049,6 +1059,11 @@ variable "proxmox_ssh_address" {
   type        = string
   default     = ""
   description = "The node's SSH address, when the API reports one this machine can't reach"
+}
+variable "ssh_via_node" {
+  type        = bool
+  default     = false
+  description = "Reach the lab VM over SSH through the node (its bridge isn't routable from here)"
 }
 variable "node" {
   type    = string

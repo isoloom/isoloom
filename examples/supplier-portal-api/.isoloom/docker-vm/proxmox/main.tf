@@ -53,6 +53,11 @@ variable "proxmox_ssh_address" {
   default     = ""
   description = "The node's SSH address, when the API reports one this machine can't reach"
 }
+variable "ssh_via_node" {
+  type        = bool
+  default     = false
+  description = "Reach the lab VM over SSH through the node (its bridge isn't routable from here)"
+}
 variable "node" {
   type    = string
   default = "pve"
@@ -205,6 +210,10 @@ resource "terraform_data" "environment" {
     user        = "isoloom"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
+    bastion_host        = var.ssh_via_node ? (var.proxmox_ssh_address != "" ? var.proxmox_ssh_address : join("", compact(regex("^https?://(?:\\[([^]]+)\\]|([^/:]+))", var.proxmox_endpoint)))) : null
+    bastion_user        = var.ssh_via_node ? var.proxmox_ssh_username : null
+    bastion_password    = var.ssh_via_node && var.proxmox_ssh_private_key_file == "" ? var.proxmox_password : null
+    bastion_private_key = var.ssh_via_node && var.proxmox_ssh_private_key_file != "" ? file(var.proxmox_ssh_private_key_file) : null
   }
   provisioner "remote-exec" {
     inline = [
