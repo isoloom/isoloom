@@ -170,6 +170,13 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 add(&format!("cloud.outputs.{k}"), format!("`{k}: {o}`: a name, then the module output it reads"));
             }
         }
+        for (k, v) in &c.vars {
+            if let Some(i) = crate::model::CloudServices::input_of(v)
+                && !spec.inputs.iter().any(|d| d == i)
+            {
+                add(&format!("cloud.vars.{k}"), format!("`{i}` isn't declared in the spec's `inputs`"));
+            }
+        }
         if c.hourly_usd.is_some_and(|h| !(0.0..=1000.0).contains(&h)) {
             add("cloud.hourly_usd", "a cost per hour in US dollars (0 to 1000)".into());
         }

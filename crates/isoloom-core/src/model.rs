@@ -736,9 +736,12 @@ pub struct CloudServices {
     pub provider: CloudProvider,
     /// A Terraform root module in the project (a folder holding `.tf` files), used as is.
     pub terraform: String,
-    /// The module's variables, fixed values.
+    /// The module's variables: any value (a string, number, boolean, list or map). A string
+    /// that is exactly `{{ inputs.NAME }}` takes the launch-time input `NAME` (declared in
+    /// `inputs`), e.g. the player's IP for an allow-list: required at `run`, kept for `down`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    pub vars: IndexMap<String, String>,
+    #[schemars(with = "IndexMap<String, serde_json::Value>")]
+    pub vars: IndexMap<String, serde_json::Value>,
     /// What the environment exposes, by name: a module output each. Checks and the message
     /// use them as `{{ cloud.outputs.<name> }}`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
@@ -756,6 +759,14 @@ pub enum CloudProvider {
     Aws,
     Azure,
     Gcp,
+}
+
+impl CloudServices {
+    /// The launch-time input a variable takes, when its value is exactly `{{ inputs.NAME }}`.
+    pub fn input_of(value: &serde_json::Value) -> Option<&str> {
+        let s = value.as_str()?.trim();
+        s.strip_prefix("{{ inputs.")?.strip_suffix(" }}").map(str::trim)
+    }
 }
 
 impl CloudProvider {

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Cloud services: typed variables, launch-time inputs
+- `cloud.vars` take any value (strings, numbers, booleans, lists, maps), and a variable whose value is exactly `{{ inputs.NAME }}` takes the launch-time input `NAME` (declared in `inputs`): `run` reads it from the environment (and refuses without it), writes it next to the state (mode 0600) and `down` destroys with the same values. For a player's IP in an allow-list (CloudGoat). (#98)
+
 ### Cloud services
 - An environment can be cloud services instead of machines: `cloud: { provider, terraform, vars, outputs, hourly_usd }` names a Terraform root module in the project, applied into the user's own AWS, Azure or Google Cloud account by the new `cloud-services` target. `run` and `down` apply and destroy it (state and plugins under `.isoloom/cloud-services/`, the module untouched), `test` fills `{{ cloud.outputs.<name> }}` into the checks and runs them from here (scripts get `ISOLOOM_OUTPUT_<NAME>`), the message too, and `status` counts the deployed resources. Example: cloud-bucket (a public S3 website). Not run against a real account yet. (#96)
 

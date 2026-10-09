@@ -9,4 +9,6 @@ here="$(pwd)"
 export TF_DATA_DIR="$here/.terraform"
 module='../../terraform'
 terraform -chdir="$module" init -input=false >&2
-terraform -chdir="$module" apply -auto-approve -input=false -state="$here/terraform.tfstate" -var-file="$here/terraform.tfvars.json"
+set -- -var-file="$here/terraform.tfvars.json"
+[ ! -f "$here/inputs.tfvars.json" ] || set -- "$@" -var-file="$here/inputs.tfvars.json"
+terraform -chdir="$module" apply -auto-approve -input=false -state="$here/terraform.tfstate" "$@"
