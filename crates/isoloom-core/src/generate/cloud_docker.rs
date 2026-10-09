@@ -220,6 +220,7 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
     ));
     tf.push_str(
         &template
+            .replace("__GCP_PROJECT__", &super::gcp_project_name(&spec.name))
             .replace("__NAME__", &spec.name)
             .replace("__SIZE__", &sizes)
             .replace("__PORTS_LIST__", &ports_list)
@@ -435,7 +436,7 @@ provider "google" {
 # A project of its own when none is given: everything goes when the environment is destroyed.
 resource "google_project" "env" {
   count               = var.project == "" ? 1 : 0
-  name                = "isoloom-__NAME__"
+  name                = "__GCP_PROJECT__"
   project_id          = "isoloom-${terraform_data.id.output}"
   billing_account     = var.billing_account
   org_id              = var.org_id == "" ? null : var.org_id

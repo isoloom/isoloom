@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Google Cloud: long environment names
+- The project Isoloom creates on Google Cloud is named `isoloom-<environment>` cut to 30 characters, Google's limit: an environment named over 22 characters failed at plan time (`terraform validate` too).
+
 ## 0.10.0
 
 ### Cloud services: typed variables, launch-time inputs
