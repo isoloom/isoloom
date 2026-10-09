@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Cloud services
+- An environment can be cloud services instead of machines: `cloud: { provider, terraform, vars, outputs, hourly_usd }` names a Terraform root module in the project, applied into the user's own AWS, Azure or Google Cloud account by the new `cloud-services` target. `run` and `down` apply and destroy it (state and plugins under `.isoloom/cloud-services/`, the module untouched), `test` fills `{{ cloud.outputs.<name> }}` into the checks and runs them from here (scripts get `ISOLOOM_OUTPUT_<NAME>`), the message too, and `status` counts the deployed resources. Example: cloud-bucket (a public S3 website). Not run against a real account yet. (#96)
+
 ### Cloud resources say which instance they are, and when they end
 - Every cloud module takes `expires_at` (Unix seconds; empty by default) and tags what it creates with the environment, the instance (`isoloom-instance` = the module's unique name; DigitalOcean and Linode: an extra tag) and `isoloom-expires-at` (AWS cloud-vm through the provider's default tags), so a reaper can find what to destroy after a crash or a lost state. Proxmox VMs keep their environment-named tags. (#88)
 

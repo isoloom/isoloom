@@ -6,6 +6,7 @@ mod appliances;
 /// The network appliances' management network (see `docker.appliance`).
 pub const APPLIANCE_MGMT_CIDR: &str = appliances::MGMT_CIDR;
 mod cloud_docker;
+mod cloud_services;
 mod cloud_vm;
 mod cloud_vm_others;
 mod docker;
@@ -79,6 +80,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
     Target::Proxmox,
     Target::CloudVm,
     Target::External,
+    Target::CloudServices,
 ];
 
 /// The files for one target.
@@ -139,6 +141,7 @@ fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
         Target::Proxmox => proxmox::generate(spec),
         Target::CloudVm => cloud_vm::generate(spec),
         Target::External => external::generate(spec),
+        Target::CloudServices => cloud_services::generate(spec),
     }
 }
 

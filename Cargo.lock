@@ -461,6 +461,7 @@ name = "isoloom"
 version = "0.9.0"
 dependencies = [
  "clap",
+ "indexmap",
  "isoloom-core",
  "serde",
  "serde_json",

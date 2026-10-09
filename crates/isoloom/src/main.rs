@@ -634,7 +634,11 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                     }
                 } else {
                     let lacking = core::targets::missing(&spec, t.needs());
-                    let why = if !lacking.is_empty() {
+                    let why = if spec.cloud.is_some() && t != core::Target::CloudServices {
+                        "cloud services run on `cloud-services` only".to_string()
+                    } else if t == core::Target::CloudServices {
+                        "needs `cloud:` (cloud services instead of machines)".to_string()
+                    } else if !lacking.is_empty() {
                         format!("needs `{}:` on {}", t.needs().key(), lacking.join(", "))
                     } else if t == core::Target::Hybrid && !core::targets::mixed(&spec) {
                         "only when some machines are containers and others are VMs".to_string()
@@ -1195,6 +1199,95 @@ fn load_settings(
     Ok((spec, settings))
 }
 
+/// A cloud-services environment's outputs, by the spec's names: `outputs.sh` read (empty when
+/// it isn't deployed or Terraform can't say).
+fn cloud_outputs(dir: &std::path::Path, instance: Option<u8>) -> indexmap::IndexMap<String, String> {
+    let script = dir.join(core::instance::output_dir(instance)).join("cloud-services/outputs.sh");
+    let Ok(out) = std::process::Command::new("sh").arg(&script).stderr(std::process::Stdio::null()).output() else {
+        return Default::default();
+    };
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
+    let Ok((spec, _)) = load_settings(dir, None, &[]) else {
+        return Default::default();
+    };
+    let Some(cloud) = &spec.cloud else { return Default::default() };
+    cloud
+        .outputs
+        .iter()
+        .filter_map(|(name, output)| {
+            let v = &json[output]["value"];
+            let text = v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
+            (!v.is_null()).then(|| (name.clone(), text))
+        })
+        .collect()
+}
+
+/// `isoloom test cloud-services`: the spec's checks, its `{{ cloud.outputs.<name> }}` filled in
+/// from the deployed module, run from this machine (scripts get each output as
+/// `ISOLOOM_OUTPUT_<NAME>`). No derived checks: cloud services have no machines.
+fn cloud_test(spec: &core::Spec, dir: &std::path::Path, instance: Option<u8>, _no_derived: bool, json: bool) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let outputs = cloud_outputs(dir, instance);
+    if outputs.is_empty() && spec.cloud.as_ref().is_some_and(|c| !c.outputs.is_empty()) {
+        return Err("no outputs: the services aren't deployed (`isoloom run cloud-services`)".into());
+    }
+    let filled = spec.with_cloud_outputs(&outputs);
+    let plan: Vec<_> = core::checks::plan(&filled).into_iter().filter(|c| !c.derived).collect();
+    if plan.is_empty() {
+        println!("nothing to check: no `checks:` in the spec");
+        return Ok(ExitCode::SUCCESS);
+    }
+    let group: Vec<&core::checks::Resolved> = plan.iter().collect();
+    let host = |h: &core::checks::Host, _: &core::checks::Position| match h {
+        core::checks::Host::Literal(l) => l.clone(),
+        core::checks::Host::Machine { name, .. } => name.clone(),
+    };
+    let run_script = |path: &str| format!("sh {path}");
+    let render = core::checks::Render {
+        host: &host,
+        script: &run_script,
+        playbook: None,
+    };
+    let script = core::checks::script(&core::checks::Position::Networks, &group, &render);
+    let mut c = std::process::Command::new("sh");
+    c.args(["-c", &script]).current_dir(dir);
+    for (k, v) in &outputs {
+        c.env(format!("ISOLOOM_OUTPUT_{}", k.to_uppercase().replace('-', "_")), v);
+    }
+    let out = c.output()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let (mut passed, mut failed) = (0, 0);
+    let mut results = Vec::new();
+    for line in text.lines() {
+        match core::checks::parse_line(line) {
+            Some(core::checks::Line::Pass(n)) => {
+                passed += 1;
+                results.push(serde_json::json!({ "name": n, "ok": true }));
+                if !json {
+                    println!("  ✓ {n}");
+                }
+            }
+            Some(core::checks::Line::Fail(n, why)) => {
+                failed += 1;
+                results.push(serde_json::json!({ "name": n, "ok": false, "detail": why }));
+                if !json {
+                    println!("  ✗ {n}: {why}");
+                }
+            }
+            _ => {}
+        }
+    }
+    if json {
+        println!("{}", serde_json::to_string_pretty(&results)?);
+    } else {
+        println!("\n{passed} passed{}", if failed > 0 { format!(", {failed} failed") } else { String::new() });
+    }
+    Ok(if failed > 0 || !out.status.success() && passed == 0 {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
 /// The baseline snapshot of a Vagrant environment: saved by `run`, restored by `reset`.
 const BASELINE: &str = "isoloom-baseline";
 
@@ -1249,7 +1342,8 @@ fn run_cmd(
     let (spec, dir, t, defaults) = prepare(dir, target, images, instance, sets)?;
     let dir = &dir;
     if !down {
-        let ready = core::host::check(t, cloud.or((t == core::Target::CloudVm).then_some("aws")));
+        let own = spec.cloud.as_ref().map(|c| c.provider.id());
+        let ready = core::host::check(t, cloud.or(own).or((t == core::Target::CloudVm).then_some("aws")));
         if !ready.ready {
             return Err(format!(
                 "this machine can't run `{}` yet: {} (see `isoloom doctor`)",
@@ -1310,7 +1404,11 @@ fn run_cmd(
                 }
             }
             // The spec's message, now that the environment is up.
-            if !down && let Ok(Some(m)) = core::resolved::render_message_at(&spec, instance, t, &real_ports(dir, t, instance)) {
+            if !down && t == core::Target::CloudServices {
+                if let Some(m) = &spec.cloud_message(&cloud_outputs(dir, instance)) {
+                    println!("\n{}", m.trim_end());
+                }
+            } else if !down && let Ok(Some(m)) = core::resolved::render_message_at(&spec, instance, t, &real_ports(dir, t, instance)) {
                 println!("\n{}", m.trim_end());
             }
             Ok(ExitCode::SUCCESS)
@@ -1362,6 +1460,9 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
         sets,
     } = opts;
     let (spec, dir, t, _) = prepare(dir, target, images, instance, sets)?;
+    if t == core::Target::CloudServices {
+        return cloud_test(&spec, &dir, instance, no_derived, json);
+    }
     let plan = checks::plan(&spec);
     let expected: Vec<&checks::Resolved> = plan.iter().filter(|c| !(no_derived && c.derived)).collect();
     if expected.is_empty() {
@@ -1391,6 +1492,8 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
     // A manifest written for this run (Kubernetes with --no-derived), removed at the end.
     let mut temp: Option<PathBuf> = None;
     match t {
+        // Handled before (cloud_test): no machines, no runners.
+        core::Target::CloudServices => unreachable!("cloud services are tested by cloud_test"),
         core::Target::Docker | core::Target::Hosted => {
             let files = lifecycle::compose_files(&dir, instance);
             // The runners run with --no-deps: the environment is up, and `compose run` would
@@ -1953,6 +2056,8 @@ fn bring_up(
         // Nothing to create or destroy: `run` provisions over SSH (see lifecycle::external_up),
         // `down` only forgets the environment.
         core::Target::External => (s("true"), vec![], dir.to_path_buf()),
+        // The generated scripts run Terraform on the project's module (see generate::cloud_services).
+        core::Target::CloudServices => (s("sh"), vec![s(if down { "down.sh" } else { "up.sh" })], out.join("cloud-services")),
     })
 }
 
