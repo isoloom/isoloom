@@ -16,6 +16,9 @@
 
 ## Unreleased
 
+### `isoloom reset`
+- `isoloom reset <target>`: back to the environment as it came up, what was done in it since gone (files dropped, users added, databases changed). Docker: torn down with its volumes and run again from the same images (init jobs run again). Vagrant: `isoloom run vagrant` saves a baseline snapshot of every VM once provisioned (`isoloom-baseline`; `ISOLOOM_NO_BASELINE=1` skips it), and `reset` restores it without provisioning; without one, down and run. Other targets: down and run. The Vagrant snapshot path is not run end to end yet. (#89)
+
 ### Labels on everything, and `isoloom gc`
 - On Docker, every container, built image, network and volume an environment creates carries `isoloom.managed=true` and `isoloom.environment=<name>`.
 - `isoloom gc` lists Docker leftovers of environments: labelled networks and volumes whose Compose project has no container left (a crashed run, a killed launcher), and with `--images` the built images no container uses; `--yes` removes them. It never touches containers (a parked environment keeps its volumes) or anything unlabelled. Cloud tags follow. (#88)
