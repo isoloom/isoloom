@@ -122,6 +122,21 @@ enum Command {
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
     },
+    /// Back to the environment as it came up, everything done in it since gone (files dropped,
+    /// users added, databases changed): VMs restore the baseline snapshot `run` saved; without
+    /// one, and on the other targets, the environment is torn down and run again (Docker: fresh
+    /// containers and volumes from the same images).
+    Reset {
+        target: Option<String>,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        #[arg(long)]
+        cloud: Option<String>,
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
+    },
     /// Tear down what `run` started for a target (the inverse tool: compose down, vagrant
     /// destroy, kubectl delete, or terraform destroy).
     Down {
@@ -707,6 +722,13 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             instance,
             sets,
         } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), None, instance, &sets, true),
+        Command::Reset {
+            target,
+            dir,
+            cloud,
+            instance,
+            sets,
+        } => reset_cmd(&dir, target.as_deref(), cloud.as_deref(), instance, &sets),
         Command::Test {
             target,
             dir,
@@ -1173,6 +1195,48 @@ fn load_settings(
     Ok((spec, settings))
 }
 
+/// The baseline snapshot of a Vagrant environment: saved by `run`, restored by `reset`.
+const BASELINE: &str = "isoloom-baseline";
+
+/// See `isoloom reset`.
+fn reset_cmd(
+    dir: &std::path::Path,
+    target: Option<&str>,
+    cloud: Option<&str>,
+    instance: Option<u8>,
+    sets: &[String],
+) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let (_, abs_dir, t, _) = prepare(dir, target, None, instance, sets)?;
+    if t == core::Target::Vagrant {
+        let vdir = abs_dir.join(core::instance::output_dir(instance)).join("vagrant");
+        let has_baseline = std::process::Command::new("vagrant")
+            .args(["snapshot", "list"])
+            .current_dir(&vdir)
+            .output()
+            .ok()
+            .is_some_and(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).lines().any(|l| l.trim() == BASELINE));
+        if has_baseline {
+            eprintln!("Restoring the baseline snapshot ({BASELINE}) of every machine");
+            let ok = std::process::Command::new("vagrant")
+                .args(["snapshot", "restore", "--no-provision", BASELINE])
+                .current_dir(&vdir)
+                .status()
+                .is_ok_and(|s| s.success());
+            if ok {
+                return Ok(ExitCode::SUCCESS);
+            }
+            eprintln!("note: restoring the snapshot failed; tearing down and running again");
+        } else {
+            eprintln!("No baseline snapshot (an older run, or ISOLOOM_NO_BASELINE): tearing down and running again");
+        }
+    }
+    let down = run_cmd(dir, target, cloud, None, instance, sets, true)?;
+    if down != ExitCode::SUCCESS {
+        return Ok(down);
+    }
+    run_cmd(dir, target, cloud, None, instance, sets, false)
+}
+
 fn run_cmd(
     dir: &std::path::Path,
     target: Option<&str>,
@@ -1232,6 +1296,18 @@ fn run_cmd(
             });
             if let Err(e) = recorded {
                 eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
+            }
+            // VMs: a baseline snapshot of the environment as it came up, for `isoloom reset`.
+            if !down && t == core::Target::Vagrant && std::env::var_os("ISOLOOM_NO_BASELINE").is_none() {
+                eprintln!("Saving the baseline snapshot ({BASELINE}) for `isoloom reset`");
+                let saved = std::process::Command::new("vagrant")
+                    .args(["snapshot", "save", "--force", BASELINE])
+                    .current_dir(&wd)
+                    .status()
+                    .is_ok_and(|s| s.success());
+                if !saved {
+                    eprintln!("note: no baseline snapshot (the provider may not support snapshots); `reset` will rebuild");
+                }
             }
             // The spec's message, now that the environment is up.
             if !down && let Ok(Some(m)) = core::resolved::render_message_at(&spec, instance, t, &real_ports(dir, t, instance)) {
