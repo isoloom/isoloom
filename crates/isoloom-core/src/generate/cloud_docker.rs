@@ -84,6 +84,12 @@ variable "auto_stop_minutes" {
   default     = 0
   description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
 }
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
 "#;
 
 /// Proxmox: reach the lab VM through the node when its bridge isn't routable from where
@@ -296,7 +302,7 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-__NAME__-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "__NAME__", "managed-by" = "isoloom" }
+  tags = { "isoloom-environment" = "__NAME__", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
 }
 
 resource "azurerm_resource_group" "env" {
@@ -487,7 +493,7 @@ resource "google_compute_instance" "env" {
   name         = local.name
   machine_type = var.machine_type
   zone         = "${var.region}-a"
-  labels       = { "isoloom-environment" = "__NAME__", "managed-by" = "isoloom" }
+  labels       = { "isoloom-environment" = "__NAME__", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
@@ -555,7 +561,7 @@ resource "digitalocean_droplet" "env" {
   image    = "debian-12-x64"
   vpc_uuid = digitalocean_vpc.env.id
   ssh_keys = [digitalocean_ssh_key.env.id]
-  tags     = ["isoloom", "__NAME__"]
+  tags     = concat(["isoloom", "__NAME__", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
 }
 
 resource "digitalocean_firewall" "env" {
@@ -626,7 +632,7 @@ resource "linode_instance" "env" {
   type            = var.type
   image           = "linode/debian12"
   authorized_keys = [trimspace(var.ssh_public_key)]
-  tags            = ["isoloom", "__NAME__"]
+  tags            = concat(["isoloom", "__NAME__", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
 }
 
 resource "linode_firewall" "env" {
@@ -819,6 +825,12 @@ variable "auto_stop_minutes" {{
   default     = 0
   description = "Shut the VM down (and terminate it) after this long; 0 = never"
 }}
+
+variable "expires_at" {{
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}}
 "#
     );
     if !spec.inputs.is_empty() {
@@ -833,6 +845,7 @@ provider "aws" {{
     tags = {{
       "isoloom:environment" = "{name}"
       "managed-by"          = "isoloom"
+      "isoloom-expires-at"  = var.expires_at
     }}
   }}
 }}

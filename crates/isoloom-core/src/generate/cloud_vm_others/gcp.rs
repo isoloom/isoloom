@@ -125,6 +125,12 @@ variable "auto_stop_minutes" {{
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
 }}
+
+variable "expires_at" {{
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}}
 "#,
         tls = if needs_controller(spec) {
             "\n    tls = {\n      source  = \"hashicorp/tls\"\n      version = \"~> 4.0\"\n    }"
@@ -266,7 +272,7 @@ resource "google_compute_network" "env" {{
 
         let _ = writeln!(
             tf,
-            "\nresource \"google_compute_instance\" \"{id}\" {{\n  project      = local.project\n  name         = \"${{local.name}}-{name}\"\n  machine_type = \"{itype}\"\n  zone         = local.zone\n  tags         = [\"{tag}\"]\n  boot_disk {{\n    initialize_params {{\n      image = \"{image}\"\n      size  = {disk}\n    }}\n  }}\n  network_interface {{\n    subnetwork = google_compute_subnetwork.{netid}.id\n    network_ip = \"{addr}\"\n    access_config {{}}\n  }}\n  metadata = {{\n    ssh-keys = \"{user}:${{var.ssh_public_key}}\"\n  }}\n  metadata_startup_script = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  labels = {{\n    \"isoloom-environment\" = \"{env}\"\n    \"managed-by\"          = \"isoloom\"\n  }}\n}}",
+            "\nresource \"google_compute_instance\" \"{id}\" {{\n  project      = local.project\n  name         = \"${{local.name}}-{name}\"\n  machine_type = \"{itype}\"\n  zone         = local.zone\n  tags         = [\"{tag}\"]\n  boot_disk {{\n    initialize_params {{\n      image = \"{image}\"\n      size  = {disk}\n    }}\n  }}\n  network_interface {{\n    subnetwork = google_compute_subnetwork.{netid}.id\n    network_ip = \"{addr}\"\n    access_config {{}}\n  }}\n  metadata = {{\n    ssh-keys = \"{user}:${{var.ssh_public_key}}\"\n  }}\n  metadata_startup_script = var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : null\n  labels = {{\n    \"isoloom-environment\" = \"{env}\"\n    \"managed-by\"          = \"isoloom\"\n    \"isoloom-instance\"   = local.name\n    \"isoloom-expires-at\" = var.expires_at\n  }}\n}}",
             itype = gcp_type(mem),
             netid = res(net),
             env = spec.name,

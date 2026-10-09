@@ -49,6 +49,12 @@ variable "auto_stop_minutes" {
   description = "Shut the machines down after this many minutes (0: never)"
 }
 
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+
 provider "azurerm" {
   features {}
   subscription_id = var.subscription_id
@@ -64,7 +70,7 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-windows-hello-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "windows-hello", "managed-by" = "isoloom" }
+  tags = { "isoloom-environment" = "windows-hello", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
 }
 
 resource "azurerm_resource_group" "env" {

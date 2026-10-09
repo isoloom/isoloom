@@ -196,6 +196,12 @@ variable "auto_stop_minutes" {
   description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
 }
 
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+
 # The environment, over SSH: the project, Docker, then the Compose file.
 resource "terraform_data" "environment" {
   triggers_replace = [proxmox_virtual_environment_vm.env.id]

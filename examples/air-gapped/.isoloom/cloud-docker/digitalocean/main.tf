@@ -54,7 +54,7 @@ resource "digitalocean_droplet" "env" {
   image    = "debian-12-x64"
   vpc_uuid = digitalocean_vpc.env.id
   ssh_keys = [digitalocean_ssh_key.env.id]
-  tags     = ["isoloom", "air-gapped"]
+  tags     = concat(["isoloom", "air-gapped", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
 }
 
 resource "digitalocean_firewall" "env" {
@@ -100,6 +100,12 @@ variable "auto_stop_minutes" {
   type        = number
   default     = 0
   description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
+}
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
 
 # The environment, over SSH: the project, Docker, then the Compose file.
