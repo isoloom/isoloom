@@ -1400,6 +1400,37 @@ fn run_cmd(
         args.extend(["--provider".to_string(), p.clone()]);
     }
     eprintln!("{} {} ({})", if down { "Tearing down" } else { "Running" }, t.id(), wd.display());
+    // Cloud services taking launch-time inputs: from the environment at `run`, written next to
+    // the state so `down` destroys with the same values.
+    if t == core::Target::CloudServices
+        && !down
+        && let Some(c) = &spec.cloud
+    {
+        let mut values = serde_json::Map::new();
+        let mut missing = Vec::new();
+        for (k, v) in &c.vars {
+            if let Some(i) = core::CloudServices::input_of(v) {
+                match std::env::var(i) {
+                    Ok(val) if !val.is_empty() => {
+                        values.insert(k.clone(), serde_json::Value::String(val));
+                    }
+                    _ => missing.push(i.to_string()),
+                }
+            }
+        }
+        if !missing.is_empty() {
+            return Err(format!("set {} in the environment (the services take them at launch)", missing.join(", ")).into());
+        }
+        if !values.is_empty() {
+            let file = wd.join("inputs.tfvars.json");
+            std::fs::write(&file, serde_json::to_string_pretty(&serde_json::Value::Object(values))?)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600))?;
+            }
+        }
+    }
     let mut cmd = std::process::Command::new(&program);
     cmd.args(&args).current_dir(&wd);
     if matches!(t, core::Target::CloudServices | core::Target::CloudVm | core::Target::CloudDocker) {

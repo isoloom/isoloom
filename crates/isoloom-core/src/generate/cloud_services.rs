@@ -22,7 +22,14 @@ fn sq(s: &str) -> String {
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     let cloud = spec.cloud.as_ref().expect("the cloud-services target needs cloud:");
     let module = sq(&format!("{ROOT}/{}", cloud.terraform.trim_end_matches('/')));
-    let vars: serde_json::Map<String, serde_json::Value> = cloud.vars.iter().map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone()))).collect();
+    // Fixed values only: a variable taking a launch-time input is written by `run`, from the
+    // environment, to inputs.tfvars.json next to the state (kept for `down`).
+    let vars: serde_json::Map<String, serde_json::Value> = cloud
+        .vars
+        .iter()
+        .filter(|(_, v)| crate::model::CloudServices::input_of(v).is_none())
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
     let mut vars_json = serde_json::to_string_pretty(&serde_json::Value::Object(vars)).expect("vars serialize");
     vars_json.push('\n');
 
@@ -41,13 +48,16 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         s
     };
     let init = "terraform -chdir=\"$module\" init -input=false >&2\n";
+    // The fixed variables, then the launch-time inputs `run` wrote (when the spec takes any).
+    let files =
+        "set -- -var-file=\"$here/terraform.tfvars.json\"\n[ ! -f \"$here/inputs.tfvars.json\" ] || set -- \"$@\" -var-file=\"$here/inputs.tfvars.json\"\n";
     let state = "-state=\"$here/terraform.tfstate\"";
     let up = format!(
-        "{}{init}terraform -chdir=\"$module\" apply -auto-approve -input=false {state} -var-file=\"$here/terraform.tfvars.json\"\n",
+        "{}{init}{files}terraform -chdir=\"$module\" apply -auto-approve -input=false {state} \"$@\"\n",
         prelude("Creates the services (`isoloom run cloud-services`).")
     );
     let down = format!(
-        "{}{init}terraform -chdir=\"$module\" destroy -auto-approve -input=false {state} -var-file=\"$here/terraform.tfvars.json\"\n",
+        "{}{init}{files}terraform -chdir=\"$module\" destroy -auto-approve -input=false {state} \"$@\"\n",
         prelude("Destroys them (`isoloom down cloud-services`): what they cost stops here.")
     );
     let outputs = format!(

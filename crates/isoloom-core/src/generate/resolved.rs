@@ -259,9 +259,24 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
             "positions": positions,
         },
     });
-    // The message, with its placeholders filled from everything above.
+    // Cloud services: what tools reading the snapshot need to run them (the cloud, the module,
+    // what they expose and cost). Not the variables, which may take a player's input.
+    if let (Some(c), Value::Object(map)) = (&spec.cloud, &mut out) {
+        map.insert(
+            "cloud".into(),
+            json!({
+                "provider": c.provider.id(),
+                "terraform": c.terraform,
+                "outputs": c.outputs.keys().collect::<Vec<_>>(),
+                "inputs": c.vars.values().filter_map(crate::model::CloudServices::input_of).collect::<Vec<_>>(),
+                "hourly_usd": c.hourly_usd,
+            }),
+        );
+    }
+    // The message, with its placeholders filled from everything above (a cloud-services
+    // message keeps its `{{ cloud.outputs.* }}`: they are only known once deployed).
     if let Some(m) = &spec.message {
-        let filled = fill(m, &out).ok();
+        let filled = fill(m, &out).ok().or_else(|| spec.cloud.as_ref().map(|_| m.clone()));
         if let Value::Object(map) = &mut out {
             map.insert("message".into(), filled.map(Value::String).unwrap_or(Value::Null));
         }

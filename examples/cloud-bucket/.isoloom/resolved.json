@@ -41,5 +41,14 @@
     "default_position": "networks",
     "positions": []
   },
-  "message": null
+  "cloud": {
+    "provider": "aws",
+    "terraform": "terraform",
+    "outputs": [
+      "site"
+    ],
+    "inputs": [],
+    "hourly_usd": 0.01
+  },
+  "message": "The website answers at {{ cloud.outputs.site }}.\n"
 }
