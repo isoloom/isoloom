@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Emulated machines on one vCPU
+- On QEMU, a machine emulating another CPU (x86 on an Apple Silicon Mac) gets one virtual CPU. QEMU emulates another architecture on a single host thread, so a second vCPU only took turns with the first, and could see code the other was rewriting half-done: Windows' PowerShell died now and then jumping into the data bytes of a .NET call stub being patched (illegal instruction `push ds`), which cut WinRM in the middle of GOAD-Mini's setup.
+
 ### Setup that survives a flaky connection
 - The environment's playbooks run again when a dropped connection cut them (WinRM's shell crashing mid-task, an SSH reset, a host briefly unreachable), up to 4 runs in all: the setup is idempotent, so a run picks up where the last stopped. A task that fails on its own still stops the setup at once. Under x86 emulation on an Apple Silicon Mac, Windows' PowerShell host crashes now and then (an illegal-instruction fault in .NET), which stopped GOAD-Mini's setup twice in one build.
 - Role downloads (`ansible-galaxy install`, from GitHub) are tried 5 times with a growing pause (`ISOLOOM_RETRY_PAUSE`, 15 s by default).

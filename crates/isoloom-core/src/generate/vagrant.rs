@@ -676,13 +676,21 @@ fn qemu_block(out: &mut String, cpus: u32, mem: u32, q: &Qemu) {
     }
     if let Some(qa) = qemu_arch {
         // Emulated (another CPU than the host's) runs many times slower: booting and WinRM get
-        // far longer to answer.
+        // far longer to answer. And on one virtual CPU: QEMU emulates another architecture on a
+        // single host thread, so a second vCPU only takes turns with the first (no speed), and
+        // code one vCPU rewrites can be seen half-done by the other. .NET rewrites its call
+        // stubs at run time; under emulation with 2 vCPUs, Windows' PowerShell died now and then
+        // jumping into a stub's data bytes (illegal instruction), which cut WinRM mid-play.
         let winrm = if q.windows_address.is_some() {
             "\n        o.winrm.retry_limit = 180\n        o.winrm.timeout = 1800"
         } else {
             ""
         };
-        let _ = writeln!(out, "      if {} != HOST_ARCH\n        o.vm.boot_timeout = 3600{winrm}\n      end", rb(qa));
+        let _ = writeln!(
+            out,
+            "      if {} != HOST_ARCH\n        v.smp = \"cpus=1\"\n        o.vm.boot_timeout = 3600{winrm}\n      end",
+            rb(qa)
+        );
     }
     if let Some((ip, len)) = q.windows_address {
         let _ = writeln!(
