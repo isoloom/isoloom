@@ -1,0 +1,45 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "cloud-bucket",
+  "instance": null,
+  "inputs": [],
+  "networks": {},
+  "reach": [],
+  "machines": {},
+  "start_order": [],
+  "clones": {},
+  "tools": {},
+  "groups": {},
+  "router": null,
+  "controller": {
+    "addresses": {}
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "cloud-services"
+    ],
+    "generated": [
+      "cloud-services"
+    ],
+    "refused": {},
+    "not_possible": {
+      "docker": "left out by `targets:`",
+      "hosted": "left out by `targets:`",
+      "docker-vm": "left out by `targets:`",
+      "cloud-docker": "left out by `targets:`",
+      "kubernetes": "left out by `targets:`",
+      "hybrid": "only when some machines are containers and others are VMs",
+      "vagrant": "left out by `targets:`",
+      "proxmox": "left out by `targets:`",
+      "cloud-vm": "left out by `targets:`",
+      "external": "left out by `targets:`"
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": []
+  },
+  "message": null
+}

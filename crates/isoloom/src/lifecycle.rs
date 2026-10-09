@@ -237,6 +237,20 @@ fn probe(e: &Entry) -> String {
                 counted(ready, items.len())
             })
         }
+        Target::CloudServices => {
+            // What the module's state holds: deployed resources, or nothing.
+            let state = out.join("cloud-services/terraform.tfstate");
+            let n = std::fs::read_to_string(&state)
+                .ok()
+                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+                .and_then(|v| v["resources"].as_array().map(Vec::len))
+                .unwrap_or(0);
+            Ok(if n > 0 {
+                format!("deployed ({n} resources)")
+            } else {
+                "not deployed".to_string()
+            })
+        }
         Target::External => {
             // Each machine answers SSH, or not.
             let machines = external_machines(&out).unwrap_or_default();
@@ -468,6 +482,9 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 core::instance::output_dir(instance),
                 sq(&inner)
             ));
+        }
+        Target::CloudServices => {
+            return Err("cloud services have no machines to reach: use their outputs (`isoloom message`)".into());
         }
         Target::External => {
             let e = m.external.as_ref().ok_or_else(|| format!("`{machine}` has no `external:` address"))?;

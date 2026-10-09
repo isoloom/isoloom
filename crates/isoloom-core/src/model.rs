@@ -13,6 +13,7 @@ pub struct Spec {
     pub version: u32,
     /// Kebab-case id of the environment.
     pub name: String,
+    #[serde(default)]
     pub networks: IndexMap<String, Network>,
     /// Allowed traffic between networks; everything else between networks is blocked.
     #[serde(default)]
@@ -20,7 +21,13 @@ pub struct Spec {
     /// Values a runner may provide at launch (e.g. tokens). Never baked into images.
     #[serde(default)]
     pub inputs: Vec<String>,
+    #[serde(default)]
     pub machines: IndexMap<String, Machine>,
+    /// An environment of cloud services rather than machines (IAM users and roles, functions,
+    /// buckets, queues...): a Terraform module in the project, applied into the user's own cloud
+    /// account. See [`CloudServices`]. A spec has either `cloud:` or machines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cloud: Option<CloudServices>,
     /// Machine fields shared by every machine (a machine's own value wins). `docker:` and `vm:`
     /// here only complete an implementation a machine declares itself.
     #[serde(default)]
@@ -687,6 +694,80 @@ pub const KNOWN_OS: &[&str] = &[
     "windows-server-2025",
 ];
 
+impl Spec {
+    /// The spec with `{{ cloud.outputs.<name> }}` filled in (checks and message), from a
+    /// deployed cloud-services environment's outputs.
+    pub fn with_cloud_outputs(&self, outputs: &IndexMap<String, String>) -> Spec {
+        let fill = |t: &str| {
+            outputs
+                .iter()
+                .fold(t.to_string(), |acc, (k, v)| acc.replace(&format!("{{{{ cloud.outputs.{k} }}}}"), v))
+        };
+        let mut s = self.clone();
+        for c in &mut s.checks {
+            match c {
+                Check::Script(p) => *p = fill(p),
+                Check::Declared(d) => {
+                    for f in [&mut d.http, &mut d.tcp, &mut d.exec, &mut d.body, &mut d.contains].into_iter().flatten() {
+                        *f = fill(f);
+                    }
+                    for v in d.headers.values_mut() {
+                        *v = fill(v);
+                    }
+                }
+            }
+        }
+        s.message = s.message.as_deref().map(fill);
+        s
+    }
+
+    /// The message of a cloud-services environment, its outputs filled in.
+    pub fn cloud_message(&self, outputs: &IndexMap<String, String>) -> Option<String> {
+        self.with_cloud_outputs(outputs).message
+    }
+}
+
+/// An environment of cloud services: a Terraform module applied into the user's account.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CloudServices {
+    /// The cloud the module deploys into (its credentials come from the environment, as
+    /// Terraform expects).
+    pub provider: CloudProvider,
+    /// A Terraform root module in the project (a folder holding `.tf` files), used as is.
+    pub terraform: String,
+    /// The module's variables, fixed values.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub vars: IndexMap<String, String>,
+    /// What the environment exposes, by name: a module output each. Checks and the message
+    /// use them as `{{ cloud.outputs.<name> }}`.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub outputs: IndexMap<String, String>,
+    /// About what the environment costs per hour while it exists, in US dollars, so runners can
+    /// warn and budget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hourly_usd: Option<f64>,
+}
+
+/// A cloud an environment of cloud services deploys into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum CloudProvider {
+    Aws,
+    Azure,
+    Gcp,
+}
+
+impl CloudProvider {
+    pub fn id(self) -> &'static str {
+        match self {
+            CloudProvider::Aws => "aws",
+            CloudProvider::Azure => "azure",
+            CloudProvider::Gcp => "gcp",
+        }
+    }
+}
+
 /// Where an environment can run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -713,10 +794,13 @@ pub enum Target {
     /// Machines that already exist, reached over SSH at the addresses the spec gives
     /// (`machines.*.external`): nothing is created, everything else applies.
     External,
+    /// The spec's cloud services (`cloud:`): its Terraform module applied into the user's own
+    /// cloud account.
+    CloudServices,
 }
 
 impl Target {
-    pub const ALL: [Target; 10] = [
+    pub const ALL: [Target; 11] = [
         Target::Docker,
         Target::Hosted,
         Target::DockerVm,
@@ -727,6 +811,7 @@ impl Target {
         Target::Proxmox,
         Target::CloudVm,
         Target::External,
+        Target::CloudServices,
     ];
 
     /// The implementation every machine needs for this target.
@@ -736,6 +821,7 @@ impl Target {
             Target::Vagrant | Target::Proxmox | Target::CloudVm => Shape::Vm,
             Target::Hybrid => Shape::Either,
             Target::External => Shape::External,
+            Target::CloudServices => Shape::Cloud,
         }
     }
 
@@ -751,6 +837,7 @@ impl Target {
             Target::Proxmox => "proxmox",
             Target::CloudVm => "cloud-vm",
             Target::External => "external",
+            Target::CloudServices => "cloud-services",
         }
     }
 }
@@ -764,6 +851,8 @@ pub enum Shape {
     Either,
     /// An `external` block: the machine exists already.
     External,
+    /// No machines: the spec's `cloud:` services.
+    Cloud,
 }
 
 impl Shape {
@@ -773,6 +862,7 @@ impl Shape {
             Shape::Vm => "vm",
             Shape::Either => "docker` or `vm",
             Shape::External => "external",
+            Shape::Cloud => "cloud",
         }
     }
 }

@@ -12,6 +12,7 @@ name = "isoloom"
 path = "src/main.rs"
 
 [dependencies]
+indexmap.workspace = true
 isoloom-core.workspace = true
 clap.workspace = true
 serde.workspace = true

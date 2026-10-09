@@ -53,6 +53,7 @@ groups: { g: { members: [fw], arch: amd64 } }
 checks: [c.sh, { name: n, from: fw, http: "http://x/", method: POST, headers: { A: b }, body: x, contains: y, tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]
 targets: [docker]
 message: hello
+cloud: { provider: aws, terraform: tf, vars: { region: us-east-1 }, outputs: { site: url }, hourly_usd: 0.1 }
 tools: { shell: {}, viewer: { image: x, command: [serve], port: 80, publish: 9000 } }
 "#;
 
