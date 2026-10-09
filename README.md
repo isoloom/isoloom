@@ -60,7 +60,7 @@ Release binaries for macOS, Linux (x86_64, arm64) and Windows are on the
 [releases page](https://github.com/isoloom/isoloom/releases). In GitHub Actions:
 
 ```yaml
-- uses: isoloom/isoloom@v0.10.0
+- uses: isoloom/isoloom@v0.10.1
 - run: isoloom check
 ```
 
