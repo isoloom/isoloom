@@ -40,6 +40,12 @@ variable "auto_stop_minutes" {
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
 }
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
 variable "inputs" {
   type        = map(string)
   default     = {}
@@ -131,7 +137,7 @@ resource "linode_instance" "database" {
   authorized_keys = [trimspace(var.ssh_public_key)]
   root_pass       = random_password.database.result
   booted          = true
-  tags            = ["isoloom", "supplier-portal-api"]
+  tags            = concat(["isoloom", "supplier-portal-api", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   metadata {
     user_data = base64encode(var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : "")
   }
@@ -199,7 +205,7 @@ resource "linode_instance" "web" {
   authorized_keys = [trimspace(var.ssh_public_key)]
   root_pass       = random_password.web.result
   booted          = true
-  tags            = ["isoloom", "supplier-portal-api"]
+  tags            = concat(["isoloom", "supplier-portal-api", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   metadata {
     user_data = base64encode(var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : "")
   }

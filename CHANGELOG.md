@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Cloud resources say which instance they are, and when they end
+- Every cloud module takes `expires_at` (Unix seconds; empty by default) and tags what it creates with the environment, the instance (`isoloom-instance` = the module's unique name; DigitalOcean and Linode: an extra tag) and `isoloom-expires-at` (AWS cloud-vm through the provider's default tags), so a reaper can find what to destroy after a crash or a lost state. Proxmox VMs keep their environment-named tags. (#88)
+
 ### Emulated machines on one vCPU
 - On QEMU, a machine emulating another CPU (x86 on an Apple Silicon Mac) gets one virtual CPU. QEMU emulates another architecture on a single host thread, so a second vCPU only took turns with the first, and could see code the other was rewriting half-done: Windows' PowerShell died now and then jumping into the data bytes of a .NET call stub being patched (illegal instruction `push ds`), which cut WinRM in the middle of GOAD-Mini's setup.
 

@@ -91,6 +91,12 @@ variable "auto_stop_minutes" {{
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
 }}
+
+variable "expires_at" {{
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}}
 "#,
     );
     if !spec.inputs.is_empty() {
@@ -187,7 +193,7 @@ resource "linode_vpc_subnet" "env" {{
         // address, so the machines reach each other at exactly the spec's addresses.
         let _ = write!(
             tf,
-            "\nresource \"linode_instance\" \"{id}\" {{\n  label           = \"${{local.name}}-{name}\"\n  region          = var.region\n  type            = \"{itype}\"\n  image           = \"{image}\"\n  authorized_keys = [trimspace(var.ssh_public_key)]\n  root_pass       = random_password.{id}.result\n  booted          = true\n  tags            = [\"isoloom\", \"{env}\"]\n  metadata {{\n    user_data = base64encode(var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : \"\")\n  }}\n  interface {{\n    purpose = \"public\"\n  }}\n  interface {{\n    purpose   = \"vpc\"\n    subnet_id = linode_vpc_subnet.env.id\n    ipv4 {{\n      vpc = \"{addr}\"\n    }}\n  }}\n}}\n",
+            "\nresource \"linode_instance\" \"{id}\" {{\n  label           = \"${{local.name}}-{name}\"\n  region          = var.region\n  type            = \"{itype}\"\n  image           = \"{image}\"\n  authorized_keys = [trimspace(var.ssh_public_key)]\n  root_pass       = random_password.{id}.result\n  booted          = true\n  tags            = concat([\"isoloom\", \"{env}\", local.name], var.expires_at == \"\" ? [] : [\"isoloom-expires-${{var.expires_at}}\"])\n  metadata {{\n    user_data = base64encode(var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : \"\")\n  }}\n  interface {{\n    purpose = \"public\"\n  }}\n  interface {{\n    purpose   = \"vpc\"\n    subnet_id = linode_vpc_subnet.env.id\n    ipv4 {{\n      vpc = \"{addr}\"\n    }}\n  }}\n}}\n",
             itype = linode_type(mem),
             env = spec.name,
         );
