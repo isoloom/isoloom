@@ -627,7 +627,12 @@ fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
     assert!(dc.contains("o.vm.box = \"peru/windows-server-2019-standard-x64-eval\""), "{dc}");
     assert!(dc.contains("o.vm.box_version = \">= 0\""), "the main box's pin isn't the QEMU box's: {dc}");
     assert!(dc.contains("o.vm.box_architecture = \"amd64\"") && dc.contains("v.arch = \"x86_64\""), "{dc}");
-    assert!(dc.contains("if \"x86_64\" != HOST_ARCH\n        o.vm.boot_timeout = 3600"), "{dc}");
+    // Emulated: one vCPU (a second only takes turns on QEMU's single emulation thread, and sees
+    // the other's code rewrites half-done) and far longer timeouts.
+    assert!(
+        dc.contains("if \"x86_64\" != HOST_ARCH\n        v.smp = \"cpus=1\"\n        o.vm.boot_timeout = 3600"),
+        "{dc}"
+    );
     assert!(dc.contains("o.winrm.retry_limit = 180"), "{dc}");
     assert!(
         dc.contains("New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 192.168.56.10 -PrefixLength 24"),

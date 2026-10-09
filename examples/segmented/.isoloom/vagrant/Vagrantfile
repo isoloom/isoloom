@@ -140,6 +140,7 @@ Vagrant.configure("2") do |config|
       v.net_mode = :socket
       v.socket_opts = "connect=127.0.0.1:22339"
       if "x86_64" != HOST_ARCH
+        v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
       end
     end
@@ -270,6 +271,7 @@ Vagrant.configure("2") do |config|
       v.net_mode = :socket
       v.socket_opts = "connect=127.0.0.1:35023"
       if "x86_64" != HOST_ARCH
+        v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
       end
     end
@@ -367,6 +369,7 @@ Vagrant.configure("2") do |config|
       v.net_mode = :socket
       v.socket_opts = "connect=127.0.0.1:23498"
       if "x86_64" != HOST_ARCH
+        v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
       end
     end

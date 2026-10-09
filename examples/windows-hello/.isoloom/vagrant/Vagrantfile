@@ -74,6 +74,7 @@ Vagrant.configure("2") do |config|
       v.net_mode = :socket
       v.socket_opts = "listen=127.0.0.1:29027"
       if "x86_64" != HOST_ARCH
+        v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
         o.winrm.retry_limit = 180
         o.winrm.timeout = 1800
