@@ -1199,11 +1199,41 @@ fn load_settings(
     Ok((spec, settings))
 }
 
+/// Temporary AWS credentials from the AWS CLI's own session (`aws login`, SSO), for Terraform,
+/// which reads only keys, profiles with keys and SSO: nothing when keys are already set or the CLI
+/// has no session. Never written anywhere; the child process gets them in its environment.
+fn aws_session_env() -> Vec<(String, String)> {
+    if std::env::var_os("AWS_ACCESS_KEY_ID").is_some() {
+        return Vec::new();
+    }
+    let Ok(out) = std::process::Command::new("aws")
+        .args(["configure", "export-credentials", "--format", "env-no-export"])
+        .stderr(std::process::Stdio::null())
+        .output()
+    else {
+        return Vec::new();
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| l.split_once('='))
+        .filter(|(k, _)| k.starts_with("AWS_"))
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
+}
+
 /// A cloud-services environment's outputs, by the spec's names: `outputs.sh` read (empty when
 /// it isn't deployed or Terraform can't say).
 fn cloud_outputs(dir: &std::path::Path, instance: Option<u8>) -> indexmap::IndexMap<String, String> {
     let script = dir.join(core::instance::output_dir(instance)).join("cloud-services/outputs.sh");
-    let Ok(out) = std::process::Command::new("sh").arg(&script).stderr(std::process::Stdio::null()).output() else {
+    let Ok(out) = std::process::Command::new("sh")
+        .arg(&script)
+        .envs(aws_session_env())
+        .stderr(std::process::Stdio::null())
+        .output()
+    else {
         return Default::default();
     };
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
@@ -1249,6 +1279,7 @@ fn cloud_test(spec: &core::Spec, dir: &std::path::Path, instance: Option<u8>, _n
     };
     let script = core::checks::script(&core::checks::Position::Networks, &group, &render);
     let mut c = std::process::Command::new("sh");
+    c.envs(aws_session_env());
     c.args(["-c", &script]).current_dir(dir);
     for (k, v) in &outputs {
         c.env(format!("ISOLOOM_OUTPUT_{}", k.to_uppercase().replace('-', "_")), v);
@@ -1369,7 +1400,12 @@ fn run_cmd(
         args.extend(["--provider".to_string(), p.clone()]);
     }
     eprintln!("{} {} ({})", if down { "Tearing down" } else { "Running" }, t.id(), wd.display());
-    let status = std::process::Command::new(&program).args(&args).current_dir(&wd).status();
+    let mut cmd = std::process::Command::new(&program);
+    cmd.args(&args).current_dir(&wd);
+    if matches!(t, core::Target::CloudServices | core::Target::CloudVm | core::Target::CloudDocker) {
+        cmd.envs(aws_session_env());
+    }
+    let status = cmd.status();
     match status {
         Ok(s) if s.success() => {
             // Remember what is up on this host, for status / connect / exec / capture.
