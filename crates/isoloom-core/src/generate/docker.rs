@@ -37,6 +37,11 @@ use crate::model::{Arch, Machine, Spec, Target};
 const DIR: &str = "docker";
 /// From `.isoloom/docker/` back to the project folder.
 const ROOT: &str = "../..";
+/// On everything an environment creates on Docker: `isoloom gc` collects only what has it.
+pub const MANAGED_LABEL: &str = "isoloom.managed";
+/// The environment a Docker resource belongs to.
+pub const ENVIRONMENT_LABEL: &str = "isoloom.environment";
+
 /// The check runner: a small image with `sh`, `curl` and busybox `nc`.
 pub(super) const CHECK_IMAGE: &str = "curlimages/curl:8.11.1";
 
@@ -717,6 +722,41 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         p.insert(s("restart"), s("no"));
         services.insert(s(name.as_str()), Value::Mapping(p));
         volumes.insert(s(name.as_str()), Value::Mapping(Mapping::new()));
+    }
+
+    // Everything the environment creates says so (containers, built images, networks, volumes),
+    // so leftovers can be told apart and collected (`isoloom gc`) without guessing.
+    let ours = || {
+        let mut l = Mapping::new();
+        l.insert(s(MANAGED_LABEL), s("true"));
+        l.insert(s(ENVIRONMENT_LABEL), s(spec.name.as_str()));
+        l
+    };
+    let add = |m: &mut Mapping| {
+        let entry = m.entry(s("labels")).or_insert_with(|| Value::Mapping(Mapping::new()));
+        if let Value::Mapping(l) = entry {
+            for (k, v) in ours() {
+                l.insert(k, v);
+            }
+        }
+    };
+    for svc in services.values_mut() {
+        if let Value::Mapping(m) = svc {
+            add(m);
+            if let Some(Value::Mapping(b)) = m.get_mut(s("build")) {
+                add(b);
+            }
+        }
+    }
+    for v in networks.values_mut().chain(volumes.values_mut()) {
+        if v.is_null() {
+            *v = Value::Mapping(Mapping::new());
+        }
+        if let Value::Mapping(m) = v
+            && m.get(s("external")).and_then(Value::as_bool) != Some(true)
+        {
+            add(m);
+        }
     }
 
     let mut root = Mapping::new();

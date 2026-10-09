@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 82% | 56 | 42 | 8 | 6 |
+| [Docker Compose](#docker-compose) | 82% | 58 | 44 | 8 | 6 |
 | [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-82% of 56 portable features (42 done, 8 partly, 6 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+82% of 58 portable features (44 done, 8 partly, 6 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -103,7 +103,7 @@ when a table disagrees with what Isoloom really generates.
 | `ipc` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `isolation` | No | No | Windows containers only |
 | `label_file` | n/a | No | Compose tooling, not the environment's behavior |
-| `labels` | Yes | Yes | From `machines.*.services` (isoloom.service.<name>, for tools reading the containers) |
+| `labels` | Yes | Yes | From `machines.*.services` (isoloom.service.<name>, for tools reading the containers); isoloom.managed and isoloom.environment on every service, for `isoloom gc` |
 | `links` | n/a | No | Legacy; replaced by networks |
 | `logging` | n/a | No | Where the runner collects logs |
 | `mac_address` | No | No | Cloud VMs get their MAC address from the provider |
@@ -163,7 +163,7 @@ when a table disagrees with what Isoloom really generates.
 | `external` | Yes | Not yet | Joining a network outside the environment (a Docker network, a host bridge, a VPC) |
 | `internal` | Yes | Yes | From `networks.*.internet: false` (when nothing routes) |
 | `ipam` | Yes | Yes | From `networks.*.cidr` |
-| `labels` | n/a | No | Compose tooling, not the environment's behavior |
+| `labels` | Yes | Yes | From `the environment: isoloom.managed and isoloom.environment, for `isoloom gc`` |
 | `name` | n/a | No | Compose scopes names to the environment |
 
 ### Volumes
@@ -173,7 +173,7 @@ when a table disagrees with what Isoloom really generates.
 | `driver` | No | No | Docker volume drivers have no VM equivalent |
 | `driver_opts` | No | No | Docker volume driver options |
 | `external` | Yes | Not yet | With volumes (data that outlives the environment) |
-| `labels` | n/a | No | Compose tooling, not the environment's behavior |
+| `labels` | Yes | Yes | From `the environment: isoloom.managed and isoloom.environment, for `isoloom gc`` |
 | `name` | n/a | No | Compose scopes names to the environment |
 
 ## Vagrant
