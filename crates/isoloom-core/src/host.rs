@@ -49,13 +49,17 @@ pub struct Host<'a> {
 /// `secs`: a wedged hypervisor service must not hang `status` or `doctor`.
 pub fn run_limited(program: &str, args: &[&str], secs: u64) -> Result<Option<String>, String> {
     use std::process::Stdio;
-    let mut child = match Command::new(program)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
+    let mut cmd = Command::new(program);
+    cmd.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+    // On Windows a console program started by a windowed app (a launcher, an IDE) opens a
+    // console window of its own: every probe would flash one on screen. Output is piped anyway.
+    #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(format!("{program} not installed")),
         Err(e) => return Err(e.to_string()),
