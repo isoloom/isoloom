@@ -65,6 +65,35 @@ fn refusal_reports_what_a_generator_would_refuse() {
     assert_eq!(isoloom_core::refusal(&plain, Target::Docker), None);
 }
 
+const BAD_CIDR: &str = "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/33 }\nmachines:\n  web: { networks: { app: 10 }, docker: { image: nginx } }\n";
+const UNDECLARED_NETWORK: &str =
+    "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n";
+
+/// `refusal` on a spec nobody validated: every target refused with the spec's problem, no panic.
+fn assert_refused_everywhere(yaml: &str, problem: &str) {
+    let spec = parse(yaml).expect("parses");
+    for t in Target::ALL {
+        let why = isoloom_core::refusal(&spec, t).unwrap_or_else(|| panic!("{t:?} not refused"));
+        assert!(why.contains(problem), "{t:?}: {why}");
+    }
+}
+
+#[test]
+fn refusal_of_an_invalid_cidr_does_not_panic() {
+    assert_refused_everywhere(BAD_CIDR, "networks.app.cidr");
+}
+
+#[test]
+fn refusal_of_an_undeclared_network_does_not_panic() {
+    assert_refused_everywhere(UNDECLARED_NETWORK, "no network named `lan`");
+}
+
+#[test]
+fn checks_plan_of_an_undeclared_network_does_not_panic() {
+    let spec = parse(UNDECLARED_NETWORK).expect("parses");
+    let _ = isoloom_core::checks::plan(&spec);
+}
+
 #[test]
 fn hybrid_runs_containers_beside_the_vms() {
     let (_, spec) = example("mixed-office");
