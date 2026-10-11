@@ -248,6 +248,15 @@ fn base_table() -> Vec<Row> {
             ),
         ),
         row(
+            "networks.*.switch",
+            done(
+                "the LAN's switch appliance instead of the Linux switch container: an access port per VLAN network, a trunk port per trunk link, VLANs and port modes in its startup configuration",
+                "cisco-switch",
+            ),
+            na("switch appliances run on the Docker targets only"),
+            na("switch appliances run on the Docker targets only"),
+        ),
+        row(
             "networks.*.vlans.*.internet",
             done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
             done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
@@ -295,6 +304,36 @@ fn base_table() -> Vec<Row> {
             done("a healthcheck, so `depends_on` and `up --wait` wait for it", "hello-stack"),
             done("machines depending on it wait until it answers", "hello-stack"),
         ),
+        Row {
+            path: "cloud.provider",
+            outputs: all(Status::Descriptive {
+                note: "the cloud of a cloud-services environment (the cloud-services target, not these outputs)",
+            }),
+        },
+        Row {
+            path: "cloud.terraform",
+            outputs: all(Status::Descriptive {
+                note: "the Terraform module the cloud-services target applies",
+            }),
+        },
+        Row {
+            path: "cloud.vars",
+            outputs: all(Status::Descriptive {
+                note: "the module's variables (terraform.tfvars.json)",
+            }),
+        },
+        Row {
+            path: "cloud.outputs",
+            outputs: all(Status::Descriptive {
+                note: "what checks and the message read once deployed",
+            }),
+        },
+        Row {
+            path: "cloud.hourly_usd",
+            outputs: all(Status::Descriptive {
+                note: "the cost runners show and budget",
+            }),
+        },
         Row {
             path: "machines.*.services[].name",
             outputs: all(Status::Descriptive {
@@ -489,6 +528,13 @@ fn base_table() -> Vec<Row> {
         ),
         vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
         vm_field(
+            "machines.*.vm.image.qemu",
+            done(
+                "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
+                "windows-hello",
+            ),
+        ),
+        vm_field(
             "machines.*.vm.image.winrm",
             done(
                 "how the Windows box answers WinRM: `plaintext` (HTTP 5985, the default) or `ssl` (HTTPS 5986)",
@@ -515,6 +561,11 @@ fn base_table() -> Vec<Row> {
             "provision[].vars",
             planned("with environment-level provisioning on containers"),
             done("extra variables (`-e`)", "ansible-pair"),
+        ),
+        common(
+            "provision[].host_vars",
+            planned("with environment-level provisioning on containers"),
+            done("on each machine's line of the inventory Isoloom writes", "ansible-pair"),
         ),
         common(
             "provision[].requirements",
@@ -564,8 +615,19 @@ fn base_table() -> Vec<Row> {
         ),
         common(
             "checks[].contains",
-            done("the response body, searched for the text (curl)", "hello-stack"),
-            done("the response body, searched for the text (curl)", "hello-stack"),
+            done(
+                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+                "hello-stack",
+            ),
+            done(
+                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+                "hello-stack",
+            ),
+        ),
+        common(
+            "checks[].send",
+            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
+            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
         ),
         row(
             "checks[].exec",
@@ -670,7 +732,7 @@ fn base_table() -> Vec<Row> {
 }
 
 /// Fields counted as one feature whatever they hold.
-const WHOLE: &[&str] = &["common", "groups", "tools"];
+const WHOLE: &[&str] = &["common", "groups", "tools", "provision[].host_vars"];
 
 /// Where in the spec names are chosen by the author (map keys become `*`).
 const NAMED: &[&str] = &[
@@ -679,6 +741,8 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "cloud.vars",
+    "cloud.outputs",
     "checks[].headers",
     "machines.*.docker.args",
     "provision[].groups",

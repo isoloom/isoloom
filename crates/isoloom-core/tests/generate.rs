@@ -372,6 +372,7 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
             vm.image = Some(isoloom_core::model::VmImage {
                 vagrant: Some("spec/box".into()),
                 vagrant_version: None,
+                qemu: None,
                 winrm: None,
             });
         }
@@ -484,6 +485,19 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() {
 }
 
 #[test]
+fn playbook_vars_keep_their_types() {
+    let (_, spec) = example("ansible-pair");
+    let vars = &spec.provision[0].vars;
+    assert_eq!(vars["tools"], serde_json::json!(["curl", "jq"]));
+    assert_eq!(vars["cache_port"], serde_json::json!(6379));
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(
+        vagrantfile.contains(r#"-e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}'"#),
+        "{vagrantfile}"
+    );
+}
+
+#[test]
 fn cloud_vm_runs_windows_over_winrm_with_its_name() {
     let (_, spec) = example("windows-hello");
     let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
@@ -543,6 +557,42 @@ fn an_idle_container_is_kept_running() {
             || k8s.contains("- sleep\n"),
         "{k8s}"
     );
+}
+
+#[test]
+fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
+    let (_, spec) = example("ansible-pair");
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(vagrantfile.contains("cache ansible_host=10.63.0.20 maxmemory='\"64mb\"'"), "{vagrantfile}");
+    assert!(vagrantfile.contains("web ansible_host=10.63.0.10\n"), "{vagrantfile}");
+    // Python literals, single-quoted: Ansible reads these back with their types (checked with
+    // ansible-inventory 2.x).
+    let spec = isoloom_core::parse(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      a: { code: \"10\", quote: \"it's\", n: 3, on: true, none: null, l: [x, 1], m: { k: v } }\n",
+    )
+    .unwrap();
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(
+        vagrantfile.contains(r#"a ansible_host=10.9.0.10 code='"10"' quote='"it'"'"'s"' n='3' on='True' none='None' l='["x", 1]' m='{"k": "v"}'"#),
+        "{vagrantfile}"
+    );
+}
+
+#[test]
+fn host_vars_name_machines_and_variables() {
+    let spec = isoloom_core::parse(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      ghost: { x: 1 }\n      a: { \"bad name\": 1, 2go: 1, ok_1: 1 }\n",
+    )
+    .unwrap();
+    let problems: Vec<String> = isoloom_core::validate(&spec).iter().map(|p| p.to_string()).collect();
+    assert_eq!(problems.len(), 3, "{problems:?}");
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("provision[0].host_vars.ghost") && p.contains("no machine named `ghost`"))
+    );
+    assert!(problems.iter().any(|p| p.contains("host_vars.a.bad name")));
+    assert!(problems.iter().any(|p| p.contains("host_vars.a.2go")));
 }
 
 /// An init job on a machine nothing depends on is a leaf job: `up --wait` would fail on its exit,
@@ -657,4 +707,65 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
         problems,
         ["machines.app.depends_on[0]: `shell`'s services are all dormant (they answer later), so there's nothing to wait for"]
     );
+}
+
+/// The block of one provider inside one VM's define, from the Vagrantfile.
+fn provider_block<'a>(vf: &'a str, vm: &str, provider: &str) -> &'a str {
+    let start = vf.find(&format!("config.vm.define \"{vm}\"")).unwrap();
+    let at = start + vf[start..].find(&format!("m.vm.provider \"{provider}\"")).unwrap();
+    &vf[at..at + vf[at..].find("\n    end\n").unwrap()]
+}
+
+#[test]
+fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
+    // GOAD-Mini's shape: one Windows DC and the controller running the lab's playbooks.
+    let spec = parse(
+        "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    services: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\nprovision:\n  - ansible: ansible/main.yml\n",
+    )
+    .unwrap();
+    assert_eq!(isoloom_core::qemu_refusal(&spec), None);
+    let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    assert!(vf.contains("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"]"));
+    // QEMU boots machines in parallel unless told not to: the controller would run its play
+    // before the DC is up, and the connecting side of the link could start before the listener.
+    assert!(vf.contains("ENV[\"VAGRANT_NO_PARALLEL\"] = \"1\""));
+
+    let dc = provider_block(vf, "dc01", "qemu");
+    assert!(dc.contains("o.vm.box = \"peru/windows-server-2019-standard-x64-eval\""), "{dc}");
+    assert!(dc.contains("o.vm.box_version = \">= 0\""), "the main box's pin isn't the QEMU box's: {dc}");
+    assert!(dc.contains("o.vm.box_architecture = \"amd64\"") && dc.contains("v.arch = \"x86_64\""), "{dc}");
+    // Emulated: one vCPU (a second only takes turns on QEMU's single emulation thread, and sees
+    // the other's code rewrites half-done) and far longer timeouts.
+    assert!(
+        dc.contains("if \"x86_64\" != HOST_ARCH\n        v.smp = \"cpus=1\"\n        o.vm.boot_timeout = 3600"),
+        "{dc}"
+    );
+    assert!(dc.contains("o.winrm.retry_limit = 180"), "{dc}");
+    assert!(
+        dc.contains("New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 192.168.56.10 -PrefixLength 24"),
+        "{dc}"
+    );
+
+    let ctl = provider_block(vf, "isoloom-controller", "qemu");
+    assert!(ctl.contains("o.vm.box = \"cloud-image/debian-12\""), "{ctl}");
+    assert!(!ctl.contains("v.arch"), "Isoloom's own VMs run on the host's CPU: {ctl}");
+    // One listens, the other connects, on the same port; the DC is defined (and up) first.
+    let port = |b: &str, side: &str| b.split(&format!("v.socket_opts = \"{side}=127.0.0.1:")).nth(1).map(|r| r[..5].to_string());
+    assert!(port(dc, "listen").is_some() && port(dc, "listen") == port(ctl, "connect"), "{dc}\n{ctl}");
+
+    // Other providers are untouched.
+    assert!(!provider_block(vf, "dc01", "virtualbox").contains("socket"));
+}
+
+#[test]
+fn qemu_refuses_more_than_two_vms_on_a_network() {
+    let three = parse(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian-12 }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian-12 }\n  c:\n    networks: { lab: 12 }\n    vm: { os: debian-12 }\n",
+    )
+    .unwrap();
+    let why = isoloom_core::qemu_refusal(&three).expect("three VMs on one network");
+    assert!(why.contains("network `lab` has 3 VMs"), "{why}");
+    let vf = &generate(&three, Target::Vagrant).unwrap()[0].contents;
+    // Still generated (for every other provider); the QEMU block says why it has no network.
+    assert!(provider_block(vf, "a", "qemu").contains("# No private network on QEMU: network `lab` has 3 VMs"));
 }

@@ -84,6 +84,21 @@ variable "auto_stop_minutes" {
   default     = 0
   description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
 }
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+"#;
+
+/// Proxmox: reach the lab VM through the node when its bridge isn't routable from where
+/// Terraform runs (a host-internal NAT bridge, an isolated lab network). Off unless
+/// `ssh_via_node`; the node's SSH login is the one the snippet upload already uses.
+const PROXMOX_BASTION: &str = r#"    bastion_host        = var.ssh_via_node ? (var.proxmox_ssh_address != "" ? var.proxmox_ssh_address : join("", compact(regex("^https?://(?:\\[([^]]+)\\]|([^/:]+))", var.proxmox_endpoint)))) : null
+    bastion_user        = var.ssh_via_node ? var.proxmox_ssh_username : null
+    bastion_password    = var.ssh_via_node && var.proxmox_ssh_private_key_file == "" ? var.proxmox_password : null
+    bastion_private_key = var.ssh_via_node && var.proxmox_ssh_private_key_file != "" ? file(var.proxmox_ssh_private_key_file) : null
 "#;
 
 /// The environment over SSH, on any cloud: the project, Docker, the Compose file, the ready
@@ -98,7 +113,7 @@ resource "terraform_data" "environment" {
     user        = "__USER__"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
-  }
+__BASTION__  }
   provisioner "remote-exec" {
     inline = [
       "cloud-init status --wait >/dev/null 2>&1 || true",
@@ -205,6 +220,7 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
     ));
     tf.push_str(
         &template
+            .replace("__GCP_PROJECT__", &super::gcp_project_name(&spec.name))
             .replace("__NAME__", &spec.name)
             .replace("__SIZE__", &sizes)
             .replace("__PORTS_LIST__", &ports_list)
@@ -236,7 +252,8 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
             .replace("__ID__", id)
             .replace("__INPUTS_FILE__", &inputs_file)
             .replace("__SOURCE_INPUTS__", source_inputs)
-            .replace("__START__", &start(spec)),
+            .replace("__START__", &start(spec))
+            .replace("__BASTION__", if cloud == "proxmox" { PROXMOX_BASTION } else { "" }),
     );
     GeneratedFile {
         path: format!("{OUTPUT_DIR}/{dir}/{cloud}/main.tf"),
@@ -286,7 +303,7 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-__NAME__-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "__NAME__", "managed-by" = "isoloom" }
+  tags = { "isoloom-environment" = "__NAME__", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
 }
 
 resource "azurerm_resource_group" "env" {
@@ -419,7 +436,7 @@ provider "google" {
 # A project of its own when none is given: everything goes when the environment is destroyed.
 resource "google_project" "env" {
   count               = var.project == "" ? 1 : 0
-  name                = "isoloom-__NAME__"
+  name                = "__GCP_PROJECT__"
   project_id          = "isoloom-${terraform_data.id.output}"
   billing_account     = var.billing_account
   org_id              = var.org_id == "" ? null : var.org_id
@@ -477,7 +494,7 @@ resource "google_compute_instance" "env" {
   name         = local.name
   machine_type = var.machine_type
   zone         = "${var.region}-a"
-  labels       = { "isoloom-environment" = "__NAME__", "managed-by" = "isoloom" }
+  labels       = { "isoloom-environment" = "__NAME__", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
@@ -545,7 +562,7 @@ resource "digitalocean_droplet" "env" {
   image    = "debian-12-x64"
   vpc_uuid = digitalocean_vpc.env.id
   ssh_keys = [digitalocean_ssh_key.env.id]
-  tags     = ["isoloom", "__NAME__"]
+  tags     = concat(["isoloom", "__NAME__", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
 }
 
 resource "digitalocean_firewall" "env" {
@@ -616,7 +633,7 @@ resource "linode_instance" "env" {
   type            = var.type
   image           = "linode/debian12"
   authorized_keys = [trimspace(var.ssh_public_key)]
-  tags            = ["isoloom", "__NAME__"]
+  tags            = concat(["isoloom", "__NAME__", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
 }
 
 resource "linode_firewall" "env" {
@@ -809,6 +826,12 @@ variable "auto_stop_minutes" {{
   default     = 0
   description = "Shut the VM down (and terminate it) after this long; 0 = never"
 }}
+
+variable "expires_at" {{
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}}
 "#
     );
     if !spec.inputs.is_empty() {
@@ -823,6 +846,7 @@ provider "aws" {{
     tags = {{
       "isoloom:environment" = "{name}"
       "managed-by"          = "isoloom"
+      "isoloom-expires-at"  = var.expires_at
     }}
   }}
 }}
@@ -1049,6 +1073,11 @@ variable "proxmox_ssh_address" {
   type        = string
   default     = ""
   description = "The node's SSH address, when the API reports one this machine can't reach"
+}
+variable "ssh_via_node" {
+  type        = bool
+  default     = false
+  description = "Reach the lab VM over SSH through the node (its bridge isn't routable from here)"
 }
 variable "node" {
   type    = string
