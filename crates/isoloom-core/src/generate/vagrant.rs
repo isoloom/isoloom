@@ -98,7 +98,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     );
     // The checks, resolved early: they decide whether there is a controller VM.
     let plan = checks::plan(spec);
-    let on_controller = controller_checks(spec, &plan);
+    let in_their_place = networks_in_place_of_machines(spec, &plan);
+    let on_controller = controller_checks(spec, &plan, &in_their_place);
     let links = qemu_links(spec, !spec.provision.is_empty() || !on_controller.is_empty());
     if router::needed(spec) {
         router_vm(spec, &mut out, &links);
@@ -389,7 +390,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 contents: checks::script(&checks::Position::Networks, &on_controller, &render),
             });
         }
-        controller_vm(spec, &mut out, !on_controller.is_empty(), &links);
+        controller_vm(spec, &mut out, &on_controller, &links);
     }
     out.push_str("end\n");
 
@@ -441,13 +442,27 @@ fn runs_on_vm(spec: &Spec, pos: &checks::Position) -> bool {
 /// The checks the controller runs: those standing on every network, Ansible playbooks, and the
 /// author's checks of a machine that isn't a VM here (supplied by the runner, or a container in
 /// a hybrid environment). Derived checks of such a machine are left out: the controller sees
-/// every network, not that machine's view.
-fn controller_checks<'a>(spec: &Spec, plan: &'a [checks::Resolved]) -> Vec<&'a checks::Resolved> {
+/// every network, not that machine's view; `in_their_place` stands in for them.
+fn controller_checks<'a>(spec: &Spec, plan: &'a [checks::Resolved], in_their_place: &'a [checks::Resolved]) -> Vec<&'a checks::Resolved> {
     plan.iter()
         .filter(|c| {
             matches!(c.probe, checks::Probe::Playbook { .. }) || (!runs_on_vm(spec, &c.position) && (!c.derived || c.position == checks::Position::Networks))
         })
+        .chain(in_their_place)
         .collect()
+}
+
+/// The derived checks the controller runs from the networks when the spec's machines could run
+/// them but none is a Linux VM here (a hybrid environment's containers next to Windows VMs, or
+/// a supplied access machine): those are left out above, and nothing else would check the
+/// services. Empty when a Linux VM runs them, or when they already stand on the networks.
+fn networks_in_place_of_machines(spec: &Spec, plan: &[checks::Resolved]) -> Vec<checks::Resolved> {
+    let any_vm = spec.machines.keys().any(|m| runs_on_vm(spec, &checks::Position::Machine(m.clone())));
+    let dropped = plan.iter().any(|c| c.derived && c.position != checks::Position::Networks);
+    if any_vm || !dropped {
+        return Vec::new();
+    }
+    checks::from_networks(spec)
 }
 
 /// Blocks new outgoing connections on the NAT interface (the default route's), in its own
@@ -786,7 +801,8 @@ fn qemu_port(env: &str, net: &str) -> u16 {
 /// they can't: a launcher asks before offering QEMU.
 pub fn qemu_refusal(spec: &Spec) -> Option<String> {
     let plan = checks::plan(spec);
-    let with_controller = !spec.provision.is_empty() || !controller_checks(spec, &plan).is_empty();
+    let in_their_place = networks_in_place_of_machines(spec, &plan);
+    let with_controller = !spec.provision.is_empty() || !controller_checks(spec, &plan, &in_their_place).is_empty();
     qemu_links(spec, with_controller).into_values().find_map(|l| match l {
         Link::Refused(why) => Some(why),
         _ => None,
@@ -918,7 +934,8 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
 
 /// The controller: a Debian VM on every network at its controller address, started after every
 /// machine. It writes the inventory and runs the environment-level Ansible playbooks.
-fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool, links: &IndexMap<String, Link>) {
+fn controller_vm(spec: &Spec, out: &mut String, on_controller: &[&checks::Resolved], links: &IndexMap<String, Link>) {
+    let with_checks = !on_controller.is_empty();
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
     let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(CONTROLLER));
     let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
@@ -997,9 +1014,7 @@ fn controller_vm(spec: &Spec, out: &mut String, with_checks: bool, links: &Index
     }
     // Its checks, on demand (`vagrant provision --provision-with checks`).
     if with_checks {
-        let plan = checks::plan(spec);
-        let scripts = controller_checks(spec, &plan);
-        let _ = writeln!(out, "{}", checks_provisioner("checks/controller.sh", &scripts));
+        let _ = writeln!(out, "{}", checks_provisioner("checks/controller.sh", on_controller));
     }
     out.push_str("  end\n");
 }

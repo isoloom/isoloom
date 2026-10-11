@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Derived checks in Windows-only environments
+- Derived checks run from Linux machines, so an environment of Windows machines (or network appliances) had none: its `services` went unchecked. When no machine can run them, every service is now checked at each of its addresses from the environment's networks: the controller on Vagrant, AWS and Azure (created for it when nothing else needed one), the check runner on every network on Docker and Kubernetes. Nothing stands where `reach` blocks a service or a network is offline, so those aren't asserted. On hybrid, where the containers' derived checks don't run (the checks run from the VM side), the controller does the same when no Linux VM can: mixed-office's hybrid output now checks files01 and the intranet. With a Linux machine to run them, nothing changes. Example: windows-hello. (#60)
+
 ### Per-machine inventory variables
 - `provision[].host_vars`: a machine's name -> its variables, written on its line of the inventory Isoloom generates (local VMs, Proxmox, cloud VMs, external machines), for playbooks that key on per-host values (its domain, a role flag). Values keep their types: each is written as a Python literal, which Ansible's INI inventory reads back (a quoted `"10"` stays a string; lists, maps, booleans and `null` as they are). Validation: every key names a machine, every variable is a valid name. With `groups:` and `vars:`, a spec can now hold a whole Ansible inventory without an inventory file. Example: ansible-pair's cache gets its `maxmemory`.
 
