@@ -200,7 +200,7 @@ fn rows() -> Vec<(String, Support)> {
         (
             "services.*.labels",
             Emitted {
-                from: "machines.*.services (isoloom.service.<name>, for tools reading the containers)",
+                from: "machines.*.services (isoloom.service.<name>, for tools reading the containers); isoloom.managed and isoloom.environment on every service, for `isoloom gc`",
             },
         ),
         ("services.*.links", LEGACY),
@@ -397,7 +397,12 @@ fn rows() -> Vec<(String, Support)> {
             },
         ),
         ("networks.*.ipam", Emitted { from: "networks.*.cidr" }),
-        ("networks.*.labels", TOOLING),
+        (
+            "networks.*.labels",
+            Emitted {
+                from: "the environment: isoloom.managed and isoloom.environment, for `isoloom gc`",
+            },
+        ),
         (
             "networks.*.name",
             Tooling {
@@ -423,7 +428,12 @@ fn rows() -> Vec<(String, Support)> {
                 note: "with volumes (data that outlives the environment)",
             },
         ),
-        ("volumes.*.labels", TOOLING),
+        (
+            "volumes.*.labels",
+            Emitted {
+                from: "the environment: isoloom.managed and isoloom.environment, for `isoloom gc`",
+            },
+        ),
         (
             "volumes.*.name",
             Tooling {

@@ -13,6 +13,7 @@ pub struct Spec {
     pub version: u32,
     /// Kebab-case id of the environment.
     pub name: String,
+    #[serde(default)]
     pub networks: IndexMap<String, Network>,
     /// Allowed traffic between networks; everything else between networks is blocked.
     #[serde(default)]
@@ -20,7 +21,13 @@ pub struct Spec {
     /// Values a runner may provide at launch (e.g. tokens). Never baked into images.
     #[serde(default)]
     pub inputs: Vec<String>,
+    #[serde(default)]
     pub machines: IndexMap<String, Machine>,
+    /// An environment of cloud services rather than machines (IAM users and roles, functions,
+    /// buckets, queues...): a Terraform module in the project, applied into the user's own cloud
+    /// account. See [`CloudServices`]. A spec has either `cloud:` or machines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cloud: Option<CloudServices>,
     /// Machine fields shared by every machine (a machine's own value wins). `docker:` and `vm:`
     /// here only complete an implementation a machine declares itself.
     #[serde(default)]
@@ -81,6 +88,12 @@ pub struct Network {
     /// `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub vlans: IndexMap<u16, Vlan>,
+    /// On a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance:
+    /// cisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch.
+    /// Its ports are derived, so the machine lists no `networks`: an access port per VLAN, then
+    /// a trunk per machine on several of the LAN's VLANs. Docker targets only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub switch: Option<String>,
     /// Set by parsing on the networks a LAN's VLANs become: that LAN and the VLAN's id, so a
     /// target can carry them on one 802.1Q segment (a machine on several of them gets a trunk).
     #[serde(skip)]
@@ -199,7 +212,9 @@ impl Arch {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Machine {
-    /// Network name -> last octet of the machine's address on it.
+    /// Network name -> last octet of the machine's address on it. Every machine has one, but a
+    /// LAN's `switch`, whose ports the LAN gives it.
+    #[serde(default)]
     pub networks: IndexMap<String, u8>,
     /// How many of this machine (2 to 99): clones named `<name>-01`, `<name>-02`, ..., each one
     /// address further along on every network. Where the spec names this machine, it means
@@ -353,6 +368,8 @@ pub enum Appliance {
     /// Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router.
     CiscoVios,
     /// Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch.
+    /// `cisco-viosl2`, as the image is named, is read too.
+    #[serde(alias = "cisco-viosl2")]
     CiscoViosL2,
     /// Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm).
     CiscoCsr1000v,
@@ -416,6 +433,10 @@ pub struct VmImage {
     /// The box version to pin.
     #[serde(default)]
     pub vagrant_version: Option<String>,
+    /// The box Vagrant's QEMU provider boots instead (libvirt format), when `vagrant` has none
+    /// (e.g. `peru/windows-server-2019-standard-x64-eval`).
+    #[serde(default)]
+    pub qemu: Option<String>,
     /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
     #[serde(default)]
     pub winrm: Option<Winrm>,
@@ -434,9 +455,10 @@ pub struct Provision {
     /// Inventory groups: a name -> the machines in it.
     #[serde(default)]
     pub groups: IndexMap<String, Vec<String>>,
-    /// Extra variables for the playbook.
+    /// Extra variables for the playbook, of any YAML type (strings, numbers, booleans, lists,
+    /// maps): passed as JSON (`-e`), which keeps their types.
     #[serde(default)]
-    pub vars: IndexMap<String, String>,
+    pub vars: IndexMap<String, serde_json::Value>,
     /// Variables per machine (a machine's name -> its variables), on its line of the inventory
     /// Isoloom writes: what a playbook keys on per host (its domain, a role flag).
     #[serde(default)]
@@ -687,6 +709,91 @@ pub const KNOWN_OS: &[&str] = &[
     "windows-server-2025",
 ];
 
+impl Spec {
+    /// The spec with `{{ cloud.outputs.<name> }}` filled in (checks and message), from a
+    /// deployed cloud-services environment's outputs.
+    pub fn with_cloud_outputs(&self, outputs: &IndexMap<String, String>) -> Spec {
+        let fill = |t: &str| {
+            outputs
+                .iter()
+                .fold(t.to_string(), |acc, (k, v)| acc.replace(&format!("{{{{ cloud.outputs.{k} }}}}"), v))
+        };
+        let mut s = self.clone();
+        for c in &mut s.checks {
+            match c {
+                Check::Script(p) => *p = fill(p),
+                Check::Declared(d) => {
+                    for f in [&mut d.http, &mut d.tcp, &mut d.exec, &mut d.body, &mut d.contains].into_iter().flatten() {
+                        *f = fill(f);
+                    }
+                    for v in d.headers.values_mut() {
+                        *v = fill(v);
+                    }
+                }
+            }
+        }
+        s.message = s.message.as_deref().map(fill);
+        s
+    }
+
+    /// The message of a cloud-services environment, its outputs filled in.
+    pub fn cloud_message(&self, outputs: &IndexMap<String, String>) -> Option<String> {
+        self.with_cloud_outputs(outputs).message
+    }
+}
+
+/// An environment of cloud services: a Terraform module applied into the user's account.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CloudServices {
+    /// The cloud the module deploys into (its credentials come from the environment, as
+    /// Terraform expects).
+    pub provider: CloudProvider,
+    /// A Terraform root module in the project (a folder holding `.tf` files), used as is.
+    pub terraform: String,
+    /// The module's variables: any value (a string, number, boolean, list or map). A string
+    /// that is exactly `{{ inputs.NAME }}` takes the launch-time input `NAME` (declared in
+    /// `inputs`), e.g. the player's IP for an allow-list: required at `run`, kept for `down`.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[schemars(with = "IndexMap<String, serde_json::Value>")]
+    pub vars: IndexMap<String, serde_json::Value>,
+    /// What the environment exposes, by name: a module output each. Checks and the message
+    /// use them as `{{ cloud.outputs.<name> }}`.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub outputs: IndexMap<String, String>,
+    /// About what the environment costs per hour while it exists, in US dollars, so runners can
+    /// warn and budget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hourly_usd: Option<f64>,
+}
+
+/// A cloud an environment of cloud services deploys into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum CloudProvider {
+    Aws,
+    Azure,
+    Gcp,
+}
+
+impl CloudServices {
+    /// The launch-time input a variable takes, when its value is exactly `{{ inputs.NAME }}`.
+    pub fn input_of(value: &serde_json::Value) -> Option<&str> {
+        let s = value.as_str()?.trim();
+        s.strip_prefix("{{ inputs.")?.strip_suffix(" }}").map(str::trim)
+    }
+}
+
+impl CloudProvider {
+    pub fn id(self) -> &'static str {
+        match self {
+            CloudProvider::Aws => "aws",
+            CloudProvider::Azure => "azure",
+            CloudProvider::Gcp => "gcp",
+        }
+    }
+}
+
 /// Where an environment can run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -713,10 +820,13 @@ pub enum Target {
     /// Machines that already exist, reached over SSH at the addresses the spec gives
     /// (`machines.*.external`): nothing is created, everything else applies.
     External,
+    /// The spec's cloud services (`cloud:`): its Terraform module applied into the user's own
+    /// cloud account.
+    CloudServices,
 }
 
 impl Target {
-    pub const ALL: [Target; 10] = [
+    pub const ALL: [Target; 11] = [
         Target::Docker,
         Target::Hosted,
         Target::DockerVm,
@@ -727,6 +837,7 @@ impl Target {
         Target::Proxmox,
         Target::CloudVm,
         Target::External,
+        Target::CloudServices,
     ];
 
     /// The implementation every machine needs for this target.
@@ -736,6 +847,7 @@ impl Target {
             Target::Vagrant | Target::Proxmox | Target::CloudVm => Shape::Vm,
             Target::Hybrid => Shape::Either,
             Target::External => Shape::External,
+            Target::CloudServices => Shape::Cloud,
         }
     }
 
@@ -751,6 +863,7 @@ impl Target {
             Target::Proxmox => "proxmox",
             Target::CloudVm => "cloud-vm",
             Target::External => "external",
+            Target::CloudServices => "cloud-services",
         }
     }
 }
@@ -764,6 +877,8 @@ pub enum Shape {
     Either,
     /// An `external` block: the machine exists already.
     External,
+    /// No machines: the spec's `cloud:` services.
+    Cloud,
 }
 
 impl Shape {
@@ -773,6 +888,7 @@ impl Shape {
             Shape::Vm => "vm",
             Shape::Either => "docker` or `vm",
             Shape::External => "external",
+            Shape::Cloud => "cloud",
         }
     }
 }
