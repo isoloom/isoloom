@@ -38,8 +38,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     let mut out = header("#");
     out.push_str("# Start:  cd .isoloom/docker-vm && vagrant up\n# Checks: cd .isoloom/docker-vm && vagrant provision --provision-with checks\n# Stop:   cd .isoloom/docker-vm && vagrant destroy -f\n\n");
     out.push_str("ROOT = File.expand_path(\"../..\", __dir__)\n");
-    out.push_str("# Copied into the VM: the project, its generated Compose file included.\n");
-    out.push_str("PROJECT = Dir.children(ROOT).reject { |e| [\".git\", \".vagrant\"].include?(e) }.sort\n");
+    out.push_str(super::vagrant::PROJECT_RB);
     if !spec.inputs.is_empty() {
         out.push_str("# Values provided at launch (empty when unset).\nINPUTS = {\n");
         for i in &spec.inputs {
@@ -51,6 +50,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("  config.vm.box = \"bento/debian-12\"\n");
     let _ = writeln!(out, "  config.vm.hostname = {}", rb(&spec.name));
     out.push_str("  config.vm.synced_folder \".\", \"/vagrant\", disabled: true\n  config.vm.boot_timeout = 600\n");
+    // A tool that can't reach the machines itself (macOS keeps third-party tools off the local
+    // network) sets ISOLOOM_SSH_PROXY_COMMAND, e.g. "/usr/bin/nc %h %p", and Vagrant's SSH goes
+    // through it. Unset: Vagrant connects directly, as before.
+    out.push_str("  config.ssh.proxy_command = ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"] if ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"]\n");
     // libvirt's domain name: the environment's, not this folder's ("docker-vm_default").
     let _ = writeln!(
         out,
@@ -102,10 +105,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         rb(&format!("{}-docker", spec.name))
     );
     out.push_str("  config.vm.provision \"shell\", name: \"docker\", inline: \"command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh\"\n");
-    out.push_str(
-        "  PROJECT.each do |entry|\n    config.vm.provision \"file\", source: File.join(ROOT, entry), destination: \"/tmp/isoloom-project/#{entry}\"\n  end\n",
-    );
-    out.push_str("  config.vm.provision \"shell\", name: \"project\", inline: \"rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom\"\n");
+    // The project, its generated Compose file included.
+    out.push_str("  config.vm.provision \"isoloom_project\", name: \"project\", generated: true\n");
     let env = if spec.inputs.is_empty() { String::new() } else { ", env: INPUTS".to_string() };
     let _ = writeln!(
         out,

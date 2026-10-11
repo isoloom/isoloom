@@ -5,7 +5,7 @@
 
 use std::fmt::Write;
 
-use crate::generate::cloud_vm::{aligned, has_windows, hcl_cmd, linux_setup_cmds, needs_controller, redirects};
+use crate::generate::cloud_vm::{aligned, has_windows, linux_setup_cmds, needs_controller, redirects, remote_exec};
 use crate::generate::proxmox::res;
 use crate::generate::{GeneratedFile, OUTPUT_DIR, header, start_order};
 use crate::model::Spec;
@@ -116,6 +116,12 @@ variable "auto_stop_minutes" {
   default     = 0
   description = "Shut the machine down after this many minutes (0: never)"
 }
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
 "#,
     );
     if !spec.inputs.is_empty() {
@@ -161,7 +167,7 @@ resource "digitalocean_droplet" "{id}" {{
   vpc_uuid  = digitalocean_vpc.env.id
   ssh_keys  = [digitalocean_ssh_key.env.fingerprint]
   user_data = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${{var.auto_stop_minutes}}\n" : null
-  tags      = ["isoloom", "{env}"]
+  tags      = concat(["isoloom", "{env}", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${{var.expires_at}}"])
 }}
 
 # What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.
@@ -195,7 +201,7 @@ resource "digitalocean_firewall" "{id}" {{
     // Its set-up, over SSH. One network: the MAC closure is never called.
     let cmds = linux_setup_cmds(spec, name, m, vm, &lab, &redirects, &|_| String::new());
     let mut prov = format!(
-        "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [digitalocean_droplet.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \\\"${{local.root}}\\\" .\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
+        "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [digitalocean_droplet.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \\\"${{abspath(local_file.isoloom_project.filename)}}\\\" -C \\\"${{dirname(local.root)}}\\\" \\\"${{basename(local.root)}}\\\"\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
     );
     if !m.inputs.is_empty() {
         let lines: Vec<String> = m
@@ -209,11 +215,8 @@ resource "digitalocean_firewall" "{id}" {{
             lines.join(", ")
         );
     }
-    let _ = write!(
-        prov,
-        "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n}}\n",
-        cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
-    );
+    prov.push_str(&remote_exec(&cmds));
+    prov.push_str("}\n");
     tf.push_str(&prov);
 
     // Outputs: the same shape as the AWS driver.

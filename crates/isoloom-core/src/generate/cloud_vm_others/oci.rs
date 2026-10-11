@@ -9,7 +9,7 @@
 
 use std::fmt::Write;
 
-use crate::generate::cloud_vm::{aligned, has_windows, hcl_cmd, linux_setup_cmds, needs_controller, redirects};
+use crate::generate::cloud_vm::{aligned, has_windows, linux_setup_cmds, needs_controller, redirects, remote_exec};
 use crate::generate::proxmox::res;
 use crate::generate::{GeneratedFile, OUTPUT_DIR, address, header, start_order};
 use crate::model::Spec;
@@ -99,6 +99,12 @@ variable "auto_stop_minutes" {
   type        = number
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
+}
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
 "#,
     );
@@ -291,7 +297,7 @@ resource "oci_core_instance" "{id}" {{
         let cmds = linux_setup_cmds(spec, name, m, vm, &lab, &redir, &|_| String::new());
 
         let mut prov = format!(
-            "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [oci_core_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \\\"${{local.root}}\\\" .\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
+            "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [oci_core_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \\\"${{abspath(local_file.isoloom_project.filename)}}\\\" -C \\\"${{dirname(local.root)}}\\\" \\\"${{basename(local.root)}}\\\"\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
         );
         if !m.inputs.is_empty() {
             let lines: Vec<String> = m
@@ -305,11 +311,7 @@ resource "oci_core_instance" "{id}" {{
                 lines.join(", ")
             );
         }
-        let _ = write!(
-            prov,
-            "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
-            cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
-        );
+        prov.push_str(&remote_exec(&cmds));
         let deps: Vec<String> = m
             .depends_on
             .iter()

@@ -54,6 +54,12 @@ variable "auto_stop_minutes" {
   description = "Shut the machines down after this many minutes (0: never)"
 }
 
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+
 provider "google" {
   region = var.region
 }
@@ -160,6 +166,8 @@ resource "google_compute_instance" "web" {
   labels = {
     "isoloom-environment" = "ansible-pair"
     "managed-by"          = "isoloom"
+    "isoloom-instance"   = local.name
+    "isoloom-expires-at" = var.expires_at
   }
 }
 
@@ -176,7 +184,7 @@ resource "terraform_data" "web" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+    command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
     source      = "${path.module}/.isoloom-project-web.tgz"
@@ -186,7 +194,7 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
       "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
       "printf '%s\\n' '10.63.0.20 cache' | sudo tee -a /etc/hosts >/dev/null",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
@@ -244,6 +252,8 @@ resource "google_compute_instance" "cache" {
   labels = {
     "isoloom-environment" = "ansible-pair"
     "managed-by"          = "isoloom"
+    "isoloom-instance"   = local.name
+    "isoloom-expires-at" = var.expires_at
   }
 }
 
@@ -260,7 +270,7 @@ resource "terraform_data" "cache" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project-cache.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+    command = "tar -czf \"${path.module}/.isoloom-project-cache.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
     source      = "${path.module}/.isoloom-project-cache.tgz"
@@ -270,7 +280,7 @@ resource "terraform_data" "cache" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
       "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
       "printf '%s\\n' '10.63.0.10 web' | sudo tee -a /etc/hosts >/dev/null",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
@@ -339,7 +349,7 @@ resource "terraform_data" "isoloom_controller" {
     inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
   }
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project-controller.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project*.tgz -C \"${local.root}\" ."
+    command = "tar -czf \"${path.module}/.isoloom-project-controller.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
     source      = "${path.module}/.isoloom-project-controller.tgz"
@@ -353,13 +363,13 @@ resource "terraform_data" "isoloom_controller" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
+      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
       "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | sudo tee -a /etc/hosts >/dev/null",
       "sudo mkdir -p /etc/isoloom && sudo install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && rm -f /tmp/isoloom-controller-key",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null",
       "[ -x /opt/ansible/bin/ansible-playbook ] || { sudo python3 -m venv /opt/ansible && sudo /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }",
-      "printf '%s' '[linux]\nweb ansible_host=10.63.0.10 ansible_user=admin\ncache ansible_host=10.63.0.20 ansible_user=admin\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n\n[pair]\nweb\ncache\n' | sudo tee /etc/isoloom/inventory.ini >/dev/null",
-      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\ncd /opt/isoloom/ansible\nansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\"}'\\'' site.yml\n'",
+      "printf '%s' '[linux]\nweb ansible_host=10.63.0.10 ansible_user=admin\ncache ansible_host=10.63.0.20 ansible_user=admin maxmemory='\\''\"64mb\"'\\''\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n\n[pair]\nweb\ncache\n' | sudo tee /etc/isoloom/inventory.ini >/dev/null",
+      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}\ncd /opt/isoloom/ansible\nretry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\",\"tools\":[\"curl\",\"jq\"],\"cache_port\":6379}'\\'' site.yml\n'",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
     ]
   }
@@ -395,4 +405,32 @@ output "checks" {
     { position = "web", machine = "web", host = google_compute_instance.web.network_interface[0].access_config[0].nat_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" },
     { position = "cache", machine = "cache", host = google_compute_instance.cache.network_interface[0].access_config[0].nat_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh" }
   ]
+}
+
+# The project's files the machines don't get: version control and the tools' state, and what
+# .isoloomignore at the project's root lists (gitignore-style: one pattern per line, `#` comments,
+# `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the middle
+# anchors the pattern at the root; `*`, `?`, `[abc]`, `**`; the last pattern matching a path, or
+# a folder it is in, decides). Read as regular expressions, as the Vagrantfiles do.
+locals {
+  project_ignore_lines = [for l in split("\n", replace(try(file("${local.root}/.isoloomignore"), ""), "\r", "")) : trimspace(l)]
+  project_ignore_pats  = [for l in local.project_ignore_lines : { keep = startswith(l, "!"), pat = trimprefix(l, "!") } if l != "" && !startswith(l, "#")]
+  project_ignore_globs = [for r in local.project_ignore_pats : merge(r, { glob = trimsuffix(trimsuffix(trimsuffix(r.pat, "/"), "/**"), "/") })]
+  project_ignore = [for r in local.project_ignore_globs : {
+    keep = r.keep
+    re = format(r.glob == r.pat ? "^%s(/|$)" : "^%s/", replace(replace(replace(replace(replace(replace(replace(replace(
+      length(split("/", r.glob)) > 1 ? trimprefix(r.glob, "/") : "**/${r.glob}",
+    "/[.+^$(){}|\\\\]/", "\\$0"), "[!", "[^"), "**/", "\u0001"), "**", "\u0002"), "*", "[^/]*"), "?", "[^/]"), "\u0001", "(.*/)?"), "\u0002", ".*"))
+  } if r.glob != ""]
+  # Each file: whether it goes (the last matching pattern decides; none: it goes).
+  project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
+  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
+  project_ignored = [for f, keep in local.project_keep : f if !keep]
+}
+
+# What `tar` leaves out of the project's archive: .isoloomignore's files, from the archive's top
+# folder, their wildcard characters escaped.
+resource "local_file" "isoloom_project" {
+  filename = "${path.module}/.isoloom-project-ignored.txt"
+  content  = join("", [for f in local.project_ignored : "${replace("${basename(local.root)}/${f}", "/[\\\\*?\\[]/", "\\$0")}\n"])
 }

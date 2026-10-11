@@ -122,9 +122,8 @@ provider "proxmox" {
 locals {
   zone = "iso${var.slot}"
   # The project, written to /opt/isoloom in each machine that has steps.
-  root    = abspath("${path.module}/../..")
-  project = [for f in fileset(local.root, "**") : f if !startswith(f, ".git/") && !startswith(f, ".isoloom/") && !startswith(f, ".vagrant/")]
-  project_files = [for f in local.project : {
+  root = abspath("${path.module}/../..")
+  project_files = [for f in local.project_paths : {
     path     = "/opt/isoloom/${f}"
     encoding = "b64"
     content  = filebase64("${local.root}/${f}")
@@ -397,4 +396,25 @@ output "checks" {
     { position = "database", machine = "database", host = "10.20.0.32", user = "isoloom", script = ".isoloom/proxmox/checks/database.sh" },
     { position = "web", machine = "web", host = "10.20.0.31", user = "isoloom", script = ".isoloom/proxmox/checks/web.sh" }
   ]
+}
+
+# The project's files the machines don't get: version control and the tools' state, and what
+# .isoloomignore at the project's root lists (gitignore-style: one pattern per line, `#` comments,
+# `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the middle
+# anchors the pattern at the root; `*`, `?`, `[abc]`, `**`; the last pattern matching a path, or
+# a folder it is in, decides). Read as regular expressions, as the Vagrantfiles do.
+locals {
+  project_ignore_lines = [for l in split("\n", replace(try(file("${local.root}/.isoloomignore"), ""), "\r", "")) : trimspace(l)]
+  project_ignore_pats  = [for l in local.project_ignore_lines : { keep = startswith(l, "!"), pat = trimprefix(l, "!") } if l != "" && !startswith(l, "#")]
+  project_ignore_globs = [for r in local.project_ignore_pats : merge(r, { glob = trimsuffix(trimsuffix(trimsuffix(r.pat, "/"), "/**"), "/") })]
+  project_ignore = [for r in local.project_ignore_globs : {
+    keep = r.keep
+    re = format(r.glob == r.pat ? "^%s(/|$)" : "^%s/", replace(replace(replace(replace(replace(replace(replace(replace(
+      length(split("/", r.glob)) > 1 ? trimprefix(r.glob, "/") : "**/${r.glob}",
+    "/[.+^$(){}|\\\\]/", "\\$0"), "[!", "[^"), "**/", "\u0001"), "**", "\u0002"), "*", "[^/]*"), "?", "[^/]"), "\u0001", "(.*/)?"), "\u0002", ".*"))
+  } if r.glob != ""]
+  # Each file: whether it goes (the last matching pattern decides; none: it goes).
+  project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
+  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
+  project_ignored = [for f, keep in local.project_keep : f if !keep]
 }

@@ -116,9 +116,8 @@ provider "proxmox" {
 locals {
   zone = "iso${var.slot}"
   # The project, written to /opt/isoloom in each machine that has steps.
-  root    = abspath("${path.module}/../..")
-  project = [for f in fileset(local.root, "**") : f if !startswith(f, ".git/") && !startswith(f, ".isoloom/") && !startswith(f, ".vagrant/")]
-  project_files = [for f in local.project : {
+  root = abspath("${path.module}/../..")
+  project_files = [for f in local.project_paths : {
     path     = "/opt/isoloom/${f}"
     encoding = "b64"
     content  = filebase64("${local.root}/${f}")
@@ -370,13 +369,13 @@ resource "proxmox_virtual_environment_file" "controller" {
       hostname    = "isoloom-controller"
       users       = local.users
       packages    = ["python3-venv", "curl", "netcat-openbsd", "openssh-client"]
-      write_files = concat(local.project_files, [{ path = "/etc/isoloom/id_ed25519", permissions = "0600", content = tls_private_key.controller.private_key_openssh }, { path = "/etc/isoloom/inventory.ini", permissions = "0644", content = "[linux]\nweb ansible_host=10.63.0.10 ansible_user=isoloom\ncache ansible_host=10.63.0.20 ansible_user=isoloom\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n" }])
+      write_files = concat(local.project_files, [{ path = "/etc/isoloom/id_ed25519", permissions = "0600", content = tls_private_key.controller.private_key_openssh }, { path = "/etc/isoloom/inventory.ini", permissions = "0644", content = "[linux]\nweb ansible_host=10.63.0.10 ansible_user=isoloom\ncache ansible_host=10.63.0.20 ansible_user=isoloom maxmemory='\"64mb\"'\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n" }])
       runcmd = [
         ["sh", "-c", "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' >> /etc/hosts"],
         ["sh", "-c", "python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm"],
         ["sh", "-c", "i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.63.0.10 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo 'web not ready'; exit 1; }; sleep 5; done"],
         ["sh", "-c", "i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.63.0.20 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo 'cache not ready'; exit 1; }; sleep 5; done"],
-        ["sh", "-c", "sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\ncd /opt/isoloom/ansible\nansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\"}'\\'' site.yml\n'"],
+        ["sh", "-c", "sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}\ncd /opt/isoloom/ansible\nretry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\",\"tools\":[\"curl\",\"jq\"],\"cache_port\":6379}'\\'' site.yml\n'"],
         ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
       ]
     })}"
@@ -458,4 +457,25 @@ output "checks" {
     { position = "web", machine = "web", host = "10.63.0.10", user = "isoloom", script = ".isoloom/proxmox/checks/web.sh" },
     { position = "cache", machine = "cache", host = "10.63.0.20", user = "isoloom", script = ".isoloom/proxmox/checks/cache.sh" }
   ]
+}
+
+# The project's files the machines don't get: version control and the tools' state, and what
+# .isoloomignore at the project's root lists (gitignore-style: one pattern per line, `#` comments,
+# `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the middle
+# anchors the pattern at the root; `*`, `?`, `[abc]`, `**`; the last pattern matching a path, or
+# a folder it is in, decides). Read as regular expressions, as the Vagrantfiles do.
+locals {
+  project_ignore_lines = [for l in split("\n", replace(try(file("${local.root}/.isoloomignore"), ""), "\r", "")) : trimspace(l)]
+  project_ignore_pats  = [for l in local.project_ignore_lines : { keep = startswith(l, "!"), pat = trimprefix(l, "!") } if l != "" && !startswith(l, "#")]
+  project_ignore_globs = [for r in local.project_ignore_pats : merge(r, { glob = trimsuffix(trimsuffix(trimsuffix(r.pat, "/"), "/**"), "/") })]
+  project_ignore = [for r in local.project_ignore_globs : {
+    keep = r.keep
+    re = format(r.glob == r.pat ? "^%s(/|$)" : "^%s/", replace(replace(replace(replace(replace(replace(replace(replace(
+      length(split("/", r.glob)) > 1 ? trimprefix(r.glob, "/") : "**/${r.glob}",
+    "/[.+^$(){}|\\\\]/", "\\$0"), "[!", "[^"), "**/", "\u0001"), "**", "\u0002"), "*", "[^/]*"), "?", "[^/]"), "\u0001", "(.*/)?"), "\u0002", ".*"))
+  } if r.glob != ""]
+  # Each file: whether it goes (the last matching pattern decides; none: it goes).
+  project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
+  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
+  project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
