@@ -25,6 +25,7 @@ use super::docker::{CHECK_IMAGE, PROBE_DIR, PROBE_IMAGE, UTILITY_IMAGE, image_of
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
 use crate::checks;
 use crate::model::{Machine, Spec, Target};
+use crate::shell;
 
 const DIR: &str = "kubernetes";
 /// The project's root, from `.isoloom/kubernetes/`.
@@ -182,7 +183,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 cmd.push_str(&format!(" -f {f}"));
             }
             for (k, v) in &d.args {
-                cmd.push_str(&format!(" --build-arg {}", super::cloud_vm::sh_quote(&format!("{k}={v}"))));
+                cmd.push_str(&format!(" --build-arg {}", shell::quote(&format!("{k}={v}"))));
             }
             builds.push(format!("{cmd} {b}"));
         }

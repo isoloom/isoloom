@@ -428,10 +428,8 @@ pub struct Render<'a> {
     pub playbook: Option<&'a dyn Fn(&str) -> String>,
 }
 
-/// Single-quoted for sh.
-pub fn sq(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
+/// Single-quoted for sh (the same as [`crate::shell::quote`]).
+pub use crate::shell::quote as sq;
 
 /// Escaped for the inside of a double-quoted sh string.
 fn dq(s: &str) -> String {

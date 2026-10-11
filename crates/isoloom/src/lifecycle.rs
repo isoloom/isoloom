@@ -8,7 +8,7 @@ use std::process::{Command, ExitCode, Stdio};
 
 use isoloom_core as core;
 use isoloom_core::registry::{self, Entry};
-use isoloom_core::{Target, checks::sq};
+use isoloom_core::{Target, shell};
 
 type Res<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -371,7 +371,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 c.current_dir(out.join(sub));
                 c.args(["ssh", &unit]);
                 if cmd.is_some() || root {
-                    c.args(["-c", &format!("{}sh -c {}", if root { "sudo " } else { "" }, sq(&inner))]);
+                    c.args(["-c", &format!("{}sh -c {}", if root { "sudo " } else { "" }, shell::quote(&inner))]);
                 }
             }
             other => return Err(format!("tool `{machine}` has no form on {}", other.id()).into()),
@@ -415,14 +415,14 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                     "ssh",
                     "isoloom-docker",
                     "-c",
-                    &format!("sudo docker exec {flags} {machine} sh -c {}", sq(&inner)),
+                    &format!("sudo docker exec {flags} {machine} sh -c {}", shell::quote(&inner)),
                 ]);
             } else if windows {
                 return Err(windows_hint(spec, machine).into());
             } else {
                 c.args(["ssh", machine]);
                 if cmd.is_some() || root {
-                    c.args(["-c", &format!("{sudo}sh -c {}", sq(&inner))]);
+                    c.args(["-c", &format!("{sudo}sh -c {}", shell::quote(&inner))]);
                 }
                 if !tty {
                     c.arg("--");
@@ -441,7 +441,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 &format!(
                     "cd /opt/isoloom && sudo docker compose -f {}/docker/compose.yml exec {flags} {machine} sh -c {}",
                     core::instance::output_dir(instance),
-                    sq(&inner)
+                    shell::quote(&inner)
                 ),
             ]);
         }
@@ -467,7 +467,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 .to_string();
             let user = outputs["ssh_users"][machine].as_str().unwrap_or("isoloom").to_string();
             c = ssh(ssh_key, &user, &host, tty, None);
-            c.arg(format!("{sudo}sh -c {}", sq(&inner)));
+            c.arg(format!("{sudo}sh -c {}", shell::quote(&inner)));
         }
         Target::CloudDocker => {
             container_only("Docker")?;
@@ -480,7 +480,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
             c.arg(format!(
                 "cd /opt/isoloom && sudo docker compose -f {}/docker/compose.yml exec {flags} {machine} sh -c {}",
                 core::instance::output_dir(instance),
-                sq(&inner)
+                shell::quote(&inner)
             ));
         }
         Target::CloudServices => {
@@ -493,7 +493,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
             if let Some(p) = e.port {
                 c.arg(format!("-p{p}"));
             }
-            c.arg(format!("{sudo}sh -c {}", sq(&inner)));
+            c.arg(format!("{sudo}sh -c {}", shell::quote(&inner)));
         }
         Target::Proxmox => {
             // Through the router (the only VM on the uplink), as the `isoloom` user.
@@ -508,7 +508,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 .to_string();
             let jump = format!("isoloom@{router}");
             c = ssh(ssh_key, "isoloom", &host, tty, Some(&jump));
-            c.arg(format!("{sudo}sh -c {}", sq(&inner)));
+            c.arg(format!("{sudo}sh -c {}", shell::quote(&inner)));
         }
     }
     Ok(c)
@@ -578,7 +578,7 @@ pub fn exec(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: &st
             if a.chars().all(|c| c.is_ascii_alphanumeric() || "-_./=:,@%+".contains(c)) {
                 a.clone()
             } else {
-                sq(a)
+                shell::quote(a)
             }
         })
         .collect::<Vec<_>>()
@@ -653,7 +653,7 @@ pub fn capture(dir: &Path, target: Option<&str>, instance: Option<u8>, machine: 
     let extra = if args.is_empty() {
         "-l -v".to_string()
     } else {
-        args.iter().map(|a| sq(a)).collect::<Vec<_>>().join(" ")
+        args.iter().map(|a| shell::quote(a)).collect::<Vec<_>>().join(" ")
     };
     let find = format!(
         "IF=$(ip -o -4 addr show | awk '$4 ~ /^{}\\//{{print $2}}' | head -n 1); [ -n \"$IF\" ] || {{ echo 'no interface with {addr} in this machine' >&2; exit 1; }}",
@@ -794,7 +794,7 @@ pub fn tc(dir: &Path, target: Option<&str>, instance: Option<u8>, action: &str, 
             let sub = if t == Target::Vagrant { "vagrant" } else { "hybrid" };
             let mut c = Command::new("vagrant");
             c.current_dir(out.join(sub));
-            c.args(["ssh", &host, "-c", &format!("sudo sh -c {}", sq(&command))]);
+            c.args(["ssh", &host, "-c", &format!("sudo sh -c {}", shell::quote(&command))]);
             c
         };
         ok &= c.status().map_err(|e| tool_error(&c, e))?.success();

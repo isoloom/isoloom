@@ -1605,7 +1605,7 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                 if let Position::Machine(m) = pos {
                     let file = out.join("docker/checks").join(core::generate::exec_runner(m));
                     if file.exists() {
-                        let q = |a: &str| format!("'{}'", a.replace('\'', "'\\''"));
+                        let q = core::shell::quote;
                         let compose: Vec<String> = files.iter().map(|f| q(f)).collect();
                         runners.push(Runner {
                             label: format!("inside {m}"),
@@ -1659,7 +1659,7 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                 let file = dir.join("checks.yaml");
                 std::fs::write(&file, patched)?;
                 temp = Some(dir);
-                format!("kubectl apply -f {} >/dev/null", core::checks::sq(&file.display().to_string()))
+                format!("kubectl apply -f {} >/dev/null", core::shell::quote(&file.display().to_string()))
             } else {
                 format!("kubectl kustomize --load-restrictor LoadRestrictionsNone {kdir} | kubectl apply -f - >/dev/null")
             };
@@ -1695,7 +1695,7 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                                 s("-c"),
                                 format!(
                                     "kubectl -n {ns} exec -i deploy/{m} -c {m} -- sh -s < {}",
-                                    core::checks::sq(&file.display().to_string())
+                                    core::shell::quote(&file.display().to_string())
                                 ),
                             ],
                             wd: dir.clone(),
@@ -1763,8 +1763,8 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                 r.args.insert(0, s("-J"));
                 let ssh_line = format!(
                     "ssh {} < {}",
-                    r.args.iter().map(|a| core::checks::sq(a)).collect::<Vec<_>>().join(" "),
-                    core::checks::sq(&script.display().to_string())
+                    r.args.iter().map(|a| core::shell::quote(a)).collect::<Vec<_>>().join(" "),
+                    core::shell::quote(&script.display().to_string())
                 );
                 r.program = s("sh");
                 r.args = vec![s("-c"), ssh_line];
@@ -1798,8 +1798,8 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
                 // `sh -s < script`: through a shell so the runner's stdin is the file.
                 let ssh_line = format!(
                     "ssh {} < {}",
-                    r.args.iter().map(|a| core::checks::sq(a)).collect::<Vec<_>>().join(" "),
-                    core::checks::sq(&script.display().to_string())
+                    r.args.iter().map(|a| core::shell::quote(a)).collect::<Vec<_>>().join(" "),
+                    core::shell::quote(&script.display().to_string())
                 );
                 r.program = s("sh");
                 r.args = vec![s("-c"), ssh_line];
@@ -2073,7 +2073,7 @@ fn bring_up(
                 args.extend([s("up"), s("-d"), s("--build"), s("--wait")]);
                 (s("docker"), args, dir.to_path_buf())
             } else {
-                let q = |a: &str| format!("'{}'", a.replace('\'', "'\\''"));
+                let q = core::shell::quote;
                 let prefix = std::iter::once("docker".to_string())
                     .chain(args.iter().map(|a| q(a)))
                     .collect::<Vec<_>>()

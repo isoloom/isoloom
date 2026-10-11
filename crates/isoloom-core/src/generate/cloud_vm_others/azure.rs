@@ -6,10 +6,11 @@
 
 use std::fmt::Write;
 
-use super::super::cloud_vm::{CONTROLLER_OS, aligned, cidr, has_windows, hcl_cmd, inventory, linux_setup_cmds, needs_controller, redirects, sh_quote, tf_expr};
+use super::super::cloud_vm::{CONTROLLER_OS, aligned, cidr, has_windows, hcl_cmd, inventory, linux_setup_cmds, needs_controller, redirects, tf_expr};
 use super::super::proxmox::{hcl, res};
 use super::super::{GeneratedFile, OUTPUT_DIR, address, address_for, header, start_order};
 use crate::model::Spec;
+use crate::shell;
 
 /// Azure matches AWS's model (static private IPs, multi-NIC machines, Windows, a controller),
 /// so nothing is refused here. The global `cloud_vm::unsupported` gate still applies.
@@ -467,9 +468,9 @@ fn controller(spec: &Spec, tf: &mut String) {
     );
     cmds.push(format!(
         "printf '%s' {} | sudo tee /etc/isoloom/inventory.ini >/dev/null",
-        sh_quote(&inventory(spec))
+        shell::quote(&inventory(spec))
     ));
-    cmds.push(format!("sudo sh -c {}", sh_quote(&super::super::vagrant::ansible_runs(spec))));
+    cmds.push(format!("sudo sh -c {}", shell::quote(&super::super::vagrant::ansible_runs(spec))));
     cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
     let deps: Vec<String> = spec
         .machines

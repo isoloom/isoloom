@@ -26,6 +26,7 @@ use std::fmt::Write;
 use super::proxmox::{hcl, res};
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, header, router, start_order};
 use crate::model::{Spec, Target};
+use crate::shell;
 use crate::validate::Cidr;
 
 const DIR: &str = "cloud-vm";
@@ -605,7 +606,7 @@ pub(super) fn linux_setup_cmds(
     for dep in &m.depends_on {
         let ports: Vec<u16> = spec.machines[dep].services.iter().map(|s| s.port).collect();
         if !ports.is_empty() {
-            cmds.push(format!("sh -c {}", sh_quote(&router::wait_for(dep, &ports, 900))));
+            cmds.push(format!("sh -c {}", shell::quote(&router::wait_for(dep, &ports, 900))));
         }
     }
     let env = if m.inputs.is_empty() {
@@ -615,12 +616,12 @@ pub(super) fn linux_setup_cmds(
     };
     for step in &vm.provision {
         if step.ends_with(".sh") {
-            cmds.push(format!("cd /opt/isoloom && sudo -E sh -c {}", sh_quote(&format!("{env}sh {step}"))));
+            cmds.push(format!("cd /opt/isoloom && sudo -E sh -c {}", shell::quote(&format!("{env}sh {step}"))));
         } else {
             cmds.push("command -v ansible-playbook >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)".into());
             cmds.push(format!(
                 "cd /opt/isoloom && sudo -E sh -c {}",
-                sh_quote(&format!("{env}ansible-playbook -c local -i localhost, {step}"))
+                shell::quote(&format!("{env}ansible-playbook -c local -i localhost, {step}"))
             ));
         }
     }
@@ -717,9 +718,9 @@ fn controller(spec: &Spec, tf: &mut String, lab: &str) {
     );
     cmds.push(format!(
         "printf '%s' {} | sudo tee /etc/isoloom/inventory.ini >/dev/null",
-        sh_quote(&inventory(spec))
+        shell::quote(&inventory(spec))
     ));
-    cmds.push(format!("sudo sh -c {}", sh_quote(&super::vagrant::ansible_runs(spec))));
+    cmds.push(format!("sudo sh -c {}", shell::quote(&super::vagrant::ansible_runs(spec))));
     cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
     let deps: Vec<String> = spec
         .machines
@@ -959,9 +960,4 @@ pub(super) fn hcl_cmd(c: &str) -> String {
 fn hcl_inner(s: &str) -> String {
     let q = hcl(s);
     q[1..q.len() - 1].to_string()
-}
-
-/// A single-quoted shell word.
-pub(super) fn sh_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
 }
