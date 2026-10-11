@@ -738,7 +738,7 @@ pub struct CloudServices {
     pub terraform: String,
     /// The module's variables: any value (a string, number, boolean, list or map). A string
     /// that is exactly `{{ inputs.NAME }}` takes the launch-time input `NAME` (declared in
-    /// `inputs`), e.g. the player's IP for an allow-list: required at `run`, kept for `down`.
+    /// `inputs`), e.g. the user's IP for an allow-list: required at `run`, kept for `down`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[schemars(with = "IndexMap<String, serde_json::Value>")]
     pub vars: IndexMap<String, serde_json::Value>,
@@ -783,7 +783,7 @@ impl CloudProvider {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Target {
-    /// Containers on the player's Docker.
+    /// Containers on the user's Docker.
     Docker,
     /// A hosting service runs the Docker shape for the user.
     Hosted,
@@ -798,7 +798,7 @@ pub enum Target {
     Hybrid,
     /// One local VM per machine (Vagrant).
     Vagrant,
-    /// One VM per machine on the player's Proxmox.
+    /// One VM per machine on the user's Proxmox.
     Proxmox,
     /// One cloud VM per machine.
     CloudVm,

@@ -479,7 +479,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             }
         }
         // What the machine serves, for tools reading the running containers (dashboards,
-        // launchers): `isoloom.service.<name>: "<http|tcp>:<port>"`.
+        // runners): `isoloom.service.<name>: "<http|tcp>:<port>"`.
         if !m.services.is_empty() {
             let mut labels = Mapping::new();
             for sv in &m.services {

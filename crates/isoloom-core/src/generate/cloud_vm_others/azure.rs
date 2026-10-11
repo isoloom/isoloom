@@ -2,7 +2,7 @@
 //! provider. One resource group and virtual network hold every network as a subnet with its
 //! exact range; each machine is a VM at its address with a public IP, a network security group
 //! doing what the router does elsewhere, and the same SSH (or WinRM) set-up. Outputs match AWS
-//! in name and shape, so the launcher reads them the same way.
+//! in name and shape (the module interface in docs/cloud-modules.md), so they read the same way.
 
 use std::fmt::Write;
 
@@ -278,8 +278,8 @@ resource "azurerm_virtual_network" "env" {{
     }
 
     // Outputs: every machine's address, and one to start from (the access machine, else the
-    // first), with its SSH user and ready marker. Where a user stands (checks, the launcher's
-    // SSH): the access machine, else the first Linux machine, else the controller.
+    // first), with its SSH user and ready marker. Where a user stands (checks, an SSH
+    // session): the access machine, else the first Linux machine, else the controller.
     let (first, check_user) = match access_ip {
         Some(ip) => (ip, None),
         None if needs_controller(spec) => ("azurerm_public_ip.isoloom_controller.ip_address".to_string(), Some(USER)),
@@ -321,7 +321,7 @@ fn outbound_allow(sg: &mut String, prio: u32) {
     );
 }
 
-/// A machine's public IP (static, so the launcher's address holds across a stop).
+/// A machine's public IP (static, so the address `ip` gives holds across a stop).
 fn public_ip(tf: &mut String, id: &str, name: &str) {
     let _ = writeln!(
         tf,

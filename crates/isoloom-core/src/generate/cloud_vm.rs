@@ -493,7 +493,7 @@ resource "aws_vpc" "env" {{
 
     // Outputs: every machine's address, and one to start from (the access machine, else the
     // first), with its SSH user and ready marker, as the other cloud outputs give.
-    // Where a user stands (checks, the launcher's SSH): the access machine, else the first Linux
+    // Where a user stands (checks, an SSH session): the access machine, else the first Linux
     // machine, else the controller (a Windows-only environment).
     let (first, check_user) = match access_ip {
         Some(ip) => (ip, None),

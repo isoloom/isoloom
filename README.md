@@ -112,7 +112,9 @@ nowhere else; offline networks stay offline), **declared** (`http`, `tcp`, `exec
 ## Layout
 
 - `crates/isoloom-core`: the format as a library (parse, validate, derive targets, generators).
-  Other Rust tools can embed it directly.
+  Other Rust tools can embed it directly. What other tools can rely on is documented in
+  [docs/cloud-modules.md](docs/cloud-modules.md) (the cloud modules' variables and outputs) and
+  [docs/registry.md](docs/registry.md) (`~/.isoloom/status.yml`).
 - `crates/isoloom`: the command line.
 - `examples/`: three environments used as tests (a two-machine app, a segmented network, an
   Active Directory domain).
