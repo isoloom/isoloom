@@ -106,6 +106,11 @@ pub fn update(f: impl FnOnce(&mut Registry)) -> Result<(), String> {
                 }
                 std::thread::sleep(std::time::Duration::from_millis(25));
             }
+            // Windows refuses to create a file another writer has just deleted while a handle on
+            // it is still open ("access denied"): the lock is changing hands, wait as above.
+            Err(e) if cfg!(windows) && e.kind() == std::io::ErrorKind::PermissionDenied && started.elapsed() < std::time::Duration::from_secs(10) => {
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
             Err(e) => return Err(format!("can't lock {}: {e}", lock.display())),
         }
     }
