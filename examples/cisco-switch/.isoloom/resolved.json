@@ -32,6 +32,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -57,6 +58,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -95,6 +97,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -124,6 +127,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -159,6 +163,8 @@
   "groups": {},
   "router": null,
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "office-vlan10": "10.92.10.253",
       "office-vlan20": "10.92.20.253"
