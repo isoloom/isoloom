@@ -215,11 +215,22 @@ fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
 /// yet (a Windows machine on Proxmox, environment-level provisioning on Docker, ...). `None`
 /// when `generate` produces the target. Lets `isoloom targets` tell the truth: a target can be
 /// possible by its machines' editions and still not be generated.
+///
+/// Safe on a spec that hasn't been validated: an invalid spec is refused by every target, with
+/// its first problem as the reason, instead of reaching a generator that assumes validity.
 pub fn refusal(spec: &Spec, target: Target) -> Option<String> {
+    if let Some(problem) = first_problem(spec) {
+        return Some(problem);
+    }
     match target_files(spec, target) {
         Err(GenerateError::Unsupported { what, .. }) => Some(what),
         _ => None,
     }
+}
+
+/// The spec's first validation problem, as `refusal` reports it.
+fn first_problem(spec: &Spec) -> Option<String> {
+    crate::validate::validate(spec).first().map(|p| format!("the spec is invalid: {p}"))
 }
 
 /// Features no generator supports yet, shared by both (none today: kept as the place to

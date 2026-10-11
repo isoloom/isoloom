@@ -183,9 +183,11 @@ fn exec_checks_run_inside_the_machine_on_docker_and_kubernetes() {
     let with_docker = parse(&format!("{BASE}checks:\n  - {{ from: web, exec: id, expect: uid }}\n")).unwrap();
     assert_eq!(isoloom_core::refusal(&with_docker, isoloom_core::Target::Docker), None);
     assert_eq!(isoloom_core::refusal(&with_docker, isoloom_core::Target::Kubernetes), None);
-    // From where no container of its own stands, there's nothing to run it inside.
+    // From where no container of its own stands, there's nothing to run it inside (`validate`
+    // says so first, and `refusal` reports the spec's problem).
     let from_user = parse(&format!("{BASE}checks:\n  - {{ exec: id }}\n")).unwrap();
-    assert!(isoloom_core::refusal(&from_user, isoloom_core::Target::Docker).is_some_and(|r| r.contains("needs `from:`")));
+    let why = isoloom_core::refusal(&from_user, isoloom_core::Target::Docker).expect("refused");
+    assert!(why.contains("say which with `from`"), "{why}");
     // Its own runner, piped into the machine; the runner beside it doesn't run it.
     let files = isoloom_core::generate(&with_docker, isoloom_core::Target::Docker).unwrap();
     let exec = files
