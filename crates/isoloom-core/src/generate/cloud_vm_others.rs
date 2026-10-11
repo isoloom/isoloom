@@ -1,7 +1,7 @@
 //! The `cloud-vm` target on clouds other than AWS: one cloud VM per machine, as Terraform under
 //! `.isoloom/cloud-vm/<cloud>/`. AWS stays in [`super::cloud_vm`]; this module adds the rest and
 //! shares that module's helpers (networks, the Linux set-up commands, the controller, the
-//! outputs the launcher reads).
+//! outputs every cloud module gives, see docs/cloud-modules.md).
 //!
 //! Each cloud is a driver: `build` writes its `main.tf`, `refusal` says when the cloud can't
 //! express a given spec (its module is then dropped for that spec, best-effort, rather than

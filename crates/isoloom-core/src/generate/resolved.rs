@@ -260,7 +260,7 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
         },
     });
     // Cloud services: what tools reading the snapshot need to run them (the cloud, the module,
-    // what they expose and cost). Not the variables, which may take a player's input.
+    // what they expose and cost). Not the variables, which may take a user's input.
     if let (Some(c), Value::Object(map)) = (&spec.cloud, &mut out) {
         map.insert(
             "cloud".into(),

@@ -783,7 +783,7 @@ fn qemu_port(env: &str, net: &str) -> u16 {
 }
 
 /// Why this environment's VMs can't all have their networks under Vagrant's QEMU provider, if
-/// they can't: a launcher asks before offering QEMU.
+/// they can't, so a tool can ask before offering QEMU.
 pub fn qemu_refusal(spec: &Spec) -> Option<String> {
     let plan = checks::plan(spec);
     let with_controller = !spec.provision.is_empty() || !controller_checks(spec, &plan).is_empty();

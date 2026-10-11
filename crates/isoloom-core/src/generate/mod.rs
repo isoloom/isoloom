@@ -373,8 +373,8 @@ mod gcp_project_name_tests {
     #[test]
     fn fits_google_limit() {
         assert_eq!(super::gcp_project_name("web"), "isoloom-web");
-        let long = super::gcp_project_name("google-ctf-2020-log-me-in");
-        assert_eq!(long, "isoloom-google-ctf-2020-log-me");
+        let long = super::gcp_project_name("acme-web-2020-login-portal");
+        assert_eq!(long, "isoloom-acme-web-2020-login-po");
         assert!(long.len() <= 30);
         // Never ends on a hyphen once cut.
         assert_eq!(super::gcp_project_name("abcdefghijklmnopqrstu-wxyz"), "isoloom-abcdefghijklmnopqrstu");

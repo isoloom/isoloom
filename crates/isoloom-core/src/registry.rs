@@ -82,7 +82,7 @@ pub fn save(r: &Registry) -> Result<(), String> {
 }
 
 /// Reads, changes and writes the registry as one step: `run`, `down` and tools embedding
-/// Isoloom (a launcher and its background workers) write it at the same time, and a plain
+/// Isoloom (and their background workers) write it at the same time, and a plain
 /// load-then-save lets one of two writers drop the other's entry. Held by a lock file beside
 /// it; one left by a process that died is taken over after 30 seconds.
 pub fn update(f: impl FnOnce(&mut Registry)) -> Result<(), String> {
@@ -235,12 +235,12 @@ mod tests {
         let r: Registry = serde_yaml_ng::from_str(old).unwrap();
         assert_eq!(r.environments[0].project, None);
         let mut e = r.environments[0].clone();
-        e.project = Some("cyberctf-abc".into());
+        e.project = Some("acme-lab-1".into());
         let text = serde_yaml_ng::to_string(&Registry { environments: vec![e] }).unwrap();
-        assert!(text.contains("project: cyberctf-abc"), "{text}");
+        assert!(text.contains("project: acme-lab-1"), "{text}");
         assert_eq!(
             serde_yaml_ng::from_str::<Registry>(&text).unwrap().environments[0].project.as_deref(),
-            Some("cyberctf-abc")
+            Some("acme-lab-1")
         );
     }
 }

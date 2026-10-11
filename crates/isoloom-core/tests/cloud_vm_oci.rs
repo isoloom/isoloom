@@ -52,7 +52,7 @@ fn single_network_linux_lab_builds_oci_instances_at_fixed_addresses() {
     // The VCN's security list, with the published port opened.
     assert!(tf.contains("resource \"oci_core_security_list\" \"env\""));
     assert!(tf.contains("min = 8080"));
-    // The launcher outputs, the same shape the AWS driver gives.
+    // The module outputs (docs/cloud-modules.md), the same shape the AWS driver gives.
     assert!(tf.contains("output \"ip\""));
     assert!(tf.contains("value = \"/var/lib/isoloom/ready\""));
 }

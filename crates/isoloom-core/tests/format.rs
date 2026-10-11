@@ -223,13 +223,13 @@ fn the_size_floor_is_a_vms() {
 fn cloud_vars_are_typed_and_can_take_inputs() {
     let base = "version: 1\nname: t\ncloud:\n  provider: aws\n  terraform: tf\n";
     let ok = parse(&format!(
-        "{base}  vars: {{ enabled: true, count: 3, ips: [\"10.0.0.1/32\"], cidr: \"{{{{ inputs.PLAYER_CIDR }}}}\" }}\ninputs: [PLAYER_CIDR]\n"
+        "{base}  vars: {{ enabled: true, count: 3, ips: [\"10.0.0.1/32\"], cidr: \"{{{{ inputs.CLIENT_CIDR }}}}\" }}\ninputs: [CLIENT_CIDR]\n"
     ))
     .expect("parses");
     let vars = &ok.cloud.as_ref().unwrap().vars;
     assert_eq!(vars["enabled"], serde_json::json!(true));
     assert_eq!(vars["ips"], serde_json::json!(["10.0.0.1/32"]));
-    assert_eq!(isoloom_core::CloudServices::input_of(&vars["cidr"]), Some("PLAYER_CIDR"));
+    assert_eq!(isoloom_core::CloudServices::input_of(&vars["cidr"]), Some("CLIENT_CIDR"));
     assert!(validate(&ok).is_empty(), "{:?}", validate(&ok));
     let undeclared = parse(&format!("{base}  vars: {{ cidr: \"{{{{ inputs.NOPE }}}}\" }}\n")).unwrap();
     assert!(validate(&undeclared).iter().any(|p| p.to_string().contains("`NOPE` isn't declared")));
