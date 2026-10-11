@@ -32,6 +32,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.redis: tcp:6379
+      isoloom.managed: 'true'
+      isoloom.environment: air-gapped
     restart: unless-stopped
   app:
     image: nginx:1.27-alpine
@@ -60,6 +62,8 @@ services:
         condition: service_healthy
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: air-gapped
     restart: unless-stopped
   isoloom-check-store:
     image: curlimages/curl:8.11.1
@@ -76,6 +80,9 @@ services:
         condition: service_healthy
       app:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: air-gapped
   isoloom-check-app:
     image: curlimages/curl:8.11.1
     profiles:
@@ -91,6 +98,9 @@ services:
         condition: service_healthy
       app:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: air-gapped
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -102,6 +112,9 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: air-gapped
 networks:
   lab:
     ipam:
@@ -109,5 +122,11 @@ networks:
       - subnet: 10.62.0.0/24
         gateway: 10.62.0.1
     internal: true
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: air-gapped
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: air-gapped

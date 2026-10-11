@@ -37,6 +37,12 @@ variable "auto_stop_minutes" {
   description = "Shut the machine down after this many minutes (0: never)"
 }
 
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+
 provider "digitalocean" {}
 
 resource "terraform_data" "id" {
@@ -72,7 +78,7 @@ resource "digitalocean_droplet" "web" {
   vpc_uuid  = digitalocean_vpc.env.id
   ssh_keys  = [digitalocean_ssh_key.env.fingerprint]
   user_data = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
-  tags      = ["isoloom", "solo-web"]
+  tags      = concat(["isoloom", "solo-web", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
 }
 
 # What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.

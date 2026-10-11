@@ -244,6 +244,15 @@ fn base_table() -> Vec<Row> {
             ),
         ),
         row(
+            "networks.*.switch",
+            done(
+                "the LAN's switch appliance instead of the Linux switch container: an access port per VLAN network, a trunk port per trunk link, VLANs and port modes in its startup configuration",
+                "cisco-switch",
+            ),
+            na("switch appliances run on the Docker targets only"),
+            na("switch appliances run on the Docker targets only"),
+        ),
+        row(
             "networks.*.vlans.*.internet",
             done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
             done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
@@ -291,6 +300,36 @@ fn base_table() -> Vec<Row> {
             done("a healthcheck, so `depends_on` and `up --wait` wait for it", "hello-stack"),
             done("machines depending on it wait until it answers", "hello-stack"),
         ),
+        Row {
+            path: "cloud.provider",
+            outputs: all(Status::Descriptive {
+                note: "the cloud of a cloud-services environment (the cloud-services target, not these outputs)",
+            }),
+        },
+        Row {
+            path: "cloud.terraform",
+            outputs: all(Status::Descriptive {
+                note: "the Terraform module the cloud-services target applies",
+            }),
+        },
+        Row {
+            path: "cloud.vars",
+            outputs: all(Status::Descriptive {
+                note: "the module's variables (terraform.tfvars.json)",
+            }),
+        },
+        Row {
+            path: "cloud.outputs",
+            outputs: all(Status::Descriptive {
+                note: "what checks and the message read once deployed",
+            }),
+        },
+        Row {
+            path: "cloud.hourly_usd",
+            outputs: all(Status::Descriptive {
+                note: "the cost runners show and budget",
+            }),
+        },
         Row {
             path: "machines.*.services[].name",
             outputs: all(Status::Descriptive {
@@ -473,6 +512,13 @@ fn base_table() -> Vec<Row> {
             done("the machine's own Vagrant box instead of the built-in one", "windows-hello"),
         ),
         vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
+        vm_field(
+            "machines.*.vm.image.qemu",
+            done(
+                "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
+                "windows-hello",
+            ),
+        ),
         vm_field(
             "machines.*.vm.image.winrm",
             done(
@@ -664,6 +710,8 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "cloud.vars",
+    "cloud.outputs",
     "checks[].headers",
     "machines.*.docker.args",
     "provision[].groups",

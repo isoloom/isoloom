@@ -42,6 +42,9 @@ services:
       CLAB_MGMT_PASSTHROUGH: 'true'
     privileged: true
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   vios-routes:
     image: alpine:3.20
     network_mode: service:vios
@@ -62,6 +65,9 @@ services:
       vios:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   csr:
     image: vrnetlab/cisco_csr1000v:17.03.08
     platform: linux/amd64
@@ -97,6 +103,9 @@ services:
       CONNECTION_MODE: tc
     privileged: true
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   csr-routes:
     image: alpine:3.20
     network_mode: service:csr
@@ -117,6 +126,9 @@ services:
       csr:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   host-a:
     image: alpine:3.20
     platform: linux/amd64
@@ -131,6 +143,9 @@ services:
     - csr:10.92.2.1
     - host-b:10.92.2.10
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   host-a-routes:
     image: alpine:3.20
     network_mode: service:host-a
@@ -153,6 +168,9 @@ services:
       vios:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   host-b:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -181,6 +199,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
     restart: unless-stopped
   host-b-routes:
     image: alpine:3.20
@@ -204,6 +224,9 @@ services:
       csr:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   isoloom-check-host-a:
     image: curlimages/curl:8.11.1
     profiles:
@@ -227,6 +250,9 @@ services:
         condition: service_healthy
       host-a:
         condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -238,25 +264,43 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
 networks:
   site-a:
     ipam:
       config:
       - subnet: 10.92.1.0/24
         gateway: 10.92.1.254
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   site-b:
     ipam:
       config:
       - subnet: 10.92.2.0/24
         gateway: 10.92.2.254
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   wan:
     ipam:
       config:
       - subnet: 10.92.0.0/29
         gateway: 10.92.0.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
   isoloom-mgmt:
     ipam:
       config:
       - subnet: 10.255.255.0/24
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-qemu
