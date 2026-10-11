@@ -28,7 +28,7 @@ fn every_example_is_valid_against_the_schema() {
     let v = validator();
     for (name, text) in examples() {
         let doc: serde_json::Value = serde_yaml_ng::from_str(&text).unwrap();
-        let errors: Vec<String> = v.iter_errors(&doc).map(|e| format!("{} at {}", e, e.instance_path)).collect();
+        let errors: Vec<String> = v.iter_errors(&doc).map(|e| format!("{} at {}", e, e.instance_path())).collect();
         assert!(errors.is_empty(), "{name}: {errors:?}");
     }
 }
