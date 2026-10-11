@@ -301,6 +301,36 @@ fn base_table() -> Vec<Row> {
             done("machines depending on it wait until it answers", "hello-stack"),
         ),
         Row {
+            path: "cloud.provider",
+            outputs: all(Status::Descriptive {
+                note: "the cloud of a cloud-services environment (the cloud-services target, not these outputs)",
+            }),
+        },
+        Row {
+            path: "cloud.terraform",
+            outputs: all(Status::Descriptive {
+                note: "the Terraform module the cloud-services target applies",
+            }),
+        },
+        Row {
+            path: "cloud.vars",
+            outputs: all(Status::Descriptive {
+                note: "the module's variables (terraform.tfvars.json)",
+            }),
+        },
+        Row {
+            path: "cloud.outputs",
+            outputs: all(Status::Descriptive {
+                note: "what checks and the message read once deployed",
+            }),
+        },
+        Row {
+            path: "cloud.hourly_usd",
+            outputs: all(Status::Descriptive {
+                note: "the cost runners show and budget",
+            }),
+        },
+        Row {
             path: "machines.*.services[].name",
             outputs: all(Status::Descriptive {
                 note: "names the service for people and runners",
@@ -482,6 +512,13 @@ fn base_table() -> Vec<Row> {
             done("the machine's own Vagrant box instead of the built-in one", "windows-hello"),
         ),
         vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
+        vm_field(
+            "machines.*.vm.image.qemu",
+            done(
+                "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
+                "windows-hello",
+            ),
+        ),
         vm_field(
             "machines.*.vm.image.winrm",
             done(
@@ -673,6 +710,8 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "cloud.vars",
+    "cloud.outputs",
     "checks[].headers",
     "machines.*.docker.args",
     "provision[].groups",

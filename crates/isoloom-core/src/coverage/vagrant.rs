@@ -367,18 +367,24 @@ fn qemu(s: &str) -> Option<Support> {
         "smp" => Emitted {
             from: "machines.*.resources.cpus",
         },
-        "arch" => ARCH,
-        "disk_resize" => DISK,
-        "advanced_network" | "net_mode" => Planned {
-            note: "private networks: QEMU gives a machine one private network (`advanced_network`), and needs vmnet or socket_vmnet on the Mac",
+        "arch" => Emitted {
+            from: "machines.*.arch (emulated when the host's CPU is another)",
         },
-        "socket_opts" | "socket_vmnet_client" | "socket_vmnet_socket" | "vmnet_interface" | "tap_device" | "mcast_addr" | "extra_netdev_args" => Planned {
-            note: "with private networks on QEMU",
+        "disk_resize" => DISK,
+        "advanced_network" | "net_mode" | "socket_opts" => Partial {
+            from: "machines.*.networks",
+            gap: "without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit)",
+        },
+        "socket_vmnet_client" | "socket_vmnet_socket" | "vmnet_interface" | "tap_device" | "mcast_addr" | "extra_netdev_args" => Planned {
+            note: "more than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac)",
+        },
+        "ssh_auto_correct" => Emitted {
+            from: "(always: each VM forwards SSH from its own host port)",
         },
         "machine" | "cpu" | "net_device" | "drive_interface" | "extra_drive_args" | "extra_image_opts" | "extra_qemu_args" => HOST_TUNING,
         "firmware_format" => IMAGE_BOOTS,
         "image_path" | "qemu_bin" | "qemu_dir" | "default_qemu_dir" | "homebrew_prefix" => USER_SETUP,
-        "control_port" | "debug_port" | "ssh_host" | "ssh_port" | "ssh_auto_correct" | "no_daemonize" | "other_default" | "graceful_timeout" => TOOLING,
+        "control_port" | "debug_port" | "ssh_host" | "ssh_port" | "no_daemonize" | "other_default" | "graceful_timeout" => TOOLING,
         _ => return None,
     })
 }

@@ -118,7 +118,8 @@
       "vagrant": "needs `vm:` on bench, web",
       "proxmox": "needs `vm:` on bench, web",
       "cloud-vm": "needs `vm:` on bench, web",
-      "external": "needs `external:` on bench, web"
+      "external": "needs `external:` on bench, web",
+      "cloud-services": "left out by `targets:`"
     }
   },
   "checks": {

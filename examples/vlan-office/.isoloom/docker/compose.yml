@@ -42,6 +42,9 @@ services:
       timeout: 3s
       retries: 60
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-switch-office:
     image: nicolaka/netshoot:v0.13
     cap_add:
@@ -65,6 +68,9 @@ services:
       timeout: 2s
       retries: 30
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   intranet:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -94,6 +100,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
     restart: unless-stopped
   intranet-routes:
     image: alpine:3.20
@@ -117,6 +125,9 @@ services:
       isoloom-router:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   guest:
     image: alpine:3.20
     platform: linux/amd64
@@ -132,6 +143,9 @@ services:
     - staff:10.70.10.10
     - admin:10.70.20.50
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   guest-routes:
     image: alpine:3.20
     network_mode: service:guest
@@ -154,6 +168,9 @@ services:
       isoloom-router:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   admin:
     image: alpine:3.20
     platform: linux/amd64
@@ -169,6 +186,9 @@ services:
     - staff:10.70.10.10
     - guest:10.70.20.10
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   admin-routes:
     image: nicolaka/netshoot:v0.13
     network_mode: service:admin
@@ -193,6 +213,9 @@ services:
       isoloom-router:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-access:
     image: alpine:3.20
     hostname: staff
@@ -208,6 +231,9 @@ services:
     - infinity
     profiles:
     - check
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-access-routes:
     image: alpine:3.20
     network_mode: service:isoloom-access
@@ -232,6 +258,9 @@ services:
     restart: unless-stopped
     profiles:
     - check
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -255,6 +284,9 @@ services:
         condition: service_started
       isoloom-access-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-check-intranet:
     image: curlimages/curl:8.11.1
     profiles:
@@ -274,6 +306,9 @@ services:
         condition: service_healthy
       admin-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-check-guest:
     image: curlimages/curl:8.11.1
     profiles:
@@ -295,6 +330,9 @@ services:
         condition: service_healthy
       guest:
         condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-check-admin:
     image: curlimages/curl:8.11.1
     profiles:
@@ -316,6 +354,9 @@ services:
         condition: service_healthy
       admin:
         condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -327,23 +368,41 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
 networks:
   office-vlan10:
     ipam:
       config:
       - subnet: 10.70.10.0/24
         gateway: 10.70.10.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   office-vlan20:
     ipam:
       config:
       - subnet: 10.70.20.0/24
         gateway: 10.70.20.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   servers:
     ipam:
       config:
       - subnet: 10.70.99.0/24
         gateway: 10.70.99.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
   isoloom-trunk-office-admin:
     internal: true
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office

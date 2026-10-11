@@ -87,7 +87,8 @@
       "cloud-docker": "needs `docker:` on box",
       "kubernetes": "needs `docker:` on box",
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on box"
+      "external": "needs `external:` on box",
+      "cloud-services": "left out by `targets:`"
     }
   },
   "checks": {

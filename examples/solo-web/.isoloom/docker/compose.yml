@@ -9,6 +9,9 @@ services:
   web:
     build:
       context: ../../build/web
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: solo-web
     image: isoloom/solo-web-web
     platform: linux/amd64
     hostname: web
@@ -35,6 +38,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: solo-web
     restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
@@ -51,6 +56,9 @@ services:
     depends_on:
       web:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: solo-web
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -62,11 +70,20 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: solo-web
 networks:
   app:
     ipam:
       config:
       - subnet: 10.80.0.0/24
         gateway: 10.80.0.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: solo-web
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: solo-web
