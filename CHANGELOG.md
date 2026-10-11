@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `isoloom provision`
+- `isoloom provision [machine...] [--target t]`: the environment's provisioning again, on a running environment, in place, for a step that failed or was interrupted (a host that stopped answering) without an hour of rebuild. With `provision:` steps, the controller (booted if halted, halted again after) gets the project's current files and runs the playbooks again, limited to the named machines (`--limit`); without, the named machines' own `vm.provision` steps run again (`vagrant provision`). Steps are meant to be idempotent. Local VMs (vagrant, docker-vm, hybrid) for now.
+
 ### Windows steps can use the project's files
 - A Windows machine's `.ps1` steps were uploaded one by one, so a step couldn't reach the project's other files (vendored tools, scripts). The project now goes to `C:\isoloom` once, before the steps, and each step runs from there (`-File C:\isoloom\<step>`, in that folder), as Linux steps run from /opt/isoloom. Vagrant: the `project` step uploads its archive over WinRM; cloud-vm (AWS, Azure): the host's archive, as a Linux machine's, with the set-up script now in `C:\ProgramData\isoloom`. The archive is unpacked by PowerShell over .NET's GZipStream (PowerShell 2.0 and later; Windows Server 2016 and older have no tar.exe); symbolic links are left out, and a name Windows can't take is skipped with a warning. `.isoloomignore` keeps the copy small. (#59)
 

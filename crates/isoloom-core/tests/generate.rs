@@ -626,6 +626,15 @@ fn the_resolved_snapshot_tells_infra_from_targets() {
 }
 
 #[test]
+fn the_provision_script_can_be_limited_to_machines() {
+    let (_, spec) = example("ansible-pair");
+    let all = isoloom_core::generate::provision_script(&spec, &[]);
+    assert!(!all.contains("--limit"));
+    let some = isoloom_core::generate::provision_script(&spec, &["web".into(), "cache".into()]);
+    assert!(some.contains(" --limit 'web,cache' "), "{some}");
+}
+
+#[test]
 fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
     let (_, spec) = example("ansible-pair");
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");

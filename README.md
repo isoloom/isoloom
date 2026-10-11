@@ -84,6 +84,7 @@ isoloom report services   # tables: addressing, services, wiring, resources
 isoloom defaults          # the defaults in effect (images, Vagrant provider, cloud regions) and their sources
 isoloom run TARGET [DIR]  # generate, then bring the environment up with the target's own tool
 isoloom test TARGET [DIR] # run the checks against it: the spec's, and the ones derived from it
+isoloom provision [MACHINE...] --target vagrant   # provisioning again, in place (after a step failed)
 isoloom run docker --instance 2   # a second copy, with its own names, blocks and ports
 isoloom run external      # machines that already exist: provision and check them over SSH
 isoloom status            # what is up on this host, and whether it still runs
