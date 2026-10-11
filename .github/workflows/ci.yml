@@ -12,14 +12,15 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
+          toolchain: stable
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo fmt --all --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
       - name: Examples validate
         run: |
           for e in examples/*/; do cargo run -q -- validate "$e" --skip-files; cargo run -q -- targets "$e"; done
@@ -29,6 +30,41 @@ jobs:
           for e in examples/*/; do
             if [ -d "$e.isoloom" ]; then cargo run -q -- check "$e"; fi
           done
+
+  # The declared rust-version (Cargo.toml) builds and passes, so it can't drift again.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: "1.88"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo test --workspace --locked
+
+  # macOS and Windows binaries are released (release.yml), and host.rs has Windows-only code.
+  platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo test --workspace --locked
+
+  # Known vulnerabilities (RustSec) in the locked dependencies.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check advisories
 
   # The generated Compose files, run for real: everything answers, and `isoloom test` passes
   # (the spec's checks and the ones derived from its services and reach rules).
@@ -42,9 +78,11 @@ jobs:
       run:
         working-directory: examples/${{ matrix.example }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Start
         run: docker compose -f .isoloom/docker/compose.yml up -d --wait --wait-timeout 300
       - name: Checks (the spec's and the derived ones, from every machine)
@@ -70,8 +108,8 @@ jobs:
       run:
         working-directory: examples/${{ matrix.example }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: helm/kind-action@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
         with:
           cluster_name: isoloom
           config: .github/kind-calico.yaml
@@ -94,8 +132,10 @@ jobs:
           ns=$(awk '/^kind: Namespace/{getline; getline; print $2; exit}' .isoloom/kubernetes/environment.yaml)
           echo "NS=$ns" >> "$GITHUB_ENV"
           kubectl -n "$ns" wait --for=condition=Available deployment --all --timeout=600s
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Checks (the spec's and the derived ones, from every machine)
         run: cargo run -q -- test kubernetes .
       - name: State
@@ -108,9 +148,11 @@ jobs:
   import:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Import, generate
         run: |
           mkdir -p /tmp/shop && cp crates/isoloom-core/tests/fixtures/compose-shop/docker-compose.yml /tmp/shop/
@@ -133,8 +175,8 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
       - name: Validate
         run: |
           for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
