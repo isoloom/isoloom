@@ -1,5 +1,5 @@
 //! The image each target uses for an OS name: the built-in table, then the runner's own
-//! table ([`Table`]: a file given to `isoloom generate --images`, or a launcher's settings),
+//! table ([`Table`]: a file given to `isoloom generate --images`, or a tool's own settings),
 //! then what a spec gives itself (`vm.image`).
 
 use indexmap::IndexMap;

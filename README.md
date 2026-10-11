@@ -116,7 +116,9 @@ answers from the controller), **declared** (`http`, `tcp`, `exec`, with `from`,
 ## Layout
 
 - `crates/isoloom-core`: the format as a library (parse, validate, derive targets, generators).
-  Other Rust tools can embed it directly.
+  Other Rust tools can embed it directly. What other tools can rely on is documented in
+  [docs/cloud-modules.md](docs/cloud-modules.md) (the cloud modules' variables and outputs) and
+  [docs/registry.md](docs/registry.md) (`~/.isoloom/status.yml`).
 - `crates/isoloom`: the command line.
 - `examples/`: environments used as tests, from a two-machine app and a segmented network to an
   Active Directory domain, Cisco routers and cloud services. Those with a committed `.isoloom/`
