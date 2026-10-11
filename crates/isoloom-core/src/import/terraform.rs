@@ -96,10 +96,10 @@ fn instances(bodies: &[Body], notes: &mut Vec<Note>) -> Vec<Instance> {
     let mut vars = hcl::Map::new();
     for body in bodies {
         for b in body.blocks().filter(|b| b.identifier() == "variable") {
-            if let (Some(name), Some(d)) = (b.labels().first(), b.body().attributes().find(|a| a.key() == "default")) {
-                if let Ok(v) = d.expr().evaluate(&Context::new()) {
-                    vars.insert(name.as_str().to_string(), v);
-                }
+            if let (Some(name), Some(d)) = (b.labels().first(), b.body().attributes().find(|a| a.key() == "default"))
+                && let Ok(v) = d.expr().evaluate(&Context::new())
+            {
+                vars.insert(name.as_str().to_string(), v);
             }
         }
     }
@@ -309,10 +309,10 @@ pub fn draft(files: &[(String, String)], fallback_name: &str, source: &str) -> R
             "aws_instance" => {
                 let mut ips: Vec<String> = i.str(&["private_ip"]).into_iter().collect();
                 for nic in i.get(&["network_interface"]).and_then(Json::as_array).into_iter().flatten() {
-                    if let Some(n) = nic.get("network_interface_id").and_then(Json::as_str).and_then(|r| resolve(&all, r)) {
-                        if let Some(Json::Array(p)) = n.get(&["private_ips"]) {
-                            ips.extend(p.iter().filter_map(|x| x.as_str().map(String::from)));
-                        }
+                    if let Some(n) = nic.get("network_interface_id").and_then(Json::as_str).and_then(|r| resolve(&all, r))
+                        && let Some(Json::Array(p)) = n.get(&["private_ips"])
+                    {
+                        ips.extend(p.iter().filter_map(|x| x.as_str().map(String::from)));
                     }
                 }
                 let os = [i.str(&["ami"]), i.str(&["tags", "OS"]), Some(i.name.clone())]

@@ -1144,7 +1144,8 @@ fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
-#[cfg(test)]
+// The retry helpers run on the Linux controller VM; the test drives them with a POSIX `sh`.
+#[cfg(all(test, unix))]
 mod retry_tests {
     use super::RETRIES;
 

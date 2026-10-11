@@ -262,10 +262,10 @@ pub fn draft(recorded: &Value, fallback_name: &str, source: &str) -> Result<Draf
                     ),
                 },
                 ("provision", "ansible") => {
-                    if let Some(p) = text(opt("playbook")) {
-                        if !env_playbooks.contains(&p) {
-                            env_playbooks.push(p);
-                        }
+                    if let Some(p) = text(opt("playbook"))
+                        && !env_playbooks.contains(&p)
+                    {
+                        env_playbooks.push(p);
                     }
                 }
                 ("provision", "file") => note(

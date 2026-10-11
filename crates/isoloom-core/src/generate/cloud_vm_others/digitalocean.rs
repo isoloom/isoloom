@@ -48,13 +48,13 @@ pub(super) fn refusal(spec: &Spec) -> Option<String> {
     }
     // An OS without a droplet image: refuse rather than build something that won't boot.
     for (name, m) in &spec.machines {
-        if let Some(vm) = &m.vm {
-            if do_image(&vm.os).is_none() {
-                return Some(format!(
-                    "machine `{name}`: no DigitalOcean image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04)",
-                    vm.os
-                ));
-            }
+        if let Some(vm) = &m.vm
+            && do_image(&vm.os).is_none()
+        {
+            return Some(format!(
+                "machine `{name}`: no DigitalOcean image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04)",
+                vm.os
+            ));
         }
     }
     None
