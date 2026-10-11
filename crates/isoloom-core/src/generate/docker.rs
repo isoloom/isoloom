@@ -263,10 +263,12 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
     if router::needed(spec) {
         services.insert(s(router::NAME), router_service(spec));
     }
-    // 802.1Q: a switch per LAN with trunks (see `trunks`).
+    // 802.1Q: a switch per LAN with trunks (see `trunks`), unless the LAN names its own (a
+    // switch appliance, wired below with the other appliances).
     let ts = trunks::trunks(spec);
     let mut lans: Vec<&str> = ts.iter().map(|t| t.lan.as_str()).collect();
     lans.dedup();
+    lans.retain(|lan| crate::vlans::switch_of(spec, lan).is_none());
     for lan in &lans {
         let of_lan: Vec<&trunks::Trunk> = ts.iter().filter(|t| t.lan == *lan).collect();
         services.insert(s(trunks::switch_name(lan)), switch_service(spec, &of_lan));
@@ -413,15 +415,14 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
                     ("priority", Value::Number(1000.into())),
                 ]),
             );
-            for (k, (net, octet)) in m.networks.iter().enumerate() {
-                nets.insert(
-                    s(net.as_str()),
-                    map([
-                        ("ipv4_address", s(address(spec, net, *octet).to_string())),
-                        ("interface_name", s(format!("eth{}", k + 1))),
-                        ("priority", Value::Number((999 - k as u64).into())),
-                    ]),
-                );
+            for (k, port) in w.ports.iter().enumerate() {
+                let mut a = Mapping::new();
+                if let Some(addr) = port.address {
+                    a.insert(s("ipv4_address"), s(addr.to_string()));
+                }
+                a.insert(s("interface_name"), s(format!("eth{}", k + 1)));
+                a.insert(s("priority"), Value::Number((999 - k as u64).into()));
+                nets.insert(s(port.network.as_str()), Value::Mapping(a));
             }
             svc.insert(s("networks"), Value::Mapping(nets));
         }
@@ -812,8 +813,10 @@ fn extra_hosts(spec: &Spec, name: &str) -> Option<Value> {
         .iter()
         // Docker's own names only reach across a network both are attached to: not one a trunk
         // carries.
+        // A LAN's switch has no address on the environment's networks: no name to resolve.
         .filter(|(o, om)| {
             o.as_str() != name
+                && !om.networks.is_empty()
                 && !om
                     .networks
                     .keys()
@@ -913,7 +916,7 @@ fn router_service(spec: &Spec) -> Value {
 fn route_commands(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
     // An appliance routes itself (IOS): its sidecar only hands the data addresses over to it.
     if m.docker.as_ref().is_some_and(|d| d.appliance.is_some()) {
-        return appliances::sidecar_commands(m);
+        return appliances::sidecar_commands(appliances::ports(spec, name, m, &|n, o| address(spec, n, o)).len());
     }
     // Its trunks first: the routes below may go through addresses only they carry.
     let ts = trunks::trunks(spec);
@@ -1025,7 +1028,12 @@ fn routes_sidecar(spec: &Spec, host: &str, name: &str, m: &Machine) -> Value {
     let mut deps = Mapping::new();
     deps.insert(s(host), map([("condition", s("service_started"))]));
     for t in trunks::of(&ts, name) {
-        deps.insert(s(trunks::switch_name(&t.lan)), map([("condition", s("service_healthy"))]));
+        match crate::vlans::switch_of(spec, &t.lan) {
+            // A switch appliance: started (IOS reports no readiness of its own; checks through
+            // it `wait` for it to boot, as for any appliance on the way).
+            Some(sw) => deps.insert(s(sw), map([("condition", s("service_started"))])),
+            None => deps.insert(s(trunks::switch_name(&t.lan)), map([("condition", s("service_healthy"))])),
+        };
     }
     if router::needed(spec) && m.networks.keys().any(|n| router::plain(spec, n)) {
         deps.insert(s(router::NAME), map([("condition", s("service_healthy"))]));

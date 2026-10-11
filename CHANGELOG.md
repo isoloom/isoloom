@@ -5,6 +5,9 @@
 ### `import compose` reads keys set twice
 - A key set twice in one mapping (secDevLabs camplake-api's `environment` sets `MONGO_PORT` twice) no longer stops `isoloom import compose` with `duplicate entry`: the last value is kept, as Compose does, and the draft's "Changed on the way in" notes say which key, where, and the value kept. (#68)
 
+### A Cisco switch for a LAN
+- `switch: <machine>` on a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance: cisco-iol-l2` or `cisco-vios-l2`) switches the LAN instead of Isoloom's Linux switch container, so frames between a VLAN and a trunk cross real IOS. The machine lists no `networks`: its data ports are an access port on each VLAN's network (in VLAN order, at the controller address, unused on Docker), then a trunk port on each trunk machine's link. Isoloom's startup configuration declares the VLANs (`vtp mode transparent`, `vlan <id>` named after the network) and sets each port (`switchport mode access` + `access vlan`, or `trunk encapsulation dot1q` + `mode trunk` + `allowed vlan`); the machine's own `config` follows. Trunk machines are unchanged; their sidecar waits for the switch to start (IOS reports no readiness: checks through it `wait` for it to boot). Validated: a switch kind, no `networks`, `services` or `aliases` of its own, one LAN per switch, no `count`, no machine on the LAN directly. Docker targets only, like every appliance. Example: cisco-switch.
+
 ## 0.10.1
 
 ### Google Cloud: long environment names
@@ -32,7 +35,6 @@
 - On Vagrant's QEMU provider (vagrant-qemu), each machine runs with its own CPU (`v.arch` from `arch`), emulated when the host's is another: an x86 Windows DC boots on an Apple Silicon Mac, slowly, so emulated machines get an hour to boot and a longer WinRM budget. A QEMU box can be given per image (`vm.image.qemu`, libvirt format); `windows-server-2019` and `debian-12` have one built in, and Isoloom's own VMs (controller, router, tool shell) use `cloud-image/debian-12` there.
 - Machines start one at a time, in dependency order, on every provider (`VAGRANT_NO_PARALLEL` in the Vagrantfile): QEMU and libvirt declare themselves parallel, so the controller ran its play before the machines were up.
 - Private networks on QEMU without root: a network of exactly two VMs is a `socket` listen/connect pair on a loopback port. A Windows machine's lab address is set from PowerShell (no cloud-init). `qemu_refusal` says when a spec doesn't fit (more than two VMs on a network, a VM on several), so a launcher can decline QEMU up front.
-
 
 ### `isoloom reset`
 - `isoloom reset <target>`: back to the environment as it came up, what was done in it since gone (files dropped, users added, databases changed). Docker: torn down with its volumes and run again from the same images (init jobs run again). Vagrant: `isoloom run vagrant` saves a baseline snapshot of every VM once provisioned (`isoloom-baseline`; `ISOLOOM_NO_BASELINE=1` skips it), and `reset` restores it without provisioning; without one, down and run. Other targets: down and run. The Vagrant snapshot path is not run end to end yet. (#89)
@@ -80,7 +82,7 @@
 - A machine's healthcheck no longer borrows the image's tools (`sh`, then `nc` or `bash`), so distroless, `scratch` and minimal images turn healthy too (OWASP Juice Shop ships on distroless Node). Isoloom brings a static busybox (`busybox:1.37.0-musl`): on Docker a one-shot `isoloom-probe-<arch>` copies it into a volume each machine with services mounts read-only at `/.isoloom-probe`, and the healthcheck runs it in exec form; on Kubernetes an init container copies it into an `emptyDir` for the readiness probe. `init:` jobs still run with the image's own `sh`. (#37)
 
 ### More network appliances: Cisco QEMU images and Dynamips
-- `appliance: cisco-vios | cisco-viosl2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
+- `appliance: cisco-vios | cisco-vios-l2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
 - `appliance: cisco-dynamips` with `docker.firmware: <your IOS .bin>`: a Cisco 7200 emulated by Dynamips, in a container Isoloom builds (Ubuntu's `dynamips`); the data interfaces bind to `FastEthernet0/0`, then `1/0`, `1/1`, `2/0`... on PA-2FE-TX adapters. No KVM needed. Example: cisco-dynamips.
 - Appliances' interfaces are named outright (`interface_name`, Compose 2.36+ / Docker 28.1+): Docker's own attach order turned out not to follow `priority`.
 
