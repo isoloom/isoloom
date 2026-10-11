@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Windows steps can use the project's files
+- A Windows machine's `.ps1` steps were uploaded one by one, so a step couldn't reach the project's other files (vendored tools, scripts). The project now goes to `C:\isoloom` once, before the steps, and each step runs from there (`-File C:\isoloom\<step>`, in that folder), as Linux steps run from /opt/isoloom. Vagrant: the `project` step uploads its archive over WinRM; cloud-vm (AWS, Azure): the host's archive, as a Linux machine's, with the set-up script now in `C:\ProgramData\isoloom`. The archive is unpacked by PowerShell over .NET's GZipStream (PowerShell 2.0 and later; Windows Server 2016 and older have no tar.exe); symbolic links are left out, and a name Windows can't take is skipped with a warning. `.isoloomignore` keeps the copy small. (#59)
+
 ### The controller halts after provisioning
 - On local VMs (Vagrant, and the Docker-on-a-VM and hybrid outputs), the controller halts once its provisioning is done, keeping its disk: it no longer holds memory for the life of the environment. `isoloom test` boots it for the checks (waiting out a halt that's just starting) and halts it again. `controller: { keep_running: true }` keeps it up, as a jump host. Proxmox and the clouds keep it running for now.
 - Roles: in the resolved snapshot, each machine has `role: target` and the controller `role: infra` (with `keep_running`). `isoloom status` counts the spec's machines only on Vagrant outputs: a halted controller (or Isoloom's router and tools) never reads as a machine down.
