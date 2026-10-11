@@ -156,6 +156,8 @@ Vagrant.configure("2") do |config|
       m.vm.provision "file", source: File.join(ROOT, entry), destination: "/tmp/isoloom-project/#{entry}"
     end
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
+    m.vm.provision "shell", name: "provision/cache-boot.sh", inline: "cd /opt/isoloom && sh provision/cache-boot.sh"
+    m.vm.provision "shell", name: "reboot", reboot: true
     m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh provision/cache.sh"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/cache.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
