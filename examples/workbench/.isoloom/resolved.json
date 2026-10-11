@@ -23,6 +23,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -52,6 +53,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -92,6 +94,8 @@
   "groups": {},
   "router": null,
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "lan": "10.90.0.253"
     }

@@ -50,6 +50,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -95,6 +96,7 @@
       "shapes": [
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -134,6 +136,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -173,6 +176,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -226,6 +230,8 @@
     }
   },
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "office-vlan10": "10.70.10.253",
       "office-vlan20": "10.70.20.253",

@@ -41,6 +41,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -82,6 +83,7 @@
       "shapes": [
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -143,6 +145,8 @@
     }
   },
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "branch": "10.75.1.253",
       "far": "10.75.2.253"

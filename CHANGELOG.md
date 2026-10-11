@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### The controller halts after provisioning
+- On local VMs (Vagrant, and the Docker-on-a-VM and hybrid outputs), the controller halts once its provisioning is done, keeping its disk: it no longer holds memory for the life of the environment. `isoloom test` boots it for the checks (waiting out a halt that's just starting) and halts it again. `controller: { keep_running: true }` keeps it up, as a jump host. Proxmox and the clouds keep it running for now.
+- Roles: in the resolved snapshot, each machine has `role: target` and the controller `role: infra` (with `keep_running`). `isoloom status` counts the spec's machines only on Vagrant outputs: a halted controller (or Isoloom's router and tools) never reads as a machine down.
+
 ### `.isoloomignore`
 - An `.isoloomignore` at the project's root lists what the machines don't get when the project is copied into them, gitignore-style: `#` comments, `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the middle anchors a pattern at the root (otherwise it matches at any depth), `*`, `?`, `[abc]`, `**`; the last pattern matching a path, or a folder it is in, decides. Every copy honors it, read when the copy is made: Vagrant's `project` step (vagrant, hybrid, docker-vm), Proxmox's cloud-init, the cloud modules' archive (cloud-vm, cloud-docker, docker-vm on Proxmox: `tar -X` with the list Terraform computes, the archive's top folder stripped when unpacked) and `isoloom run external`. Each reads a pattern as the same regular expression. Proxmox also leaves out `.vagrant` and `.terraform` folders at any depth now. (#61)
 
