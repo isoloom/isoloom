@@ -15,10 +15,11 @@
 
 use std::fmt::Write;
 
-use super::super::cloud_vm::{CONTROLLER_OS, aligned, cidr, hcl_cmd, inventory, linux_setup_cmds, needs_controller, remote_exec, sh_quote};
+use super::super::cloud_vm::{CONTROLLER_OS, aligned, cidr, hcl_cmd, inventory, linux_setup_cmds, needs_controller, remote_exec};
 use super::super::proxmox::res;
 use super::super::{GeneratedFile, OUTPUT_DIR, address, header, start_order, vagrant};
 use crate::model::Spec;
+use crate::shell;
 
 const DIR: &str = "cloud-vm";
 
@@ -395,9 +396,9 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
     );
     cmds.push(format!(
         "printf '%s' {} | sudo tee /etc/isoloom/inventory.ini >/dev/null",
-        sh_quote(&inventory(spec))
+        shell::quote(&inventory(spec))
     ));
-    cmds.push(format!("sudo sh -c {}", sh_quote(&vagrant::ansible_runs(spec, &[]))));
+    cmds.push(format!("sudo sh -c {}", shell::quote(&vagrant::ansible_runs(spec, &[]))));
     cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
     let deps: Vec<String> = spec
         .machines

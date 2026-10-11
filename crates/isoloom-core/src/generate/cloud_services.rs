@@ -9,19 +9,15 @@
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
 use crate::model::Spec;
+use crate::shell;
 
 const DIR: &str = "cloud-services";
 /// From `.isoloom/cloud-services/` back to the project folder.
 const ROOT: &str = "../..";
 
-/// Single-quoted for sh.
-fn sq(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
-
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     let cloud = spec.cloud.as_ref().expect("the cloud-services target needs cloud:");
-    let module = sq(&format!("{ROOT}/{}", cloud.terraform.trim_end_matches('/')));
+    let module = shell::quote(&format!("{ROOT}/{}", cloud.terraform.trim_end_matches('/')));
     // Fixed values only: a variable taking a launch-time input is written by `run`, from the
     // environment, to inputs.tfvars.json next to the state (kept for `down`).
     let vars: serde_json::Map<String, serde_json::Value> = cloud
