@@ -24,6 +24,7 @@ use indexmap::IndexMap;
 use crate::checks;
 use crate::images;
 use crate::model::{Arch, Machine, Spec, Target, VmImpl};
+use crate::shell;
 
 const DIR: &str = "vagrant";
 
@@ -1085,7 +1086,7 @@ pub(super) fn ansible_runs(spec: &Spec) -> String {
         let vars = if step.vars.is_empty() {
             String::new()
         } else {
-            format!(" -e {}", shell_quote(&serde_json::to_string(&step.vars).expect("strings serialize")))
+            format!(" -e {}", shell::quote(&serde_json::to_string(&step.vars).expect("strings serialize")))
         };
         let requirements = match &step.requirements {
             Some(r) => format!("retry_download ansible-galaxy install -r /opt/isoloom/{r}\n"),
@@ -1138,11 +1139,6 @@ run_play() {
   done
 }
 "#;
-
-/// A single-quoted shell word.
-fn shell_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
 
 #[cfg(test)]
 mod retry_tests {
