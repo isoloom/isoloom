@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### A Cisco switch for a LAN
+- `switch: <machine>` on a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance: cisco-iol-l2` or `cisco-vios-l2`) switches the LAN instead of Isoloom's Linux switch container, so frames between a VLAN and a trunk cross real IOS. The machine lists no `networks`: its data ports are an access port on each VLAN's network (in VLAN order, at the controller address, unused on Docker), then a trunk port on each trunk machine's link. Isoloom's startup configuration declares the VLANs (`vtp mode transparent`, `vlan <id>` named after the network) and sets each port (`switchport mode access` + `access vlan`, or `trunk encapsulation dot1q` + `mode trunk` + `allowed vlan`); the machine's own `config` follows. Trunk machines are unchanged; their sidecar waits for the switch to start (IOS reports no readiness: checks through it `wait` for it to boot). Validated: a switch kind, no `networks`, `services` or `aliases` of its own, one LAN per switch, no `count`, no machine on the LAN directly. Docker targets only, like every appliance. Example: cisco-switch.
+
 ## 0.10.1
 
 ### Google Cloud: long environment names
@@ -37,9 +42,6 @@
 - `isoloom gc` lists Docker leftovers of environments: labelled networks and volumes whose Compose project has no container left (a crashed run, a killed launcher), and with `--images` the built images no container uses; `--yes` removes them. It never touches containers (a parked environment keeps its volumes) or anything unlabelled. Cloud tags follow. (#88)
 
 ## 0.9.0
-
-### A Cisco switch for a LAN
-- `switch: <machine>` on a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance: cisco-iol-l2` or `cisco-vios-l2`) switches the LAN instead of Isoloom's Linux switch container, so frames between a VLAN and a trunk cross real IOS. The machine lists no `networks`: its data ports are an access port on each VLAN's network (in VLAN order, at the controller address, unused on Docker), then a trunk port on each trunk machine's link. Isoloom's startup configuration declares the VLANs (`vtp mode transparent`, `vlan <id>` named after the network) and sets each port (`switchport mode access` + `access vlan`, or `trunk encapsulation dot1q` + `mode trunk` + `allowed vlan`); the machine's own `config` follows. Trunk machines are unchanged; their sidecar waits for the switch to start (IOS reports no readiness: checks through it `wait` for it to boot). Validated: a switch kind, no `networks`, `services` or `aliases` of its own, one LAN per switch, no `count`, no machine on the LAN directly. Docker targets only, like every appliance. Example: cisco-switch.
 
 ### Fixed published ports
 - `fixed: true` on a service keeps its `publish` port as the host port on local Docker too (normally a free one, so labs never collide), for apps whose pages call `localhost:<port>` themselves. Launchers that pin ports keep a fixed one as is. (#70)

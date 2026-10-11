@@ -45,6 +45,9 @@ services:
     - NET_ADMIN
     - NET_RAW
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   sw1-routes:
     image: alpine:3.20
     network_mode: service:sw1
@@ -65,6 +68,9 @@ services:
       sw1:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   files:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -93,6 +99,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
     restart: unless-stopped
   files-routes:
     image: nicolaka/netshoot:v0.13
@@ -116,6 +124,9 @@ services:
       sw1:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   staff:
     image: alpine:3.20
     platform: linux/amd64
@@ -130,6 +141,9 @@ services:
     - files:10.92.10.10
     - guest:10.92.20.20
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   guest:
     image: alpine:3.20
     platform: linux/amd64
@@ -144,6 +158,9 @@ services:
     - files:10.92.20.10
     - staff:10.92.10.20
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   isoloom-check-files:
     image: curlimages/curl:8.11.1
     profiles:
@@ -161,6 +178,9 @@ services:
         condition: service_healthy
       files-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   isoloom-check-staff:
     image: curlimages/curl:8.11.1
     profiles:
@@ -180,6 +200,9 @@ services:
         condition: service_healthy
       staff:
         condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   isoloom-check-guest:
     image: curlimages/curl:8.11.1
     profiles:
@@ -199,6 +222,9 @@ services:
         condition: service_healthy
       guest:
         condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -210,6 +236,9 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
 networks:
   office-vlan10:
     ipam:
@@ -217,17 +246,32 @@ networks:
       - subnet: 10.92.10.0/24
         gateway: 10.92.10.1
     internal: true
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   office-vlan20:
     ipam:
       config:
       - subnet: 10.92.20.0/24
         gateway: 10.92.20.1
     internal: true
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   isoloom-trunk-office-files:
     internal: true
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
   isoloom-mgmt:
     ipam:
       config:
       - subnet: 10.255.255.0/24
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-switch
