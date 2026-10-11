@@ -5,6 +5,9 @@
 ### `tcp` checks read a greeting
 - `tcp` checks take `contains` (text the bytes read in the first 5 seconds of the connection must contain: a banner, a prompt) and `send` (a line written first, a newline added; end it with `\r` for CRLF), retried for `wait` like any check: proving the right service answers no longer needs a `(sleep 4) | curl telnet://...` script. Rendered with `nc` (busybox in the runner image, the VM's own nc whatever its flavor), else bash's `/dev/tcp`; stdin stays open while reading and nc is stopped after 5 seconds, so nc flavors that quit at the end of stdin or never quit behave the same. hello-stack sends the cache a `PING` and expects `+PONG`. (#73)
 
+### Typed playbook variables
+- `provision[].vars` takes any YAML value: strings as before, and numbers, booleans, lists and maps, passed to `ansible-playbook` as JSON (`-e`) with their types (a list stays a list, not a string to iterate over). `isoloom run`'s own playbook runs pass them as JSON too (they split values on spaces before). Example: ansible-pair's `tools: [curl, jq]` and `cache_port: 6379`.
+
 ### `import compose` reads keys set twice
 - A key set twice in one mapping (secDevLabs camplake-api's `environment` sets `MONGO_PORT` twice) no longer stops `isoloom import compose` with `duplicate entry`: the last value is kept, as Compose does, and the draft's "Changed on the way in" notes say which key, where, and the value kept. (#68)
 
