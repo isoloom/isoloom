@@ -30,8 +30,10 @@ jobs:
             if [ -d "$e.isoloom" ]; then cargo run -q -- check "$e"; fi
           done
 
-  # The generated Compose files, run for real: everything answers, and `isoloom test` passes
-  # (the spec's checks and the ones derived from its services and reach rules).
+  # The generated Compose files, run for real through the CLI's own lifecycle: `isoloom run`
+  # brings the example up, `status` sees it, `isoloom test` passes (the spec's checks and the
+  # ones derived from its services and reach rules), `down` leaves nothing behind and `gc` finds
+  # nothing to collect. One example also goes through `isoloom reset`.
   docker:
     runs-on: ubuntu-latest
     strategy:
@@ -45,16 +47,44 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Start
-        run: docker compose -f .isoloom/docker/compose.yml up -d --wait --wait-timeout 300
+      - name: Build
+        working-directory: .
+        run: |
+          cargo build -q -p isoloom
+          echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
+      - name: Run
+        run: isoloom run docker .
+      - name: The files `run` wrote are the committed ones
+        run: git diff --exit-code -- .isoloom
+      - name: Status (recorded, and running)
+        run: |
+          isoloom status
+          isoloom status --json | jq -e --arg n "${{ matrix.example }}" \
+            '[.environments[] | select(.name == $n and .target == "docker" and (.state | startswith("running")))] | length == 1'
       - name: Checks (the spec's and the derived ones, from every machine)
-        run: cargo run -q -- test docker .
+        run: isoloom test docker .
+      - name: Reset (a dropped file and a changed volume are gone, the seed is back)
+        if: matrix.example == 'hello-stack'
+        run: |
+          isoloom exec web -- sh -c 'echo pwned > /usr/share/nginx/html/shell.php'
+          isoloom exec cache -- redis-cli set marker 1
+          isoloom reset docker .
+          isoloom exec web -- test ! -e /usr/share/nginx/html/shell.php
+          test "$(isoloom exec cache -- redis-cli exists marker)" = 0
+          isoloom test docker .
       - name: Logs
         if: failure()
         run: docker compose -f .isoloom/docker/compose.yml --profile check logs --no-color
+      - name: Down (nothing left, nothing recorded)
+        run: |
+          isoloom down docker .
+          test -z "$(docker ps -aq --filter label=isoloom.managed=true)"
+          isoloom status --json | jq -e '.environments | length == 0'
+      - name: Gc (lists, removes nothing)
+        run: isoloom gc --images
       - name: Stop
         if: always()
-        run: docker compose -f .isoloom/docker/compose.yml --profile check down -v
+        run: isoloom down docker . || docker compose -f .isoloom/docker/compose.yml --profile check down -v
 
   # A Compose file, imported, generated and started: the draft runs.
   # The Kubernetes output on a real (throwaway) cluster: built images loaded, the environment
