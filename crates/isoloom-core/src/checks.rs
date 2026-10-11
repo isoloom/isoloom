@@ -144,6 +144,18 @@ impl HttpRequest {
     }
 }
 
+/// What a `tcp` check writes and reads beyond connecting (both optional; `send` needs `contains`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TcpExchange {
+    /// A line written once connected (a newline is added).
+    pub send: Option<String>,
+    /// Text the bytes read within [`TCP_READ_SECONDS`] must contain.
+    pub contains: Option<String>,
+}
+
+/// How long a `tcp` check with `contains` reads from the connection, per attempt.
+pub const TCP_READ_SECONDS: u32 = 5;
+
 /// One resolved probe.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Probe {
@@ -157,20 +169,15 @@ pub enum Probe {
         host: Host,
         port: u16,
         expect: TcpExpect,
+        /// A line to write and text to read back: empty for a bare connection.
+        exchange: TcpExchange,
     },
     /// A command inside the position's machine; `expect` is text the output must contain.
-    Exec {
-        command: String,
-        expect: Option<String>,
-    },
+    Exec { command: String, expect: Option<String> },
     /// A script in the project, run with sh from the position.
-    Script {
-        path: String,
-    },
+    Script { path: String },
     /// An Ansible playbook in the project, run from the controller.
-    Playbook {
-        path: String,
-    },
+    Playbook { path: String },
 }
 
 /// A check, resolved: where it runs, what it probes, how long it may take to pass.
@@ -257,11 +264,16 @@ fn declared(d: &Declared, default: &Position) -> Option<Resolved> {
             TcpExpect::Blocked => format!("{t} blocked"),
             TcpExpect::Open => t.to_string(),
         };
+        let exchange = TcpExchange {
+            send: d.send.clone(),
+            contains: d.contains.clone(),
+        };
         (
             Probe::Tcp {
                 host: Host::Literal(host.to_string()),
                 port,
                 expect,
+                exchange,
             },
             wait,
             what,
@@ -340,6 +352,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                                 },
                                 port: svc.port,
                                 expect: TcpExpect::Blocked,
+                                exchange: TcpExchange::default(),
                             },
                             wait: 0,
                             derived: true,
@@ -368,6 +381,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                             host,
                             port: svc.port,
                             expect: TcpExpect::Open,
+                            exchange: TcpExchange::default(),
                         }
                     };
                     out.push(Resolved {
@@ -496,7 +510,19 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
                     }
                 }
             }
-            Probe::Tcp { host, port, expect } => {
+            Probe::Tcp {
+                host,
+                port,
+                expect: TcpExpect::Open,
+                exchange: TcpExchange { send, contains: Some(want) },
+            } => format!(
+                "if _retry {w} _tcp_read {h} {port} {snd} {t}; then pass {n}; else fail {n} \"$out\"; fi\n",
+                w = c.wait,
+                h = sq(&(r.host)(host, position)),
+                snd = sq(send.as_deref().unwrap_or("")),
+                t = sq(want),
+            ),
+            Probe::Tcp { host, port, expect, .. } => {
                 let text = (r.host)(host, position);
                 let (h, ht) = (sq(&text), dq(&text));
                 match expect {
@@ -578,6 +604,31 @@ _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
   else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
+}
+# _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
+# LINE and a newline, if any) contain TEXT; $out says why not (nc, else bash). Stdin stays open
+# while reading (some nc quit at its end), and nc is stopped after 5s whatever its flavor.
+_tcp_read() {
+  f=$(mktemp); i=0; r=1
+  if command -v nc >/dev/null 2>&1; then
+    { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
+  else
+    H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
+  fi
+  p=$!
+  while :; do
+    if grep -qF -- "$4" "$f"; then r=0; break; fi
+    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    sleep 1; i=$((i+1))
+  done
+  [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
+  touch "$f.end"; kill $p 2>/dev/null
+  if [ $r = 1 ]; then
+    if [ -s "$f" ]; then out="$1:$2 answered \"$(head -c 100 "$f" | tr -d '\000\r' | tr '\n\t' '  ')\", without the expected text"
+    elif [ $i -lt 5 ]; then out="$1:$2 refused the connection or closed it without a word"
+    else out="nothing read from $1:$2 within 5s"; fi
+  fi
+  rm -f "$f" "$f.end"; return $r
 }
 # _exec COMMAND TEXT -> 0 when the command succeeds and its output contains TEXT (if any).
 _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep -qF -- "$2"; }; }

@@ -132,6 +132,34 @@ fn a_check_that_is_off_names_its_field() {
         problems(&format!("{BASE}checks:\n  - {{ http: http://web/, expect: open }}\n")),
         ["checks[0].expect: for `http`: a status code (100-599), `any` or `blocked`"]
     );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ exec: id, from: web, contains: x }}\n")),
+        ["checks[0]: `contains` goes with `http` or `tcp`"]
+    );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, send: PING }}\n")),
+        ["checks[0]: `send` goes with `tcp` and `contains` (the text the answer must contain)"]
+    );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ http: http://web/, send: x, contains: y }}\n")),
+        ["checks[0]: `send` goes with `tcp` and `contains` (the text the answer must contain)"]
+    );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, contains: x, expect: blocked }}\n")),
+        ["checks[0]: a `blocked` check sends nothing to look at: leave out `method`, `headers`, `body`, `send` and `contains`"]
+    );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, method: GET }}\n")),
+        ["checks[0]: `method`, `headers` and `body` go with `http`"]
+    );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, contains: \"\" }}\n")),
+        ["checks[0].contains: give the text to look for, or leave `contains` out"]
+    );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, send: \"a\\nb\", contains: x }}\n")),
+        ["checks[0].send: one line: Isoloom adds the newline"]
+    );
     // A typo in a declared check is reported as such, not as "no variant matched".
     let err = parse(&format!("{BASE}checks:\n  - {{ htp: http://web/ }}\n")).unwrap_err().to_string();
     assert!(err.contains("unknown field `htp`"), "{err}");
@@ -170,6 +198,76 @@ fn runner_scripts_print_lines_the_cli_reads_back() {
     );
     assert_eq!(checks::parse_line("isoloom-check: END 3 passed, 1 failed"), Some(Line::End(3, 1)));
     assert_eq!(checks::parse_line("== checks/x.sh"), None);
+}
+
+/// A server on 127.0.0.1 answering each connection with `answer(line read, if `wait_line`)`
+/// after `delay_ms`, then holding the connection open a while (as a service does).
+#[cfg(unix)]
+fn serve(wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> u16 {
+    use std::io::{BufRead, BufReader, Write};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = l.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        for mut c in l.incoming().flatten() {
+            std::thread::spawn(move || {
+                let mut line = String::new();
+                if wait_line {
+                    let _ = BufReader::new(c.try_clone().unwrap()).read_line(&mut line);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                let _ = c.write_all(answer(line.trim_end_matches('\n')).as_bytes());
+                std::thread::sleep(std::time::Duration::from_secs(8));
+            });
+        }
+    });
+    port
+}
+
+#[test]
+#[cfg(unix)]
+fn tcp_checks_read_a_greeting_and_send_a_line() {
+    let banner = serve(false, 0, |_| "SSH-2.0-OpenSSH_9.6\r\n".into());
+    let late = serve(false, 1500, |_| "220 mail ESMTP ready\r\n".into());
+    let pong = serve(true, 0, |l| if l == "PING" { "+PONG\r\n".into() } else { format!("-ERR unknown '{l}'\r\n") });
+    let silent = serve(false, 0, |_| String::new());
+    let spec = parse(&format!(
+        "{BASE}checks:\n  \
+         - {{ name: banner, tcp: '127.0.0.1:{banner}', contains: SSH-2.0 }}\n  \
+         - {{ name: late, tcp: '127.0.0.1:{late}', contains: ESMTP, wait: 0 }}\n  \
+         - {{ name: ping, tcp: '127.0.0.1:{pong}', send: PING, contains: +PONG }}\n  \
+         - {{ name: wrong, tcp: '127.0.0.1:{pong}', send: PING, contains: HELLO, wait: 0 }}\n  \
+         - {{ name: silent, tcp: '127.0.0.1:{silent}', contains: x, wait: 0 }}\n"
+    ))
+    .unwrap();
+    assert_eq!(validate(&spec), vec![]);
+    let plan: Vec<checks::Resolved> = checks::plan(&spec).into_iter().filter(|c| !c.derived).collect();
+    let host = |h: &checks::Host, _: &Position| h.to_string();
+    let run = |p: &str| format!("sh {p}");
+    let render = checks::Render {
+        host: &host,
+        script: &run,
+        playbook: None,
+    };
+    let script = checks::script(&Position::Machine("user".into()), &plan.iter().collect::<Vec<_>>(), &render);
+    assert!(script.contains(&format!("_retry 30 _tcp_read '127.0.0.1' {pong} 'PING' '+PONG'")), "{script}");
+    let out = std::process::Command::new("sh").arg("-c").arg(&script).output().expect("sh runs");
+    let lines: Vec<Line> = String::from_utf8_lossy(&out.stdout).lines().filter_map(checks::parse_line).collect();
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    for ok in ["banner", "late", "ping"] {
+        assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
+    }
+    assert!(
+        lines.contains(&Line::Fail(
+            "wrong".into(),
+            format!("127.0.0.1:{pong} answered \"+PONG \", without the expected text")
+        )),
+        "{text}"
+    );
+    assert!(
+        lines.contains(&Line::Fail("silent".into(), format!("nothing read from 127.0.0.1:{silent} within 5s"))),
+        "{text}"
+    );
+    assert_eq!(lines.last(), Some(&Line::End(3, 2)), "{text}");
 }
 
 #[test]
