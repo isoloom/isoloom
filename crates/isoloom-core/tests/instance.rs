@@ -72,5 +72,5 @@ fn vagrant_instances_differ_by_name_only() {
     // Published ports shift so two instances can both forward to the host.
     assert!(vf.contains("guest: 80, host: 8180"), "{vf}");
     // The project copy leaves every instance folder behind.
-    assert!(vf.contains("e.start_with?(\".isoloom\")"));
+    assert!(vf.contains("rel.start_with?(\".isoloom\")"));
 }
