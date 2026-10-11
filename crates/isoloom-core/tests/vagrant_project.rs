@@ -84,7 +84,7 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() {
     std::fs::write(&rb, file(&example("hello-stack"), Target::Vagrant, "vagrant/Vagrantfile")).unwrap();
     let run = |generated: bool, out: &str| {
         let script = format!(
-            "eval(File.read(ARGV[0]).split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, generated: {generated}, extra: [\".isoloom/hybrid/compose.yml\"]) }}"
+            "eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, generated: {generated}, extra: [\".isoloom/hybrid/compose.yml\"]) }}"
         );
         let st = Command::new("ruby")
             .arg("-e")
