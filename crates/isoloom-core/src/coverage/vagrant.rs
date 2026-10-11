@@ -115,7 +115,7 @@ fn core() -> Format {
         .into_iter()
         .map(|s| (format!("config.vm.{s}"), machine(s).unwrap_or(Unclassified)))
         .collect();
-    let extra: [(&str, Support); 19] = [
+    let extra: [(&str, Support); 20] = [
         (
             "config.vm.network private_network",
             Emitted {
@@ -137,13 +137,19 @@ fn core() -> Format {
         (
             "config.vm.provision shell",
             Emitted {
-                from: "machines.*.vm.provision (.sh), and Isoloom's own steps",
+                from: "machines.*.vm.provision (.sh, `reboot`), and Isoloom's own steps",
             },
         ),
         (
             "config.vm.provision file",
+            Equivalent {
+                via: "`isoloom_project` (below) copies the project; a file provisioner follows symlinks and lists files when the Vagrantfile loads",
+            },
+        ),
+        (
+            "config.vm.provision isoloom_project",
             Emitted {
-                from: "(the project, copied into each VM)",
+                from: "(Isoloom's own provisioner, defined in the Vagrantfile: the project into each VM as a tar.gz built when the step runs, symlinks kept as links)",
             },
         ),
         (
@@ -367,18 +373,24 @@ fn qemu(s: &str) -> Option<Support> {
         "smp" => Emitted {
             from: "machines.*.resources.cpus",
         },
-        "arch" => ARCH,
-        "disk_resize" => DISK,
-        "advanced_network" | "net_mode" => Planned {
-            note: "private networks: QEMU gives a machine one private network (`advanced_network`), and needs vmnet or socket_vmnet on the Mac",
+        "arch" => Emitted {
+            from: "machines.*.arch (emulated when the host's CPU is another)",
         },
-        "socket_opts" | "socket_vmnet_client" | "socket_vmnet_socket" | "vmnet_interface" | "tap_device" | "mcast_addr" | "extra_netdev_args" => Planned {
-            note: "with private networks on QEMU",
+        "disk_resize" => DISK,
+        "advanced_network" | "net_mode" | "socket_opts" => Partial {
+            from: "machines.*.networks",
+            gap: "without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit)",
+        },
+        "socket_vmnet_client" | "socket_vmnet_socket" | "vmnet_interface" | "tap_device" | "mcast_addr" | "extra_netdev_args" => Planned {
+            note: "more than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac)",
+        },
+        "ssh_auto_correct" => Emitted {
+            from: "(always: each VM forwards SSH from its own host port)",
         },
         "machine" | "cpu" | "net_device" | "drive_interface" | "extra_drive_args" | "extra_image_opts" | "extra_qemu_args" => HOST_TUNING,
         "firmware_format" => IMAGE_BOOTS,
         "image_path" | "qemu_bin" | "qemu_dir" | "default_qemu_dir" | "homebrew_prefix" => USER_SETUP,
-        "control_port" | "debug_port" | "ssh_host" | "ssh_port" | "ssh_auto_correct" | "no_daemonize" | "other_default" | "graceful_timeout" => TOOLING,
+        "control_port" | "debug_port" | "ssh_host" | "ssh_port" | "no_daemonize" | "other_default" | "graceful_timeout" => TOOLING,
         _ => return None,
     })
 }

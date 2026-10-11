@@ -17,6 +17,9 @@ services:
       lan:
         ipv4_address: 10.90.0.10
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: workbench
   web:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -42,6 +45,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: workbench
     restart: unless-stopped
   isoloom-check-bench:
     image: curlimages/curl:8.11.1
@@ -58,6 +63,9 @@ services:
         condition: service_healthy
       bench:
         condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: workbench
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -69,11 +77,20 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: workbench
 networks:
   lan:
     ipam:
       config:
       - subnet: 10.90.0.0/24
         gateway: 10.90.0.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: workbench
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: workbench

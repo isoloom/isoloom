@@ -144,7 +144,8 @@
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on cache, web"
+      "external": "needs `external:` on cache, web",
+      "cloud-services": "left out by `targets:`"
     }
   },
   "checks": {
@@ -169,6 +170,14 @@
             "kind": "http",
             "target": "http://web/",
             "expect": "200",
+            "wait": 30
+          },
+          {
+            "name": "the cache answers a PING",
+            "derived": false,
+            "kind": "tcp",
+            "target": "cache:6379",
+            "expect": "open",
             "wait": 30
           },
           {

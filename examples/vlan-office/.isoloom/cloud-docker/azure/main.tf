@@ -44,7 +44,7 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-vlan-office-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "vlan-office", "managed-by" = "isoloom" }
+  tags = { "isoloom-environment" = "vlan-office", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
 }
 
 resource "azurerm_resource_group" "env" {
@@ -149,6 +149,12 @@ variable "auto_stop_minutes" {
   type        = number
   default     = 0
   description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
+}
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
 
 # The environment, over SSH: the project, Docker, then the Compose file.

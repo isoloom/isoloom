@@ -239,6 +239,20 @@ fn probe(e: &Entry) -> String {
                 counted(ready, items.len())
             })
         }
+        Target::CloudServices => {
+            // What the module's state holds: deployed resources, or nothing.
+            let state = out.join("cloud-services/terraform.tfstate");
+            let n = std::fs::read_to_string(&state)
+                .ok()
+                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+                .and_then(|v| v["resources"].as_array().map(Vec::len))
+                .unwrap_or(0);
+            Ok(if n > 0 {
+                format!("deployed ({n} resources)")
+            } else {
+                "not deployed".to_string()
+            })
+        }
         Target::External => {
             // Each machine answers SSH, or not.
             let machines = external_machines(&out).unwrap_or_default();
@@ -470,6 +484,9 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
                 core::instance::output_dir(instance),
                 sq(&inner)
             ));
+        }
+        Target::CloudServices => {
+            return Err("cloud services have no machines to reach: use their outputs (`isoloom message`)".into());
         }
         Target::External => {
             let e = m.external.as_ref().ok_or_else(|| format!("`{machine}` has no `external:` address"))?;
@@ -805,7 +822,8 @@ pub fn external_machines(out: &Path) -> Res<std::collections::BTreeMap<String, E
 
 /// `isoloom run external`: provisions the existing machines over SSH, in start order: the
 /// project copied to /opt/isoloom, each machine's `.sh` steps run there, its `.yml` steps run
-/// from here against it, then the environment's `provision:` playbooks with the inventory.
+/// from here against it (a `reboot` step restarts it and waits until it's back), then the
+/// environment's `provision:` playbooks with the inventory.
 pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<()> {
     let out = dir.join(core::instance::output_dir(instance));
     let machines = external_machines(&out)?;
@@ -862,7 +880,9 @@ pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<(
         run("ssh", &a, Some(std::process::Stdio::from(tar.stdout.expect("piped"))))?;
         for step in &vm.provision {
             eprintln!("{name}: {step}");
-            if step.ends_with(".sh") {
+            if core::model::is_reboot(step) {
+                reboot_external(name, &ssh_args(m))?;
+            } else if step.ends_with(".sh") {
                 let mut a = ssh_args(m);
                 a.push(format!("cd /opt/isoloom && sudo sh {step}"));
                 run("ssh", &a, None)?;
@@ -882,13 +902,44 @@ pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<(
         for inv in &step.inventory {
             a.extend(["-i".to_string(), dir.join(inv).display().to_string()]);
         }
-        for (k, v) in &step.vars {
-            a.extend(["-e".to_string(), format!("{k}={v}")]);
+        // As JSON: `-e k=v` splits values on spaces and makes everything a string.
+        if !step.vars.is_empty() {
+            a.extend(["-e".to_string(), serde_json::to_string(&step.vars).expect("JSON values serialize")]);
         }
         a.push(dir.join(&step.ansible).display().to_string());
         run("ansible-playbook", &a, None)?;
     }
     Ok(())
+}
+
+/// A `reboot` step on an existing machine: restart it over SSH, then wait until it answers
+/// again from a new boot (its boot id changed), for up to 10 minutes.
+fn reboot_external(name: &str, ssh: &[String]) -> Res<()> {
+    const BOOT_ID: &str = "cat /proc/sys/kernel/random/boot_id";
+    // Polled without prompting (`BatchMode`): a password prompt would stop every try.
+    let boot_id = |batch: bool| -> Option<String> {
+        let mut c = Command::new("ssh");
+        if batch {
+            c.args(["-o", "BatchMode=yes"]);
+        }
+        c.args(["-o", "ConnectTimeout=5"]).args(ssh).arg(BOOT_ID);
+        let out = c.stderr(Stdio::null()).output().ok().filter(|o| o.status.success())?;
+        Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|s| !s.is_empty())
+    };
+    let before = boot_id(false).ok_or_else(|| format!("{name}: can't read its boot id over SSH before the reboot"))?;
+    // The connection may drop before ssh returns: its status says nothing.
+    let mut c = Command::new("ssh");
+    c.args(ssh).arg("sudo sh -c 'systemctl --no-block reboot 2>/dev/null || reboot'");
+    let _ = c.status().map_err(|e| tool_error(&c, e))?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
+    while std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        if boot_id(true).is_some_and(|now| now != before) {
+            eprintln!("{name}: back after the reboot");
+            return Ok(());
+        }
+    }
+    Err(format!("{name}: not back 10 minutes after the reboot step (waiting needs SSH without a password prompt: a key or an agent)").into())
 }
 
 /// The spec, as the instance when one is named (its names and ports are the instance's).
@@ -913,6 +964,117 @@ fn tool_error(c: &Command, e: std::io::Error) -> String {
     } else {
         format!("{program}: {e}")
     }
+}
+
+/// `docker <args>`, its stdout lines (empty when Docker isn't there or fails).
+fn docker_lines(args: &[&str]) -> Vec<String> {
+    Command::new("docker")
+        .args(args)
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// See `isoloom gc`.
+pub fn gc(remove: bool, images: bool) -> Res<ExitCode> {
+    let managed = format!("label={}=true", core::generate::MANAGED_LABEL);
+    let env_label = core::generate::ENVIRONMENT_LABEL;
+    // Compose projects that still have a container, in any state: never collected (a parked
+    // environment keeps its volumes, with the user's progress in them).
+    let alive: std::collections::BTreeSet<String> = docker_lines(&["ps", "-a", "--format", "{{.Label \"com.docker.compose.project\"}}"])
+        .into_iter()
+        .collect();
+    let orphans = |kind: &str| -> Vec<(String, String)> {
+        docker_lines(&[
+            kind,
+            "ls",
+            "--filter",
+            &managed,
+            "--format",
+            &format!("{{{{.Name}}}}\t{{{{.Label \"com.docker.compose.project\"}}}}\t{{{{.Label \"{env_label}\"}}}}"),
+        ])
+        .into_iter()
+        .filter_map(|l| {
+            let mut p = l.split('\t');
+            let (name, project, env) = (p.next()?.to_string(), p.next().unwrap_or("").to_string(), p.next().unwrap_or("").to_string());
+            (!alive.contains(&project)).then_some((name, if env.is_empty() { project } else { env }))
+        })
+        .collect()
+    };
+    let networks = orphans("network");
+    let volumes = orphans("volume");
+    let mut unused_images: Vec<(String, String)> = Vec::new();
+    if images {
+        let used: std::collections::BTreeSet<String> = {
+            let ids = docker_lines(&["ps", "-aq"]);
+            let mut args = vec!["inspect", "-f", "{{.Image}}"];
+            args.extend(ids.iter().map(String::as_str));
+            if ids.is_empty() {
+                Default::default()
+            } else {
+                docker_lines(&args).into_iter().collect()
+            }
+        };
+        // `docker images` has no `.Label` field: the name says which environment built it.
+        unused_images = docker_lines(&["images", "--no-trunc", "--filter", &managed, "--format", "{{.ID}}\t{{.Repository}}:{{.Tag}}"])
+            .into_iter()
+            .filter_map(|l| {
+                let (id, name) = l.split_once('\t')?;
+                (!used.contains(id)).then(|| (id.to_string(), name.to_string()))
+            })
+            .collect();
+    }
+    if networks.is_empty() && volumes.is_empty() && unused_images.is_empty() {
+        println!("nothing to collect");
+        return Ok(ExitCode::SUCCESS);
+    }
+    for (kind, list) in [("network", &networks), ("volume", &volumes)] {
+        for (name, env) in list {
+            println!("{kind} {name} ({env})");
+        }
+    }
+    for (_, what) in &unused_images {
+        println!("image {what}");
+    }
+    if !remove {
+        println!(
+            "\n{} left over; `isoloom gc --yes{}` removes them",
+            networks.len() + volumes.len() + unused_images.len(),
+            if images { " --images" } else { "" }
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+    let mut failed = 0;
+    let mut rm = |args: &[&str]| {
+        if !Command::new("docker").args(args).stdout(Stdio::null()).status().is_ok_and(|s| s.success()) {
+            failed += 1;
+        }
+    };
+    for (n, _) in &networks {
+        rm(&["network", "rm", n]);
+    }
+    for (n, _) in &volumes {
+        rm(&["volume", "rm", n]);
+    }
+    for (id, _) in &unused_images {
+        rm(&["image", "rm", id]);
+    }
+    if failed > 0 {
+        eprintln!("✗ {failed} could not be removed (in use?)");
+        return Ok(ExitCode::from(1));
+    }
+    println!("removed");
+    Ok(ExitCode::SUCCESS)
 }
 
 #[cfg(test)]

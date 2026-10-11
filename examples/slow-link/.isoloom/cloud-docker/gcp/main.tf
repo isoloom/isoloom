@@ -103,7 +103,7 @@ resource "google_compute_instance" "env" {
   name         = local.name
   machine_type = var.machine_type
   zone         = "${var.region}-a"
-  labels       = { "isoloom-environment" = "slow-link", "managed-by" = "isoloom" }
+  labels       = { "isoloom-environment" = "slow-link", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
@@ -134,6 +134,12 @@ variable "auto_stop_minutes" {
   type        = number
   default     = 0
   description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
+}
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
 
 # The environment, over SSH: the project, Docker, then the Compose file.
