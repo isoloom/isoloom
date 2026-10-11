@@ -409,7 +409,8 @@ pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
     let mut out = Vec::new();
     for (b, mb) in &spec.machines {
         let multi = mb.networks.len() > 1;
-        for svc in &mb.services {
+        // A dormant service answers only once woken, as above.
+        for svc in mb.services.iter().filter(|s| !s.dormant) {
             for n in mb.networks.keys() {
                 let on = if multi { format!(" on {n}") } else { String::new() };
                 out.push(Resolved {
