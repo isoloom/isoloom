@@ -44,6 +44,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: arm-lab
     restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
@@ -60,6 +62,9 @@ services:
     depends_on:
       web:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: arm-lab
   isoloom-probe-arm64:
     image: busybox:1.37.0-musl
     platform: linux/arm64
@@ -71,11 +76,20 @@ services:
     - isoloom-probe-arm64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: arm-lab
 networks:
   lab:
     ipam:
       config:
       - subnet: 10.60.0.0/24
         gateway: 10.60.0.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: arm-lab
 volumes:
-  isoloom-probe-arm64: {}
+  isoloom-probe-arm64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: arm-lab

@@ -49,13 +49,17 @@ pub struct Host<'a> {
 /// `secs`: a wedged hypervisor service must not hang `status` or `doctor`.
 pub fn run_limited(program: &str, args: &[&str], secs: u64) -> Result<Option<String>, String> {
     use std::process::Stdio;
-    let mut child = match Command::new(program)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
+    let mut cmd = Command::new(program);
+    cmd.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+    // On Windows a console program started by a windowed app (a launcher, an IDE) opens a
+    // console window of its own: every probe would flash one on screen. Output is piped anyway.
+    #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(format!("{program} not installed")),
         Err(e) => return Err(e.to_string()),
@@ -136,6 +140,12 @@ pub fn all() -> Vec<Readiness> {
     let mut out = Vec::new();
     for t in Target::ALL {
         match t {
+            // A cloud-services environment names its own cloud: `doctor` checks the three.
+            Target::CloudServices => {
+                for c in ["aws", "azure", "gcp"] {
+                    out.push(check_with(t, Some(c), &host));
+                }
+            }
             Target::CloudDocker | Target::CloudVm => {
                 for c in CLOUDS {
                     out.push(check_with(t, Some(c), &host));
@@ -265,7 +275,7 @@ pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
                 "no Proxmox credentials (PROXMOX_VE_API_TOKEN, or PROXMOX_VE_USERNAME and PROXMOX_VE_PASSWORD)",
             );
         }
-        Target::CloudDocker | Target::CloudVm => {
+        Target::CloudDocker | Target::CloudVm | Target::CloudServices => {
             need(
                 (h.run)("terraform", &["version", "-json"]).map(|_| "Terraform".to_string()),
                 "terraform isn't installed",
@@ -275,7 +285,9 @@ pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
                     (h.env)("AWS_ACCESS_KEY_ID")
                         .map(|_| "AWS keys in the environment".to_string())
                         .or_else(|| (h.env)("AWS_PROFILE").map(|p| format!("AWS profile {p}")))
-                        .or_else(|| (h.exists)(&h.home.join(".aws/credentials")).then(|| "~/.aws/credentials".to_string())),
+                        .or_else(|| (h.exists)(&h.home.join(".aws/credentials")).then(|| "~/.aws/credentials".to_string()))
+                        // `aws login` and SSO keep their session under ~/.aws/login or ~/.aws/sso.
+                        .or_else(|| (h.exists)(&h.home.join(".aws/config")).then(|| "~/.aws/config (aws login or SSO)".to_string())),
                     "no AWS credentials (AWS_ACCESS_KEY_ID, AWS_PROFILE or ~/.aws/credentials; `aws login`)",
                 ),
                 "azure" => need(

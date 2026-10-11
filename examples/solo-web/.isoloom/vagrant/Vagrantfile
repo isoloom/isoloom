@@ -3,9 +3,13 @@
 # Start:  cd .isoloom/vagrant && vagrant up
 # Stop:   cd .isoloom/vagrant && vagrant destroy -f
 
+# One machine at a time, in order (QEMU and libvirt would boot them all at once).
+ENV["VAGRANT_NO_PARALLEL"] = "1"
 ROOT = File.expand_path("../..", __dir__)
 # Copied into each VM: the project, without version control or generated files.
 PROJECT = Dir.children(ROOT).reject { |e| [".git", ".vagrant"].include?(e) || e.start_with?(".isoloom") }.sort
+# This host's CPU as QEMU names it: a machine built for another one runs emulated there.
+HOST_ARCH = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "aarch64" : "x86_64"
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (app); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
@@ -17,6 +21,7 @@ end
 Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 900
+  config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
     v.default_prefix = "solo-web_"
   end
@@ -48,9 +53,21 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "qemu" do |v|
+    m.vm.provider "qemu" do |v, o|
+      o.vm.box = "cloud-image/debian-12"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = "amd64"
+      v.arch = "x86_64"
       v.smp = "cpus=1"
       v.memory = "1024M"
+      v.ssh_auto_correct = true
+      v.advanced_network = true
+      v.net_mode = :socket
+      v.socket_opts = "listen=127.0.0.1:29129"
+      if "x86_64" != HOST_ARCH
+        v.smp = "cpus=1"
+        o.vm.boot_timeout = 3600
+      end
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -101,9 +118,15 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "qemu" do |v|
+    m.vm.provider "qemu" do |v, o|
+      o.vm.box = "cloud-image/debian-12"
+      o.vm.box_version = ">= 0"
       v.smp = "cpus=1"
       v.memory = "1024M"
+      v.ssh_auto_correct = true
+      v.advanced_network = true
+      v.net_mode = :socket
+      v.socket_opts = "connect=127.0.0.1:29129"
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")

@@ -228,6 +228,12 @@ variable "auto_stop_minutes" {{
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
 }}
+
+variable "expires_at" {{
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}}
 "#,
         tls = if spec.provision.is_empty() {
             ""
@@ -246,7 +252,7 @@ variable "auto_stop_minutes" {{
 provider "aws" {{
   region = var.region
   default_tags {{
-    tags = {{ "isoloom-environment" = "{env}", "managed-by" = "isoloom" }}
+    tags = {{ "isoloom-environment" = "{env}", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }}
   }}
 }}
 
@@ -919,9 +925,14 @@ pub(super) fn inventory(spec: &Spec) -> String {
         let Some((net, octet)) = m.networks.first() else { continue };
         let user = image(&vm.os).map(|i| i.2).unwrap_or("admin");
         if crate::images::is_windows(&vm.os) {
-            let _ = writeln!(windows, "{name} ansible_host={}", address(spec, net, *octet));
+            let _ = writeln!(windows, "{name} ansible_host={}{}", address(spec, net, *octet), super::host_vars(spec, name));
         } else {
-            let _ = writeln!(linux, "{name} ansible_host={} ansible_user={user}", address(spec, net, *octet));
+            let _ = writeln!(
+                linux,
+                "{name} ansible_host={} ansible_user={user}{}",
+                address(spec, net, *octet),
+                super::host_vars(spec, name)
+            );
         }
     }
     let mut inv = format!("[linux]\n{linux}\n[windows]\n{windows}\n");

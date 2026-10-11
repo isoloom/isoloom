@@ -18,7 +18,7 @@
 use std::fmt;
 
 use crate::images;
-use crate::model::{Check, Declared, Expect, Machine, Spec};
+use crate::model::{Check, Declared, Expect, Machine, Service, Spec};
 
 /// Where a check runs from.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -144,6 +144,18 @@ impl HttpRequest {
     }
 }
 
+/// What a `tcp` check writes and reads beyond connecting (both optional; `send` needs `contains`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TcpExchange {
+    /// A line written once connected (a newline is added).
+    pub send: Option<String>,
+    /// Text the bytes read within [`TCP_READ_SECONDS`] must contain.
+    pub contains: Option<String>,
+}
+
+/// How long a `tcp` check with `contains` reads from the connection, per attempt.
+pub const TCP_READ_SECONDS: u32 = 5;
+
 /// One resolved probe.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Probe {
@@ -157,20 +169,15 @@ pub enum Probe {
         host: Host,
         port: u16,
         expect: TcpExpect,
+        /// A line to write and text to read back: empty for a bare connection.
+        exchange: TcpExchange,
     },
     /// A command inside the position's machine; `expect` is text the output must contain.
-    Exec {
-        command: String,
-        expect: Option<String>,
-    },
+    Exec { command: String, expect: Option<String> },
     /// A script in the project, run with sh from the position.
-    Script {
-        path: String,
-    },
+    Script { path: String },
     /// An Ansible playbook in the project, run from the controller.
-    Playbook {
-        path: String,
-    },
+    Playbook { path: String },
 }
 
 /// A check, resolved: where it runs, what it probes, how long it may take to pass.
@@ -257,11 +264,16 @@ fn declared(d: &Declared, default: &Position) -> Option<Resolved> {
             TcpExpect::Blocked => format!("{t} blocked"),
             TcpExpect::Open => t.to_string(),
         };
+        let exchange = TcpExchange {
+            send: d.send.clone(),
+            contains: d.contains.clone(),
+        };
         (
             Probe::Tcp {
                 host: Host::Literal(host.to_string()),
                 port,
                 expect,
+                exchange,
             },
             wait,
             what,
@@ -313,7 +325,13 @@ pub fn allowed(spec: &Spec, from: &Machine, network: &str, port: u16) -> bool {
 ///   any of its addresses on an interface the traffic may use, so the outcome isn't the spec's
 ///   to promise;
 /// - the internet doesn't answer from a machine whose networks are all offline.
+///
+/// When no machine can run checks (only Windows machines, or network appliances), they run from
+/// the environment's networks instead (see [`from_networks`]).
 pub fn derived(spec: &Spec) -> Vec<Resolved> {
+    if !spec.machines.values().any(can_run_checks) {
+        return from_networks(spec);
+    }
     let mut out = Vec::new();
     for (a, ma) in &spec.machines {
         if !can_run_checks(ma) {
@@ -340,6 +358,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                                 },
                                 port: svc.port,
                                 expect: TcpExpect::Blocked,
+                                exchange: TcpExchange::default(),
                             },
                             wait: 0,
                             derived: true,
@@ -348,32 +367,10 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                     continue;
                 }
                 for (n, _) in paths.iter().filter(|(_, ok)| *ok) {
-                    let host = Host::Machine {
-                        name: b.clone(),
-                        network: (*n).clone(),
-                    };
-                    let probe = if svc.http {
-                        Probe::Http {
-                            url: Url {
-                                https: svc.tls,
-                                host,
-                                port: Some(svc.port),
-                                path: "/".into(),
-                            },
-                            expect: HttpExpect::Any,
-                            request: HttpRequest::default(),
-                        }
-                    } else {
-                        Probe::Tcp {
-                            host,
-                            port: svc.port,
-                            expect: TcpExpect::Open,
-                        }
-                    };
                     out.push(Resolved {
                         name: format!("{b}:{}{} from {a}", svc.port, on(n)),
                         position: position.clone(),
-                        probe,
+                        probe: answers(b, n, svc),
                         wait: 30,
                         derived: true,
                     });
@@ -395,6 +392,59 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
         }
     }
     out
+}
+
+/// The derived checks of an environment where no machine can run them (only Windows machines,
+/// or network appliances): every service answers at each of its addresses, from the
+/// environment's networks (on VM targets, the controller, which stands on every network).
+/// Nothing stands where `reach` blocks a service or where a network is offline, so those aren't
+/// asserted. A target where the machines that could run them don't (the containers of a hybrid
+/// environment) uses it too.
+pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
+    let mut out = Vec::new();
+    for (b, mb) in &spec.machines {
+        let multi = mb.networks.len() > 1;
+        for svc in &mb.services {
+            for n in mb.networks.keys() {
+                let on = if multi { format!(" on {n}") } else { String::new() };
+                out.push(Resolved {
+                    name: format!("{b}:{}{on} from the networks", svc.port),
+                    position: Position::Networks,
+                    probe: answers(b, n, svc),
+                    wait: 30,
+                    derived: true,
+                });
+            }
+        }
+    }
+    out
+}
+
+/// The probe that machine `b`'s service answers at its address on network `n`.
+fn answers(b: &str, n: &str, svc: &Service) -> Probe {
+    let host = Host::Machine {
+        name: b.to_string(),
+        network: n.to_string(),
+    };
+    if svc.http {
+        Probe::Http {
+            url: Url {
+                https: svc.tls,
+                host,
+                port: Some(svc.port),
+                path: "/".into(),
+            },
+            expect: HttpExpect::Any,
+            request: HttpRequest::default(),
+        }
+    } else {
+        Probe::Tcp {
+            host,
+            port: svc.port,
+            expect: TcpExpect::Open,
+            exchange: TcpExchange::default(),
+        }
+    }
 }
 
 /// The checks grouped by position: the default position first, then machines in spec order.
@@ -496,7 +546,19 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
                     }
                 }
             }
-            Probe::Tcp { host, port, expect } => {
+            Probe::Tcp {
+                host,
+                port,
+                expect: TcpExpect::Open,
+                exchange: TcpExchange { send, contains: Some(want) },
+            } => format!(
+                "if _retry {w} _tcp_read {h} {port} {snd} {t}; then pass {n}; else fail {n} \"$out\"; fi\n",
+                w = c.wait,
+                h = sq(&(r.host)(host, position)),
+                snd = sq(send.as_deref().unwrap_or("")),
+                t = sq(want),
+            ),
+            Probe::Tcp { host, port, expect, .. } => {
                 let text = (r.host)(host, position);
                 let (h, ht) = (sq(&text), dq(&text));
                 match expect {
@@ -578,6 +640,31 @@ _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
   else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
+}
+# _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
+# LINE and a newline, if any) contain TEXT; $out says why not (nc, else bash). Stdin stays open
+# while reading (some nc quit at its end), and nc is stopped after 5s whatever its flavor.
+_tcp_read() {
+  f=$(mktemp); i=0; r=1
+  if command -v nc >/dev/null 2>&1; then
+    { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
+  else
+    H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
+  fi
+  p=$!
+  while :; do
+    if grep -qF -- "$4" "$f"; then r=0; break; fi
+    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    sleep 1; i=$((i+1))
+  done
+  [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
+  touch "$f.end"; kill $p 2>/dev/null
+  if [ $r = 1 ]; then
+    if [ -s "$f" ]; then out="$1:$2 answered \"$(head -c 100 "$f" | tr -d '\000\r' | tr '\n\t' '  ')\", without the expected text"
+    elif [ $i -lt 5 ]; then out="$1:$2 refused the connection or closed it without a word"
+    else out="nothing read from $1:$2 within 5s"; fi
+  fi
+  rm -f "$f" "$f.end"; return $r
 }
 # _exec COMMAND TEXT -> 0 when the command succeeds and its output contains TEXT (if any).
 _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep -qF -- "$2"; }; }

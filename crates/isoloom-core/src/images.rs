@@ -87,14 +87,20 @@ impl Table {
     }
 }
 
-/// A Vagrant box: its name, a pinned version when known-good, and the libvirt box when the
-/// main one has no libvirt build.
+/// A Vagrant box: its name, a pinned version when known-good, and the libvirt and QEMU boxes
+/// when the main one has no build for them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VagrantBox {
     pub name: String,
     pub version: Option<String>,
     pub libvirt: Option<String>,
+    pub qemu: Option<String>,
 }
+
+/// Debian 12 for QEMU: the official Debian cloud image as a box (amd64 and arm64), with the
+/// cloud-init vagrant-qemu sets a private network's address through. Isoloom's own Debian VMs
+/// (router, controller, tool shell) use it there too.
+pub const QEMU_DEBIAN_12: &str = "cloud-image/debian-12";
 
 /// Whether an OS name is a Windows one (WinRM and PowerShell instead of SSH and sh).
 pub fn is_windows(os: &str) -> bool {
@@ -107,10 +113,16 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         name: name.into(),
         version: version.map(Into::into),
         libvirt: libvirt.map(Into::into),
+        qemu: None,
+    };
+    // The QEMU box (vagrant-qemu boots libvirt-format boxes), where the main one has none.
+    let q = |mut v: VagrantBox, qemu: &str| {
+        v.qemu = Some(qemu.into());
+        v
     };
     Some(match os {
         "debian-11" => b("bento/debian-11", None, Some("generic/debian11")),
-        "debian-12" => b("bento/debian-12", None, Some("generic/debian12")),
+        "debian-12" => q(b("bento/debian-12", None, Some("generic/debian12")), QEMU_DEBIAN_12),
         "debian-13" => b("bento/debian-13", None, None),
         // End of life: for labs about older systems (Metasploitable 3 runs on 14.04). No cloud
         // or Proxmox image is mapped for these, so those targets decline them.
@@ -133,7 +145,11 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "windows-server-2012r2" => b("jborean93/WindowsServer2012R2", Some("1.2.0"), None),
         "windows-server-2016" => b("StefanScherer/windows_2016", Some("2019.02.14"), None),
         // The box GOAD uses (VirtualBox, VMware, Hyper-V), pinned to its known-good version.
-        "windows-server-2019" => b("StefanScherer/windows_2019", Some("2021.05.15"), None),
+        // On QEMU (an Apple Silicon Mac emulating x86), an evaluation box built for libvirt.
+        "windows-server-2019" => q(
+            b("StefanScherer/windows_2019", Some("2021.05.15"), None),
+            "peru/windows-server-2019-standard-x64-eval",
+        ),
         // Pinned so a rebuilt box can't change an environment under it.
         "windows-server-2022" => b("gusztavvargadr/windows-server-2022-standard", Some("2607.0.0"), None),
         "windows-11" => b("gusztavvargadr/windows-11", Some("2607.1.0"), None),
@@ -155,6 +171,7 @@ pub fn vagrant(vm: &VmImpl) -> Option<VagrantBox> {
             name,
             version: vm.image.as_ref().and_then(|i| i.vagrant_version.clone()),
             libvirt: None,
+            qemu: vm.image.as_ref().and_then(|i| i.qemu.clone()),
         }),
         None => builtin_vagrant(&vm.os),
     }

@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Cloud services instead of machines: a Terraform module (terraform/) applied into the user's
+# own AWS account, here a public S3 website. `isoloom run cloud-services` creates it,
+# `isoloom test cloud-services` checks it from here, `isoloom down cloud-services` ends it.
+version: 1
+name: cloud-bucket
+
+cloud:
+  provider: aws
+  terraform: terraform
+  vars: { region: us-east-1 }
+  outputs: { site: website_url }
+  hourly_usd: 0.01
+
+checks:
+  - name: the website answers
+    http: "{{ cloud.outputs.site }}"
+    wait: 120
+  - name: the page greets
+    http: "{{ cloud.outputs.site }}"
+    contains: hello from isoloom
+
+message: |
+  The website answers at {{ cloud.outputs.site }}.

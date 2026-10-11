@@ -39,6 +39,8 @@ services:
           memory: 1024M
     labels:
       isoloom.service.mysql: tcp:3207
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api
     restart: unless-stopped
   database-init-1:
     image: mysql:8.0
@@ -55,9 +57,15 @@ services:
       database:
         condition: service_healthy
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api
   web:
     build:
       context: ../../build/web
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: supplier-portal-api
     image: isoloom/supplier-portal-api-web
     platform: linux/amd64
     hostname: web
@@ -93,6 +101,8 @@ services:
           memory: 1024M
     labels:
       isoloom.service.portal: http:3206
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api
     restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
@@ -113,6 +123,9 @@ services:
         condition: service_completed_successfully
       web:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api
   isoloom-check-database:
     image: curlimages/curl:8.11.1
     profiles:
@@ -130,6 +143,9 @@ services:
         condition: service_completed_successfully
       web:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api
   isoloom-check-web:
     image: curlimages/curl:8.11.1
     profiles:
@@ -147,6 +163,9 @@ services:
         condition: service_completed_successfully
       web:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -158,11 +177,20 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api
 networks:
   lab:
     ipam:
       config:
       - subnet: 10.20.0.0/24
         gateway: 10.20.0.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: supplier-portal-api

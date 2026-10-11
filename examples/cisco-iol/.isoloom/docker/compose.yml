@@ -42,6 +42,9 @@ services:
     environment:
       IOL_PID: '1'
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   r1-routes:
     image: alpine:3.20
     network_mode: service:r1
@@ -62,6 +65,9 @@ services:
       r1:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   r2:
     image: vrnetlab/cisco_iol:17.12.01
     platform: linux/amd64
@@ -98,6 +104,9 @@ services:
     environment:
       IOL_PID: '2'
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   r2-routes:
     image: alpine:3.20
     network_mode: service:r2
@@ -118,6 +127,9 @@ services:
       r2:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   host-a:
     image: alpine:3.20
     platform: linux/amd64
@@ -132,6 +144,9 @@ services:
     - r2:10.91.2.1
     - host-b:10.91.2.10
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   host-a-routes:
     image: alpine:3.20
     network_mode: service:host-a
@@ -154,6 +169,9 @@ services:
       r1:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   host-b:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -182,6 +200,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
     restart: unless-stopped
   host-b-routes:
     image: alpine:3.20
@@ -205,6 +225,9 @@ services:
       r2:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   isoloom-check-host-a:
     image: curlimages/curl:8.11.1
     profiles:
@@ -228,6 +251,9 @@ services:
         condition: service_healthy
       host-a:
         condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -239,25 +265,43 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
 networks:
   site-a:
     ipam:
       config:
       - subnet: 10.91.1.0/24
         gateway: 10.91.1.254
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   site-b:
     ipam:
       config:
       - subnet: 10.91.2.0/24
         gateway: 10.91.2.254
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   wan:
     ipam:
       config:
       - subnet: 10.91.0.0/29
         gateway: 10.91.0.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
   isoloom-mgmt:
     ipam:
       config:
       - subnet: 10.255.255.0/24
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: cisco-iol

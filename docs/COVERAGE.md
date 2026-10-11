@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 82% | 56 | 42 | 8 | 6 |
+| [Docker Compose](#docker-compose) | 82% | 58 | 44 | 8 | 6 |
 | [Vagrant](#vagrant) | 82% | 35 | 29 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -18,7 +18,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: libvirt](#vagrant-libvirt) | 15% | 20 | 3 | 0 | 17 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 25% | 4 | 1 | 0 | 3 |
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
-| [Vagrant: QEMU](#vagrant-qemu) | 14% | 14 | 2 | 0 | 12 |
+| [Vagrant: QEMU](#vagrant-qemu) | 36% | 15 | 4 | 3 | 8 |
 | [Vagrant: ESXi](#vagrant-esxi) | 47% | 19 | 9 | 0 | 10 |
 | [Terraform: Proxmox](#terraform-proxmox) | 43% | 16 | 7 | 0 | 9 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-82% of 56 portable features (42 done, 8 partly, 6 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+82% of 58 portable features (44 done, 8 partly, 6 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -103,7 +103,7 @@ when a table disagrees with what Isoloom really generates.
 | `ipc` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `isolation` | No | No | Windows containers only |
 | `label_file` | n/a | No | Compose tooling, not the environment's behavior |
-| `labels` | Yes | Yes | From `machines.*.services` (isoloom.service.<name>, for tools reading the containers) |
+| `labels` | Yes | Yes | From `machines.*.services` (isoloom.service.<name>, for tools reading the containers); isoloom.managed and isoloom.environment on every service, for `isoloom gc` |
 | `links` | n/a | No | Legacy; replaced by networks |
 | `logging` | n/a | No | Where the runner collects logs |
 | `mac_address` | No | No | Cloud VMs get their MAC address from the provider |
@@ -163,7 +163,7 @@ when a table disagrees with what Isoloom really generates.
 | `external` | Yes | Not yet | Joining a network outside the environment (a Docker network, a host bridge, a VPC) |
 | `internal` | Yes | Yes | From `networks.*.internet: false` (when nothing routes) |
 | `ipam` | Yes | Yes | From `networks.*.cidr` |
-| `labels` | n/a | No | Compose tooling, not the environment's behavior |
+| `labels` | Yes | Yes | From `the environment: isoloom.managed and isoloom.environment, for `isoloom gc`` |
 | `name` | n/a | No | Compose scopes names to the environment |
 
 ### Volumes
@@ -173,7 +173,7 @@ when a table disagrees with what Isoloom really generates.
 | `driver` | No | No | Docker volume drivers have no VM equivalent |
 | `driver_opts` | No | No | Docker volume driver options |
 | `external` | Yes | Not yet | With volumes (data that outlives the environment) |
-| `labels` | n/a | No | Compose tooling, not the environment's behavior |
+| `labels` | Yes | Yes | From `the environment: isoloom.managed and isoloom.environment, for `isoloom gc`` |
 | `name` | n/a | No | Compose scopes names to the environment |
 
 ## Vagrant
@@ -545,14 +545,14 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: QEMU
 
-14% of 14 portable features (2 done, 0 partly, 12 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
+36% of 15 portable features (4 done, 3 partly, 8 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
 
 ### Settings
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `advanced_network` | Yes | Not yet | Private networks: QEMU gives a machine one private network (`advanced_network`), and needs vmnet or socket_vmnet on the Mac |
-| `arch` | Yes | Not yet | A CPU architecture field (amd64, arm64) |
+| `advanced_network` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit) |
+| `arch` | Yes | Yes | From `machines.*.arch` (emulated when the host's CPU is another) |
 | `control_port` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `cpu` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `debug_port` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -561,30 +561,30 @@ when a table disagrees with what Isoloom really generates.
 | `drive_interface` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `extra_drive_args` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `extra_image_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `extra_netdev_args` | Yes | Not yet | With private networks on QEMU |
+| `extra_netdev_args` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
 | `extra_qemu_args` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `firmware_format` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `graceful_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `homebrew_prefix` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `image_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `machine` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `mcast_addr` | Yes | Not yet | With private networks on QEMU |
+| `mcast_addr` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
 | `memory` | Yes | Yes | From `machines.*.resources` |
 | `net_device` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `net_mode` | Yes | Not yet | Private networks: QEMU gives a machine one private network (`advanced_network`), and needs vmnet or socket_vmnet on the Mac |
+| `net_mode` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit) |
 | `no_daemonize` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `other_default` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `qemu_bin` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `qemu_dir` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `smp` | Yes | Yes | From `machines.*.resources.cpus` |
-| `socket_opts` | Yes | Not yet | With private networks on QEMU |
-| `socket_vmnet_client` | Yes | Not yet | With private networks on QEMU |
-| `socket_vmnet_socket` | Yes | Not yet | With private networks on QEMU |
-| `ssh_auto_correct` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `socket_opts` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit) |
+| `socket_vmnet_client` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
+| `socket_vmnet_socket` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
+| `ssh_auto_correct` | Yes | Yes | Always: each VM forwards SSH from its own host port |
 | `ssh_host` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `ssh_port` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `tap_device` | Yes | Not yet | With private networks on QEMU |
-| `vmnet_interface` | Yes | Not yet | With private networks on QEMU |
+| `tap_device` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
+| `vmnet_interface` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
 
 ## Vagrant: ESXi
 
