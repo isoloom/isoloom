@@ -92,7 +92,7 @@ fn without_a_machine_to_run_them_derived_checks_stand_on_the_networks() {
     );
     assert!(derived.iter().all(|c| c.derived && c.position == Position::Networks && c.wait == 30));
     assert!(
-        matches!(&derived[1].probe, Probe::Tcp { host: checks::Host::Machine { name, network }, port: 389, expect: TcpExpect::Open } if name == "dc" && network == "vault")
+        matches!(&derived[1].probe, Probe::Tcp { host: checks::Host::Machine { name, network }, port: 389, expect: TcpExpect::Open, .. } if name == "dc" && network == "vault")
     );
     assert!(matches!(&derived[2].probe, Probe::Http { url, expect: HttpExpect::Any, .. } if url.https));
 
