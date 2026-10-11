@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Typed playbook variables
+- `provision[].vars` takes any YAML value: strings as before, and numbers, booleans, lists and maps, passed to `ansible-playbook` as JSON (`-e`) with their types (a list stays a list, not a string to iterate over). `isoloom run`'s own playbook runs pass them as JSON too (they split values on spaces before). Example: ansible-pair's `tools: [curl, jq]` and `cache_port: 6379`.
+
 ### `import compose` reads keys set twice
 - A key set twice in one mapping (secDevLabs camplake-api's `environment` sets `MONGO_PORT` twice) no longer stops `isoloom import compose` with `duplicate entry`: the last value is kept, as Compose does, and the draft's "Changed on the way in" notes say which key, where, and the value kept. (#68)
 
