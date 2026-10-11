@@ -19,12 +19,19 @@
 //! - **Dynamips** (a 7200): Isoloom builds the container (Ubuntu's `dynamips`), binds each data
 //!   interface to a router port (`FastEthernet0/0`, then `1/0`, `1/1`, `2/0`... on PA-2FE-TX
 //!   adapters) and boots the IOS `.bin` in `firmware`.
+//!
+//! A LAN's `switch` (a switch kind, no `networks` of its own) takes its ports from the LAN
+//! instead: an access port on each VLAN's network (at the controller address, unused on Docker,
+//! as Isoloom's Linux switch had), then a trunk port on each trunk machine's link (see
+//! `trunks`). Its configuration declares the VLANs (VTP transparent) and sets each port's mode.
 
 use std::fmt::Write;
 use std::net::Ipv4Addr;
 
+use super::trunks;
 use crate::model::{Appliance, Machine, Spec};
 use crate::validate::Cidr;
+use crate::vlans;
 
 /// Isoloom's management network for appliances, outside the environment (no `reach`, no checks).
 pub const MGMT_NETWORK: &str = "isoloom-mgmt";
@@ -77,8 +84,60 @@ fn mask(len: u8) -> Ipv4Addr {
     Ipv4Addr::from(if len == 0 { 0 } else { u32::MAX << (32 - len) })
 }
 
+/// One data interface of an appliance: `eth1`, `eth2`... in order.
+pub struct Port {
+    /// The Compose network it is on.
+    pub network: String,
+    /// The container's address there (none on a trunk's link, which has no addresses).
+    pub address: Option<Ipv4Addr>,
+    pub role: Role,
+}
+
+/// What a data interface is for.
+pub enum Role {
+    /// One of the machine's own networks (a router's interface takes its address).
+    Network,
+    /// A LAN switch's access port in a VLAN.
+    Access(u16),
+    /// A LAN switch's trunk to a machine on several of its VLANs: that machine, the VLAN ids.
+    Trunk(String, Vec<u16>),
+}
+
+/// The data interfaces of appliance `name`, in order: its networks; for a LAN's `switch`, an
+/// access port per VLAN of the LAN, then a trunk port per machine on several of them.
+pub fn ports(spec: &Spec, name: &str, m: &Machine, address: &impl Fn(&str, u8) -> Ipv4Addr) -> Vec<Port> {
+    let Some(lan) = vlans::switched_by(spec, name) else {
+        return m
+            .networks
+            .iter()
+            .map(|(net, octet)| Port {
+                network: net.clone(),
+                address: Some(address(net, *octet)),
+                role: Role::Network,
+            })
+            .collect();
+    };
+    let mut out: Vec<Port> = vlans::of_lan(spec, lan)
+        .map(|(net, id)| Port {
+            network: net.clone(),
+            address: Some(trunks::switch_address(spec, net)),
+            role: Role::Access(id),
+        })
+        .collect();
+    for t in trunks::trunks(spec).iter().filter(|t| t.lan == lan) {
+        out.push(Port {
+            network: trunks::link_network(t),
+            address: None,
+            role: Role::Trunk(t.machine.clone(), t.vlans.iter().map(|(_, id, _)| *id).collect()),
+        });
+    }
+    out
+}
+
 /// How an appliance's container is set up.
 pub struct Wiring {
+    /// Its data interfaces, in order (`eth1`, `eth2`...).
+    pub ports: Vec<Port>,
     /// Files to mount: (name in its folder, path inside, contents).
     pub files: Vec<(String, String, String)>,
     /// Where the machine's own `config` is mounted (read when the container starts).
@@ -94,7 +153,7 @@ pub struct Wiring {
 }
 
 /// The startup configuration Isoloom writes: hostname, credentials, each interface's address.
-fn base_config(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: &impl Fn(&str, u8) -> Ipv4Addr) -> String {
+fn base_config(spec: &Spec, name: &str, kind: Appliance, ports: &[Port]) -> String {
     let mut cfg = format!("hostname {name}\n!\nno ip domain lookup\nip domain name lab\n!\nusername admin privilege 15 secret admin\n!\n");
     if matches!(kind, Appliance::CiscoIol | Appliance::CiscoIolL2) {
         let mgmt = Cidr::parse(MGMT_CIDR).expect("constant");
@@ -106,11 +165,41 @@ fn base_config(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: &
             mask(mgmt.len),
         );
     }
-    for (k, (net, octet)) in m.networks.iter().enumerate() {
-        let _ = write!(cfg, "interface {}\n description {net}\n", interface(kind, k + 1));
-        if !is_switch(kind) {
-            let len = Cidr::parse(&spec.networks[net].cidr).expect("validated cidr").len;
-            let _ = writeln!(cfg, " ip address {} {}", address(net, *octet), mask(len));
+    // A LAN's switch: its VLANs, kept in the configuration (VTP transparent).
+    let access: Vec<(&str, u16)> = ports
+        .iter()
+        .filter_map(|p| match p.role {
+            Role::Access(id) => Some((p.network.as_str(), id)),
+            _ => None,
+        })
+        .collect();
+    if !access.is_empty() {
+        cfg.push_str("vtp mode transparent\n!\n");
+        for (net, id) in &access {
+            // IOS takes VLAN names of up to 32 characters.
+            let _ = write!(cfg, "vlan {id}\n name {}\n!\n", net.chars().take(32).collect::<String>());
+        }
+    }
+    for (k, port) in ports.iter().enumerate() {
+        let _ = writeln!(cfg, "interface {}", interface(kind, k + 1));
+        match &port.role {
+            Role::Network => {
+                let _ = writeln!(cfg, " description {}", port.network);
+                if let (false, Some(addr)) = (is_switch(kind), port.address) {
+                    let len = Cidr::parse(&spec.networks[&port.network].cidr).expect("validated cidr").len;
+                    let _ = writeln!(cfg, " ip address {addr} {}", mask(len));
+                }
+            }
+            Role::Access(id) => {
+                let _ = write!(cfg, " description {}\n switchport mode access\n switchport access vlan {id}\n", port.network);
+            }
+            Role::Trunk(machine, ids) => {
+                let ids = ids.iter().map(u16::to_string).collect::<Vec<_>>().join(",");
+                let _ = write!(
+                    cfg,
+                    " description trunk to {machine}\n switchport trunk encapsulation dot1q\n switchport mode trunk\n switchport trunk allowed vlan {ids}\n"
+                );
+            }
         }
         cfg.push_str(" no shutdown\n!\n");
     }
@@ -123,8 +212,9 @@ fn base_config(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: &
 
 /// How the container of appliance `name` is wired.
 pub fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: impl Fn(&str, u8) -> Ipv4Addr) -> Wiring {
-    let cfg = base_config(spec, name, m, kind, &address);
-    let n = m.networks.len();
+    let ports = ports(spec, name, m, &address);
+    let cfg = base_config(spec, name, kind, &ports);
+    let n = ports.len();
     match kind {
         Appliance::CiscoIol | Appliance::CiscoIolL2 => {
             let pid = iol_pid(spec, name);
@@ -136,6 +226,7 @@ pub fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: im
                 let _ = writeln!(netmap, "{pid}:{slot}/{port} 513:{slot}/{port}");
             }
             Wiring {
+                ports,
                 files: vec![
                     ("base.txt".into(), "/iol/base.txt".into(), cfg),
                     ("NETMAP".into(), "/iol/NETMAP".into(), netmap),
@@ -155,6 +246,7 @@ pub fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: im
                 environment.push(("CLAB_MGMT_PASSTHROUGH".into(), "true".into()));
             }
             Wiring {
+                ports,
                 files: vec![("base.cfg".into(), "/config/base.cfg".into(), cfg)],
                 own_config: "/config/own.cfg",
                 firmware: None,
@@ -178,6 +270,7 @@ pub fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: im
                 let _ = write!(args, " -s {slot}:{port}:linux_eth:eth{k}");
             }
             Wiring {
+                ports,
                 files: vec![("base.cfg".into(), "/config/base.cfg".into(), cfg)],
                 own_config: "/config/own.cfg",
                 firmware: Some("/firmware/ios.bin"),
@@ -198,7 +291,8 @@ fn shell(script: &str) -> Vec<String> {
     vec!["/bin/sh".into(), "-c".into(), script.into()]
 }
 
-/// What the network sidecar runs: the container lets go of the data addresses (IOS owns them).
-pub fn sidecar_commands(m: &Machine) -> Vec<String> {
-    (1..=m.networks.len()).map(|k| format!("ip addr flush dev eth{k}")).collect()
+/// What the network sidecar runs: the container lets go of the data addresses on its `ports`
+/// data interfaces (IOS owns them).
+pub fn sidecar_commands(ports: usize) -> Vec<String> {
+    (1..=ports).map(|k| format!("ip addr flush dev eth{k}")).collect()
 }
