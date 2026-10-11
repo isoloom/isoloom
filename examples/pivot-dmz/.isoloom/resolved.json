@@ -56,6 +56,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -106,6 +107,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -152,6 +154,7 @@
         "docker",
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -197,6 +200,7 @@
       "shapes": [
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "kali",
       "windows": false,
@@ -252,6 +256,8 @@
     }
   },
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "dmz": "10.30.10.253",
       "internal": "10.30.20.253",

@@ -23,6 +23,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "arm64",
       "os": null,
       "windows": false,
@@ -62,6 +63,8 @@
   "groups": {},
   "router": null,
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "lab": "10.60.0.253"
     }

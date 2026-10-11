@@ -41,6 +41,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -79,6 +80,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -117,6 +119,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -146,6 +149,7 @@
       "shapes": [
         "docker"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -188,6 +192,8 @@
   "groups": {},
   "router": null,
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "site-a": "10.91.1.253",
       "site-b": "10.91.2.253",

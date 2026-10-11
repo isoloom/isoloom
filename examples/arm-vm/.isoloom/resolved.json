@@ -23,6 +23,7 @@
       "shapes": [
         "vm"
       ],
+      "role": "target",
       "arch": "arm64",
       "os": "ubuntu-24.04",
       "windows": false,
@@ -62,6 +63,8 @@
   "groups": {},
   "router": null,
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "lab": "10.70.0.253"
     }

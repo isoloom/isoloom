@@ -23,6 +23,7 @@
       "shapes": [
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -59,6 +60,7 @@
       "shapes": [
         "vm"
       ],
+      "role": "target",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -104,6 +106,8 @@
   },
   "router": null,
   "controller": {
+    "role": "infra",
+    "keep_running": false,
     "addresses": {
       "lab": "10.63.0.253"
     }

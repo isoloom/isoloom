@@ -603,6 +603,29 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() {
 }
 
 #[test]
+fn the_controller_halts_after_provisioning_unless_kept_running() {
+    let (_, mut spec) = example("ansible-pair");
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
+    // After the playbooks, before the on-demand checks; marked so a check run waits it out.
+    let (ansible, halt) = (ctl.find("name: \"ansible\"").unwrap(), ctl.find("name: \"halt\"").unwrap());
+    assert!(ansible < halt, "{ctl}");
+    assert!(ctl.contains("touch /run/isoloom-halting; (sleep 5; poweroff)"));
+    spec.controller.get_or_insert_default().keep_running = true;
+    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(!vagrantfile.contains("name: \"halt\""));
+}
+
+#[test]
+fn the_resolved_snapshot_tells_infra_from_targets() {
+    let (_, spec) = example("ansible-pair");
+    let resolved = isoloom_core::generate::resolved::resolve(&spec);
+    assert_eq!(resolved["machines"]["web"]["role"], "target");
+    assert_eq!(resolved["controller"]["role"], "infra");
+    assert_eq!(resolved["controller"]["keep_running"], false);
+}
+
+#[test]
 fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
     let (_, spec) = example("ansible-pair");
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
