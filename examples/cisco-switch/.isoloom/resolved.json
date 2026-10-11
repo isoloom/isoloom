@@ -1,0 +1,276 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "cisco-switch",
+  "instance": null,
+  "inputs": [],
+  "networks": {
+    "office-vlan10": {
+      "cidr": "10.92.10.0/24",
+      "docker_cidr": "10.92.10.0/24",
+      "internet": false,
+      "gateway": null,
+      "gateway_address": "10.92.10.1",
+      "router": null,
+      "controller": "10.92.10.253"
+    },
+    "office-vlan20": {
+      "cidr": "10.92.20.0/24",
+      "docker_cidr": "10.92.20.0/24",
+      "internet": false,
+      "gateway": null,
+      "gateway_address": "10.92.20.1",
+      "router": null,
+      "controller": "10.92.20.253"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "sw1": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker"
+      ],
+      "arch": "amd64",
+      "os": null,
+      "windows": false,
+      "addresses": {},
+      "docker_addresses": {},
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": true
+    },
+    "files": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker"
+      ],
+      "arch": "amd64",
+      "os": null,
+      "windows": false,
+      "addresses": {
+        "office-vlan10": "10.92.10.10",
+        "office-vlan20": "10.92.20.10"
+      },
+      "docker_addresses": {
+        "office-vlan10": "10.92.10.10",
+        "office-vlan20": "10.92.20.10"
+      },
+      "services": [
+        {
+          "port": 80,
+          "name": null,
+          "http": true,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": true
+    },
+    "staff": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker"
+      ],
+      "arch": "amd64",
+      "os": null,
+      "windows": false,
+      "addresses": {
+        "office-vlan10": "10.92.10.20"
+      },
+      "docker_addresses": {
+        "office-vlan10": "10.92.10.20"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": true
+    },
+    "guest": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "docker"
+      ],
+      "arch": "amd64",
+      "os": null,
+      "windows": false,
+      "addresses": {
+        "office-vlan20": "10.92.20.20"
+      },
+      "docker_addresses": {
+        "office-vlan20": "10.92.20.20"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": true
+    }
+  },
+  "start_order": [
+    "sw1",
+    "files",
+    "staff",
+    "guest"
+  ],
+  "clones": {},
+  "tools": {},
+  "groups": {},
+  "router": null,
+  "controller": {
+    "addresses": {
+      "office-vlan10": "10.92.10.253",
+      "office-vlan20": "10.92.20.253"
+    }
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes"
+    ],
+    "generated": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker"
+    ],
+    "refused": {
+      "kubernetes": "machine `sw1` is a network appliance (`docker.appliance`), which runs on the Docker targets"
+    },
+    "not_possible": {
+      "hybrid": "only when some machines are containers and others are VMs",
+      "vagrant": "needs `vm:` on sw1, files, staff, guest",
+      "proxmox": "needs `vm:` on sw1, files, staff, guest",
+      "cloud-vm": "needs `vm:` on sw1, files, staff, guest",
+      "external": "needs `external:` on sw1, files, staff, guest",
+      "cloud-services": "left out by `targets:`"
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "files",
+        "machine": "files",
+        "runner": "isoloom-check-files",
+        "checks": [
+          {
+            "name": "no internet from files",
+            "derived": true,
+            "kind": "http",
+            "target": "http://1.1.1.1/",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "staff",
+        "machine": "staff",
+        "runner": "isoloom-check-staff",
+        "checks": [
+          {
+            "name": "staff reach the file server through the switch (VLAN 10, tagged on its trunk)",
+            "derived": false,
+            "kind": "http",
+            "target": "http://10.92.10.10/",
+            "expect": "200",
+            "wait": 180
+          },
+          {
+            "name": "files:80 on office-vlan10 from staff",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.92.10.10:80/",
+            "expect": "any",
+            "wait": 30
+          },
+          {
+            "name": "no internet from staff",
+            "derived": true,
+            "kind": "http",
+            "target": "http://1.1.1.1/",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      },
+      {
+        "position": "guest",
+        "machine": "guest",
+        "runner": "isoloom-check-guest",
+        "checks": [
+          {
+            "name": "guests too, on VLAN 20",
+            "derived": false,
+            "kind": "http",
+            "target": "http://10.92.20.10/",
+            "expect": "200",
+            "wait": 180
+          },
+          {
+            "name": "files:80 on office-vlan20 from guest",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.92.20.10:80/",
+            "expect": "any",
+            "wait": 30
+          },
+          {
+            "name": "no internet from guest",
+            "derived": true,
+            "kind": "http",
+            "target": "http://1.1.1.1/",
+            "expect": "blocked",
+            "wait": 0
+          }
+        ]
+      }
+    ]
+  }
+}

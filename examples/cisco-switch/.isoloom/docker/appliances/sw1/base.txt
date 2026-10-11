@@ -1,0 +1,57 @@
+hostname sw1
+!
+no ip domain lookup
+ip domain name lab
+!
+username admin privilege 15 secret admin
+!
+no aaa new-model
+ip cef
+!
+vrf definition isoloom-mgmt
+ description Isoloom management
+ address-family ipv4
+ exit-address-family
+!
+interface Ethernet0/0
+ no switchport
+ vrf forwarding isoloom-mgmt
+ description Isoloom management
+ ip address 10.255.255.10 255.255.255.0
+ no shutdown
+!
+vtp mode transparent
+!
+vlan 10
+ name office-vlan10
+!
+vlan 20
+ name office-vlan20
+!
+interface Ethernet0/1
+ description office-vlan10
+ switchport mode access
+ switchport access vlan 10
+ no shutdown
+!
+interface Ethernet0/2
+ description office-vlan20
+ switchport mode access
+ switchport access vlan 20
+ no shutdown
+!
+interface Ethernet0/3
+ description trunk to files
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20
+ no shutdown
+!
+ip route vrf isoloom-mgmt 0.0.0.0 0.0.0.0 Ethernet0/0 10.255.255.1
+!
+ip ssh version 2
+!
+line vty 0 4
+ login local
+ transport input ssh telnet
+!

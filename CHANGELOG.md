@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### A Cisco switch for a LAN
+- `switch: <machine>` on a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance: cisco-iol-l2` or `cisco-vios-l2`) switches the LAN instead of Isoloom's Linux switch container, so frames between a VLAN and a trunk cross real IOS. The machine lists no `networks`: its data ports are an access port on each VLAN's network (in VLAN order, at the controller address, unused on Docker), then a trunk port on each trunk machine's link. Isoloom's startup configuration declares the VLANs (`vtp mode transparent`, `vlan <id>` named after the network) and sets each port (`switchport mode access` + `access vlan`, or `trunk encapsulation dot1q` + `mode trunk` + `allowed vlan`); the machine's own `config` follows. Trunk machines are unchanged; their sidecar waits for the switch to start (IOS reports no readiness: checks through it `wait` for it to boot). Validated: a switch kind, no `networks`, `services` or `aliases` of its own, one LAN per switch, no `count`, no machine on the LAN directly. Docker targets only, like every appliance. Example: cisco-switch.
+
 ## 0.10.1
 
 ### Google Cloud: long environment names
@@ -75,7 +80,7 @@
 - A machine's healthcheck no longer borrows the image's tools (`sh`, then `nc` or `bash`), so distroless, `scratch` and minimal images turn healthy too (OWASP Juice Shop ships on distroless Node). Isoloom brings a static busybox (`busybox:1.37.0-musl`): on Docker a one-shot `isoloom-probe-<arch>` copies it into a volume each machine with services mounts read-only at `/.isoloom-probe`, and the healthcheck runs it in exec form; on Kubernetes an init container copies it into an `emptyDir` for the readiness probe. `init:` jobs still run with the image's own `sh`. (#37)
 
 ### More network appliances: Cisco QEMU images and Dynamips
-- `appliance: cisco-vios | cisco-viosl2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
+- `appliance: cisco-vios | cisco-vios-l2 | cisco-csr1000v | cisco-c8000v`: vrnetlab's QEMU images, as containerlab runs them: `launch.py` with its arguments (`tc` connection mode), `CLAB_INTFS`, the startup configuration in `/config/startup-config.cfg` (applied once the VM has booted), privileged for /dev/kvm. IOSv's data interfaces are `GigabitEthernet0/1`..., IOS XE's `GigabitEthernet2`.... Example: cisco-qemu (IOSv and CSR1000v, OSPF).
 - `appliance: cisco-dynamips` with `docker.firmware: <your IOS .bin>`: a Cisco 7200 emulated by Dynamips, in a container Isoloom builds (Ubuntu's `dynamips`); the data interfaces bind to `FastEthernet0/0`, then `1/0`, `1/1`, `2/0`... on PA-2FE-TX adapters. No KVM needed. Example: cisco-dynamips.
 - Appliances' interfaces are named outright (`interface_name`, Compose 2.36+ / Docker 28.1+): Docker's own attach order turned out not to follow `priority`.
 
