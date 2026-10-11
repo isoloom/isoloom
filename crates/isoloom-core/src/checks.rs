@@ -380,7 +380,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                 }
             }
         }
-        if !ma.networks.keys().any(|n| spec.networks[n].internet) {
+        if !ma.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.internet)) {
             out.push(Resolved {
                 name: format!("no internet from {a}"),
                 position,
