@@ -251,6 +251,20 @@ resource "terraform_data" "cache" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz",
       "printf '%s\\n' '192.168.1.20 web' | sudo tee -a /etc/hosts >/dev/null",
+      "cd /opt/isoloom && sudo -E sh -c 'sh provision/cache-boot.sh'",
+      "sudo mkdir -p /var/lib/isoloom && sudo cp /proc/sys/kernel/random/boot_id /var/lib/isoloom/boot-id"
+    ]
+  }
+  # The reboot step: the connection drops as the machine goes down.
+  provisioner "remote-exec" {
+    inline     = ["sudo touch /run/nologin", "sudo systemctl stop ssh.socket ssh.service sshd.service 2>/dev/null || true", "sudo systemctl --no-block reboot", "sleep 600"]
+    on_failure = continue
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "if [ \"$(cat /proc/sys/kernel/random/boot_id)\" = \"$(cat /var/lib/isoloom/boot-id)\" ]; then echo 'the reboot step: the machine did not restart' >&2; exit 1; fi",
+      "${var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes}" : "true"}",
       "cd /opt/isoloom && sudo -E sh -c 'sh provision/cache.sh'",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
     ]

@@ -6,7 +6,8 @@
 //! - The project is copied into the VM at `/opt/isoloom` (no shared folders, works on every
 //!   host OS): a tar.gz built in Vagrant's own Ruby when the `project` step runs, symlinks kept
 //!   as links. Then the `vm.provision` steps run there in order: `.sh` with sh, `.yml` / `.yaml`
-//!   with Ansible inside the VM (never on the user's machine).
+//!   with Ansible inside the VM (never on the user's machine), `reboot` with Vagrant's own
+//!   restart (the shell provisioner's `reboot: true`).
 //! - Machines start in dependency order; Vagrant boots and provisions them one after the
 //!   other, so a machine's services are installed before the machines depending on it start.
 //! - Inputs are read from the environment (empty when unset), passed only to the machines
@@ -24,7 +25,7 @@ use indexmap::IndexMap;
 
 use crate::checks;
 use crate::images;
-use crate::model::{Arch, Machine, Spec, Target, VmImpl};
+use crate::model::{Arch, Machine, Spec, Target, VmImpl, is_reboot};
 
 const DIR: &str = "vagrant";
 
@@ -57,9 +58,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             continue;
         }
         for step in &vm.provision {
-            if !(step.ends_with(".sh") || step.ends_with(".yml") || step.ends_with(".yaml")) {
+            if !(step.ends_with(".sh") || step.ends_with(".yml") || step.ends_with(".yaml") || is_reboot(step)) {
                 return Err(unsupported(format!(
-                    "machine `{name}`: provisioning step `{step}` isn't a .sh, .yml or .yaml file"
+                    "machine `{name}`: provisioning step `{step}` isn't a .sh, .yml or .yaml file (or `reboot`)"
                 )));
             }
         }
@@ -314,7 +315,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             };
             let mut ansible_ready = false;
             for step in &vm.provision {
-                if step.ends_with(".sh") {
+                if is_reboot(step) {
+                    // Vagrant restarts the guest and waits until it answers again. What Isoloom
+                    // set up before is kept across it: names, routes and `tc` (boot-time units).
+                    out.push_str("    m.vm.provision \"shell\", name: \"reboot\", reboot: true\n");
+                } else if step.ends_with(".sh") {
                     let _ = writeln!(
                         out,
                         "    m.vm.provision \"shell\", name: {}, inline: {}{env}",

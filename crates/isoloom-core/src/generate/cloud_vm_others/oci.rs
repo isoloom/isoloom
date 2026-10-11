@@ -9,7 +9,7 @@
 
 use std::fmt::Write;
 
-use crate::generate::cloud_vm::{aligned, has_windows, hcl_cmd, linux_setup_cmds, needs_controller, redirects};
+use crate::generate::cloud_vm::{aligned, has_windows, linux_setup_cmds, needs_controller, redirects, remote_exec};
 use crate::generate::proxmox::res;
 use crate::generate::{GeneratedFile, OUTPUT_DIR, address, header, start_order};
 use crate::model::Spec;
@@ -311,11 +311,7 @@ resource "oci_core_instance" "{id}" {{
                 lines.join(", ")
             );
         }
-        let _ = write!(
-            prov,
-            "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
-            cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
-        );
+        prov.push_str(&remote_exec(&cmds));
         let deps: Vec<String> = m
             .depends_on
             .iter()
