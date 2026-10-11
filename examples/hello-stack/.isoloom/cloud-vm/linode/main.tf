@@ -41,6 +41,12 @@ variable "auto_stop_minutes" {
   description = "Shut the machines down after this many minutes (0: never)"
 }
 
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+
 provider "linode" {}
 
 resource "terraform_data" "id" {
@@ -125,7 +131,7 @@ resource "linode_instance" "cache" {
   authorized_keys = [trimspace(var.ssh_public_key)]
   root_pass       = random_password.cache.result
   booted          = true
-  tags            = ["isoloom", "hello-stack"]
+  tags            = concat(["isoloom", "hello-stack", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   metadata {
     user_data = base64encode(var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : "")
   }
@@ -192,7 +198,7 @@ resource "linode_instance" "web" {
   authorized_keys = [trimspace(var.ssh_public_key)]
   root_pass       = random_password.web.result
   booted          = true
-  tags            = ["isoloom", "hello-stack"]
+  tags            = concat(["isoloom", "hello-stack", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   metadata {
     user_data = base64encode(var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : "")
   }

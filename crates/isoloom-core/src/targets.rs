@@ -15,6 +15,8 @@ pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
             Shape::Vm => m.vm.is_none(),
             Shape::Either => m.docker.is_none() && m.vm.is_none(),
             Shape::External => m.external.is_none(),
+            // Cloud services aren't machines: see `derive`.
+            Shape::Cloud => false,
         })
         .map(|(n, _)| n.clone())
         .collect()
@@ -22,8 +24,16 @@ pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
 
 /// Every target the implementations allow, narrowed by the spec's `targets:` when set.
 pub fn derive(spec: &Spec) -> Vec<Target> {
+    // Cloud services run on their own target only; a spec without machines runs nowhere else.
+    if spec.cloud.is_some() {
+        return vec![Target::CloudServices];
+    }
+    if spec.machines.is_empty() {
+        return Vec::new();
+    }
     Target::ALL
         .into_iter()
+        .filter(|t| *t != Target::CloudServices)
         .filter(|t| missing(spec, t.needs()).is_empty())
         .filter(|t| *t != Target::Hybrid || mixed(spec))
         .collect()

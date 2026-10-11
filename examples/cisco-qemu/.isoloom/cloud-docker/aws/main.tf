@@ -40,12 +40,19 @@ variable "auto_stop_minutes" {
   description = "Shut the VM down (and terminate it) after this long; 0 = never"
 }
 
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+
 provider "aws" {
   region = var.region
   default_tags {
     tags = {
       "isoloom:environment" = "cisco-qemu"
       "managed-by"          = "isoloom"
+      "isoloom-expires-at"  = var.expires_at
     }
   }
 }

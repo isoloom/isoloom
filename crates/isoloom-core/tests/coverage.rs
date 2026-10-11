@@ -21,7 +21,7 @@ networks:
   out: { cidr: 10.1.0.0/24, internet: true, docker: { cidr: 10.1.0.0/24 } }
   dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw, docker: { cidr: 10.1.1.0/24 } }
   far: { cidr: 10.1.2.0/24, tc: { delay: 50ms, jitter: 5ms, loss: 0.5, rate: 10mbit } }
-  office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
+  office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, switch: fw, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
 reach: [{ from: out, to: dmz, ports: [80] }]
 inputs: [TOKEN]
 machines:
@@ -41,7 +41,7 @@ machines:
     access: false
     aliases: [api.example.test]
     docker: { image: a, init: [x.sh], idle: true, appliance: cisco-iol, config: r.cfg, firmware: f.bin }
-    vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1", winrm: ssl } }
+    vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1", qemu: x/z, winrm: ssl } }
     external: { address: 192.168.1.2, user: admin, port: 2222, key: ~/.ssh/lab }
   h:
     count: 2
@@ -53,6 +53,7 @@ groups: { g: { members: [fw], arch: amd64 } }
 checks: [c.sh, { name: n, from: fw, http: "http://x/", method: POST, headers: { A: b }, body: x, contains: y, send: z, tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]
 targets: [docker]
 message: hello
+cloud: { provider: aws, terraform: tf, vars: { region: us-east-1 }, outputs: { site: url }, hourly_usd: 0.1 }
 tools: { shell: {}, viewer: { image: x, command: [serve], port: 80, publish: 9000 } }
 "#;
 
