@@ -5,6 +5,9 @@
 ### Per-machine inventory variables
 - `provision[].host_vars`: a machine's name -> its variables, written on its line of the inventory Isoloom generates (local VMs, Proxmox, cloud VMs, external machines), for playbooks that key on per-host values (its domain, a role flag). Values keep their types: each is written as a Python literal, which Ansible's INI inventory reads back (a quoted `"10"` stays a string; lists, maps, booleans and `null` as they are). Validation: every key names a machine, every variable is a valid name. With `groups:` and `vars:`, a spec can now hold a whole Ansible inventory without an inventory file. Example: ansible-pair's cache gets its `maxmemory`.
 
+### `tcp` checks read a greeting
+- `tcp` checks take `contains` (text the bytes read in the first 5 seconds of the connection must contain: a banner, a prompt) and `send` (a line written first, a newline added; end it with `\r` for CRLF), retried for `wait` like any check: proving the right service answers no longer needs a `(sleep 4) | curl telnet://...` script. Rendered with `nc` (busybox in the runner image, the VM's own nc whatever its flavor), else bash's `/dev/tcp`; stdin stays open while reading and nc is stopped after 5 seconds, so nc flavors that quit at the end of stdin or never quit behave the same. hello-stack sends the cache a `PING` and expects `+PONG`. (#73)
+
 ### Typed playbook variables
 - `provision[].vars` takes any YAML value: strings as before, and numbers, booleans, lists and maps, passed to `ansible-playbook` as JSON (`-e`) with their types (a list stays a list, not a string to iterate over). `isoloom run`'s own playbook runs pass them as JSON too (they split values on spaces before). Example: ansible-pair's `tools: [curl, jq]` and `cache_port: 6379`.
 
