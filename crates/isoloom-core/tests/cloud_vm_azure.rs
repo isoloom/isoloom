@@ -26,7 +26,7 @@ fn azure_uses_azurerm_with_static_addresses_and_the_shared_outputs() {
     assert!(tf.contains("source  = \"hashicorp/azurerm\""), "{tf}");
     assert!(tf.contains("version = \"~> 5.0\""), "{tf}");
     assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"web\""));
-    // The launcher contract: a `region` var and ARM_SUBSCRIPTION_ID from the environment.
+    // The module interface (docs/cloud-modules.md): a `region` var and ARM_SUBSCRIPTION_ID from the environment.
     assert!(tf.contains("variable \"region\""), "{tf}");
     assert!(tf.contains("subscription_id = var.subscription_id"), "{tf}");
     assert!(tf.contains("location            = var.region"), "{tf}");
@@ -34,10 +34,10 @@ fn azure_uses_azurerm_with_static_addresses_and_the_shared_outputs() {
     // Every address of the spec is kept: a static private IP at the spec's octet.
     assert!(tf.contains("private_ip_address_allocation = \"Static\""));
     assert!(tf.contains("private_ip_address            = \"10.60.0.10\""), "{tf}");
-    // A static public IP the launcher reaches it on.
+    // A static public IP it is reached on (the `ip` output).
     assert!(tf.contains("resource \"azurerm_public_ip\" \"web\""));
     assert!(tf.contains("allocation_method   = \"Static\""));
-    // The outputs the launcher consumes, identical in name and shape to AWS.
+    // The module outputs (docs/cloud-modules.md), identical in name and shape to AWS.
     assert!(tf.contains("output \"machines\""));
     assert!(tf.contains("output \"ssh_users\""));
     assert!(tf.contains("output \"ip\""));

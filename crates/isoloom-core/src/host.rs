@@ -51,7 +51,7 @@ pub fn run_limited(program: &str, args: &[&str], secs: u64) -> Result<Option<Str
     use std::process::Stdio;
     let mut cmd = Command::new(program);
     cmd.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
-    // On Windows a console program started by a windowed app (a launcher, an IDE) opens a
+    // On Windows a console program started by a windowed app (a desktop app, an IDE) opens a
     // console window of its own: every probe would flash one on screen. Output is piped anyway.
     #[cfg(windows)]
     {
