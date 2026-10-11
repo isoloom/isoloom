@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### A lighter controller, sized by the spec
+- The controller that runs `provision:` playbooks defaults to 1 CPU and 512 MB on every target (it was 1 GB). On local VMs its box is `generic/alpine319` (about 100 MB to download instead of 675 MB, for VirtualBox, libvirt, VMware and Parallels alike): Python, ansible-core and pywinrm install in seconds. Proxmox and the clouds keep their Debian images, at the new size (AWS `t3.micro`, Azure `Standard_B1s`, GCP `e2-small`).
+- `controller:` (top level) sets it like a machine: `image: { vagrant, vagrant_version }` for a box of your own (its setup handles Alpine and Debian), `resources: { cpus, memory_mb, disk_gb }` (disk on Proxmox) for many forks against a large environment. Example: ansible-pair gives it 768 MB.
+
 ### The project goes into VMs as an archive
 - The Vagrant outputs (vagrant, hybrid, docker-vm) copied the project with one `file` provisioner per top-level entry, listed when the Vagrantfile loaded: the copy followed symbolic links, so a vendored tree with a link loop failed it (`Too many levels of symbolic links`) and Vagrant destroyed the VM, and an entry deleted during `vagrant up` failed it too. A VM's `project` step is now Isoloom's own provisioner (`isoloom_project`, defined in the Vagrantfile): a tar.gz of the project as it is when the step runs, written by Vagrant's own Ruby (no `tar` needed on the host, Windows included), symbolic links kept as links, unpacked in /opt/isoloom. `.git`, `.vagrant` and `.terraform` stay out at any depth (a `.vagrant` holds private keys). (#67, #63)
 
