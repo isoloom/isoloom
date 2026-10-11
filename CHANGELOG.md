@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `import compose` reads keys set twice
+- A key set twice in one mapping (secDevLabs camplake-api's `environment` sets `MONGO_PORT` twice) no longer stops `isoloom import compose` with `duplicate entry`: the last value is kept, as Compose does, and the draft's "Changed on the way in" notes say which key, where, and the value kept. (#68)
+
 ### A Cisco switch for a LAN
 - `switch: <machine>` on a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance: cisco-iol-l2` or `cisco-vios-l2`) switches the LAN instead of Isoloom's Linux switch container, so frames between a VLAN and a trunk cross real IOS. The machine lists no `networks`: its data ports are an access port on each VLAN's network (in VLAN order, at the controller address, unused on Docker), then a trunk port on each trunk machine's link. Isoloom's startup configuration declares the VLANs (`vtp mode transparent`, `vlan <id>` named after the network) and sets each port (`switchport mode access` + `access vlan`, or `trunk encapsulation dot1q` + `mode trunk` + `allowed vlan`); the machine's own `config` follows. Trunk machines are unchanged; their sidecar waits for the switch to start (IOS reports no readiness: checks through it `wait` for it to boot). Validated: a switch kind, no `networks`, `services` or `aliases` of its own, one LAN per switch, no `count`, no machine on the LAN directly. Docker targets only, like every appliance. Example: cisco-switch.
 
