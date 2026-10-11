@@ -26,6 +26,7 @@ use indexmap::IndexMap;
 use crate::checks;
 use crate::images;
 use crate::model::{Arch, Machine, Spec, Target, VmImpl, is_reboot};
+use crate::shell;
 
 const DIR: &str = "vagrant";
 
@@ -1150,7 +1151,7 @@ pub(super) fn ansible_runs(spec: &Spec, limit: &[String]) -> String {
     let limit = if limit.is_empty() {
         String::new()
     } else {
-        format!(" --limit {}", shell_quote(&limit.join(",")))
+        format!(" --limit {}", shell::quote(&limit.join(",")))
     };
     // Performance: gather facts once and cache them (the WinRM `setup` module is slow and the
     // environment playbooks re-run across many imported plays), fan out across hosts (default
@@ -1169,7 +1170,7 @@ pub(super) fn ansible_runs(spec: &Spec, limit: &[String]) -> String {
         let vars = if step.vars.is_empty() {
             String::new()
         } else {
-            format!(" -e {}", shell_quote(&serde_json::to_string(&step.vars).expect("JSON values serialize")))
+            format!(" -e {}", shell::quote(&serde_json::to_string(&step.vars).expect("JSON values serialize")))
         };
         let requirements = match &step.requirements {
             Some(r) => format!("retry_download ansible-galaxy install -r /opt/isoloom/{r}\n"),
@@ -1222,11 +1223,6 @@ run_play() {
   done
 }
 "#;
-
-/// A single-quoted shell word.
-fn shell_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
 
 #[cfg(test)]
 mod retry_tests {

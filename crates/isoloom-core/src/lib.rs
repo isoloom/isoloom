@@ -23,6 +23,7 @@ pub mod model;
 pub mod registry;
 pub mod report;
 pub mod schema;
+pub mod shell;
 pub mod targets;
 pub mod validate;
 pub mod vlans;
