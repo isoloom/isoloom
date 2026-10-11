@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### `import compose` reads keys set twice
+- A key set twice in one mapping (secDevLabs camplake-api's `environment` sets `MONGO_PORT` twice) no longer stops `isoloom import compose` with `duplicate entry`: the last value is kept, as Compose does, and the draft's "Changed on the way in" notes say which key, where, and the value kept. (#68)
+
 ## 0.10.1
 
 ### Google Cloud: long environment names

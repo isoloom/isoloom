@@ -259,10 +259,122 @@ fn yaml_str(s: &str) -> String {
     format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
+/// A key set twice in one mapping: where, which key, and the value kept (the last).
+struct Duplicate {
+    at: String,
+    key: String,
+    kept: String,
+}
+
+/// Reads YAML the way Compose does: a key set twice in one mapping keeps its last value
+/// (serde_yaml_ng refuses the file instead). Every such key is recorded with where it was.
+fn lenient_yaml(text: &str) -> Result<(Value, Vec<Duplicate>), serde_yaml_ng::Error> {
+    use serde::de::DeserializeSeed;
+    let dups = std::cell::RefCell::new(Vec::new());
+    let value = Lenient {
+        at: String::new(),
+        dups: &dups,
+    }
+    .deserialize(serde_yaml_ng::Deserializer::from_str(text))?;
+    Ok((value, dups.into_inner()))
+}
+
+/// A YAML value at a path (`services.api.environment`), tolerating duplicate keys below it.
+struct Lenient<'a> {
+    at: String,
+    dups: &'a std::cell::RefCell<Vec<Duplicate>>,
+}
+
+impl<'de> serde::de::DeserializeSeed<'de> for Lenient<'_> {
+    type Value = Value;
+    fn deserialize<D: serde::Deserializer<'de>>(self, d: D) -> Result<Value, D::Error> {
+        d.deserialize_any(self)
+    }
+}
+
+impl<'de> serde::de::Visitor<'de> for Lenient<'_> {
+    type Value = Value;
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("any YAML value")
+    }
+    fn visit_bool<E>(self, b: bool) -> Result<Value, E> {
+        Ok(Value::Bool(b))
+    }
+    fn visit_i64<E>(self, i: i64) -> Result<Value, E> {
+        Ok(Value::Number(i.into()))
+    }
+    fn visit_u64<E>(self, u: u64) -> Result<Value, E> {
+        Ok(Value::Number(u.into()))
+    }
+    fn visit_f64<E>(self, f: f64) -> Result<Value, E> {
+        Ok(Value::Number(f.into()))
+    }
+    fn visit_str<E>(self, s: &str) -> Result<Value, E> {
+        Ok(Value::String(s.to_owned()))
+    }
+    fn visit_string<E>(self, s: String) -> Result<Value, E> {
+        Ok(Value::String(s))
+    }
+    fn visit_unit<E>(self) -> Result<Value, E> {
+        Ok(Value::Null)
+    }
+    fn visit_none<E>(self) -> Result<Value, E> {
+        Ok(Value::Null)
+    }
+    fn visit_some<D: serde::Deserializer<'de>>(self, d: D) -> Result<Value, D::Error> {
+        d.deserialize_any(self)
+    }
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Value, A::Error> {
+        let mut items = Vec::new();
+        while let Some(item) = seq.next_element_seed(Lenient {
+            at: format!("{}.{}", self.at, items.len()),
+            dups: self.dups,
+        })? {
+            items.push(item);
+        }
+        Ok(Value::Sequence(items))
+    }
+    fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Value, A::Error> {
+        let mut mapping = Mapping::new();
+        while let Some(key) = map.next_key::<Value>()? {
+            let name = str_of(&key).unwrap_or_else(|| flat(&key));
+            let at = if self.at.is_empty() { name.clone() } else { format!("{}.{name}", self.at) };
+            let value = map.next_value_seed(Lenient { at, dups: self.dups })?;
+            if mapping.contains_key(&key) {
+                // Compose keeps the last one; so does `insert`, in the first one's place.
+                let mut dups = self.dups.borrow_mut();
+                let kept = flat(&value);
+                match dups.iter_mut().find(|d| d.at == self.at && d.key == name) {
+                    Some(d) => d.kept = kept,
+                    None => dups.push(Duplicate {
+                        at: self.at.clone(),
+                        key: name,
+                        kept,
+                    }),
+                }
+            }
+            mapping.insert(key, value);
+        }
+        Ok(Value::Mapping(mapping))
+    }
+    fn visit_enum<A: serde::de::EnumAccess<'de>>(self, data: A) -> Result<Value, A::Error> {
+        use serde::de::{Error, VariantAccess};
+        let (tag, contents) = data.variant::<String>()?;
+        if tag.is_empty() {
+            return Err(A::Error::custom("empty YAML tag is not allowed"));
+        }
+        let value = contents.newtype_variant_seed(self)?;
+        Ok(Value::Tagged(Box::new(serde_yaml_ng::value::TaggedValue {
+            tag: serde_yaml_ng::value::Tag::new(tag),
+            value,
+        })))
+    }
+}
+
 /// Drafts a spec from Compose YAML. `fallback_name` names the environment when the file
 /// doesn't (usually its folder); `source` is how the file is named in the draft's header.
 pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Draft, String> {
-    let doc: Value = serde_yaml_ng::from_str(compose_yaml).map_err(|e| format!("not a Compose file: {e}"))?;
+    let (doc, dups) = lenient_yaml(compose_yaml).map_err(|e| format!("not a Compose file: {e}"))?;
     let root = doc.as_mapping().ok_or("not a Compose file: expected a mapping")?;
     let services = root
         .get("services")
@@ -270,6 +382,16 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         .filter(|s| !s.is_empty())
         .ok_or("the Compose file has no services")?;
     let mut notes = Vec::new();
+    for d in dups {
+        let at = if d.at.is_empty() { d.key.clone() } else { d.at };
+        let kept = if d.kept.is_empty() { String::new() } else { format!(" (`{}`)", d.kept) };
+        note(
+            &mut notes,
+            at,
+            NoteKind::Changed,
+            format!("`{}` is set more than once; the last value{kept} is kept, as Compose does", d.key),
+        );
+    }
 
     // Top level.
     let name = root.get("name").and_then(str_of).map(|n| label(&n)).unwrap_or_else(|| label(fallback_name));
