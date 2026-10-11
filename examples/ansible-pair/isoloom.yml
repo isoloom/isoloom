@@ -41,6 +41,9 @@ provision:
       # Any YAML value: lists, numbers and booleans keep their types.
       tools: [curl, jq]
       cache_port: 6379
+    # Per machine, on its inventory line.
+    host_vars:
+      cache: { maxmemory: 64mb }
 
 checks:
   - checks/web-answers.sh
