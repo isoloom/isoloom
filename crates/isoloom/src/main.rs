@@ -122,6 +122,21 @@ enum Command {
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
     },
+    /// Back to the environment as it came up, everything done in it since gone (files dropped,
+    /// users added, databases changed): VMs restore the baseline snapshot `run` saved; without
+    /// one, and on the other targets, the environment is torn down and run again (Docker: fresh
+    /// containers and volumes from the same images).
+    Reset {
+        target: Option<String>,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        #[arg(long)]
+        cloud: Option<String>,
+        #[arg(long, value_name = "N")]
+        instance: Option<u8>,
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
+    },
     /// Tear down what `run` started for a target (the inverse tool: compose down, vagrant
     /// destroy, kubectl delete, or terraform destroy).
     Down {
@@ -170,6 +185,17 @@ enum Command {
         /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
+    },
+    /// Docker leftovers of environments: networks and volumes labelled by Isoloom whose Compose
+    /// project has no container left, and (with --images) built images no container uses.
+    /// Lists them; `--yes` removes them. Never touches containers or unlabelled resources.
+    Gc {
+        /// Remove what is listed.
+        #[arg(long)]
+        yes: bool,
+        /// Also built images that no container uses (they are rebuilt or pulled on the next run).
+        #[arg(long)]
+        images: bool,
     },
     /// The environments `run` brought up on this host, with their live state.
     Status {
@@ -608,7 +634,11 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                     }
                 } else {
                     let lacking = core::targets::missing(&spec, t.needs());
-                    let why = if !lacking.is_empty() {
+                    let why = if spec.cloud.is_some() && t != core::Target::CloudServices {
+                        "cloud services run on `cloud-services` only".to_string()
+                    } else if t == core::Target::CloudServices {
+                        "needs `cloud:` (cloud services instead of machines)".to_string()
+                    } else if !lacking.is_empty() {
                         format!("needs `{}:` on {}", t.needs().key(), lacking.join(", "))
                     } else if t == core::Target::Hybrid && !core::targets::mixed(&spec) {
                         "only when some machines are containers and others are VMs".to_string()
@@ -696,6 +726,13 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             instance,
             sets,
         } => run_cmd(&dir, target.as_deref(), cloud.as_deref(), None, instance, &sets, true),
+        Command::Reset {
+            target,
+            dir,
+            cloud,
+            instance,
+            sets,
+        } => reset_cmd(&dir, target.as_deref(), cloud.as_deref(), instance, &sets),
         Command::Test {
             target,
             dir,
@@ -720,6 +757,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             },
         ),
         Command::Status { json, cleanup } => lifecycle::status(json, cleanup.as_deref(), None),
+        Command::Gc { yes, images } => lifecycle::gc(yes, images),
         Command::Connect {
             machine,
             dir,
@@ -1161,6 +1199,168 @@ fn load_settings(
     Ok((spec, settings))
 }
 
+/// Temporary AWS credentials from the AWS CLI's own session (`aws login`, SSO), for Terraform,
+/// which reads only keys, profiles with keys and SSO: nothing when keys are already set or the CLI
+/// has no session. Never written anywhere; the child process gets them in its environment.
+fn aws_session_env() -> Vec<(String, String)> {
+    if std::env::var_os("AWS_ACCESS_KEY_ID").is_some() {
+        return Vec::new();
+    }
+    let Ok(out) = std::process::Command::new("aws")
+        .args(["configure", "export-credentials", "--format", "env-no-export"])
+        .stderr(std::process::Stdio::null())
+        .output()
+    else {
+        return Vec::new();
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| l.split_once('='))
+        .filter(|(k, _)| k.starts_with("AWS_"))
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
+}
+
+/// A cloud-services environment's outputs, by the spec's names: `outputs.sh` read (empty when
+/// it isn't deployed or Terraform can't say).
+fn cloud_outputs(dir: &std::path::Path, instance: Option<u8>) -> indexmap::IndexMap<String, String> {
+    let script = dir.join(core::instance::output_dir(instance)).join("cloud-services/outputs.sh");
+    let Ok(out) = std::process::Command::new("sh")
+        .arg(&script)
+        .envs(aws_session_env())
+        .stderr(std::process::Stdio::null())
+        .output()
+    else {
+        return Default::default();
+    };
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
+    let Ok((spec, _)) = load_settings(dir, None, &[]) else {
+        return Default::default();
+    };
+    let Some(cloud) = &spec.cloud else { return Default::default() };
+    cloud
+        .outputs
+        .iter()
+        .filter_map(|(name, output)| {
+            let v = &json[output]["value"];
+            let text = v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
+            (!v.is_null()).then(|| (name.clone(), text))
+        })
+        .collect()
+}
+
+/// `isoloom test cloud-services`: the spec's checks, its `{{ cloud.outputs.<name> }}` filled in
+/// from the deployed module, run from this machine (scripts get each output as
+/// `ISOLOOM_OUTPUT_<NAME>`). No derived checks: cloud services have no machines.
+fn cloud_test(spec: &core::Spec, dir: &std::path::Path, instance: Option<u8>, _no_derived: bool, json: bool) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let outputs = cloud_outputs(dir, instance);
+    if outputs.is_empty() && spec.cloud.as_ref().is_some_and(|c| !c.outputs.is_empty()) {
+        return Err("no outputs: the services aren't deployed (`isoloom run cloud-services`)".into());
+    }
+    let filled = spec.with_cloud_outputs(&outputs);
+    let plan: Vec<_> = core::checks::plan(&filled).into_iter().filter(|c| !c.derived).collect();
+    if plan.is_empty() {
+        println!("nothing to check: no `checks:` in the spec");
+        return Ok(ExitCode::SUCCESS);
+    }
+    let group: Vec<&core::checks::Resolved> = plan.iter().collect();
+    let host = |h: &core::checks::Host, _: &core::checks::Position| match h {
+        core::checks::Host::Literal(l) => l.clone(),
+        core::checks::Host::Machine { name, .. } => name.clone(),
+    };
+    let run_script = |path: &str| format!("sh {path}");
+    let render = core::checks::Render {
+        host: &host,
+        script: &run_script,
+        playbook: None,
+    };
+    let script = core::checks::script(&core::checks::Position::Networks, &group, &render);
+    let mut c = std::process::Command::new("sh");
+    c.envs(aws_session_env());
+    c.args(["-c", &script]).current_dir(dir);
+    for (k, v) in &outputs {
+        c.env(format!("ISOLOOM_OUTPUT_{}", k.to_uppercase().replace('-', "_")), v);
+    }
+    let out = c.output()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let (mut passed, mut failed) = (0, 0);
+    let mut results = Vec::new();
+    for line in text.lines() {
+        match core::checks::parse_line(line) {
+            Some(core::checks::Line::Pass(n)) => {
+                passed += 1;
+                results.push(serde_json::json!({ "name": n, "ok": true }));
+                if !json {
+                    println!("  ✓ {n}");
+                }
+            }
+            Some(core::checks::Line::Fail(n, why)) => {
+                failed += 1;
+                results.push(serde_json::json!({ "name": n, "ok": false, "detail": why }));
+                if !json {
+                    println!("  ✗ {n}: {why}");
+                }
+            }
+            _ => {}
+        }
+    }
+    if json {
+        println!("{}", serde_json::to_string_pretty(&results)?);
+    } else {
+        println!("\n{passed} passed{}", if failed > 0 { format!(", {failed} failed") } else { String::new() });
+    }
+    Ok(if failed > 0 || !out.status.success() && passed == 0 {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
+/// The baseline snapshot of a Vagrant environment: saved by `run`, restored by `reset`.
+const BASELINE: &str = "isoloom-baseline";
+
+/// See `isoloom reset`.
+fn reset_cmd(
+    dir: &std::path::Path,
+    target: Option<&str>,
+    cloud: Option<&str>,
+    instance: Option<u8>,
+    sets: &[String],
+) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let (_, abs_dir, t, _) = prepare(dir, target, None, instance, sets)?;
+    if t == core::Target::Vagrant {
+        let vdir = abs_dir.join(core::instance::output_dir(instance)).join("vagrant");
+        let has_baseline = std::process::Command::new("vagrant")
+            .args(["snapshot", "list"])
+            .current_dir(&vdir)
+            .output()
+            .ok()
+            .is_some_and(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).lines().any(|l| l.trim() == BASELINE));
+        if has_baseline {
+            eprintln!("Restoring the baseline snapshot ({BASELINE}) of every machine");
+            let ok = std::process::Command::new("vagrant")
+                .args(["snapshot", "restore", "--no-provision", BASELINE])
+                .current_dir(&vdir)
+                .status()
+                .is_ok_and(|s| s.success());
+            if ok {
+                return Ok(ExitCode::SUCCESS);
+            }
+            eprintln!("note: restoring the snapshot failed; tearing down and running again");
+        } else {
+            eprintln!("No baseline snapshot (an older run, or ISOLOOM_NO_BASELINE): tearing down and running again");
+        }
+    }
+    let down = run_cmd(dir, target, cloud, None, instance, sets, true)?;
+    if down != ExitCode::SUCCESS {
+        return Ok(down);
+    }
+    run_cmd(dir, target, cloud, None, instance, sets, false)
+}
+
 fn run_cmd(
     dir: &std::path::Path,
     target: Option<&str>,
@@ -1173,7 +1373,8 @@ fn run_cmd(
     let (spec, dir, t, defaults) = prepare(dir, target, images, instance, sets)?;
     let dir = &dir;
     if !down {
-        let ready = core::host::check(t, cloud.or((t == core::Target::CloudVm).then_some("aws")));
+        let own = spec.cloud.as_ref().map(|c| c.provider.id());
+        let ready = core::host::check(t, cloud.or(own).or((t == core::Target::CloudVm).then_some("aws")));
         if !ready.ready {
             return Err(format!(
                 "this machine can't run `{}` yet: {} (see `isoloom doctor`)",
@@ -1199,7 +1400,43 @@ fn run_cmd(
         args.extend(["--provider".to_string(), p.clone()]);
     }
     eprintln!("{} {} ({})", if down { "Tearing down" } else { "Running" }, t.id(), wd.display());
-    let status = std::process::Command::new(&program).args(&args).current_dir(&wd).status();
+    // Cloud services taking launch-time inputs: from the environment at `run`, written next to
+    // the state so `down` destroys with the same values.
+    if t == core::Target::CloudServices
+        && !down
+        && let Some(c) = &spec.cloud
+    {
+        let mut values = serde_json::Map::new();
+        let mut missing = Vec::new();
+        for (k, v) in &c.vars {
+            if let Some(i) = core::CloudServices::input_of(v) {
+                match std::env::var(i) {
+                    Ok(val) if !val.is_empty() => {
+                        values.insert(k.clone(), serde_json::Value::String(val));
+                    }
+                    _ => missing.push(i.to_string()),
+                }
+            }
+        }
+        if !missing.is_empty() {
+            return Err(format!("set {} in the environment (the services take them at launch)", missing.join(", ")).into());
+        }
+        if !values.is_empty() {
+            let file = wd.join("inputs.tfvars.json");
+            std::fs::write(&file, serde_json::to_string_pretty(&serde_json::Value::Object(values))?)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600))?;
+            }
+        }
+    }
+    let mut cmd = std::process::Command::new(&program);
+    cmd.args(&args).current_dir(&wd);
+    if matches!(t, core::Target::CloudServices | core::Target::CloudVm | core::Target::CloudDocker) {
+        cmd.envs(aws_session_env());
+    }
+    let status = cmd.status();
     match status {
         Ok(s) if s.success() => {
             // Remember what is up on this host, for status / connect / exec / capture.
@@ -1221,8 +1458,24 @@ fn run_cmd(
             if let Err(e) = recorded {
                 eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
             }
+            // VMs: a baseline snapshot of the environment as it came up, for `isoloom reset`.
+            if !down && t == core::Target::Vagrant && std::env::var_os("ISOLOOM_NO_BASELINE").is_none() {
+                eprintln!("Saving the baseline snapshot ({BASELINE}) for `isoloom reset`");
+                let saved = std::process::Command::new("vagrant")
+                    .args(["snapshot", "save", "--force", BASELINE])
+                    .current_dir(&wd)
+                    .status()
+                    .is_ok_and(|s| s.success());
+                if !saved {
+                    eprintln!("note: no baseline snapshot (the provider may not support snapshots); `reset` will rebuild");
+                }
+            }
             // The spec's message, now that the environment is up.
-            if !down && let Ok(Some(m)) = core::resolved::render_message_at(&spec, instance, t, &real_ports(dir, t, instance)) {
+            if !down && t == core::Target::CloudServices {
+                if let Some(m) = &spec.cloud_message(&cloud_outputs(dir, instance)) {
+                    println!("\n{}", m.trim_end());
+                }
+            } else if !down && let Ok(Some(m)) = core::resolved::render_message_at(&spec, instance, t, &real_ports(dir, t, instance)) {
                 println!("\n{}", m.trim_end());
             }
             Ok(ExitCode::SUCCESS)
@@ -1274,6 +1527,9 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
         sets,
     } = opts;
     let (spec, dir, t, _) = prepare(dir, target, images, instance, sets)?;
+    if t == core::Target::CloudServices {
+        return cloud_test(&spec, &dir, instance, no_derived, json);
+    }
     let plan = checks::plan(&spec);
     let expected: Vec<&checks::Resolved> = plan.iter().filter(|c| !(no_derived && c.derived)).collect();
     if expected.is_empty() {
@@ -1303,6 +1559,8 @@ fn test_cmd(dir: &std::path::Path, target: Option<&str>, opts: TestOpts) -> Resu
     // A manifest written for this run (Kubernetes with --no-derived), removed at the end.
     let mut temp: Option<PathBuf> = None;
     match t {
+        // Handled before (cloud_test): no machines, no runners.
+        core::Target::CloudServices => unreachable!("cloud services are tested by cloud_test"),
         core::Target::Docker | core::Target::Hosted => {
             let files = lifecycle::compose_files(&dir, instance);
             // The runners run with --no-deps: the environment is up, and `compose run` would
@@ -1865,6 +2123,8 @@ fn bring_up(
         // Nothing to create or destroy: `run` provisions over SSH (see lifecycle::external_up),
         // `down` only forgets the environment.
         core::Target::External => (s("true"), vec![], dir.to_path_buf()),
+        // The generated scripts run Terraform on the project's module (see generate::cloud_services).
+        core::Target::CloudServices => (s("sh"), vec![s(if down { "down.sh" } else { "up.sh" })], out.join("cloud-services")),
     })
 }
 

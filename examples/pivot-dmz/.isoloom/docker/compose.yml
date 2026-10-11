@@ -43,9 +43,15 @@ services:
       timeout: 3s
       retries: 60
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   gateway:
     build:
       context: ../../build/gateway
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: pivot-dmz
     image: isoloom/pivot-dmz-gateway
     platform: linux/amd64
     hostname: gateway
@@ -75,6 +81,8 @@ services:
     labels:
       isoloom.service.80: tcp:80
       isoloom.service.22: tcp:22
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
     restart: unless-stopped
   gateway-routes:
     image: alpine:3.20
@@ -98,9 +106,15 @@ services:
       isoloom-router:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   app:
     build:
       context: ../../build/app
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: pivot-dmz
     image: isoloom/pivot-dmz-app
     platform: linux/amd64
     hostname: app
@@ -127,6 +141,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.8080: tcp:8080
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
     restart: unless-stopped
   app-routes:
     image: alpine:3.20
@@ -150,6 +166,9 @@ services:
       isoloom-router:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   db:
     image: postgres:16
     platform: linux/amd64
@@ -177,6 +196,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.5432: tcp:5432
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
     restart: unless-stopped
   db-routes:
     image: alpine:3.20
@@ -200,6 +221,9 @@ services:
       isoloom-router:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   isoloom-access:
     image: alpine:3.20
     hostname: user
@@ -215,6 +239,9 @@ services:
     - infinity
     profiles:
     - check
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   isoloom-access-routes:
     image: alpine:3.20
     network_mode: service:isoloom-access
@@ -239,6 +266,9 @@ services:
     restart: unless-stopped
     profiles:
     - check
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -267,6 +297,9 @@ services:
         condition: service_started
       isoloom-access-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   isoloom-check-gateway:
     image: curlimages/curl:8.11.1
     profiles:
@@ -290,6 +323,9 @@ services:
         condition: service_healthy
       db-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   isoloom-check-app:
     image: curlimages/curl:8.11.1
     profiles:
@@ -313,6 +349,9 @@ services:
         condition: service_healthy
       db-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   isoloom-check-db:
     image: curlimages/curl:8.11.1
     profiles:
@@ -336,6 +375,9 @@ services:
         condition: service_healthy
       db-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -347,21 +389,36 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
 networks:
   dmz:
     ipam:
       config:
       - subnet: 10.30.10.0/24
         gateway: 10.30.10.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   internal:
     ipam:
       config:
       - subnet: 10.30.20.0/24
         gateway: 10.30.20.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
   access:
     ipam:
       config:
       - subnet: 10.30.99.0/24
         gateway: 10.30.99.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: pivot-dmz

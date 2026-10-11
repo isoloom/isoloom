@@ -49,6 +49,12 @@ variable "auto_stop_minutes" {
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
 }
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
 variable "inputs" {
   type        = map(string)
   default     = {}
@@ -157,6 +163,8 @@ resource "google_compute_instance" "database" {
   labels = {
     "isoloom-environment" = "supplier-portal-api"
     "managed-by"          = "isoloom"
+    "isoloom-instance"   = local.name
+    "isoloom-expires-at" = var.expires_at
   }
 }
 
@@ -258,6 +266,8 @@ resource "google_compute_instance" "web" {
   labels = {
     "isoloom-environment" = "supplier-portal-api"
     "managed-by"          = "isoloom"
+    "isoloom-instance"   = local.name
+    "isoloom-expires-at" = var.expires_at
   }
 }
 

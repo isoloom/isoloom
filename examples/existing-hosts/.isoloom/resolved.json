@@ -124,7 +124,8 @@
       "docker-vm": "needs `docker:` on web, cache",
       "cloud-docker": "needs `docker:` on web, cache",
       "kubernetes": "needs `docker:` on web, cache",
-      "hybrid": "only when some machines are containers and others are VMs"
+      "hybrid": "only when some machines are containers and others are VMs",
+      "cloud-services": "left out by `targets:`"
     }
   },
   "checks": {

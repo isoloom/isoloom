@@ -143,8 +143,43 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
 
     // Networks: valid, private, sized /24 to /29, not overlapping each other.
     let mut cidrs: Vec<(String, Cidr)> = Vec::new();
-    if spec.networks.is_empty() {
+    if spec.networks.is_empty() && spec.cloud.is_none() {
         add("networks", "declare at least one network".into());
+    }
+    // Cloud services: a module and what it exposes, no machines.
+    if let Some(c) = &spec.cloud {
+        if !spec.machines.is_empty() {
+            add(
+                "cloud",
+                "an environment is cloud services or machines, not both (yet): leave `machines` out".into(),
+            );
+        }
+        if c.terraform.trim().is_empty() {
+            add("cloud.terraform", "the Terraform module's folder, in the project".into());
+        }
+        let ident = |s: &str| {
+            !s.is_empty() && s.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-') && !s.starts_with(|ch: char| ch.is_ascii_digit())
+        };
+        for k in c.vars.keys() {
+            if !ident(k) {
+                add(&format!("cloud.vars.{k}"), format!("`{k}` isn't a Terraform variable name"));
+            }
+        }
+        for (k, o) in &c.outputs {
+            if !ident(k) || !ident(o) {
+                add(&format!("cloud.outputs.{k}"), format!("`{k}: {o}`: a name, then the module output it reads"));
+            }
+        }
+        for (k, v) in &c.vars {
+            if let Some(i) = crate::model::CloudServices::input_of(v)
+                && !spec.inputs.iter().any(|d| d == i)
+            {
+                add(&format!("cloud.vars.{k}"), format!("`{i}` isn't declared in the spec's `inputs`"));
+            }
+        }
+        if c.hourly_usd.is_some_and(|h| !(0.0..=1000.0).contains(&h)) {
+            add("cloud.hourly_usd", "a cost per hour in US dollars (0 to 1000)".into());
+        }
     }
     for (name, net) in &spec.networks {
         let at = format!("networks.{name}");
@@ -229,7 +264,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     }
 
     // Machines.
-    if spec.machines.is_empty() {
+    if spec.machines.is_empty() && spec.cloud.is_none() {
         add("machines", "declare at least one machine".into());
     }
     let mut taken: HashMap<(String, u8), String> = HashMap::new();
@@ -729,6 +764,19 @@ pub fn starts_after<'a>(spec: &'a Spec, name: &str, m: &'a crate::model::Machine
 /// Checks that every path the spec mentions exists in the project folder.
 pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     let mut p = Vec::new();
+    // A cloud-services module is a folder of .tf files.
+    let mut module_problem = None;
+    if let Some(c) = &spec.cloud {
+        let tf = std::fs::read_dir(lab_dir.join(&c.terraform))
+            .map(|d| d.flatten().any(|e| e.path().extension().is_some_and(|x| x == "tf")))
+            .unwrap_or(false);
+        if !tf && lab_dir.join(&c.terraform).is_dir() {
+            module_problem = Some(Problem {
+                at: "cloud.terraform".into(),
+                message: format!("`{}` holds no .tf file: it must be a Terraform root module", c.terraform),
+            });
+        }
+    }
     let mut check = |at: String, path: &str| {
         if path.starts_with('/') || path.split('/').any(|s| s == "..") {
             p.push(Problem {
@@ -742,6 +790,9 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
             });
         }
     };
+    if let Some(c) = &spec.cloud {
+        check("cloud.terraform".into(), &c.terraform);
+    }
     for (name, m) in &spec.machines {
         if let Some(d) = &m.docker {
             if let Some(b) = &d.build {
@@ -784,6 +835,7 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
             check(at, path);
         }
     }
+    p.extend(module_problem);
     p
 }
 
@@ -839,7 +891,9 @@ fn validate_check(spec: &Spec, i: usize, d: &crate::model::Declared, add: &mut d
         add(&format!("{at}.method"), format!("`{m}` isn't an HTTP method like GET or POST"));
     }
     if let Some(u) = &d.http {
-        if Url::parse(u).is_none() {
+        // A cloud-services output is only known once the services are deployed.
+        let output = spec.cloud.is_some() && u.contains("{{ cloud.outputs.");
+        if !output && Url::parse(u).is_none() {
             add(&format!("{at}.http"), format!("`{u}` isn't a URL like http://web:8080/path"));
         }
         match &d.expect {

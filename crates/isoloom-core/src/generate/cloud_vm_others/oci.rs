@@ -100,6 +100,12 @@ variable "auto_stop_minutes" {
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
 }
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
 "#,
     );
     if !spec.inputs.is_empty() {

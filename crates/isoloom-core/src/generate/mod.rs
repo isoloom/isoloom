@@ -6,10 +6,11 @@ mod appliances;
 /// The network appliances' management network (see `docker.appliance`).
 pub const APPLIANCE_MGMT_CIDR: &str = appliances::MGMT_CIDR;
 mod cloud_docker;
+mod cloud_services;
 mod cloud_vm;
 mod cloud_vm_others;
 mod docker;
-pub use docker::{StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
+pub use docker::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
 mod docker_vm;
 mod external;
 mod hybrid;
@@ -19,6 +20,7 @@ pub mod resolved;
 mod router;
 mod trunks;
 mod vagrant;
+pub use vagrant::qemu_refusal;
 
 use std::fmt;
 use std::net::Ipv4Addr;
@@ -78,6 +80,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
     Target::Proxmox,
     Target::CloudVm,
     Target::External,
+    Target::CloudServices,
 ];
 
 /// The files for one target.
@@ -138,6 +141,7 @@ fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
         Target::Proxmox => proxmox::generate(spec),
         Target::CloudVm => cloud_vm::generate(spec),
         Target::External => external::generate(spec),
+        Target::CloudServices => cloud_services::generate(spec),
     }
 }
 
@@ -178,6 +182,13 @@ fn arm64_machine(spec: &Spec) -> Option<&str> {
         .filter(|(_, m)| m.docker.is_some() || m.vm.is_some())
         .find(|(_, m)| m.arch == crate::model::Arch::Arm64)
         .map(|(n, _)| n.as_str())
+}
+
+/// A Google Cloud project's display name: `isoloom-<environment>`, cut to the 30 characters
+/// Google allows (a longer one fails at plan time), without a trailing hyphen.
+pub(crate) fn gcp_project_name(env: &str) -> String {
+    let full = format!("isoloom-{env}");
+    full.chars().take(30).collect::<String>().trim_end_matches('-').to_string()
 }
 
 fn header(comment: &str) -> String {
@@ -355,4 +366,17 @@ fn on_docker(spec: &Spec) -> Spec {
         n.cidr = format!("{}/{}", Ipv4Addr::from(c.base), c.len);
     }
     s
+}
+
+#[cfg(test)]
+mod gcp_project_name_tests {
+    #[test]
+    fn fits_google_limit() {
+        assert_eq!(super::gcp_project_name("web"), "isoloom-web");
+        let long = super::gcp_project_name("google-ctf-2020-log-me-in");
+        assert_eq!(long, "isoloom-google-ctf-2020-log-me");
+        assert!(long.len() <= 30);
+        // Never ends on a hyphen once cut.
+        assert_eq!(super::gcp_project_name("abcdefghijklmnopqrstu-wxyz"), "isoloom-abcdefghijklmnopqrstu");
+    }
 }

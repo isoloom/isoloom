@@ -1,6 +1,42 @@
 # Changelog
 
-## Unreleased
+## 0.10.1
+
+### Google Cloud: long environment names
+- The project Isoloom creates on Google Cloud is named `isoloom-<environment>` cut to 30 characters, Google's limit: an environment named over 22 characters failed at plan time (`terraform validate` too).
+
+## 0.10.0
+
+### Cloud services: typed variables, launch-time inputs
+- `cloud.vars` take any value (strings, numbers, booleans, lists, maps), and a variable whose value is exactly `{{ inputs.NAME }}` takes the launch-time input `NAME` (declared in `inputs`): `run` reads it from the environment (and refuses without it), writes it next to the state (mode 0600) and `down` destroys with the same values. For a player's IP in an allow-list (CloudGoat). (#98)
+
+### Cloud services
+- An environment can be cloud services instead of machines: `cloud: { provider, terraform, vars, outputs, hourly_usd }` names a Terraform root module in the project, applied into the user's own AWS, Azure or Google Cloud account by the new `cloud-services` target. `run` and `down` apply and destroy it (state and plugins under `.isoloom/cloud-services/`, the module untouched), `test` fills `{{ cloud.outputs.<name> }}` into the checks and runs them from here (scripts get `ISOLOOM_OUTPUT_<NAME>`), the message too, and `status` counts the deployed resources. Example: cloud-bucket (a public S3 website). Run against a real AWS account: cloud-bucket and 13 AWS labs (AWSGoat, CloudGoat scenarios, CloudFoxable, iam-vulnerable, sadcloud) applied, tested and destroyed. (#96)
+
+### Cloud resources say which instance they are, and when they end
+- Every cloud module takes `expires_at` (Unix seconds; empty by default) and tags what it creates with the environment, the instance (`isoloom-instance` = the module's unique name; DigitalOcean and Linode: an extra tag) and `isoloom-expires-at` (AWS cloud-vm through the provider's default tags), so a reaper can find what to destroy after a crash or a lost state. Proxmox VMs keep their environment-named tags. (#88)
+
+### Emulated machines on one vCPU
+- On QEMU, a machine emulating another CPU (x86 on an Apple Silicon Mac) gets one virtual CPU. QEMU emulates another architecture on a single host thread, so a second vCPU only took turns with the first, and could see code the other was rewriting half-done: Windows' PowerShell died now and then jumping into the data bytes of a .NET call stub being patched (illegal instruction `push ds`), which cut WinRM in the middle of GOAD-Mini's setup.
+
+### Setup that survives a flaky connection
+- The environment's playbooks run again when a dropped connection cut them (WinRM's shell crashing mid-task, an SSH reset, a host briefly unreachable), up to 4 runs in all: the setup is idempotent, so a run picks up where the last stopped. A task that fails on its own still stops the setup at once. Under x86 emulation on an Apple Silicon Mac, Windows' PowerShell host crashes now and then (an illegal-instruction fault in .NET), which stopped GOAD-Mini's setup twice in one build.
+- Role downloads (`ansible-galaxy install`, from GitHub) are tried 5 times with a growing pause (`ISOLOOM_RETRY_PAUSE`, 15 s by default).
+
+### x86 machines on an Apple Silicon Mac, with QEMU
+- On Vagrant's QEMU provider (vagrant-qemu), each machine runs with its own CPU (`v.arch` from `arch`), emulated when the host's is another: an x86 Windows DC boots on an Apple Silicon Mac, slowly, so emulated machines get an hour to boot and a longer WinRM budget. A QEMU box can be given per image (`vm.image.qemu`, libvirt format); `windows-server-2019` and `debian-12` have one built in, and Isoloom's own VMs (controller, router, tool shell) use `cloud-image/debian-12` there.
+- Machines start one at a time, in dependency order, on every provider (`VAGRANT_NO_PARALLEL` in the Vagrantfile): QEMU and libvirt declare themselves parallel, so the controller ran its play before the machines were up.
+- Private networks on QEMU without root: a network of exactly two VMs is a `socket` listen/connect pair on a loopback port. A Windows machine's lab address is set from PowerShell (no cloud-init). `qemu_refusal` says when a spec doesn't fit (more than two VMs on a network, a VM on several), so a launcher can decline QEMU up front.
+
+
+### `isoloom reset`
+- `isoloom reset <target>`: back to the environment as it came up, what was done in it since gone (files dropped, users added, databases changed). Docker: torn down with its volumes and run again from the same images (init jobs run again). Vagrant: `isoloom run vagrant` saves a baseline snapshot of every VM once provisioned (`isoloom-baseline`; `ISOLOOM_NO_BASELINE=1` skips it), and `reset` restores it without provisioning; without one, down and run. Other targets: down and run. The Vagrant snapshot path is not run end to end yet. (#89)
+
+### Labels on everything, and `isoloom gc`
+- On Docker, every container, built image, network and volume an environment creates carries `isoloom.managed=true` and `isoloom.environment=<name>`.
+- `isoloom gc` lists Docker leftovers of environments: labelled networks and volumes whose Compose project has no container left (a crashed run, a killed launcher), and with `--images` the built images no container uses; `--yes` removes them. It never touches containers (a parked environment keeps its volumes) or anything unlabelled. Cloud tags follow. (#88)
+
+## 0.9.0
 
 ### `import compose` reads keys set twice
 - A key set twice in one mapping (secDevLabs camplake-api's `environment` sets `MONGO_PORT` twice) no longer stops `isoloom import compose` with `duplicate entry`: the last value is kept, as Compose does, and the draft's "Changed on the way in" notes say which key, where, and the value kept. (#68)

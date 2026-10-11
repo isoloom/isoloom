@@ -32,6 +32,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.redis: tcp:6379
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
     restart: unless-stopped
   cache-routes:
     image: alpine:3.20
@@ -53,6 +55,9 @@ services:
       cache:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
   cache-init-1:
     image: redis:7-alpine
     entrypoint:
@@ -68,9 +73,15 @@ services:
       cache-routes:
         condition: service_healthy
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
   web:
     build:
       context: ../../build/web
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: hello-stack
     image: isoloom/hello-stack-web
     platform: linux/amd64
     hostname: web
@@ -103,6 +114,8 @@ services:
         condition: service_healthy
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
     restart: unless-stopped
   web-routes:
     image: alpine:3.20
@@ -124,6 +137,9 @@ services:
       web:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -151,6 +167,9 @@ services:
         condition: service_healthy
       web-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
   isoloom-check-cache:
     image: curlimages/curl:8.11.1
     profiles:
@@ -172,6 +191,9 @@ services:
         condition: service_healthy
       web-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
   isoloom-check-web:
     image: curlimages/curl:8.11.1
     profiles:
@@ -193,6 +215,9 @@ services:
         condition: service_healthy
       web-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -204,12 +229,24 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
 networks:
   app:
     ipam:
       config:
       - subnet: 10.60.0.0/24
         gateway: 10.60.0.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
 volumes:
-  cache-data: {}
-  isoloom-probe-amd64: {}
+  cache-data:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: hello-stack
