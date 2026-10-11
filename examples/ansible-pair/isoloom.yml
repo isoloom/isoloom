@@ -45,5 +45,9 @@ provision:
     host_vars:
       cache: { maxmemory: 64mb }
 
+# The controller that runs the playbooks: 1 CPU, 512 MB and an Alpine box by default.
+controller:
+  resources: { memory_mb: 768 }
+
 checks:
   - checks/web-answers.sh
