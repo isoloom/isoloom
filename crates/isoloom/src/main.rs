@@ -585,6 +585,9 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
         }
         Command::Targets { dir, json, host } => {
             let spec = core::load(&dir)?;
+            if report_invalid(&spec) {
+                return Ok(ExitCode::FAILURE);
+            }
             let effective = core::effective(&spec);
             // A target can be possible by its machines' editions and still be refused by its
             // generator (a Windows machine on Proxmox, say). A ✓ here means `generate` really
@@ -671,12 +674,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
         }
         Command::Generate { dir, target, images, sets } => {
             let (spec, settings) = load_settings(&dir, images.as_deref(), &sets)?;
-            let problems = core::validate(&spec);
-            if !problems.is_empty() {
-                for p in &problems {
-                    eprintln!("✗ {p}");
-                }
-                eprintln!("fix the spec first (`isoloom validate`)");
+            if report_invalid(&spec) {
                 return Ok(ExitCode::FAILURE);
             }
             let (files, skipped) = match &target {
@@ -1088,14 +1086,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
         }
         Command::Check { dir, images, sets } => {
             let (spec, settings) = load_settings(&dir, images.as_deref(), &sets)?;
-            // Generators assume a validated spec (they `expect` valid CIDRs and addresses). A spec
-            // that parses but is invalid must fail with the field and reason, not a panic.
-            let problems = core::validate(&spec);
-            if !problems.is_empty() {
-                for p in &problems {
-                    eprintln!("✗ {p}");
-                }
-                eprintln!("fix the spec first (`isoloom validate`)");
+            if report_invalid(&spec) {
                 return Ok(ExitCode::FAILURE);
             }
             let (files, _) = core::generate_all(&spec);
@@ -1188,6 +1179,20 @@ fn prepare(
 }
 
 /// The spec with `-s` overrides and the image table applied, and the defaults in effect.
+/// Prints the spec's problems and returns true when it has any. Generators assume a validated
+/// spec (they `expect` valid CIDRs and declared networks): a spec that parses but is invalid
+/// must fail with the field and reason, not a panic.
+fn report_invalid(spec: &core::Spec) -> bool {
+    let problems = core::validate(spec);
+    for p in &problems {
+        eprintln!("✗ {p}");
+    }
+    if !problems.is_empty() {
+        eprintln!("fix the spec first (`isoloom validate`)");
+    }
+    !problems.is_empty()
+}
+
 fn load_settings(
     dir: &std::path::Path,
     images: Option<&std::path::Path>,
