@@ -105,6 +105,9 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                     if s.fixed {
                         v["fixed"] = json!(true);
                     }
+                    if s.dormant {
+                        v["dormant"] = json!(true);
+                    }
                     v
                 }).collect::<Vec<_>>(),
                 "depends_on": m.depends_on,

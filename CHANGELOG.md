@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Dormant services: a port that answers only later
+- `dormant: true` on a service: a port that only answers once something wakes it (the bind shell an exploit opens). It is declared, published if asked and opened by `reach` like any service, but nothing waits for it: left out of the Docker healthcheck (so `depends_on` and `up --wait` don't wait for it), the Kubernetes readiness probe and init-job wait, and the dependency waits on the VM targets (Vagrant, Proxmox, the clouds); no derived check expects it to answer (the `blocked` ones still apply). A machine whose services are all dormant has no healthcheck; `depends_on` such a machine is refused (nothing to wait for). The snapshot says `dormant: true`. segmented's web server has a dormant 4444. (#69)
+
 ### Derived checks in Windows-only environments
 - Derived checks run from Linux machines, so an environment of Windows machines (or network appliances) had none: its `services` went unchecked. When no machine can run them, every service is now checked at each of its addresses from the environment's networks: the controller on Vagrant, AWS and Azure (created for it when nothing else needed one), the check runner on every network on Docker and Kubernetes. Nothing stands where `reach` blocks a service or a network is offline, so those aren't asserted. On hybrid, where the containers' derived checks don't run (the checks run from the VM side), the controller does the same when no Linux VM can: mixed-office's hybrid output now checks files01 and the intranet. With a Linux machine to run them, nothing changes. Example: windows-hello. (#60)
 

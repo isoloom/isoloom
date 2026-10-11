@@ -21,10 +21,14 @@ fn names(plan: &[checks::Resolved], from: &str) -> Vec<String> {
 fn derived_checks_follow_reach_and_shared_networks() {
     // segmented: access -> front (all ports), front -> back on 6379 only.
     let derived = checks::derived(&example("segmented"));
+    // web's dormant 4444 isn't expected to answer from the user (only once exploited).
     assert_eq!(names(&derived, "user"), ["cache:6379 blocked from user", "web:80 from user"]);
     assert_eq!(names(&derived, "web"), ["cache:6379 from web"]);
-    // The cache can't reach the front network, and its network is offline.
-    assert_eq!(names(&derived, "cache"), ["web:80 blocked from cache", "no internet from cache"]);
+    // The cache can't reach the front network (dormant or not), and its network is offline.
+    assert_eq!(
+        names(&derived, "cache"),
+        ["web:80 blocked from cache", "web:4444 blocked from cache", "no internet from cache"]
+    );
     let blocked = derived.iter().find(|c| c.name == "cache:6379 blocked from user").unwrap();
     assert!(matches!(
         &blocked.probe,

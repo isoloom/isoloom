@@ -319,7 +319,7 @@ pub fn allowed(spec: &Spec, from: &Machine, network: &str, port: u16) -> bool {
 
 /// The checks the spec implies, from every machine that can run them:
 /// - each service of another machine answers at the addresses `reach` (or a shared network)
-///   lets this machine through to, and
+///   lets this machine through to (not a `dormant` one: it answers only once woken), and
 /// - is blocked at every address when nothing lets it through at all. When one path is open and
 ///   another isn't, the closed one isn't asserted: a machine with several interfaces answers for
 ///   any of its addresses on an interface the traffic may use, so the outcome isn't the spec's
@@ -366,6 +366,11 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                     }
                     continue;
                 }
+                // A dormant service answers once something wakes it, not before: nothing
+                // to expect yet (still blocked from where `reach` doesn't let it through).
+                if svc.dormant {
+                    continue;
+                }
                 for (n, _) in paths.iter().filter(|(_, ok)| *ok) {
                     out.push(Resolved {
                         name: format!("{b}:{}{} from {a}", svc.port, on(n)),
@@ -404,7 +409,8 @@ pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
     let mut out = Vec::new();
     for (b, mb) in &spec.machines {
         let multi = mb.networks.len() > 1;
-        for svc in &mb.services {
+        // A dormant service answers only once woken, as above.
+        for svc in mb.services.iter().filter(|s| !s.dormant) {
             for n in mb.networks.keys() {
                 let on = if multi { format!(" on {n}") } else { String::new() };
                 out.push(Resolved {
