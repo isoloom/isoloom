@@ -539,7 +539,7 @@ fn check_from_windows() {
 
 #[test]
 fn http_options_on_a_tcp_check() {
-    assert_problem(&with_check("{ tcp: 'web:80', contains: hi }"), "checks[0]", "go with `http`");
+    assert_problem(&with_check("{ tcp: 'web:80', method: POST }"), "checks[0]", "go with `http`");
 }
 
 #[test]
