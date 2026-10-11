@@ -9,6 +9,9 @@ services:
   fw:
     build:
       context: ../../build/fw
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: edge-firewall
     image: isoloom/edge-firewall-fw
     platform: linux/amd64
     hostname: fw
@@ -41,6 +44,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.status: http:8080
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
     restart: unless-stopped
   fw-routes:
     image: alpine:3.20
@@ -62,9 +67,15 @@ services:
       fw:
         condition: service_started
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   web:
     build:
       context: ../../build/web
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: edge-firewall
     image: isoloom/edge-firewall-web
     platform: linux/amd64
     hostname: web
@@ -94,6 +105,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
     restart: unless-stopped
   web-routes:
     image: alpine:3.20
@@ -117,6 +130,9 @@ services:
       fw:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   cache:
     image: redis:7-alpine
     platform: linux/amd64
@@ -146,6 +162,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.redis: tcp:6379
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
     restart: unless-stopped
   cache-routes:
     image: alpine:3.20
@@ -169,6 +187,9 @@ services:
       fw:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   isoloom-access:
     image: alpine:3.20
     hostname: user
@@ -184,6 +205,9 @@ services:
     - infinity
     profiles:
     - check
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   isoloom-access-routes:
     image: alpine:3.20
     network_mode: service:isoloom-access
@@ -206,6 +230,9 @@ services:
     restart: unless-stopped
     profiles:
     - check
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -234,6 +261,9 @@ services:
         condition: service_started
       isoloom-access-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   isoloom-check-fw:
     image: curlimages/curl:8.11.1
     profiles:
@@ -257,6 +287,9 @@ services:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   isoloom-check-web:
     image: curlimages/curl:8.11.1
     profiles:
@@ -280,6 +313,9 @@ services:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   isoloom-check-cache:
     image: curlimages/curl:8.11.1
     profiles:
@@ -303,6 +339,9 @@ services:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -314,21 +353,36 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
 networks:
   outside:
     ipam:
       config:
       - subnet: 10.70.0.0/24
         gateway: 10.70.0.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   dmz:
     ipam:
       config:
       - subnet: 10.70.10.0/24
         gateway: 10.70.10.254
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
   lan:
     ipam:
       config:
       - subnet: 10.70.20.0/24
         gateway: 10.70.20.254
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall

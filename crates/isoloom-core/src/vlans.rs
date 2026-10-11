@@ -17,6 +17,30 @@ pub fn vlan_network(lan: &str, id: u16) -> String {
     format!("{lan}-vlan{id}")
 }
 
+/// The VLAN networks of a LAN, in order: (network, VLAN id). After [`flatten`].
+pub fn of_lan<'a>(spec: &'a Spec, lan: &'a str) -> impl Iterator<Item = (&'a String, u16)> + 'a {
+    spec.networks
+        .iter()
+        .filter_map(move |(n, net)| net.vlan.as_ref().filter(|(l, _)| l == lan).map(|(_, id)| (n, *id)))
+}
+
+/// The machine that switches a LAN (its `switch`), if any. After [`flatten`].
+pub fn switch_of<'a>(spec: &'a Spec, lan: &str) -> Option<&'a str> {
+    spec.networks
+        .values()
+        .find(|n| n.vlan.as_ref().is_some_and(|(l, _)| l == lan))
+        .and_then(|n| n.switch.as_deref())
+}
+
+/// The LAN a machine switches (it is that LAN's `switch`), if any. After [`flatten`].
+pub fn switched_by<'a>(spec: &'a Spec, machine: &str) -> Option<&'a str> {
+    spec.networks
+        .values()
+        .find(|n| n.vlan.is_some() && n.switch.as_deref() == Some(machine))
+        .and_then(|n| n.vlan.as_ref())
+        .map(|(lan, _)| lan.as_str())
+}
+
 /// `office.vlan10` -> (`office`, 10).
 fn vlan_ref(name: &str) -> Option<(&str, u16)> {
     let (lan, vlan) = name.split_once('.')?;
@@ -105,6 +129,8 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, String> {
                     gateway: None,
                     docker: None,
                     vlans: IndexMap::new(),
+                    // The LAN's switch, on each of its VLANs (the LAN itself is gone).
+                    switch: net.switch.clone(),
                     // A VLAN carries no impairment of its own (set it on a network the router is on).
                     tc: None,
                     vlan: Some((lan.clone(), *id)),
@@ -213,6 +239,21 @@ machines:
             "  servers: { cidr: 10.20.0.0/24 }\n  office-vlan10: { cidr: 10.30.0.0/24 }",
         );
         assert!(flatten(raw(&clash)).unwrap_err().contains("already has"));
+    }
+
+    #[test]
+    fn the_lans_switch_follows_its_vlans() {
+        let yaml = OFFICE.replace("    internet: false\n    vlans:", "    internet: false\n    switch: sw\n    vlans:")
+            + "  sw: { docker: { image: x, appliance: cisco-iol-l2 } }\n";
+        let s = flatten(raw(&yaml)).unwrap();
+        assert_eq!(switch_of(&s, "office"), Some("sw"));
+        assert_eq!(switched_by(&s, "sw"), Some("office"));
+        assert_eq!(switched_by(&s, "pc1"), None);
+        assert_eq!(
+            of_lan(&s, "office").collect::<Vec<_>>(),
+            [(&"office-vlan10".to_string(), 10), (&"office-vlan20".to_string(), 20)]
+        );
+        assert!(crate::validate(&s).is_empty(), "{:?}", crate::validate(&s));
     }
 
     #[test]

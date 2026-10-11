@@ -111,6 +111,30 @@ fn published_ports_read_every_compose_form() {
     assert!(has(&d, NoteKind::Changed, "services.a.ports", "no fixed host port for 9000"));
 }
 
+#[test]
+fn a_key_set_twice_keeps_the_last_value_as_compose_does() {
+    // secDevLabs camplake-api sets MONGO_PORT twice; Compose takes the last.
+    let compose = "services:\n  api:\n    image: x\n    expose: [3000]\n    environment:\n      MONGO_PORT: 27017\n      MONGO_HOST: db\n      MONGO_PORT: \"27018\"\n      MONGO_PORT: 27019\n    expose: [8080]\n";
+    let d = draft(compose, "x", "compose.yaml").unwrap();
+    let spec = parse(&d.yaml).unwrap();
+    assert_eq!(validate(&spec), vec![]);
+    assert_eq!(spec.machines["api"].services.iter().map(|s| s.port).collect::<Vec<_>>(), [8080]);
+    assert!(has(&d, NoteKind::InImage, "services.api.environment", "MONGO_PORT=27019, MONGO_HOST=db"));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        "services.api.environment",
+        "`MONGO_PORT` is set more than once; the last value (`27019`)"
+    ));
+    assert!(has(&d, NoteKind::Changed, "services.api", "`expose` is set more than once"));
+    assert_eq!(
+        d.notes.iter().filter(|n| n.text.contains("more than once")).count(),
+        2,
+        "one note per key: {:?}",
+        d.notes
+    );
+}
+
 // Vagrant: from what a Vagrantfile set when it ran (recorded by the CLI's vagrant_record.rb).
 
 fn recorded(name: &str) -> serde_json::Value {
