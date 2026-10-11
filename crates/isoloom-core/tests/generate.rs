@@ -2,6 +2,7 @@
 //! are exactly what `generate` produces (what `isoloom check` enforces in CI), and specs
 //! a generator can't handle yet are refused with the reason.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use isoloom_core::{GenerateError, Target, generate, generate_all, load, parse};
@@ -12,41 +13,82 @@ fn example(name: &str) -> (PathBuf, isoloom_core::Spec) {
     (dir, spec)
 }
 
-fn assert_committed(name: &str) {
+/// Every example with committed outputs (a `.isoloom/` folder), by name.
+fn examples_with_outputs() -> Vec<String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let mut names: Vec<String> = std::fs::read_dir(root)
+        .expect("examples folder")
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().join(".isoloom").is_dir())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+/// Files a run leaves next to the generated ones (all git-ignored): not outputs.
+fn is_run_artifact(rel: &str) -> bool {
+    rel.split('/').any(|c| c == ".terraform" || c == ".vagrant") || rel.ends_with(".terraform.lock.hcl") || rel.contains(".tfstate")
+}
+
+/// Every file under `dir`, as paths relative to `base` with `/` separators.
+fn files_under(base: &Path, dir: &Path, out: &mut BTreeSet<String>) {
+    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            files_under(base, &path, out);
+        } else {
+            let rel = path.strip_prefix(base).unwrap().to_string_lossy().replace('\\', "/");
+            out.insert(rel);
+        }
+    }
+}
+
+/// The problems with one example's committed outputs: stale or missing files, and files on disk
+/// that `generate` no longer writes.
+fn committed_problems(name: &str) -> Vec<String> {
     let (dir, spec) = example(name);
     let (files, _) = generate_all(&spec);
-    assert!(!files.is_empty(), "{name}: nothing generated");
-    for f in files {
-        let on_disk = std::fs::read_to_string(dir.join(&f.path)).unwrap_or_default();
-        assert!(
-            on_disk == f.contents,
-            "{name}: {} is stale; run `cargo run -- generate examples/{name}`",
-            f.path
-        );
+    if files.is_empty() {
+        return vec![format!("{name}: nothing generated")];
     }
+    let mut problems: Vec<String> = files
+        .iter()
+        .filter(|f| std::fs::read_to_string(dir.join(&f.path)).ok().as_deref() != Some(f.contents.as_str()))
+        .map(|f| format!("{name}: {} is stale or missing", f.path))
+        .collect();
+    let generated: BTreeSet<&str> = files.iter().map(|f| f.path.as_str()).collect();
+    let mut on_disk = BTreeSet::new();
+    files_under(&dir, &dir.join(".isoloom"), &mut on_disk);
+    problems.extend(
+        on_disk
+            .iter()
+            .filter(|rel| !is_run_artifact(rel) && !generated.contains(rel.as_str()))
+            .map(|rel| format!("{name}: {rel} is no longer generated")),
+    );
+    problems
 }
 
 #[test]
 fn committed_outputs_are_up_to_date() {
-    assert_committed("hello-stack");
-    assert_committed("supplier-portal-api");
-    assert_committed("segmented");
-    assert_committed("pivot-dmz");
-    assert_committed("edge-firewall");
-    assert_committed("air-gapped");
-    assert_committed("windows-hello");
-    assert_committed("ansible-pair");
-    assert_committed("mixed-office");
-    assert_committed("arm-lab");
-    assert_committed("arm-vm");
-    assert_committed("slow-link");
-    assert_committed("existing-hosts");
-    assert_committed("workbench");
-    assert_committed("vlan-office");
-    assert_committed("cisco-iol");
-    assert_committed("cisco-dynamips");
-    assert_committed("cisco-qemu");
-    assert_committed("solo-web");
+    let names = examples_with_outputs();
+    assert!(names.len() >= 20, "examples not found: {names:?}");
+    let problems: Vec<String> = names.iter().flat_map(|n| committed_problems(n)).collect();
+    assert!(
+        problems.is_empty(),
+        "run `cargo run -- generate examples/<name>` and delete what it no longer writes:\n{}",
+        problems.join("\n")
+    );
+}
+
+#[test]
+fn an_example_without_outputs_is_refused_with_reasons() {
+    // corp-ad-basics has no `.isoloom/`: every generator refuses it (Windows provisioning with an
+    // Ansible playbook, no Proxmox image for Windows), so the walk above has nothing to compare.
+    let (_, spec) = example("corp-ad-basics");
+    let (files, skipped) = generate_all(&spec);
+    assert!(files.is_empty(), "{:?}", files.iter().map(|f| &f.path).collect::<Vec<_>>());
+    assert!(!skipped.is_empty());
 }
 
 #[test]
