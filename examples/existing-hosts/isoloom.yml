@@ -23,5 +23,12 @@ machines:
     services: [{ port: 6379, name: redis }]
     vm:
       os: debian-12
-      provision: [provision/cache.sh]
+      # A kernel boot option, the restart that applies it, then Redis.
+      provision: [provision/cache-boot.sh, reboot, provision/cache.sh]
     external: { address: 192.168.1.21, user: florian, key: ~/.ssh/id_ed25519 }
+
+checks:
+  - name: the cache came back with transparent hugepages off
+    from: cache
+    exec: cat /sys/kernel/mm/transparent_hugepage/enabled
+    expect: "[never]"

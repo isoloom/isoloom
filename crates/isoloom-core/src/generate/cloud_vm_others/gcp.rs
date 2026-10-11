@@ -15,9 +15,9 @@
 
 use std::fmt::Write;
 
-use super::super::cloud_vm::{CONTROLLER_OS, aligned, cidr, hcl_cmd, inventory, needs_controller, sh_quote, tf_expr};
+use super::super::cloud_vm::{CONTROLLER_OS, aligned, cidr, hcl_cmd, inventory, linux_setup_cmds, needs_controller, remote_exec, sh_quote};
 use super::super::proxmox::res;
-use super::super::{GeneratedFile, OUTPUT_DIR, address, address_for, header, router, start_order, vagrant};
+use super::super::{GeneratedFile, OUTPUT_DIR, address, header, start_order, vagrant};
 use crate::model::Spec;
 
 const DIR: &str = "cloud-vm";
@@ -279,70 +279,9 @@ resource "google_compute_network" "env" {{
             env = spec.name,
         );
 
-        // Its set-up, over SSH: the project, names, volumes, waits, its steps, the ready marker.
-        // No MAC-based interface step: GCP machines here are single-NIC (multi-NIC is refused).
-        let mut cmds: Vec<String> = vec![
-            "set -e".into(),
-            "cloud-init status --wait >/dev/null 2>&1 || true".into(),
-            "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom && rm -f /tmp/isoloom-project.tgz".into(),
-        ];
-        if needs_controller(spec) {
-            cmds.push(format!(
-                "mkdir -p ~/.ssh && echo '{}' >> ~/.ssh/authorized_keys",
-                tf_expr("trimspace(tls_private_key.controller.public_key_openssh)")
-            ));
-        }
-        let hosts: Vec<String> = spec
-            .machines
-            .keys()
-            .filter(|o| o.as_str() != name)
-            .map(|o| format!("{} {o}", address_for(spec, name, o)))
-            .collect();
-        if !hosts.is_empty() {
-            cmds.push(format!(
-                "printf '%s\\n' {} | sudo tee -a /etc/hosts >/dev/null",
-                hosts.iter().map(|h| format!("'{h}'")).collect::<Vec<_>>().join(" ")
-            ));
-        }
-        if !m.volumes.is_empty() {
-            cmds.push(format!("sudo mkdir -p {}", m.volumes.values().cloned().collect::<Vec<_>>().join(" ")));
-        }
-        for dep in &m.depends_on {
-            let ports: Vec<u16> = spec.machines[dep].services.iter().map(|s| s.port).collect();
-            if !ports.is_empty() {
-                cmds.push(format!("sh -c {}", sh_quote(&router::wait_for(dep, &ports, 900))));
-            }
-        }
-        let env = if m.inputs.is_empty() {
-            ""
-        } else {
-            "set -a; . /tmp/isoloom-inputs.env; set +a; "
-        };
-        for step in &vm.provision {
-            if step.ends_with(".sh") {
-                cmds.push(format!("cd /opt/isoloom && sudo -E sh -c {}", sh_quote(&format!("{env}sh {step}"))));
-            } else {
-                cmds.push("command -v ansible-playbook >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)".into());
-                cmds.push(format!(
-                    "cd /opt/isoloom && sudo -E sh -c {}",
-                    sh_quote(&format!("{env}ansible-playbook -c local -i localhost, {step}"))
-                ));
-            }
-        }
-        if !redirects.is_empty() || !m.networks.keys().any(|n| spec.networks[n].internet) {
-            cmds.push("command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)".into());
-        }
-        for (h, p) in &redirects {
-            cmds.push(format!(
-                "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting {{ type nat hook prerouting priority -100; }}' && sudo nft add rule ip isoloom-publish prerouting tcp dport {h} redirect to :{p}"
-            ));
-        }
-        if !m.networks.keys().any(|n| spec.networks[n].internet) {
-            cmds.push(format!(
-                "printf '%s\\n' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    ip daddr != {lab} ct state new drop' '  }}' '}}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft"
-            ));
-        }
-        cmds.push("sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null".into());
+        // Its set-up, over SSH, as on every cloud. No interface step: GCP machines here are
+        // single-NIC (multi-NIC is refused).
+        let cmds = linux_setup_cmds(spec, name, m, vm, &lab, &redirects, &|_| String::new());
 
         let deps: Vec<String> = m
             .depends_on
@@ -365,11 +304,7 @@ resource "google_compute_network" "env" {{
                 lines.join(", ")
             );
         }
-        let _ = write!(
-            prov,
-            "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
-            cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
-        );
+        prov.push_str(&remote_exec(&cmds));
         if !deps.is_empty() {
             let _ = writeln!(prov, "  depends_on = [{}]", deps.join(", "));
         }

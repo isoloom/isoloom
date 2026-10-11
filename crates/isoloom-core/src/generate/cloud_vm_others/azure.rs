@@ -6,7 +6,9 @@
 
 use std::fmt::Write;
 
-use super::super::cloud_vm::{CONTROLLER_OS, aligned, cidr, has_windows, hcl_cmd, inventory, linux_setup_cmds, needs_controller, redirects, sh_quote, tf_expr};
+use super::super::cloud_vm::{
+    CONTROLLER_OS, aligned, cidr, has_windows, hcl_cmd, inventory, linux_setup_cmds, needs_controller, redirects, remote_exec, sh_quote, tf_expr,
+};
 use super::super::proxmox::{hcl, res};
 use super::super::{GeneratedFile, OUTPUT_DIR, address, address_for, header, start_order};
 use crate::model::Spec;
@@ -369,11 +371,7 @@ fn provision(spec: &Spec, id: &str, pip: &str, user: &str, m: &crate::model::Mac
             lines.join(", ")
         );
     }
-    let _ = write!(
-        prov,
-        "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
-        cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
-    );
+    prov.push_str(&remote_exec(cmds));
     if !deps.is_empty() {
         let _ = writeln!(prov, "  depends_on = [{}]", deps.join(", "));
     }

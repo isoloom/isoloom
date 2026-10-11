@@ -377,12 +377,22 @@ pub struct VmImpl {
     #[serde(default)]
     pub os: String,
     /// Steps run inside the VM, in order: `.sh` on Linux (and Ansible playbooks, `.yml`),
-    /// `.ps1` on Windows.
+    /// `.ps1` on Windows. On Linux, the step `reboot` restarts the machine and goes on with the
+    /// next step once it is back (a new kernel, a changed boot configuration).
     #[serde(default)]
     pub provision: Vec<String>,
     /// The image to use instead of the built-in one for `os`, per target.
     #[serde(default)]
     pub image: Option<VmImage>,
+}
+
+/// The `vm.provision` step that restarts a Linux machine; the steps after it run once the
+/// machine is back.
+pub const REBOOT_STEP: &str = "reboot";
+
+/// Whether a `vm.provision` step is the [`REBOOT_STEP`] rather than a file.
+pub fn is_reboot(step: &str) -> bool {
+    step == REBOOT_STEP
 }
 
 /// How a Windows box answers WinRM. Most boxes (StefanScherer, gusztavvargadr) use plain HTTP

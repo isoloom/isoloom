@@ -820,7 +820,8 @@ pub fn external_machines(out: &Path) -> Res<std::collections::BTreeMap<String, E
 
 /// `isoloom run external`: provisions the existing machines over SSH, in start order: the
 /// project copied to /opt/isoloom, each machine's `.sh` steps run there, its `.yml` steps run
-/// from here against it, then the environment's `provision:` playbooks with the inventory.
+/// from here against it (a `reboot` step restarts it and waits until it's back), then the
+/// environment's `provision:` playbooks with the inventory.
 pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<()> {
     let out = dir.join(core::instance::output_dir(instance));
     let machines = external_machines(&out)?;
@@ -877,7 +878,9 @@ pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<(
         run("ssh", &a, Some(std::process::Stdio::from(tar.stdout.expect("piped"))))?;
         for step in &vm.provision {
             eprintln!("{name}: {step}");
-            if step.ends_with(".sh") {
+            if core::model::is_reboot(step) {
+                reboot_external(name, &ssh_args(m))?;
+            } else if step.ends_with(".sh") {
                 let mut a = ssh_args(m);
                 a.push(format!("cd /opt/isoloom && sudo sh {step}"));
                 run("ssh", &a, None)?;
@@ -904,6 +907,36 @@ pub fn external_up(dir: &Path, spec: &core::Spec, instance: Option<u8>) -> Res<(
         run("ansible-playbook", &a, None)?;
     }
     Ok(())
+}
+
+/// A `reboot` step on an existing machine: restart it over SSH, then wait until it answers
+/// again from a new boot (its boot id changed), for up to 10 minutes.
+fn reboot_external(name: &str, ssh: &[String]) -> Res<()> {
+    const BOOT_ID: &str = "cat /proc/sys/kernel/random/boot_id";
+    // Polled without prompting (`BatchMode`): a password prompt would stop every try.
+    let boot_id = |batch: bool| -> Option<String> {
+        let mut c = Command::new("ssh");
+        if batch {
+            c.args(["-o", "BatchMode=yes"]);
+        }
+        c.args(["-o", "ConnectTimeout=5"]).args(ssh).arg(BOOT_ID);
+        let out = c.stderr(Stdio::null()).output().ok().filter(|o| o.status.success())?;
+        Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|s| !s.is_empty())
+    };
+    let before = boot_id(false).ok_or_else(|| format!("{name}: can't read its boot id over SSH before the reboot"))?;
+    // The connection may drop before ssh returns: its status says nothing.
+    let mut c = Command::new("ssh");
+    c.args(ssh).arg("sudo sh -c 'systemctl --no-block reboot 2>/dev/null || reboot'");
+    let _ = c.status().map_err(|e| tool_error(&c, e))?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
+    while std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        if boot_id(true).is_some_and(|now| now != before) {
+            eprintln!("{name}: back after the reboot");
+            return Ok(());
+        }
+    }
+    Err(format!("{name}: not back 10 minutes after the reboot step (waiting needs SSH without a password prompt: a key or an agent)").into())
 }
 
 /// The spec, as the instance when one is named (its names and ports are the instance's).

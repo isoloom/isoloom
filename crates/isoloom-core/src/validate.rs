@@ -486,6 +486,19 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             } else if !KNOWN_OS.contains(&v.os.as_str()) {
                 add(&format!("{at}.vm.os"), format!("unknown OS `{}`; use one of: {}", v.os, KNOWN_OS.join(", ")));
             }
+            // `reboot` is a Linux step. A Windows machine restarts from the environment's
+            // playbooks (`ansible.windows.win_reboot`), which run from the controller and wait
+            // for it to come back; its `.ps1` steps are one script on the cloud targets.
+            if crate::images::is_windows(&v.os) {
+                for (i, step) in v.provision.iter().enumerate() {
+                    if crate::model::is_reboot(step) {
+                        add(
+                            &format!("{at}.vm.provision[{i}]"),
+                            "`reboot` is a Linux step: restart a Windows machine from the environment's playbooks (`ansible.windows.win_reboot`)".into(),
+                        );
+                    }
+                }
+            }
             if v.provision.is_empty() && !m.access && spec.provision.is_empty() {
                 add(
                     &format!("{at}.vm.provision"),
@@ -812,7 +825,7 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
             }
         }
         if let Some(v) = &m.vm {
-            for (i, s) in v.provision.iter().enumerate() {
+            for (i, s) in v.provision.iter().enumerate().filter(|(_, s)| !crate::model::is_reboot(s)) {
                 check(format!("machines.{name}.vm.provision[{i}]"), s);
             }
         }

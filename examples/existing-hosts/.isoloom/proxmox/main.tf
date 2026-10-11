@@ -305,12 +305,13 @@ resource "proxmox_virtual_environment_file" "cache" {
       hostname    = "cache"
       users       = local.users
       packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = local.project_files
+      write_files = concat(local.project_files, [{ path = "/etc/systemd/system/isoloom-steps.service", permissions = "0644", content = "[Unit]\nDescription=Isoloom: the provisioning steps after a reboot\nWants=network-online.target\nAfter=network-online.target\nConditionPathExists=/var/lib/isoloom/next-boot\n\n[Service]\nType=oneshot\nExecStart=/bin/sh /var/lib/isoloom/steps.sh\nStandardOutput=journal+console\nTimeoutStartSec=0\n\n[Install]\nWantedBy=multi-user.target\n" }, { path = "/var/lib/isoloom/steps.sh", permissions = "0700", content = "#!/bin/sh\nset -e\nn=$(cat /var/lib/isoloom/next-boot)\nrm -f /var/lib/isoloom/next-boot\nexec sh -e /var/lib/isoloom/boot-$n.sh\n" }, { path = "/var/lib/isoloom/boot-1.sh", permissions = "0700", content = "#!/bin/sh\nset -e\ncd /opt/isoloom && sh provision/cache.sh\nmkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready\nsystemctl disable isoloom-steps.service\n" }])
       runcmd = [
         ["sh", "-c", "printf '%s\\n' '192.168.1.20 web' >> /etc/hosts"],
-        ["sh", "-c", "cd /opt/isoloom && sh provision/cache.sh"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
+        ["sh", "-c", "cd /opt/isoloom && sh provision/cache-boot.sh"],
+        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo 1 > /var/lib/isoloom/next-boot && systemctl enable isoloom-steps.service"]
       ]
+      power_state = { mode = "reboot", message = "isoloom: the reboot step", condition = "test -f /var/lib/isoloom/next-boot" }
     })}"
   }
 }
