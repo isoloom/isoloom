@@ -13,6 +13,7 @@ pub mod defaults;
 pub mod generate;
 pub mod groups;
 pub mod host;
+pub mod ignore;
 pub mod images;
 pub mod import;
 pub mod instance;

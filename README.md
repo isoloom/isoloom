@@ -93,7 +93,9 @@ isoloom capture MACHINE NETWORK   # tcpdump on its interface there
 isoloom down TARGET [DIR] # tear it down
 ```
 
-`DIR` holds `isoloom.yml` (`isoloom.yaml` also works).
+`DIR` holds `isoloom.yml` (`isoloom.yaml` also works). VMs get a copy of the project in
+`/opt/isoloom`; an `.isoloomignore` next to `isoloom.yml` (gitignore-style) lists what they don't
+need, on every target that copies it.
 
 Or run what it generates by hand:
 

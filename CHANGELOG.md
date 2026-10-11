@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### `.isoloomignore`
+- An `.isoloomignore` at the project's root lists what the machines don't get when the project is copied into them, gitignore-style: `#` comments, `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the middle anchors a pattern at the root (otherwise it matches at any depth), `*`, `?`, `[abc]`, `**`; the last pattern matching a path, or a folder it is in, decides. Every copy honors it, read when the copy is made: Vagrant's `project` step (vagrant, hybrid, docker-vm), Proxmox's cloud-init, the cloud modules' archive (cloud-vm, cloud-docker, docker-vm on Proxmox: `tar -X` with the list Terraform computes, the archive's top folder stripped when unpacked) and `isoloom run external`. Each reads a pattern as the same regular expression. Proxmox also leaves out `.vagrant` and `.terraform` folders at any depth now. (#61)
+
 ### A lighter controller, sized by the spec
 - The controller that runs `provision:` playbooks defaults to 1 CPU and 512 MB on every target (it was 1 GB). On local VMs its box is `generic/alpine319` (about 100 MB to download instead of 675 MB, for VirtualBox, libvirt, VMware and Parallels alike): Python, ansible-core and pywinrm install in seconds. Proxmox and the clouds keep their Debian images, at the new size (AWS `t3.micro`, Azure `Standard_B1s`, GCP `e2-small`).
 - `controller:` (top level) sets it like a machine: `image: { vagrant, vagrant_version }` for a box of your own (its setup handles Alpine and Debian), `resources: { cpus, memory_mb, disk_gb }` (disk on Proxmox) for many forks against a large environment. Example: ansible-pair gives it 768 MB.
