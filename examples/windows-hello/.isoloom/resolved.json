@@ -93,7 +93,8 @@
       "cloud-docker": "needs `docker:` on web01",
       "kubernetes": "needs `docker:` on web01",
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on web01"
+      "external": "needs `external:` on web01",
+      "cloud-services": "left out by `targets:`"
     }
   },
   "checks": {

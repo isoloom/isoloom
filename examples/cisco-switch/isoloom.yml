@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# An office LAN split into two VLANs, switched by a real Cisco IOS switch (IOL-L2) instead of
+# Isoloom's Linux one. The switch lists no networks: Isoloom gives it an access port per VLAN
+# (Ethernet0/1 in VLAN 10, Ethernet0/2 in VLAN 20) and a trunk port to the file server, which is
+# on both VLANs (Ethernet0/3, VLANs 10 and 20 tagged), declares the VLANs and sets each port's
+# mode; its own configuration is added after. Staff and guests reach the file server through
+# IOS. IOL-L2 comes from Cisco Modeling Labs and isn't Isoloom's to ship: build the image with
+# vrnetlab (cisco/iol) from a release you're licensed for, then set its tag below.
+version: 1
+name: cisco-switch
+
+networks:
+  office:
+    cidr: 10.92.0.0/16
+    internet: false
+    switch: sw1
+    vlans:
+      10: { cidr: 10.92.10.0/24 }
+      20: { cidr: 10.92.20.0/24 }
+
+machines:
+  sw1:
+    docker:
+      image: "vrnetlab/cisco_iol:L2-17.12.01"
+      appliance: cisco-iol-l2
+      config: configs/sw1.cfg
+
+  files:
+    networks: { office.vlan10: 10, office.vlan20: 10 }
+    services: [{ port: 80, http: true }]
+    docker: { image: "nginx:1.27-alpine" }
+
+  staff:
+    networks: { office.vlan10: 20 }
+    docker: { image: "alpine:3.20", idle: true }
+
+  guest:
+    networks: { office.vlan20: 20 }
+    docker: { image: "alpine:3.20", idle: true }
+
+checks:
+  - name: staff reach the file server through the switch (VLAN 10, tagged on its trunk)
+    from: staff
+    http: http://10.92.10.10/
+    expect: 200
+    wait: 180
+  - name: guests too, on VLAN 20
+    from: guest
+    http: http://10.92.20.10/
+    expect: 200
+    wait: 180

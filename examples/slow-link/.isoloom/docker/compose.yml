@@ -42,12 +42,18 @@ services:
       timeout: 3s
       retries: 60
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
   web:
     build:
       context: ../../build/web
       dockerfile: ../web.Dockerfile
       args:
         NGINX_TAG: 1.27-alpine
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: slow-link
     image: isoloom/slow-link-web
     platform: linux/amd64
     hostname: web
@@ -74,6 +80,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
     restart: unless-stopped
   web-routes:
     image: nicolaka/netshoot:v0.13
@@ -97,6 +105,9 @@ services:
       isoloom-router:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
   isoloom-access:
     image: alpine:3.20
     hostname: user
@@ -110,6 +121,9 @@ services:
     - infinity
     profiles:
     - check
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
   isoloom-access-routes:
     image: alpine:3.20
     network_mode: service:isoloom-access
@@ -134,6 +148,9 @@ services:
     restart: unless-stopped
     profiles:
     - check
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -154,6 +171,9 @@ services:
         condition: service_started
       isoloom-access-routes:
         condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
   isoloom-tool-shell:
     image: nicolaka/netshoot
     hostname: shell
@@ -169,6 +189,9 @@ services:
       far:
         ipv4_address: 10.75.2.252
     restart: unless-stopped
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -180,16 +203,28 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
 networks:
   branch:
     ipam:
       config:
       - subnet: 10.75.1.0/24
         gateway: 10.75.1.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
   far:
     ipam:
       config:
       - subnet: 10.75.2.0/24
         gateway: 10.75.2.1
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: slow-link

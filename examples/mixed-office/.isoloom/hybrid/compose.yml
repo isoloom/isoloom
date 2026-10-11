@@ -34,6 +34,8 @@ services:
         condition: service_completed_successfully
     labels:
       isoloom.service.80: http:80
+      isoloom.managed: 'true'
+      isoloom.environment: mixed-office
     restart: unless-stopped
     extra_hosts:
     - files01:192.168.58.10
@@ -48,10 +50,16 @@ services:
     - isoloom-probe-amd64:/probe
     network_mode: none
     restart: no
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: mixed-office
 networks:
   isoloom-publish: null
   office:
     external: true
     name: isoloom-mixed-office-office
 volumes:
-  isoloom-probe-amd64: {}
+  isoloom-probe-amd64:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: mixed-office

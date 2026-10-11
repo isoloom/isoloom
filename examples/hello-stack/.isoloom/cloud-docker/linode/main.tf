@@ -42,7 +42,7 @@ resource "linode_instance" "env" {
   type            = var.type
   image           = "linode/debian12"
   authorized_keys = [trimspace(var.ssh_public_key)]
-  tags            = ["isoloom", "hello-stack"]
+  tags            = concat(["isoloom", "hello-stack", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
 }
 
 resource "linode_firewall" "env" {
@@ -74,6 +74,12 @@ variable "auto_stop_minutes" {
   type        = number
   default     = 0
   description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
+}
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
 
 # The environment, over SSH: the project, Docker, then the Compose file.
