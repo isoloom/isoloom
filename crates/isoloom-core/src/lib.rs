@@ -3,8 +3,10 @@
 //! VMs on this machine, a Proxmox server, or the cloud.
 //!
 //! This crate is the format itself: parse, validate, derive the targets a spec can run on,
-//! and add up what it needs; generate each target's files (Docker Compose, Vagrant); and
-//! track what each output does with every field ([`coverage`]).
+//! and add up what it needs; generate each target's files (Docker Compose, hosted, Kubernetes,
+//! hybrid, Vagrant, Docker on one VM, Docker on one cloud VM, Proxmox, one cloud VM per
+//! machine, existing hosts, cloud services: see [`model::Target`]); and track what each output
+//! does with every field ([`coverage`]).
 
 pub mod checks;
 pub mod clones;

@@ -114,21 +114,25 @@ nowhere else; offline networks stay offline), **declared** (`http`, `tcp`, `exec
 - `crates/isoloom-core`: the format as a library (parse, validate, derive targets, generators).
   Other Rust tools can embed it directly.
 - `crates/isoloom`: the command line.
-- `examples/`: three environments used as tests (a two-machine app, a segmented network, an
-  Active Directory domain).
+- `examples/`: environments used as tests, from a two-machine app and a segmented network to an
+  Active Directory domain, Cisco routers and cloud services. Those with a committed `.isoloom/`
+  are checked against the generators in CI.
 
 ## Status
 
-v0.8. Generators: **Docker Compose**, **Kubernetes** (manifests, NetworkPolicies for networks
-and `reach`), **Vagrant** (VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, ESXi),
-**Docker on one VM** (Vagrant, Proxmox), **Proxmox** (one VM per Linux machine, its own SDN
-network and router) and **Docker on one cloud VM** (AWS, Azure, Google Cloud, DigitalOcean,
-Linode, Oracle). Routers enforce `reach` between networks; a network can name its own
+See the [changelog](CHANGELOG.md) for the current version. Generators: **Docker Compose** (also
+for a **hosting service**), **Kubernetes** (manifests, NetworkPolicies for networks and
+`reach`), **Vagrant** (VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, ESXi),
+**hybrid** (containers and VMs on the same networks), **Docker on one VM** (Vagrant, Proxmox),
+**Proxmox** (one VM per Linux machine, its own SDN network and router), **Docker on one cloud
+VM** and **one cloud VM per machine** (AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle),
+**existing hosts** reached over SSH, and **cloud services** (a Terraform module applied into
+your own cloud account). Routers enforce `reach` between networks; a network can name its own
 `gateway` (an edge firewall); `internet: false`, published ports, volumes, inputs, Windows VMs
 (WinRM, PowerShell steps), environment-level Ansible from a controller, and checks on every
 target. Your own image table (`--images`) sets OS images and supplies the access machine.
 
-Run for real in CI: Docker (hello-stack, air-gapped, segmented, edge-firewall), Kubernetes on kind
+Run for real in CI: Docker (hello-stack, air-gapped, segmented, edge-firewall, slow-link), Kubernetes on kind
 (hello-stack, segmented). Run by hand: VirtualBox (several examples, Windows Server 2019).
 Generated and validated only: Proxmox, the clouds, ESXi.
 
