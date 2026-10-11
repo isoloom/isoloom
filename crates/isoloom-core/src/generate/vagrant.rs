@@ -941,8 +941,9 @@ fn windows_steps(spec: &Spec, name: &str, m: &Machine, vm: &VmImpl, out: &mut St
 /// netcat (checks). Alpine's packages (the default box), or Debian's (a `controller.image`).
 const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add -q --no-cache python3 sshpass curl netcat-openbsd\nelse\n  export DEBIAN_FRONTEND=noninteractive\n  apt-get update -qq\n  apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\nfi\n";
 
-/// The controller: a small VM (Alpine by default) on every network at its controller address, started after every
-/// machine. It writes the inventory and runs the environment-level Ansible playbooks.
+/// The controller: a small VM (Alpine by default) on every network at its controller address,
+/// started after every machine. It writes the inventory and runs the environment-level Ansible
+/// playbooks.
 fn controller_vm(spec: &Spec, out: &mut String, on_controller: &[&checks::Resolved], links: &IndexMap<String, Link>) {
     let with_checks = !on_controller.is_empty();
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
