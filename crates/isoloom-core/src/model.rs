@@ -635,9 +635,14 @@ pub struct Declared {
     /// With `http`: the request body, sent as is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
-    /// With `http`: text the response body must contain.
+    /// With `http`: text the response body must contain. With `tcp`: text the bytes read in
+    /// the first 5 seconds of the connection (after `send`) must contain, like a banner.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contains: Option<String>,
+    /// With `tcp` and `contains`: a line written once connected (followed by a newline; end it
+    /// with `\r` for CRLF), before reading.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub send: Option<String>,
     /// A TCP connection to `host:port`. `expect`: `open` (default) or `blocked`.
     #[serde(default)]
     pub tcp: Option<String>,

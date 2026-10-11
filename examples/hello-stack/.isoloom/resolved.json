@@ -169,6 +169,14 @@
             "wait": 30
           },
           {
+            "name": "the cache answers a PING",
+            "derived": false,
+            "kind": "tcp",
+            "target": "cache:6379",
+            "expect": "open",
+            "wait": 30
+          },
+          {
             "name": "the page says hello",
             "derived": false,
             "kind": "http",

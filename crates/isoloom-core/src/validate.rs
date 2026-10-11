@@ -875,15 +875,29 @@ fn validate_check(spec: &Spec, i: usize, d: &crate::model::Declared, add: &mut d
     {
         add(&format!("{at}.wait"), "at most 3600 seconds".into());
     }
-    let extras = d.method.is_some() || !d.headers.is_empty() || d.body.is_some() || d.contains.is_some();
-    if extras && d.http.is_none() {
-        add(&at, "`method`, `headers`, `body` and `contains` go with `http`".into());
+    let http_extras = d.method.is_some() || !d.headers.is_empty() || d.body.is_some();
+    if http_extras && d.http.is_none() {
+        add(&at, "`method`, `headers` and `body` go with `http`".into());
     }
-    if extras && matches!(&d.expect, Some(Expect::Text(t)) if t == "blocked") {
+    if d.contains.is_some() && d.http.is_none() && d.tcp.is_none() {
+        add(&at, "`contains` goes with `http` or `tcp`".into());
+    }
+    if d.send.is_some() && (d.tcp.is_none() || d.contains.is_none()) {
+        add(&at, "`send` goes with `tcp` and `contains` (the text the answer must contain)".into());
+    }
+    if (http_extras || d.contains.is_some() || d.send.is_some()) && matches!(&d.expect, Some(Expect::Text(t)) if t == "blocked") {
         add(
             &at,
-            "a `blocked` check sends nothing to look at: leave out `method`, `headers`, `body` and `contains`".into(),
+            "a `blocked` check sends nothing to look at: leave out `method`, `headers`, `body`, `send` and `contains`".into(),
         );
+    }
+    if d.contains.as_deref().is_some_and(str::is_empty) {
+        add(&format!("{at}.contains"), "give the text to look for, or leave `contains` out".into());
+    }
+    if let Some(s) = &d.send
+        && s.contains('\n')
+    {
+        add(&format!("{at}.send"), "one line: Isoloom adds the newline".into());
     }
     if let Some(m) = &d.method
         && (m.is_empty() || !m.chars().all(|c| c.is_ascii_alphabetic()))

@@ -200,7 +200,7 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                                 HttpExpect::Blocked => "blocked".into(),
                             },
                         ),
-                        Probe::Tcp { host: h, port, expect } => (
+                        Probe::Tcp { host: h, port, expect, .. } => (
                             "tcp",
                             format!("{}:{port}", host(h)),
                             match expect {
