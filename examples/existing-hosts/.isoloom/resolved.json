@@ -124,7 +124,8 @@
       "docker-vm": "needs `docker:` on web, cache",
       "cloud-docker": "needs `docker:` on web, cache",
       "kubernetes": "needs `docker:` on web, cache",
-      "hybrid": "only when some machines are containers and others are VMs"
+      "hybrid": "only when some machines are containers and others are VMs",
+      "cloud-services": "left out by `targets:`"
     }
   },
   "checks": {
@@ -150,6 +151,14 @@
         "machine": "cache",
         "runner": "isoloom-check-cache",
         "checks": [
+          {
+            "name": "the cache came back with transparent hugepages off",
+            "derived": false,
+            "kind": "exec",
+            "target": "cat /sys/kernel/mm/transparent_hugepage/enabled",
+            "expect": "[never]",
+            "wait": 0
+          },
           {
             "name": "web:80 from cache",
             "derived": true,

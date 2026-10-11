@@ -3,9 +3,13 @@
 # Start:  cd .isoloom/vagrant && vagrant up
 # Stop:   cd .isoloom/vagrant && vagrant destroy -f
 
+# One machine at a time, in order (QEMU and libvirt would boot them all at once).
+ENV["VAGRANT_NO_PARALLEL"] = "1"
 ROOT = File.expand_path("../..", __dir__)
 # Copied into each VM: the project, without version control or generated files.
 PROJECT = Dir.children(ROOT).reject { |e| [".git", ".vagrant"].include?(e) || e.start_with?(".isoloom") }.sort
+# This host's CPU as QEMU names it: a machine built for another one runs emulated there.
+HOST_ARCH = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "aarch64" : "x86_64"
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (lab); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
@@ -17,6 +21,7 @@ end
 Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 900
+  config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
     v.default_prefix = "ansible-pair_"
   end
@@ -47,9 +52,19 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "qemu" do |v|
+    m.vm.provider "qemu" do |v, o|
+      o.vm.box = "cloud-image/debian-12"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = "amd64"
+      v.arch = "x86_64"
       v.smp = "cpus=1"
       v.memory = "1024M"
+      v.ssh_auto_correct = true
+      # No private network on QEMU: network `lab` has 3 VMs, and QEMU links exactly two without root.
+      if "x86_64" != HOST_ARCH
+        v.smp = "cpus=1"
+        o.vm.boot_timeout = 3600
+      end
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -97,9 +112,19 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "qemu" do |v|
+    m.vm.provider "qemu" do |v, o|
+      o.vm.box = "cloud-image/debian-12"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = "amd64"
+      v.arch = "x86_64"
       v.smp = "cpus=1"
       v.memory = "1024M"
+      v.ssh_auto_correct = true
+      # No private network on QEMU: network `lab` has 3 VMs, and QEMU links exactly two without root.
+      if "x86_64" != HOST_ARCH
+        v.smp = "cpus=1"
+        o.vm.boot_timeout = 3600
+      end
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -122,34 +147,38 @@ Vagrant.configure("2") do |config|
   end
 
   config.vm.define "isoloom-controller" do |m|
-    m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
+    m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-controller"
     m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "ansible-pair · controller"
       v.linked_clone = true
       v.cpus = 1
-      v.memory = 768
+      v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
       v.vmx["displayName"] = "ansible-pair · controller"
       v.vmx["numvcpus"] = "1"
-      v.vmx["memsize"] = "768"
+      v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
       v.name = "ansible-pair · controller"
       v.linked_clone = true
       v.cpus = 1
-      v.memory = 768
+      v.memory = 1024
     end
     m.vm.provider "utm" do |v|
       v.name = "ansible-pair · controller"
       v.cpus = 1
-      v.memory = 768
+      v.memory = 1024
     end
-    m.vm.provider "qemu" do |v|
+    m.vm.provider "qemu" do |v, o|
+      o.vm.box = "cloud-image/debian-12"
+      o.vm.box_version = ">= 0"
       v.smp = "cpus=1"
-      v.memory = "768M"
+      v.memory = "1024M"
+      v.ssh_auto_correct = true
+      # No private network on QEMU: network `lab` has 3 VMs, and QEMU links exactly two without root.
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -160,12 +189,12 @@ Vagrant.configure("2") do |config|
       v.esxi_virtual_network = esxi_networks(["lab"])
       v.guest_name = "ansible-pair-controller"
       v.guest_numvcpus = 1
-      v.guest_memsize = 768
+      v.guest_memsize = 1024
     end
     m.vm.provider "libvirt" do |v, o|
-      o.vm.box = "generic/alpine319"
+      o.vm.box = "generic/debian12"
       v.cpus = 1
-      v.memory = 768
+      v.memory = 1024
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.63.0.10 web' '10.63.0.20 cache'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     PROJECT.each do |entry|
@@ -174,19 +203,15 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "project", inline: "rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom"
     m.vm.provision "shell", name: "controller", inline: <<~'SH'
       set -e
-      if command -v apk >/dev/null; then
-        apk add -q --no-cache python3 sshpass curl netcat-openbsd
-      else
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update -qq
-        apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null
-      fi
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -qq
+      apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null
       [ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/inventory.ini <<'INV'
       [linux]
       web ansible_host=10.63.0.10
-      cache ansible_host=10.63.0.20
+      cache ansible_host=10.63.0.20 maxmemory='"64mb"'
 
       [windows]
 
@@ -219,9 +244,41 @@ Vagrant.configure("2") do |config|
       set -e
       mkdir -p /tmp/isoloom-facts
       export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200
+      _isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'
+      _isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
+      retry_download() {
+        _isoloom_n=1
+        until "$@"; do
+          [ "$_isoloom_n" -lt 5 ] || return 1
+          echo "isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)"
+          sleep $((_isoloom_n * _isoloom_pause))
+          _isoloom_n=$((_isoloom_n + 1))
+        done
+      }
+      run_play() {
+        _isoloom_n=1
+        _isoloom_log=$(mktemp)
+        _isoloom_rcf=$(mktemp)
+        while :; do
+          { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
+          _isoloom_rc=$(cat "$_isoloom_rcf")
+          if [ "$_isoloom_rc" -eq 0 ]; then
+            rm -f "$_isoloom_log" "$_isoloom_rcf"
+            return 0
+          fi
+          if [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log"; then
+            echo "isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)"
+            sleep $((2 * _isoloom_pause))
+            _isoloom_n=$((_isoloom_n + 1))
+          else
+            rm -f "$_isoloom_log" "$_isoloom_rcf"
+            return "$_isoloom_rc"
+          fi
+        done
+      }
       cd /opt/isoloom/ansible
-      ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml
-      ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible"}' site.yml
+      retry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml
+      run_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}' site.yml
     SH
     m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/web-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end

@@ -5,11 +5,16 @@
 mod appliances;
 /// The network appliances' management network (see `docker.appliance`).
 pub const APPLIANCE_MGMT_CIDR: &str = appliances::MGMT_CIDR;
+/// Whether an appliance kind is a switch (it can be a LAN's `switch`).
+pub fn is_switch_appliance(kind: crate::model::Appliance) -> bool {
+    appliances::is_switch(kind)
+}
 mod cloud_docker;
+mod cloud_services;
 mod cloud_vm;
 mod cloud_vm_others;
 mod docker;
-pub use docker::{StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
+pub use docker::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
 mod docker_vm;
 mod external;
 mod hybrid;
@@ -19,6 +24,7 @@ pub mod resolved;
 mod router;
 mod trunks;
 mod vagrant;
+pub use vagrant::qemu_refusal;
 
 use std::fmt;
 use std::net::Ipv4Addr;
@@ -28,6 +34,37 @@ use indexmap::IndexMap;
 use crate::model::{Spec, Target};
 use crate::targets::effective;
 use crate::validate::Cidr;
+
+/// The `provision[].host_vars` of `machine`, as ` key='value'` pairs for its inventory line.
+/// Ansible splits a host line like a shell and reads each value as a Python literal, so every
+/// value is written as one (a string quoted, so `"10"` stays a string; `True`, `None`, lists and
+/// dicts as Python spells them), then single-quoted for the split.
+pub(crate) fn host_vars(spec: &Spec, machine: &str) -> String {
+    fn py(v: &serde_json::Value) -> String {
+        use serde_json::Value;
+        match v {
+            Value::Null => "None".into(),
+            Value::Bool(b) => if *b { "True" } else { "False" }.into(),
+            Value::Number(n) => n.to_string(),
+            Value::String(s) => serde_json::to_string(s).expect("a string serializes"),
+            Value::Array(a) => format!("[{}]", a.iter().map(py).collect::<Vec<_>>().join(", ")),
+            Value::Object(o) => format!(
+                "{{{}}}",
+                o.iter()
+                    .map(|(k, v)| format!("{}: {}", serde_json::to_string(k).expect("a string serializes"), py(v)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        }
+    }
+    let mut out = String::new();
+    for step in &spec.provision {
+        for (k, v) in step.host_vars.get(machine).into_iter().flatten() {
+            out.push_str(&format!(" {k}='{}'", py(v).replace('\'', "'\"'\"'")));
+        }
+    }
+    out
+}
 
 /// The name of the router Isoloom adds (a Compose service, a VM) when `reach` rules need one.
 /// The controller's Vagrant box by default: Alpine, about 100 MB (Python, ansible-core and
@@ -101,6 +138,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
     Target::Proxmox,
     Target::CloudVm,
     Target::External,
+    Target::CloudServices,
 ];
 
 /// The files for one target.
@@ -161,6 +199,7 @@ fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
         Target::Proxmox => proxmox::generate(spec),
         Target::CloudVm => cloud_vm::generate(spec),
         Target::External => external::generate(spec),
+        Target::CloudServices => cloud_services::generate(spec),
     }
 }
 
@@ -201,6 +240,13 @@ fn arm64_machine(spec: &Spec) -> Option<&str> {
         .filter(|(_, m)| m.docker.is_some() || m.vm.is_some())
         .find(|(_, m)| m.arch == crate::model::Arch::Arm64)
         .map(|(n, _)| n.as_str())
+}
+
+/// A Google Cloud project's display name: `isoloom-<environment>`, cut to the 30 characters
+/// Google allows (a longer one fails at plan time), without a trailing hyphen.
+pub(crate) fn gcp_project_name(env: &str) -> String {
+    let full = format!("isoloom-{env}");
+    full.chars().take(30).collect::<String>().trim_end_matches('-').to_string()
 }
 
 fn header(comment: &str) -> String {
@@ -378,4 +424,17 @@ fn on_docker(spec: &Spec) -> Spec {
         n.cidr = format!("{}/{}", Ipv4Addr::from(c.base), c.len);
     }
     s
+}
+
+#[cfg(test)]
+mod gcp_project_name_tests {
+    #[test]
+    fn fits_google_limit() {
+        assert_eq!(super::gcp_project_name("web"), "isoloom-web");
+        let long = super::gcp_project_name("google-ctf-2020-log-me-in");
+        assert_eq!(long, "isoloom-google-ctf-2020-log-me");
+        assert!(long.len() <= 30);
+        // Never ends on a hyphen once cut.
+        assert_eq!(super::gcp_project_name("abcdefghijklmnopqrstu-wxyz"), "isoloom-abcdefghijklmnopqrstu");
+    }
 }

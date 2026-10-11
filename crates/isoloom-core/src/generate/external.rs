@@ -40,6 +40,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         if let Some(k) = &e.key {
             let _ = write!(line, " ansible_ssh_private_key_file={k}");
         }
+        line.push_str(&super::host_vars(spec, name));
         if m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os)) {
             let _ = writeln!(windows, "{line}");
         } else {

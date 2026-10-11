@@ -38,6 +38,31 @@ _tcp() {
   else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
 }
+# _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
+# LINE and a newline, if any) contain TEXT; $out says why not (nc, else bash). Stdin stays open
+# while reading (some nc quit at its end), and nc is stopped after 5s whatever its flavor.
+_tcp_read() {
+  f=$(mktemp); i=0; r=1
+  if command -v nc >/dev/null 2>&1; then
+    { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
+  else
+    H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
+  fi
+  p=$!
+  while :; do
+    if grep -qF -- "$4" "$f"; then r=0; break; fi
+    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    sleep 1; i=$((i+1))
+  done
+  [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
+  touch "$f.end"; kill $p 2>/dev/null
+  if [ $r = 1 ]; then
+    if [ -s "$f" ]; then out="$1:$2 answered \"$(head -c 100 "$f" | tr -d '\000\r' | tr '\n\t' '  ')\", without the expected text"
+    elif [ $i -lt 5 ]; then out="$1:$2 refused the connection or closed it without a word"
+    else out="nothing read from $1:$2 within 5s"; fi
+  fi
+  rm -f "$f" "$f.end"; return $r
+}
 # _exec COMMAND TEXT -> 0 when the command succeeds and its output contains TEXT (if any).
 _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep -qF -- "$2"; }; }
 # _retry SECONDS COMMAND... -> keeps trying every 2s until it passes or the time is up.
@@ -45,6 +70,14 @@ _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)"
 
 echo '== checks/both-answer.sh'
 if _retry 0 sh -c 'cd /opt/isoloom && sh checks/both-answer.sh'; then pass 'checks/both-answer.sh'; else fail 'checks/both-answer.sh' "checks/both-answer.sh exited non-zero"; fi
+
+if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
+if _retry 30 _tcp '192.168.58.10' 445; then pass 'files01:445 from the networks'; else fail 'files01:445 from the networks' "nothing listens at 192.168.58.10:445"; fi
+fi
+
+if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
+if _retry 30 _http_any 'http://192.168.58.20:80/'; then pass 'intranet:80 from the networks'; else fail 'intranet:80 from the networks' "nothing answers at http://192.168.58.20:80/"; fi
+fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

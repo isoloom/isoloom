@@ -140,6 +140,10 @@ pub fn table() -> Vec<Row> {
             "machines.*.services[].port",
             done("machines depending on it wait until it answers", "segmented"),
         ),
+        (
+            "machines.*.services[].dormant",
+            done("left out of the dependency waits; no derived check expects it to answer", "segmented"),
+        ),
         ("machines.*.resources.cpus", done("the VM's cores", "segmented")),
         ("machines.*.resources.memory_mb", done("the VM's memory", "segmented")),
         ("machines.*.resources.disk_gb", done("the VM's disk size", "segmented")),
@@ -152,7 +156,13 @@ pub fn table() -> Vec<Row> {
                 proof: "segmented",
             },
         ),
-        ("machines.*.vm.provision", done("cloud-init writes the project and runs the steps", "segmented")),
+        (
+            "machines.*.vm.provision",
+            done(
+                "cloud-init writes the project and runs the steps; after a `reboot`, a unit runs the rest at the next boot",
+                "existing-hosts",
+            ),
+        ),
         ("machines.*.volumes", done("the VM's own disk keeps the data; the path is created", "segmented")),
     ];
     for (path, status) in proxmox {
@@ -244,6 +254,15 @@ fn base_table() -> Vec<Row> {
             ),
         ),
         row(
+            "networks.*.switch",
+            done(
+                "the LAN's switch appliance instead of the Linux switch container: an access port per VLAN network, a trunk port per trunk link, VLANs and port modes in its startup configuration",
+                "cisco-switch",
+            ),
+            na("switch appliances run on the Docker targets only"),
+            na("switch appliances run on the Docker targets only"),
+        ),
+        row(
             "networks.*.vlans.*.internet",
             done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
             done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
@@ -292,6 +311,36 @@ fn base_table() -> Vec<Row> {
             done("machines depending on it wait until it answers", "hello-stack"),
         ),
         Row {
+            path: "cloud.provider",
+            outputs: all(Status::Descriptive {
+                note: "the cloud of a cloud-services environment (the cloud-services target, not these outputs)",
+            }),
+        },
+        Row {
+            path: "cloud.terraform",
+            outputs: all(Status::Descriptive {
+                note: "the Terraform module the cloud-services target applies",
+            }),
+        },
+        Row {
+            path: "cloud.vars",
+            outputs: all(Status::Descriptive {
+                note: "the module's variables (terraform.tfvars.json)",
+            }),
+        },
+        Row {
+            path: "cloud.outputs",
+            outputs: all(Status::Descriptive {
+                note: "what checks and the message read once deployed",
+            }),
+        },
+        Row {
+            path: "cloud.hourly_usd",
+            outputs: all(Status::Descriptive {
+                note: "the cost runners show and budget",
+            }),
+        },
+        Row {
             path: "machines.*.services[].name",
             outputs: all(Status::Descriptive {
                 note: "names the service for people and runners",
@@ -306,6 +355,17 @@ fn base_table() -> Vec<Row> {
             "machines.*.services[].fixed",
             done("the `publish` port itself on the host, not a free one", "supplier-portal-api"),
             done("Vagrant forwards `publish` as is", "supplier-portal-api"),
+        ),
+        common(
+            "machines.*.services[].dormant",
+            done(
+                "left out of the healthcheck (so `depends_on` and `up --wait` don't wait for it) and of the derived checks that expect an answer; still published and opened by `reach`",
+                "segmented",
+            ),
+            done(
+                "left out of the dependency waits and of the derived checks that expect an answer; still forwarded and opened by `reach`",
+                "segmented",
+            ),
         ),
         Row {
             path: "machines.*.services[].tls",
@@ -474,13 +534,26 @@ fn base_table() -> Vec<Row> {
         ),
         vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
         vm_field(
+            "machines.*.vm.image.qemu",
+            done(
+                "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
+                "windows-hello",
+            ),
+        ),
+        vm_field(
             "machines.*.vm.image.winrm",
             done(
                 "how the Windows box answers WinRM: `plaintext` (HTTP 5985, the default) or `ssl` (HTTPS 5986)",
                 "windows-hello",
             ),
         ),
-        vm_field("machines.*.vm.provision", done("`.sh` steps, and Ansible run inside the VM", "hello-stack")),
+        vm_field(
+            "machines.*.vm.provision",
+            done(
+                "`.sh` steps, Ansible run inside the VM, and `reboot` (Vagrant restarts the VM)",
+                "existing-hosts",
+            ),
+        ),
         common(
             "provision[].ansible",
             planned("environment-level provisioning on containers (a controller container)"),
@@ -500,6 +573,11 @@ fn base_table() -> Vec<Row> {
             "provision[].vars",
             planned("with environment-level provisioning on containers"),
             done("extra variables (`-e`)", "ansible-pair"),
+        ),
+        common(
+            "provision[].host_vars",
+            planned("with environment-level provisioning on containers"),
+            done("on each machine's line of the inventory Isoloom writes", "ansible-pair"),
         ),
         common(
             "controller",
@@ -554,8 +632,19 @@ fn base_table() -> Vec<Row> {
         ),
         common(
             "checks[].contains",
-            done("the response body, searched for the text (curl)", "hello-stack"),
-            done("the response body, searched for the text (curl)", "hello-stack"),
+            done(
+                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+                "hello-stack",
+            ),
+            done(
+                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+                "hello-stack",
+            ),
+        ),
+        common(
+            "checks[].send",
+            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
+            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
         ),
         row(
             "checks[].exec",
@@ -660,7 +749,7 @@ fn base_table() -> Vec<Row> {
 }
 
 /// Fields counted as one feature whatever they hold.
-const WHOLE: &[&str] = &["common", "groups", "tools", "controller"];
+const WHOLE: &[&str] = &["common", "groups", "tools", "provision[].host_vars", "controller"];
 
 /// Where in the spec names are chosen by the author (map keys become `*`).
 const NAMED: &[&str] = &[
@@ -669,6 +758,8 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "cloud.vars",
+    "cloud.outputs",
     "checks[].headers",
     "machines.*.docker.args",
     "provision[].groups",

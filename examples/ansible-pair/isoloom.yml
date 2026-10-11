@@ -38,6 +38,12 @@ provision:
       caches: [cache]
     vars:
       greeting: hello from ansible
+      # Any YAML value: lists, numbers and booleans keep their types.
+      tools: [curl, jq]
+      cache_port: 6379
+    # Per machine, on its inventory line.
+    host_vars:
+      cache: { maxmemory: 64mb }
 
 # The controller that runs the playbooks: 1 CPU, 512 MB and an Alpine box by default.
 controller:

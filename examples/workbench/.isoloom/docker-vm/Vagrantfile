@@ -13,6 +13,7 @@ Vagrant.configure("2") do |config|
   config.vm.hostname = "workbench"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
+  config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
     v.default_prefix = "workbench_"
   end

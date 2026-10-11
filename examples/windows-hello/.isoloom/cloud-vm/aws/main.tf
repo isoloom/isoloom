@@ -36,10 +36,16 @@ variable "auto_stop_minutes" {
   description = "Shut the machines down after this many minutes (0: never)"
 }
 
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+
 provider "aws" {
   region = var.region
   default_tags {
-    tags = { "isoloom-environment" = "windows-hello", "managed-by" = "isoloom" }
+    tags = { "isoloom-environment" = "windows-hello", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
   }
 }
 
@@ -319,7 +325,7 @@ resource "terraform_data" "isoloom_controller" {
       "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null",
       "[ -x /opt/ansible/bin/ansible-playbook ] || { sudo python3 -m venv /opt/ansible && sudo /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }",
       "printf '%s' '[linux]\n\n[windows]\nweb01 ansible_host=192.168.57.10\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n' | sudo tee /etc/isoloom/inventory.ini >/dev/null",
-      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n'",
+      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}\n'",
       "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
     ]
   }

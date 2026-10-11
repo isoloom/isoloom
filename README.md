@@ -60,7 +60,7 @@ Release binaries for macOS, Linux (x86_64, arm64) and Windows are on the
 [releases page](https://github.com/isoloom/isoloom/releases). In GitHub Actions:
 
 ```yaml
-- uses: isoloom/isoloom@v0.8.1
+- uses: isoloom/isoloom@v0.10.1
 - run: isoloom check
 ```
 
@@ -106,7 +106,8 @@ kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | k
 
 Checks come in three kinds, and `isoloom test` runs them all from inside the environment:
 **derived** from the spec (every service answers from the machines `reach` lets through and from
-nowhere else; offline networks stay offline), **declared** (`http`, `tcp`, `exec`, with `from`,
+nowhere else; offline networks stay offline; without a Linux machine to run them, every service
+answers from the controller), **declared** (`http`, `tcp`, `exec`, with `from`,
 `expect` and `wait`), and **scripts**.
 
 ## Layout

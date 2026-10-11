@@ -5,7 +5,7 @@
 
 use std::fmt::Write;
 
-use crate::generate::cloud_vm::{aligned, hcl_cmd, linux_setup_cmds, needs_controller, redirects};
+use crate::generate::cloud_vm::{aligned, linux_setup_cmds, needs_controller, redirects, remote_exec};
 use crate::generate::proxmox::res;
 use crate::generate::{GeneratedFile, OUTPUT_DIR, address, header, start_order};
 use crate::model::Spec;
@@ -90,6 +90,12 @@ variable "auto_stop_minutes" {{
   type        = number
   default     = 0
   description = "Shut the machines down after this many minutes (0: never)"
+}}
+
+variable "expires_at" {{
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }}
 "#,
     );
@@ -187,7 +193,7 @@ resource "linode_vpc_subnet" "env" {{
         // address, so the machines reach each other at exactly the spec's addresses.
         let _ = write!(
             tf,
-            "\nresource \"linode_instance\" \"{id}\" {{\n  label           = \"${{local.name}}-{name}\"\n  region          = var.region\n  type            = \"{itype}\"\n  image           = \"{image}\"\n  authorized_keys = [trimspace(var.ssh_public_key)]\n  root_pass       = random_password.{id}.result\n  booted          = true\n  tags            = [\"isoloom\", \"{env}\"]\n  metadata {{\n    user_data = base64encode(var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : \"\")\n  }}\n  interface {{\n    purpose = \"public\"\n  }}\n  interface {{\n    purpose   = \"vpc\"\n    subnet_id = linode_vpc_subnet.env.id\n    ipv4 {{\n      vpc = \"{addr}\"\n    }}\n  }}\n}}\n",
+            "\nresource \"linode_instance\" \"{id}\" {{\n  label           = \"${{local.name}}-{name}\"\n  region          = var.region\n  type            = \"{itype}\"\n  image           = \"{image}\"\n  authorized_keys = [trimspace(var.ssh_public_key)]\n  root_pass       = random_password.{id}.result\n  booted          = true\n  tags            = concat([\"isoloom\", \"{env}\", local.name], var.expires_at == \"\" ? [] : [\"isoloom-expires-${{var.expires_at}}\"])\n  metadata {{\n    user_data = base64encode(var.auto_stop_minutes > 0 ? \"#!/bin/sh\\nshutdown -h +${{var.auto_stop_minutes}}\\n\" : \"\")\n  }}\n  interface {{\n    purpose = \"public\"\n  }}\n  interface {{\n    purpose   = \"vpc\"\n    subnet_id = linode_vpc_subnet.env.id\n    ipv4 {{\n      vpc = \"{addr}\"\n    }}\n  }}\n}}\n",
             itype = linode_type(mem),
             env = spec.name,
         );
@@ -218,11 +224,7 @@ resource "linode_vpc_subnet" "env" {{
                 lines.join(", ")
             );
         }
-        let _ = write!(
-            prov,
-            "  provisioner \"remote-exec\" {{\n    inline = [\n{}\n    ]\n  }}\n",
-            cmds.iter().map(|c| format!("      {}", hcl_cmd(c))).collect::<Vec<_>>().join(",\n")
-        );
+        prov.push_str(&remote_exec(&cmds));
         let _ = writeln!(prov, "  depends_on = [{}]", deps.join(", "));
         prov.push_str("}\n");
         tf.push_str(&prov);
