@@ -745,6 +745,10 @@ pub struct Declared {
     /// the first 5 seconds of the connection (after `send`) must contain, like a banner.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contains: Option<String>,
+    /// With `http`: follow redirects (up to 5 hops) and compare the final answer's status, for a
+    /// page that redirects (a login page, an app's index). Default: the first answer counts.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub follow: bool,
     /// With `tcp` and `contains`: a line written once connected (followed by a newline; end it
     /// with `\r` for CRLF), before reading.
     #[serde(default, skip_serializing_if = "Option::is_none")]

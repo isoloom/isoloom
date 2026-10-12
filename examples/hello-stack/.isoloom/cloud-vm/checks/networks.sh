@@ -5,12 +5,16 @@
 passed=0; failed=0
 pass() { passed=$((passed+1)); echo "isoloom-check: PASS $1"; }
 fail() { failed=$((failed+1)); echo "isoloom-check: FAIL $1: $2"; }
-# _http URL -> the status code, 000 when nothing answers (curl, else wget, else bash).
+# _http URL [follow] -> the status code, 000 when nothing answers (curl, else wget, else bash):
+# the first answer's, or with `follow` the last one's after at most 5 redirects (bash: the first).
 _http() {
   if command -v curl >/dev/null 2>&1; then
-    c=$(curl -sk -o /dev/null -m 5 -w '%{http_code}' "$1" 2>/dev/null)
+    if [ -n "$2" ]; then set -- "$1" -L --max-redirs 5; else set -- "$1"; fi
+    c=$(curl -sk -o /dev/null -m 5 -w '%{http_code}' "$@" 2>/dev/null)
   elif command -v wget >/dev/null 2>&1; then
-    c=$(wget -q -S -O /dev/null -T 5 --no-check-certificate "$1" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | tail -n 1)
+    # wget follows redirects whatever it's told (busybox's can't be told): -S prints each answer.
+    if [ -n "$2" ]; then _n=6; else _n=1; fi
+    c=$(wget -q -S -O /dev/null -T 5 --no-check-certificate "$1" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | head -n $_n | tail -n 1)
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
@@ -18,7 +22,7 @@ _http() {
   fi
   echo "${c:-000}"
 }
-_http_is() { [ "$(_http "$1")" = "$2" ]; }
+_http_is() { [ "$(_http "$1" "$3")" = "$2" ]; }
 # _req STATUS|any TEXT CURL-ARGS... -> 0 when the request gets that status (any answer for `any`)
 # and its body contains TEXT (if any); $out says why not. Needs curl.
 _req() {
@@ -31,7 +35,7 @@ _req() {
   fi
   rm -f "$b"; return $r
 }
-_http_any() { [ "$(_http "$1")" != 000 ]; }
+_http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
@@ -76,6 +80,10 @@ if _retry 30 _http_is 'http://web/' 200; then pass 'the page greets'; else fail 
 if _retry 30 _tcp_read 'cache' 6379 'PING' '+PONG'; then pass 'the cache answers a PING'; else fail 'the cache answers a PING' "$out"; fi
 
 if _retry 30 _req 200 'hello from isoloom' -H 'Accept: text/html' 'http://web/'; then pass 'the page says hello'; else fail 'the page says hello' "$out"; fi
+
+if _retry 30 _http_is 'http://web/hello' 301; then pass 'the folder'\''s address without its slash redirects'; else fail 'the folder'\''s address without its slash redirects' "expected HTTP 301 from http://web/hello, got $(_http 'http://web/hello')"; fi
+
+if _retry 30 _http_is 'http://web/hello' 200 follow; then pass 'the folder'\''s page, past the redirect'; else fail 'the folder'\''s page, past the redirect' "expected HTTP 200 from http://web/hello (after redirects), got $(_http 'http://web/hello' follow)"; fi
 
 if _retry 30 _req 405 '' -X 'POST' --data-binary 'greeting=hi' 'http://web/'; then pass 'the static page refuses a POST'; else fail 'the static page refuses a POST' "$out"; fi
 

@@ -252,6 +252,14 @@ fn a_check_that_is_off_names_its_field() {
         problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, send: \"a\\nb\", contains: x }}\n")),
         ["checks[0].send: one line: Isoloom adds the newline"]
     );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, follow: true }}\n")),
+        ["checks[0]: `follow` (redirects) goes with `http`"]
+    );
+    assert_eq!(
+        problems(&format!("{BASE}checks:\n  - {{ http: http://web/, follow: true, expect: blocked }}\n")),
+        ["checks[0]: a `blocked` check gets no answer, so no redirect to follow: leave out `follow`"]
+    );
     // A typo in a declared check is reported as such, not as "no variant matched".
     let err = parse(&format!("{BASE}checks:\n  - {{ htp: http://web/ }}\n")).unwrap_err().to_string();
     assert!(err.contains("unknown field `htp`"), "{err}");
@@ -400,4 +408,105 @@ fn a_tls_service_is_probed_over_https() {
         .expect("a derived http check");
     let checks::Probe::Http { url, .. } = &derived.probe else { unreachable!() };
     assert!(url.https);
+}
+
+/// The runner's sh, with only these tools on its PATH (plus what the runtime itself needs): a
+/// runner where curl, or wget, is all there is.
+#[cfg(unix)]
+fn run_with_only(script: &str, tools: &[(&str, &str)]) -> String {
+    let dir = std::env::temp_dir().join(format!("isoloom-path-{}-{}", std::process::id(), tools[0].0));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let which = |t: &str| {
+        let out = std::process::Command::new("sh").arg("-c").arg(format!("command -v {t}")).output().unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    for t in ["sh", "sed", "head", "tail", "grep", "mktemp", "rm", "date", "sleep", "cat", "tr"] {
+        std::os::unix::fs::symlink(which(t), dir.join(t)).unwrap();
+    }
+    for (name, target) in tools {
+        std::os::unix::fs::symlink(target, dir.join(name)).unwrap();
+    }
+    let out = std::process::Command::new(dir.join("sh"))
+        .arg("-c")
+        .arg(script)
+        .env("PATH", &dir)
+        .output()
+        .expect("sh runs");
+    let _ = std::fs::remove_dir_all(&dir);
+    String::from_utf8_lossy(&out.stdout).to_string()
+}
+
+#[test]
+#[cfg(unix)]
+fn http_checks_follow_redirects_when_asked() {
+    // /old redirects to /new (200); /loop redirects to itself for ever.
+    let port = serve(true, 0, |l| {
+        let path = l.split_whitespace().nth(1).unwrap_or("/");
+        match path {
+            "/old" => "HTTP/1.1 302 Found\r\nLocation: /new\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            "/loop" => "HTTP/1.1 302 Found\r\nLocation: /loop\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            _ => "HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nwelcome\n".into(),
+        }
+    });
+    let u = format!("http://127.0.0.1:{port}");
+    let spec = parse(&format!(
+        "{BASE}checks:\n  \
+         - {{ name: first, http: '{u}/old', expect: 302, wait: 0 }}\n  \
+         - {{ name: unfollowed, http: '{u}/old', wait: 0 }}\n  \
+         - {{ name: followed, http: '{u}/old', follow: true, wait: 0 }}\n  \
+         - {{ name: looping, http: '{u}/loop', follow: true, wait: 0 }}\n  \
+         - {{ name: followed body, http: '{u}/old', follow: true, contains: welcome, wait: 0 }}\n"
+    ))
+    .unwrap();
+    assert_eq!(validate(&spec), vec![]);
+    let plan: Vec<checks::Resolved> = checks::plan(&spec).into_iter().filter(|c| !c.derived).collect();
+    assert!(matches!(&plan[2].probe, Probe::Http { request, .. } if request.follow));
+    let host = |h: &checks::Host, _: &Position| h.to_string();
+    let run = |p: &str| format!("sh {p}");
+    let render = checks::Render {
+        host: &host,
+        script: &run,
+        playbook: None,
+    };
+    let position = Position::Machine("user".into());
+    let script = checks::script(&position, &plan.iter().collect::<Vec<_>>(), &render);
+    assert!(script.contains(&format!("_retry 0 _http_is '{u}/old' 200 follow;")), "{script}");
+    assert!(script.contains(&format!("-L --max-redirs 5 '{u}/old'")), "{script}");
+    let expect = |text: &str, with_body: bool| {
+        let lines: Vec<Line> = text.lines().filter_map(checks::parse_line).collect();
+        for ok in ["first", "followed"] {
+            assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
+        }
+        assert!(
+            lines.contains(&Line::Fail("unfollowed".into(), format!("expected HTTP 200 from {u}/old, got 302"))),
+            "{text}"
+        );
+        assert!(
+            lines.contains(&Line::Fail(
+                "looping".into(),
+                format!("expected HTTP 200 from {u}/loop (after redirects), got 302")
+            )),
+            "{text}"
+        );
+        if with_body {
+            assert!(lines.contains(&Line::Pass("followed body".into())), "{text}");
+        }
+    };
+    let which = |t: &str| {
+        let out = std::process::Command::new("sh").arg("-c").arg(format!("command -v {t}")).output().unwrap();
+        Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|p| !p.is_empty())
+    };
+    // curl, else GNU wget, else busybox's: the same answers (wget follows whatever it's told).
+    if let Some(curl) = which("curl") {
+        expect(&run_with_only(&script, &[("curl", &curl)]), true);
+    }
+    let plain: Vec<&checks::Resolved> = plan.iter().filter(|c| c.name != "followed body").collect();
+    let plain = checks::script(&position, &plain, &render);
+    if let Some(wget) = which("wget") {
+        expect(&run_with_only(&plain, &[("wget", &wget)]), false);
+    }
+    if let Some(busybox) = which("busybox") {
+        expect(&run_with_only(&plain, &[("wget", &busybox)]), false);
+    }
 }
