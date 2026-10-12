@@ -264,7 +264,9 @@ pub struct Machine {
     #[serde(default)]
     pub depends_on: Vec<String>,
     /// Data that survives restarts and re-creation of the machine, until the environment is
-    /// destroyed: a name -> an absolute path in the machine.
+    /// destroyed: a name -> an absolute path in the machine. On the container targets a volume
+    /// starts with the image's files at that path (Docker's named volumes; Kubernetes seeds
+    /// its claim from the image while it is empty), so init jobs can add to them.
     #[serde(default)]
     pub volumes: IndexMap<String, String>,
     /// The machine the user lands on. It may have no implementation: the runner supplies it.

@@ -514,6 +514,35 @@ fn kubernetes_turns_networks_and_reach_into_network_policies() {
 }
 
 #[test]
+fn kubernetes_seeds_a_volume_from_the_image_before_the_init_jobs() {
+    // `volumes: { ctf: /chroot }` over an image path: on Docker the named volume starts with the
+    // image's files; the claim does too, from an init container of the machine's image.
+    let spec = parse(
+        "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  chal:\n    networks: { app: 10 }\n    volumes: { ctf: /chroot }\n    docker: { image: \"gcr.io/distroless/static\", init: [flag.sh] }\n",
+    )
+    .expect("parses");
+    let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
+    let seed = env.find("- name: seed-ctf").expect("a seed init container");
+    let init = env.find("initContainers:").expect("init containers");
+    let containers = env.find("containers:\n      - name: chal").expect("the machine");
+    // An init container: done before the machine and its init jobs (a container of the pod) start.
+    assert!(init < seed && seed < containers, "{env}");
+    let block = &env[seed..containers];
+    // The machine's image, run by Isoloom's busybox (no shell needed from the image), as root,
+    // the claim at a path of its own, copied into only while empty (a `lost+found` aside).
+    assert!(block.contains("image: gcr.io/distroless/static"), "{block}");
+    assert!(block.contains("- /.isoloom-probe/busybox\n        - sh"), "{block}");
+    assert!(block.contains("runAsUser: 0"), "{block}");
+    assert!(block.contains("name: vol-ctf\n          mountPath: /isoloom-seed"), "{block}");
+    assert!(block.contains("[ -d '/chroot' ] || exit 0"), "{block}");
+    assert!(block.contains("lost+found"), "{block}");
+    assert!(block.contains("busybox cp -a '/chroot/.' \"$d/\""), "{block}");
+    // The busybox it runs is copied in first, even though the machine has no services to probe.
+    assert!(env[init..seed].contains("- name: isoloom-probe\n        image: busybox"), "{env}");
+    assert!(env.contains("- name: isoloom-probe\n        emptyDir: {}"), "{env}");
+}
+
+#[test]
 fn kubernetes_publishes_and_keeps_offline_machines_inside() {
     let (_, spec) = example("hello-stack");
     let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");

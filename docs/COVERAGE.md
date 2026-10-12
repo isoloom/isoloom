@@ -147,7 +147,7 @@ when a table disagrees with what Isoloom really generates.
 | `user` | Yes | Partly | Isoloom's check runner, as root to drop its default route on offline networks; not yet: a machine's own user: set it in its image |
 | `userns_mode` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `uts` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
-| `volumes` | Yes | Partly | From `machines.*.volumes` (and read-only mounts of init and check scripts); not yet: data shared between machines |
+| `volumes` | Yes | Partly | From `machines.*.volumes` (seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts); not yet: data shared between machines |
 | `volumes_from` | Yes | Not yet | With volumes (data shared between machines) |
 | `working_dir` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 
