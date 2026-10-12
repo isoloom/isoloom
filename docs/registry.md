@@ -15,6 +15,7 @@ repeat the target. Tools that embed Isoloom read and write it too, through
 ```yaml
 # Environments `isoloom run` brought up on this host. Written by `isoloom run` and `isoloom down`;
 # `isoloom status` reads it.
+version: 1
 environments:
 - name: hello-stack
   dir: /home/me/labs/hello-stack
@@ -32,6 +33,13 @@ environments:
   project: acme-shop-7
   started: 2026-10-10T11:30:00Z
 ```
+
+At the top, `version` is the format version (`isoloom_core::registry::VERSION`), written on
+every save. A file without it (written before the field existed) is version 1. It changes only
+when a field is removed or changes meaning; a new optional field doesn't change it, so readers
+should ignore fields they don't know.
+
+Each entry of `environments`:
 
 | Field | Required | Meaning |
 |---|---|---|

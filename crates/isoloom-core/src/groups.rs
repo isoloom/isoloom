@@ -28,7 +28,7 @@ use serde_yaml_ng::{Mapping, Value};
 use crate::model::Spec;
 
 /// Group names Isoloom fills itself in inventories.
-pub const RESERVED: &[&str] = &["all", "linux", "windows"];
+pub(crate) const RESERVED: &[&str] = &["all", "linux", "windows"];
 
 fn key(s: &str) -> Value {
     Value::String(s.to_string())

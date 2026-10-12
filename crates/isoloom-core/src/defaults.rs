@@ -191,7 +191,7 @@ pub fn scalar(text: &str) -> Value {
 }
 
 /// A nested mapping holding `value` at a dotted path.
-pub fn at_path(path: &str, value: Value) -> Value {
+pub(crate) fn at_path(path: &str, value: Value) -> Value {
     path.rsplit('.').fold(value, |inner, key| {
         let mut m = Mapping::new();
         m.insert(Value::String(key.to_string()), inner);

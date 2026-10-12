@@ -7,6 +7,34 @@
 //! hybrid, Vagrant, Docker on one VM, Docker on one cloud VM, Proxmox, one cloud VM per
 //! machine, existing hosts, cloud services: see [`model::Target`]); and track what each output
 //! does with every field ([`coverage`]).
+//!
+//! # Stability
+//!
+//! The crate is embedded by other tools (as a git dependency, pinned to a tag), so part of it is
+//! a supported library surface and the rest is Isoloom's own:
+//!
+//! - **Supported**: the items at the crate root ([`load`], [`load_with`], [`parse`], [`find`],
+//!   [`validate()`], [`validate_files`], [`derive`](fn@derive), [`effective`], [`generate()`],
+//!   [`generate_all`], [`generate_instance`], [`refusal`], [`totals`], the re-exported model
+//!   types) and the modules [`model`], [`validate`](mod@validate), [`targets`],
+//!   [`generate`](mod@generate) (with [`resolved`], the snapshot), [`checks`] (the check plan
+//!   and the runner's output lines), [`instance`], [`defaults`], [`registry`]
+//!   (`~/.isoloom/status.yml`, see `docs/registry.md`) and [`host`].
+//! - **Internal**: every other module ([`clones`], [`groups`], [`vlans`], [`ignore`], [`images`],
+//!   [`import`], [`coverage`], [`report`], [`schema`], [`shell`]) is public for the `isoloom`
+//!   command line and may change in any release. Helpers no other crate needs are
+//!   `pub(crate)`; more will follow.
+//!
+//! While Isoloom is at 0.x, a breaking change to the supported surface (an item removed or
+//! renamed, a signature or a public field changed) bumps the minor version (0.10 -> 0.11), never
+//! the patch, and gets a "Breaking (library)" line in the CHANGELOG. A new public field or enum
+//! variant isn't breaking (a new spec key is one): get the model's types by parsing a spec, build
+//! the others with `..Default::default()` where they have one, and match enums with a `_` arm
+//! where a new variant could appear. Release tags (`v0.10.1`)
+//! are the pinning points: depend on a tag, not on a branch. The files other tools read have
+//! their own contracts: `~/.isoloom/status.yml` carries a `version:` ([`registry::VERSION`]),
+//! the resolved snapshot a `version` ([`resolved::RESOLVED_VERSION`]), and the cloud modules'
+//! variables and outputs are listed in `docs/cloud-modules.md`.
 
 pub mod checks;
 pub mod clones;

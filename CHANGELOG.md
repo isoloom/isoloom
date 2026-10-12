@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Library: a stability policy
+- The README ("Using the library") and the crate docs say what `isoloom-core` supports: the crate root and the modules `model`, `validate`, `targets`, `generate` (with `resolved`), `checks`, `instance`, `defaults`, `registry` and `host`. The other public modules are internal (public for the command line). While at 0.x, a breaking change to the supported surface bumps the minor version (a new public field or enum variant isn't one) and gets a "Breaking (library)" line here; release tags are the pinning points. CI runs `cargo semver-checks` on every pull request, against its base and the last tag, and reports what changed in the job summary (a warning, not a failure). (#108)
+- `~/.isoloom/status.yml` starts with `version: 1` (`registry::Registry::version`, `registry::VERSION`), written on every save; a file without it reads as version 1, and unknown fields are still ignored. Build a `Registry` with `Registry::default()`. (#108)
+- Breaking (library): `checks::sq`, `vlans::vlan_network`, `groups::RESERVED`, `registry::rfc3339` and `defaults::at_path` are no longer public. (#108)
+
 ### `isoloom provision`
 - `isoloom provision [machine...] [--target t]`: the environment's provisioning again, on a running environment, in place, for a step that failed or was interrupted (a host that stopped answering) without an hour of rebuild. With `provision:` steps, the controller (booted if halted, halted again after) gets the project's current files and runs the playbooks again, limited to the named machines (`--limit`); without, the named machines' own `vm.provision` steps run again (`vagrant provision`). Steps are meant to be idempotent. Local VMs (vagrant, docker-vm, hybrid) for now.
 

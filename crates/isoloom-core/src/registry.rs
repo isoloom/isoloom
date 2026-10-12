@@ -32,10 +32,32 @@ pub struct Entry {
     pub started: String,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// The format version [`save`] writes: `version:` at the top of `status.yml`. It changes only
+/// when a field is removed or changes meaning; a new optional field doesn't change it (readers
+/// ignore fields they don't know).
+pub const VERSION: u32 = 1;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Registry {
+    /// The file's format version. A file written before the field existed reads as 1, the
+    /// format it has; [`save`] always writes [`VERSION`].
+    #[serde(default = "first_version")]
+    pub version: u32,
     #[serde(default)]
     pub environments: Vec<Entry>,
+}
+
+fn first_version() -> u32 {
+    1
+}
+
+impl Default for Registry {
+    fn default() -> Self {
+        Registry {
+            version: VERSION,
+            environments: Vec::new(),
+        }
+    }
 }
 
 /// The folder Isoloom keeps its own state in: `$ISOLOOM_HOME`, else `~/.isoloom`.
@@ -71,14 +93,23 @@ pub fn save(r: &Registry) -> Result<(), String> {
     if let Some(parent) = p.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("can't create {}: {e}", parent.display()))?;
     }
-    let text = format!(
-        "# Environments `isoloom run` brought up on this host. Written by `isoloom run` and `isoloom down`;\n# `isoloom status` reads it.\n{}",
-        serde_yaml_ng::to_string(r).map_err(|e| e.to_string())?
-    );
+    let text = render(r)?;
     // Whole or not at all: a reader never sees a half-written file.
     let tmp = p.with_extension(format!("yml.{}.tmp", std::process::id()));
     std::fs::write(&tmp, text).map_err(|e| format!("can't write {}: {e}", tmp.display()))?;
     std::fs::rename(&tmp, &p).map_err(|e| format!("can't write {}: {e}", p.display()))
+}
+
+/// The file's text: a comment, then the registry with `version:` set to [`VERSION`].
+fn render(r: &Registry) -> Result<String, String> {
+    let current = Registry {
+        version: VERSION,
+        environments: r.environments.clone(),
+    };
+    Ok(format!(
+        "# Environments `isoloom run` brought up on this host. Written by `isoloom run` and `isoloom down`;\n# `isoloom status` reads it.\n{}",
+        serde_yaml_ng::to_string(&current).map_err(|e| e.to_string())?
+    ))
 }
 
 /// Reads, changes and writes the registry as one step: `run`, `down` and tools embedding
@@ -153,7 +184,7 @@ pub fn now() -> String {
 }
 
 /// Unix seconds as `YYYY-MM-DDTHH:MM:SSZ`.
-pub fn rfc3339(secs: u64) -> String {
+pub(crate) fn rfc3339(secs: u64) -> String {
     let days = secs / 86_400;
     let rem = secs % 86_400;
     let (h, m, s) = (rem / 3600, (rem % 3600) / 60, rem % 60);
@@ -241,11 +272,27 @@ mod tests {
         assert_eq!(r.environments[0].project, None);
         let mut e = r.environments[0].clone();
         e.project = Some("acme-lab-1".into());
-        let text = serde_yaml_ng::to_string(&Registry { environments: vec![e] }).unwrap();
+        let text = serde_yaml_ng::to_string(&Registry {
+            environments: vec![e],
+            ..Registry::default()
+        })
+        .unwrap();
         assert!(text.contains("project: acme-lab-1"), "{text}");
         assert_eq!(
             serde_yaml_ng::from_str::<Registry>(&text).unwrap().environments[0].project.as_deref(),
             Some("acme-lab-1")
         );
+    }
+
+    #[test]
+    fn the_version_is_written_and_defaults_to_1_when_missing() {
+        // An older file, without `version:`, is format 1; a field from a newer writer is ignored.
+        let old = "environments:\n- name: x\n  dir: /p\n  target: docker\n  started: 1970-01-01T00:00:00Z\n  later: field\nalso: later\n";
+        let r: Registry = serde_yaml_ng::from_str(old).unwrap();
+        assert_eq!((r.version, r.environments.len()), (1, 1));
+        assert_eq!(Registry::default().version, VERSION);
+
+        let text = render(&Registry { version: 0, ..r }).unwrap();
+        assert!(text.contains(&format!("\nversion: {VERSION}\nenvironments:")), "{text}");
     }
 }

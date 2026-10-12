@@ -66,6 +66,41 @@ jobs:
         with:
           command: check advisories
 
+  # isoloom-core's public API, compared by cargo-semver-checks: with the pull request's base (what
+  # this change does to the API) and with the last release tag (what the next release must bump
+  # for). Reported in the job summary, with a warning annotation; not enforced: the model's
+  # structs mirror the spec and are public with public fields, so every new spec key reads as a
+  # breaking change, and only the supported modules (README, "Using the library") are a promise.
+  # A reviewer decides whether a change needs a "Breaking (library)" line and a minor bump.
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
+      - name: API changes (reported, not enforced)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          tag=$(git describe --tags --abbrev=0 --match 'v*')
+          compare() { # $1: baseline rev, $2: its label
+            echo "### isoloom-core since $2" >> "$GITHUB_STEP_SUMMARY"
+            if cargo semver-checks check-release -p isoloom-core --baseline-rev "$1" --color never > "$RUNNER_TEMP/semver.txt" 2>&1; then
+              echo "No breaking change." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::warning title=isoloom-core API::breaking changes since $2; see the job summary. Supported surface changed? Add a \"Breaking (library)\" line to the CHANGELOG."
+              { echo '```'; grep -vE '^ *(Building|Built|Parsing|Parsed|Checking|Checked|Finished|Compiling) ' "$RUNNER_TEMP/semver.txt" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            cat "$RUNNER_TEMP/semver.txt"
+          }
+          if [ -n "$BASE" ]; then compare "$BASE" "the pull request's base"; fi
+          compare "$tag" "$tag"
+
   # The generated Compose files, run for real through the CLI's own lifecycle: `isoloom run`
   # brings the example up, `status` sees it, `isoloom test` passes (the spec's checks and the
   # ones derived from its services and reach rules), `down` leaves nothing behind and `gc` finds
