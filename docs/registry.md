@@ -48,7 +48,7 @@ Each entry of `environments`:
 | `target` | yes | The target id: `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`, `hybrid`, `vagrant`, `proxmox`, `cloud-vm`, `external`, `cloud-services`. |
 | `instance` | no | The instance number (1-99), when the environment was run with `--instance`. Its outputs live in `.isoloom-<n>/`. |
 | `cloud` | no | The cloud whose module was applied (`aws`, `azure`, ...), for `cloud-vm` and `cloud-docker`. |
-| `project` | no | Docker and hosted only: the Compose project name, when a tool ran the Compose file under its own name (`docker compose -p <project>`). Without it, the name is the Compose file's `name:`. `status`, `connect`, `exec`, `capture` and `down` pass `-p <project>` when it's set. Without it, Compose would look for an environment that isn't there. A later `isoloom run` of the same environment keeps it. |
+| `project` | no | Docker and hosted only: the Compose project name, when the Compose file was brought up under another name than its own `name:` (`docker compose -p <project>`), so the containers are labelled with that name. Whatever started it that way (a script, a tool running several copies under names of its own) records the name here. `isoloom run` never sets it: it uses the file's `name:`, and `--instance` for copies. When it's set, `status`, `connect`, `exec`, `capture` and `down` pass `-p <project>`; without it, Compose would look for an environment that isn't there. A later `isoloom run` of the same environment keeps it. |
 | `started` | yes | When `run` finished, in RFC 3339 UTC format (`YYYY-MM-DDTHH:MM:SSZ`). |
 
 An entry is identified by `dir`, `target` and `instance` together. `run` replaces the entry with

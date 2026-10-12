@@ -337,7 +337,7 @@ fn base_table() -> Vec<Row> {
         Row {
             path: "cloud.hourly_usd",
             outputs: all(Status::Descriptive {
-                note: "the cost runners show and budget",
+                note: "an estimate: `isoloom run` says it, the snapshot carries it",
             }),
         },
         Row {

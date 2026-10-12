@@ -809,8 +809,10 @@ pub struct CloudServices {
     /// use them as `{{ cloud.outputs.<name> }}`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub outputs: IndexMap<String, String>,
-    /// About what the environment costs per hour while it exists, in US dollars, so runners can
-    /// warn and budget.
+    /// About what the environment costs per hour while it exists, in US dollars: the author's
+    /// estimate, for whoever runs it. `isoloom run` says it before applying, and the resolved
+    /// snapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a
+    /// budget. Isoloom doesn't bill or stop anything by it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hourly_usd: Option<f64>,
 }
