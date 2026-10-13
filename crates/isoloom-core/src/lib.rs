@@ -18,7 +18,7 @@
 //!   [`generate_all`], [`generate_instance`], [`refusal`], [`refusal_on`], [`totals`], the
 //!   re-exported model types) and the modules [`model`], [`validate`](mod@validate),
 //!   [`targets`], [`generate`](mod@generate) (with [`resolved`], the snapshot), [`checks`] (the
-//!   check plan and the runner's output lines), [`instance`], [`defaults`], [`registry`]
+//!   check plan and the runner's output lines), [`instance`], [`defaults`], [`profile`], [`registry`]
 //!   (`~/.isoloom/status.yml`, see `docs/registry.md`) and [`host`].
 //! - **Internal**: every other module ([`clones`], [`groups`], [`vlans`], [`ignore`], [`images`],
 //!   [`import`], [`coverage`], [`report`], [`schema`], [`shell`]) is public for the `isoloom`
@@ -48,6 +48,7 @@ pub mod images;
 pub mod import;
 pub mod instance;
 pub mod model;
+pub mod profile;
 pub mod registry;
 pub mod report;
 pub mod schema;
@@ -125,9 +126,26 @@ pub fn load(dir: &Path) -> Result<Spec, LoadError> {
 /// Reads the spec in `dir` with `-s key=value` overrides applied first (see
 /// [`defaults::override_spec`]); keys prefixed `defaults.` are left to the defaults.
 pub fn load_with(dir: &Path, sets: &[String]) -> Result<Spec, LoadError> {
+    load_profiled(dir, None, sets)
+}
+
+/// Reads the spec in `dir` with a profile's `spec` merged in (checked against the spec first:
+/// see [`profile::Profile::check`]), then `-s key=value` overrides.
+pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[String]) -> Result<Spec, LoadError> {
     let path = find(dir)?;
     let text = std::fs::read_to_string(&path).map_err(|e| LoadError::Read(path, e))?;
-    let text = defaults::override_spec(&text, sets).map_err(LoadError::Parse)?;
+    let text = match profile {
+        Some(p) => {
+            let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text).map_err(|e| LoadError::Parse(e.to_string()))?;
+            let problems = p.check(&doc);
+            if !problems.is_empty() {
+                return Err(LoadError::Parse(problems.join("\n")));
+            }
+            defaults::override_spec_with(&text, Some(&p.spec), sets)
+        }
+        None => defaults::override_spec(&text, sets),
+    }
+    .map_err(LoadError::Parse)?;
     parse(&text)
 }
 

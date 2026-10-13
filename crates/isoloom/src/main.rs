@@ -17,6 +17,48 @@ mod lifecycle;
 struct Cli {
     #[command(subcommand)]
     command: Command,
+    /// Run with a profile: `profiles/<name>.yml` in the project, what differs for one customer or
+    /// site (target, spec values, defaults, inputs). Also `ISOLOOM_PROFILE`.
+    #[arg(long, global = true, value_name = "NAME")]
+    profile: Option<String>,
+}
+
+/// The profile asked for (`--profile`, else `ISOLOOM_PROFILE`), set once at start.
+static PROFILE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// The profile asked for, read from `dir`. The first time, its inputs become environment
+/// variables (those not already set), so every target's tool sees them as it sees the user's.
+fn profile_for(dir: &std::path::Path) -> Result<Option<core::profile::Profile>, Box<dyn std::error::Error>> {
+    static INPUTS: std::sync::Once = std::sync::Once::new();
+    let Some(name) = PROFILE.get().and_then(Option::as_deref) else {
+        return Ok(None);
+    };
+    let p = core::profile::load(dir, name)?;
+    INPUTS.call_once(|| {
+        for (k, v) in &p.inputs {
+            if std::env::var_os(k).is_none() {
+                // SAFETY: called while loading the spec, before the command line starts any
+                // thread of its own (the check runners and log readers start later); the main
+                // thread only waits for this one.
+                unsafe { std::env::set_var(k, v) };
+            }
+        }
+    });
+    Ok(Some(p))
+}
+
+/// The spec in `dir`, with the profile asked for.
+pub(crate) fn load_spec(dir: &std::path::Path) -> Result<core::Spec, Box<dyn std::error::Error>> {
+    let profile = profile_for(dir)?;
+    Ok(core::load_profiled(dir, profile.as_ref(), &[])?)
+}
+
+/// The target to use: the profile's when none is asked for.
+fn pinned(dir: &std::path::Path, asked: Option<&str>) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    Ok(match profile_for(dir)? {
+        Some(p) => p.pin(asked)?,
+        None => asked.map(str::to_string),
+    })
 }
 
 #[derive(Subcommand)]
@@ -387,6 +429,14 @@ enum Command {
         #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
         sets: Vec<String>,
     },
+    /// List the project's profiles (`profiles/<name>.yml`) and check each against the spec: the
+    /// names it uses, the spec it makes, and that its target can run it. Fails when one doesn't.
+    Profiles {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
     Schema,
     /// Draft an isoloom.yml from files you already have.
@@ -552,19 +602,29 @@ fn record_vagrantfile(file: &std::path::Path) -> Result<serde_json::Value, Box<d
 }
 
 fn main() -> ExitCode {
-    match run(Cli::parse()) {
-        Ok(code) => code,
-        Err(e) => {
-            eprintln!("error: {e}");
-            ExitCode::from(2)
-        }
-    }
+    // The command line runs on a thread of its own with a larger stack: clap builds every
+    // subcommand's parser on the stack, and Windows gives the main thread only 1 MB, which a
+    // debug build outgrows (a stack overflow before any output).
+    let cli = std::thread::Builder::new()
+        .name("isoloom".into())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| match run(Cli::parse()) {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::from(2)
+            }
+        })
+        .expect("can't start the command line's thread");
+    cli.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
 }
 
 fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let profile = cli.profile.or_else(|| std::env::var("ISOLOOM_PROFILE").ok().filter(|s| !s.is_empty()));
+    let _ = PROFILE.set(profile);
     match cli.command {
         Command::Validate { dir, skip_files, json } => {
-            let spec = core::load(&dir)?;
+            let spec = load_spec(&dir)?;
             let mut problems = core::validate(&spec);
             if !skip_files {
                 problems.extend(core::validate_files(&spec, &dir));
@@ -605,7 +665,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Targets { dir, json, host } => {
-            let spec = core::load(&dir)?;
+            let spec = load_spec(&dir)?;
             if report_invalid(&spec) {
                 return Ok(ExitCode::FAILURE);
             }
@@ -675,7 +735,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Resources { dir, json } => {
-            let spec = core::load(&dir)?;
+            let spec = load_spec(&dir)?;
             let t = core::totals(&spec);
             if json {
                 println!(
@@ -694,6 +754,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Generate { dir, target, images, sets } => {
+            let target = pinned(&dir, target.as_deref())?;
             let (spec, settings) = load_settings(&dir, images.as_deref(), &sets)?;
             if report_invalid(&spec) {
                 return Ok(ExitCode::FAILURE);
@@ -958,6 +1019,7 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(ExitCode::SUCCESS)
         }
+        Command::Profiles { dir, json } => profiles_cmd(&dir, json),
         Command::Schema => {
             println!("{}", serde_json::to_string_pretty(&core::schema::schema())?);
             Ok(ExitCode::SUCCESS)
@@ -1068,7 +1130,8 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             let value = if system {
                 core::defaults::builtin()
             } else {
-                let r = core::defaults::load(&dir, None, &[])?;
+                let profile = profile_for(&dir)?;
+                let r = core::defaults::load_profiled(&dir, None, profile.as_ref(), &[])?;
                 let mut merged = core::defaults::builtin();
                 core::defaults::merge(&mut merged, &r.merged);
                 if json {
@@ -1154,6 +1217,8 @@ fn prepare(
     instance: Option<u8>,
     sets: &[String],
 ) -> Result<(core::Spec, PathBuf, core::Target, core::defaults::Defaults), Box<dyn std::error::Error>> {
+    let target = pinned(dir, target)?;
+    let target = target.as_deref();
     let (spec, settings) = load_settings(dir, images, sets)?;
     // Absolute, so the paths we hand to docker/vagrant/terraform don't depend on their working
     // directory (compose runs from `dir`, terraform and vagrant from the module folder).
@@ -1206,6 +1271,66 @@ fn prepare(
     Ok((spec, dir, t, settings.defaults))
 }
 
+/// `isoloom profiles`: each profile, checked.
+fn profiles_cmd(dir: &std::path::Path, json: bool) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let names = core::profile::list(dir);
+    let mut out = Vec::new();
+    for name in &names {
+        let mut problems = Vec::new();
+        let profile = core::profile::load(dir, name);
+        let (target, description) = match &profile {
+            Ok(p) => (p.target.map(|t| t.id()), p.description.clone()),
+            Err(_) => (None, None),
+        };
+        match profile {
+            Err(e) => problems.push(e),
+            Ok(p) => match core::load_profiled(dir, Some(&p), &[]) {
+                Err(e) => problems.extend(e.to_string().lines().map(str::to_string)),
+                Ok(spec) => {
+                    let spec = core::defaults::load_profiled(dir, None, Some(&p), &[]).map(|r| r.defaults.images.apply(&spec));
+                    match spec {
+                        Err(e) => problems.push(e),
+                        Ok(spec) => {
+                            problems.extend(core::validate(&spec).iter().map(|e| format!("the spec it makes: {e}")));
+                            if let Some(t) = p.target
+                                && problems.is_empty()
+                                && !core::effective(&spec).contains(&t)
+                            {
+                                let why = core::refusal(&spec, t).unwrap_or_else(|| "not one of its targets".into());
+                                problems.push(format!("can't run on `{}`: {why}", t.id()));
+                            }
+                        }
+                    }
+                }
+            },
+        }
+        out.push((name.clone(), target, description, problems));
+    }
+    let failed = out.iter().any(|(_, _, _, p)| !p.is_empty());
+    if json {
+        let items: Vec<serde_json::Value> = out
+            .iter()
+            .map(|(n, t, d, p)| serde_json::json!({ "name": n, "target": t, "description": d, "ok": p.is_empty(), "problems": p }))
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&items)?);
+    } else if out.is_empty() {
+        println!(
+            "no profiles in {} (one file per customer or site: profiles/<name>.yml)",
+            dir.join(core::profile::DIR).display()
+        );
+    } else {
+        let width = out.iter().map(|(n, ..)| n.len()).max().unwrap_or(0);
+        for (n, t, d, p) in &out {
+            let mark = if p.is_empty() { '✓' } else { '✗' };
+            println!("{mark} {n:<width$}  {:<14}  {}", t.unwrap_or("any target"), d.as_deref().unwrap_or(""));
+            for problem in p {
+                println!("    {problem}");
+            }
+        }
+    }
+    Ok(if failed { ExitCode::FAILURE } else { ExitCode::SUCCESS })
+}
+
 /// The spec with `-s` overrides and the image table applied, and the defaults in effect.
 /// Prints the spec's problems and returns true when it has any. Generators assume a validated
 /// spec (they `expect` valid CIDRs and declared networks): a spec that parses but is invalid
@@ -1226,8 +1351,9 @@ fn load_settings(
     images: Option<&std::path::Path>,
     sets: &[String],
 ) -> Result<(core::Spec, core::defaults::Resolved), Box<dyn std::error::Error>> {
-    let spec = core::load_with(dir, sets)?;
-    let settings = core::defaults::load(dir, images, sets)?;
+    let profile = profile_for(dir)?;
+    let spec = core::load_profiled(dir, profile.as_ref(), sets)?;
+    let settings = core::defaults::load_profiled(dir, images, profile.as_ref(), sets)?;
     let spec = settings.defaults.images.apply(&spec);
     Ok((spec, settings))
 }
@@ -1498,6 +1624,7 @@ fn run_cmd(
                         instance,
                         cloud: cloud.map(str::to_string),
                         project: project.clone(),
+                        profile: PROFILE.get().cloned().flatten(),
                         started: core::registry::now(),
                     });
                 }

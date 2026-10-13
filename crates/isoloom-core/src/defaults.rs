@@ -100,6 +100,11 @@ pub fn user_file() -> PathBuf {
 /// `sets` (`defaults.cloud.aws.region=eu-west-1`, the prefix optional), and `images_file`
 /// (the `--images` table, between the files and `sets`).
 pub fn load(project: &Path, images_file: Option<&Path>, sets: &[String]) -> Result<Resolved, String> {
+    load_profiled(project, images_file, None, sets)
+}
+
+/// [`load`] with a profile's layer between the project's file and `--images`.
+pub fn load_profiled(project: &Path, images_file: Option<&Path>, profile: Option<&crate::profile::Profile>, sets: &[String]) -> Result<Resolved, String> {
     let mut layers = Vec::new();
     for (label, path) in [("user file", user_file()), ("project file", project.join(PROJECT_FILE))] {
         match std::fs::read_to_string(&path) {
@@ -110,6 +115,9 @@ pub fn load(project: &Path, images_file: Option<&Path>, sets: &[String]) -> Resu
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(format!("can't read {}: {e}", path.display())),
         }
+    }
+    if let Some(p) = profile {
+        layers.push(p.layer());
     }
     if let Some(f) = images_file {
         let text = std::fs::read_to_string(f).map_err(|e| format!("can't read {}: {e}", f.display()))?;
@@ -233,8 +241,17 @@ pub fn leaves(v: &Value, prefix: &str) -> Vec<String> {
 /// The spec's YAML with `-s key=value` overrides applied (keys without the `defaults.` prefix),
 /// before it is parsed: `machines.web.vm.os=ubuntu-24.04`, `networks.lab.internet=false`.
 pub fn override_spec(yaml: &str, sets: &[String]) -> Result<String, String> {
+    override_spec_with(yaml, None, sets)
+}
+
+/// [`override_spec`] with `base` (a profile's `spec`) deep-merged first.
+pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> Result<String, String> {
     let mut doc: Value = serde_yaml_ng::from_str(yaml).map_err(|e| e.to_string())?;
     let mut any = false;
+    if let Some(b) = base.filter(|b| b.as_mapping().is_some_and(|m| !m.is_empty())) {
+        merge(&mut doc, b);
+        any = true;
+    }
     for s in sets {
         let (k, v) = parse_set(s)?;
         if k.starts_with("defaults.") {
