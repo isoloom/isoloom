@@ -103,6 +103,26 @@ fn input_name(s: &str) -> Option<String> {
 /// A container port and its protocol.
 type PortKey = (u16, Protocol);
 
+/// The `ports` / `expose` entries with a protocol other than TCP and UDP (`sctp`), as written.
+fn other_protocols(v: &Value) -> Vec<String> {
+    v.as_sequence()
+        .into_iter()
+        .flatten()
+        .filter(|item| {
+            let p = match item {
+                Value::Mapping(m) => m.get("protocol").and_then(str_of).unwrap_or_default(),
+                other => str_of(other)
+                    .unwrap_or_default()
+                    .rsplit_once('/')
+                    .map(|(_, p)| p.to_string())
+                    .unwrap_or_default(),
+            };
+            !p.is_empty() && !p.eq_ignore_ascii_case("tcp") && !p.eq_ignore_ascii_case("udp")
+        })
+        .map(flat)
+        .collect()
+}
+
 /// The protocol of a `ports` / `expose` entry: `53/udp`, `{ protocol: udp }`, else TCP.
 fn port_protocol(item: &Value) -> Protocol {
     let p = match item {
@@ -755,6 +775,15 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
                 "ports" | "expose" => match container_ports(v) {
                     Ok(ports) => {
                         m.ports.extend(ports);
+                        let other = other_protocols(v);
+                        if !other.is_empty() {
+                            note(
+                                &mut notes,
+                                kat.clone(),
+                                NoteKind::Changed,
+                                format!("{} drafted as TCP: services are TCP or UDP", other.join(", ")),
+                            );
+                        }
                         if k == "ports" {
                             let (published, unknown) = published_ports(v);
                             for (container, host) in published {

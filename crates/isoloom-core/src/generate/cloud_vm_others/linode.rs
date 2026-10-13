@@ -239,7 +239,7 @@ resource "linode_vpc_subnet" "env" {{
 
         for sv in &m.services {
             if let Some(h) = sv.publish {
-                let label = sv.label();
+                let label = m.service_label(sv);
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }

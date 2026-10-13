@@ -769,7 +769,7 @@ fn published(spec: &Spec) -> Vec<(String, String, std::net::Ipv4Addr, u16, u16, 
         let Some((net, octet)) = m.networks.first() else { continue };
         for sv in &m.services {
             if let Some(host) = sv.publish {
-                out.push((name.clone(), sv.label(), super::address(spec, net, *octet), sv.port, host, sv.protocol));
+                out.push((name.clone(), m.service_label(sv), super::address(spec, net, *octet), sv.port, host, sv.protocol));
             }
         }
     }

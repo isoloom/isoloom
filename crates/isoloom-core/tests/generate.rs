@@ -912,6 +912,18 @@ fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
     let ports = serde_yaml_ng::to_string(&svc("dns")["ports"]).unwrap();
     assert!(ports.contains("+10053}:53/udp"), "{ports}");
     assert_eq!(svc("dns")["labels"]["isoloom.service.53-udp"].as_str(), Some("udp:53"));
+    // A name shared by the TCP and UDP services keeps both apart (`dns`, `dns-udp`).
+    let named = parse(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
+         dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, name: dns, publish: 10053 }, { port: 53, name: dns, publish: 1053 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+    )
+    .unwrap();
+    assert_eq!(isoloom_core::validate(&named), vec![]);
+    let c: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents(&generate(&named, Target::Docker).unwrap(), ".isoloom/docker/compose.yml")).unwrap();
+    assert_eq!(c["services"]["dns"]["labels"]["isoloom.service.dns-udp"].as_str(), Some("udp:53"));
+    assert_eq!(c["services"]["dns"]["labels"]["isoloom.service.dns"].as_str(), Some("tcp:53"));
+    let aws = contents(&generate(&named, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
+    assert!(aws.contains("\"dns/dns-udp\"") && aws.contains("\"dns/dns\""), "{aws}");
     assert_eq!(svc("dns")["labels"]["isoloom.service.53"].as_str(), Some("tcp:53"));
     let probe = serde_yaml_ng::to_string(&svc("dns")["healthcheck"]).unwrap();
     assert!(probe.contains("127.0.0.1 53"), "{probe}");
@@ -931,7 +943,10 @@ fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
 
     // Vagrant: forwarded as UDP; app waits for dns on TCP 53.
     let vf = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
-    assert!(vf.contains("guest: 53, host: 10053, host_ip: \"127.0.0.1\", protocol: \"udp\""), "{vf}");
+    assert!(
+        vf.contains("guest: 53, host: 10053, host_ip: \"127.0.0.1\", protocol: \"udp\" # not on libvirt"),
+        "{vf}"
+    );
     assert!(!vf.contains("/dev/tcp/syslog/514"), "{vf}");
 
     // Proxmox: the router forwards the published port as UDP.

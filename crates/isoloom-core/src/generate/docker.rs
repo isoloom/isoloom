@@ -494,7 +494,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         if !m.services.is_empty() {
             let mut labels = Mapping::new();
             for sv in &m.services {
-                let key = sv.label();
+                let key = m.service_label(sv);
                 let kind = if sv.http { "http" } else { sv.protocol.id() };
                 labels.insert(s(format!("isoloom.service.{key}")), s(format!("{kind}:{}", sv.port)));
             }

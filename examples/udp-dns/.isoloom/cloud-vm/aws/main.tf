@@ -335,7 +335,7 @@ output "checks" {
 
 output "published" {
   value = {
-    "dns/dns" = "${aws_instance.dns.public_ip}:10053"
+    "dns/dns-udp" = "${aws_instance.dns.public_ip}:10053"
   }
 }
 

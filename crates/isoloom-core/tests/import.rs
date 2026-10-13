@@ -129,6 +129,14 @@ fn udp_ports_are_imported_as_udp_services() {
         (svc(53, true), svc(53, false), svc(69, true), svc(161, true)),
         (Some(5353), Some(53), Some(6969), None)
     );
+
+    // SCTP has no service protocol: drafted as TCP, and said so.
+    let d = draft("services:\n  sig:\n    image: x\n    ports: [\"3868:3868/sctp\"]\n", "x", "compose.yaml").unwrap();
+    assert!(
+        has(&d, NoteKind::Changed, "services.sig.ports", "3868:3868/sctp drafted as TCP"),
+        "{:?}",
+        d.notes
+    );
 }
 
 #[test]

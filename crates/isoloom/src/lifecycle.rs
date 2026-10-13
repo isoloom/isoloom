@@ -141,6 +141,28 @@ pub fn docker_published(dir: &Path, instance: Option<u8>) -> Vec<(String, u16, c
     published_of(&items)
 }
 
+/// Whether a Vagrant folder's machines run on libvirt (`.vagrant/machines/<m>/libvirt/id`).
+pub fn vagrant_uses_libvirt(wd: &Path) -> bool {
+    std::fs::read_dir(wd.join(".vagrant/machines"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .any(|m| m.path().join("libvirt/id").is_file())
+}
+
+/// The spec's published UDP services, as `<machine>:<port>/udp (published as <host>)`.
+pub fn udp_forwards(spec: &core::Spec) -> Vec<String> {
+    spec.machines
+        .iter()
+        .flat_map(|(name, m)| {
+            m.services
+                .iter()
+                .filter(|s| !s.protocol.is_tcp())
+                .filter_map(move |s| s.publish.map(|h| format!("{name}:{}/udp (published as {h})", s.port)))
+        })
+        .collect()
+}
+
 /// (service, container port, protocol, host port) for each port `docker compose ps` lists as
 /// published.
 fn published_of(items: &[serde_json::Value]) -> Vec<(String, u16, core::model::Protocol, u16)> {
@@ -1094,6 +1116,23 @@ pub fn gc(remove: bool, images: bool) -> Res<ExitCode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn libvirt_is_told_from_vagrants_machine_folders() {
+        let dir = std::env::temp_dir().join(format!("isoloom-libvirt-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join(".vagrant/machines/dns/virtualbox")).unwrap();
+        std::fs::write(dir.join(".vagrant/machines/dns/virtualbox/id"), "x").unwrap();
+        assert!(!vagrant_uses_libvirt(&dir));
+        std::fs::create_dir_all(dir.join(".vagrant/machines/web/libvirt")).unwrap();
+        std::fs::write(dir.join(".vagrant/machines/web/libvirt/id"), "x").unwrap();
+        assert!(vagrant_uses_libvirt(&dir));
+        std::fs::remove_dir_all(&dir).ok();
+        let spec = isoloom_core::parse(
+            "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53, publish: 1053 }], vm: { os: debian-12 } }\n",
+        )
+        .unwrap();
+        assert_eq!(udp_forwards(&spec), ["dns:53/udp (published as 10053)"]);
+    }
 
     #[test]
     fn published_ports_come_from_compose_ps() {

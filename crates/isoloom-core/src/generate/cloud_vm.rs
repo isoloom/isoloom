@@ -402,7 +402,7 @@ resource "aws_vpc" "env" {{
                     "  ingress {{\n    description = \"published\"\n    from_port   = {h}\n    to_port     = {h}\n    protocol    = \"{proto}\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n",
                     proto = sv.protocol.id()
                 );
-                let label = sv.label();
+                let label = m.service_label(sv);
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }
@@ -855,7 +855,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
                 "  ingress {{\n    description = \"published\"\n    from_port   = {h}\n    to_port     = {h}\n    protocol    = \"{proto}\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n",
                 proto = sv.protocol.id()
             );
-            let label = sv.label();
+            let label = m.service_label(sv);
             published_out.push((format!("\"{name}/{label}\""), format!("\"${{aws_instance.{id}.public_ip}}:{h}\"")));
             if h != sv.port && sv.protocol.is_tcp() {
                 ps.push(format!(

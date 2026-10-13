@@ -320,7 +320,7 @@ Vagrant.configure("2") do |config|
   config.vm.provider "libvirt" do |v|
     v.default_prefix = "udp-dns_"
   end
-  config.vm.network "forwarded_port", guest: 10053, host: 10053, host_ip: "127.0.0.1", protocol: "udp"
+  config.vm.network "forwarded_port", guest: 10053, host: 10053, host_ip: "127.0.0.1", protocol: "udp" # not on libvirt: vagrant-libvirt skips UDP forwards
   config.vm.provider "virtualbox" do |v|
     v.name = "udp-dns · docker"
     v.cpus = 2

@@ -61,7 +61,7 @@
         },
         {
           "port": 53,
-          "name": "dns-tcp",
+          "name": "dns",
           "http": false,
           "publish": null
         }

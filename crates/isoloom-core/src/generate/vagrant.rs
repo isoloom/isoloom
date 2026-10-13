@@ -1226,9 +1226,14 @@ run_play() {
 }
 "#;
 
-/// A `forwarded_port`'s protocol option: nothing for TCP (Vagrant's default), `protocol: "udp"`.
+/// A `forwarded_port`'s protocol option: nothing for TCP (Vagrant's default), `protocol: "udp"`
+/// (vagrant-libvirt skips those, with a warning; `isoloom run` repeats it).
 pub(super) fn forwarded_protocol(p: crate::model::Protocol) -> &'static str {
-    if p.is_tcp() { "" } else { ", protocol: \"udp\"" }
+    if p.is_tcp() {
+        ""
+    } else {
+        ", protocol: \"udp\" # not on libvirt: vagrant-libvirt skips UDP forwards"
+    }
 }
 
 // The retry helpers run on the Linux controller VM; the test drives them with a POSIX `sh`.

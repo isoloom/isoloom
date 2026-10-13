@@ -418,7 +418,7 @@ output "checks" {
 
 output "published" {
   value = {
-    "dns/dns" = "${azurerm_public_ip.dns.ip_address}:10053"
+    "dns/dns-udp" = "${azurerm_public_ip.dns.ip_address}:10053"
   }
 }
 

@@ -380,10 +380,11 @@ fn base_table() -> Vec<Row> {
                 "`udp`: published as `<port>/udp`; left out of the healthcheck and the derived checks (no handshake); opened by `reach` (TCP and UDP alike)",
                 "udp-dns",
             ),
-            done(
-                "`udp`: forwarded as UDP; left out of the dependency waits and the derived checks; opened by `reach`",
-                "udp-dns",
-            ),
+            Status::Partial {
+                how: "`udp`: forwarded as UDP; left out of the dependency waits and the derived checks; opened by `reach`",
+                gap: "vagrant-libvirt skips UDP forwarded ports (`isoloom run` warns): reach the machine's address instead",
+                proof: "udp-dns",
+            },
         ),
         Row {
             path: "machines.*.services[].tls",

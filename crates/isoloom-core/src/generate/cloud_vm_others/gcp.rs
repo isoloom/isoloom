@@ -265,7 +265,7 @@ resource "google_compute_network" "env" {{
                 if h != sv.port {
                     redirects.push((h, sv.port, sv.protocol));
                 }
-                let label = sv.label();
+                let label = m.service_label(sv);
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }

@@ -191,7 +191,7 @@ resource "digitalocean_firewall" "{id}" {{
                 "  inbound_rule {{\n    protocol         = \"{proto}\"\n    port_range       = \"{h}\"\n    source_addresses = [var.allowed_cidr]\n  }}\n",
                 proto = sv.protocol.id()
             );
-            let label = sv.label();
+            let label = m.service_label(sv);
             published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
         }
     }

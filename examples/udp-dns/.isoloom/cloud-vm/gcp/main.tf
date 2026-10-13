@@ -356,7 +356,7 @@ output "checks" {
 
 output "published" {
   value = {
-    "dns/dns" = "${google_compute_instance.dns.network_interface[0].access_config[0].nat_ip}:10053"
+    "dns/dns-udp" = "${google_compute_instance.dns.network_interface[0].access_config[0].nat_ip}:10053"
   }
 }
 

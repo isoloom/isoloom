@@ -348,21 +348,21 @@ impl Protocol {
     }
 }
 
-impl Service {
-    /// How outputs name it: its `name`, else its port (`<port>-udp` for UDP, so a port served
-    /// over both protocols keeps two names).
-    pub fn label(&self) -> String {
-        self.name.clone().unwrap_or_else(|| {
-            if self.protocol.is_tcp() {
-                self.port.to_string()
-            } else {
-                format!("{}-udp", self.port)
-            }
-        })
-    }
-}
-
 impl Machine {
+    /// How outputs name one of its services (published outputs, Compose labels): its `name`,
+    /// else its port. A UDP service is `<port>-udp`, and `<name>-udp` when a TCP service of the
+    /// machine has the same name (DNS's `dns` over both protocols), so the two never share a key.
+    pub fn service_label(&self, s: &Service) -> String {
+        match &s.name {
+            None if s.protocol.is_tcp() => s.port.to_string(),
+            None => format!("{}-udp", s.port),
+            Some(n) if !s.protocol.is_tcp() && self.services.iter().any(|o| o.protocol.is_tcp() && o.name.as_ref() == Some(n)) => {
+                format!("{n}-udp")
+            }
+            Some(n) => n.clone(),
+        }
+    }
+
     /// The ports Isoloom waits for before the machine counts as ready: its TCP services but the
     /// dormant ones (UDP has no handshake to probe). Empty: nothing to probe (no healthcheck, no
     /// readiness probe).

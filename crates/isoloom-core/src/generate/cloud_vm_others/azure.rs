@@ -240,7 +240,7 @@ resource "azurerm_virtual_network" "env" {{
                     &h.to_string(),
                     "var.allowed_cidr",
                 );
-                let label = sv.label();
+                let label = m.service_label(sv);
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }
@@ -559,7 +559,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
                 &h.to_string(),
                 "var.allowed_cidr",
             );
-            let label = sv.label();
+            let label = m.service_label(sv);
             published_out.push((format!("\"{name}/{label}\""), format!("\"${{azurerm_public_ip.{id}.ip_address}}:{h}\"")));
             if h != sv.port && sv.protocol.is_tcp() {
                 ps.push(format!(

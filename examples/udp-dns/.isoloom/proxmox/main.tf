@@ -380,7 +380,7 @@ output "address" {
 # Published services, from the router's uplink address.
 output "published" {
   value = {
-    "dns/dns" = "${local.router_address}:10053"
+    "dns/dns-udp" = "${local.router_address}:10053"
   }
 }
 
