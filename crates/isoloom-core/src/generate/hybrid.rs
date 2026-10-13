@@ -41,6 +41,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         return Err(unsupported("networks with a `gateway` machine in hybrid environments come later".into()));
     }
     let container = |name: &str| spec.machines[name].docker.is_some();
+    for v in spec.volumes.keys() {
+        let users = spec.volume_users(v);
+        if users.iter().any(|u| container(u)) && users.iter().any(|u| !container(u)) {
+            return Err(unsupported(format!(
+                "volume `{v}` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now"
+            )));
+        }
+    }
     for (name, m) in &spec.machines {
         if !container(name)
             && let Some(dep) = m.depends_on.iter().find(|d| container(d))

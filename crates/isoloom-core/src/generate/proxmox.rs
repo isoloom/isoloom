@@ -364,7 +364,7 @@ locals {
         let mem = m.resources.and_then(|r| r.memory_mb).unwrap_or(crate::DEFAULT_MEMORY_MB);
         let disk = m.resources.and_then(|r| r.disk_gb).unwrap_or(crate::DEFAULT_DISK_GB);
 
-        let mut runcmd: Vec<String> = super::machine_setup::linux(m).into_iter().collect();
+        let mut runcmd: Vec<String> = super::machine_setup::linux(spec, name, m).into_iter().collect();
         // Its 802.1Q trunks, in the VM (see `trunks`; Proxmox's bridges learn the trunk's MAC).
         let vm_trunks = trunks::vm_trunks(spec);
         let trunk_cmds: Vec<String> = trunks::of(&vm_trunks, name)

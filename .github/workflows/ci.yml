@@ -112,7 +112,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns, tuned-web]
+        example: [hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns, tuned-web, shared-files]
     defaults:
       run:
         working-directory: examples/${{ matrix.example }}
@@ -170,7 +170,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [hello-stack, segmented]
+        example: [hello-stack, segmented, shared-files]
     defaults:
       run:
         working-directory: examples/${{ matrix.example }}

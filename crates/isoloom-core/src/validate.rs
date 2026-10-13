@@ -125,6 +125,46 @@ pub const PRIVATE: [Cidr; 3] = [
 /// Docker's own pools, Docker Desktop's network and home LANs.
 pub const DOCKER_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
 
+/// The volumes shared between machines: mounted, held by one of their users, reachable from
+/// every other over a network they share (NFS on the VM targets), Linux machines only.
+fn shared_volumes(spec: &Spec) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for (v, sv) in &spec.volumes {
+        let at = format!("volumes.{v}");
+        let users = spec.volume_users(v);
+        if users.is_empty() {
+            out.push((at, "no machine mounts it: list it in a machine's `volumes`".into()));
+            continue;
+        }
+        if let Some(o) = &sv.owner
+            && !users.contains(&o.as_str())
+        {
+            out.push((
+                format!("{at}.owner"),
+                format!("`{o}` doesn't mount it: the owner is one of its machines ({})", users.join(", ")),
+            ));
+            continue;
+        }
+        let owner = spec.volume_owner(v).expect("a user");
+        for u in &users {
+            let m = &spec.machines[*u];
+            if m.vm.as_ref().is_some_and(|vm| crate::images::is_windows(&vm.os)) {
+                out.push((
+                    format!("machines.{u}.volumes.{v}"),
+                    "a shared volume is mounted over NFS: Linux machines only".into(),
+                ));
+            }
+            if *u != owner && !m.networks.keys().any(|n| spec.machines[owner].networks.contains_key(n)) {
+                out.push((
+                    format!("machines.{u}.volumes.{v}"),
+                    format!("`{u}` shares no network with `{owner}`, which holds the volume (NFS on the VM targets)"),
+                ));
+            }
+        }
+    }
+    out
+}
+
 /// The sysctls a container can set: those the kernel keeps per network or IPC namespace.
 pub const CONTAINER_SYSCTLS: &[&str] = &[
     "net.",
@@ -462,6 +502,9 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 );
             }
         }
+    }
+    for (at, message) in shared_volumes(spec) {
+        add(&at, message);
     }
     for (name, m) in &spec.machines {
         for (at, message) in machine_settings(name, m) {
@@ -985,6 +1028,16 @@ pub fn starts_after<'a>(spec: &'a Spec, name: &str, m: &'a crate::model::Machine
             && !after.contains(&gw)
         {
             after.push(gw);
+        }
+    }
+    // A shared volume's users start once its owner holds it (serves it, on the VM targets).
+    for v in m.volumes.keys() {
+        if let Some(owner) = spec.volume_owner(v)
+            && owner != name
+            && spec.machines.contains_key(owner)
+            && !after.contains(&owner)
+        {
+            after.push(owner);
         }
     }
     after

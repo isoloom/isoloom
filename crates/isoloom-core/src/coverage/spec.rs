@@ -484,6 +484,14 @@ fn base_table() -> Vec<Row> {
             done("boots after its dependencies, then waits until they answer", "hello-stack"),
         ),
         common(
+            "volumes.*.owner",
+            done("one named volume (one claim on Kubernetes, its users on the owner's node)", "shared-files"),
+            done(
+                "the owner's directory served over NFS, mounted by the others before their steps",
+                "shared-files",
+            ),
+        ),
+        common(
             "machines.*.volumes",
             done("a named volume per path", "hello-stack"),
             done("the VM's own disk keeps the data; the path is created", "hello-stack"),
@@ -813,6 +821,7 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "volumes",
     "cloud.vars",
     "cloud.outputs",
     "checks[].headers",

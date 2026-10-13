@@ -171,6 +171,32 @@ fn unsupported(spec: &Spec) -> Option<String> {
     None
 }
 
+/// Whether machine `name` holds its volume `v`'s claim: its own volume, or a shared one it owns.
+fn holds(spec: &Spec, name: &str, v: &str) -> bool {
+    !spec.volumes.contains_key(v) || spec.volume_owner(v) == Some(name)
+}
+
+/// A machine mounting shared volumes it doesn't own runs on their owners' node: one claim,
+/// mounted by every pod of that node (ReadWriteOnce allows it), on any storage class.
+fn beside_owners(spec: &Spec, name: &str, m: &Machine) -> Option<Value> {
+    let owners: Vec<&str> = m
+        .volumes
+        .keys()
+        .filter(|v| !holds(spec, name, v))
+        .filter_map(|v| spec.volume_owner(v))
+        .collect();
+    if owners.is_empty() {
+        return None;
+    }
+    let terms = owners.iter().map(|o| {
+        map([
+            ("labelSelector", map([("matchLabels", labels(&[(MACHINE_LABEL.to_string(), *o)]))])),
+            ("topologyKey", s("kubernetes.io/hostname")),
+        ])
+    });
+    Some(map([("podAffinity", map([("requiredDuringSchedulingIgnoredDuringExecution", list(terms))]))]))
+}
+
 /// The emptyDir holding Isoloom's probe, and the init container filling it.
 const PROBE_VOLUME: &str = "isoloom-probe";
 /// Where a seed init container sees the claim it fills.
@@ -343,6 +369,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 
         let mut pod = Mapping::new();
         pod.insert(s("hostname"), s(name.as_str()));
+        if let Some(affinity) = beside_owners(spec, name, m) {
+            pod.insert(s("affinity"), affinity);
+        }
         // Namespaced sysctls are the pod's (the kubelet allows the safe ones; others need its
         // --allowed-unsafe-sysctls).
         if !m.sysctls.is_empty() {
@@ -362,7 +391,13 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             ]));
         }
         // The volumes start with the image's files (before the machine and its init jobs).
-        waits.extend(m.volumes.iter().map(|(v, path)| seed_container(&image, v, path)));
+        // A shared volume is seeded once, by its owner.
+        waits.extend(
+            m.volumes
+                .iter()
+                .filter(|(v, _)| holds(spec, name, v))
+                .map(|(v, path)| seed_container(&image, v, path)),
+        );
         waits.extend(m.depends_on.iter().filter_map(|dep| {
             let ports: Vec<u16> = spec.machines[dep].ready_ports();
             (!ports.is_empty()).then(|| {
@@ -400,7 +435,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             .map(|v| {
                 map([
                     ("name", s(format!("vol-{v}"))),
-                    ("persistentVolumeClaim", map([("claimName", s(format!("{name}-{v}")))])),
+                    ("persistentVolumeClaim", map([("claimName", s(spec.volume_key(name, v)))])),
                 ])
             })
             .collect();
@@ -443,11 +478,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             )],
         ));
 
-        for v in m.volumes.keys() {
+        for v in m.volumes.keys().filter(|v| holds(spec, name, v)) {
             docs.push(doc(
                 "PersistentVolumeClaim",
                 "v1",
-                &format!("{name}-{v}"),
+                &spec.volume_key(name, v),
                 vec![(
                     "spec",
                     map([

@@ -24,6 +24,7 @@ networks:
   office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, switch: fw, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
 reach: [{ from: out, to: dmz, ports: [80] }]
 inputs: [TOKEN]
+volumes: { data: { owner: fw } }
 machines:
   fw:
     networks: { out: 2, dmz: 1 }

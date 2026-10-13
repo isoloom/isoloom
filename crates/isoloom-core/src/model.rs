@@ -28,6 +28,10 @@ pub struct Spec {
     /// account. See [`CloudServices`]. A spec has either `cloud:` or machines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<CloudServices>,
+    /// Volumes shared between machines: a machine volume with one of these names is this
+    /// volume, wherever it mounts it. See [`SharedVolume`].
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub volumes: IndexMap<String, SharedVolume>,
     /// What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time
     /// servers. Usually set by a profile, one customer's network at a time. See [`Constraints`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -840,6 +844,33 @@ pub const KNOWN_OS: &[&str] = &[
 ];
 
 impl Spec {
+    /// The storage behind machine `machine`'s volume `volume`: the shared volume's own name,
+    /// else one of its own (`<machine>-<volume>`).
+    pub fn volume_key(&self, machine: &str, volume: &str) -> String {
+        if self.volumes.contains_key(volume) {
+            volume.to_string()
+        } else {
+            format!("{machine}-{volume}")
+        }
+    }
+
+    /// The machines that mount shared volume `volume`, in spec order.
+    pub fn volume_users(&self, volume: &str) -> Vec<&str> {
+        self.machines
+            .iter()
+            .filter(|(_, m)| m.volumes.contains_key(volume))
+            .map(|(n, _)| n.as_str())
+            .collect()
+    }
+
+    /// The machine holding shared volume `volume`: its `owner`, else its first user.
+    pub fn volume_owner(&self, volume: &str) -> Option<&str> {
+        match self.volumes.get(volume)?.owner.as_deref() {
+            Some(o) => Some(o),
+            None => self.volume_users(volume).first().copied(),
+        }
+    }
+
     /// The spec with `{{ cloud.outputs.<name> }}` filled in (checks and message), from a
     /// deployed cloud-services environment's outputs.
     pub fn with_cloud_outputs(&self, outputs: &IndexMap<String, String>) -> Spec {
@@ -870,6 +901,18 @@ impl Spec {
     pub fn cloud_message(&self, outputs: &IndexMap<String, String>) -> Option<String> {
         self.with_cloud_outputs(outputs).message
     }
+}
+
+/// A volume several machines mount (see [`Spec::volumes`]): one named volume on Docker, one
+/// claim on Kubernetes (its users on its owner's node), and on VMs the owner's directory
+/// served over NFS to the others, mounted at their own paths.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SharedVolume {
+    /// The machine that holds the data (serves it over NFS on the VM targets). Default: the
+    /// first machine that mounts it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
 }
 
 /// A process limit (see [`Machine::ulimits`]): one value for the soft and hard limits, or both.
