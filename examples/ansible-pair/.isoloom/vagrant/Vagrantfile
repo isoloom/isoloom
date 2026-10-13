@@ -832,7 +832,9 @@ Vagrant.configure("2") do |config|
       set -e
       mkdir -p /tmp/isoloom-facts
       export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200
-      _isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'
+      mkdir -p /tmp/isoloom-retry
+      export ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry
+      _isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|Connection reset by peer|Connection timed out|Remote end closed connection'
       _isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
       retry_download() {
         _isoloom_n=1
@@ -847,21 +849,42 @@ Vagrant.configure("2") do |config|
         _isoloom_n=1
         _isoloom_log=$(mktemp)
         _isoloom_rcf=$(mktemp)
+        # The playbook is the last argument; Ansible names its retry file after it.
+        for _isoloom_book; do :; done
+        _isoloom_retry=${ANSIBLE_RETRY_FILES_SAVE_PATH:-/tmp/isoloom-retry}/$(basename "${_isoloom_book%.*}").retry
+        _isoloom_limit=
+        rm -f "$_isoloom_retry"
         while :; do
-          { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
+          { "$@" $_isoloom_limit && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
           _isoloom_rc=$(cat "$_isoloom_rcf")
           if [ "$_isoloom_rc" -eq 0 ]; then
-            rm -f "$_isoloom_log" "$_isoloom_rcf"
+            rm -f "$_isoloom_log" "$_isoloom_rcf" "$_isoloom_retry"
             return 0
           fi
-          if [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log"; then
-            echo "isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)"
+          # Exit 4: a host unreachable, maybe a task failed too (4 wins over 2), or a playbook that
+          # doesn't parse (4 as well, no recap). Unreachable hosts only: the recap shows some with
+          # `unreachable=` and none with `failed=` above 0, and Ansible wrote their retry file.
+          if [ "$_isoloom_rc" -eq 4 ] && grep -qE ' unreachable=[1-9]' "$_isoloom_log" && ! grep -qE ' failed=[1-9]' "$_isoloom_log" && [ -s "$_isoloom_retry" ]; then
+            _isoloom_hosts=$(echo $(cat "$_isoloom_retry"))
+            _isoloom_limit="--limit @$_isoloom_retry"
+            if [ "$_isoloom_n" -lt 4 ]; then
+              echo "isoloom: $_isoloom_book: unreachable: $_isoloom_hosts; waiting $((4 * _isoloom_pause)) s, then running it again on them ($((_isoloom_n + 1))/4)"
+              sleep $((4 * _isoloom_pause))
+              _isoloom_n=$((_isoloom_n + 1))
+              continue
+            fi
+            echo "isoloom: $_isoloom_book: still unreachable after $_isoloom_n runs: $_isoloom_hosts; giving up"
+          elif [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log" && ! grep -q 'UNREACHABLE!' "$_isoloom_log"; then
+            # A task cut mid-way by a dropped connection (not a host unreachable while another
+            # failed a task: that failure is real).
+            echo "isoloom: $_isoloom_book: the play was cut by a dropped connection; waiting $((2 * _isoloom_pause)) s, then running it again ($((_isoloom_n + 1))/4)"
             sleep $((2 * _isoloom_pause))
+            _isoloom_limit=
             _isoloom_n=$((_isoloom_n + 1))
-          else
-            rm -f "$_isoloom_log" "$_isoloom_rcf"
-            return "$_isoloom_rc"
+            continue
           fi
+          rm -f "$_isoloom_log" "$_isoloom_rcf"
+          return "$_isoloom_rc"
         done
       }
       cd /opt/isoloom/ansible
