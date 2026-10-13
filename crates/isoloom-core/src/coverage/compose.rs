@@ -68,9 +68,8 @@ fn rows() -> Vec<(String, Support)> {
         ),
         (
             "services.*.cap_add",
-            Partial {
-                from: "networks.*.gateway",
-                gap: "nothing more: capabilities only exist for containers (root on a VM has them all)",
+            Emitted {
+                from: "networks.*.gateway (capabilities only exist for containers: root on a VM has them all)",
             },
         ),
         ("services.*.cap_drop", NO_CONTAINER_ON_VMS),
@@ -102,9 +101,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.depends_on", Emitted { from: "machines.*.depends_on" }),
         (
             "services.*.deploy",
-            Partial {
-                from: "machines.*.resources",
-                gap: "replicas (see `scale`)",
+            Emitted {
+                from: "machines.*.resources (replicas: see `scale`)",
             },
         ),
         ("services.*.develop", TOOLING),
@@ -136,9 +134,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.domainname", Emitted { from: "machines.*.dns.domain" }),
         (
             "services.*.entrypoint",
-            Partial {
-                from: "(Isoloom's own containers and init jobs)",
-                gap: "a machine's own: set it in its image",
+            Emitted {
+                from: "(Isoloom's own containers and init jobs; a machine's own is its image's)",
             },
         ),
         ("services.*.env_file", Equivalent { via: "inputs" }),
@@ -228,9 +225,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.models", TOOLING),
         (
             "services.*.network_mode",
-            Partial {
-                from: "(Isoloom's own sidecars and check runner)",
-                gap: "nothing more: sharing another machine's network isn't possible between VMs",
+            Emitted {
+                from: "(Isoloom's own sidecars and check runner; sharing another machine's network isn't possible between VMs)",
             },
         ),
         (
@@ -298,8 +294,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.runtime", NO_CONTAINER_ON_VMS),
         (
             "services.*.scale",
-            Planned {
-                note: "several identical machines (replicas), each with its own address",
+            Equivalent {
+                via: "machines.*.count (identical machines, each with its own name and address)",
             },
         ),
         ("services.*.secrets", Equivalent { via: "machines.*.inputs" }),
@@ -342,9 +338,8 @@ fn rows() -> Vec<(String, Support)> {
         ),
         (
             "services.*.user",
-            Partial {
-                from: "(Isoloom's check runner, as root to drop its default route on offline networks)",
-                gap: "a machine's own user: set it in its image",
+            Emitted {
+                from: "(Isoloom's check runner, as root to drop its default route on offline networks; a machine's own user is its image's)",
             },
         ),
         ("services.*.userns_mode", SHARED_NAMESPACE),
