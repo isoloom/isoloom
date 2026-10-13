@@ -1327,9 +1327,26 @@ fn cloud_leftovers(spec: &core::Spec, wd: &std::path::Path) {
         .envs(&c.env)
         .envs(aws_session_env())
         .stderr(std::process::Stdio::null());
-    let named = ["AWS_REGION", "AWS_DEFAULT_REGION"].iter().any(|k| c.env.contains_key(*k));
-    if !named && let Some(r) = c.vars.get("region").and_then(|v| v.as_str()) {
-        cmd.args(["--region", r]);
+    // The region: `cloud.env`'s, else `cloud.vars.region` as applied (an input's value from
+    // inputs.tfvars.json), else the user's own environment. Unknown, the CLI's default is
+    // searched, and the name is kept whatever it finds.
+    let region_env = ["AWS_REGION", "AWS_DEFAULT_REGION"];
+    let mut known = region_env.iter().any(|k| c.env.contains_key(*k));
+    if !known {
+        let applied = || -> Option<String> {
+            let v = c.vars.get("region")?;
+            if core::CloudServices::inputs_in(v).is_empty() {
+                return v.as_str().map(String::from);
+            }
+            let inputs: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(wd.join("inputs.tfvars.json")).ok()?).ok()?;
+            inputs["region"].as_str().map(String::from)
+        };
+        if let Some(r) = applied().filter(|r| !r.is_empty() && !r.contains("{{")) {
+            cmd.args(["--region", &r]);
+            known = true;
+        } else {
+            known = region_env.iter().any(|k| std::env::var(k).is_ok_and(|v| !v.is_empty()));
+        }
     }
     let arns: Vec<String> = match cmd.output() {
         Ok(o) if o.status.success() => serde_json::from_slice(&o.stdout).unwrap_or_default(),
@@ -1343,7 +1360,13 @@ fn cloud_leftovers(spec: &core::Spec, wd: &std::path::Path) {
         }
     };
     if arns.is_empty() {
-        let _ = std::fs::remove_file(&file);
+        if known {
+            let _ = std::fs::remove_file(&file);
+        } else {
+            eprintln!(
+                "note: nothing tagged isoloom-instance={id} in the aws CLI's default region; the region isn't known (set AWS_REGION in `cloud.env`), so the name is kept for the next `down`"
+            );
+        }
         return;
     }
     eprintln!(

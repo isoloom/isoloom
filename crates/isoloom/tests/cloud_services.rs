@@ -263,3 +263,31 @@ fn down_lists_what_is_left_with_the_deployments_tag() {
     assert!(!text(&o).contains("Still in the cloud"), "{}", text(&o));
     assert!(!lab.out().join("isoloom-instance").exists());
 }
+
+#[test]
+fn leftovers_use_the_applied_region_and_keep_the_name_when_it_is_unknown() {
+    // The region from an input: the value applied, read back at `down`.
+    let lab = Lab::new("region-input", "  vars: { region: \"{{ inputs.REGION }}\" }\ninputs: [REGION]\n");
+    let o = lab.command(&["run", "cloud-services"]).env("REGION", "ap-south-1").output().unwrap();
+    assert!(o.status.success(), "{}", text(&o));
+    let o = lab.isoloom(&["down", "cloud-services"]);
+    assert!(o.status.success(), "{}", text(&o));
+    let aws = read(&lab.tf.join("aws.log"));
+    assert!(aws.trim_end().ends_with("--region ap-south-1"), "{aws}");
+    assert!(!lab.out().join("isoloom-instance").exists());
+
+    // No region anywhere: the CLI's default is searched, and an empty answer forgets nothing.
+    let lab = Lab::new("region-unknown", "");
+    let o = lab.isoloom(&["run", "cloud-services"]);
+    assert!(o.status.success(), "{}", text(&o));
+    let o = lab
+        .command(&["down", "cloud-services"])
+        .env_remove("AWS_REGION")
+        .env_remove("AWS_DEFAULT_REGION")
+        .output()
+        .unwrap();
+    assert!(o.status.success(), "{}", text(&o));
+    assert!(!read(&lab.tf.join("aws.log")).contains("--region"));
+    assert!(text(&o).contains("the name is kept"), "{}", text(&o));
+    assert!(lab.out().join("isoloom-instance").exists());
+}

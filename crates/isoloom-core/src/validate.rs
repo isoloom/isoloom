@@ -915,6 +915,7 @@ const CLOUD_ENV_RESERVED: &[&str] = &[
     "PS4",
     "HOME",
     "TF_DATA_DIR",
+    "TF_VAR_isoloom_instance",
 ];
 
 /// Checks that every path the spec mentions exists in the project folder.
