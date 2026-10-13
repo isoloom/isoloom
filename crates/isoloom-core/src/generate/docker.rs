@@ -102,17 +102,20 @@ pub(super) fn probe_command(m: &Machine) -> Vec<Value> {
 
 /// A machine's Compose `build`: its context, and the Dockerfile (Compose reads it relative to
 /// the context) and build arguments when the spec gives them.
-fn build_of(build: &str, d: &crate::model::DockerImpl) -> Value {
+fn build_of(spec: &Spec, build: &str, d: &crate::model::DockerImpl) -> Value {
     let mut b = Mapping::new();
     b.insert(s("context"), s(format!("{ROOT}/{build}")));
     if let Some(f) = &d.dockerfile {
         b.insert(s("dockerfile"), s(relative_to(build, f)));
     }
-    if !d.args.is_empty() {
+    let constraints = super::constraints::build_args(spec);
+    if !d.args.is_empty() || !constraints.is_empty() {
         let mut args = Mapping::new();
-        for (k, v) in &d.args {
+        let own = d.args.iter().map(|(k, v)| (k.clone(), v.clone()));
+        // The spec's own arguments win over the constraints'.
+        for (k, v) in constraints.into_iter().filter(|(k, _)| !d.args.contains_key(k)).chain(own) {
             // `$$`: a literal value, not Compose's interpolation.
-            args.insert(s(k.as_str()), s(v.replace('$', "$$")));
+            args.insert(s(k), s(v.replace('$', "$$")));
         }
         b.insert(s("args"), Value::Mapping(args));
     }
@@ -129,11 +132,17 @@ pub(super) fn relative_to(from: &str, path: &str) -> String {
     out.join("/")
 }
 
-fn environment(m: &Machine) -> Option<Value> {
-    if m.inputs.is_empty() {
+/// A machine's environment: the spec's constraints (proxy, package mirrors), then its inputs.
+fn environment(spec: &Spec, m: &Machine) -> Option<Value> {
+    let constraints = super::constraints::machine_env(spec);
+    if m.inputs.is_empty() && constraints.is_empty() {
         return None;
     }
     let mut env = Mapping::new();
+    for (k, v) in constraints {
+        // `$$`: a literal value, not Compose's interpolation.
+        env.insert(s(k), s(v.replace('$', "$$")));
+    }
     for name in &m.inputs {
         env.insert(s(name.as_str()), s(format!("${{{name}:-}}")));
     }
@@ -291,7 +300,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         let mut svc = Mapping::new();
         let image = image_of(spec, name, m);
         if let Some(build) = &d.build {
-            svc.insert(s("build"), build_of(build, d));
+            svc.insert(s("build"), build_of(spec, build, d));
         }
         svc.insert(s("image"), s(image.clone()));
         // Pin the architecture so the machine runs the same on an x86-64 or an ARM host.
@@ -344,7 +353,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         if let Some(hosts) = extra_hosts(spec, name) {
             svc.insert(s("extra_hosts"), hosts);
         }
-        if let Some(env) = environment(m) {
+        if let Some(env) = environment(spec, m) {
             svc.insert(s("environment"), env);
         }
         let ports: Vec<Value> = m
@@ -520,7 +529,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             mounts.extend(m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", volume_name(name, v)))));
             j.insert(s("volumes"), Value::Sequence(mounts));
             j.insert(s("network_mode"), s(format!("service:{name}")));
-            if let Some(env) = environment(m) {
+            if let Some(env) = environment(spec, m) {
                 j.insert(s("environment"), env);
             }
             let mut deps = Mapping::new();

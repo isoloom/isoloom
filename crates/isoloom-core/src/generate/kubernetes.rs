@@ -122,12 +122,15 @@ fn pod_labels(machine: Option<&str>, nets: &[&String]) -> Value {
     labels(&pairs)
 }
 
-/// The machine's inputs, from the `isoloom-inputs` Secret (optional: unset inputs are empty).
-fn env(m: &Machine) -> Option<Value> {
-    if m.inputs.is_empty() {
+/// The machine's environment: the spec's constraints (proxy, package mirrors), then its inputs
+/// from the `isoloom-inputs` Secret (optional: unset inputs are empty).
+fn env(spec: &Spec, m: &Machine) -> Option<Value> {
+    let constraints = super::constraints::machine_env(spec);
+    if m.inputs.is_empty() && constraints.is_empty() {
         return None;
     }
-    Some(list(m.inputs.iter().map(|i| {
+    let fixed = constraints.into_iter().map(|(k, v)| map([("name", s(k)), ("value", s(v))]));
+    Some(list(fixed.chain(m.inputs.iter().map(|i| {
         map([
             ("name", s(i.as_str())),
             (
@@ -138,7 +141,7 @@ fn env(m: &Machine) -> Option<Value> {
                 )]),
             ),
         ])
-    })))
+    }))))
 }
 
 fn unsupported(spec: &Spec) -> Option<String> {
@@ -268,7 +271,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 ]),
             );
         }
-        if let Some(e) = env(m) {
+        if let Some(e) = env(spec, m) {
             c.insert(s("env"), e);
         }
         if let Some(r) = m.resources {
@@ -321,7 +324,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             j.insert(s("image"), s(image.clone()));
             j.insert(s("imagePullPolicy"), s("IfNotPresent"));
             j.insert(s("command"), list([s("sh"), s("-c"), s(steps.join(" && "))]));
-            if let Some(e) = env(m) {
+            if let Some(e) = env(spec, m) {
                 j.insert(s("env"), e);
             }
             let mut jm = mounts.clone();

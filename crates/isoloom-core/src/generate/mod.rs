@@ -13,6 +13,7 @@ mod cloud_docker;
 mod cloud_services;
 mod cloud_vm;
 mod cloud_vm_others;
+pub mod constraints;
 mod docker;
 pub use docker::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
 mod docker_vm;
@@ -190,6 +191,8 @@ fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
     for f in files.iter_mut().filter(|f| f.path.ends_with(".tf")) {
         project::terraform(&mut f.contents);
     }
+    constraints::rewrite_images(spec, &mut files);
+    constraints::terraform_prelude(spec, &mut files);
     Ok(files)
 }
 

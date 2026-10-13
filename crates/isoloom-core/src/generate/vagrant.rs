@@ -49,6 +49,15 @@ pub(super) const UNTAR_PS1: &str = include_str!("untar.ps1");
 const PROJECT_STEP: &str = "    m.vm.provision \"isoloom_project\", name: \"project\"\n";
 
 /// Ruby double-quoted string.
+/// The spec's constraints (see `constraints::linux_prelude`) as a Linux VM's first
+/// provisioner, `var` being the VM's block variable (`m`, or `config` for a single-VM file).
+pub(super) fn constraints_step(spec: &Spec, indent: &str, var: &str) -> String {
+    match super::constraints::linux_prelude(spec) {
+        Some(sh) => format!("{indent}{var}.vm.provision \"shell\", name: \"constraints\", inline: {}\n", rb(&sh)),
+        None => String::new(),
+    }
+}
+
 fn rb(s: &str) -> String {
     format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace("#{", "\\#{"))
 }
@@ -162,6 +171,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let label = format!("{} · {name}", spec.name);
 
         let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(name));
+        if !is_windows_machine(spec, name) {
+            out.push_str(&constraints_step(spec, "    ", "m"));
+        }
         let _ = writeln!(out, "    m.vm.box = {}", rb(vbox));
         if let Some(v) = &image.version {
             let _ = writeln!(out, "    m.vm.box_version = {}", rb(v));
@@ -525,6 +537,7 @@ fn tool_vm(spec: &Spec, index: usize, out: &mut String, links: &IndexMap<String,
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
     let _ = writeln!(out, "\n  # Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).");
     let _ = writeln!(out, "  config.vm.define {} do |m|", rb(TOOL_SHELL));
+    out.push_str(&constraints_step(spec, "    ", "m"));
     let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
     let _ = writeln!(out, "    m.vm.hostname = \"shell\"");
     for net in spec.networks.keys() {
@@ -847,6 +860,7 @@ fn esxi(out: &mut String, guest: &str, cpus: u32, mem: u32, nets: &[&str]) {
 /// The router VM: on every network at its last address, forwarding with the `reach` rules.
 fn router_vm(spec: &Spec, out: &mut String, links: &IndexMap<String, Link>) {
     let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(router::NAME));
+    out.push_str(&constraints_step(spec, "    ", "m"));
     let _ = writeln!(out, "    m.vm.box = \"bento/debian-12\"");
     let _ = writeln!(out, "    m.vm.hostname = {}", rb(router::NAME));
     for net in router::networks(spec) {
@@ -982,6 +996,7 @@ fn controller_vm(spec: &Spec, out: &mut String, on_controller: &[&checks::Resolv
     let with_checks = !on_controller.is_empty();
     let cidr = |net: &str| crate::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
     let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(CONTROLLER));
+    out.push_str(&constraints_step(spec, "    ", "m"));
     let (bx, version) = super::controller_box(spec);
     let (cpus, mem, _) = super::controller_size(spec);
     if bx == super::CONTROLLER_BOX && version.is_none() {
