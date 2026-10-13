@@ -997,6 +997,12 @@ fn validate_check(spec: &Spec, i: usize, d: &crate::model::Declared, add: &mut d
     if http_extras && d.http.is_none() {
         add(&at, "`method`, `headers` and `body` go with `http`".into());
     }
+    if d.follow && d.http.is_none() {
+        add(&at, "`follow` (redirects) goes with `http`".into());
+    }
+    if d.follow && d.http.is_some() && matches!(&d.expect, Some(Expect::Text(t)) if t == "blocked") {
+        add(&at, "a `blocked` check gets no answer, so no redirect to follow: leave out `follow`".into());
+    }
     if d.contains.is_some() && d.http.is_none() && d.tcp.is_none() {
         add(&at, "`contains` goes with `http` or `tcp`".into());
     }

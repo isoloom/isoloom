@@ -661,6 +661,17 @@ fn base_table() -> Vec<Row> {
             ),
         ),
         common(
+            "checks[].follow",
+            done(
+                "redirects followed (curl -L --max-redirs 5; wget, which follows anyway, reads the last of at most 6 answers), the final status compared",
+                "hello-stack",
+            ),
+            done(
+                "redirects followed (curl -L --max-redirs 5; wget, which follows anyway, reads the last of at most 6 answers), the final status compared",
+                "hello-stack",
+            ),
+        ),
+        common(
             "checks[].send",
             done("a line written to the connection before reading (nc else bash)", "hello-stack"),
             done("a line written to the connection before reading (nc else bash)", "hello-stack"),

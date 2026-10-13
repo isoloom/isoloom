@@ -47,6 +47,12 @@ checks:
     http: http://web/
     headers: { Accept: text/html }
     contains: hello from isoloom
+  - name: the folder's address without its slash redirects
+    http: http://web/hello
+    expect: 301
+  - name: the folder's page, past the redirect
+    http: http://web/hello
+    follow: true
   - name: the static page refuses a POST
     http: http://web/
     method: POST

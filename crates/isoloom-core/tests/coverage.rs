@@ -51,7 +51,7 @@ provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, var
 controller: { image: { vagrant: x/y }, resources: { cpus: 1, memory_mb: 512 } }
 common: { resources: { cpus: 1 } }
 groups: { g: { members: [fw], arch: amd64 } }
-checks: [c.sh, { name: n, from: fw, http: "http://x/", method: POST, headers: { A: b }, body: x, contains: y, send: z, tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]
+checks: [c.sh, { name: n, from: fw, http: "http://x/", method: POST, headers: { A: b }, body: x, contains: y, follow: true, send: z, tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]
 targets: [docker]
 message: hello
 cloud: { provider: aws, terraform: tf, vars: { region: us-east-1 }, outputs: { site: url }, hourly_usd: 0.1 }

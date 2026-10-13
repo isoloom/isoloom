@@ -189,6 +189,23 @@
             "wait": 30
           },
           {
+            "name": "the folder's address without its slash redirects",
+            "derived": false,
+            "kind": "http",
+            "target": "http://web/hello",
+            "expect": "301",
+            "wait": 30
+          },
+          {
+            "name": "the folder's page, past the redirect",
+            "derived": false,
+            "kind": "http",
+            "target": "http://web/hello",
+            "expect": "200",
+            "wait": 30,
+            "follow": true
+          },
+          {
             "name": "the static page refuses a POST",
             "derived": false,
             "kind": "http",

@@ -227,7 +227,13 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                         Probe::Script { path } => ("script", path.clone(), String::new()),
                         Probe::Playbook { path } => ("playbook", path.clone(), String::new()),
                     };
-                    json!({ "name": c.name, "derived": c.derived, "kind": kind, "target": target, "expect": expect, "wait": c.wait })
+                    let mut v = json!({ "name": c.name, "derived": c.derived, "kind": kind, "target": target, "expect": expect, "wait": c.wait });
+                    if let Probe::Http { request, .. } = &c.probe
+                        && request.follow
+                    {
+                        v["follow"] = json!(true);
+                    }
+                    v
                 })
                 .collect();
             json!({

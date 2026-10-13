@@ -136,13 +136,20 @@ pub struct HttpRequest {
     pub body: Option<String>,
     /// Text the response body must contain.
     pub contains: Option<String>,
+    /// Follow redirects (up to [`HTTP_MAX_REDIRECTS`]) and compare the final status.
+    pub follow: bool,
 }
 
 impl HttpRequest {
+    /// Nothing beyond a GET and its status (following redirects or not).
     fn is_plain(&self) -> bool {
-        *self == HttpRequest::default()
+        self.method.is_none() && self.headers.is_empty() && self.body.is_none() && self.contains.is_none()
     }
 }
+
+/// How many redirects an `http` check with `follow` goes through before giving up (the status
+/// compared is then that of the last answer, a redirect).
+pub const HTTP_MAX_REDIRECTS: u32 = 5;
 
 /// What a `tcp` check writes and reads beyond connecting (both optional; `send` needs `contains`).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -243,6 +250,7 @@ fn declared(d: &Declared, default: &Position) -> Option<Resolved> {
             headers: d.headers.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             body: d.body.clone(),
             contains: d.contains.clone(),
+            follow: d.follow,
         };
         let what = match (&expect, &request.method) {
             (HttpExpect::Blocked, _) => format!("{u} blocked"),
@@ -515,8 +523,23 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
             Probe::Http { url, expect, request } if !request.is_plain() && *expect != HttpExpect::Blocked => {
                 let text = url.render(&(r.host)(&url.host, position));
                 let mut args = String::new();
-                if let Some(m) = &request.method {
-                    args.push_str(&format!(" -X {}", sq(&m.to_uppercase())));
+                if request.follow {
+                    args.push_str(&format!(" -L --max-redirs {HTTP_MAX_REDIRECTS}"));
+                }
+                let method = request.method.as_deref().map(str::to_uppercase);
+                match method.as_deref() {
+                    // Following redirects, a POST is sent as curl sends a form (`--data-binary`,
+                    // or an empty `-d ''`), not forced with `-X`: a 301/302/303 is then followed
+                    // with a GET, as browsers do. `-X POST` would POST to every hop (a login
+                    // page's redirect to a GET-only page answering 405).
+                    Some("POST") if request.follow => {
+                        if request.body.is_none() {
+                            args.push_str(" -d ''");
+                        }
+                    }
+                    Some("HEAD") if request.follow => args.push_str(" -I"),
+                    Some(m) => args.push_str(&format!(" -X {}", sq(m))),
+                    None => {}
                 }
                 for (k, v) in &request.headers {
                     args.push_str(&format!(" -H {}", sq(&format!("{k}: {v}"))));
@@ -535,16 +558,19 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
                     u = sq(&text),
                 )
             }
-            Probe::Http { url, expect, .. } => {
+            Probe::Http { url, expect, request } => {
                 let text = url.render(&(r.host)(&url.host, position));
                 let (u, ut) = (sq(&text), dq(&text));
+                // `_http`'s second argument: follow redirects.
+                let f = if request.follow { " follow" } else { "" };
+                let after = if request.follow { " (after redirects)" } else { "" };
                 match expect {
                     HttpExpect::Status(code) => format!(
-                        "if _retry {w} _http_is {u} {code}; then pass {n}; else fail {n} \"expected HTTP {code} from {ut}, got $(_http {u})\"; fi\n",
+                        "if _retry {w} _http_is {u} {code}{f}; then pass {n}; else fail {n} \"expected HTTP {code} from {ut}{after}, got $(_http {u}{f})\"; fi\n",
                         w = c.wait
                     ),
                     HttpExpect::Any => format!(
-                        "if _retry {w} _http_any {u}; then pass {n}; else fail {n} \"nothing answers at {ut}\"; fi\n",
+                        "if _retry {w} _http_any {u}{f}; then pass {n}; else fail {n} \"nothing answers at {ut}\"; fi\n",
                         w = c.wait
                     ),
                     HttpExpect::Blocked => {
@@ -614,12 +640,16 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
 const RUNTIME: &str = r#"passed=0; failed=0
 pass() { passed=$((passed+1)); echo "isoloom-check: PASS $1"; }
 fail() { failed=$((failed+1)); echo "isoloom-check: FAIL $1: $2"; }
-# _http URL -> the status code, 000 when nothing answers (curl, else wget, else bash).
+# _http URL [follow] -> the status code, 000 when nothing answers (curl, else wget, else bash):
+# the first answer's, or with `follow` the last one's after at most 5 redirects (bash: the first).
 _http() {
   if command -v curl >/dev/null 2>&1; then
-    c=$(curl -sk -o /dev/null -m 5 -w '%{http_code}' "$1" 2>/dev/null)
+    if [ -n "$2" ]; then set -- "$1" -L --max-redirs 5; else set -- "$1"; fi
+    c=$(curl -sk -o /dev/null -m 5 -w '%{http_code}' "$@" 2>/dev/null)
   elif command -v wget >/dev/null 2>&1; then
-    c=$(wget -q -S -O /dev/null -T 5 --no-check-certificate "$1" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | tail -n 1)
+    # wget follows redirects whatever it's told (busybox's can't be told): -S prints each answer.
+    if [ -n "$2" ]; then _n=6; else _n=1; fi
+    c=$(wget -q -S -O /dev/null -T 5 --no-check-certificate "$1" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | head -n $_n | tail -n 1)
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
@@ -627,7 +657,7 @@ _http() {
   fi
   echo "${c:-000}"
 }
-_http_is() { [ "$(_http "$1")" = "$2" ]; }
+_http_is() { [ "$(_http "$1" "$3")" = "$2" ]; }
 # _req STATUS|any TEXT CURL-ARGS... -> 0 when the request gets that status (any answer for `any`)
 # and its body contains TEXT (if any); $out says why not. Needs curl.
 _req() {
@@ -640,7 +670,7 @@ _req() {
   fi
   rm -f "$b"; return $r
 }
-_http_any() { [ "$(_http "$1")" != 000 ]; }
+_http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
