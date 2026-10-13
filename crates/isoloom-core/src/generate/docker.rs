@@ -122,6 +122,22 @@ fn build_of(spec: &Spec, build: &str, d: &crate::model::DockerImpl) -> Value {
     Value::Mapping(b)
 }
 
+/// A machine's Compose `ulimits`: one number when soft and hard agree, else both.
+fn ulimits(m: &Machine) -> Value {
+    m.ulimits
+        .iter()
+        .map(|(name, u)| {
+            let v = if u.soft() == u.hard() {
+                Value::from(u.soft())
+            } else {
+                map([("soft", Value::from(u.soft())), ("hard", Value::from(u.hard()))])
+            };
+            (s(name.as_str()), v)
+        })
+        .collect::<Mapping>()
+        .into()
+}
+
 /// `path` (from the project folder) as seen from the folder `from` (also from the project).
 pub(super) fn relative_to(from: &str, path: &str) -> String {
     let clean = |p: &str| -> Vec<String> { p.split('/').filter(|c| !c.is_empty() && *c != ".").map(String::from).collect() };
@@ -132,14 +148,16 @@ pub(super) fn relative_to(from: &str, path: &str) -> String {
     out.join("/")
 }
 
-/// A machine's environment: the spec's constraints (proxy, package mirrors), then its inputs.
+/// A machine's environment: the spec's constraints (proxy, package mirrors), its own fixed
+/// values, then its inputs.
 fn environment(spec: &Spec, m: &Machine) -> Option<Value> {
     let constraints = super::constraints::machine_env(spec);
-    if m.inputs.is_empty() && constraints.is_empty() {
+    let fixed = m.environment.iter().map(|(k, v)| (k.clone(), v.clone()));
+    if m.inputs.is_empty() && constraints.is_empty() && m.environment.is_empty() {
         return None;
     }
     let mut env = Mapping::new();
-    for (k, v) in constraints {
+    for (k, v) in constraints.into_iter().chain(fixed) {
         // `$$`: a literal value, not Compose's interpolation.
         env.insert(s(k), s(v.replace('$', "$$")));
     }
@@ -310,6 +328,15 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
         }
         if m.read_only {
             svc.insert(s("read_only"), Value::Bool(true));
+        }
+        if !m.sysctls.is_empty() {
+            svc.insert(
+                s("sysctls"),
+                Value::Mapping(m.sysctls.iter().map(|(k, v)| (s(k.as_str()), s(v.as_str()))).collect()),
+            );
+        }
+        if !m.ulimits.is_empty() {
+            svc.insert(s("ulimits"), ulimits(m));
         }
         if let Some(shm) = &m.shm_size {
             svc.insert(s("shm_size"), s(shm.as_str()));

@@ -125,6 +125,63 @@ pub const PRIVATE: [Cidr; 3] = [
 /// Docker's own pools, Docker Desktop's network and home LANs.
 pub const DOCKER_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
 
+/// The sysctls a container can set: those the kernel keeps per network or IPC namespace.
+pub const CONTAINER_SYSCTLS: &[&str] = &[
+    "net.",
+    "kernel.shm",
+    "kernel.msgmax",
+    "kernel.msgmnb",
+    "kernel.msgmni",
+    "kernel.sem",
+    "fs.mqueue.",
+];
+
+/// A machine's `environment`, `sysctls` and `ulimits`: names each can take, values that fit,
+/// and what its implementations can do with them.
+fn machine_settings(name: &str, m: &crate::model::Machine) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let at = |field: &str, key: &str| format!("machines.{name}.{field}.{key}");
+    let windows = m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os));
+    for k in m.environment.keys() {
+        let ok = k.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+        if !ok {
+            out.push((at("environment", k), "a variable name: letters, digits and _, not starting with a digit".into()));
+        }
+    }
+    for (k, v) in &m.sysctls {
+        let ok = k.contains('.')
+            && k.split('.')
+                .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-'));
+        if !ok {
+            out.push((at("sysctls", k), "a kernel parameter, e.g. net.core.somaxconn".into()));
+        } else if m.docker.is_some() && !CONTAINER_SYSCTLS.iter().any(|p| k.starts_with(p)) {
+            out.push((
+                at("sysctls", k),
+                "a container can only set the namespaced ones (net.*, kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*): leave `docker:` out to make the machine VM-only".into(),
+            ));
+        }
+        if v.trim().is_empty() || v.contains('\n') {
+            out.push((at("sysctls", k), "a value on one line".into()));
+        }
+    }
+    for (k, u) in &m.ulimits {
+        if !crate::model::ULIMITS.contains(&k.as_str()) {
+            out.push((at("ulimits", k), format!("one of {}", crate::model::ULIMITS.join(", "))));
+        }
+        if u.soft() > u.hard() {
+            out.push((at("ulimits", k), "the soft limit can't be above the hard one".into()));
+        }
+    }
+    if windows {
+        for (field, set) in [("sysctls", !m.sysctls.is_empty()), ("ulimits", !m.ulimits.is_empty())] {
+            if set {
+                out.push((format!("machines.{name}.{field}"), "Linux only: a Windows machine has none".into()));
+            }
+        }
+    }
+    out
+}
+
 /// Checks the spec itself (no file system access). See [`validate_files`] for paths.
 pub fn validate(spec: &Spec) -> Vec<Problem> {
     let mut p = Vec::new();
@@ -407,6 +464,9 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         }
     }
     for (name, m) in &spec.machines {
+        for (at, message) in machine_settings(name, m) {
+            add(&at, message);
+        }
         let at = format!("machines.{name}");
         if !dns_label(name) {
             add(&at, "machine names are DNS names: kebab-case, starting with a letter".into());

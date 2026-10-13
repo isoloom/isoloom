@@ -240,6 +240,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         };
         providers(&mut out, &label, &format!("{}-{name}", spec.name), size, &nets, libvirt_box, &qemu);
         disk_step(size, windows, &mut out);
+        settings_step(m, windows, &mut out);
 
         if windows {
             windows_steps(spec, name, m, vm, &mut out);
@@ -612,6 +613,18 @@ const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update
 /// The libvirt box of Isoloom's own Debian VMs (router, controller, tool shell): libvirt can't
 /// run `bento/debian-12`.
 const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
+
+/// The machine's environment, sysctls and ulimits (see `machine_setup`), before its steps.
+fn settings_step(m: &Machine, windows: bool, out: &mut String) {
+    let script = if windows {
+        super::machine_setup::windows(m)
+    } else {
+        super::machine_setup::linux(m)
+    };
+    if let Some(script) = script {
+        let _ = writeln!(out, "    m.vm.provision \"shell\", name: \"settings\", inline: {}", rb(&script));
+    }
+}
 
 /// A VM's size: CPUs, memory (MB), and the disk (GB) when the spec sets one. The disk is a
 /// minimum: a box whose disk is already bigger keeps it (no provider shrinks a disk).

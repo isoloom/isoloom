@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 88% | 58 | 50 | 3 | 5 |
+| [Docker Compose](#docker-compose) | 92% | 58 | 53 | 1 | 4 |
 | [Vagrant](#vagrant) | 88% | 36 | 32 | 0 | 4 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-88% of 58 portable features (50 done, 3 partly, 5 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+92% of 58 portable features (53 done, 1 partly, 4 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -89,7 +89,7 @@ when a table disagrees with what Isoloom really generates.
 | `domainname` | Yes | Yes | From `machines.*.dns.domain` |
 | `entrypoint` | Yes | Yes | Isoloom's own containers and init jobs; a machine's own is its image's |
 | `env_file` | Yes | Another way | Via inputs |
-| `environment` | Yes | Partly | From `machines.*.inputs`; not yet: fixed values: set them in the image or the provisioning |
+| `environment` | Yes | Yes | From `machines.*.environment and machines.*.inputs` |
 | `expose` | Yes | Another way | Via machines.*.services (every port is reachable on the machine's networks) |
 | `extends` | n/a | No | Compose tooling, not the environment's behavior |
 | `external_links` | n/a | No | Legacy; replaced by networks |
@@ -139,10 +139,10 @@ when a table disagrees with what Isoloom really generates.
 | `stop_grace_period` | n/a | No | Compose tooling, not the environment's behavior |
 | `stop_signal` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 | `storage_opt` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `sysctls` | Yes | Partly | From `networks.*.gateway`; not yet: a machine's own network sysctls (net.*): containers only allow those, VMs allow them too |
+| `sysctls` | Yes | Yes | From `machines.*.sysctls and networks.*.gateway` |
 | `tmpfs` | Yes | Yes | From `machines.*.tmpfs` (and Memory emptyDirs on Kubernetes) |
 | `tty` | n/a | No | Compose tooling, not the environment's behavior |
-| `ulimits` | Yes | Not yet | Process limits (limits.conf or systemd on VMs) |
+| `ulimits` | Yes | Yes | From `machines.*.ulimits` |
 | `use_api_socket` | No | No | Hands the host's Docker to a machine: VMs and the cloud have none |
 | `user` | Yes | Yes | Isoloom's check runner, as root to drop its default route on offline networks; a machine's own user is its image's |
 | `userns_mode` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |

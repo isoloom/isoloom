@@ -129,7 +129,8 @@ fn pod_labels(machine: Option<&str>, nets: &[&String]) -> Value {
 /// The machine's environment: the spec's constraints (proxy, package mirrors), then its inputs
 /// from the `isoloom-inputs` Secret (optional: unset inputs are empty).
 fn env(spec: &Spec, m: &Machine) -> Option<Value> {
-    let constraints = super::constraints::machine_env(spec);
+    let mut constraints = super::constraints::machine_env(spec);
+    constraints.extend(m.environment.iter().map(|(k, v)| (k.clone(), v.clone())));
     if m.inputs.is_empty() && constraints.is_empty() {
         return None;
     }
@@ -160,6 +161,9 @@ fn unsupported(spec: &Spec) -> Option<String> {
     }
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine on Kubernetes come later".into());
+    }
+    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| !m.ulimits.is_empty()) {
+        return Some(format!("machine `{name}` sets `ulimits`: Kubernetes has no per-container process limits"));
     }
     if spec.networks.values().any(|n| n.tc.is_some()) {
         return Some("link impairment (`tc`) needs a router in the path; Kubernetes has none".into());
@@ -339,6 +343,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 
         let mut pod = Mapping::new();
         pod.insert(s("hostname"), s(name.as_str()));
+        // Namespaced sysctls are the pod's (the kubelet allows the safe ones; others need its
+        // --allowed-unsafe-sysctls).
+        if !m.sysctls.is_empty() {
+            let sysctls = m.sysctls.iter().map(|(k, v)| map([("name", s(k.as_str())), ("value", s(v.as_str()))]));
+            pod.insert(s("securityContext"), map([("sysctls", list(sysctls))]));
+        }
         // Wait for the machines it depends on: their services answer.
         let mut waits: Vec<Value> = Vec::new();
         // Isoloom's busybox: for the readiness probe and for seeding the volumes.

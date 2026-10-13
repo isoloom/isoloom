@@ -620,6 +620,7 @@ pub(super) fn linux_setup_cmds(
             hosts.iter().map(|h| format!("'{h}'")).collect::<Vec<_>>().join(" ")
         ));
     }
+    cmds.extend(super::machine_setup::sudo_command(m));
     if !m.volumes.is_empty() {
         cmds.push(format!("sudo mkdir -p {}", m.volumes.values().cloned().collect::<Vec<_>>().join(" ")));
     }
@@ -893,6 +894,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
             hosts.iter().map(|h| format!("'{h}'")).collect::<Vec<_>>().join(", ")
         ));
     }
+    ps.extend(super::machine_setup::windows(m));
     for sv in &m.services {
         ps.extend(windows_firewall(sv));
     }

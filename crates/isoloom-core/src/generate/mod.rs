@@ -15,6 +15,7 @@ mod cloud_vm;
 mod cloud_vm_others;
 pub mod constraints;
 mod docker;
+pub mod machine_setup;
 pub use docker::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
 mod docker_vm;
 mod external;

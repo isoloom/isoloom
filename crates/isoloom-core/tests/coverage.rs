@@ -35,6 +35,9 @@ machines:
     tmpfs: [/tmp, /run]
     shm_size: 256m
     dns: { servers: [10.0.0.1], search: [lab.local], domain: lab.local }
+    environment: { MODE: x }
+    sysctls: { net.core.somaxconn: 1024 }
+    ulimits: { nofile: 1024 }
     resources: { cpus: 1, memory_mb: 512, disk_gb: 10 }
     depends_on: []
     volumes: { data: /data }
