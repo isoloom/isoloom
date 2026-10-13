@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 82% | 58 | 44 | 8 | 6 |
+| [Docker Compose](#docker-compose) | 88% | 58 | 50 | 3 | 5 |
 | [Vagrant](#vagrant) | 83% | 36 | 30 | 0 | 6 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-82% of 58 portable features (44 done, 8 partly, 6 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+88% of 58 portable features (50 done, 3 partly, 5 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -61,7 +61,7 @@ when a table disagrees with what Isoloom really generates.
 | `attach` | n/a | No | Compose tooling, not the environment's behavior |
 | `blkio_config` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `build` | Yes | Yes | From `machines.*.docker.build` |
-| `cap_add` | Yes | Partly | From `networks.*.gateway`; not yet: nothing more: capabilities only exist for containers (root on a VM has them all) |
+| `cap_add` | Yes | Yes | From `networks.*.gateway` (capabilities only exist for containers: root on a VM has them all) |
 | `cap_drop` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `cgroup` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `cgroup_parent` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
@@ -79,7 +79,7 @@ when a table disagrees with what Isoloom really generates.
 | `cpuset` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `credential_spec` | No | No | Windows containers only |
 | `depends_on` | Yes | Yes | From `machines.*.depends_on` |
-| `deploy` | Yes | Partly | From `machines.*.resources`; not yet: replicas (see `scale`) |
+| `deploy` | Yes | Yes | From `machines.*.resources` (replicas: see `scale`) |
 | `develop` | n/a | No | Compose tooling, not the environment's behavior |
 | `device_cgroup_rules` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `devices` | No | No | Host devices: hosting services and cloud VMs have none to pass |
@@ -87,7 +87,7 @@ when a table disagrees with what Isoloom really generates.
 | `dns_opt` | Yes | In the image | Resolver options (resolv.conf) belong to the machine's provisioning |
 | `dns_search` | Yes | Yes | From `machines.*.dns.search` (and the Kubernetes dnsConfig) |
 | `domainname` | Yes | Yes | From `machines.*.dns.domain` |
-| `entrypoint` | Yes | Partly | Isoloom's own containers and init jobs; not yet: a machine's own: set it in its image |
+| `entrypoint` | Yes | Yes | Isoloom's own containers and init jobs; a machine's own is its image's |
 | `env_file` | Yes | Another way | Via inputs |
 | `environment` | Yes | Partly | From `machines.*.inputs`; not yet: fixed values: set them in the image or the provisioning |
 | `expose` | Yes | Another way | Via machines.*.services (every port is reachable on the machine's networks) |
@@ -112,7 +112,7 @@ when a table disagrees with what Isoloom really generates.
 | `mem_swappiness` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `memswap_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `models` | n/a | No | Compose tooling, not the environment's behavior |
-| `network_mode` | Yes | Partly | Isoloom's own sidecars and check runner; not yet: nothing more: sharing another machine's network isn't possible between VMs |
+| `network_mode` | Yes | Yes | Isoloom's own sidecars and check runner; sharing another machine's network isn't possible between VMs |
 | `networks` | Yes | Yes | From `machines.*.networks` (fixed addresses) |
 | `oom_kill_disable` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `oom_score_adj` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
@@ -131,7 +131,7 @@ when a table disagrees with what Isoloom really generates.
 | `read_only` | Yes | Yes | From `machines.*.read_only` (a read-only root filesystem; `volumes` stay writable) |
 | `restart` | Yes | Yes | Always unless-stopped: machines stay up like VMs |
 | `runtime` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `scale` | Yes | Not yet | Several identical machines (replicas), each with its own address |
+| `scale` | Yes | Another way | Via machines.*.count (identical machines, each with its own name and address) |
 | `secrets` | Yes | Another way | Via machines.*.inputs |
 | `security_opt` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `shm_size` | Yes | Yes | From `machines.*.shm_size` (and a Memory emptyDir on Kubernetes) |
@@ -144,7 +144,7 @@ when a table disagrees with what Isoloom really generates.
 | `tty` | n/a | No | Compose tooling, not the environment's behavior |
 | `ulimits` | Yes | Not yet | Process limits (limits.conf or systemd on VMs) |
 | `use_api_socket` | No | No | Hands the host's Docker to a machine: VMs and the cloud have none |
-| `user` | Yes | Partly | Isoloom's check runner, as root to drop its default route on offline networks; not yet: a machine's own user: set it in its image |
+| `user` | Yes | Yes | Isoloom's check runner, as root to drop its default route on offline networks; a machine's own user is its image's |
 | `userns_mode` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `uts` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `volumes` | Yes | Partly | From `machines.*.volumes` (seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts); not yet: data shared between machines |
