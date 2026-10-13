@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### A machine's environment, kernel parameters and process limits, on every target
+- `environment` (fixed values), `sysctls` and `ulimits` (one value, or `{ soft, hard }`) on a machine, or shared through `common:` and groups. A container gets them from its runtime (Compose `environment`, `sysctls`, `ulimits`; on Kubernetes the env and the pod's sysctls, and `ulimits` refused: it has none per container). A VM gets them from one set-up script run as root before its steps, the same on Vagrant, Proxmox and every cloud: `/etc/environment` and systemd's `DefaultEnvironment`, `/etc/sysctl.d`, `limits.d` and systemd's `DefaultLimit*`, then systemd re-executed so the services the steps install start with them. On Windows the environment is set machine-wide.
+- Validated: variable names; kernel parameter names; a machine with `docker:` may only set the sysctls a container can (`net.*`, `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`): leaving `docker:` out makes it VM-only; known limit names, soft not above hard; no sysctls or ulimits on Windows.
+- Example: tuned-web (nginx with `APP_MODE`, a 4096-deep accept queue and 8192/16384 open files), whose checks read the three from inside the machine. Run on Docker (CI) and on VirtualBox: a service started by systemd gets the environment and the limits. Compose 88% → 92%.
+
 ### The disk size on every Vagrant provider
 - `resources.disk_gb` now sizes a VM's disk on Vagrant too, as it already did on Proxmox and the clouds: Vagrant's own `vm.disk` (VirtualBox, VMware, Hyper-V), libvirt's `machine_virtual_size` and ESXi's `guest_boot_disk_size`. It is a minimum: a box whose disk is already bigger keeps it (the providers warn and go on). A `disk` step then grows the root filesystem into the space, before the machine's steps: the root partition when it is the disk's last, LVM's volumes, ext4 or XFS; `Resize-Partition` on Windows. Run on VirtualBox: an Ubuntu 24.04 box's root went from 31 to 77 GB.
 - QEMU is left out on purpose: its plugin makes the disk an overlay of that size, and one below the box's truncates it.

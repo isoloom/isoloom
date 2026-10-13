@@ -141,9 +141,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.env_file", Equivalent { via: "inputs" }),
         (
             "services.*.environment",
-            Partial {
-                from: "machines.*.inputs",
-                gap: "fixed values: set them in the image or the provisioning",
+            Emitted {
+                from: "machines.*.environment and machines.*.inputs",
             },
         ),
         (
@@ -312,9 +311,8 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.storage_opt", NO_CONTAINER_ON_VMS),
         (
             "services.*.sysctls",
-            Partial {
-                from: "networks.*.gateway",
-                gap: "a machine's own network sysctls (net.*): containers only allow those, VMs allow them too",
+            Emitted {
+                from: "machines.*.sysctls and networks.*.gateway",
             },
         ),
         (
@@ -324,12 +322,7 @@ fn rows() -> Vec<(String, Support)> {
             },
         ),
         ("services.*.tty", TOOLING),
-        (
-            "services.*.ulimits",
-            Planned {
-                note: "process limits (limits.conf or systemd on VMs)",
-            },
-        ),
+        ("services.*.ulimits", Emitted { from: "machines.*.ulimits" }),
         (
             "services.*.use_api_socket",
             NotPortable {

@@ -549,6 +549,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
             host.to_uppercase()
         ),
     ];
+    ps.extend(crate::generate::machine_setup::windows(m));
     for sv in &m.services {
         if let Some(h) = sv.publish {
             inbound(

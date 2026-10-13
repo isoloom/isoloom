@@ -257,6 +257,22 @@ pub struct Machine {
     /// in its own provisioning (resolv.conf).
     #[serde(default)]
     pub dns: Option<Dns>,
+    /// Environment variables with fixed values: a container's environment; on a VM, every
+    /// service's (systemd's default environment) and every login's (`/etc/environment`).
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty", deserialize_with = "scalars")]
+    #[schemars(with = "IndexMap<String, ScalarSchema>")]
+    pub environment: IndexMap<String, String>,
+    /// Kernel parameters, e.g. `net.core.somaxconn: 1024`. A container can only set the ones
+    /// the kernel keeps per network or IPC namespace (`net.*`, `kernel.shm*`, `kernel.msg*`,
+    /// `kernel.sem`, `fs.mqueue.*`); a VM sets any (`/etc/sysctl.d`).
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty", deserialize_with = "scalars")]
+    #[schemars(with = "IndexMap<String, ScalarSchema>")]
+    pub sysctls: IndexMap<String, String>,
+    /// Process limits, by name (`nofile`, `nproc`, `memlock`...): one value for both, or
+    /// `{ soft, hard }`. A container's ulimits; on a VM, every service's (systemd) and every
+    /// login's (`limits.d`). Kubernetes has none per container.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub ulimits: IndexMap<String, Ulimit>,
     #[serde(default)]
     pub services: Vec<Service>,
     /// The spec inputs this machine receives (only these).
@@ -582,6 +598,14 @@ pub struct Shared {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dns: Option<Dns>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<IndexMap<String, ScalarSchema>>")]
+    pub environment: Option<IndexMap<String, serde_json::Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<IndexMap<String, ScalarSchema>>")]
+    pub sysctls: Option<IndexMap<String, serde_json::Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ulimits: Option<IndexMap<String, Ulimit>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inputs: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
@@ -846,6 +870,69 @@ impl Spec {
     pub fn cloud_message(&self, outputs: &IndexMap<String, String>) -> Option<String> {
         self.with_cloud_outputs(outputs).message
     }
+}
+
+/// A process limit (see [`Machine::ulimits`]): one value for the soft and hard limits, or both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Ulimit {
+    Both(u64),
+    Pair { soft: u64, hard: u64 },
+}
+
+impl Ulimit {
+    pub fn soft(self) -> u64 {
+        match self {
+            Ulimit::Both(n) | Ulimit::Pair { soft: n, .. } => n,
+        }
+    }
+    pub fn hard(self) -> u64 {
+        match self {
+            Ulimit::Both(n) | Ulimit::Pair { hard: n, .. } => n,
+        }
+    }
+}
+
+/// The process limits Linux knows (`ulimit`, `limits.conf`, systemd's `Limit*`).
+pub const ULIMITS: &[&str] = &[
+    "core",
+    "cpu",
+    "data",
+    "fsize",
+    "locks",
+    "memlock",
+    "msgqueue",
+    "nice",
+    "nofile",
+    "nproc",
+    "rss",
+    "rtprio",
+    "rttime",
+    "sigpending",
+    "stack",
+];
+
+/// A text, a number or a boolean, read as text (environment values, sysctl values).
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+pub enum ScalarSchema {
+    Text(String),
+    Number(f64),
+    Bool(bool),
+}
+
+/// A mapping of scalars, read as texts (`1024`, `true` and `"x"` alike).
+fn scalars<'de, D: serde::Deserializer<'de>>(d: D) -> Result<IndexMap<String, String>, D::Error> {
+    let raw: IndexMap<String, serde_json::Value> = serde::Deserialize::deserialize(d)?;
+    raw.into_iter()
+        .map(|(k, v)| match v {
+            serde_json::Value::String(s) => Ok((k, s)),
+            serde_json::Value::Number(n) => Ok((k, n.to_string())),
+            serde_json::Value::Bool(b) => Ok((k, b.to_string())),
+            _ => Err(serde::de::Error::custom(format!("`{k}`: a text, a number or a boolean"))),
+        })
+        .collect()
 }
 
 /// What the network an environment runs in imposes, applied on every target: images pulled

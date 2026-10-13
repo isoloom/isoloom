@@ -404,6 +404,21 @@ fn base_table() -> Vec<Row> {
             done("environment of that machine's provisioning only", "supplier-portal-api"),
         ),
         common(
+            "machines.*.environment",
+            done("the container's environment (and its Kubernetes env)", "tuned-web"),
+            done("/etc/environment and systemd's default environment, before the steps", "tuned-web"),
+        ),
+        common(
+            "machines.*.sysctls",
+            done("the container's namespaced sysctls (and the Kubernetes pod's)", "tuned-web"),
+            done("/etc/sysctl.d, applied before the steps", "tuned-web"),
+        ),
+        common(
+            "machines.*.ulimits",
+            done("the container's ulimits (Kubernetes has none per container: refused)", "tuned-web"),
+            done("limits.d and systemd's default limits, before the steps", "tuned-web"),
+        ),
+        common(
             "machines.*.aliases",
             done("network aliases (and extra_hosts across the router)", "edge-firewall"),
             done("in every Linux VM's /etc/hosts, after the machine's name", "edge-firewall"),
@@ -779,7 +794,17 @@ fn base_table() -> Vec<Row> {
 }
 
 /// Fields counted as one feature whatever they hold.
-const WHOLE: &[&str] = &["common", "groups", "tools", "provision[].host_vars", "controller"];
+const WHOLE: &[&str] = &[
+    "common",
+    "groups",
+    "tools",
+    "provision[].host_vars",
+    "controller",
+    // Maps of the author's own names (variables, kernel parameters, limits): one feature each.
+    "machines.*.environment",
+    "machines.*.sysctls",
+    "machines.*.ulimits",
+];
 
 /// Where in the spec names are chosen by the author (map keys become `*`).
 const NAMED: &[&str] = &[
