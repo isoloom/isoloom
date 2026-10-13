@@ -684,6 +684,14 @@ fn disk_step(size: Size, windows: bool, out: &mut String) {
     let _ = writeln!(out, "    m.vm.provision \"shell\", name: \"disk\", inline: {}", rb(script));
 }
 
+/// The CPU architecture as QEMU and libvirt name it.
+fn qemu_arch(a: Arch) -> &'static str {
+    match a {
+        Arch::Amd64 => "x86_64",
+        Arch::Arm64 => "aarch64",
+    }
+}
+
 /// Every provider's block for one VM, the same set for the lab's machines and Isoloom's own
 /// (router, controller, tool shell), so a provider added here reaches all of them: `label` is
 /// its display name, `guest` its ESXi guest name, `nets` the networks it is on, `libvirt_box`
@@ -695,6 +703,9 @@ fn providers(out: &mut String, label: &str, guest: &str, size: Size, nets: &[&st
     if let Some(d) = disk {
         let _ = writeln!(out, "    m.vm.disk :disk, size: \"{d}GB\", primary: true");
     }
+    // libvirt runs a lab machine as its own CPU (emulated when the host's is another), as
+    // QEMU does; Isoloom's own VMs take the host's.
+    let libvirt_arch = qemu.arch.map(|a| format!("\n      v.machine_arch = {}", rb(qemu_arch(a)))).unwrap_or_default();
     let libvirt_disk = disk.map(|d| format!("\n      v.machine_virtual_size = {d}")).unwrap_or_default();
     let _ = writeln!(
         out,
@@ -719,14 +730,14 @@ fn providers(out: &mut String, label: &str, guest: &str, size: Size, nets: &[&st
         Some(b) => {
             let _ = writeln!(
                 out,
-                "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = {}\n      v.cpus = {cpus}\n      v.memory = {mem}{libvirt_disk}\n    end",
+                "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = {}\n      v.cpus = {cpus}\n      v.memory = {mem}{libvirt_arch}{libvirt_disk}\n    end",
                 rb(b)
             );
         }
         None => {
             let _ = writeln!(
                 out,
-                "    m.vm.provider \"libvirt\" do |v|\n      v.cpus = {cpus}\n      v.memory = {mem}{libvirt_disk}\n    end"
+                "    m.vm.provider \"libvirt\" do |v|\n      v.cpus = {cpus}\n      v.memory = {mem}{libvirt_arch}{libvirt_disk}\n    end"
             );
         }
     }
@@ -781,10 +792,7 @@ fn qemu_block(out: &mut String, size: Size, q: &Qemu) {
         // A box of its own: the main box's version pin isn't one of its versions.
         let _ = writeln!(out, "      o.vm.box = {}\n      o.vm.box_version = \">= 0\"", rb(b));
     }
-    let qemu_arch = q.arch.map(|a| match a {
-        Arch::Amd64 => "x86_64",
-        Arch::Arm64 => "aarch64",
-    });
+    let qemu_arch = q.arch.map(qemu_arch);
     if let (Some(a), Some(qa)) = (q.arch, qemu_arch) {
         // Its own CPU, whatever the host's (Vagrant otherwise picks the box for the host's).
         let _ = writeln!(out, "      o.vm.box_architecture = {}\n      v.arch = {}", rb(a.id()), rb(qa));

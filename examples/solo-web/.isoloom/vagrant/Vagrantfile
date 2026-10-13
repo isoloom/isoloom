@@ -388,6 +388,7 @@ Vagrant.configure("2") do |config|
       o.vm.box = "generic/debian12"
       v.cpus = 1
       v.memory = 1024
+      v.machine_arch = "x86_64"
     end
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh provision/web.sh"

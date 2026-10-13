@@ -462,6 +462,7 @@ Vagrant.configure("2") do |config|
       o.vm.box = "generic/debian12"
       v.cpus = 1
       v.memory = 1024
+      v.machine_arch = "x86_64"
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.30.20.20 app' '10.30.20.30 db' '10.30.99.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
@@ -561,6 +562,7 @@ Vagrant.configure("2") do |config|
       o.vm.box = "generic/debian12"
       v.cpus = 1
       v.memory = 1024
+      v.machine_arch = "x86_64"
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.30.20.10 gateway' '10.30.20.30 db' '10.30.99.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
@@ -694,6 +696,7 @@ Vagrant.configure("2") do |config|
       o.vm.box = "generic/debian12"
       v.cpus = 1
       v.memory = 1024
+      v.machine_arch = "x86_64"
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.30.20.10 gateway' '10.30.20.20 app' '10.30.99.10 user'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
@@ -826,6 +829,7 @@ Vagrant.configure("2") do |config|
     m.vm.provider "libvirt" do |v|
       v.cpus = 1
       v.memory = 1024
+      v.machine_arch = "x86_64"
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.30.10.10 gateway' '10.30.20.20 app' '10.30.20.30 db'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'

@@ -462,6 +462,7 @@ Vagrant.configure("2") do |config|
       o.vm.box = "generic/debian12"
       v.cpus = 1
       v.memory = 1024
+      v.machine_arch = "x86_64"
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.66.20.10 client'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
@@ -588,6 +589,7 @@ Vagrant.configure("2") do |config|
       o.vm.box = "generic/debian12"
       v.cpus = 1
       v.memory = 1024
+      v.machine_arch = "x86_64"
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.66.10.53 dns'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'

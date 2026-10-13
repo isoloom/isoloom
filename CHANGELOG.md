@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### libvirt runs a machine as its own CPU
+- The libvirt provider block sets `machine_arch` from the machine's `arch` (`x86_64`, `aarch64`), as the QEMU provider already did: an arm64 spec no longer runs as the host's CPU on libvirt. Isoloom's own VMs keep the host's. vagrant-libvirt leaves the machine type to libvirt's default for that architecture. libvirt 30% → 35%.
+
 ### A machine's environment, kernel parameters and process limits, on every target
 - `environment` (fixed values), `sysctls` and `ulimits` (one value, or `{ soft, hard }`) on a machine, or shared through `common:` and groups. A container gets them from its runtime (Compose `environment`, `sysctls`, `ulimits`; on Kubernetes the env and the pod's sysctls, and `ulimits` refused: it has none per container). A VM gets them from one set-up script run as root before its steps, the same on Vagrant, Proxmox and every cloud: `/etc/environment` and systemd's `DefaultEnvironment`, `/etc/sysctl.d`, `limits.d` and systemd's `DefaultLimit*`, then systemd re-executed so the services the steps install start with them. On Windows the environment is set machine-wide.
 - Validated: variable names; kernel parameter names; a machine with `docker:` may only set the sysctls a container can (`net.*`, `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`): leaving `docker:` out makes it VM-only; known limit names, soft not above hard; no sysctls or ulimits on Windows.

@@ -383,6 +383,7 @@ Vagrant.configure("2") do |config|
     m.vm.provider "libvirt" do |v|
       v.cpus = 1
       v.memory = 1024
+      v.machine_arch = "aarch64"
     end
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "provision/setup.sh", inline: "cd /opt/isoloom && sh provision/setup.sh"
