@@ -28,7 +28,12 @@ fn examples_with_outputs() -> Vec<String> {
 
 /// Files a run leaves next to the generated ones (all git-ignored): not outputs.
 fn is_run_artifact(rel: &str) -> bool {
-    rel.split('/').any(|c| c == ".terraform" || c == ".vagrant") || rel.ends_with(".terraform.lock.hcl") || rel.contains(".tfstate")
+    rel.split('/').any(|c| c == ".terraform" || c == ".vagrant")
+        || rel.ends_with(".terraform.lock.hcl")
+        || rel.contains(".tfstate")
+        // cloud-services: the module's copy, the launch-time inputs, the apply's marker.
+        || rel.contains("/cloud-services/module/")
+        || ["inputs.tfvars.json", "deploying"].iter().any(|f| rel.ends_with(&format!("/cloud-services/{f}")))
 }
 
 /// Every file under `dir`, as paths relative to `base` with `/` separators.

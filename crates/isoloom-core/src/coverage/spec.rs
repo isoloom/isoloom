@@ -348,6 +348,30 @@ fn base_table() -> Vec<Row> {
             }),
         },
         Row {
+            path: "cloud.before",
+            outputs: all(Status::Descriptive {
+                note: "host steps before the apply (up.sh)",
+            }),
+        },
+        Row {
+            path: "cloud.env",
+            outputs: all(Status::Descriptive {
+                note: "Terraform's environment (the cloud-services scripts)",
+            }),
+        },
+        Row {
+            path: "cloud.apply_retries",
+            outputs: all(Status::Descriptive {
+                note: "applies again after a failed apply (up.sh)",
+            }),
+        },
+        Row {
+            path: "cloud.requires",
+            outputs: all(Status::Descriptive {
+                note: "host tools `doctor` and `run` check",
+            }),
+        },
+        Row {
             path: "machines.*.services[].name",
             outputs: all(Status::Descriptive {
                 note: "names the service for people and runners",
@@ -800,6 +824,7 @@ const NAMED: &[&str] = &[
     "machines.*.volumes",
     "cloud.vars",
     "cloud.outputs",
+    "cloud.env",
     "checks[].headers",
     "machines.*.docker.args",
     "provision[].groups",

@@ -157,6 +157,48 @@ pub fn all() -> Vec<Readiness> {
     out
 }
 
+/// What a cloud-services module needs on this machine besides Terraform (`cloud.requires`):
+/// target `cloud-services`, ready when every entry is there. None without `cloud.requires`.
+///
+/// A bare name is looked up on the PATH; anything else is a shell command from the spec, run
+/// only when `run_commands` (by `isoloom run`, about to run the project's code anyway; never by
+/// `doctor`, which can look at a project nobody has vetted yet).
+pub fn requirements(spec: &crate::model::Spec, run_commands: bool) -> Option<Readiness> {
+    let (run, ..) = real_host();
+    requirements_with(spec, run_commands, &run)
+}
+
+/// [`requirements`], with `run` running a program (as [`Host::run`]).
+pub fn requirements_with(spec: &crate::model::Spec, run_commands: bool, run: &dyn Fn(&str, &[&str]) -> Option<String>) -> Option<Readiness> {
+    let cloud = spec.cloud.as_ref().filter(|c| !c.requires.is_empty())?;
+    let mut notes = Vec::new();
+    for r in &cloud.requires {
+        let r = r.trim();
+        let bare = !r.contains(char::is_whitespace);
+        if !bare && !run_commands {
+            notes.push(format!("`{r}` (checked at `isoloom run`)"));
+            continue;
+        }
+        let probe = if bare {
+            format!("command -v {}", crate::shell::quote(r))
+        } else {
+            r.to_string()
+        };
+        let found = run("sh", &["-c", &probe]).is_some();
+        notes.push(match (found, bare) {
+            (true, _) => r.to_string(),
+            (false, true) => format!("! `{r}` isn't installed"),
+            (false, false) => format!("! `{r}` failed"),
+        });
+    }
+    Some(Readiness {
+        target: Target::CloudServices,
+        cloud: Some(cloud.provider.id().to_string()),
+        ready: notes.iter().all(|n| !n.starts_with('!')),
+        notes,
+    })
+}
+
 pub const CLOUDS: &[&str] = &["aws", "azure", "gcp", "digitalocean", "linode", "oci"];
 
 /// Why KVM can't be used here, on Linux: no `/dev/kvm` (virtualization off, or a VM without

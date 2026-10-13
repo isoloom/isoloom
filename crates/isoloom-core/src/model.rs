@@ -858,8 +858,9 @@ pub struct CloudServices {
     /// A Terraform root module in the project (a folder holding `.tf` files), used as is.
     pub terraform: String,
     /// The module's variables: any value (a string, number, boolean, list or map). A string
-    /// that is exactly `{{ inputs.NAME }}` takes the launch-time input `NAME` (declared in
-    /// `inputs`), e.g. the user's IP for an allow-list: required at `run`, kept for `down`.
+    /// holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the
+    /// launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list:
+    /// required at `run`, kept for `down`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[schemars(with = "IndexMap<String, serde_json::Value>")]
     pub vars: IndexMap<String, serde_json::Value>,
@@ -873,6 +874,29 @@ pub struct CloudServices {
     /// budget. Isoloom doesn't bill or stop anything by it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hourly_usd: Option<f64>,
+    /// Steps run on this machine before Terraform applies the module (a key pair the module
+    /// reads, a build): scripts in the project, run in order from the module's copy, with the
+    /// spec's inputs and `env` in their environment. They run at every `run`: make them
+    /// idempotent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub before: Vec<String>,
+    /// Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`).
+    /// Not for credentials: those come from the user's own environment.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub env: IndexMap<String, String>,
+    /// How many times to apply again when an apply fails (a module that only converges on a
+    /// second apply). 0 by default.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub apply_retries: u8,
+    /// What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)
+    /// that must be on the PATH, or a shell command that must succeed
+    /// (`python3 -c 'import boto3'`). `isoloom doctor` and `isoloom run` check them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<String>,
+}
+
+fn is_zero(n: &u8) -> bool {
+    *n == 0
 }
 
 /// A cloud an environment of cloud services deploys into.
@@ -889,6 +913,45 @@ impl CloudServices {
     pub fn input_of(value: &serde_json::Value) -> Option<&str> {
         let s = value.as_str()?.trim();
         s.strip_prefix("{{ inputs.")?.strip_suffix(" }}").map(str::trim)
+    }
+
+    /// The launch-time inputs a variable's value takes: every `{{ inputs.NAME }}` in its strings,
+    /// at any depth, in order (repeats kept).
+    pub fn inputs_in(value: &serde_json::Value) -> Vec<String> {
+        let mut found = Vec::new();
+        Self::fill_inputs(value, &mut |name| {
+            found.push(name.to_string());
+            Some(String::new())
+        });
+        found
+    }
+
+    /// The value with each `{{ inputs.NAME }}` replaced by `input(NAME)` (left as is when it
+    /// gives nothing).
+    pub fn fill_inputs(value: &serde_json::Value, input: &mut dyn FnMut(&str) -> Option<String>) -> serde_json::Value {
+        use serde_json::Value;
+        match value {
+            Value::String(s) => {
+                let mut out = String::new();
+                let mut rest = s.as_str();
+                while let Some(start) = rest.find("{{") {
+                    let Some(len) = rest[start..].find("}}") else { break };
+                    let inner = rest[start + 2..start + len].trim();
+                    out.push_str(&rest[..start]);
+                    let whole = &rest[start..start + len + 2];
+                    match inner.strip_prefix("inputs.").map(str::trim).and_then(|n| input(n).map(|v| (n, v))) {
+                        Some((_, v)) => out.push_str(&v),
+                        None => out.push_str(whole),
+                    }
+                    rest = &rest[start + len + 2..];
+                }
+                out.push_str(rest);
+                Value::String(out)
+            }
+            Value::Array(a) => Value::Array(a.iter().map(|v| Self::fill_inputs(v, input)).collect()),
+            Value::Object(m) => Value::Object(m.iter().map(|(k, v)| (k.clone(), Self::fill_inputs(v, input))).collect()),
+            other => other.clone(),
+        }
     }
 }
 

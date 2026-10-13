@@ -283,13 +283,19 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
     // Cloud services: what tools reading the snapshot need to run them (the cloud, the module,
     // what they expose and cost). Not the variables, which may take a user's input.
     if let (Some(c), Value::Object(map)) = (&spec.cloud, &mut out) {
+        let mut inputs: Vec<String> = Vec::new();
+        for n in c.vars.values().flat_map(crate::model::CloudServices::inputs_in) {
+            if !inputs.contains(&n) {
+                inputs.push(n);
+            }
+        }
         map.insert(
             "cloud".into(),
             json!({
                 "provider": c.provider.id(),
                 "terraform": c.terraform,
                 "outputs": c.outputs.keys().collect::<Vec<_>>(),
-                "inputs": c.vars.values().filter_map(crate::model::CloudServices::input_of).collect::<Vec<_>>(),
+                "inputs": inputs,
                 "hourly_usd": c.hourly_usd,
             }),
         );
