@@ -152,6 +152,8 @@ fn run_applies_a_copy_after_the_before_steps_and_retries() {
     let o = lab.isoloom(&["down", "cloud-services"]);
     assert!(o.status.success(), "{}", text(&o));
     let log = read(&lab.tf.join("log"));
+    // The canonical path: on macOS the temporary folder (/var) is a link to /private/var.
+    let module = module.canonicalize().unwrap();
     assert!(log.lines().any(|l| l.contains(&format!("-chdir={} destroy", module.display()))), "{log}");
     assert_eq!(lab.status_state(), None);
 }
@@ -189,7 +191,8 @@ fn status_says_deploying_while_the_first_apply_runs() {
     let mut seen = None;
     while std::time::Instant::now() < deadline {
         seen = lab.status_state();
-        if seen.as_deref().is_some_and(|s| s.starts_with("deploying")) {
+        // "deploying" alone until the fake apply has written its state: wait for the count.
+        if seen.as_deref().is_some_and(|s| s.starts_with("deploying (")) {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
