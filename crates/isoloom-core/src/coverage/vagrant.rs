@@ -50,8 +50,13 @@ const LINKED_CLONE: Support = Tooling {
 const LINKED_CLONE_ON: Support = Emitted {
     from: "(a differencing disk, so a clone is instant instead of copying the whole box)",
 };
-const DISK: Support = Planned {
-    note: "machines.*.resources.disk_gb",
+/// The VM's own disk, sized: a minimum (a bigger box keeps its own), the root filesystem grown.
+const DISK: Support = Emitted {
+    from: "machines.*.resources.disk_gb (the root filesystem grown into it)",
+};
+/// More disks: a machine's data lives on its one disk, sized by `disk_gb`, at its volumes' paths.
+const MORE_DISKS: Support = Equivalent {
+    via: "machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths)",
 };
 const ARCH: Support = Planned {
     note: "a CPU architecture field (amd64, arm64)",
@@ -250,7 +255,8 @@ fn machine(s: &str) -> Option<Support> {
         "provider" => Emitted {
             from: "machines.*.resources (see each provider below)",
         },
-        "disk" | "disks" => DISK,
+        "disk" => DISK,
+        "disks" => MORE_DISKS,
         "box_architecture" => Emitted { from: "machines.*.arch" },
         "box_version" => Emitted {
             from: "machines.*.vm.image.vagrant_version, or a built-in pin",
@@ -376,7 +382,9 @@ fn qemu(s: &str) -> Option<Support> {
         "arch" => Emitted {
             from: "machines.*.arch (emulated when the host's CPU is another)",
         },
-        "disk_resize" => DISK,
+        "disk_resize" => Planned {
+            note: "machines.*.resources.disk_gb, once the box's own size is known: the plugin makes the disk an overlay of that size, and one below the box's truncates it",
+        },
         "advanced_network" | "net_mode" | "socket_opts" => Partial {
             from: "machines.*.networks",
             gap: "without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit)",
@@ -414,7 +422,8 @@ fn vmware_esxi(s: &str) -> Option<Support> {
         "esxi_hostname" | "esxi_hostport" | "esxi_username" | "esxi_password" | "esxi_disk_store" => Emitted {
             from: "the ESXI_* environment variables (the host is the user's)",
         },
-        "guest_boot_disk_size" | "guest_storage" => DISK,
+        "guest_boot_disk_size" => DISK,
+        "guest_storage" => MORE_DISKS,
         "guest_guestos" | "guestos" => WINDOWS,
         "guest_mac_address" | "mac_address" => NotPortable {
             why: "cloud VMs get their MAC address from the provider",
@@ -453,7 +462,8 @@ fn libvirt(s: &str) -> Option<Support> {
     Some(match s {
         "cpus" | "memory" => RESOURCES,
         "machine_arch" => ARCH,
-        "machine_virtual_size" | "storage" | "disks" => DISK,
+        "machine_virtual_size" => DISK,
+        "storage" | "disks" => MORE_DISKS,
         "nested" => Planned {
             note: "nested virtualization: running VMs inside (makes an environment VM-only)",
         },

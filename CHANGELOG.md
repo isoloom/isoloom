@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### The disk size on every Vagrant provider
+- `resources.disk_gb` now sizes a VM's disk on Vagrant too, as it already did on Proxmox and the clouds: Vagrant's own `vm.disk` (VirtualBox, VMware, Hyper-V), libvirt's `machine_virtual_size` and ESXi's `guest_boot_disk_size`. It is a minimum: a box whose disk is already bigger keeps it (the providers warn and go on). A `disk` step then grows the root filesystem into the space, before the machine's steps: the root partition when it is the disk's last, LVM's volumes, ext4 or XFS; `Resize-Partition` on Windows. Run on VirtualBox: an Ubuntu 24.04 box's root went from 31 to 77 GB.
+- QEMU is left out on purpose: its plugin makes the disk an overlay of that size, and one below the box's truncates it.
+- The settings that add disks (`disks`, libvirt `storage`, ESXi `guest_storage`) are covered another way: a machine's one disk, sized, holds its volumes' paths. Vagrant 83% → 88%, libvirt 15% → 30%, ESXi 47% → 57%.
+
 ### A Helm chart beside the Kubernetes manifests
 - The Kubernetes output gains `.isoloom/kubernetes/chart/`: the same manifests as a Helm chart, for customers who install with Helm and for chart registries. The namespace is the release's; each machine's image is a value (`images.<machine>`, pulled through the constraints' mirrors when there are some; a built image is named there once pushed); the inputs are a Secret from `inputs.<NAME>`; the checks are `helm test` Pods (the `exec` ones, run inside a machine, stay with `isoloom test kubernetes`); `NOTES.txt` carries the message (as written, or a pointer to `isoloom message` when it has placeholders). Anything in the manifests that Helm would read as a template is printed as it is.
 - The chart works away from the project: `isoloom generate`, `run` and `check` copy the scripts its pods run (init jobs, check scripts) into `chart/files/project/`, so `check` fails when a copy is stale. A script the project doesn't have yet is left to `validate`, and the chart's `required` names it at install. Library: `project_copies(files, dir)`.

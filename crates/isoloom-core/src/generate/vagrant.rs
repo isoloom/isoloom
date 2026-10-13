@@ -166,8 +166,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         let image = images::vagrant(vm).expect("checked above");
         let (vbox, libvirt_box) = (image.name.as_str(), image.libvirt.as_deref());
         let windows = images::is_windows(&vm.os);
-        let cpus = m.resources.and_then(|r| r.cpus).unwrap_or(crate::DEFAULT_CPUS);
-        let mem = m.resources.and_then(|r| r.memory_mb).unwrap_or(crate::DEFAULT_MEMORY_MB);
+        let size = Size::of(m);
         let label = format!("{} · {name}", spec.name);
 
         let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(name));
@@ -239,7 +238,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 .filter(|_| windows)
                 .map(|(net, octet)| (address(spec, net, *octet), cidr_len(spec, net))),
         };
-        providers(&mut out, &label, &format!("{}-{name}", spec.name), cpus, mem, &nets, libvirt_box, &qemu);
+        providers(&mut out, &label, &format!("{}-{name}", spec.name), size, &nets, libvirt_box, &qemu);
+        disk_step(size, windows, &mut out);
 
         if windows {
             windows_steps(spec, name, m, vm, &mut out);
@@ -556,8 +556,7 @@ fn tool_vm(spec: &Spec, index: usize, out: &mut String, links: &IndexMap<String,
         out,
         &format!("{} · tool shell", spec.name),
         &format!("{}-tool-shell", spec.name),
-        1,
-        512,
+        Size::HELPER,
         &all,
         Some(HELPER_LIBVIRT_BOX),
         &Qemu::helper(&links[TOOL_SHELL]),
@@ -614,13 +613,76 @@ const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update
 /// run `bento/debian-12`.
 const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
 
+/// A VM's size: CPUs, memory (MB), and the disk (GB) when the spec sets one. The disk is a
+/// minimum: a box whose disk is already bigger keeps it (no provider shrinks a disk).
+#[derive(Debug, Clone, Copy)]
+struct Size {
+    cpus: u32,
+    mem: u32,
+    disk: Option<u32>,
+}
+
+impl Size {
+    /// Isoloom's own small VMs (router, tool shell): the box's disk.
+    const HELPER: Size = Size { cpus: 1, mem: 512, disk: None };
+
+    fn of(m: &Machine) -> Size {
+        let r = m.resources;
+        Size {
+            cpus: r.and_then(|r| r.cpus).unwrap_or(crate::DEFAULT_CPUS),
+            mem: r.and_then(|r| r.memory_mb).unwrap_or(crate::DEFAULT_MEMORY_MB),
+            disk: r.and_then(|r| r.disk_gb),
+        }
+    }
+}
+
+/// Grows the root filesystem into a disk made bigger than the box's: its partition when it is
+/// the disk's last, LVM's physical and logical volumes, then the filesystem (ext4 or XFS).
+/// Idempotent: with nothing to grow, nothing changes.
+const GROW_ROOT_SH: &str = r#"set -e
+part_grow() {
+  dev=$(readlink -f "$1")
+  disk=/dev/$(lsblk -no PKNAME "$dev" | head -n1)
+  num=$(cat "/sys/class/block/$(basename "$dev")/partition")
+  if command -v growpart >/dev/null; then growpart "$disk" "$num" >/dev/null || true
+  else echo ", +" | sfdisk --no-reread -N "$num" "$disk" >/dev/null 2>&1 && partx -u "$disk" || true; fi
+}
+fs_grow() { resize2fs "$1" >/dev/null 2>&1 || xfs_growfs / >/dev/null 2>&1 || true; }
+src=$(findmnt -n -o SOURCE /)
+case "$(lsblk -no TYPE "$src" | head -n1)" in
+  lvm)
+    vg=$(lvs --noheadings -o vg_name "$src" | tr -d ' ')
+    for pv in $(pvs --noheadings -o pv_name -S vg_name="$vg" | tr -d ' '); do part_grow "$pv"; pvresize "$pv" >/dev/null; done
+    lvextend -l +100%FREE "$src" >/dev/null 2>&1 || true
+    fs_grow "$src" ;;
+  part) part_grow "$src"; fs_grow "$src" ;;
+esac
+"#;
+
+/// The same on Windows: C: to the largest size its disk allows.
+const GROW_ROOT_PS1: &str = "$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; if ((Get-Partition -DriveLetter C).Size -lt $max) { Resize-Partition -DriveLetter C -Size $max }";
+
+/// The step that grows the root filesystem when the machine's disk is set.
+fn disk_step(size: Size, windows: bool, out: &mut String) {
+    if size.disk.is_none() {
+        return;
+    }
+    let script = if windows { GROW_ROOT_PS1 } else { GROW_ROOT_SH };
+    let _ = writeln!(out, "    m.vm.provision \"shell\", name: \"disk\", inline: {}", rb(script));
+}
+
 /// Every provider's block for one VM, the same set for the lab's machines and Isoloom's own
 /// (router, controller, tool shell), so a provider added here reaches all of them: `label` is
 /// its display name, `guest` its ESXi guest name, `nets` the networks it is on, `libvirt_box`
 /// the box libvirt uses instead of the VirtualBox one (if any), `qemu` how QEMU runs it.
-#[allow(clippy::too_many_arguments)]
-fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, nets: &[&str], libvirt_box: Option<&str>, qemu: &Qemu) {
+fn providers(out: &mut String, label: &str, guest: &str, size: Size, nets: &[&str], libvirt_box: Option<&str>, qemu: &Qemu) {
+    let Size { cpus, mem, disk } = size;
     let label = rb(label);
+    // Vagrant's own disk setting: VirtualBox, VMware and Hyper-V resize the box's disk.
+    if let Some(d) = disk {
+        let _ = writeln!(out, "    m.vm.disk :disk, size: \"{d}GB\", primary: true");
+    }
+    let libvirt_disk = disk.map(|d| format!("\n      v.machine_virtual_size = {d}")).unwrap_or_default();
     let _ = writeln!(
         out,
         "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {label}\n      v.linked_clone = true\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
@@ -638,20 +700,20 @@ fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, ne
         out,
         "    m.vm.provider \"utm\" do |v|\n      v.name = {label}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
     );
-    qemu_block(out, cpus, mem, qemu);
-    esxi(out, guest, cpus, mem, nets);
+    qemu_block(out, size, qemu);
+    esxi(out, guest, size, nets);
     match libvirt_box {
         Some(b) => {
             let _ = writeln!(
                 out,
-                "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end",
+                "    m.vm.provider \"libvirt\" do |v, o|\n      o.vm.box = {}\n      v.cpus = {cpus}\n      v.memory = {mem}{libvirt_disk}\n    end",
                 rb(b)
             );
         }
         None => {
             let _ = writeln!(
                 out,
-                "    m.vm.provider \"libvirt\" do |v|\n      v.cpus = {cpus}\n      v.memory = {mem}\n    end"
+                "    m.vm.provider \"libvirt\" do |v|\n      v.cpus = {cpus}\n      v.memory = {mem}{libvirt_disk}\n    end"
             );
         }
     }
@@ -697,7 +759,10 @@ impl<'a> Qemu<'a> {
 }
 
 /// The QEMU (vagrant-qemu) provider block.
-fn qemu_block(out: &mut String, cpus: u32, mem: u32, q: &Qemu) {
+fn qemu_block(out: &mut String, size: Size, q: &Qemu) {
+    // No `disk_resize`: the plugin makes the VM's disk an overlay of that size on the box's,
+    // and a size below the box's truncates it (the guest's filesystem is lost).
+    let Size { cpus, mem, .. } = size;
     out.push_str("    m.vm.provider \"qemu\" do |v, o|\n");
     if let Some(b) = q.boxed {
         // A box of its own: the main box's version pin isn't one of its versions.
@@ -848,11 +913,13 @@ pub(crate) fn qemu_refusal(spec: &Spec) -> Option<String> {
 }
 
 /// The vagrant-vmware-esxi provider block: the host from ESXI_* variables, a port group per NIC.
-fn esxi(out: &mut String, guest: &str, cpus: u32, mem: u32, nets: &[&str]) {
+fn esxi(out: &mut String, guest: &str, size: Size, nets: &[&str]) {
+    let Size { cpus, mem, disk } = size;
     let nets = nets.iter().map(|n| rb(n)).collect::<Vec<_>>().join(", ");
+    let disk = disk.map(|d| format!("\n      v.guest_boot_disk_size = {d}")).unwrap_or_default();
     let _ = writeln!(
         out,
-        "    m.vm.provider \"vmware_esxi\" do |v|\n      v.esxi_hostname = ENV.fetch(\"ESXI_HOSTNAME\", \"\")\n      v.esxi_hostport = ENV.fetch(\"ESXI_HOSTPORT\", \"22\").to_i\n      v.esxi_username = ENV.fetch(\"ESXI_USERNAME\", \"root\")\n      v.esxi_password = \"env:ESXI_PASSWORD\"\n      v.esxi_disk_store = ENV[\"ESXI_DATASTORE\"] if ENV[\"ESXI_DATASTORE\"]\n      v.esxi_virtual_network = esxi_networks([{nets}])\n      v.guest_name = {}\n      v.guest_numvcpus = {cpus}\n      v.guest_memsize = {mem}\n    end",
+        "    m.vm.provider \"vmware_esxi\" do |v|\n      v.esxi_hostname = ENV.fetch(\"ESXI_HOSTNAME\", \"\")\n      v.esxi_hostport = ENV.fetch(\"ESXI_HOSTPORT\", \"22\").to_i\n      v.esxi_username = ENV.fetch(\"ESXI_USERNAME\", \"root\")\n      v.esxi_password = \"env:ESXI_PASSWORD\"\n      v.esxi_disk_store = ENV[\"ESXI_DATASTORE\"] if ENV[\"ESXI_DATASTORE\"]\n      v.esxi_virtual_network = esxi_networks([{nets}])\n      v.guest_name = {}\n      v.guest_numvcpus = {cpus}\n      v.guest_memsize = {mem}{disk}\n    end",
         rb(guest)
     );
 }
@@ -879,8 +946,7 @@ fn router_vm(spec: &Spec, out: &mut String, links: &IndexMap<String, Link>) {
         out,
         &format!("{} · router", spec.name),
         &format!("{}-router", spec.name),
-        1,
-        512,
+        Size::HELPER,
         &router_nets,
         Some(HELPER_LIBVIRT_BOX),
         &Qemu::helper(&links[router::NAME]),
@@ -998,7 +1064,7 @@ fn controller_vm(spec: &Spec, out: &mut String, on_controller: &[&checks::Resolv
     let _ = writeln!(out, "\n  config.vm.define {} do |m|", rb(CONTROLLER));
     out.push_str(&constraints_step(spec, "    ", "m"));
     let (bx, version) = super::controller_box(spec);
-    let (cpus, mem, _) = super::controller_size(spec);
+    let (cpus, mem, disk) = super::controller_size(spec);
     if bx == super::CONTROLLER_BOX && version.is_none() {
         let _ = writeln!(
             out,
@@ -1030,12 +1096,12 @@ fn controller_vm(spec: &Spec, out: &mut String, on_controller: &[&checks::Resolv
         out,
         &format!("{} · controller", spec.name),
         &format!("{}-controller", spec.name),
-        cpus,
-        mem,
+        Size { cpus, mem, disk },
         &all,
         (bx == super::CONTROLLER_BOX).then_some(super::CONTROLLER_BOX),
         &Qemu::helper(&links[CONTROLLER]),
     );
+    disk_step(Size { cpus, mem, disk }, false, out);
     // Every machine by name, at its address on its first network (the controller is on all).
     let hosts: Vec<String> = spec
         .machines
