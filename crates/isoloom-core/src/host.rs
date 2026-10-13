@@ -438,7 +438,9 @@ mod tests {
                 home: PathBuf::new(),
             },
         );
-        assert!(!r.ready && r.summary().contains("no Vagrant provider"));
+        // On Windows the Hyper-V probe runs too, and finds no Hyper-V here: that's the reason given.
+        let none = if cfg!(windows) { "Hyper-V isn't turned on" } else { "no Vagrant provider" };
+        assert!(!r.ready && r.summary().contains(none), "{}", r.summary());
         let (run, env, exists) = host(&["vagrant", "prlctl"], &[]);
         let r = check_with(
             Target::Vagrant,
