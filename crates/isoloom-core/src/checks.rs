@@ -526,8 +526,20 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
                 if request.follow {
                     args.push_str(&format!(" -L --max-redirs {HTTP_MAX_REDIRECTS}"));
                 }
-                if let Some(m) = &request.method {
-                    args.push_str(&format!(" -X {}", sq(&m.to_uppercase())));
+                let method = request.method.as_deref().map(str::to_uppercase);
+                match method.as_deref() {
+                    // Following redirects, a POST is sent as curl sends a form (`--data-binary`,
+                    // or an empty `-d ''`), not forced with `-X`: a 301/302/303 is then followed
+                    // with a GET, as browsers do. `-X POST` would POST to every hop (a login
+                    // page's redirect to a GET-only page answering 405).
+                    Some("POST") if request.follow => {
+                        if request.body.is_none() {
+                            args.push_str(" -d ''");
+                        }
+                    }
+                    Some("HEAD") if request.follow => args.push_str(" -I"),
+                    Some(m) => args.push_str(&format!(" -X {}", sq(m))),
+                    None => {}
                 }
                 for (k, v) in &request.headers {
                     args.push_str(&format!(" -H {}", sq(&format!("{k}: {v}"))));

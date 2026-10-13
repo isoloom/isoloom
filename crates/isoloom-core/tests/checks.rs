@@ -446,6 +446,9 @@ fn http_checks_follow_redirects_when_asked() {
         match path {
             "/old" => "HTTP/1.1 302 Found\r\nLocation: /new\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
             "/loop" => "HTTP/1.1 302 Found\r\nLocation: /loop\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            // A login form: a POST is answered with a redirect to a page that takes GET only.
+            "/login" if l.starts_with("POST ") => "HTTP/1.1 302 Found\r\nLocation: /home\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            "/home" if !l.starts_with("GET ") => "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
             _ => "HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nwelcome\n".into(),
         }
     });
@@ -456,7 +459,10 @@ fn http_checks_follow_redirects_when_asked() {
          - {{ name: unfollowed, http: '{u}/old', wait: 0 }}\n  \
          - {{ name: followed, http: '{u}/old', follow: true, wait: 0 }}\n  \
          - {{ name: looping, http: '{u}/loop', follow: true, wait: 0 }}\n  \
-         - {{ name: followed body, http: '{u}/old', follow: true, contains: welcome, wait: 0 }}\n"
+         - {{ name: followed body, http: '{u}/old', follow: true, contains: welcome, wait: 0 }}\n  \
+         - {{ name: login, http: '{u}/login', method: post, body: 'user=a', follow: true, contains: welcome, wait: 0 }}\n  \
+         - {{ name: empty post, http: '{u}/login', method: POST, follow: true, wait: 0 }}\n  \
+         - {{ name: unfollowed post, http: '{u}/login', method: POST, body: 'user=a', expect: 302, wait: 0 }}\n"
     ))
     .unwrap();
     assert_eq!(validate(&spec), vec![]);
@@ -490,7 +496,10 @@ fn http_checks_follow_redirects_when_asked() {
             "{text}"
         );
         if with_body {
-            assert!(lines.contains(&Line::Pass("followed body".into())), "{text}");
+            // A POST answered with a redirect goes on as a GET, as in a browser.
+            for ok in ["followed body", "login", "empty post", "unfollowed post"] {
+                assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
+            }
         }
     };
     let which = |t: &str| {
@@ -501,7 +510,13 @@ fn http_checks_follow_redirects_when_asked() {
     if let Some(curl) = which("curl") {
         expect(&run_with_only(&script, &[("curl", &curl)]), true);
     }
-    let plain: Vec<&checks::Resolved> = plan.iter().filter(|c| c.name != "followed body").collect();
+    assert!(script.contains(&format!("-L --max-redirs 5 --data-binary 'user=a' '{u}/login'")), "{script}");
+    assert!(script.contains(&format!("-L --max-redirs 5 -d '' '{u}/login'")), "{script}");
+    assert!(script.contains(&format!("-X 'POST' --data-binary 'user=a' '{u}/login'")), "{script}");
+    let plain: Vec<&checks::Resolved> = plan
+        .iter()
+        .filter(|c| matches!(&c.probe, Probe::Http { request, .. } if request.method.is_none() && request.contains.is_none()))
+        .collect();
     let plain = checks::script(&position, &plain, &render);
     if let Some(wget) = which("wget") {
         expect(&run_with_only(&plain, &[("wget", &wget)]), false);
