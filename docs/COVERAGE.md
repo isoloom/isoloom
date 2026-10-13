@@ -11,15 +11,15 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [Docker Compose](#docker-compose) | 88% | 58 | 50 | 3 | 5 |
-| [Vagrant](#vagrant) | 83% | 36 | 30 | 0 | 6 |
+| [Vagrant](#vagrant) | 88% | 36 | 32 | 0 | 4 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
-| [Vagrant: libvirt](#vagrant-libvirt) | 15% | 20 | 3 | 0 | 17 |
+| [Vagrant: libvirt](#vagrant-libvirt) | 30% | 20 | 6 | 0 | 14 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 25% | 4 | 1 | 0 | 3 |
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
 | [Vagrant: QEMU](#vagrant-qemu) | 36% | 15 | 4 | 3 | 8 |
-| [Vagrant: ESXi](#vagrant-esxi) | 47% | 19 | 9 | 0 | 10 |
+| [Vagrant: ESXi](#vagrant-esxi) | 57% | 19 | 11 | 0 | 8 |
 | [Terraform: Proxmox](#terraform-proxmox) | 43% | 16 | 7 | 0 | 9 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 63% | 19 | 12 | 0 | 7 |
@@ -178,7 +178,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant
 
-83% of 36 portable features (30 done, 0 partly, 6 to do; 62 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
+88% of 36 portable features (32 done, 0 partly, 4 to do; 62 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
 
 ### Machine settings (config.vm)
 
@@ -212,8 +212,8 @@ when a table disagrees with what Isoloom really generates.
 | `cloud_init_first_boot_only` | Yes | Another way | Via provisioning steps run any setup |
 | `communicator` | Yes | Yes | From `vm.os` (Windows uses WinRM, plain HTTP or SSL per the box's `image.winrm`) |
 | `define` | Yes | Yes | From `machines` |
-| `disk` | Yes | Not yet | Machines.*.resources.disk_gb |
-| `disks` | Yes | Not yet | Machines.*.resources.disk_gb |
+| `disk` | Yes | Yes | From `machines.*.resources.disk_gb` (the root filesystem grown into it) |
+| `disks` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
 | `graceful_halt_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest` | Yes | Yes | From `vm.os` (Windows uses WinRM, plain HTTP or SSL per the box's `image.winrm`) |
 | `host_name` | n/a | No | Old name of `hostname` |
@@ -345,7 +345,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: libvirt
 
-15% of 20 portable features (3 done, 0 partly, 17 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
+30% of 20 portable features (6 done, 0 partly, 14 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
 
 ### Settings
 
@@ -385,7 +385,7 @@ when a table disagrees with what Isoloom really generates.
 | `disk_device` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `disk_driver` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `disk_driver_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `disks` | Yes | Not yet | Machines.*.resources.disk_gb |
+| `disks` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
 | `driver` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `dtb` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `emulator_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
@@ -415,7 +415,7 @@ when a table disagrees with what Isoloom really generates.
 | `loader` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `machine_arch` | Yes | Not yet | A CPU architecture field (amd64, arm64) |
 | `machine_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `machine_virtual_size` | Yes | Not yet | Machines.*.resources.disk_gb |
+| `machine_virtual_size` | Yes | Yes | From `machines.*.resources.disk_gb` (the root filesystem grown into it) |
 | `management_network_address` | n/a | No | Vagrant's management network, used to provision (like the NAT interface elsewhere) |
 | `management_network_autostart` | n/a | No | Vagrant's management network, used to provision (like the NAT interface elsewhere) |
 | `management_network_device` | n/a | No | Vagrant's management network, used to provision (like the NAT interface elsewhere) |
@@ -473,7 +473,7 @@ when a table disagrees with what Isoloom really generates.
 | `snapshot_pool_name` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `socket` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `sound_type` | No | No | Display, input and host devices: containers and cloud VMs have none |
-| `storage` | Yes | Not yet | Machines.*.resources.disk_gb |
+| `storage` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
 | `storage_pool_name` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `storage_pool_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `suspend_mode` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -558,7 +558,7 @@ when a table disagrees with what Isoloom really generates.
 | `cpu` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `debug_port` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `default_qemu_dir` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `disk_resize` | Yes | Not yet | Machines.*.resources.disk_gb |
+| `disk_resize` | Yes | Not yet | Machines.*.resources.disk_gb, once the box's own size is known: the plugin makes the disk an overlay of that size, and one below the box's truncates it |
 | `drive_interface` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `extra_drive_args` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `extra_image_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
@@ -589,7 +589,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: ESXi
 
-47% of 19 portable features (9 done, 0 partly, 10 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
+57% of 19 portable features (11 done, 0 partly, 8 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
 
 ### Settings
 
@@ -609,7 +609,7 @@ when a table disagrees with what Isoloom really generates.
 | `esxi_username` | Yes | Yes | From the ESXI_* environment variables (the host is the user's) |
 | `esxi_virtual_network` | Yes | Yes | From networks: a port group per network, from ESXI_VIRTUAL_NETWORK |
 | `guest_autostart` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `guest_boot_disk_size` | Yes | Not yet | Machines.*.resources.disk_gb |
+| `guest_boot_disk_size` | Yes | Yes | From `machines.*.resources.disk_gb` (the root filesystem grown into it) |
 | `guest_custom_vmx_settings` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_disk_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_guestos` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
@@ -621,7 +621,7 @@ when a table disagrees with what Isoloom really generates.
 | `guest_numvcpus` | Yes | Yes | From `machines.*.resources` |
 | `guest_snapshot_includememory` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_snapshot_quiesced` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `guest_storage` | Yes | Not yet | Machines.*.resources.disk_gb |
+| `guest_storage` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
 | `guest_username` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_virtualhw_version` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guestos` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
