@@ -534,9 +534,18 @@ fn kubernetes_seeds_a_volume_from_the_image_before_the_init_jobs() {
     assert!(block.contains("- /.isoloom-probe/busybox\n        - sh"), "{block}");
     assert!(block.contains("runAsUser: 0"), "{block}");
     assert!(block.contains("name: vol-ctf\n          mountPath: /isoloom-seed"), "{block}");
-    assert!(block.contains("[ -d '/chroot' ] || exit 0"), "{block}");
-    assert!(block.contains("lost+found"), "{block}");
-    assert!(block.contains("busybox cp -a '/chroot/.' \"$d/\""), "{block}");
+    // Its script, as Kubernetes reads it.
+    let docs: Vec<serde_yaml_ng::Value> = env.split("\n---\n").filter_map(|d| serde_yaml_ng::from_str(d).ok()).collect();
+    let deploy = docs.iter().find(|d| d["kind"] == "Deployment").expect("the machine's Deployment");
+    let inits = deploy["spec"]["template"]["spec"]["initContainers"].as_sequence().unwrap();
+    let seed_c = inits.iter().find(|c| c["name"] == "seed-ctf").unwrap();
+    let script = seed_c["command"][3].as_str().unwrap();
+    assert!(script.contains("[ -d '/chroot' ] || exit 0"), "{script}");
+    assert!(script.contains("lost+found"), "{script}");
+    assert!(script.contains("$b cp -a '/chroot/.' \"$d/\""), "{script}");
+    // A marker stands while copying: a failed copy is cleared and done again, not taken as seeded.
+    assert!(script.contains(": > \"$m\" && $b cp -a") && script.ends_with("&& $b rm -f \"$m\""), "{script}");
+    assert!(script.contains("[ -e \"$m\" ] || exit 0; $b rm -rf \"$f\""), "{script}");
     // The busybox it runs is copied in first, even though the machine has no services to probe.
     assert!(env[init..seed].contains("- name: isoloom-probe\n        image: busybox"), "{env}");
     assert!(env.contains("- name: isoloom-probe\n        emptyDir: {}"), "{env}");

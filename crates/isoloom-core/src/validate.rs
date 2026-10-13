@@ -407,6 +407,12 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                     &vat,
                     "machine name and volume name together are at most 62 characters: the Kubernetes claim is `<machine>-<volume>`".into(),
                 );
+            } else if v.len() > 58 {
+                // Its Kubernetes init container is `seed-<volume>`, a 63-character label too.
+                add(
+                    &vat,
+                    "volume names are at most 58 characters: the Kubernetes init container seeding it is `seed-<volume>`".into(),
+                );
             }
             // No spaces or ':' : the Docker short mount syntax (`<vol>:<path>`) and the `mkdir -p`
             // the VM/Proxmox provisioners run both split on those, so either would corrupt the mount.

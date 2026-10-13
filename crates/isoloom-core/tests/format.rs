@@ -201,6 +201,17 @@ fn names_leave_room_for_the_kubernetes_affixes() {
     ));
     assert!(p.iter().any(|m| m.contains("at most 53 characters")), "{p:?}");
     assert!(p.iter().any(|m| m.contains("at most 62 characters")), "{p:?}");
+    // A volume name that fits the claim but not its seed init container (`seed-<volume>`).
+    let v59 = "v".repeat(59);
+    let p = problems(&format!(
+        "{BASE}machines:\n  b: {{ networks: {{ lab: 6 }}, volumes: {{ {v59}: /data }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m.contains("at most 58 characters")), "{p:?}");
+    let v58 = "v".repeat(58);
+    let p = problems(&format!(
+        "{BASE}machines:\n  b: {{ networks: {{ lab: 6 }}, volumes: {{ {v58}: /data }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.is_empty(), "{p:?}");
 }
 
 /// A container can be small (a Go service capped at 64 MB); a VM needs room to boot.

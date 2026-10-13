@@ -164,6 +164,8 @@ fn unsupported(spec: &Spec) -> Option<String> {
 const PROBE_VOLUME: &str = "isoloom-probe";
 /// Where a seed init container sees the claim it fills.
 const SEED_DIR: &str = "/isoloom-seed";
+/// In the claim while a seed copy runs (see [`seed_container`]).
+const SEED_MARKER: &str = ".isoloom-seeding";
 
 /// An init container that gives volume `v` (mounted at `path`) the image's files at that path
 /// while the claim is empty, as Docker does for a named volume the first time it is mounted: a
@@ -173,10 +175,15 @@ const SEED_DIR: &str = "/isoloom-seed";
 /// `cp -a` keeps owners and modes. Empty means nothing in the claim but a `lost+found` (ext4
 /// claims have one); a path the image doesn't have leaves the claim empty. Once seeded, or
 /// written by the machine, a claim is never seeded again (its data survives restarts).
+///
+/// A `.isoloom-seeding` marker stands in the claim while the copy runs: a copy that failed (the
+/// claim too small for the image's files) fails the pod, and the next try finds the marker,
+/// clears what the last one left and copies again, instead of taking a half-filled claim as
+/// seeded.
 fn seed_container(image: &str, v: &str, path: &str) -> Value {
     let src = shell::quote(&format!("{}/.", path.trim_end_matches('/')));
     let script = format!(
-        "d={SEED_DIR}; [ -d {path} ] || exit 0; for f in \"$d\"/* \"$d\"/.[!.]* \"$d\"/..?*; do if [ -e \"$f\" ] || [ -L \"$f\" ]; then [ \"$f\" = \"$d/lost+found\" ] || exit 0; fi; done; exec {PROBE_DIR}/busybox cp -a {src} \"$d/\"",
+        "d={SEED_DIR}; m=\"$d/{SEED_MARKER}\"; b={PROBE_DIR}/busybox; [ -d {path} ] || exit 0; for f in \"$d\"/* \"$d\"/.[!.]* \"$d\"/..?*; do if [ -e \"$f\" ] || [ -L \"$f\" ]; then case \"$f\" in \"$d/lost+found\" | \"$m\") ;; *) [ -e \"$m\" ] || exit 0; $b rm -rf \"$f\" ;; esac; fi; done; : > \"$m\" && $b cp -a {src} \"$d/\" && $b rm -f \"$m\"",
         path = shell::quote(path),
     );
     map([

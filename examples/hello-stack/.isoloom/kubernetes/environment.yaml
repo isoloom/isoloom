@@ -47,7 +47,7 @@ spec:
         - /.isoloom-probe/busybox
         - sh
         - -c
-        - d=/isoloom-seed; [ -d '/data' ] || exit 0; for f in "$d"/* "$d"/.[!.]* "$d"/..?*; do if [ -e "$f" ] || [ -L "$f" ]; then [ "$f" = "$d/lost+found" ] || exit 0; fi; done; exec /.isoloom-probe/busybox cp -a '/data/.' "$d/"
+        - 'd=/isoloom-seed; m="$d/.isoloom-seeding"; b=/.isoloom-probe/busybox; [ -d ''/data'' ] || exit 0; for f in "$d"/* "$d"/.[!.]* "$d"/..?*; do if [ -e "$f" ] || [ -L "$f" ]; then case "$f" in "$d/lost+found" | "$m") ;; *) [ -e "$m" ] || exit 0; $b rm -rf "$f" ;; esac; fi; done; : > "$m" && $b cp -a ''/data/.'' "$d/" && $b rm -f "$m"'
         securityContext:
           runAsUser: 0
           runAsGroup: 0
