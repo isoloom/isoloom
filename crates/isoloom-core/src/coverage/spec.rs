@@ -416,7 +416,10 @@ fn base_table() -> Vec<Row> {
         common(
             "machines.*.privileged",
             done("the container runs privileged (and a Kubernetes securityContext)", "arm-lab"),
-            na("a VM already has kernel access: its workload runs as root"),
+            done(
+                "nested virtualization on Hyper-V (`enable_virtualization_extensions`); elsewhere a VM already has kernel access",
+                "existing-hosts",
+            ),
         ),
         common(
             "machines.*.read_only",
@@ -556,6 +559,13 @@ fn base_table() -> Vec<Row> {
             "machines.*.vm.image.qemu",
             done(
                 "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
+                "windows-hello",
+            ),
+        ),
+        vm_field(
+            "machines.*.vm.image.hyperv",
+            done(
+                "the box Vagrant's Hyper-V provider boots instead (its latest version with a Hyper-V build)",
                 "windows-hello",
             ),
         ),

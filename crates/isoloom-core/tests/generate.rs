@@ -449,6 +449,7 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
                 vagrant: Some("spec/box".into()),
                 vagrant_version: None,
                 qemu: None,
+                hyperv: None,
                 winrm: None,
             });
         }
@@ -1074,4 +1075,85 @@ fn qemu_refuses_more_than_two_vms_on_a_network() {
     let vf = &generate(&three, Target::Vagrant).unwrap()[0].contents;
     // Still generated (for every other provider); the QEMU block says why it has no network.
     assert!(provider_block(vf, "a", "qemu").contains("# No private network on QEMU: network `lab` has 3 VMs"));
+}
+
+#[test]
+fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_guest() {
+    let (_, spec) = example("segmented");
+    let v = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    // The first adapter's switch from ISOLOOM_HYPERV_SWITCH, the helper module once.
+    assert_eq!(v.matches("HYPERV_SWITCH = ENV.fetch(\"ISOLOOM_HYPERV_SWITCH\", \"Default Switch\")").count(), 1);
+    let web = &v[v.find("config.vm.define \"web\"").unwrap()..];
+    let web = &web[..web.find("\n  end\n").unwrap()];
+    // bento has no Hyper-V build: the roboxes box, pinned; the VM named after the environment.
+    assert!(
+        web.contains(
+            "m.vm.provider \"hyperv\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      o.vm.box_version = \"4.3.12\"\n      v.vmname = \"segmented-web\""
+        ),
+        "{web}"
+    );
+    assert!(web.contains("o.vm.network \"private_network\", bridge: HYPERV_SWITCH"), "{web}");
+    assert!(!web.contains("enable_virtualization_extensions"), "{web}");
+    // Its network is a private switch, its adapter attached before every start (by a fixed MAC),
+    // its address set in the guest once it answers, the switch gone with the last VM.
+    assert!(web.contains("IsoloomHyperV.switches([\"isoloom-segmented-front\"])"), "{web}");
+    assert!(web.contains("before :\"VagrantPlugins::HyperV::Action::StartInstance\""), "{web}");
+    assert!(web.contains("IsoloomHyperV.attach(machine, [[\"isoloom-segmented-front\", \"0215"), "{web}");
+    // The address step hangs on a Hyper-V action: other providers run (and print) no trigger.
+    assert!(web.contains("m.trigger.after :\"VagrantPlugins::HyperV::Action::WaitForIPAddress\""), "{web}");
+    assert!(!v.contains("Vagrant::Action::Builtin"), "a trigger fires on every provider");
+    // Every network is tried, and a missing adapter fails the step.
+    assert!(
+        web.contains("rc=0\n") && web.contains(" 10.61.10.10/24 || rc=1\n") && web.contains("exit $rc\n"),
+        "{web}"
+    );
+    assert!(
+        web.contains("systemctl enable -q isoloom-lab-net.service") && web.contains("rc-update add local default"),
+        "{web}"
+    );
+    assert!(web.contains("IsoloomHyperV.prune([\"isoloom-segmented-front\"])"), "{web}");
+    // The router is on every network, with an adapter on each; every adapter has its own MAC.
+    let router = &v[v.find("config.vm.define \"isoloom-router\"").unwrap()..];
+    let router = &router[..router.find("\n  end\n").unwrap()];
+    assert_eq!(router.matches("\", \"0215").count(), spec.networks.len(), "{router}");
+    let macs: Vec<&str> = v.match_indices("\"0215").map(|(i, _)| &v[i..i + 14]).collect();
+    let mut unique = macs.clone();
+    unique.sort();
+    unique.dedup();
+    assert!(macs.len() > spec.networks.len() && macs.len() == unique.len(), "{macs:?}");
+
+    // Windows: the box's Hyper-V build from `vm.image.hyperv`, a static address through WMI.
+    let (_, win) = example("windows-hello");
+    let v = contents(&generate(&win, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(
+        v.contains("      o.vm.box = \"StefanScherer/windows_2019\"\n      o.vm.box_version = \">= 0\"\n      v.vmname = \"windows-hello-web01\""),
+        "{v}"
+    );
+    assert!(
+        v.contains("IsoloomHyperV.address(machine, <<~'PS1')") && v.contains("EnableStatic(@($n.ip), @($n.mask))"),
+        "{v}"
+    );
+    // Its published port isn't forwarded on Hyper-V: a warning says where it is.
+    assert!(v.contains("IsoloomHyperV.ports(machine, [[80, 8082]])"), "{v}");
+    assert!(v.contains("mac = '02:15:") && v.contains("ip = '192.168.57.10'; mask = '255.255.255.0'"), "{v}");
+
+    // A privileged machine runs VMs of its own: nested virtualization.
+    let (_, hosts) = example("existing-hosts");
+    let v = contents(&generate(&hosts, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    let cache = &v[v.find("config.vm.define \"cache\"").unwrap()..];
+    assert!(cache[..cache.find("\n  end\n").unwrap()].contains("v.enable_virtualization_extensions = true"));
+
+    // No Hyper-V box known for the OS: said so, and the spec can give one.
+    let yaml = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    networks: { lab: 10 }\n    vm: { os: debian-13 }\n";
+    let v = contents(&generate(&parse(yaml).unwrap(), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(v.contains("# No Hyper-V build of this box is known: give one with `vm.image.hyperv`."), "{v}");
+    let v = contents(
+        &generate(
+            &parse(&yaml.replace("os: debian-13", "os: debian-13, image: { hyperv: my/debian13 }")).unwrap(),
+            Target::Vagrant,
+        )
+        .unwrap(),
+        ".isoloom/vagrant/Vagrantfile",
+    );
+    assert!(v.contains("o.vm.box = \"my/debian13\"\n      o.vm.box_version = \">= 0\""), "{v}");
 }

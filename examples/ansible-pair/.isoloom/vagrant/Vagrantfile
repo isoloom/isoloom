@@ -313,6 +313,72 @@ IsoloomProject::UNTAR_PS1 = <<'PS1'
   "$files files in $dest$note"
 }
 PS1
+# Hyper-V (`vagrant up --provider hyperv`, from an elevated shell: an administrator, or a member
+# of Hyper-V Administrators). Vagrant connects every adapter of a VM to one virtual switch and
+# sets no address in the guest, so Isoloom does the rest:
+# - the first adapter (Vagrant's own connection, and the internet) is on ISOLOOM_HYPERV_SWITCH,
+#   else the Default Switch (Windows 10 and 11; on Windows Server, name an external or NAT one);
+# - each network is a private switch named after it (between the VMs only, like a VirtualBox
+#   internal network), created when missing and removed with the environment's last VM;
+# - each VM has an adapter there with a fixed MAC, attached before every start (Vagrant has
+#   just connected them all to the first switch), and its address set in the guest once it
+#   answers (a boot-time unit on Linux, a static address on Windows);
+# - published ports aren't forwarded to the host (Hyper-V can't): a warning says where they are.
+HYPERV_SWITCH = ENV.fetch("ISOLOOM_HYPERV_SWITCH", "Default Switch")
+module IsoloomHyperV
+  def self.fail!(message)
+    raise Class.new(Vagrant::Errors::VagrantError) { define_method(:error_message) { "Hyper-V: #{message}" } }
+  end
+
+  # Runs PowerShell on this host: its output, or the error it stopped on.
+  def self.ps(script)
+    require "vagrant/util/powershell"
+    r = Vagrant::Util::PowerShell.execute_inline("$ErrorActionPreference = 'Stop'; #{script}")
+    fail!(r.stderr.strip.empty? ? r.stdout.strip : r.stderr.strip) if r.exit_code != 0
+    r.stdout
+  end
+
+  # A PowerShell string.
+  def self.q(s)
+    "'#{s.to_s.gsub("'", "''")}'"
+  end
+
+  # Before Vagrant picks the first adapter's switch: that switch exists (Vagrant would otherwise
+  # ask which one, or take another), and so do the networks' private switches.
+  def self.switches(names)
+    ps((["if (-not (Hyper-V\\Get-VMSwitch -Name #{q(HYPERV_SWITCH)} -ErrorAction SilentlyContinue)) { throw ('no virtual switch named ' + #{q(HYPERV_SWITCH)} + ': set ISOLOOM_HYPERV_SWITCH to one of Get-VMSwitch') }"] +
+        names.map { |n| "if (-not (Hyper-V\\Get-VMSwitch -Name #{q(n)} -ErrorAction SilentlyContinue)) { Hyper-V\\New-VMSwitch -Name #{q(n)} -SwitchType Private | Out-Null }" }).join("; "))
+  end
+
+  # Before the VM starts: its adapter on each network's switch, found by its MAC (added the
+  # first time), connected there.
+  def self.attach(machine, nics)
+    return if nics.empty?
+    ps((["$vm = Hyper-V\\Get-VM -Id #{q(machine.id)}"] + nics.map { |sw, mac|
+      "$a = @(Hyper-V\\Get-VMNetworkAdapter -VM $vm | Where-Object { $_.MacAddress -eq #{q(mac)} }); " \
+      "if ($a.Count -eq 0) { Hyper-V\\Add-VMNetworkAdapter -VM $vm -Name #{q(sw)} -SwitchName #{q(sw)} -StaticMacAddress #{q(mac)} } " \
+      "else { Hyper-V\\Connect-VMNetworkAdapter -VMNetworkAdapter $a[0] -SwitchName #{q(sw)} }"
+    }).join("; "))
+  end
+
+  # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
+  # answers, before its provisioning: its addresses on the networks.
+  def self.address(machine, script)
+    fail!("#{machine.name} didn't answer within #{machine.config.vm.boot_timeout} s") unless machine.communicate.wait_for_ready(machine.config.vm.boot_timeout)
+    machine.communicate.sudo(script)
+  end
+
+  # Hyper-V forwards no ports: where the published ones (guest => host) are instead.
+  def self.ports(machine, ports)
+    ip = (machine.ssh_info || {})[:host] || "the VM's address"
+    machine.ui.warn("Hyper-V forwards no ports to this host: " + ports.map { |guest, host| "127.0.0.1:#{host} isn't there, use #{ip}:#{guest}" }.join("; "))
+  end
+
+  # After a VM is deleted: the networks' switches no VM uses any more.
+  def self.prune(names)
+    ps(names.map { |n| "if ((Hyper-V\\Get-VMSwitch -Name #{q(n)} -ErrorAction SilentlyContinue) -and -not (Hyper-V\\Get-VMNetworkAdapter -All | Where-Object { $_.SwitchName -eq #{q(n)} })) { Hyper-V\\Remove-VMSwitch -Name #{q(n)} -Force }" }.join("; "))
+  end
+end
 
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (lab); a missing one reuses the last.
@@ -386,6 +452,79 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
+    m.vm.provider "hyperv" do |v, o|
+      o.vm.box = "generic/debian12"
+      o.vm.box_version = "4.3.12"
+      v.vmname = "ansible-pair-web"
+      v.cpus = 1
+      v.memory = 1024
+      v.linked_clone = true
+      o.vm.network "private_network", bridge: HYPERV_SWITCH
+    end
+    m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+    end
+    m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215CFE4F0A1"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomHyperV.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/lab-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.
+          lab() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          lab 02:15:cf:e4:f0:a1 10.63.0.10/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/lab-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:cf:e4:f0:a1\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
+          [Unit]
+          Description=Addresses on the isoloom networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/lab-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-lab-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/lab-net.sh\n' > /etc/local.d/isoloom-lab-net.start
+            chmod +x /etc/local.d/isoloom-lab-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/lab-net.sh
+        SH
+      end
+    end
+    m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
+    end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.63.0.20 cache'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
@@ -446,6 +585,79 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
+    m.vm.provider "hyperv" do |v, o|
+      o.vm.box = "generic/debian12"
+      o.vm.box_version = "4.3.12"
+      v.vmname = "ansible-pair-cache"
+      v.cpus = 1
+      v.memory = 1024
+      v.linked_clone = true
+      o.vm.network "private_network", bridge: HYPERV_SWITCH
+    end
+    m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+    end
+    m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215605C41D5"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomHyperV.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/lab-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.
+          lab() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          lab 02:15:60:5c:41:d5 10.63.0.20/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/lab-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:60:5c:41:d5\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
+          [Unit]
+          Description=Addresses on the isoloom networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/lab-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-lab-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/lab-net.sh\n' > /etc/local.d/isoloom-lab-net.start
+            chmod +x /etc/local.d/isoloom-lab-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/lab-net.sh
+        SH
+      end
+    end
+    m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
+    end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.63.0.10 web'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/cache.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
@@ -499,6 +711,77 @@ Vagrant.configure("2") do |config|
       o.vm.box = "generic/alpine319"
       v.cpus = 1
       v.memory = 768
+    end
+    m.vm.provider "hyperv" do |v, o|
+      v.vmname = "ansible-pair-controller"
+      v.cpus = 1
+      v.memory = 768
+      v.linked_clone = true
+      o.vm.network "private_network", bridge: HYPERV_SWITCH
+    end
+    m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+    end
+    m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "021508FC11D1"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomHyperV.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/lab-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.
+          lab() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          lab 02:15:08:fc:11:d1 10.63.0.253/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/lab-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:08:fc:11:d1\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
+          [Unit]
+          Description=Addresses on the isoloom networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/lab-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-lab-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/lab-net.sh\n' > /etc/local.d/isoloom-lab-net.start
+            chmod +x /etc/local.d/isoloom-lab-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/lab-net.sh
+        SH
+      end
+    end
+    m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
     end
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.63.0.10 web' '10.63.0.20 cache'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"

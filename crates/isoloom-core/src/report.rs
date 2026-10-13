@@ -163,6 +163,31 @@ pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String, String> {
     Ok(table(&head, &rows, markdown))
 }
 
+/// Under Vagrant's Hyper-V provider the published ports (`127.0.0.1:<port>` in the services
+/// report) aren't there: Hyper-V forwards none. A note saying so and where they are instead, when
+/// the environment publishes any.
+pub fn hyperv_ports_note(r: &Value) -> Option<String> {
+    let published: Vec<String> = r["machines"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .flat_map(|(m, v)| {
+            v["services"].as_array().into_iter().flatten().filter_map(move |s| {
+                s["publish"]
+                    .as_u64()
+                    .map(|p| format!("127.0.0.1:{p} ({m}:{})", s["port"].as_u64().unwrap_or(0)))
+            })
+        })
+        .collect();
+    (!published.is_empty()).then(|| {
+        format!(
+            "Note: on Vagrant's Hyper-V provider no port is forwarded to this host, so {} {} not there: reach each service at its VM's address on the first switch (`vagrant ssh-config <machine>` shows it).\n",
+            published.join(", "),
+            if published.len() == 1 { "is" } else { "are" }
+        )
+    })
+}
+
 fn addressing(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     let nets: Vec<String> = r["networks"].as_object().into_iter().flatten().map(|(n, _)| n.clone()).collect();
     let mut head = vec!["machine".to_string()];
