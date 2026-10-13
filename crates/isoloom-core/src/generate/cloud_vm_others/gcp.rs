@@ -254,21 +254,32 @@ resource "google_compute_network" "env" {{
         }
         let mut redirects = Vec::new();
         let mut pub_ports = Vec::new();
+        let mut pub_udp = Vec::new();
         for sv in &m.services {
             if let Some(h) = sv.publish {
-                pub_ports.push(h);
-                if h != sv.port {
-                    redirects.push((h, sv.port));
+                if sv.protocol.is_tcp() {
+                    pub_ports.push(h);
+                } else {
+                    pub_udp.push(h);
                 }
-                let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+                if h != sv.port {
+                    redirects.push((h, sv.port, sv.protocol));
+                }
+                let label = m.service_label(sv);
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }
-        if !pub_ports.is_empty() {
-            let ports = pub_ports.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
+        if !pub_ports.is_empty() || !pub_udp.is_empty() {
+            let quoted = |v: &[u16]| v.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
+            let mut allow = String::new();
+            for (proto, v) in [("tcp", &pub_ports), ("udp", &pub_udp)] {
+                if !v.is_empty() {
+                    let _ = write!(allow, "  allow {{\n    protocol = \"{proto}\"\n    ports    = [{}]\n  }}\n", quoted(v));
+                }
+            }
             let _ = write!(
                 tf,
-                "\nresource \"google_compute_firewall\" \"{id}_published\" {{\n  project       = local.project\n  name          = \"${{local.name}}-{name}-published\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [var.allowed_cidr]\n  target_tags   = [\"{tag}\"]\n  allow {{\n    protocol = \"tcp\"\n    ports    = [{ports}]\n  }}\n}}\n",
+                "\nresource \"google_compute_firewall\" \"{id}_published\" {{\n  project       = local.project\n  name          = \"${{local.name}}-{name}-published\"\n  network       = google_compute_network.env.id\n  direction     = \"INGRESS\"\n  source_ranges = [var.allowed_cidr]\n  target_tags   = [\"{tag}\"]\n{allow}}}\n",
             );
         }
 

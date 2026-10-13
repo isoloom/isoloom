@@ -26,7 +26,7 @@ use std::fmt::Write;
 
 use super::proxmox::{hcl, res};
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, header, router, start_order};
-use crate::model::{Spec, Target, is_reboot};
+use crate::model::{Protocol, Spec, Target, is_reboot};
 use crate::shell;
 use crate::validate::Cidr;
 
@@ -89,6 +89,9 @@ fn unsupported(spec: &Spec) -> Option<String> {
     }
     if nets.iter().any(|c| family(*c) != family(nets[0])) {
         return Some("AWS can't mix private ranges (10/8, 172.16/12, 192.168/16) in one VPC".into());
+    }
+    if let Some(why) = windows_udp_redirect(spec) {
+        return Some(why);
     }
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
@@ -396,9 +399,10 @@ resource "aws_vpc" "env" {{
             if let Some(h) = sv.publish {
                 let _ = write!(
                     sg,
-                    "  ingress {{\n    description = \"published\"\n    from_port   = {h}\n    to_port     = {h}\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n"
+                    "  ingress {{\n    description = \"published\"\n    from_port   = {h}\n    to_port     = {h}\n    protocol    = \"{proto}\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n",
+                    proto = sv.protocol.id()
                 );
-                let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+                let label = m.service_label(sv);
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }
@@ -541,12 +545,29 @@ pub(super) fn has_windows(spec: &Spec) -> bool {
     spec.machines.values().any(|m| m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os)))
 }
 
-/// The redirects a machine needs: a published port that differs from the service's own port.
-pub(super) fn redirects(m: &crate::model::Machine) -> Vec<(u16, u16)> {
+/// The redirects a machine needs: a published port that differs from the service's own port,
+/// as (published port, port, protocol).
+pub(super) fn redirects(m: &crate::model::Machine) -> Vec<(u16, u16, Protocol)> {
     m.services
         .iter()
-        .filter_map(|s| s.publish.filter(|h| *h != s.port).map(|h| (h, s.port)))
+        .filter_map(|s| s.publish.filter(|h| *h != s.port).map(|h| (h, s.port, s.protocol)))
         .collect()
+}
+
+/// A Windows machine's UDP service published on another port: Windows' port proxy (`netsh
+/// interface portproxy`) forwards TCP only.
+pub(super) fn windows_udp_redirect(spec: &Spec) -> Option<String> {
+    spec.machines.iter().find_map(|(name, m)| {
+        let windows = m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os));
+        let s = m.services.iter().find(|s| !s.protocol.is_tcp() && s.publish.is_some_and(|h| h != s.port))?;
+        windows.then(|| {
+            format!(
+                "machine `{name}`: UDP port {} published as {} on a Windows VM in the cloud (its port proxy is TCP only): publish it on its own port",
+                s.port,
+                s.publish.unwrap_or_default()
+            )
+        })
+    })
 }
 
 /// A Linux machine's set-up over SSH, the same on every cloud: the controller's key, its extra
@@ -560,7 +581,7 @@ pub(super) fn linux_setup_cmds(
     m: &crate::model::Machine,
     vm: &crate::model::VmImpl,
     lab: &str,
-    redirects: &[(u16, u16)],
+    redirects: &[(u16, u16, Protocol)],
     mac_expr: &dyn Fn(&str) -> String,
 ) -> Vec<String> {
     let mut cmds: Vec<String> = vec![
@@ -644,9 +665,10 @@ pub(super) fn linux_setup_cmds(
     if !redirects.is_empty() || !m.networks.keys().any(|n| spec.networks[n].internet) {
         cmds.push("command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)".into());
     }
-    for (h, p) in redirects {
+    for (h, p, proto) in redirects {
         cmds.push(format!(
-            "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting {{ type nat hook prerouting priority -100; }}' && sudo nft add rule ip isoloom-publish prerouting tcp dport {h} redirect to :{p}"
+            "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting {{ type nat hook prerouting priority -100; }}' && sudo nft add rule ip isoloom-publish prerouting {proto} dport {h} redirect to :{p}",
+            proto = proto.id()
         ));
     }
     // Offline: no new connections leaving the environment, once provisioned.
@@ -807,12 +829,16 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
             r.ports.iter().map(u16::to_string).collect()
         };
         for p in ports {
-            let (proto, to) = if p == "0" { ("-1", "0".to_string()) } else { ("tcp", p.clone()) };
-            let _ = write!(
-                sg,
-                "  ingress {{\n    description = \"reach from {f}\"\n    from_port   = {p}\n    to_port     = {to}\n    protocol    = \"{proto}\"\n    cidr_blocks = [\"{from}\"]\n  }}\n",
-                f = r.from
-            );
+            // A port opens for TCP and UDP, as on the Linux machines.
+            let protos: &[&str] = if p == "0" { &["-1"] } else { &["tcp", "udp"] };
+            for proto in protos {
+                let to = if p == "0" { "0" } else { p.as_str() };
+                let _ = write!(
+                    sg,
+                    "  ingress {{\n    description = \"reach from {f}\"\n    from_port   = {p}\n    to_port     = {to}\n    protocol    = \"{proto}\"\n    cidr_blocks = [\"{from}\"]\n  }}\n",
+                    f = r.from
+                );
+            }
         }
     }
     let mut ps: Vec<String> = vec![
@@ -826,11 +852,12 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
         if let Some(h) = sv.publish {
             let _ = write!(
                 sg,
-                "  ingress {{\n    description = \"published\"\n    from_port   = {h}\n    to_port     = {h}\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n"
+                "  ingress {{\n    description = \"published\"\n    from_port   = {h}\n    to_port     = {h}\n    protocol    = \"{proto}\"\n    cidr_blocks = [var.allowed_cidr]\n  }}\n",
+                proto = sv.protocol.id()
             );
-            let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+            let label = m.service_label(sv);
             published_out.push((format!("\"{name}/{label}\""), format!("\"${{aws_instance.{id}.public_ip}}:{h}\"")));
-            if h != sv.port {
+            if h != sv.port && sv.protocol.is_tcp() {
                 ps.push(format!(
                     "netsh interface portproxy add v4tov4 listenport={h} listenaddress=0.0.0.0 connectport={p} connectaddress=127.0.0.1 | Out-Null",
                     p = sv.port
@@ -867,15 +894,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
         ));
     }
     for sv in &m.services {
-        ps.push(format!(
-            "New-NetFirewallRule -DisplayName 'isoloom {p}' -Direction Inbound -Protocol TCP -LocalPort {p} -Action Allow | Out-Null",
-            p = sv.port
-        ));
-        if let Some(h) = sv.publish.filter(|h| *h != sv.port) {
-            ps.push(format!(
-                "New-NetFirewallRule -DisplayName 'isoloom {h}' -Direction Inbound -Protocol TCP -LocalPort {h} -Action Allow | Out-Null"
-            ));
-        }
+        ps.extend(windows_firewall(sv));
     }
     // The project in C:\isoloom (as a Linux machine's archive), then the steps, run from there.
     let (project_tf, project_ps) = windows_project(&id);
@@ -1028,4 +1047,20 @@ pub(super) fn hcl_cmd(c: &str) -> String {
 fn hcl_inner(s: &str) -> String {
     let q = hcl(s);
     q[1..q.len() - 1].to_string()
+}
+
+/// A Windows machine's firewall openings for a service: its port, and the published port when
+/// that differs, over the service's protocol.
+pub(super) fn windows_firewall(sv: &crate::model::Service) -> Vec<String> {
+    let (proto, suffix) = if sv.protocol.is_tcp() { ("TCP", "") } else { ("UDP", " udp") };
+    let mut out = vec![format!(
+        "New-NetFirewallRule -DisplayName 'isoloom {p}{suffix}' -Direction Inbound -Protocol {proto} -LocalPort {p} -Action Allow | Out-Null",
+        p = sv.port
+    )];
+    if let Some(h) = sv.publish.filter(|h| *h != sv.port) {
+        out.push(format!(
+            "New-NetFirewallRule -DisplayName 'isoloom {h}{suffix}' -Direction Inbound -Protocol {proto} -LocalPort {h} -Action Allow | Out-Null"
+        ));
+    }
+    out
 }

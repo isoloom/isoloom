@@ -49,6 +49,8 @@ fn the_message_says_the_host_port_the_environment_really_got() {
     use isoloom_core::Target;
     use isoloom_core::resolved::render_message_at;
     let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-stack")).unwrap();
-    let m = render_message_at(&spec, None, Target::Docker, &[("web".into(), 80, 32772)]).unwrap().unwrap();
+    let m = render_message_at(&spec, None, Target::Docker, &[("web".into(), 80, isoloom_core::model::Protocol::Tcp, 32772)])
+        .unwrap()
+        .unwrap();
     assert!(m.contains("http://localhost:32772/"), "{m}");
 }

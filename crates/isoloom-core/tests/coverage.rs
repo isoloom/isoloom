@@ -27,7 +27,7 @@ inputs: [TOKEN]
 machines:
   fw:
     networks: { out: 2, dmz: 1 }
-    services: [{ port: 80, name: web, http: true, tls: true, publish: 8080, fixed: true }, { port: 4444, dormant: true }]
+    services: [{ port: 80, name: web, http: true, tls: true, publish: 8080, fixed: true }, { port: 4444, dormant: true }, { port: 53, protocol: udp }]
     inputs: [TOKEN]
     arch: amd64
     privileged: true

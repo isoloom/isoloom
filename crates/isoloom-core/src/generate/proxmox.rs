@@ -298,9 +298,10 @@ locals {
     // Published services: forwarded from the router's uplink address (anything not from the lab).
     let published = published(spec);
     let mut dnat = String::new();
-    for (_, _, addr, port, host) in &published {
-        let _ = writeln!(nft, "    ip daddr {addr} tcp dport {port} ct status dnat accept");
-        let _ = writeln!(dnat, "    ip saddr != {lab} tcp dport {host} dnat ip to {addr}:{port}");
+    for (_, _, addr, port, host, proto) in &published {
+        let proto = proto.id();
+        let _ = writeln!(nft, "    ip daddr {addr} {proto} dport {port} ct status dnat accept");
+        let _ = writeln!(dnat, "    ip saddr != {lab} {proto} dport {host} dnat ip to {addr}:{port}");
     }
     // The internet, for every network (machines install their software); offline machines block
     // it themselves once provisioned, as on local VMs.
@@ -521,7 +522,7 @@ locals {
     );
     if !published.is_empty() {
         tf.push_str("\n# Published services, from the router's uplink address.\noutput \"published\" {\n  value = {\n");
-        for (machine, service, _, _, host) in &published {
+        for (machine, service, _, _, host, _) in &published {
             let _ = writeln!(tf, "    \"{machine}/{service}\" = \"${{local.router_address}}:{host}\"");
         }
         tf.push_str("  }\n}\n");
@@ -761,15 +762,14 @@ pub(super) fn res(s: &str) -> String {
     s.replace(['-', '.'], "_")
 }
 
-/// Published services: (machine, service name, machine address, port, published port).
-fn published(spec: &Spec) -> Vec<(String, String, std::net::Ipv4Addr, u16, u16)> {
+/// Published services: (machine, service name, machine address, port, published port, protocol).
+fn published(spec: &Spec) -> Vec<(String, String, std::net::Ipv4Addr, u16, u16, crate::model::Protocol)> {
     let mut out = Vec::new();
     for (name, m) in &spec.machines {
         let Some((net, octet)) = m.networks.first() else { continue };
         for sv in &m.services {
             if let Some(host) = sv.publish {
-                let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
-                out.push((name.clone(), label, super::address(spec, net, *octet), sv.port, host));
+                out.push((name.clone(), m.service_label(sv), super::address(spec, net, *octet), sv.port, host, sv.protocol));
             }
         }
     }

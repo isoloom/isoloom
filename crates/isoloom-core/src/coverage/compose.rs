@@ -252,7 +252,7 @@ fn rows() -> Vec<(String, Support)> {
         (
             "services.*.ports",
             Emitted {
-                from: "machines.*.services[].publish (on the host's loopback)",
+                from: "machines.*.services[].publish (on the host's loopback; `/udp` with `protocol: udp`)",
             },
         ),
         (

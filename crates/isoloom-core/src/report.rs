@@ -31,8 +31,8 @@ pub fn graph_d2(r: &Value) -> String {
             .into_iter()
             .flatten()
             .map(|s| match s["name"].as_str() {
-                Some(n) => format!("{} {n}", s["port"]),
-                None => s["port"].to_string(),
+                Some(n) => format!("{} {n}", port_text(s)),
+                None => port_text(s),
             })
             .collect();
         if !services.is_empty() {
@@ -92,7 +92,7 @@ pub fn graph_dot(r: &Value) -> String {
     }
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
         let mut label = m.to_string();
-        let services: Vec<String> = v["services"].as_array().into_iter().flatten().map(|s| s["port"].to_string()).collect();
+        let services: Vec<String> = v["services"].as_array().into_iter().flatten().map(port_text).collect();
         if !services.is_empty() {
             label.push_str(&format!("\\n:{}", services.join(" :")));
         }
@@ -185,6 +185,14 @@ fn addressing(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     (head, rows)
 }
 
+/// A service's port as shown: `53`, or `53/udp` for a UDP one.
+fn port_text(s: &Value) -> String {
+    match s["protocol"].as_str() {
+        Some(p) if p != "tcp" => format!("{}/{p}", s["port"]),
+        _ => s["port"].to_string(),
+    }
+}
+
 fn services(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     let head = ["machine", "port", "name", "http", "published", "reachable from"]
         .iter()
@@ -212,7 +220,7 @@ fn services(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
             }
             rows.push(vec![
                 m.clone(),
-                port.to_string(),
+                port_text(s),
                 s["name"].as_str().unwrap_or("").to_string(),
                 if s["http"].as_bool() == Some(true) { "yes".into() } else { String::new() },
                 s["publish"].as_u64().map(|p| format!("127.0.0.1:{p}")).unwrap_or_default(),

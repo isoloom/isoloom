@@ -12,15 +12,15 @@
 use std::fmt::Write;
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
-use crate::model::{Spec, Target};
+use crate::model::{Protocol, Spec, Target};
 
-/// The published ports of the machines that have a container form.
-fn published(spec: &Spec) -> Vec<u16> {
+/// The published ports of the machines that have a container form, over one protocol.
+fn published(spec: &Spec, protocol: Protocol) -> Vec<u16> {
     let mut ports: Vec<u16> = spec
         .machines
         .values()
         .filter(|m| m.docker.is_some())
-        .flat_map(|m| m.services.iter().filter_map(|s| s.publish))
+        .flat_map(|m| m.services.iter().filter(|s| s.protocol == protocol).filter_map(|s| s.publish))
         .collect();
     ports.sort_unstable();
     ports.dedup();
@@ -203,7 +203,8 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
             "oci_core_instance.env.id",
         ),
     };
-    let ports = published(spec);
+    let ports = published(spec, Protocol::Tcp);
+    let udp_rules = udp_rules(cloud, &published(spec, Protocol::Udp));
     let ports_list = ports.iter().map(u16::to_string).collect::<Vec<_>>().join(", ");
     let ports_quoted = ports.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
     let ocpus_mem = if mem <= 4096 {
@@ -225,6 +226,7 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
             .replace("__SIZE__", &sizes)
             .replace("__PORTS_LIST__", &ports_list)
             .replace("__PORTS_QUOTED__", &ports_quoted)
+            .replace("__UDP__\n", &udp_rules)
             .replace("__OCPUS__", &ocpus_mem.0.to_string())
             .replace("__OMEM__", &ocpus_mem.1.to_string())
             .replace("__CPUS__", &cpus(spec).to_string())
@@ -258,6 +260,33 @@ pub(super) fn other_in(spec: &Spec, dir: &str, cloud: &str, template: &str) -> G
     GeneratedFile {
         path: format!("{OUTPUT_DIR}/{dir}/{cloud}/main.tf"),
         contents: tf,
+    }
+}
+
+/// The rules opening the published UDP ports from `allowed_cidr`, in a cloud template's
+/// firewall (`__UDP__`): nothing when none is published.
+fn udp_rules(cloud: &str, ports: &[u16]) -> String {
+    if ports.is_empty() {
+        return String::new();
+    }
+    let quoted = ports.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
+    let list = ports.iter().map(u16::to_string).collect::<Vec<_>>().join(", ");
+    match cloud {
+        "azure" => format!(
+            "  security_rule {{\n    name                       = \"published-udp\"\n    priority                   = 110\n    direction                  = \"Inbound\"\n    access                     = \"Allow\"\n    protocol                   = \"Udp\"\n    source_port_range          = \"*\"\n    destination_port_ranges    = [{quoted}]\n    source_address_prefix      = var.allowed_cidr\n    destination_address_prefix = \"*\"\n  }}\n"
+        ),
+        "gcp" => format!("  allow {{\n    protocol = \"udp\"\n    ports    = [{quoted}]\n  }}\n"),
+        "digitalocean" => format!(
+            "  dynamic \"inbound_rule\" {{\n    for_each = [{list}]\n    content {{\n      protocol         = \"udp\"\n      port_range       = tostring(inbound_rule.value)\n      source_addresses = [var.allowed_cidr]\n    }}\n  }}\n"
+        ),
+        "linode" => format!(
+            "  inbound {{\n    label    = \"published-udp\"\n    action   = \"ACCEPT\"\n    protocol = \"UDP\"\n    ports    = \"{}\"\n    ipv4     = [var.allowed_cidr]\n  }}\n",
+            ports.iter().map(u16::to_string).collect::<Vec<_>>().join(",")
+        ),
+        "oci" => format!(
+            "  dynamic \"ingress_security_rules\" {{\n    for_each = [{list}]\n    content {{\n      source   = var.allowed_cidr\n      protocol = \"17\"\n      udp_options {{\n        min = ingress_security_rules.value\n        max = ingress_security_rules.value\n      }}\n    }}\n  }}\n"
+        ),
+        _ => String::new(),
     }
 }
 
@@ -349,6 +378,7 @@ resource "azurerm_network_security_group" "env" {
     source_address_prefix      = var.allowed_cidr
     destination_address_prefix = "*"
   }
+__UDP__
 }
 
 resource "azurerm_network_interface" "env" {
@@ -487,6 +517,7 @@ resource "google_compute_firewall" "env" {
     protocol = "tcp"
     ports    = concat(["22"], [__PORTS_QUOTED__])
   }
+__UDP__
 }
 
 resource "google_compute_instance" "env" {
@@ -581,6 +612,7 @@ resource "digitalocean_firewall" "env" {
       source_addresses = [var.allowed_cidr]
     }
   }
+__UDP__
   outbound_rule {
     protocol              = "tcp"
     port_range            = "1-65535"
@@ -647,6 +679,7 @@ resource "linode_firewall" "env" {
     ports    = join(",", concat(["22"], [__PORTS_QUOTED__]))
     ipv4     = [var.allowed_cidr]
   }
+__UDP__
   linodes = [linode_instance.env.id]
 }
 
@@ -741,6 +774,7 @@ resource "oci_core_security_list" "env" {
       }
     }
   }
+__UDP__
 }
 
 resource "oci_core_subnet" "env" {
@@ -927,10 +961,15 @@ resource "aws_security_group" "env" {{
 "#,
         name = spec.name
     );
-    for p in published(spec) {
+    for (proto, p) in published(spec, Protocol::Tcp)
+        .into_iter()
+        .map(|p| ("tcp", p))
+        .chain(published(spec, Protocol::Udp).into_iter().map(|p| ("udp", p)))
+    {
+        let what = if proto == "udp" { format!("{p}/udp") } else { p.to_string() };
         let _ = writeln!(
             tf,
-            "  ingress {{\n    description = \"published {p}\"\n    from_port   = {p}\n    to_port     = {p}\n    protocol    = \"tcp\"\n    cidr_blocks = [var.allowed_cidr]\n  }}"
+            "  ingress {{\n    description = \"published {what}\"\n    from_port   = {p}\n    to_port     = {p}\n    protocol    = \"{proto}\"\n    cidr_blocks = [var.allowed_cidr]\n  }}"
         );
     }
     let inputs_file = if spec.inputs.is_empty() {

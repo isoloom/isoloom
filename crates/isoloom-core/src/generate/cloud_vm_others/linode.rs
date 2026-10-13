@@ -141,8 +141,13 @@ resource "linode_vpc_subnet" "env" {{
     // Who may reach the machines: SSH and the published ports from allowed_cidr, everything from
     // the VPC subnet, the rest dropped. One firewall for every instance.
     let machines: Vec<&str> = start_order(spec).into_iter().filter(|n| spec.machines[*n].vm.is_some()).collect();
-    let published: Vec<u16> = {
-        let mut v: Vec<u16> = spec.machines.values().flat_map(|m| m.services.iter().filter_map(|s| s.publish)).collect();
+    // Published ports by protocol (TCP, then UDP).
+    let published = |udp: bool| -> Vec<u16> {
+        let mut v: Vec<u16> = spec
+            .machines
+            .values()
+            .flat_map(|m| m.services.iter().filter(|s| s.protocol.is_tcp() != udp).filter_map(|s| s.publish))
+            .collect();
         v.sort_unstable();
         v.dedup();
         v
@@ -150,12 +155,15 @@ resource "linode_vpc_subnet" "env" {{
     let mut fw = String::from(
         "\nresource \"linode_firewall\" \"env\" {\n  label           = local.name\n  inbound_policy  = \"DROP\"\n  outbound_policy = \"ACCEPT\"\n  inbound {\n    label    = \"ssh\"\n    action   = \"ACCEPT\"\n    protocol = \"TCP\"\n    ports    = \"22\"\n    ipv4     = [var.allowed_cidr]\n  }\n",
     );
-    if !published.is_empty() {
-        let _ = write!(
-            fw,
-            "  inbound {{\n    label    = \"published\"\n    action   = \"ACCEPT\"\n    protocol = \"TCP\"\n    ports    = \"{}\"\n    ipv4     = [var.allowed_cidr]\n  }}\n",
-            published.iter().map(u16::to_string).collect::<Vec<_>>().join(",")
-        );
+    for (udp, label, proto) in [(false, "published", "TCP"), (true, "published-udp", "UDP")] {
+        let ports = published(udp);
+        if !ports.is_empty() {
+            let _ = write!(
+                fw,
+                "  inbound {{\n    label    = \"{label}\"\n    action   = \"ACCEPT\"\n    protocol = \"{proto}\"\n    ports    = \"{}\"\n    ipv4     = [var.allowed_cidr]\n  }}\n",
+                ports.iter().map(u16::to_string).collect::<Vec<_>>().join(",")
+            );
+        }
     }
     let _ = write!(
         fw,
@@ -231,7 +239,7 @@ resource "linode_vpc_subnet" "env" {{
 
         for sv in &m.services {
             if let Some(h) = sv.publish {
-                let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+                let label = m.service_label(sv);
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }

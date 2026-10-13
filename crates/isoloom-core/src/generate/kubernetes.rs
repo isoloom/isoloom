@@ -26,7 +26,7 @@ use serde_yaml_ng::{Mapping, Value};
 use super::docker::{CHECK_IMAGE, PROBE_DIR, PROBE_IMAGE, UTILITY_IMAGE, image_of, list, map, offline, probe, probe_command, s};
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
 use crate::checks;
-use crate::model::{Machine, Spec, Target};
+use crate::model::{Machine, Protocol, Spec, Target};
 use crate::shell;
 
 const DIR: &str = "kubernetes";
@@ -248,7 +248,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             c.insert(s("command"), list([s("sleep"), s("infinity")]));
         }
         if !m.services.is_empty() {
-            c.insert(s("ports"), list(m.services.iter().map(|sv| map([("containerPort", Value::from(sv.port))]))));
+            c.insert(
+                s("ports"),
+                list(
+                    m.services
+                        .iter()
+                        .map(|sv| with_protocol(map([("containerPort", Value::from(sv.port))]), sv.protocol)),
+                ),
+            );
         }
         // Ready when its services answer (dormant ones aren't waited for).
         if !m.ready_ports().is_empty() {
@@ -447,11 +454,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                         (
                             "ports",
                             list(m.services.iter().map(|sv| {
-                                map([
-                                    ("name", s(format!("p{}", sv.port))),
-                                    ("port", Value::from(sv.port)),
-                                    ("targetPort", Value::from(sv.port)),
-                                ])
+                                with_protocol(
+                                    map([
+                                        ("name", s(port_name(sv.port, sv.protocol))),
+                                        ("port", Value::from(sv.port)),
+                                        ("targetPort", Value::from(sv.port)),
+                                    ]),
+                                    sv.protocol,
+                                )
                             })),
                         ),
                     ]),
@@ -459,7 +469,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             ));
         }
         // Published services: reachable from outside the cluster.
-        let published: Vec<_> = m.services.iter().filter_map(|sv| sv.publish.map(|h| (sv.port, h))).collect();
+        let published: Vec<_> = m.services.iter().filter_map(|sv| sv.publish.map(|h| (sv.port, h, sv.protocol))).collect();
         if !published.is_empty() {
             docs.push(doc(
                 "Service",
@@ -472,11 +482,12 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                         ("selector", labels(&[(MACHINE_LABEL.to_string(), name.as_str())])),
                         (
                             "ports",
-                            list(
-                                published
-                                    .iter()
-                                    .map(|(p, h)| map([("name", s(format!("p{h}"))), ("port", Value::from(*h)), ("targetPort", Value::from(*p))])),
-                            ),
+                            list(published.iter().map(|(p, h, proto)| {
+                                with_protocol(
+                                    map([("name", s(port_name(*h, *proto))), ("port", Value::from(*h)), ("targetPort", Value::from(*p))]),
+                                    *proto,
+                                )
+                            })),
                         ),
                     ]),
                 )],
@@ -493,7 +504,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                             "ingress",
                             list([map([
                                 ("from", list([map([("ipBlock", map([("cidr", s("0.0.0.0/0"))]))])])),
-                                ("ports", list(published.iter().map(|(p, _)| map([("port", Value::from(*p))])))),
+                                (
+                                    "ports",
+                                    list(published.iter().map(|(p, _, proto)| with_protocol(map([("port", Value::from(*p))]), *proto))),
+                                ),
                             ])]),
                         ),
                     ]),
@@ -759,4 +773,20 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
 
 fn yaml(v: &Value) -> String {
     serde_yaml_ng::to_string(v).expect("a kubernetes manifest serializes")
+}
+
+/// A port entry with its `protocol`: none for TCP (the default, kept out), `UDP`.
+fn with_protocol(mut v: Value, p: Protocol) -> Value {
+    if let Value::Mapping(m) = &mut v
+        && !p.is_tcp()
+    {
+        m.insert(s("protocol"), s("UDP"));
+    }
+    v
+}
+
+/// A Service port's name, unique within the Service: `p53`, and `p53-udp` for UDP (a port
+/// served over both protocols is two entries).
+fn port_name(port: u16, p: Protocol) -> String {
+    if p.is_tcp() { format!("p{port}") } else { format!("p{port}-udp") }
 }

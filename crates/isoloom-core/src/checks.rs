@@ -318,7 +318,7 @@ pub fn allowed(spec: &Spec, from: &Machine, network: &str, port: u16) -> bool {
 }
 
 /// The checks the spec implies, from every machine that can run them:
-/// - each service of another machine answers at the addresses `reach` (or a shared network)
+/// - each TCP service of another machine answers at the addresses `reach` (or a shared network)
 ///   lets this machine through to (not a `dormant` one: it answers only once woken), and
 /// - is blocked at every address when nothing lets it through at all. When one path is open and
 ///   another isn't, the closed one isn't asserted: a machine with several interfaces answers for
@@ -343,7 +343,9 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
                 continue;
             }
             let multi = mb.networks.len() > 1;
-            for svc in &mb.services {
+            // A UDP service has no handshake: nothing tells "answers" from "blocked" without
+            // speaking its protocol, so only the author's checks probe it.
+            for svc in mb.services.iter().filter(|s| s.protocol.is_tcp()) {
                 let paths: Vec<(&String, bool)> = mb.networks.keys().map(|n| (n, allowed(spec, ma, n, svc.port))).collect();
                 let on = |n: &str| if multi { format!(" on {n}") } else { String::new() };
                 if paths.iter().all(|(_, ok)| !ok) {
@@ -409,8 +411,8 @@ pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
     let mut out = Vec::new();
     for (b, mb) in &spec.machines {
         let multi = mb.networks.len() > 1;
-        // A dormant service answers only once woken, as above.
-        for svc in mb.services.iter().filter(|s| !s.dormant) {
+        // A dormant service answers only once woken, a UDP one isn't probed, as above.
+        for svc in mb.services.iter().filter(|s| !s.dormant && s.protocol.is_tcp()) {
             for n in mb.networks.keys() {
                 let on = if multi { format!(" on {n}") } else { String::new() };
                 out.push(Resolved {

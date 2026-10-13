@@ -144,6 +144,13 @@ pub fn table() -> Vec<Row> {
             "machines.*.services[].dormant",
             done("left out of the dependency waits; no derived check expects it to answer", "segmented"),
         ),
+        (
+            "machines.*.services[].protocol",
+            done(
+                "`udp`: the router forwards a published port as UDP; left out of the dependency waits; `reach` opens TCP and UDP",
+                "udp-dns",
+            ),
+        ),
         ("machines.*.resources.cpus", done("the VM's cores", "segmented")),
         ("machines.*.resources.memory_mb", done("the VM's memory", "segmented")),
         ("machines.*.resources.disk_gb", done("the VM's disk size", "segmented")),
@@ -366,6 +373,18 @@ fn base_table() -> Vec<Row> {
                 "left out of the dependency waits and of the derived checks that expect an answer; still forwarded and opened by `reach`",
                 "segmented",
             ),
+        ),
+        common(
+            "machines.*.services[].protocol",
+            done(
+                "`udp`: published as `<port>/udp`; left out of the healthcheck and the derived checks (no handshake); opened by `reach` (TCP and UDP alike)",
+                "udp-dns",
+            ),
+            Status::Partial {
+                how: "`udp`: forwarded as UDP; left out of the dependency waits and the derived checks; opened by `reach`",
+                gap: "vagrant-libvirt skips UDP forwarded ports (`isoloom run` warns): reach the machine's address instead",
+                proof: "udp-dns",
+            },
         ),
         Row {
             path: "machines.*.services[].tls",

@@ -209,13 +209,19 @@ resource "oci_core_security_list" "env" {{
   }}
 "#,
     );
-    let mut published_ports: Vec<u16> = spec.machines.values().flat_map(|m| m.services.iter().filter_map(|s| s.publish)).collect();
+    // Published ports, as (port, UDP), TCP first: protocol 6 with tcp_options, 17 with udp_options.
+    let mut published_ports: Vec<(bool, u16)> = spec
+        .machines
+        .values()
+        .flat_map(|m| m.services.iter().filter_map(|s| s.publish.map(|h| (!s.protocol.is_tcp(), h))))
+        .collect();
     published_ports.sort_unstable();
     published_ports.dedup();
-    for p in &published_ports {
+    for (udp, p) in &published_ports {
+        let (num, opts) = if *udp { ("17", "udp_options") } else { ("6", "tcp_options") };
         let _ = write!(
             tf,
-            "  ingress_security_rules {{\n    description = \"published\"\n    source      = var.allowed_cidr\n    protocol    = \"6\"\n    tcp_options {{\n      min = {p}\n      max = {p}\n    }}\n  }}\n"
+            "  ingress_security_rules {{\n    description = \"published\"\n    source      = var.allowed_cidr\n    protocol    = \"{num}\"\n    {opts} {{\n      min = {p}\n      max = {p}\n    }}\n  }}\n"
         );
     }
     let _ = write!(
@@ -254,7 +260,7 @@ resource "oci_core_subnet" "env" {{
 
         for sv in &m.services {
             if let Some(h) = sv.publish {
-                let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+                let label = m.service_label(sv);
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }

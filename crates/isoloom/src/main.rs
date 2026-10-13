@@ -1517,6 +1517,12 @@ fn run_cmd(
                     eprintln!("note: no baseline snapshot (the provider may not support snapshots); `reset` will rebuild");
                 }
             }
+            // vagrant-libvirt skips UDP forwarded ports (a warning lost in Vagrant's output).
+            if !down && program == "vagrant" && lifecycle::vagrant_uses_libvirt(&wd) {
+                for line in lifecycle::udp_forwards(&spec) {
+                    eprintln!("warning: vagrant-libvirt doesn't forward UDP ports: {line} isn't reachable from this host (use the machine's address)");
+                }
+            }
             // The spec's message, now that the environment is up.
             if !down && t == core::Target::CloudServices {
                 if let Some(m) = &spec.cloud_message(&cloud_outputs(dir, instance)) {
@@ -2229,7 +2235,7 @@ fn snapshot_of(dir: &std::path::Path, instance: Option<u8>, sets: &[String]) -> 
 
 /// The host ports an environment really got, for its message: local Docker publishes on free
 /// ports unless `ISOLOOM_PUBLISH_FIXED` pins them to the spec's; the other targets keep them.
-fn real_ports(dir: &std::path::Path, t: core::Target, instance: Option<u8>) -> Vec<(String, u16, u16)> {
+fn real_ports(dir: &std::path::Path, t: core::Target, instance: Option<u8>) -> Vec<(String, u16, core::model::Protocol, u16)> {
     if t != core::Target::Docker || std::env::var_os("ISOLOOM_PUBLISH_FIXED").is_some_and(|v| !v.is_empty()) {
         return Vec::new();
     }
