@@ -162,8 +162,10 @@ your own cloud account). Routers enforce `reach` between networks; a network can
 target. Your own image table (`--images`) sets OS images and supplies the access machine.
 
 Run for real in CI: Docker (hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns), Kubernetes on kind
-(hello-stack, segmented). Run by hand: VirtualBox (several examples, Windows Server 2019).
-Generated and validated only: Proxmox, the clouds, ESXi.
+(hello-stack, segmented). Run by hand: VirtualBox (several examples, Windows Server 2019); on
+AWS, one cloud VM per machine with Ansible provisioning, Docker on a cloud VM, and cloud services
+(cloud-bucket and thirteen AWS labs); Docker on a cloud VM on Azure. Generated and validated
+only: Proxmox, the other clouds, ESXi.
 
 Already have a Compose file? `isoloom import compose` drafts the `isoloom.yml` from it: what the
 format expresses goes into the draft, and every other key is listed with why (belongs in the
