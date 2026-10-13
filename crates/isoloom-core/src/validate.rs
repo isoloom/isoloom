@@ -187,6 +187,11 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                     &format!("cloud.env.{k}"),
                     format!("`{k}` isn't an environment variable name (letters, digits, `_`)"),
                 );
+            } else if CLOUD_ENV_RESERVED.contains(&k.as_str()) || k.starts_with("ISOLOOM_") {
+                add(
+                    &format!("cloud.env.{k}"),
+                    format!("`{k}` is the scripts' own (or the shell's): pick another name"),
+                );
             }
         }
         if c.apply_retries > 5 {
@@ -895,6 +900,22 @@ pub fn starts_after<'a>(spec: &'a Spec, name: &str, m: &'a crate::model::Machine
     }
     after
 }
+
+/// What `cloud.env` can't set: the cloud-services scripts' own variables, and the shell's.
+const CLOUD_ENV_RESERVED: &[&str] = &[
+    "here",
+    "src",
+    "module",
+    "tries",
+    "rc",
+    "PATH",
+    "IFS",
+    "ENV",
+    "CDPATH",
+    "PS4",
+    "HOME",
+    "TF_DATA_DIR",
+];
 
 /// Checks that every path the spec mentions exists in the project folder.
 pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {

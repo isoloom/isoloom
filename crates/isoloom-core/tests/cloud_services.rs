@@ -19,6 +19,13 @@ fn terraform_runs_on_a_copy_of_the_module() {
     let up = script(&s, "up.sh");
     assert!(up.contains("src='../../tf'\nmodule=\"$here/module\"\n"), "{up}");
     assert!(up.contains("tar -C \"$src\" -cf - --exclude=.terraform"), "{up}");
+    // The old copy's Terraform files go before the new ones land.
+    let (clean, tar) = (up.find("find \"$module\" -type f").unwrap(), up.find("tar -C").unwrap());
+    assert!(clean < tar, "{up}");
+    assert!(
+        up.contains("-name '*.tf' -o -name '*.tf.json' -o -name '*.tfvars' -o -name '*.tfvars.json'"),
+        "{up}"
+    );
     assert!(up.contains("terraform -chdir=\"$module\" init"), "{up}");
     assert!(up.contains("terraform -chdir=\"$module\" apply -auto-approve"), "{up}");
     assert!(!up.contains("until"), "no retries by default: {up}");
@@ -42,8 +49,11 @@ fn before_steps_env_and_retries_reach_the_scripts() {
     // The steps come after the copy and before init.
     let (copy, step, init) = (up.find("tar -C").unwrap(), up.find("step 'keys.sh'").unwrap(), up.find(" init ").unwrap());
     assert!(copy < step && step < init, "{up}");
-    assert!(up.contains("until terraform -chdir=\"$module\" apply"), "{up}");
-    assert!(up.contains("[ \"$tries\" -le 2 ] || exit 1"), "{up}");
+    assert!(
+        up.contains("  terraform -chdir=\"$module\" apply -auto-approve -input=false -state=\"$here/terraform.tfstate\" \"$@\" || rc=$?\n"),
+        "{up}"
+    );
+    assert!(up.contains("[ \"$tries\" -le 2 ] || exit \"$rc\""), "{up}");
     for f in ["down.sh", "outputs.sh"] {
         assert!(script(&s, f).contains("export AWS_REGION='us-east-1'\n"), "{f}");
     }
@@ -52,9 +62,18 @@ fn before_steps_env_and_retries_reach_the_scripts() {
 
 #[test]
 fn new_keys_are_validated() {
-    let bad = spec("  env: { 'AWS-REGION': x, 1X: y }\n  apply_retries: 9\n  requires: [' ']\n");
+    let bad = spec("  env: { 'AWS-REGION': x, 1X: y, here: z, PATH: /bin, TF_DATA_DIR: d, ISOLOOM_PROJECT: p }\n  apply_retries: 9\n  requires: [' ']\n");
     let found: Vec<String> = validate(&bad).iter().map(|p| p.to_string()).collect();
-    for want in ["cloud.env.AWS-REGION", "cloud.env.1X", "cloud.apply_retries: at most 5", "cloud.requires[0]"] {
+    for want in [
+        "cloud.env.AWS-REGION",
+        "cloud.env.1X",
+        "cloud.env.here: `here` is the scripts' own",
+        "cloud.env.PATH: `PATH` is the scripts' own",
+        "cloud.env.TF_DATA_DIR",
+        "cloud.env.ISOLOOM_PROJECT",
+        "cloud.apply_retries: at most 5",
+        "cloud.requires[0]",
+    ] {
         assert!(found.iter().any(|p| p.contains(want)), "{want} not in {found:?}");
     }
 }
@@ -78,7 +97,7 @@ fn a_before_step_must_exist_in_the_project() {
 #[test]
 fn requires_are_looked_up_or_run() {
     use isoloom_core::host::requirements_with;
-    assert!(requirements_with(&spec(""), &|_, _| Some(String::new())).is_none());
+    assert!(requirements_with(&spec(""), true, &|_, _| Some(String::new())).is_none());
     let s = spec("  requires: [gsed, \"python3 -c 'import boto3'\", jq]\n");
     let seen = std::cell::RefCell::new(Vec::new());
     // `jq` is there; the others aren't.
@@ -86,7 +105,7 @@ fn requires_are_looked_up_or_run() {
         seen.borrow_mut().push(format!("{p} {}", a.join(" ")));
         a.last().is_some_and(|c| c.ends_with("'jq'")).then(String::new)
     };
-    let r = requirements_with(&s, &run).unwrap();
+    let r = requirements_with(&s, true, &run).unwrap();
     assert!(!r.ready);
     assert_eq!(r.cloud.as_deref(), Some("aws"));
     assert_eq!(
@@ -94,6 +113,12 @@ fn requires_are_looked_up_or_run() {
         ["sh -c command -v 'gsed'", "sh -c python3 -c 'import boto3'", "sh -c command -v 'jq'"]
     );
     assert_eq!(r.summary(), "not ready: `gsed` isn't installed; `python3 -c 'import boto3'` failed");
-    let all = requirements_with(&s, &|_, _| Some(String::new())).unwrap();
+    let all = requirements_with(&s, true, &|_, _| Some(String::new())).unwrap();
     assert!(all.ready, "{all:?}");
+    // Without `run_commands` (`doctor`), the spec's shell commands aren't run: listed for `run`.
+    seen.borrow_mut().clear();
+    let r = requirements_with(&s, false, &run).unwrap();
+    assert_eq!(*seen.borrow(), ["sh -c command -v 'gsed'", "sh -c command -v 'jq'"]);
+    assert_eq!(r.summary(), "not ready: `gsed` isn't installed");
+    assert!(r.notes.contains(&"`python3 -c 'import boto3'` (checked at `isoloom run`)".to_string()), "{r:?}");
 }

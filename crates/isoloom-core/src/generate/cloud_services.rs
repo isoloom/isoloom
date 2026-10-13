@@ -50,9 +50,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     };
     // The module is copied next to the state, and Terraform runs there: its lock file and what
     // the module writes (archives, keys) stay out of the project. A copy refreshed over the old
-    // one, so what the steps or Terraform wrote there before stays.
+    // one, so what the steps or Terraform wrote there before stays; the old copy's Terraform
+    // files go first, so a file renamed or deleted in the module isn't applied any more.
     let mut copy = String::from(
-        "mkdir -p \"$module\"\ntar -C \"$src\" -cf - --exclude=.terraform --exclude='*.tfstate' --exclude='*.tfstate.*' . | tar -C \"$module\" -xf -\n",
+        "mkdir -p \"$module\"\nfind \"$module\" -type f \\( -name '*.tf' -o -name '*.tf.json' -o -name '*.tfvars' -o -name '*.tfvars.json' \\) -exec rm -f {} +\ntar -C \"$src\" -cf - --exclude=.terraform --exclude='*.tfstate' --exclude='*.tfstate.*' . | tar -C \"$module\" -xf -\n",
     );
     // The host steps, in order, from the copy (a script runs as itself when executable, else
     // with sh).
@@ -74,7 +75,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     let apply = match cloud.apply_retries {
         0 => format!("{apply}\n"),
         n => format!(
-            "tries=0\nuntil {apply}; do\n  tries=$((tries + 1))\n  [ \"$tries\" -le {n} ] || exit 1\n  echo \"isoloom: the apply failed; applying again ($tries of {n})\" >&2\ndone\n"
+            "tries=0\nwhile :; do\n  rc=0\n  {apply} || rc=$?\n  [ \"$rc\" -ne 0 ] || break\n  tries=$((tries + 1))\n  [ \"$tries\" -le {n} ] || exit \"$rc\"\n  echo \"isoloom: the apply failed; applying again ($tries of {n})\" >&2\ndone\n"
         ),
     };
     let up = format!(

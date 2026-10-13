@@ -11,6 +11,7 @@ src='../../terraform'
 module="$here/module"
 if [ ! -d "$module" ]; then
   mkdir -p "$module"
+  find "$module" -type f \( -name '*.tf' -o -name '*.tf.json' -o -name '*.tfvars' -o -name '*.tfvars.json' \) -exec rm -f {} +
   tar -C "$src" -cf - --exclude=.terraform --exclude='*.tfstate' --exclude='*.tfstate.*' . | tar -C "$module" -xf -
 fi
 terraform -chdir="$module" init -input=false >&2

@@ -589,12 +589,13 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
         }
         Command::Doctor { dir, json } => {
             let mut all = core::host::all();
-            // A spec here: what its cloud-services module needs on this machine (`cloud.requires`).
+            // A spec here: what its cloud-services module needs on this machine (`cloud.requires`):
+            // command names only; its shell commands are the project's code, run by `run` alone.
             let required = core::find(&dir)
                 .is_ok()
                 .then(|| core::load(&dir).ok())
                 .flatten()
-                .and_then(|spec| core::host::requirements(&spec));
+                .and_then(|spec| core::host::requirements(&spec, false));
             let required_at = all.len();
             all.extend(required);
             if json {
@@ -1461,7 +1462,7 @@ fn run_cmd(
             )
             .into());
         }
-        if let Some(r) = core::host::requirements(&spec).filter(|r| !r.ready) {
+        if let Some(r) = core::host::requirements(&spec, true).filter(|r| !r.ready) {
             return Err(format!(
                 "this machine lacks what the module needs: {} (`cloud.requires`; see `isoloom doctor`)",
                 r.summary().trim_start_matches("not ready: ")

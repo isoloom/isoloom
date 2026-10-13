@@ -23,7 +23,7 @@ case "$1" in
       echo '{"resources":[{"type":"x"}]}' > "$state"
       while [ ! -f "$FAKE_TF_WAIT" ]; do sleep 0.1; done
     fi
-    [ "$n" -ge "${FAKE_TF_FAIL_UNTIL:-1}" ] || { echo "apply failed" >&2; exit 1; }
+    [ "$n" -ge "${FAKE_TF_FAIL_UNTIL:-1}" ] || { echo "apply failed" >&2; exit 3; }
     echo '{"resources":[{"type":"x"}]}' > "$state" ;;
   destroy) echo '{"resources":[]}' > "$state" ;;
   output) echo '{}' ;;
@@ -106,6 +106,10 @@ fn text(o: &Output) -> String {
     format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr))
 }
 
+fn stdout_has(o: &Output, s: &str) -> bool {
+    String::from_utf8_lossy(&o.stdout).contains(s)
+}
+
 fn read(p: &Path) -> String {
     std::fs::read_to_string(p).unwrap_or_default()
 }
@@ -154,16 +158,20 @@ fn run_applies_a_copy_after_the_before_steps_and_retries() {
 
 #[test]
 fn run_refuses_without_what_the_module_requires() {
-    let lab = Lab::new("requires", "  requires: [isoloom-no-such-tool, \"sh -c 'exit 0'\"]\n");
+    let lab = Lab::new("requires", "  requires: [isoloom-no-such-tool, \"touch \\\"$FAKE_TF_DIR/ran\\\"\"]\n");
     let o = lab.isoloom(&["run", "cloud-services"]);
     assert!(!o.status.success());
     assert!(text(&o).contains("`isoloom-no-such-tool` isn't installed"), "{}", text(&o));
-    assert!(!text(&o).contains("exit 0' failed"), "{}", text(&o));
+    assert!(lab.tf.join("ran").exists(), "run checks the shell commands");
+    std::fs::remove_file(lab.tf.join("ran")).unwrap();
     assert!(!lab.tf.join("applies").exists(), "nothing applied");
-    // `doctor` says the same, for the spec in the folder.
+    // `doctor` says the same for the spec in the folder, but never runs its shell commands.
     let o = lab.isoloom(&["doctor"]);
     assert!(text(&o).contains("✗ the spec's requires"), "{}", text(&o));
     assert!(text(&o).contains("`isoloom-no-such-tool` isn't installed"), "{}", text(&o));
+    assert!(!lab.tf.join("ran").exists(), "doctor ran the spec's command");
+    let o = lab.isoloom(&["doctor", "--json"]);
+    assert!(stdout_has(&o, "(checked at `isoloom run`)"), "{}", text(&o));
 }
 
 #[test]
@@ -190,4 +198,20 @@ fn status_says_deploying_while_the_first_apply_runs() {
     assert!(child.wait().unwrap().success());
     assert_eq!(seen.as_deref(), Some("deploying (1 resources so far)"));
     assert_eq!(lab.status_state().as_deref(), Some("deployed (1 resources)"));
+}
+
+#[test]
+fn a_renamed_module_file_leaves_the_copy_and_a_failed_apply_keeps_its_code() {
+    let lab = Lab::new("rename", "  apply_retries: 1\n");
+    let o = lab.isoloom(&["run", "cloud-services"]);
+    assert!(o.status.success(), "{}", text(&o));
+    std::fs::rename(lab.project.join("terraform/main.tf"), lab.project.join("terraform/site.tf")).unwrap();
+    // Every apply fails from here: the last failure's code is what `run` reports.
+    let o = lab.command(&["run", "cloud-services"]).env("FAKE_TF_FAIL_UNTIL", "99").output().unwrap();
+    assert!(!o.status.success());
+    assert!(text(&o).contains("exit status: 3"), "{}", text(&o));
+    assert_eq!(read(&lab.tf.join("applies")).trim(), "3");
+    let module = lab.out().join("module");
+    assert!(module.join("site.tf").is_file());
+    assert!(!module.join("main.tf").exists(), "the old name is still applied");
 }
