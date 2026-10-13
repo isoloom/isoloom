@@ -398,6 +398,7 @@ Vagrant.configure("2") do |config|
     m.vm.provider "libvirt" do |v|
       v.cpus = 2
       v.memory = 3072
+      v.machine_arch = "x86_64"
     end
     m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('192.168.58.20 intranet')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
     m.vm.provision "isoloom_project", name: "project"

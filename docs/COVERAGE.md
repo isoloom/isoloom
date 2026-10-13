@@ -15,7 +15,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
-| [Vagrant: libvirt](#vagrant-libvirt) | 30% | 20 | 6 | 0 | 14 |
+| [Vagrant: libvirt](#vagrant-libvirt) | 35% | 20 | 7 | 0 | 13 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 25% | 4 | 1 | 0 | 3 |
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
 | [Vagrant: QEMU](#vagrant-qemu) | 36% | 15 | 4 | 3 | 8 |
@@ -345,7 +345,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Vagrant: libvirt
 
-30% of 20 portable features (6 done, 0 partly, 14 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
+35% of 20 portable features (7 done, 0 partly, 13 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
 
 ### Settings
 
@@ -413,7 +413,7 @@ when a table disagrees with what Isoloom really generates.
 | `launchsecurity` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `launchsecurity_data` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `loader` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
-| `machine_arch` | Yes | Not yet | A CPU architecture field (amd64, arm64) |
+| `machine_arch` | Yes | Yes | From `machines.*.arch` |
 | `machine_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `machine_virtual_size` | Yes | Yes | From `machines.*.resources.disk_gb` (the root filesystem grown into it) |
 | `management_network_address` | n/a | No | Vagrant's management network, used to provision (like the NAT interface elsewhere) |

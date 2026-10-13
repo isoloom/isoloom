@@ -58,9 +58,7 @@ const DISK: Support = Emitted {
 const MORE_DISKS: Support = Equivalent {
     via: "machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths)",
 };
-const ARCH: Support = Planned {
-    note: "a CPU architecture field (amd64, arm64)",
-};
+const ARCH: Support = Emitted { from: "machines.*.arch" };
 const WINDOWS: Support = Planned {
     note: "with Windows guests (which make an environment VM-only)",
 };
