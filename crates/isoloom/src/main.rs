@@ -37,8 +37,9 @@ fn profile_for(dir: &std::path::Path) -> Result<Option<core::profile::Profile>, 
     INPUTS.call_once(|| {
         for (k, v) in &p.inputs {
             if std::env::var_os(k).is_none() {
-                // SAFETY: called while loading the spec, before this process starts any thread
-                // (the check runners and log readers start later).
+                // SAFETY: called while loading the spec, before the command line starts any
+                // thread of its own (the check runners and log readers start later); the main
+                // thread only waits for this one.
                 unsafe { std::env::set_var(k, v) };
             }
         }
@@ -601,13 +602,21 @@ fn record_vagrantfile(file: &std::path::Path) -> Result<serde_json::Value, Box<d
 }
 
 fn main() -> ExitCode {
-    match run(Cli::parse()) {
-        Ok(code) => code,
-        Err(e) => {
-            eprintln!("error: {e}");
-            ExitCode::from(2)
-        }
-    }
+    // The command line runs on a thread of its own with a larger stack: clap builds every
+    // subcommand's parser on the stack, and Windows gives the main thread only 1 MB, which a
+    // debug build outgrows (a stack overflow before any output).
+    let cli = std::thread::Builder::new()
+        .name("isoloom".into())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| match run(Cli::parse()) {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::from(2)
+            }
+        })
+        .expect("can't start the command line's thread");
+    cli.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
 }
 
 fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
