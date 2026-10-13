@@ -18,6 +18,10 @@
 //! - Checks: a Job per position in `.isoloom/kubernetes/checks/`, with the networks (labels) of
 //!   the machine it stands for, so the same policies apply to it.
 //! - Addresses: Kubernetes picks pod addresses; names, ports and reachability are kept.
+//! - A Helm chart of the same manifests in `.isoloom/kubernetes/chart/` (see [`chart`]): the
+//!   machines' images and the inputs as values, the checks as `helm test` Jobs, the project's
+//!   scripts under `files/project/` (copied there by the command line, see
+//!   [`super::project_copies`]).
 
 use std::fmt::Write;
 
@@ -588,6 +592,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     // the same policies apply), else on every network. Each runner is a sh script next to the
     // Job, carried by a ConfigMap of its own.
     let mut check_files = Vec::new();
+    // The same checks for the chart: its test Jobs and their runners.
+    let mut chart_tests: Vec<Value> = Vec::new();
+    let mut chart_runners: Vec<(String, String)> = Vec::new();
     let plan = checks::plan(spec);
     if !plan.is_empty() {
         let default_pos = checks::default_position(spec);
@@ -632,9 +639,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                     contents: checks::script(&pos, &execs, &render),
                 });
             }
+            let runner = checks::script(&pos, &group, &render);
+            chart_runners.push((format!("{id}.sh"), runner.clone()));
             check_files.push(GeneratedFile {
                 path: format!("{OUTPUT_DIR}/{DIR}/checks/{id}.sh"),
-                contents: checks::script(&pos, &group, &render),
+                contents: runner,
             });
             runner_scripts.push(format!("{id}.sh"));
             let mut labels_ = pod_labels(None, &nets);
@@ -694,6 +703,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 )],
             ));
         }
+        chart_tests = jobs.clone();
         let job_names: Vec<String> = jobs.iter().filter_map(|j| j["metadata"]["name"].as_str().map(str::to_string)).collect();
         let mut out = header("#");
         out.push_str(&format!(
@@ -771,7 +781,194 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         },
     ];
     files.extend(check_files);
+    files.extend(chart(spec, &docs, &scripts, &chart_tests, &chart_runners));
     Ok(files)
+}
+
+/// Where the chart is, and where its copies of the project's scripts go.
+pub(super) const CHART: &str = "chart";
+pub(super) const CHART_PROJECT_FILES: &str = "files/project";
+
+/// Helm's template engine reads `{{` as an action: one already in a manifest (a script, the
+/// message) is printed as it is.
+fn helm_literal(text: &str) -> String {
+    text.replace("{{", "{{ \"{{\" }}")
+}
+
+/// The environment as a Helm chart: the same manifests (the namespace is the release's), each
+/// machine's image a value (`images.<machine>`), the inputs a Secret from `inputs.<NAME>`, the
+/// checks `helm test` Jobs (the `exec` ones, run inside a machine, stay with `isoloom test`),
+/// the project's scripts read from `files/project/` (see [`super::project_copies`]).
+fn chart(spec: &Spec, docs: &[Value], scripts: &[String], tests: &[Value], runners: &[(String, String)]) -> Vec<GeneratedFile> {
+    let base = format!("{OUTPUT_DIR}/{DIR}/{CHART}");
+    let constraints = super::constraints::of(spec);
+    let token = |machine: &str| format!("isoloom-chart-image--{machine}--");
+
+    // Each machine's image, pulled through the constraints' mirrors (a built one is local).
+    let mut images = Mapping::new();
+    let mut original: indexmap::IndexMap<String, String> = indexmap::IndexMap::new();
+    for (name, m) in &spec.machines {
+        let Some(d) = &m.docker else { continue };
+        let image = image_of(spec, name, m);
+        let pulled = match (constraints, &d.build) {
+            (Some(c), None) => super::constraints::rewrite_image(c, &image),
+            _ => image.clone(),
+        };
+        images.insert(s(name.as_str()), s(pulled));
+        original.insert(name.clone(), image);
+    }
+
+    // The manifests, without the namespace, a machine's own image swapped for its value.
+    let manifests: Vec<String> = docs
+        .iter()
+        .filter(|d| d["kind"].as_str() != Some("Namespace"))
+        .map(|d| {
+            let mut d = d.clone();
+            if d["kind"].as_str() == Some("Deployment")
+                && let Some(name) = d["metadata"]["name"].as_str().map(str::to_string)
+                && let Some(image) = original.get(&name)
+                && let Some(Value::Mapping(pod)) = d.get_mut("spec").and_then(|v| v.get_mut("template")).and_then(|v| v.get_mut("spec"))
+            {
+                for key in ["containers", "initContainers"] {
+                    if let Some(Value::Sequence(cs)) = pod.get_mut(s(key)) {
+                        for c in cs.iter_mut() {
+                            if c["image"].as_str() == Some(image.as_str())
+                                && let Value::Mapping(c) = c
+                            {
+                                c.insert(s("image"), s(token(&name)));
+                            }
+                        }
+                    }
+                }
+            }
+            yaml(&d)
+        })
+        .collect();
+    let mut env = header("#");
+    env.push_str(&helm_literal(&manifests.join("---\n")));
+    for name in original.keys() {
+        env = env.replace(
+            &format!("image: {}", token(name)),
+            &format!("image: {{{{ index .Values.images {} | quote }}}}", serde_json::to_string(name).expect("a name")),
+        );
+    }
+
+    let mut files = Vec::new();
+    let description = format!("The {} environment, generated by Isoloom from isoloom.yml", spec.name);
+    files.push(GeneratedFile {
+        path: format!("{base}/Chart.yaml"),
+        contents: format!(
+            "{}apiVersion: v2\nname: {}\ndescription: {}\ntype: application\n# `isoloom chart --version <v>` packages it with that version.\nversion: 0.1.0\nappVersion: \"0.1.0\"\n",
+            header("#"),
+            spec.name,
+            serde_json::to_string(&description).expect("text")
+        ),
+    });
+
+    let mut values = Mapping::new();
+    values.insert(s("images"), Value::Mapping(images));
+    let has_inputs = spec.machines.values().any(|m| !m.inputs.is_empty());
+    if has_inputs {
+        let mut inputs = Mapping::new();
+        for i in &spec.inputs {
+            inputs.insert(s(i.as_str()), s(""));
+        }
+        values.insert(s("inputs"), Value::Mapping(inputs));
+    }
+    let mut v = header("#");
+    v.push_str("# images: each machine's image (images built from the project must be pushed where the\n# cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).\n");
+    v.push_str(&yaml(&Value::Mapping(values)));
+    files.push(GeneratedFile {
+        path: format!("{base}/values.yaml"),
+        contents: v,
+    });
+
+    files.push(GeneratedFile {
+        path: format!("{base}/templates/environment.yaml"),
+        contents: env,
+    });
+
+    if !scripts.is_empty() {
+        let mut t = header("#");
+        let _ = writeln!(
+            t,
+            "# The project's scripts (init jobs, checks): copies in {CHART_PROJECT_FILES}/, written by `isoloom generate`."
+        );
+        let _ = writeln!(t, "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: {SCRIPTS}\ndata:");
+        for f in scripts {
+            let k = key(f);
+            let _ = writeln!(
+                t,
+                "  {k}: {{{{ required \"{CHART_PROJECT_FILES}/{k} is missing: run isoloom generate\" (.Files.Get \"{CHART_PROJECT_FILES}/{k}\") | quote }}}}"
+            );
+        }
+        files.push(GeneratedFile {
+            path: format!("{base}/templates/scripts.yaml"),
+            contents: t,
+        });
+    }
+
+    if has_inputs {
+        let mut t = header("#");
+        let _ = writeln!(
+            t,
+            "apiVersion: v1\nkind: Secret\nmetadata:\n  name: {INPUTS}\ntype: Opaque\nstringData:\n{{{{- range $name, $value := .Values.inputs }}}}\n  {{{{ $name }}}}: {{{{ $value | toString | quote }}}}\n{{{{- end }}}}"
+        );
+        files.push(GeneratedFile {
+            path: format!("{base}/templates/inputs.yaml"),
+            contents: t,
+        });
+    }
+
+    if !tests.is_empty() {
+        let mut t = header("#");
+        t.push_str(
+            "# The checks: `helm test <release>` runs a Job per position (`exec` checks, run inside a machine,\n# stay with `isoloom test kubernetes`).\n",
+        );
+        let _ = writeln!(t, "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: {CHECK_SCRIPTS}\ndata:");
+        for (name, _) in runners {
+            let _ = writeln!(t, "  {name}: {{{{ .Files.Get \"files/checks/{name}\" | quote }}}}");
+        }
+        for job in tests {
+            let mut job = job.clone();
+            if let Some(Value::Mapping(meta)) = job.get_mut("metadata") {
+                meta.insert(
+                    s("annotations"),
+                    map([("helm.sh/hook", s("test")), ("helm.sh/hook-delete-policy", s("before-hook-creation"))]),
+                );
+            }
+            t.push_str("---\n");
+            t.push_str(&helm_literal(&yaml(&job)));
+        }
+        files.push(GeneratedFile {
+            path: format!("{base}/templates/tests/checks.yaml"),
+            contents: t,
+        });
+        for (name, contents) in runners {
+            files.push(GeneratedFile {
+                path: format!("{base}/files/checks/{name}"),
+                contents: contents.clone(),
+            });
+        }
+    }
+
+    // The message as written when it has no placeholders: filling them takes the resolved
+    // snapshot, which asks every generator (this one too) whether it would refuse the spec.
+    let mut notes = String::new();
+    match spec.message.as_deref().map(str::trim_end).filter(|m| !m.trim().is_empty()) {
+        Some(m) if !m.contains("{{") => {
+            notes.push_str(&helm_literal(m));
+            notes.push_str("\n\n");
+        }
+        Some(_) => notes.push_str("How to use it: isoloom message --target kubernetes (in the project).\n\n"),
+        None => {}
+    }
+    let _ = writeln!(notes, "Checks: helm test {{{{ .Release.Name }}}} -n {{{{ .Release.Namespace }}}}");
+    files.push(GeneratedFile {
+        path: format!("{base}/templates/NOTES.txt"),
+        contents: notes,
+    });
+    files
 }
 
 fn yaml(v: &Value) -> String {

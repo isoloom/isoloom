@@ -437,6 +437,22 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Package the Helm chart (`.isoloom/kubernetes/chart/`, written first) as `<name>-<version>.tgz`
+    /// with `helm package`: the artifact to hand over or push to a chart registry.
+    Chart {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// The chart's version (and app version), e.g. the product's release: 4.2.1.
+        #[arg(long, default_value = "0.1.0")]
+        version: String,
+        /// Where the .tgz goes (default: the project folder).
+        #[arg(short, long, value_name = "DIR")]
+        out: Option<PathBuf>,
+        #[arg(long, value_name = "FILE")]
+        images: Option<PathBuf>,
+        #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+        sets: Vec<String>,
+    },
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
     Schema,
     /// Draft an isoloom.yml from files you already have.
@@ -772,7 +788,8 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 }
                 None => core::generate_all(&spec),
             };
-            let files = core::defaults::apply_to_files(files, &settings.defaults);
+            let mut files = core::defaults::apply_to_files(files, &settings.defaults);
+            files.extend(core::project_copies(&files, &dir)?);
             for f in &files {
                 let path = dir.join(&f.path);
                 if let Some(parent) = path.parent() {
@@ -1020,6 +1037,13 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Profiles { dir, json } => profiles_cmd(&dir, json),
+        Command::Chart {
+            dir,
+            version,
+            out,
+            images,
+            sets,
+        } => chart_cmd(&dir, &version, out.as_deref(), images.as_deref(), &sets),
         Command::Schema => {
             println!("{}", serde_json::to_string_pretty(&core::schema::schema())?);
             Ok(ExitCode::SUCCESS)
@@ -1181,7 +1205,8 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
                 return Ok(ExitCode::FAILURE);
             }
             let (files, _) = core::generate_all(&spec);
-            let files = core::defaults::apply_to_files(files, &settings.defaults);
+            let mut files = core::defaults::apply_to_files(files, &settings.defaults);
+            files.extend(core::project_copies(&files, &dir)?);
             let mut stale = 0;
             for f in &files {
                 match std::fs::read_to_string(dir.join(&f.path)) {
@@ -1255,7 +1280,8 @@ fn prepare(
         None => core::generate(&spec, t),
     }
     .map_err(|e| format!("can't generate `{}`: {e}", t.id()))?;
-    let files = core::defaults::apply_to_files(files, &settings.defaults);
+    let mut files = core::defaults::apply_to_files(files, &settings.defaults);
+    files.extend(core::project_copies(&files, &dir)?);
     for f in &files {
         let path = dir.join(&f.path);
         if let Some(parent) = path.parent() {
@@ -1269,6 +1295,49 @@ fn prepare(
         None => spec,
     };
     Ok((spec, dir, t, settings.defaults))
+}
+
+/// `isoloom chart`: the Kubernetes files (the chart with them), then `helm package`.
+fn chart_cmd(
+    dir: &std::path::Path,
+    version: &str,
+    out: Option<&std::path::Path>,
+    images: Option<&std::path::Path>,
+    sets: &[String],
+) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    if version.is_empty() || version.starts_with('v') || !version.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        return Err(format!("`--version {version}`: a semantic version, like 4.2.1").into());
+    }
+    let (spec, settings) = load_settings(dir, images, sets)?;
+    if report_invalid(&spec) {
+        return Ok(ExitCode::FAILURE);
+    }
+    let files = core::generate(&spec, core::Target::Kubernetes).map_err(|e| format!("no chart: {e}"))?;
+    let mut files = core::defaults::apply_to_files(files, &settings.defaults);
+    files.extend(core::project_copies(&files, dir)?);
+    for f in &files {
+        let path = dir.join(&f.path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&path, &f.contents)?;
+    }
+    let chart = dir.join(core::OUTPUT_DIR).join("kubernetes").join("chart");
+    let dest = out.map(std::path::Path::to_path_buf).unwrap_or_else(|| dir.to_path_buf());
+    std::fs::create_dir_all(&dest)?;
+    let status = std::process::Command::new("helm")
+        .arg("package")
+        .arg(&chart)
+        .args(["--version", version, "--app-version", version, "--destination"])
+        .arg(&dest)
+        .status()
+        .map_err(|e| {
+            format!(
+                "can't run helm ({e}): install it (https://helm.sh/docs/intro/install/), or use {} as it is",
+                chart.display()
+            )
+        })?;
+    Ok(if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE })
 }
 
 /// `isoloom profiles`: each profile, checked.

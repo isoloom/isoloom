@@ -1,0 +1,3 @@
+How to use it: isoloom message --target kubernetes (in the project).
+
+Checks: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

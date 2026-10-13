@@ -205,9 +205,23 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Checks (the spec's and the derived ones, from every machine)
         run: cargo run -q -- test kubernetes .
+      # The Helm chart of the same environment, in a namespace of its own beside it: linted,
+      # installed, Available, and its checks as `helm test`. (No `helm --wait`: it would wait
+      # for the published LoadBalancer's address, which kind never gives.)
+      - name: Helm chart (lint, install, helm test)
+        run: |
+          helm lint .isoloom/kubernetes/chart
+          helm install env .isoloom/kubernetes/chart -n "helm-$NS" --create-namespace
+          kubectl -n "helm-$NS" wait --for=condition=Available deployment --all --timeout=600s
+          helm test env -n "helm-$NS" --logs --timeout 5m
+      - name: Package the chart
+        run: |
+          cargo run -q -- chart . --version 1.2.3 -o "$RUNNER_TEMP"
+          ls "$RUNNER_TEMP"/*-1.2.3.tgz
       - name: State
         if: failure()
         run: |
+          kubectl -n "helm-$NS" get all,networkpolicy,pvc,job -o wide || true
           kubectl -n "$NS" get all,networkpolicy,pvc -o wide || true
           kubectl -n "$NS" describe pods || true
           kubectl -n "$NS" logs --all-containers --prefix -l isoloom.com/machine --tail=50 || true

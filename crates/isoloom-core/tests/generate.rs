@@ -48,7 +48,9 @@ fn files_under(base: &Path, dir: &Path, out: &mut BTreeSet<String>) {
 /// that `generate` no longer writes.
 fn committed_problems(name: &str) -> Vec<String> {
     let (dir, spec) = example(name);
-    let (files, _) = generate_all(&spec);
+    let (mut files, _) = generate_all(&spec);
+    // The Helm chart's copies of the project's scripts, as `isoloom generate` writes them.
+    files.extend(isoloom_core::project_copies(&files, &dir).expect("the scripts the chart copies exist"));
     if files.is_empty() {
         return vec![format!("{name}: nothing generated")];
     }
