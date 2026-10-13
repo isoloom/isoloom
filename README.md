@@ -82,6 +82,7 @@ isoloom connect shell     # the `shell` tool: a toolbox on every network (tools:
 isoloom graph -o lab.svg  # the environment as a diagram (D2 or Graphviz)
 isoloom report services   # tables: addressing, services, wiring, resources
 isoloom defaults          # the defaults in effect (images, Vagrant provider, cloud regions) and their sources
+isoloom profiles          # the project's profiles (profiles/<name>.yml), each checked against the spec
 isoloom run TARGET [DIR]  # generate, then bring the environment up with the target's own tool
 isoloom test TARGET [DIR] # run the checks against it: the spec's, and the ones derived from it
 isoloom provision [MACHINE...] --target vagrant   # provisioning again, in place (after a step failed)
@@ -92,6 +93,23 @@ isoloom connect MACHINE   # a shell on a machine (compose exec, vagrant ssh, kub
 isoloom exec MACHINE -- … # a command on one machine, or `all`
 isoloom capture MACHINE NETWORK   # tcpdump on its interface there
 isoloom down TARGET [DIR] # tear it down
+```
+
+Every command takes `--profile NAME` (or `ISOLOOM_PROFILE`): `profiles/<name>.yml`, what differs
+for one customer or site. It can pin the target, change spec values (`spec:`, merged in before
+`-s`), add a layer of defaults, and give inputs their values (the environment still wins):
+
+```yaml
+# profiles/bank-fr.yml
+description: Bank, Paris site
+target: proxmox
+spec:
+  networks: { lan: { internet: false } }
+  machines: { web: { resources: { cpus: 4, memory_mb: 8192 } } }
+defaults:
+  images: { os: { debian-12: { proxmox: local:iso/debian-12-bank.qcow2 } } }
+inputs:
+  REGISTRY: registry.bank.local
 ```
 
 `DIR` holds `isoloom.yml` (`isoloom.yaml` also works). VMs get a copy of the project in
@@ -133,7 +151,7 @@ isoloom-core = { git = "https://github.com/isoloom/isoloom", tag = "v0.10.1" }
 - **Supported surface**: the crate root (`load`, `parse`, `validate`, `validate_files`,
   `derive`, `generate`, `refusal`, `refusal_on`, `totals`, the model types) and the modules `model`,
   `validate`, `targets`, `generate` (with `resolved`, the snapshot), `checks`, `instance`,
-  `defaults`, `registry` and `host`. Every other public module (`clones`, `groups`, `vlans`,
+  `defaults`, `profile`, `registry` and `host`. Every other public module (`clones`, `groups`, `vlans`,
   `ignore`, `images`, `import`, `coverage`, `report`, `schema`, `shell`) is internal: public for
   the command line, and may change in any release.
 - **Versions**: while Isoloom is at 0.x, a breaking change to the supported surface bumps the

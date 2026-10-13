@@ -30,6 +30,9 @@ pub struct Entry {
     /// look for an environment that isn't there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
+    /// The profile it was brought up with (`--profile`), when one was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
     /// When `run` finished, as RFC 3339 (UTC).
     pub started: String,
 }
@@ -224,6 +227,7 @@ mod tests {
             instance: None,
             cloud: None,
             project: None,
+            profile: None,
             started: rfc3339(0),
         };
         r.upsert(e(Target::Docker));
@@ -251,6 +255,7 @@ mod tests {
                             instance: None,
                             cloud: None,
                             project: None,
+                            profile: None,
                             started: rfc3339(0),
                         })
                     })

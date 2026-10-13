@@ -54,7 +54,7 @@ pub fn status(json: bool, cleanup: Option<&str>, ssh_key: Option<&Path>) -> Res<
             .iter()
             .map(|(e, state)| {
                 serde_json::json!({
-                    "name": e.name, "dir": e.dir, "target": e.target.id(), "instance": e.instance, "cloud": e.cloud, "started": e.started, "state": state,
+                    "name": e.name, "dir": e.dir, "target": e.target.id(), "instance": e.instance, "cloud": e.cloud, "profile": e.profile, "started": e.started, "state": state,
                 })
             })
             .collect();
@@ -95,6 +95,9 @@ fn target_label(e: &Entry) -> String {
     };
     if let Some(n) = e.instance {
         label.push_str(&format!(" #{n}"));
+    }
+    if let Some(p) = &e.profile {
+        label.push_str(&format!(" [{p}]"));
     }
     label
 }
@@ -980,7 +983,7 @@ fn reboot_external(name: &str, ssh: &[String]) -> Res<()> {
 
 /// The spec, as the instance when one is named (its names and ports are the instance's).
 fn load_as(dir: &Path, instance: Option<u8>) -> Res<core::Spec> {
-    let spec = core::load(dir)?;
+    let spec = super::load_spec(dir)?;
     Ok(match instance {
         Some(n) => core::instance::apply(&spec, n)?,
         None => spec,
