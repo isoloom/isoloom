@@ -19,7 +19,7 @@
 //!   the machine it stands for, so the same policies apply to it.
 //! - Addresses: Kubernetes picks pod addresses; names, ports and reachability are kept.
 //! - A Helm chart of the same manifests in `.isoloom/kubernetes/chart/` (see [`chart`]): the
-//!   machines' images and the inputs as values, the checks as `helm test` Jobs, the project's
+//!   machines' images and the inputs as values, the checks as `helm test` Pods, the project's
 //!   scripts under `files/project/` (copied there by the command line, see
 //!   [`super::project_copies`]).
 
@@ -797,7 +797,7 @@ fn helm_literal(text: &str) -> String {
 
 /// The environment as a Helm chart: the same manifests (the namespace is the release's), each
 /// machine's image a value (`images.<machine>`), the inputs a Secret from `inputs.<NAME>`, the
-/// checks `helm test` Jobs (the `exec` ones, run inside a machine, stay with `isoloom test`),
+/// checks `helm test` Pods (the `exec` ones, run inside a machine, stay with `isoloom test`),
 /// the project's scripts read from `files/project/` (see [`super::project_copies`]).
 fn chart(spec: &Spec, docs: &[Value], scripts: &[String], tests: &[Value], runners: &[(String, String)]) -> Vec<GeneratedFile> {
     let base = format!("{OUTPUT_DIR}/{DIR}/{CHART}");
@@ -929,16 +929,27 @@ fn chart(spec: &Spec, docs: &[Value], scripts: &[String], tests: &[Value], runne
         for (name, _) in runners {
             let _ = writeln!(t, "  {name}: {{{{ .Files.Get \"files/checks/{name}\" | quote }}}}");
         }
+        // As Pods named after their Job: `helm test --logs` reads each test's logs from a pod
+        // of the hook's own name.
         for job in tests {
-            let mut job = job.clone();
-            if let Some(Value::Mapping(meta)) = job.get_mut("metadata") {
-                meta.insert(
-                    s("annotations"),
-                    map([("helm.sh/hook", s("test")), ("helm.sh/hook-delete-policy", s("before-hook-creation"))]),
-                );
+            let name = job["metadata"]["name"].as_str().unwrap_or("isoloom-check");
+            let template = &job["spec"]["template"];
+            let mut meta = Mapping::new();
+            meta.insert(s("name"), s(name));
+            if let Some(l) = template["metadata"].get("labels") {
+                meta.insert(s("labels"), l.clone());
             }
+            meta.insert(
+                s("annotations"),
+                map([("helm.sh/hook", s("test")), ("helm.sh/hook-delete-policy", s("before-hook-creation"))]),
+            );
+            let mut pod = Mapping::new();
+            pod.insert(s("apiVersion"), s("v1"));
+            pod.insert(s("kind"), s("Pod"));
+            pod.insert(s("metadata"), Value::Mapping(meta));
+            pod.insert(s("spec"), template["spec"].clone());
             t.push_str("---\n");
-            t.push_str(&helm_literal(&yaml(&job)));
+            t.push_str(&helm_literal(&yaml(&Value::Mapping(pod))));
         }
         files.push(GeneratedFile {
             path: format!("{base}/templates/tests/checks.yaml"),

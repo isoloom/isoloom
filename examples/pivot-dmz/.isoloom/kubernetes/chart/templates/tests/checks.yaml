@@ -12,133 +12,117 @@ data:
   app.sh: {{ .Files.Get "files/checks/app.sh" | quote }}
   db.sh: {{ .Files.Get "files/checks/db.sh" | quote }}
 ---
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
   name: isoloom-check
+  labels:
+    net.isoloom.com/access: member
+    isoloom.com/check: isoloom-check
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
-  backoffLimit: 0
-  template:
-    metadata:
-      labels:
-        net.isoloom.com/access: member
-        isoloom.com/check: isoloom-check
-    spec:
-      restartPolicy: Never
-      containers:
-      - name: check
-        image: curlimages/curl:8.11.1
-        command:
-        - /bin/sh
-        - /isoloom/run/user.sh
-        volumeMounts:
-        - name: runner
-          mountPath: /isoloom/run
-        - name: scripts
-          mountPath: /isoloom/scripts
-      volumes:
-      - name: runner
-        configMap:
-          name: isoloom-check-runners
-          defaultMode: 493
-      - name: scripts
-        configMap:
-          name: isoloom-scripts
-          defaultMode: 493
+  restartPolicy: Never
+  containers:
+  - name: check
+    image: curlimages/curl:8.11.1
+    command:
+    - /bin/sh
+    - /isoloom/run/user.sh
+    volumeMounts:
+    - name: runner
+      mountPath: /isoloom/run
+    - name: scripts
+      mountPath: /isoloom/scripts
+  volumes:
+  - name: runner
+    configMap:
+      name: isoloom-check-runners
+      defaultMode: 493
+  - name: scripts
+    configMap:
+      name: isoloom-scripts
+      defaultMode: 493
 ---
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
   name: isoloom-check-gateway
+  labels:
+    net.isoloom.com/dmz: member
+    net.isoloom.com/internal: member
+    isoloom.com/check: isoloom-check-gateway
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
-  backoffLimit: 0
-  template:
-    metadata:
-      labels:
-        net.isoloom.com/dmz: member
-        net.isoloom.com/internal: member
-        isoloom.com/check: isoloom-check-gateway
-    spec:
-      restartPolicy: Never
-      containers:
-      - name: check
-        image: curlimages/curl:8.11.1
-        command:
-        - /bin/sh
-        - /isoloom/run/gateway.sh
-        volumeMounts:
-        - name: runner
-          mountPath: /isoloom/run
-      volumes:
-      - name: runner
-        configMap:
-          name: isoloom-check-runners
-          defaultMode: 493
+  restartPolicy: Never
+  containers:
+  - name: check
+    image: curlimages/curl:8.11.1
+    command:
+    - /bin/sh
+    - /isoloom/run/gateway.sh
+    volumeMounts:
+    - name: runner
+      mountPath: /isoloom/run
+  volumes:
+  - name: runner
+    configMap:
+      name: isoloom-check-runners
+      defaultMode: 493
 ---
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
   name: isoloom-check-app
+  labels:
+    net.isoloom.com/internal: member
+    isoloom.com/check: isoloom-check-app
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
-  backoffLimit: 0
-  template:
-    metadata:
-      labels:
-        net.isoloom.com/internal: member
-        isoloom.com/check: isoloom-check-app
-    spec:
-      restartPolicy: Never
-      containers:
-      - name: check
-        image: curlimages/curl:8.11.1
-        command:
-        - /bin/sh
-        - /isoloom/run/app.sh
-        volumeMounts:
-        - name: runner
-          mountPath: /isoloom/run
-      volumes:
-      - name: runner
-        configMap:
-          name: isoloom-check-runners
-          defaultMode: 493
+  restartPolicy: Never
+  containers:
+  - name: check
+    image: curlimages/curl:8.11.1
+    command:
+    - /bin/sh
+    - /isoloom/run/app.sh
+    volumeMounts:
+    - name: runner
+      mountPath: /isoloom/run
+  volumes:
+  - name: runner
+    configMap:
+      name: isoloom-check-runners
+      defaultMode: 493
 ---
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
   name: isoloom-check-db
+  labels:
+    net.isoloom.com/internal: member
+    isoloom.com/check: isoloom-check-db
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
-  backoffLimit: 0
-  template:
-    metadata:
-      labels:
-        net.isoloom.com/internal: member
-        isoloom.com/check: isoloom-check-db
-    spec:
-      restartPolicy: Never
-      containers:
-      - name: check
-        image: curlimages/curl:8.11.1
-        command:
-        - /bin/sh
-        - /isoloom/run/db.sh
-        volumeMounts:
-        - name: runner
-          mountPath: /isoloom/run
-      volumes:
-      - name: runner
-        configMap:
-          name: isoloom-check-runners
-          defaultMode: 493
+  restartPolicy: Never
+  containers:
+  - name: check
+    image: curlimages/curl:8.11.1
+    command:
+    - /bin/sh
+    - /isoloom/run/db.sh
+    volumeMounts:
+    - name: runner
+      mountPath: /isoloom/run
+  volumes:
+  - name: runner
+    configMap:
+      name: isoloom-check-runners
+      defaultMode: 493

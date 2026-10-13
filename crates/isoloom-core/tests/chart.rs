@@ -46,7 +46,9 @@ fn the_chart_is_the_same_environment_with_images_as_values() {
 fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() {
     let (dir, files) = example("hello-stack");
     let tests = get(&files, "chart/templates/tests/checks.yaml");
-    assert_eq!(tests.matches("helm.sh/hook: test").count(), tests.matches("kind: Job").count());
+    assert_eq!(tests.matches("helm.sh/hook: test").count(), 3);
+    assert_eq!(tests.matches("kind: Pod").count(), 3, "pods, so `helm test --logs` finds them");
+    assert!(tests.contains("name: isoloom-check\n") && tests.contains("restartPolicy: Never"));
     assert!(tests.contains("networks.sh: {{ .Files.Get \"files/checks/networks.sh\" | quote }}"));
     assert_eq!(get(&files, "chart/files/checks/web.sh"), get(&files, "kubernetes/checks/web.sh"));
     assert!(!tests.contains("exec-cache"), "exec checks stay with isoloom test");
