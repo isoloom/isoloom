@@ -268,7 +268,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         add("machines", "declare at least one machine".into());
     }
     let mut taken: HashMap<(String, u8), String> = HashMap::new();
-    let mut published: HashMap<u16, String> = HashMap::new();
+    let mut published: HashMap<(u16, crate::model::Protocol), String> = HashMap::new();
     let access: Vec<&String> = spec.machines.iter().filter(|(_, m)| m.access).map(|(n, _)| n).collect();
     if access.len() > 1 {
         add("machines", format!("only one machine can be the access machine (found {})", access.len()));
@@ -429,13 +429,20 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
         for (i, s) in m.services.iter().enumerate() {
             if s.port == 0 {
                 add(&format!("{at}.services[{i}].port"), "port 0 isn't a port".into());
-            } else if !ports.insert(s.port) {
-                add(&format!("{at}.services[{i}].port"), format!("port {} is listed twice", s.port));
+            } else if !ports.insert((s.port, s.protocol)) {
+                let udp = if s.protocol.is_tcp() { "" } else { " (UDP)" };
+                add(&format!("{at}.services[{i}].port"), format!("port {}{udp} is listed twice", s.port));
+            }
+            if !s.protocol.is_tcp() && (s.http || s.tls) {
+                add(
+                    &format!("{at}.services[{i}]"),
+                    "`http` and `tls` run over TCP: a UDP service has neither".into(),
+                );
             }
             match s.publish {
                 Some(0) => add(&format!("{at}.services[{i}].publish"), "port 0 isn't a port".into()),
                 Some(p) => {
-                    if let Some(other) = published.insert(p, name.clone()) {
+                    if let Some(other) = published.insert((p, s.protocol), name.clone()) {
                         add(&format!("{at}.services[{i}].publish"), format!("port {p} is already published by `{other}`"));
                     }
                 }
@@ -459,9 +466,17 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                     format!("`{dep}` has no services, so there's nothing to wait for; give it a service"),
                 );
             } else if spec.machines[dep].ready_ports().is_empty() {
+                let dm = &spec.machines[dep];
+                let why = if dm.services.iter().all(|s| s.dormant) {
+                    "are all dormant (they answer later)"
+                } else if dm.services.iter().all(|s| !s.protocol.is_tcp()) {
+                    "are all UDP (no handshake to wait for)"
+                } else {
+                    "are all dormant (they answer later) or UDP (no handshake to wait for)"
+                };
                 add(
                     &format!("{at}.depends_on[{i}]"),
-                    format!("`{dep}`'s services are all dormant (they answer later), so there's nothing to wait for"),
+                    format!("`{dep}`'s services {why}, so there's nothing to wait for"),
                 );
             }
         }
@@ -666,7 +681,10 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             add(&format!("{at}.publish"), "say which `port` the tool serves".into());
         }
         if let Some(p) = t.publish
-            && spec.machines.values().any(|m| m.services.iter().any(|s| s.publish == Some(p)))
+            && spec
+                .machines
+                .values()
+                .any(|m| m.services.iter().any(|s| s.publish == Some(p) && s.protocol.is_tcp()))
         {
             add(&format!("{at}.publish"), format!("host port {p} is already published by a machine"));
         }

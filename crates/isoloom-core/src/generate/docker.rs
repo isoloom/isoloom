@@ -353,12 +353,14 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             .filter_map(|svc| {
                 // Ephemeral loopback host port by default (no collisions); ISOLOOM_PUBLISH_FIXED
                 // pins it to `publish` inside the docker-vm/cloud VMs that forward it.
+                // `<port>/udp` for a UDP service (Compose's default is TCP).
+                let proto = if svc.protocol.is_tcp() { "" } else { "/udp" };
                 svc.publish.map(|p| {
                     if svc.fixed {
-                        s(format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{p}:{port}", port = svc.port))
+                        s(format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{p}:{port}{proto}", port = svc.port))
                     } else {
                         s(format!(
-                            "${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{ISOLOOM_PUBLISH_FIXED:+{p}}}:{port}",
+                            "${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{ISOLOOM_PUBLISH_FIXED:+{p}}}:{port}{proto}",
                             port = svc.port
                         ))
                     }
@@ -487,12 +489,13 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             }
         }
         // What the machine serves, for tools reading the running containers (dashboards,
-        // runners): `isoloom.service.<name>: "<http|tcp>:<port>"`.
+        // runners): `isoloom.service.<name>: "<http|tcp|udp>:<port>"` (an unnamed UDP service's
+        // key is `<port>-udp`, so a port served over both keeps both).
         if !m.services.is_empty() {
             let mut labels = Mapping::new();
             for sv in &m.services {
-                let key = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
-                let kind = if sv.http { "http" } else { "tcp" };
+                let key = sv.label();
+                let kind = if sv.http { "http" } else { sv.protocol.id() };
                 labels.insert(s(format!("isoloom.service.{key}")), s(format!("{kind}:{}", sv.port)));
             }
             svc.insert(s("labels"), Value::Mapping(labels));

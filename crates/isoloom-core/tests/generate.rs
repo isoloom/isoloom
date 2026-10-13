@@ -893,6 +893,105 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
     );
 }
 
+#[test]
+fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
+    // dns serves 53 over UDP (published) and TCP; syslog serves UDP only; app waits for dns.
+    let spec = parse(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  far: { cidr: 10.9.1.0/24 }\nreach: [{ from: far, to: lab, ports: [53] }]\nmachines:\n  \
+         dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
+         syslog: { networks: { lab: 6 }, services: [{ port: 514, protocol: udp, publish: 1514 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
+         app: { networks: { far: 20 }, depends_on: [dns], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+    )
+    .unwrap();
+    assert_eq!(isoloom_core::validate(&spec), vec![]);
+
+    // Docker: published as `<port>/udp`, labelled udp, and the healthcheck probes TCP 53 only;
+    // a machine with only UDP services has none.
+    let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents(&generate(&spec, Target::Docker).unwrap(), ".isoloom/docker/compose.yml")).unwrap();
+    let svc = |n: &str| compose["services"][n].clone();
+    let ports = serde_yaml_ng::to_string(&svc("dns")["ports"]).unwrap();
+    assert!(ports.contains("+10053}:53/udp"), "{ports}");
+    assert_eq!(svc("dns")["labels"]["isoloom.service.53-udp"].as_str(), Some("udp:53"));
+    assert_eq!(svc("dns")["labels"]["isoloom.service.53"].as_str(), Some("tcp:53"));
+    let probe = serde_yaml_ng::to_string(&svc("dns")["healthcheck"]).unwrap();
+    assert!(probe.contains("127.0.0.1 53"), "{probe}");
+    assert!(svc("syslog").get("healthcheck").is_none());
+    assert!(serde_yaml_ng::to_string(&svc("syslog")["ports"]).unwrap().contains(":514/udp"));
+
+    // Kubernetes: UDP container ports and Service ports, named apart from the TCP one; the
+    // NetworkPolicy for `reach` already opens both protocols.
+    let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
+    assert!(
+        env.contains("- containerPort: 53\n          protocol: UDP\n        - containerPort: 53\n"),
+        "{env}"
+    );
+    assert!(env.contains("name: p53-udp") && env.contains("name: p53\n"), "{env}");
+    assert!(env.contains("name: p10053-udp"), "{env}");
+    assert!(!env.contains("127.0.0.1 514"), "{env}");
+
+    // Vagrant: forwarded as UDP; app waits for dns on TCP 53.
+    let vf = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(vf.contains("guest: 53, host: 10053, host_ip: \"127.0.0.1\", protocol: \"udp\""), "{vf}");
+    assert!(!vf.contains("/dev/tcp/syslog/514"), "{vf}");
+
+    // Proxmox: the router forwards the published port as UDP.
+    let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
+    assert!(tf.contains("udp dport 1514 dnat ip to 10.9.0.6:514"), "{tf}");
+    assert!(tf.contains("meta l4proto { tcp, udp } th dport { 53 } accept"), "{tf}");
+
+    // The clouds: published as UDP.
+    let aws = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
+    assert!(aws.contains("from_port   = 1514\n    to_port     = 1514\n    protocol    = \"udp\""), "{aws}");
+
+    // No derived check probes UDP (nothing tells an answer from a drop); TCP 53 is checked.
+    let plan = isoloom_core::checks::plan(&spec);
+    let names: Vec<&String> = plan.iter().map(|c| &c.name).collect();
+    assert!(names.iter().any(|n| *n == "dns:53 from app"), "{names:?}");
+    assert!(!names.iter().any(|n| n.contains(":514")), "{names:?}");
+
+    // The snapshot says so.
+    let snap = isoloom_core::resolved::resolve(&spec);
+    assert_eq!(snap["machines"]["dns"]["services"][0]["protocol"], "udp");
+    assert!(snap["machines"]["dns"]["services"][1].get("protocol").is_none());
+
+    // Depending on a machine with only UDP services waits for nothing: refused.
+    let mut bad = spec.clone();
+    bad.machines.get_mut("app").unwrap().depends_on = vec!["syslog".into()];
+    let problems: Vec<String> = isoloom_core::validate(&bad).iter().map(|p| p.to_string()).collect();
+    assert_eq!(
+        problems,
+        ["machines.app.depends_on[0]: `syslog`'s services are all UDP (no handshake to wait for), so there's nothing to wait for"]
+    );
+}
+
+#[test]
+fn a_udp_service_is_validated() {
+    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { networks: { lab: 5 }, docker: { image: x }, services: ";
+    let problems = |svcs: &str| -> Vec<String> {
+        isoloom_core::validate(&parse(&format!("{base}{svcs} }}\n")).unwrap())
+            .iter()
+            .map(|p| p.to_string())
+            .collect()
+    };
+    // One port over both protocols is two services; the same one twice isn't.
+    assert_eq!(problems("[{ port: 53, protocol: udp }, { port: 53, protocol: tcp }]"), Vec::<String>::new());
+    assert_eq!(
+        problems("[{ port: 53, protocol: udp }, { port: 53, protocol: udp }]"),
+        ["machines.a.services[1].port: port 53 (UDP) is listed twice"]
+    );
+    // A host port may be published once per protocol.
+    assert_eq!(
+        problems("[{ port: 53, protocol: udp, publish: 53 }, { port: 53, publish: 53 }]"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        problems("[{ port: 69, protocol: udp, http: true }]"),
+        ["machines.a.services[0]: `http` and `tls` run over TCP: a UDP service has neither"]
+    );
+    let err = parse(&format!("{base}[{{ port: 53, protocol: sctp }}] }}\n")).unwrap_err().to_string();
+    assert!(err.contains("sctp"), "{err}");
+}
+
 /// The block of one provider inside one VM's define, from the Vagrantfile.
 fn provider_block<'a>(vf: &'a str, vm: &str, provider: &str) -> &'a str {
     let start = vf.find(&format!("config.vm.define \"{vm}\"")).unwrap();

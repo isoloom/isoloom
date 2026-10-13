@@ -125,7 +125,7 @@ fn core() -> Format {
         (
             "config.vm.network forwarded_port",
             Emitted {
-                from: "machines.*.services[].publish (on the host's loopback)",
+                from: "machines.*.services[].publish (on the host's loopback; `protocol: \"udp\"` with `protocol: udp`)",
             },
         ),
         (

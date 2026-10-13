@@ -119,7 +119,7 @@ when a table disagrees with what Isoloom really generates.
 | `pid` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `pids_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `platform` | Yes | Yes | From `machines.*.arch` (pinned on every container, so the machine runs the same on an x86-64 or an ARM host) |
-| `ports` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback) |
+| `ports` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback; `/udp` with `protocol: udp`) |
 | `post_start` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
 | `pre_start` | Yes | Another way | Via machines.*.depends_on and docker.init |
 | `pre_stop` | n/a | No | Compose tooling, not the environment's behavior |
@@ -232,7 +232,7 @@ when a table disagrees with what Isoloom really generates.
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `private_network` | Yes | Yes | From `networks and machines.*.networks` |
-| `forwarded_port` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback) |
+| `forwarded_port` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback; `protocol: "udp"` with `protocol: udp`) |
 | `public_network` | Yes | Not yet | A network bridged to the outside (Compose `external`, a host bridge, a VPC) |
 
 ### Provisioners

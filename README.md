@@ -161,7 +161,7 @@ your own cloud account). Routers enforce `reach` between networks; a network can
 (WinRM, PowerShell steps), environment-level Ansible from a controller, and checks on every
 target. Your own image table (`--images`) sets OS images and supplies the access machine.
 
-Run for real in CI: Docker (hello-stack, air-gapped, segmented, edge-firewall, slow-link), Kubernetes on kind
+Run for real in CI: Docker (hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns), Kubernetes on kind
 (hello-stack, segmented). Run by hand: VirtualBox (several examples, Windows Server 2019).
 Generated and validated only: Proxmox, the clouds, ESXi.
 

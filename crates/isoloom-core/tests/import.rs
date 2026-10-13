@@ -112,6 +112,26 @@ fn published_ports_read_every_compose_form() {
 }
 
 #[test]
+fn udp_ports_are_imported_as_udp_services() {
+    let compose = "services:\n  dns:\n    image: x\n    ports: [\"5353:53/udp\", \"53:53\", { target: 69, published: 6969, protocol: udp }]\n    expose: [\"161/udp\"]\n  app:\n    image: x\n    depends_on: [dns]\n";
+    let d = draft(compose, "x", "compose.yaml").unwrap();
+    let spec = parse(&d.yaml).unwrap();
+    assert_eq!(validate(&spec), vec![], "{}", d.yaml);
+    let svc = |p: u16, udp: bool| {
+        spec.machines["dns"]
+            .services
+            .iter()
+            .find(|s| s.port == p && s.protocol.is_tcp() != udp)
+            .unwrap_or_else(|| panic!("{p} udp={udp}: {}", d.yaml))
+            .publish
+    };
+    assert_eq!(
+        (svc(53, true), svc(53, false), svc(69, true), svc(161, true)),
+        (Some(5353), Some(53), Some(6969), None)
+    );
+}
+
+#[test]
 fn a_key_set_twice_keeps_the_last_value_as_compose_does() {
     // secDevLabs camplake-api sets MONGO_PORT twice; Compose takes the last.
     let compose = "services:\n  api:\n    image: x\n    expose: [3000]\n    environment:\n      MONGO_PORT: 27017\n      MONGO_HOST: db\n      MONGO_PORT: \"27018\"\n      MONGO_PORT: 27019\n    expose: [8080]\n";
@@ -157,6 +177,21 @@ fn a_vagrantfile_with_a_loop_becomes_a_valid_spec() {
     assert_eq!(vm.image.as_ref().unwrap().vagrant.as_deref(), Some("ubuntu/jammy64"), "an unknown box is kept");
     assert_eq!(vm.provision, ["site.yml", "provision/web.sh"], "global provisioners run first");
     assert!(has(&d, NoteKind::InImage, "define web.vm.provision", "inline script"));
+}
+
+#[test]
+fn a_udp_forwarded_port_is_imported_as_a_udp_service() {
+    let mut rec = recorded("recorded.json");
+    let calls = rec["children"]["vm"]["calls"][1]["block"]["children"]["vm"]["calls"].as_array_mut().unwrap();
+    calls.insert(
+        2,
+        serde_json::json!({"name": "network", "args": ["forwarded_port", {"guest": 514, "host": 1514, "protocol": "udp"}], "block": null}),
+    );
+    let d = isoloom_core::import::vagrant::draft(&rec, "classic", "Vagrantfile").unwrap();
+    let spec = parse(&d.yaml).unwrap();
+    assert_eq!(validate(&spec), vec![], "{}", d.yaml);
+    let s = &spec.machines["web"].services[1];
+    assert_eq!((s.port, s.publish, s.protocol), (514, Some(1514), isoloom_core::model::Protocol::Udp));
 }
 
 #[test]

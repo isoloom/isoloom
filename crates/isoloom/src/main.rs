@@ -2229,7 +2229,7 @@ fn snapshot_of(dir: &std::path::Path, instance: Option<u8>, sets: &[String]) -> 
 
 /// The host ports an environment really got, for its message: local Docker publishes on free
 /// ports unless `ISOLOOM_PUBLISH_FIXED` pins them to the spec's; the other targets keep them.
-fn real_ports(dir: &std::path::Path, t: core::Target, instance: Option<u8>) -> Vec<(String, u16, u16)> {
+fn real_ports(dir: &std::path::Path, t: core::Target, instance: Option<u8>) -> Vec<(String, u16, core::model::Protocol, u16)> {
     if t != core::Target::Docker || std::env::var_os("ISOLOOM_PUBLISH_FIXED").is_some_and(|v| !v.is_empty()) {
         return Vec::new();
     }

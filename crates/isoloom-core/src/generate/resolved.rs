@@ -10,7 +10,7 @@ use serde_json::{Map, Value, json};
 use super::{GENERATED_TARGETS, GeneratedFile, address, docker_cidrs, on_docker, refusal, router, start_order};
 use crate::checks::{self, HttpExpect, Position, Probe, TcpExpect};
 use crate::images;
-use crate::model::{Spec, Target};
+use crate::model::{Protocol, Spec, Target};
 use crate::targets::{effective, missing, mixed};
 use crate::validate::Cidr;
 
@@ -109,6 +109,9 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
                     if s.dormant {
                         v["dormant"] = json!(true);
                     }
+                    if !s.protocol.is_tcp() {
+                        v["protocol"] = json!(s.protocol.id());
+                    }
                     v
                 }).collect::<Vec<_>>(),
                 "depends_on": m.depends_on,
@@ -144,9 +147,15 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
         .machines
         .iter()
         .flat_map(|(name, m)| {
-            m.services
-                .iter()
-                .filter_map(move |s| s.publish.map(|host| json!({ "machine": name, "port": s.port, "host_port": host })))
+            m.services.iter().filter_map(move |s| {
+                s.publish.map(|host| {
+                    let mut v = json!({ "machine": name, "port": s.port, "host_port": host });
+                    if !s.protocol.is_tcp() {
+                        v["protocol"] = json!(s.protocol.id());
+                    }
+                    v
+                })
+            })
         })
         .collect();
 
@@ -306,23 +315,29 @@ pub fn render_message_on(spec: &Spec, instance: Option<u8>, target: Target) -> R
 }
 
 /// [`render_message_on`] with the host ports the environment really got, as (machine, port,
-/// host port): local Docker publishes on free ports unless `ISOLOOM_PUBLISH_FIXED` is set, so
+/// protocol, host port): local Docker publishes on free ports unless `ISOLOOM_PUBLISH_FIXED` is set, so
 /// `{{ machines.web.services.0.publish }}` must say where it answers (see [`with_published`]).
-pub fn render_message_at(spec: &Spec, instance: Option<u8>, target: Target, published: &[(String, u16, u16)]) -> Result<Option<String>, String> {
+pub fn render_message_at(spec: &Spec, instance: Option<u8>, target: Target, published: &[(String, u16, Protocol, u16)]) -> Result<Option<String>, String> {
     let Some(m) = &spec.message else { return Ok(None) };
     fill(m, &with_published(on_target(resolve_with(spec, instance), target), published)).map(Some)
 }
 
-/// The snapshot with the host ports the environment really got, as (machine, port, host
-/// port): each service's `publish` and the `published` list's `host_port`.
-pub fn with_published(mut snapshot: Value, published: &[(String, u16, u16)]) -> Value {
-    for (machine, port, host) in published {
+/// The snapshot with the host ports the environment really got, as (machine, port, protocol,
+/// host port): each service's `publish` and the `published` list's `host_port`.
+pub fn with_published(mut snapshot: Value, published: &[(String, u16, Protocol, u16)]) -> Value {
+    // A service without `protocol` in the snapshot is TCP.
+    let same = |v: &Value, port: u16, proto: Protocol| v["port"] == port && v["protocol"].as_str().unwrap_or("tcp") == proto.id();
+    for (machine, port, proto, host) in published {
         let services = snapshot.pointer_mut(&format!("/machines/{machine}/services")).and_then(Value::as_array_mut);
-        for s in services.into_iter().flatten().filter(|s| s["port"] == *port) {
+        for s in services.into_iter().flatten().filter(|s| same(s, *port, *proto)) {
             s["publish"] = (*host).into();
         }
         let listed = snapshot.get_mut("published").and_then(Value::as_array_mut);
-        for p in listed.into_iter().flatten().filter(|p| p["machine"] == machine.as_str() && p["port"] == *port) {
+        for p in listed
+            .into_iter()
+            .flatten()
+            .filter(|p| p["machine"] == machine.as_str() && same(p, *port, *proto))
+        {
             p["host_port"] = (*host).into();
         }
     }

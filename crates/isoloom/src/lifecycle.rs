@@ -119,10 +119,11 @@ pub fn compose_files(dir: &Path, instance: Option<u8>) -> Vec<String> {
     }
 }
 
-/// The host ports a local Docker environment really got, as (machine, port, host port): its
+/// The host ports a local Docker environment really got, as (machine, port, protocol, host
+/// port): its
 /// Compose file publishes on free loopback ports unless `ISOLOOM_PUBLISH_FIXED` is set, so the
 /// spec's `publish:` values aren't where it answers. Empty when Compose can't say.
-pub fn docker_published(dir: &Path, instance: Option<u8>) -> Vec<(String, u16, u16)> {
+pub fn docker_published(dir: &Path, instance: Option<u8>) -> Vec<(String, u16, core::model::Protocol, u16)> {
     let Ok(out) = Command::new("docker")
         .arg("compose")
         .args(compose_files(dir, instance))
@@ -140,18 +141,27 @@ pub fn docker_published(dir: &Path, instance: Option<u8>) -> Vec<(String, u16, u
     published_of(&items)
 }
 
-/// (service, container port, host port) for each port `docker compose ps` lists as published.
-fn published_of(items: &[serde_json::Value]) -> Vec<(String, u16, u16)> {
+/// (service, container port, protocol, host port) for each port `docker compose ps` lists as
+/// published.
+fn published_of(items: &[serde_json::Value]) -> Vec<(String, u16, core::model::Protocol, u16)> {
+    use core::model::Protocol;
     let mut found = Vec::new();
     for i in items {
         let Some(service) = i["Service"].as_str() else { continue };
         for p in i["Publishers"].as_array().into_iter().flatten() {
             let port = p["TargetPort"].as_u64().and_then(|n| u16::try_from(n).ok());
             let host = p["PublishedPort"].as_u64().and_then(|n| u16::try_from(n).ok()).filter(|h| *h != 0);
+            let proto = if p["Protocol"].as_str() == Some("udp") {
+                Protocol::Udp
+            } else {
+                Protocol::Tcp
+            };
             if let (Some(port), Some(host)) = (port, host)
-                && !found.iter().any(|(s, c, _): &(String, u16, u16)| s == service && *c == port)
+                && !found
+                    .iter()
+                    .any(|(s, c, pr, _): &(String, u16, Protocol, u16)| s == service && *c == port && *pr == proto)
             {
-                found.push((service.to_string(), port, host));
+                found.push((service.to_string(), port, proto, host));
             }
         }
     }
@@ -1089,10 +1099,19 @@ mod tests {
     fn published_ports_come_from_compose_ps() {
         let items: Vec<serde_json::Value> = serde_json::from_str(
             r#"[{"Service":"web","Publishers":[{"URL":"127.0.0.1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"},{"URL":"::1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"}]},
+                {"Service":"dns","Publishers":[{"URL":"127.0.0.1","TargetPort":53,"PublishedPort":32780,"Protocol":"udp"},{"URL":"127.0.0.1","TargetPort":53,"PublishedPort":32781,"Protocol":"tcp"}]},
                 {"Service":"cache","Publishers":[{"URL":"","TargetPort":6379,"PublishedPort":0,"Protocol":"tcp"}]},
                 {"Service":"isoloom-check"}]"#,
         )
         .unwrap();
-        assert_eq!(published_of(&items), [("web".to_string(), 80, 32772)]);
+        use isoloom_core::model::Protocol;
+        assert_eq!(
+            published_of(&items),
+            [
+                ("web".to_string(), 80, Protocol::Tcp, 32772),
+                ("dns".to_string(), 53, Protocol::Udp, 32780),
+                ("dns".to_string(), 53, Protocol::Tcp, 32781)
+            ]
+        );
     }
 }

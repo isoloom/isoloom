@@ -7,17 +7,18 @@
 use std::fmt::Write;
 
 use super::super::cloud_vm::{
-    CONTROLLER_OS, aligned, cidr, has_windows, hcl_cmd, inventory, linux_setup_cmds, needs_controller, redirects, remote_exec, tf_expr,
+    CONTROLLER_OS, aligned, cidr, has_windows, hcl_cmd, inventory, linux_setup_cmds, needs_controller, redirects, remote_exec, tf_expr, windows_firewall,
+    windows_udp_redirect,
 };
 use super::super::proxmox::{hcl, res};
 use super::super::{GeneratedFile, OUTPUT_DIR, address, address_for, header, start_order};
-use crate::model::Spec;
+use crate::model::{Protocol, Spec};
 use crate::shell;
 
 /// Azure matches AWS's model (static private IPs, multi-NIC machines, Windows, a controller),
-/// so nothing is refused here. The global `cloud_vm::unsupported` gate still applies.
-pub(super) fn refusal(_spec: &Spec) -> Option<String> {
-    None
+/// so nothing else is refused here. The global `cloud_vm::unsupported` gate still applies.
+pub(super) fn refusal(spec: &Spec) -> Option<String> {
+    windows_udp_redirect(spec)
 }
 
 /// The Azure Marketplace image for an OS name: (publisher, offer, sku). Azure sets the admin
@@ -231,8 +232,15 @@ resource "azurerm_virtual_network" "env" {{
         let redirects = redirects(m);
         for sv in &m.services {
             if let Some(h) = sv.publish {
-                inbound(&mut sg, &mut prio, &format!("published-{h}"), "Tcp", &h.to_string(), "var.allowed_cidr");
-                let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+                inbound(
+                    &mut sg,
+                    &mut prio,
+                    &published_rule(h, sv.protocol),
+                    azure_protocol(sv.protocol),
+                    &h.to_string(),
+                    "var.allowed_cidr",
+                );
+                let label = sv.label();
                 published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
             }
         }
@@ -308,6 +316,16 @@ resource "azurerm_virtual_network" "env" {{
 }
 
 /// One inbound allow rule in a network security group.
+/// A published port's rule name, unique per protocol.
+fn published_rule(h: u16, p: Protocol) -> String {
+    if p.is_tcp() { format!("published-{h}") } else { format!("published-{h}-udp") }
+}
+
+/// A rule's protocol as Azure writes it.
+fn azure_protocol(p: Protocol) -> &'static str {
+    if p.is_tcp() { "Tcp" } else { "Udp" }
+}
+
 fn inbound(sg: &mut String, prio: &mut u32, name: &str, proto: &str, port: &str, src: &str) {
     let _ = write!(
         sg,
@@ -520,6 +538,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
         } else {
             for p in &r.ports {
                 inbound(&mut sg, &mut prio, &format!("reach-{ri}-{}-{p}", r.from), "Tcp", &p.to_string(), &from);
+                inbound(&mut sg, &mut prio, &format!("reach-{ri}-{}-{p}-udp", r.from), "Udp", &p.to_string(), &from);
             }
         }
     }
@@ -532,10 +551,17 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
     ];
     for sv in &m.services {
         if let Some(h) = sv.publish {
-            inbound(&mut sg, &mut prio, &format!("published-{h}"), "Tcp", &h.to_string(), "var.allowed_cidr");
-            let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+            inbound(
+                &mut sg,
+                &mut prio,
+                &published_rule(h, sv.protocol),
+                azure_protocol(sv.protocol),
+                &h.to_string(),
+                "var.allowed_cidr",
+            );
+            let label = sv.label();
             published_out.push((format!("\"{name}/{label}\""), format!("\"${{azurerm_public_ip.{id}.ip_address}}:{h}\"")));
-            if h != sv.port {
+            if h != sv.port && sv.protocol.is_tcp() {
                 ps.push(format!(
                     "netsh interface portproxy add v4tov4 listenport={h} listenaddress=0.0.0.0 connectport={p} connectaddress=127.0.0.1 | Out-Null",
                     p = sv.port
@@ -578,15 +604,7 @@ fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32
         ));
     }
     for sv in &m.services {
-        ps.push(format!(
-            "New-NetFirewallRule -DisplayName 'isoloom {p}' -Direction Inbound -Protocol TCP -LocalPort {p} -Action Allow | Out-Null",
-            p = sv.port
-        ));
-        if let Some(h) = sv.publish.filter(|h| *h != sv.port) {
-            ps.push(format!(
-                "New-NetFirewallRule -DisplayName 'isoloom {h}' -Direction Inbound -Protocol TCP -LocalPort {h} -Action Allow | Out-Null"
-            ));
-        }
+        ps.extend(windows_firewall(sv));
     }
     ps.push("New-Item -ItemType Directory -Force C:\\ProgramData\\isoloom | Out-Null; Set-Content C:\\ProgramData\\isoloom\\ready 'ready'".into());
 

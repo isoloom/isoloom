@@ -10,6 +10,7 @@ use serde_yaml_ng::{Mapping, Value};
 
 use super::{Draft, Note, NoteKind};
 use crate::coverage::{Support, compose};
+use crate::model::Protocol;
 use crate::validate::Cidr;
 
 /// Where re-addressed networks go: 10.88.<n>.0/24.
@@ -28,9 +29,9 @@ struct Net {
 struct Machine {
     name: String,
     networks: Vec<(String, u8)>,
-    ports: BTreeSet<u16>,
+    ports: BTreeSet<(u16, Protocol)>,
     /// Container port -> host port it's published on.
-    publish: IndexMap<u16, u16>,
+    publish: IndexMap<(u16, Protocol), u16>,
     inputs: BTreeSet<String>,
     cpus: Option<u32>,
     memory_mb: Option<u32>,
@@ -99,11 +100,29 @@ fn input_name(s: &str) -> Option<String> {
     ok.then(|| s.to_string())
 }
 
-/// Container ports from Compose `ports` (`"8080:80"`, `"127.0.0.1:8080:80/tcp"`, `80`,
-/// `{ target: 80 }`) and `expose`; ranges are expanded up to 32 ports.
-fn container_ports(v: &Value) -> Result<Vec<u16>, String> {
+/// A container port and its protocol.
+type PortKey = (u16, Protocol);
+
+/// The protocol of a `ports` / `expose` entry: `53/udp`, `{ protocol: udp }`, else TCP.
+fn port_protocol(item: &Value) -> Protocol {
+    let p = match item {
+        Value::Mapping(m) => m.get("protocol").and_then(str_of).unwrap_or_default(),
+        other => str_of(other)
+            .unwrap_or_default()
+            .rsplit_once('/')
+            .map(|(_, p)| p.to_string())
+            .unwrap_or_default(),
+    };
+    if p.eq_ignore_ascii_case("udp") { Protocol::Udp } else { Protocol::Tcp }
+}
+
+/// Container ports from Compose `ports` (`"8080:80"`, `"127.0.0.1:8080:80/tcp"`, `"53:53/udp"`,
+/// `80`, `{ target: 80, protocol: udp }`) and `expose`, with their protocol; ranges are expanded
+/// up to 32 ports.
+fn container_ports(v: &Value) -> Result<Vec<(u16, Protocol)>, String> {
     let mut out = Vec::new();
     for item in v.as_sequence().into_iter().flatten() {
+        let proto = port_protocol(item);
         let spec = match item {
             Value::Mapping(m) => m.get("target").and_then(str_of).unwrap_or_default(),
             other => str_of(other).unwrap_or_default(),
@@ -115,7 +134,7 @@ fn container_ports(v: &Value) -> Result<Vec<u16>, String> {
             None => (container.parse::<u16>(), container.parse::<u16>()),
         };
         match (lo, hi) {
-            (Ok(lo), Ok(hi)) if lo <= hi && hi - lo < 32 => out.extend(lo..=hi),
+            (Ok(lo), Ok(hi)) if lo <= hi && hi - lo < 32 => out.extend((lo..=hi).map(|p| (p, proto))),
             _ => return Err(spec),
         }
     }
@@ -125,7 +144,7 @@ fn container_ports(v: &Value) -> Result<Vec<u16>, String> {
 /// Container port -> host port, for `ports` entries with a fixed host port (`8080:80`,
 /// `127.0.0.1:8080:80`, `${WEB_PORT:-8080}:80`, `{ target: 80, published: 8080 }`); entries
 /// with none (`80`, a variable without a default, a range) come back as text.
-fn published_ports(v: &Value) -> (Vec<(u16, u16)>, Vec<String>) {
+fn published_ports(v: &Value) -> (Vec<(PortKey, u16)>, Vec<String>) {
     let mut found = Vec::new();
     let mut unknown = Vec::new();
     // `${NAME:-8080}` -> 8080; a plain number as is.
@@ -167,7 +186,7 @@ fn published_ports(v: &Value) -> (Vec<(u16, u16)>, Vec<String>) {
             }
         };
         match (container, host) {
-            (Some(c), Some(h)) if h > 0 => found.push((c, h)),
+            (Some(c), Some(h)) if h > 0 => found.push(((c, port_protocol(item)), h)),
             _ => unknown.push(flat(item)),
         }
     }
@@ -907,7 +926,12 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
     }
 
     // depends_on needs something to wait for.
-    let with_ports: BTreeSet<String> = machines.iter().filter(|m| !m.ports.is_empty()).map(|m| m.name.clone()).collect();
+    // A UDP port has no handshake to wait for.
+    let with_ports: BTreeSet<String> = machines
+        .iter()
+        .filter(|m| m.ports.iter().any(|(_, p)| p.is_tcp()))
+        .map(|m| m.name.clone())
+        .collect();
     let drafted: BTreeSet<String> = machines.iter().map(|m| m.name.clone()).collect();
     for m in &mut machines {
         let (keep, drop): (Vec<String>, Vec<String>) = m.depends_on.drain(..).partition(|d| with_ports.contains(d));
@@ -920,7 +944,7 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
                 &mut notes,
                 format!("machines.{}.depends_on", m.name),
                 NoteKind::Changed,
-                format!("`{d}` has no known port, so there's nothing to wait for; add its `services` and the dependency back"),
+                format!("`{d}` has no known TCP port (UDP has no handshake), so there's nothing to wait for; add its `services` and the dependency back"),
             );
         }
     }
@@ -955,9 +979,13 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
             let ports = m
                 .ports
                 .iter()
-                .map(|p| match m.publish.get(p) {
-                    Some(h) => format!("{{ port: {p}, publish: {h} }}"),
-                    None => format!("{{ port: {p} }}"),
+                .map(|key| {
+                    let (p, proto) = key;
+                    let udp = if proto.is_tcp() { "" } else { ", protocol: udp" };
+                    match m.publish.get(key) {
+                        Some(h) => format!("{{ port: {p}{udp}, publish: {h} }}"),
+                        None => format!("{{ port: {p}{udp} }}"),
+                    }
                 })
                 .collect::<Vec<_>>()
                 .join(", ");

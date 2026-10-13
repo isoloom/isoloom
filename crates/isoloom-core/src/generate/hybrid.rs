@@ -18,7 +18,7 @@ use std::fmt::Write;
 use serde_yaml_ng::{Mapping, Value};
 
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, header, router};
-use crate::model::{Spec, Target};
+use crate::model::{Protocol, Spec, Target};
 use crate::validate::Cidr;
 
 const DIR: &str = "hybrid";
@@ -100,7 +100,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         // In the spec's order.
         spec.networks.keys().filter(|k| n.contains(k)).cloned().collect()
     };
-    let mut published: Vec<String> = Vec::new();
+    let mut published: Vec<(String, Protocol)> = Vec::new();
     if let Some(Value::Mapping(services)) = doc.get_mut("services") {
         services.remove(Value::String(router::NAME.into()));
         let names: Vec<String> = services.keys().filter_map(|k| k.as_str().map(str::to_string)).collect();
@@ -121,7 +121,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                     // which Vagrant forwards to this machine's loopback.
                     let Some((rest, port)) = text.rsplit_once(':') else { continue };
                     let host = rest.rsplit_once(":+").and_then(|(_, h)| h.strip_suffix('}')).unwrap_or(rest);
-                    published.push(host.to_string());
+                    let protocol = if port.ends_with("/udp") { Protocol::Udp } else { Protocol::Tcp };
+                    published.push((host.to_string(), protocol));
                     *p = Value::String(format!("{host}:{port}"));
                 }
                 if let Some(Value::Mapping(nets)) = svc.get_mut("networks") {
@@ -174,10 +175,11 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         rb(HOST),
         rb(HOST)
     );
-    for host_port in &published {
+    for (host_port, protocol) in &published {
         let _ = writeln!(
             host,
-            "    m.vm.network \"forwarded_port\", guest: {host_port}, host: {host_port}, host_ip: \"127.0.0.1\""
+            "    m.vm.network \"forwarded_port\", guest: {host_port}, host: {host_port}, host_ip: \"127.0.0.1\"{}",
+            super::vagrant::forwarded_protocol(*protocol)
         );
     }
     let mut nics = String::new();

@@ -188,9 +188,10 @@ resource "digitalocean_firewall" "{id}" {{
         if let Some(h) = sv.publish {
             let _ = write!(
                 tf,
-                "  inbound_rule {{\n    protocol         = \"tcp\"\n    port_range       = \"{h}\"\n    source_addresses = [var.allowed_cidr]\n  }}\n"
+                "  inbound_rule {{\n    protocol         = \"{proto}\"\n    port_range       = \"{h}\"\n    source_addresses = [var.allowed_cidr]\n  }}\n",
+                proto = sv.protocol.id()
             );
-            let label = sv.name.clone().unwrap_or_else(|| sv.port.to_string());
+            let label = sv.label();
             published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
         }
     }

@@ -315,13 +315,59 @@ pub struct Service {
     /// readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub dormant: bool,
+    /// `tcp` (default) or `udp` (DNS, SNMP, TFTP, syslog): published, forwarded and opened as
+    /// UDP. UDP has no handshake, so nothing waits for it (healthcheck, readiness probe,
+    /// `depends_on`) and no derived check probes it: a check of your own says how (`exec: dig`).
+    /// A port served over both is two services, one per protocol.
+    #[serde(default, skip_serializing_if = "Protocol::is_tcp")]
+    pub protocol: Protocol,
+}
+
+/// A service's transport protocol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Protocol {
+    /// TCP, the default.
+    #[default]
+    Tcp,
+    /// UDP.
+    Udp,
+}
+
+impl Protocol {
+    /// `tcp` or `udp`, as Compose, Vagrant, nftables and Terraform providers write it.
+    pub fn id(self) -> &'static str {
+        match self {
+            Protocol::Tcp => "tcp",
+            Protocol::Udp => "udp",
+        }
+    }
+
+    pub fn is_tcp(&self) -> bool {
+        *self == Protocol::Tcp
+    }
+}
+
+impl Service {
+    /// How outputs name it: its `name`, else its port (`<port>-udp` for UDP, so a port served
+    /// over both protocols keeps two names).
+    pub fn label(&self) -> String {
+        self.name.clone().unwrap_or_else(|| {
+            if self.protocol.is_tcp() {
+                self.port.to_string()
+            } else {
+                format!("{}-udp", self.port)
+            }
+        })
+    }
 }
 
 impl Machine {
-    /// The ports Isoloom waits for before the machine counts as ready: its services but the
-    /// dormant ones. Empty: nothing to probe (no healthcheck, no readiness probe).
+    /// The ports Isoloom waits for before the machine counts as ready: its TCP services but the
+    /// dormant ones (UDP has no handshake to probe). Empty: nothing to probe (no healthcheck, no
+    /// readiness probe).
     pub fn ready_ports(&self) -> Vec<u16> {
-        self.services.iter().filter(|s| !s.dormant).map(|s| s.port).collect()
+        self.services.iter().filter(|s| !s.dormant && s.protocol.is_tcp()).map(|s| s.port).collect()
     }
 }
 

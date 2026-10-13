@@ -65,7 +65,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             if let Some(host) = svc.publish {
                 let _ = writeln!(
                     out,
-                    "  config.vm.network \"forwarded_port\", guest: {host}, host: {host}, host_ip: \"127.0.0.1\""
+                    "  config.vm.network \"forwarded_port\", guest: {host}, host: {host}, host_ip: \"127.0.0.1\"{}",
+                    super::vagrant::forwarded_protocol(svc.protocol)
                 );
             }
         }

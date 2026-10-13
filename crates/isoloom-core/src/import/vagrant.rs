@@ -18,7 +18,8 @@ struct Machine {
     os: String,
     image: Option<(String, Option<String>)>,
     networks: Vec<(String, u8)>,
-    publish: Vec<(u16, u16)>,
+    /// (guest port, host port, UDP).
+    publish: Vec<(u16, u16, bool)>,
     cpus: Option<u32>,
     memory_mb: Option<u32>,
     provision: Vec<String>,
@@ -205,7 +206,10 @@ pub fn draft(recorded: &Value, fallback_name: &str, source: &str) -> Result<Draf
                         continue;
                     }
                     match (number(opt("guest")), number(opt("host"))) {
-                        (Some(g), Some(h)) => m.publish.push((g as u16, h as u16)),
+                        (Some(g), Some(h)) => {
+                            let udp = text(opt("protocol")).is_some_and(|p| p.eq_ignore_ascii_case("udp"));
+                            m.publish.push((g as u16, h as u16, udp))
+                        }
                         _ => note(
                             &mut notes,
                             format!("{at}.vm.network"),
@@ -375,7 +379,10 @@ pub fn draft(recorded: &Value, fallback_name: &str, source: &str) -> Result<Draf
             let svcs = m
                 .publish
                 .iter()
-                .map(|(g, h)| format!("{{ port: {g}, publish: {h} }}"))
+                .map(|(g, h, udp)| {
+                    let proto = if *udp { ", protocol: udp" } else { "" };
+                    format!("{{ port: {g}{proto}, publish: {h} }}")
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             let _ = writeln!(y, "    services: [{svcs}]");

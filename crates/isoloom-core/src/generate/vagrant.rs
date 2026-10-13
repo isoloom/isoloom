@@ -204,13 +204,14 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 rb(&netname),
             );
         }
-        // Published services: forwarded from the host's loopback only.
+        // Published services: forwarded from the host's loopback only (UDP ones as UDP).
         for svc in &m.services {
             if let Some(host) = svc.publish {
                 let _ = writeln!(
                     out,
-                    "    m.vm.network \"forwarded_port\", guest: {}, host: {host}, host_ip: \"127.0.0.1\"",
-                    svc.port
+                    "    m.vm.network \"forwarded_port\", guest: {}, host: {host}, host_ip: \"127.0.0.1\"{}",
+                    svc.port,
+                    forwarded_protocol(svc.protocol)
                 );
             }
         }
@@ -1224,6 +1225,11 @@ run_play() {
   done
 }
 "#;
+
+/// A `forwarded_port`'s protocol option: nothing for TCP (Vagrant's default), `protocol: "udp"`.
+pub(super) fn forwarded_protocol(p: crate::model::Protocol) -> &'static str {
+    if p.is_tcp() { "" } else { ", protocol: \"udp\"" }
+}
 
 // The retry helpers run on the Linux controller VM; the test drives them with a POSIX `sh`.
 #[cfg(all(test, unix))]
