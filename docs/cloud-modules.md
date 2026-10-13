@@ -83,6 +83,7 @@ and outputs are whatever it declares. Under `.isoloom/cloud-services/`, Isoloom 
 | File | What |
 |---|---|
 | `terraform.tfvars.json` | The fixed values of `cloud.vars`. |
+| `isoloom-instance` | Written by `isoloom run`: this deployment's name, passed to Terraform as `TF_VAR_isoloom_instance` (see below). |
 | `inputs.tfvars.json` | Written by `isoloom run`: each variable whose value holds `{{ inputs.NAME }}` (in a string, at any depth: `["{{ inputs.PLAYER_IP }}/32"]`), filled from the environment variable `NAME`. It is kept for `down` and is mode 0600. |
 | `up.sh` | Copies the module to `module/`, runs the `cloud.before` steps, then `terraform init` and `apply` on the copy, with both variable files. |
 | `down.sh` | `terraform destroy` on the copy, with the same variables. |
@@ -98,6 +99,34 @@ it. `down` destroys with the copy as it was applied, and copies the module again
 steps) only when it is gone. The state (`terraform.tfstate`) and the provider plugins
 (`.terraform/`) stay in `.isoloom/cloud-services/` too. While `up.sh` applies, `deploying`
 holds its process id: `isoloom status` says `deploying` until the apply ends.
+
+### Tags and leftovers
+
+`isoloom run` names each deployment (`isoloom-<environment>[-<instance>]-<8 hex>`, kept in
+`isoloom-instance` next to the state) and the scripts pass it to Terraform as
+`TF_VAR_isoloom_instance`. A module that declares the variable can tag what it creates with it,
+on AWS with the provider's `default_tags`:
+
+```hcl
+variable "isoloom_instance" {
+  type    = string
+  default = ""
+}
+
+provider "aws" {
+  default_tags {
+    tags = { "isoloom-instance" = var.isoloom_instance }
+  }
+}
+```
+
+After `terraform destroy`, `isoloom down` (AWS, with the `aws` CLI installed) asks the Resource
+Groups Tagging API for anything still tagged `isoloom-instance=<that name>`: what AWS created
+outside Terraform (log groups, service-linked roles) or is still deleting (secrets pending
+deletion). It lists their ARNs and deletes nothing. The region is `AWS_REGION` or
+`AWS_DEFAULT_REGION` from `cloud.env`, else `cloud.vars.region`, else the CLI's own. The name is
+forgotten once nothing is left, so the next `run` gets a new one. Only tagged resources are
+found, and only in that region.
 
 `cloud.outputs` maps names to module outputs. Checks and the message use them as
 `{{ cloud.outputs.<name> }}`.

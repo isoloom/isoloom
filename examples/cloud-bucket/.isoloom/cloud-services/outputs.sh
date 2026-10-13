@@ -7,6 +7,7 @@ set -eu
 cd "$(dirname "$0")"
 here="$(pwd)"
 export TF_DATA_DIR="$here/.terraform"
+[ ! -f "$here/isoloom-instance" ] || export TF_VAR_isoloom_instance="$(cat "$here/isoloom-instance")"
 src='../../terraform'
 module="$here/module"
 [ -d "$module" ] || module="$src"

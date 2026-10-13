@@ -29,6 +29,14 @@ fn terraform_runs_on_a_copy_of_the_module() {
     assert!(up.contains("terraform -chdir=\"$module\" init"), "{up}");
     assert!(up.contains("terraform -chdir=\"$module\" apply -auto-approve"), "{up}");
     assert!(!up.contains("until"), "no retries by default: {up}");
+    // The deployment's name, for the module's tags.
+    for f in ["up.sh", "down.sh", "outputs.sh"] {
+        let text = script(&s, f);
+        assert!(
+            text.contains("[ ! -f \"$here/isoloom-instance\" ] || export TF_VAR_isoloom_instance=\"$(cat \"$here/isoloom-instance\")\"\n"),
+            "{f}: {text}"
+        );
+    }
     // The apply's marker, for `status`.
     assert!(up.contains("echo $$ > \"$here/deploying\"\ntrap 'rm -f \"$here/deploying\"' EXIT\n"), "{up}");
     // Destroy copies the module only when its copy is gone (what the steps wrote there stays).

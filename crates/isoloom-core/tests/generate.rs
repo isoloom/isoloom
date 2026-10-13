@@ -31,9 +31,10 @@ fn is_run_artifact(rel: &str) -> bool {
     rel.split('/').any(|c| c == ".terraform" || c == ".vagrant")
         || rel.ends_with(".terraform.lock.hcl")
         || rel.contains(".tfstate")
-        // cloud-services: the module's copy, the launch-time inputs, the apply's marker.
+        // cloud-services: the module's copy, the launch-time inputs, the apply's marker, the
+        // deployment's name.
         || rel.contains("/cloud-services/module/")
-        || ["inputs.tfvars.json", "deploying"].iter().any(|f| rel.ends_with(&format!("/cloud-services/{f}")))
+        || ["inputs.tfvars.json", "deploying", "isoloom-instance"].iter().any(|f| rel.ends_with(&format!("/cloud-services/{f}")))
 }
 
 /// Every file under `dir`, as paths relative to `base` with `/` separators.

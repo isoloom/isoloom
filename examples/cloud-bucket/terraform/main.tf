@@ -11,10 +11,16 @@ variable "region" {
   default = "us-east-1"
 }
 
+# Set by Isoloom for each deployment, so `isoloom down` can list what is left with its tag.
+variable "isoloom_instance" {
+  type    = string
+  default = ""
+}
+
 provider "aws" {
   region = var.region
   default_tags {
-    tags = { "isoloom-environment" = "cloud-bucket", "managed-by" = "isoloom" }
+    tags = { "isoloom-environment" = "cloud-bucket", "managed-by" = "isoloom", "isoloom-instance" = var.isoloom_instance }
   }
 }
 
