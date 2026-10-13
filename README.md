@@ -113,8 +113,9 @@ Administrators); `isoloom doctor` says whether Hyper-V is on and usable from you
 first adapter is on `ISOLOOM_HYPERV_SWITCH` (default: the Default Switch, which Windows Server
 doesn't have); each network becomes a private switch `isoloom-<env>-<network>` (between the VMs
 only, removed with the last VM), and each machine's fixed address there is set inside the guest.
-Published ports aren't forwarded to the host's loopback on Hyper-V (Vagrant can't): reach them at
-the VM's address on the first switch. OS names without a Hyper-V box (debian-13, ubuntu-14.04,
+Published ports aren't forwarded to the host's loopback on Hyper-V (Vagrant can't): `vagrant up`
+warns with the VM's address to use instead, and `isoloom report services` says so when Hyper-V is
+the provider (the defaults' `vagrant.provider`, or `VAGRANT_DEFAULT_PROVIDER`). OS names without a Hyper-V box (debian-13, ubuntu-14.04,
 fedora-42) need `vm.image.hyperv`.
 
 Checks come in three kinds, and `isoloom test` runs them all from inside the environment:

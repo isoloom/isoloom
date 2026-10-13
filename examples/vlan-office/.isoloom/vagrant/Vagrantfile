@@ -322,7 +322,8 @@ PS1
 #   internal network), created when missing and removed with the environment's last VM;
 # - each VM has an adapter there with a fixed MAC, attached before every start (Vagrant has
 #   just connected them all to the first switch), and its address set in the guest once it
-#   answers (a boot-time unit on Linux, a static address on Windows).
+#   answers (a boot-time unit on Linux, a static address on Windows);
+# - published ports aren't forwarded to the host (Hyper-V can't): a warning says where they are.
 HYPERV_SWITCH = ENV.fetch("ISOLOOM_HYPERV_SWITCH", "Default Switch")
 module IsoloomHyperV
   def self.fail!(message)
@@ -360,9 +361,17 @@ module IsoloomHyperV
     }).join("; "))
   end
 
-  # Once the guest answers (before its provisioning): its addresses on the networks.
+  # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
+  # answers, before its provisioning: its addresses on the networks.
   def self.address(machine, script)
+    fail!("#{machine.name} didn't answer within #{machine.config.vm.boot_timeout} s") unless machine.communicate.wait_for_ready(machine.config.vm.boot_timeout)
     machine.communicate.sudo(script)
+  end
+
+  # Hyper-V forwards no ports: where the published ones (guest => host) are instead.
+  def self.ports(machine, ports)
+    ip = (machine.ssh_info || {})[:host] || "the VM's address"
+    machine.ui.warn("Hyper-V forwards no ports to this host: " + ports.map { |guest, host| "127.0.0.1:#{host} isn't there, use #{ip}:#{guest}" }.join("; "))
   end
 
   # After a VM is deleted: the networks' switches no VM uses any more.
@@ -454,9 +463,9 @@ Vagrant.configure("2") do |config|
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
       t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-office-vlan10", "0215940671E7"], ["isoloom-vlan-office-office-vlan20", "021501FED04C"], ["isoloom-vlan-office-servers", "0215DE785C18"]]) }
     end
-    m.trigger.before :"Vagrant::Action::Builtin::SetHostname", type: :action do |t|
+    m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
-        IsoloomHyperV.address(machine, <<~'SH') if machine.provider_name == :hyperv
+        IsoloomHyperV.address(machine, <<~'SH')
           set -e
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/lab-net.sh <<'NET'
@@ -474,9 +483,11 @@ Vagrant.configure("2") do |config|
             echo "isoloom: no network adapter with MAC $1" >&2
             return 1
           }
-          lab 02:15:94:06:71:e7 10.70.10.254/24
-          lab 02:15:01:fe:d0:4c 10.70.20.254/24
-          lab 02:15:de:78:5c:18 10.70.99.254/24
+          rc=0
+          lab 02:15:94:06:71:e7 10.70.10.254/24 || rc=1
+          lab 02:15:01:fe:d0:4c 10.70.20.254/24 || rc=1
+          lab 02:15:de:78:5c:18 10.70.99.254/24 || rc=1
+          exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
@@ -608,9 +619,9 @@ Vagrant.configure("2") do |config|
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
       t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-servers", "0215A0BD8F2E"]]) }
     end
-    m.trigger.before :"Vagrant::Action::Builtin::SetHostname", type: :action do |t|
+    m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
-        IsoloomHyperV.address(machine, <<~'SH') if machine.provider_name == :hyperv
+        IsoloomHyperV.address(machine, <<~'SH')
           set -e
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/lab-net.sh <<'NET'
@@ -628,7 +639,9 @@ Vagrant.configure("2") do |config|
             echo "isoloom: no network adapter with MAC $1" >&2
             return 1
           }
-          lab 02:15:a0:bd:8f:2e 10.70.99.10/24
+          rc=0
+          lab 02:15:a0:bd:8f:2e 10.70.99.10/24 || rc=1
+          exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
@@ -804,9 +817,9 @@ Vagrant.configure("2") do |config|
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
       t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-office-vlan10", "021553776EDC"]]) }
     end
-    m.trigger.before :"Vagrant::Action::Builtin::SetHostname", type: :action do |t|
+    m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
-        IsoloomHyperV.address(machine, <<~'SH') if machine.provider_name == :hyperv
+        IsoloomHyperV.address(machine, <<~'SH')
           set -e
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/lab-net.sh <<'NET'
@@ -824,7 +837,9 @@ Vagrant.configure("2") do |config|
             echo "isoloom: no network adapter with MAC $1" >&2
             return 1
           }
-          lab 02:15:53:77:6e:dc 10.70.10.10/24
+          rc=0
+          lab 02:15:53:77:6e:dc 10.70.10.10/24 || rc=1
+          exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
@@ -998,9 +1013,9 @@ Vagrant.configure("2") do |config|
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
       t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-office-vlan20", "02159CB547F5"]]) }
     end
-    m.trigger.before :"Vagrant::Action::Builtin::SetHostname", type: :action do |t|
+    m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
-        IsoloomHyperV.address(machine, <<~'SH') if machine.provider_name == :hyperv
+        IsoloomHyperV.address(machine, <<~'SH')
           set -e
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/lab-net.sh <<'NET'
@@ -1018,7 +1033,9 @@ Vagrant.configure("2") do |config|
             echo "isoloom: no network adapter with MAC $1" >&2
             return 1
           }
-          lab 02:15:9c:b5:47:f5 10.70.20.10/24
+          rc=0
+          lab 02:15:9c:b5:47:f5 10.70.20.10/24 || rc=1
+          exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
@@ -1162,9 +1179,9 @@ Vagrant.configure("2") do |config|
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
       t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-office-vlan10", "0215DDCE5929"], ["isoloom-vlan-office-office-vlan20", "0215E3D0A132"]]) }
     end
-    m.trigger.before :"Vagrant::Action::Builtin::SetHostname", type: :action do |t|
+    m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
-        IsoloomHyperV.address(machine, <<~'SH') if machine.provider_name == :hyperv
+        IsoloomHyperV.address(machine, <<~'SH')
           set -e
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/lab-net.sh <<'NET'
@@ -1182,8 +1199,10 @@ Vagrant.configure("2") do |config|
             echo "isoloom: no network adapter with MAC $1" >&2
             return 1
           }
-          lab 02:15:dd:ce:59:29 10.70.10.50/24
-          lab 02:15:e3:d0:a1:32 10.70.20.50/24
+          rc=0
+          lab 02:15:dd:ce:59:29 10.70.10.50/24 || rc=1
+          lab 02:15:e3:d0:a1:32 10.70.20.50/24 || rc=1
+          exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.

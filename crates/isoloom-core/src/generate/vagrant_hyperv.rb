@@ -7,7 +7,8 @@
 #   internal network), created when missing and removed with the environment's last VM;
 # - each VM has an adapter there with a fixed MAC, attached before every start (Vagrant has
 #   just connected them all to the first switch), and its address set in the guest once it
-#   answers (a boot-time unit on Linux, a static address on Windows).
+#   answers (a boot-time unit on Linux, a static address on Windows);
+# - published ports aren't forwarded to the host (Hyper-V can't): a warning says where they are.
 HYPERV_SWITCH = ENV.fetch("ISOLOOM_HYPERV_SWITCH", "Default Switch")
 module IsoloomHyperV
   def self.fail!(message)
@@ -45,9 +46,17 @@ module IsoloomHyperV
     }).join("; "))
   end
 
-  # Once the guest answers (before its provisioning): its addresses on the networks.
+  # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
+  # answers, before its provisioning: its addresses on the networks.
   def self.address(machine, script)
+    fail!("#{machine.name} didn't answer within #{machine.config.vm.boot_timeout} s") unless machine.communicate.wait_for_ready(machine.config.vm.boot_timeout)
     machine.communicate.sudo(script)
+  end
+
+  # Hyper-V forwards no ports: where the published ones (guest => host) are instead.
+  def self.ports(machine, ports)
+    ip = (machine.ssh_info || {})[:host] || "the VM's address"
+    machine.ui.warn("Hyper-V forwards no ports to this host: " + ports.map { |guest, host| "127.0.0.1:#{host} isn't there, use #{ip}:#{guest}" }.join("; "))
   end
 
   # After a VM is deleted: the networks' switches no VM uses any more.

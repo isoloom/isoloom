@@ -1099,8 +1099,14 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
     assert!(web.contains("IsoloomHyperV.switches([\"isoloom-segmented-front\"])"), "{web}");
     assert!(web.contains("before :\"VagrantPlugins::HyperV::Action::StartInstance\""), "{web}");
     assert!(web.contains("IsoloomHyperV.attach(machine, [[\"isoloom-segmented-front\", \"0215"), "{web}");
-    assert!(web.contains("if machine.provider_name == :hyperv"), "{web}");
-    assert!(web.contains("lab 02:15:") && web.contains(" 10.61.10.10/24\n"), "{web}");
+    // The address step hangs on a Hyper-V action: other providers run (and print) no trigger.
+    assert!(web.contains("m.trigger.after :\"VagrantPlugins::HyperV::Action::WaitForIPAddress\""), "{web}");
+    assert!(!v.contains("Vagrant::Action::Builtin"), "a trigger fires on every provider");
+    // Every network is tried, and a missing adapter fails the step.
+    assert!(
+        web.contains("rc=0\n") && web.contains(" 10.61.10.10/24 || rc=1\n") && web.contains("exit $rc\n"),
+        "{web}"
+    );
     assert!(
         web.contains("systemctl enable -q isoloom-lab-net.service") && web.contains("rc-update add local default"),
         "{web}"
@@ -1124,9 +1130,11 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
         "{v}"
     );
     assert!(
-        v.contains("<<~'PS1') if machine.provider_name == :hyperv") && v.contains("EnableStatic(@($n.ip), @($n.mask))"),
+        v.contains("IsoloomHyperV.address(machine, <<~'PS1')") && v.contains("EnableStatic(@($n.ip), @($n.mask))"),
         "{v}"
     );
+    // Its published port isn't forwarded on Hyper-V: a warning says where it is.
+    assert!(v.contains("IsoloomHyperV.ports(machine, [[80, 8082]])"), "{v}");
     assert!(v.contains("mac = '02:15:") && v.contains("ip = '192.168.57.10'; mask = '255.255.255.0'"), "{v}");
 
     // A privileged machine runs VMs of its own: nested virtualization.

@@ -241,6 +241,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             nics: m.networks.iter().map(|(net, octet)| nic(spec, net, address(spec, net, *octet))).collect(),
             windows,
             nested: m.privileged,
+            published: m.services.iter().filter_map(|s| s.publish.map(|h| (s.port, h))).collect(),
         };
         providers(
             &mut out,
@@ -681,6 +682,8 @@ struct HyperV<'a> {
     windows: bool,
     /// Nested virtualization (`privileged`): the VM runs VMs of its own.
     nested: bool,
+    /// Its published ports (guest, host): not forwarded on Hyper-V, so a warning says where.
+    published: Vec<(u16, u16)>,
 }
 
 /// A VM's adapter on one network, and its address there.
@@ -712,6 +715,7 @@ impl<'a> HyperV<'a> {
             nics: at.map(|(net, ip)| nic(spec, net, ip)).collect(),
             windows: false,
             nested: false,
+            published: Vec::new(),
         }
     }
 
@@ -740,7 +744,9 @@ fn mac_text(mac: [u8; 6], sep: &str, upper: bool) -> String {
 
 /// The Hyper-V provider block, and the triggers giving the VM its networks there: the switches
 /// before Vagrant picks the first adapter's, the adapters before it starts, their addresses in
-/// the guest once it answers (before its provisioning), the switches gone with the last VM.
+/// the guest once it answers (before its provisioning; with a warning saying where published
+/// ports are), the switches gone with the last VM. Every trigger hangs on a Hyper-V step, so
+/// other providers run (and print) none.
 fn hyperv_block(out: &mut String, guest: &str, cpus: u32, mem: u32, hv: &HyperV) {
     out.push_str("    m.vm.provider \"hyperv\" do |v, o|\n");
     match &hv.boxed {
@@ -771,29 +777,47 @@ fn hyperv_block(out: &mut String, guest: &str, cpus: u32, mem: u32, hv: &HyperV)
         out,
         "    m.trigger.before :\"VagrantPlugins::HyperV::Action::Configure\", type: :action do |t|\n      t.ruby {{ |_, _| IsoloomHyperV.switches([{switches}]) }}\n    end"
     );
-    if hv.nics.is_empty() {
-        return;
-    }
     let attach = hv
         .nics
         .iter()
         .map(|n| format!("[{}, {}]", rb(&hv.switch(n.net)), rb(&mac_text(hyperv_mac(guest, n.net), "", true))))
         .collect::<Vec<_>>()
         .join(", ");
+    if !hv.nics.is_empty() {
+        let _ = writeln!(
+            out,
+            "    m.trigger.before :\"VagrantPlugins::HyperV::Action::StartInstance\", type: :action do |t|\n      t.ruby {{ |_, machine| IsoloomHyperV.attach(machine, [{attach}]) }}\n    end"
+        );
+    }
+    // After a Hyper-V step (so nothing runs, or prints, on other providers): the addresses once
+    // the guest answers, and where the published ports are.
+    if hv.nics.is_empty() && hv.published.is_empty() {
+        return;
+    }
+    let mut steps = String::new();
+    if !hv.nics.is_empty() {
+        let (script, tag) = if hv.windows {
+            (hyperv_windows_addresses(guest, &hv.nics), "PS1")
+        } else {
+            (hyperv_linux_addresses(guest, &hv.nics), "SH")
+        };
+        let _ = write!(
+            steps,
+            "        IsoloomHyperV.address(machine, <<~'{tag}')\n{}        {tag}\n",
+            indent(&script, 10)
+        );
+    }
+    if !hv.published.is_empty() {
+        let ports = hv.published.iter().map(|(g, h)| format!("[{g}, {h}]")).collect::<Vec<_>>().join(", ");
+        let _ = writeln!(steps, "        IsoloomHyperV.ports(machine, [{ports}])");
+    }
     let _ = writeln!(
         out,
-        "    m.trigger.before :\"VagrantPlugins::HyperV::Action::StartInstance\", type: :action do |t|\n      t.ruby {{ |_, machine| IsoloomHyperV.attach(machine, [{attach}]) }}\n    end"
+        "    m.trigger.after :\"VagrantPlugins::HyperV::Action::WaitForIPAddress\", type: :action do |t|\n      t.ruby do |_, machine|\n{steps}      end\n    end"
     );
-    let (script, tag) = if hv.windows {
-        (hyperv_windows_addresses(guest, &hv.nics), "PS1")
-    } else {
-        (hyperv_linux_addresses(guest, &hv.nics), "SH")
-    };
-    let _ = writeln!(
-        out,
-        "    m.trigger.before :\"Vagrant::Action::Builtin::SetHostname\", type: :action do |t|\n      t.ruby do |_, machine|\n        IsoloomHyperV.address(machine, <<~'{tag}') if machine.provider_name == :hyperv\n{}        {tag}\n      end\n    end",
-        indent(&script, 10)
-    );
+    if hv.nics.is_empty() {
+        return;
+    }
     let _ = writeln!(
         out,
         "    m.trigger.after :\"VagrantPlugins::HyperV::Action::DeleteVM\", type: :action do |t|\n      t.ruby {{ |_, _| IsoloomHyperV.prune([{switches}]) }}\n    end"
@@ -802,11 +826,12 @@ fn hyperv_block(out: &mut String, guest: &str, cpus: u32, mem: u32, hv: &HyperV)
 
 /// A Linux VM's addresses on its networks under Hyper-V: each adapter found by its MAC, its
 /// address set with `ip` (NetworkManager told to leave it alone), by a unit run at every boot
-/// (systemd, or OpenRC's `local` on Alpine), and now.
+/// (systemd, or OpenRC's `local` on Alpine), and now. Every network is tried; a missing adapter
+/// fails the script (and so `vagrant up`).
 fn hyperv_linux_addresses(guest: &str, nics: &[Nic]) -> String {
     let lines: String = nics
         .iter()
-        .map(|n| format!("lab {} {}/{}\n", mac_text(hyperv_mac(guest, n.net), ":", false), n.ip, n.len))
+        .map(|n| format!("lab {} {}/{} || rc=1\n", mac_text(hyperv_mac(guest, n.net), ":", false), n.ip, n.len))
         .collect();
     let unmanaged = nics
         .iter()
@@ -814,7 +839,7 @@ fn hyperv_linux_addresses(guest: &str, nics: &[Nic]) -> String {
         .collect::<Vec<_>>()
         .join(";");
     format!(
-        "set -e\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/lab-net.sh <<'NET'\n#!/bin/sh\n# This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.\nlab() {{\n  for d in /sys/class/net/*; do\n    [ \"$(cat \"$d/address\" 2>/dev/null)\" = \"$1\" ] || continue\n    IF=${{d##*/}}\n    if command -v nmcli >/dev/null; then nmcli device set \"$IF\" managed no 2>/dev/null || true; fi\n    ip link set \"$IF\" up\n    ip -4 addr show dev \"$IF\" | grep -q \" $2 \" || ip addr add \"$2\" dev \"$IF\"\n    return 0\n  done\n  echo \"isoloom: no network adapter with MAC $1\" >&2\n  return 1\n}}\n{lines}NET\nchmod +x /etc/isoloom/lab-net.sh\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf\nfi\nif [ -d /run/systemd/system ]; then\n  cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'\n[Unit]\nDescription=Addresses on the isoloom networks\nAfter=network-pre.target NetworkManager.service systemd-networkd.service\nBefore=network-online.target isoloom-routes.service\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/lab-net.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\n  systemctl daemon-reload\n  systemctl enable -q isoloom-lab-net.service\nelif command -v rc-update >/dev/null; then\n  printf '#!/bin/sh\\nexec /etc/isoloom/lab-net.sh\\n' > /etc/local.d/isoloom-lab-net.start\n  chmod +x /etc/local.d/isoloom-lab-net.start\n  rc-update add local default >/dev/null\nfi\n/etc/isoloom/lab-net.sh\n"
+        "set -e\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/lab-net.sh <<'NET'\n#!/bin/sh\n# This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.\nlab() {{\n  for d in /sys/class/net/*; do\n    [ \"$(cat \"$d/address\" 2>/dev/null)\" = \"$1\" ] || continue\n    IF=${{d##*/}}\n    if command -v nmcli >/dev/null; then nmcli device set \"$IF\" managed no 2>/dev/null || true; fi\n    ip link set \"$IF\" up\n    ip -4 addr show dev \"$IF\" | grep -q \" $2 \" || ip addr add \"$2\" dev \"$IF\"\n    return 0\n  done\n  echo \"isoloom: no network adapter with MAC $1\" >&2\n  return 1\n}}\nrc=0\n{lines}exit $rc\nNET\nchmod +x /etc/isoloom/lab-net.sh\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf\nfi\nif [ -d /run/systemd/system ]; then\n  cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'\n[Unit]\nDescription=Addresses on the isoloom networks\nAfter=network-pre.target NetworkManager.service systemd-networkd.service\nBefore=network-online.target isoloom-routes.service\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/lab-net.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\n  systemctl daemon-reload\n  systemctl enable -q isoloom-lab-net.service\nelif command -v rc-update >/dev/null; then\n  printf '#!/bin/sh\\nexec /etc/isoloom/lab-net.sh\\n' > /etc/local.d/isoloom-lab-net.start\n  chmod +x /etc/local.d/isoloom-lab-net.start\n  rc-update add local default >/dev/null\nfi\n/etc/isoloom/lab-net.sh\n"
     )
 }
 

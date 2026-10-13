@@ -918,6 +918,13 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             let snapshot = snapshot_of(&dir, instance, &sets)?;
             print!("{}", core::report::report(&name, &snapshot, md)?);
+            // Published ports on Hyper-V (the provider the defaults or Vagrant pick): not forwarded.
+            if name == "services"
+                && vagrant_provider(&dir).as_deref() == Some("hyperv")
+                && let Some(note) = core::report::hyperv_ports_note(&snapshot)
+            {
+                print!("\n{note}");
+            }
             Ok(ExitCode::SUCCESS)
         }
         Command::Inspect {
@@ -1230,6 +1237,15 @@ fn load_settings(
     let settings = core::defaults::load(dir, images, sets)?;
     let spec = settings.defaults.images.apply(&spec);
     Ok((spec, settings))
+}
+
+/// The Vagrant provider `isoloom run vagrant` would use: the defaults' `vagrant.provider`, else
+/// Vagrant's own `VAGRANT_DEFAULT_PROVIDER`.
+fn vagrant_provider(dir: &std::path::Path) -> Option<String> {
+    core::defaults::load(dir, None, &[])
+        .ok()
+        .and_then(|r| r.defaults.vagrant.provider)
+        .or_else(|| std::env::var("VAGRANT_DEFAULT_PROVIDER").ok().filter(|v| !v.is_empty()))
 }
 
 /// Temporary AWS credentials from the AWS CLI's own session (`aws login`, SSO), for Terraform,
