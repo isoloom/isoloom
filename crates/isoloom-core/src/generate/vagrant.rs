@@ -1387,7 +1387,8 @@ pub(super) fn ansible_runs(spec: &Spec, limit: &[String]) -> String {
     let mut script = String::from(
         "set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False \
          ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
-         ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n",
+         ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n\
+         mkdir -p /tmp/isoloom-retry\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry\n",
     );
     script.push_str(RETRIES);
     for step in &spec.provision {
@@ -1414,11 +1415,18 @@ pub(super) fn ansible_runs(spec: &Spec, limit: &[String]) -> String {
 /// The shell helpers of [`ansible_runs`] (POSIX sh, safe under `set -e`):
 /// - `retry_download`: role downloads (Galaxy, from GitHub) fail now and then on the network;
 ///   tried 5 times, with a growing pause (`ISOLOOM_RETRY_PAUSE` seconds, 15 by default).
-/// - `run_play`: a play cut by a dropped connection (WinRM's shell crashing mid-task, an SSH
-///   reset, a host briefly unreachable, often under CPU emulation) runs again, up to 4 times in
-///   all. The play is the environment's own setup, which re-runs idempotently, so it picks up
-///   where it stopped. A task that fails on its own isn't retried.
-const RETRIES: &str = r#"_isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'
+/// - `run_play`: up to 4 runs of a play in all, for two kinds of failure that aren't the
+///   play's own. The play is the environment's own setup, which re-runs idempotently, so it
+///   picks up where it stopped; a task that fails on its own isn't retried.
+///   - Only unreachable hosts: a Windows host dropping WinRM for a minute after a reboot.
+///     `ansible-playbook` exits 4 when a host was unreachable, whether or not a task failed
+///     elsewhere (unreachable wins over failed, 2), so the play's recap must also show no host
+///     with `failed=` above 0: a task that failed is real, and stops the setup. After a pause (4 x the
+///     pause, 60 s by default), the play runs again on those hosts only (`--limit
+///     @<playbook>.retry`, the retry file Ansible writes in `ANSIBLE_RETRY_FILES_SAVE_PATH`).
+///   - A play cut by a dropped connection mid-task (WinRM's shell crashing, an SSH reset,
+///     often under CPU emulation), as its output says: it runs again whole, after 2 x the pause.
+const RETRIES: &str = r#"_isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|Connection reset by peer|Connection timed out|Remote end closed connection'
 _isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
 retry_download() {
   _isoloom_n=1
@@ -1433,21 +1441,47 @@ run_play() {
   _isoloom_n=1
   _isoloom_log=$(mktemp)
   _isoloom_rcf=$(mktemp)
+  # The playbook is the last argument; Ansible names its retry file after it.
+  for _isoloom_book; do :; done
+  _isoloom_retry=${ANSIBLE_RETRY_FILES_SAVE_PATH:-/tmp/isoloom-retry}/$(basename "${_isoloom_book%.*}").retry
+  _isoloom_limit=
+  rm -f "$_isoloom_retry"
   while :; do
-    { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
+    { "$@" $_isoloom_limit && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
     _isoloom_rc=$(cat "$_isoloom_rcf")
     if [ "$_isoloom_rc" -eq 0 ]; then
-      rm -f "$_isoloom_log" "$_isoloom_rcf"
+      rm -f "$_isoloom_log" "$_isoloom_rcf" "$_isoloom_retry"
       return 0
     fi
-    if [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log"; then
-      echo "isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)"
+    # Exit 4: a host unreachable, and maybe a task failed too (4 wins over 2): only
+    # unreachable when the recap has no `failed=` above 0.
+    if [ "$_isoloom_rc" -eq 4 ] && ! grep -qE ' failed=[1-9]' "$_isoloom_log"; then
+      # Those hosts again (all of them when Ansible wrote no retry file).
+      if [ -s "$_isoloom_retry" ]; then
+        _isoloom_hosts=$(echo $(cat "$_isoloom_retry"))
+        _isoloom_limit="--limit @$_isoloom_retry"
+      else
+        _isoloom_hosts="(no retry file: every host)"
+        _isoloom_limit=
+      fi
+      if [ "$_isoloom_n" -lt 4 ]; then
+        echo "isoloom: $_isoloom_book: unreachable: $_isoloom_hosts; waiting $((4 * _isoloom_pause)) s, then running it again on them ($((_isoloom_n + 1))/4)"
+        sleep $((4 * _isoloom_pause))
+        _isoloom_n=$((_isoloom_n + 1))
+        continue
+      fi
+      echo "isoloom: $_isoloom_book: still unreachable after $_isoloom_n runs: $_isoloom_hosts; giving up"
+    elif [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log" && ! grep -q 'UNREACHABLE!' "$_isoloom_log"; then
+      # A task cut mid-way by a dropped connection (not a host unreachable while another
+      # failed a task: that failure is real).
+      echo "isoloom: $_isoloom_book: the play was cut by a dropped connection; waiting $((2 * _isoloom_pause)) s, then running it again ($((_isoloom_n + 1))/4)"
       sleep $((2 * _isoloom_pause))
+      _isoloom_limit=
       _isoloom_n=$((_isoloom_n + 1))
-    else
-      rm -f "$_isoloom_log" "$_isoloom_rcf"
-      return "$_isoloom_rc"
+      continue
     fi
+    rm -f "$_isoloom_log" "$_isoloom_rcf"
+    return "$_isoloom_rc"
   done
 }
 "#;
@@ -1472,7 +1506,10 @@ mod retry_tests {
     fn run(body: &str) -> (i32, String, usize) {
         let dir = std::env::temp_dir().join(format!("isoloom-retries-{}-{}", std::process::id(), body.len()));
         std::fs::create_dir_all(&dir).unwrap();
-        let script = format!("set -e\nCALLS={}/calls\n{RETRIES}{body}\n", dir.display());
+        let script = format!(
+            "set -e\nCALLS={d}/calls\nexport ANSIBLE_RETRY_FILES_SAVE_PATH={d}\n{RETRIES}{body}\n",
+            d = dir.display()
+        );
         let out = std::process::Command::new("sh")
             .arg("-c")
             .arg(&script)
@@ -1491,7 +1528,11 @@ mod retry_tests {
             "play() { echo x >> $CALLS; [ $(wc -l < $CALLS) -ge 3 ] && echo 'failed=0' || { echo 'fatal: [dc01]: FAILED! => {\"msg\": \"winrm send_input failed\"}'; return 2; }; }\nrun_play play\necho after",
         );
         assert_eq!((code, calls), (0, 3), "{out}");
-        assert!(out.contains("running it again (3/4)") && out.trim_end().ends_with("after"), "{out}");
+        assert!(
+            out.contains("play: the play was cut by a dropped connection; waiting 0 s, then running it again (3/4)"),
+            "{out}"
+        );
+        assert!(out.trim_end().ends_with("after"), "{out}");
     }
 
     #[test]
@@ -1502,10 +1543,90 @@ mod retry_tests {
         assert!(!out.contains("after"));
     }
 
+    /// A fake `ansible-playbook`: records its arguments, then exits with the next code of
+    /// `$CODES` (one per run), writing the retry file (named after the playbook, the last
+    /// argument) with `$HOSTS` when it fails, as Ansible does.
+    const FAKE: &str = r#"play() {
+  echo "$*" >> $CALLS
+  n=$(wc -l < $CALLS)
+  rc=$(echo $CODES | cut -d' ' -f$n)
+  for book; do :; done
+  [ "$rc" -eq 0 ] || printf '%s\n' $HOSTS > "$ANSIBLE_RETRY_FILES_SAVE_PATH/${book%.yml}.retry"
+  [ "$rc" -eq 4 ] && echo 'fatal: [dc01]: UNREACHABLE! => {"msg": "ntlm: the specified credentials were rejected by the server"}'
+  return $rc
+}
+"#;
+
+    fn args(body: &str) -> (i32, String, Vec<String>) {
+        let dir = std::env::temp_dir().join(format!("isoloom-retries-args-{}-{}", std::process::id(), body.len()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = format!(
+            "set -e\nCALLS={d}/calls\nexport ANSIBLE_RETRY_FILES_SAVE_PATH={d}\n{RETRIES}{FAKE}{body}\n",
+            d = dir.display()
+        );
+        let out = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(&script)
+            .env("ISOLOOM_RETRY_PAUSE", "0")
+            .output()
+            .unwrap();
+        let calls = std::fs::read_to_string(dir.join("calls"))
+            .unwrap_or_default()
+            .lines()
+            .map(|l| l.replace(&dir.display().to_string(), "$DIR"))
+            .collect();
+        std::fs::remove_dir_all(&dir).ok();
+        (out.status.code().unwrap_or(-1), String::from_utf8_lossy(&out.stdout).into_owned(), calls)
+    }
+
     #[test]
-    fn a_play_that_keeps_dropping_stops_after_four_runs() {
-        let (code, _, calls) = run("play() { echo x >> $CALLS; echo 'UNREACHABLE!'; return 4; }\nrun_play play");
-        assert_eq!((code, calls), (4, 4));
+    fn unreachable_hosts_alone_are_run_again_on_their_own_after_a_pause() {
+        // dc01 and srv02 drop WinRM after a reboot; the next run reaches dc01, the third srv02.
+        let (code, out, calls) = args("CODES='4 4 0' HOSTS='dc01 srv02'\nrun_play play -i inv.ini site.yml\necho after");
+        assert_eq!(code, 0, "{out}");
+        assert_eq!(
+            calls,
+            [
+                "-i inv.ini site.yml",
+                "-i inv.ini site.yml --limit @$DIR/site.retry",
+                "-i inv.ini site.yml --limit @$DIR/site.retry",
+            ]
+        );
+        assert!(
+            out.contains("isoloom: site.yml: unreachable: dc01 srv02; waiting 0 s, then running it again on them (2/4)"),
+            "{out}"
+        );
+        assert!(out.contains("(3/4)") && out.trim_end().ends_with("after"), "{out}");
+    }
+
+    #[test]
+    fn hosts_that_stay_unreachable_stop_the_setup_after_four_runs() {
+        let (code, out, calls) = args("CODES='4 4 4 4 4' HOSTS=dc01\nrun_play play site.yml\necho after");
+        assert_eq!((code, calls.len()), (4, 4), "{out}");
+        assert!(out.contains("isoloom: site.yml: still unreachable after 4 runs: dc01; giving up"), "{out}");
+        assert!(!out.contains("after\n"), "set -e stops the setup: {out}");
+    }
+
+    #[test]
+    fn a_failed_task_is_not_retried_even_with_a_host_unreachable() {
+        // ansible-playbook exits 4 when a host is unreachable even if a task failed on another
+        // (as ansible-core 2.16 does): the recap's `failed=1` says the failure is real.
+        let (code, out, calls) = args(
+            "play() { echo \"$*\" >> $CALLS; echo 'fatal: [dc01]: UNREACHABLE! => {\"msg\": \"Connection timed out\"}'; echo 'fatal: [web]: FAILED! => {\"msg\": \"no such user\"}'; \
+             echo 'dc01 : ok=0 changed=0 unreachable=1 failed=0 skipped=0 rescued=0 ignored=0'; echo 'web : ok=3 changed=0 unreachable=0 failed=1 skipped=0 rescued=0 ignored=0'; return 4; }\nrun_play play site.yml",
+        );
+        assert_eq!((code, calls.len()), (4, 1), "{out}");
+        assert!(!out.contains("running it again"), "{out}");
+        // A task that failed on its own (exit 2) isn't either.
+        let (code, out, calls) = args("CODES=2 HOSTS=web\nrun_play play site.yml");
+        assert_eq!((code, calls.len()), (2, 1), "{out}");
+    }
+
+    #[test]
+    fn without_a_retry_file_every_host_runs_again() {
+        let (code, out, calls) = run("play() { echo x >> $CALLS; [ $(wc -l < $CALLS) -ge 2 ] || return 4; }\nrun_play play site.yml");
+        assert_eq!((code, calls), (0, 2), "{out}");
+        assert!(out.contains("unreachable: (no retry file: every host)"), "{out}");
     }
 
     #[test]
