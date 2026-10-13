@@ -861,17 +861,12 @@ Vagrant.configure("2") do |config|
             rm -f "$_isoloom_log" "$_isoloom_rcf" "$_isoloom_retry"
             return 0
           fi
-          # Exit 4: a host unreachable, and maybe a task failed too (4 wins over 2): only
-          # unreachable when the recap has no `failed=` above 0.
-          if [ "$_isoloom_rc" -eq 4 ] && ! grep -qE ' failed=[1-9]' "$_isoloom_log"; then
-            # Those hosts again (all of them when Ansible wrote no retry file).
-            if [ -s "$_isoloom_retry" ]; then
-              _isoloom_hosts=$(echo $(cat "$_isoloom_retry"))
-              _isoloom_limit="--limit @$_isoloom_retry"
-            else
-              _isoloom_hosts="(no retry file: every host)"
-              _isoloom_limit=
-            fi
+          # Exit 4: a host unreachable, maybe a task failed too (4 wins over 2), or a playbook that
+          # doesn't parse (4 as well, no recap). Unreachable hosts only: the recap shows some with
+          # `unreachable=` and none with `failed=` above 0, and Ansible wrote their retry file.
+          if [ "$_isoloom_rc" -eq 4 ] && grep -qE ' unreachable=[1-9]' "$_isoloom_log" && ! grep -qE ' failed=[1-9]' "$_isoloom_log" && [ -s "$_isoloom_retry" ]; then
+            _isoloom_hosts=$(echo $(cat "$_isoloom_retry"))
+            _isoloom_limit="--limit @$_isoloom_retry"
             if [ "$_isoloom_n" -lt 4 ]; then
               echo "isoloom: $_isoloom_book: unreachable: $_isoloom_hosts; waiting $((4 * _isoloom_pause)) s, then running it again on them ($((_isoloom_n + 1))/4)"
               sleep $((4 * _isoloom_pause))

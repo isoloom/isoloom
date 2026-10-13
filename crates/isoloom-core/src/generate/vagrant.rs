@@ -1420,8 +1420,10 @@ pub(super) fn ansible_runs(spec: &Spec, limit: &[String]) -> String {
 ///   picks up where it stopped; a task that fails on its own isn't retried.
 ///   - Only unreachable hosts: a Windows host dropping WinRM for a minute after a reboot.
 ///     `ansible-playbook` exits 4 when a host was unreachable, whether or not a task failed
-///     elsewhere (unreachable wins over failed, 2), so the play's recap must also show no host
-///     with `failed=` above 0: a task that failed is real, and stops the setup. After a pause (4 x the
+///     elsewhere (unreachable wins over failed, 2), and for a playbook that doesn't parse; so
+///     the play's recap must also show a host with `unreachable=` above 0 and none with
+///     `failed=` above 0 (a task that failed is real, and stops the setup), and Ansible must
+///     have written the retry file. After a pause (4 x the
 ///     pause, 60 s by default), the play runs again on those hosts only (`--limit
 ///     @<playbook>.retry`, the retry file Ansible writes in `ANSIBLE_RETRY_FILES_SAVE_PATH`).
 ///   - A play cut by a dropped connection mid-task (WinRM's shell crashing, an SSH reset,
@@ -1453,17 +1455,12 @@ run_play() {
       rm -f "$_isoloom_log" "$_isoloom_rcf" "$_isoloom_retry"
       return 0
     fi
-    # Exit 4: a host unreachable, and maybe a task failed too (4 wins over 2): only
-    # unreachable when the recap has no `failed=` above 0.
-    if [ "$_isoloom_rc" -eq 4 ] && ! grep -qE ' failed=[1-9]' "$_isoloom_log"; then
-      # Those hosts again (all of them when Ansible wrote no retry file).
-      if [ -s "$_isoloom_retry" ]; then
-        _isoloom_hosts=$(echo $(cat "$_isoloom_retry"))
-        _isoloom_limit="--limit @$_isoloom_retry"
-      else
-        _isoloom_hosts="(no retry file: every host)"
-        _isoloom_limit=
-      fi
+    # Exit 4: a host unreachable, maybe a task failed too (4 wins over 2), or a playbook that
+    # doesn't parse (4 as well, no recap). Unreachable hosts only: the recap shows some with
+    # `unreachable=` and none with `failed=` above 0, and Ansible wrote their retry file.
+    if [ "$_isoloom_rc" -eq 4 ] && grep -qE ' unreachable=[1-9]' "$_isoloom_log" && ! grep -qE ' failed=[1-9]' "$_isoloom_log" && [ -s "$_isoloom_retry" ]; then
+      _isoloom_hosts=$(echo $(cat "$_isoloom_retry"))
+      _isoloom_limit="--limit @$_isoloom_retry"
       if [ "$_isoloom_n" -lt 4 ]; then
         echo "isoloom: $_isoloom_book: unreachable: $_isoloom_hosts; waiting $((4 * _isoloom_pause)) s, then running it again on them ($((_isoloom_n + 1))/4)"
         sleep $((4 * _isoloom_pause))
@@ -1552,7 +1549,10 @@ mod retry_tests {
   rc=$(echo $CODES | cut -d' ' -f$n)
   for book; do :; done
   [ "$rc" -eq 0 ] || printf '%s\n' $HOSTS > "$ANSIBLE_RETRY_FILES_SAVE_PATH/${book%.yml}.retry"
-  [ "$rc" -eq 4 ] && echo 'fatal: [dc01]: UNREACHABLE! => {"msg": "ntlm: the specified credentials were rejected by the server"}'
+  if [ "$rc" -eq 4 ]; then
+    echo 'fatal: [dc01]: UNREACHABLE! => {"msg": "ntlm: the specified credentials were rejected by the server"}'
+    echo 'dc01                       : ok=0    changed=0    unreachable=1    failed=0    skipped=0    rescued=0    ignored=0'
+  fi
   return $rc
 }
 "#;
@@ -1623,10 +1623,12 @@ mod retry_tests {
     }
 
     #[test]
-    fn without_a_retry_file_every_host_runs_again() {
-        let (code, out, calls) = run("play() { echo x >> $CALLS; [ $(wc -l < $CALLS) -ge 2 ] || return 4; }\nrun_play play site.yml");
-        assert_eq!((code, calls), (0, 2), "{out}");
-        assert!(out.contains("unreachable: (no retry file: every host)"), "{out}");
+    fn a_playbook_that_does_not_parse_is_not_retried() {
+        // ansible-core exits 4 for a syntax error too: no recap, no retry file.
+        let (code, out, calls) =
+            run("play() { echo x >> $CALLS; echo 'ERROR! We were unable to read either as JSON nor YAML'; return 4; }\nrun_play play site.yml\necho after");
+        assert_eq!((code, calls), (4, 1), "{out}");
+        assert!(!out.contains("running it again") && !out.contains("after"), "{out}");
     }
 
     #[test]
