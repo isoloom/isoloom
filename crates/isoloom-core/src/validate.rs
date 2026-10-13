@@ -171,14 +171,31 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             }
         }
         for (k, v) in &c.vars {
-            if let Some(i) = crate::model::CloudServices::input_of(v)
-                && !spec.inputs.iter().any(|d| d == i)
-            {
-                add(&format!("cloud.vars.{k}"), format!("`{i}` isn't declared in the spec's `inputs`"));
+            for i in crate::model::CloudServices::inputs_in(v) {
+                if !spec.inputs.contains(&i) {
+                    add(&format!("cloud.vars.{k}"), format!("`{i}` isn't declared in the spec's `inputs`"));
+                }
             }
         }
         if c.hourly_usd.is_some_and(|h| !(0.0..=1000.0).contains(&h)) {
             add("cloud.hourly_usd", "a cost per hour in US dollars (0 to 1000)".into());
+        }
+        for k in c.env.keys() {
+            let env_name = k.starts_with(|ch: char| ch.is_ascii_alphabetic() || ch == '_') && k.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_');
+            if !env_name {
+                add(
+                    &format!("cloud.env.{k}"),
+                    format!("`{k}` isn't an environment variable name (letters, digits, `_`)"),
+                );
+            }
+        }
+        if c.apply_retries > 5 {
+            add("cloud.apply_retries", "at most 5 more applies".into());
+        }
+        for (i, r) in c.requires.iter().enumerate() {
+            if r.trim().is_empty() {
+                add(&format!("cloud.requires[{i}]"), "a command name, or a shell command that must succeed".into());
+            }
         }
     }
     for (name, net) in &spec.networks {
@@ -910,6 +927,9 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     };
     if let Some(c) = &spec.cloud {
         check("cloud.terraform".into(), &c.terraform);
+        for (i, b) in c.before.iter().enumerate() {
+            check(format!("cloud.before[{i}]"), b);
+        }
     }
     for (name, m) in &spec.machines {
         if let Some(d) = &m.docker {

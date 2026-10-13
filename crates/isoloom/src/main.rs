@@ -45,8 +45,10 @@ enum Command {
         host: bool,
     },
     /// What this machine can run: for every target, the tools and credentials found and the ones
-    /// missing. No spec needed.
+    /// missing. No spec needed; with one in DIR, also what its cloud services require.
     Doctor {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
         /// Machine-readable output.
         #[arg(long)]
         json: bool,
@@ -585,18 +587,34 @@ fn run(cli: Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             }
             Ok(if problems.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE })
         }
-        Command::Doctor { json } => {
-            let all = core::host::all();
+        Command::Doctor { dir, json } => {
+            let mut all = core::host::all();
+            // A spec here: what its cloud-services module needs on this machine (`cloud.requires`).
+            let required = core::find(&dir)
+                .is_ok()
+                .then(|| core::load(&dir).ok())
+                .flatten()
+                .and_then(|spec| core::host::requirements(&spec));
+            let required_at = all.len();
+            all.extend(required);
             if json {
                 let list: Vec<serde_json::Value> = all
                     .iter()
-                    .map(|r| serde_json::json!({ "target": r.target.id(), "cloud": r.cloud, "ready": r.ready, "notes": r.notes }))
+                    .enumerate()
+                    .map(|(i, r)| {
+                        let mut v = serde_json::json!({ "target": r.target.id(), "cloud": r.cloud, "ready": r.ready, "notes": r.notes });
+                        if i >= required_at {
+                            v["requires"] = true.into();
+                        }
+                        v
+                    })
                     .collect();
                 println!("{}", serde_json::to_string_pretty(&list)?);
                 return Ok(ExitCode::SUCCESS);
             }
-            for r in &all {
+            for (i, r) in all.iter().enumerate() {
                 let name = match &r.cloud {
+                    _ if i >= required_at => "the spec's requires".to_string(),
                     Some(c) => format!("{} ({c})", r.target.id()),
                     None => r.target.id().to_string(),
                 };
@@ -1443,6 +1461,13 @@ fn run_cmd(
             )
             .into());
         }
+        if let Some(r) = core::host::requirements(&spec).filter(|r| !r.ready) {
+            return Err(format!(
+                "this machine lacks what the module needs: {} (`cloud.requires`; see `isoloom doctor`)",
+                r.summary().trim_start_matches("not ready: ")
+            )
+            .into());
+        }
     }
     if t == core::Target::External && !down {
         lifecycle::external_up(dir, &spec, instance)?;
@@ -1472,14 +1497,19 @@ fn run_cmd(
         let mut values = serde_json::Map::new();
         let mut missing = Vec::new();
         for (k, v) in &c.vars {
-            if let Some(i) = core::CloudServices::input_of(v) {
-                match std::env::var(i) {
-                    Ok(val) if !val.is_empty() => {
-                        values.insert(k.clone(), serde_json::Value::String(val));
-                    }
-                    _ => missing.push(i.to_string()),
-                }
+            if core::CloudServices::inputs_in(v).is_empty() {
+                continue;
             }
+            let filled = core::CloudServices::fill_inputs(v, &mut |i| match std::env::var(i) {
+                Ok(val) if !val.is_empty() => Some(val),
+                _ => {
+                    if !missing.iter().any(|m| m == i) {
+                        missing.push(i.to_string());
+                    }
+                    None
+                }
+            });
+            values.insert(k.clone(), filled);
         }
         if !missing.is_empty() {
             return Err(format!("set {} in the environment (the services take them at launch)", missing.join(", ")).into());
@@ -1494,6 +1524,32 @@ fn run_cmd(
             }
         }
     }
+    // Remember what is up on this host, for status / connect / exec / capture.
+    let record = |down: bool| {
+        let recorded = core::registry::update(|reg| {
+            if down {
+                reg.remove(dir, t, instance);
+            } else {
+                reg.upsert(core::registry::Entry {
+                    name: spec.name.clone(),
+                    dir: dir.clone(),
+                    target: t,
+                    instance,
+                    cloud: cloud.map(str::to_string),
+                    project: project.clone(),
+                    started: core::registry::now(),
+                });
+            }
+        });
+        if let Err(e) = recorded {
+            eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
+        }
+    };
+    // Cloud services cost from the first resource: recorded before the apply, so `status` shows
+    // them deploying (and what a failed apply left).
+    if !down && t == core::Target::CloudServices {
+        record(false);
+    }
     let mut cmd = std::process::Command::new(&program);
     cmd.args(&args).current_dir(&wd);
     if matches!(t, core::Target::CloudServices | core::Target::CloudVm | core::Target::CloudDocker) {
@@ -1502,25 +1558,7 @@ fn run_cmd(
     let status = cmd.status();
     match status {
         Ok(s) if s.success() => {
-            // Remember what is up on this host, for status / connect / exec / capture.
-            let recorded = core::registry::update(|reg| {
-                if down {
-                    reg.remove(dir, t, instance);
-                } else {
-                    reg.upsert(core::registry::Entry {
-                        name: spec.name.clone(),
-                        dir: dir.clone(),
-                        target: t,
-                        instance,
-                        cloud: cloud.map(str::to_string),
-                        project: project.clone(),
-                        started: core::registry::now(),
-                    });
-                }
-            });
-            if let Err(e) = recorded {
-                eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
-            }
+            record(down);
             // VMs: a baseline snapshot of the environment as it came up, for `isoloom reset`.
             if !down && t == core::Target::Vagrant && std::env::var_os("ISOLOOM_NO_BASELINE").is_none() {
                 eprintln!("Saving the baseline snapshot ({BASELINE}) for `isoloom reset`");

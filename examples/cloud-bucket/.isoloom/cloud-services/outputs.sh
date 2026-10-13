@@ -7,5 +7,7 @@ set -eu
 cd "$(dirname "$0")"
 here="$(pwd)"
 export TF_DATA_DIR="$here/.terraform"
-module='../../terraform'
+src='../../terraform'
+module="$here/module"
+[ -d "$module" ] || module="$src"
 terraform -chdir="$module" output -json -state="$here/terraform.tfstate"

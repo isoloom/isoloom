@@ -83,11 +83,40 @@ and outputs are whatever it declares. Under `.isoloom/cloud-services/`, Isoloom 
 | File | What |
 |---|---|
 | `terraform.tfvars.json` | The fixed values of `cloud.vars`. |
-| `inputs.tfvars.json` | Written by `isoloom run`: each variable whose value is exactly `{{ inputs.NAME }}`, taken from the environment variable `NAME`. It is kept for `down` and is mode 0600. |
-| `up.sh` | `terraform init` and `apply` on the module, with both variable files. |
-| `down.sh` | `terraform destroy`, with the same variables. |
+| `inputs.tfvars.json` | Written by `isoloom run`: each variable whose value holds `{{ inputs.NAME }}` (in a string, at any depth: `["{{ inputs.PLAYER_IP }}/32"]`), filled from the environment variable `NAME`. It is kept for `down` and is mode 0600. |
+| `up.sh` | Copies the module to `module/`, runs the `cloud.before` steps, then `terraform init` and `apply` on the copy, with both variable files. |
+| `down.sh` | `terraform destroy` on the copy, with the same variables. |
 | `outputs.sh` | The module's outputs as JSON (`terraform output -json`). |
 
-The state (`terraform.tfstate`) and the provider plugins (`.terraform/`) stay in that folder,
-not in the module. `cloud.outputs` maps names to module outputs. Checks and the message use
-them as `{{ cloud.outputs.<name> }}`.
+Terraform runs on a copy of the module, `module/`, refreshed over the old one at every `run`
+(`.terraform` folders and state files are left out). The lock file and whatever the module or a
+step writes (archives, keys) land there, not in the project. A path the module reads outside
+its own folder (`${path.module}/../x`) doesn't resolve from the copy: keep what it needs inside
+it. `down` destroys with the copy as it was applied, and copies the module again (with the
+steps) only when it is gone. The state (`terraform.tfstate`) and the provider plugins
+(`.terraform/`) stay in `.isoloom/cloud-services/` too. While `up.sh` applies, `deploying`
+holds its process id: `isoloom status` says `deploying` until the apply ends.
+
+`cloud.outputs` maps names to module outputs. Checks and the message use them as
+`{{ cloud.outputs.<name> }}`.
+
+The other keys of `cloud:`:
+
+| Key | What |
+|---|---|
+| `before` | Scripts in the project, run in order before `terraform init` (CloudGoat's `ssh-keygen`). Each runs in the module's copy, as itself when executable (its shebang), else with `sh`, with `env`, the launch-time inputs and `ISOLOOM_PROJECT` (the project folder) in its environment. They run at every `run`, so make them idempotent (`[ -f key ] \|\| ssh-keygen ...`). |
+| `env` | Environment variables for Terraform and the steps, e.g. `AWS_REGION: us-east-1`, exported by every script. Not for credentials. |
+| `apply_retries` | How many more applies after a failed one (0 to 5, default 0), for a module that only converges on a second apply. |
+| `requires` | What the module needs on this machine besides Terraform: a command name (`gsed`, `jq`) looked up on the PATH, or a shell command that must succeed (`python3 -c 'import boto3'`, `bash -c '[ ${BASH_VERSINFO[0]} -ge 5 ]'`). `isoloom doctor` (run in the project folder, or given it) lists them; `isoloom run` refuses when one is missing. |
+
+```yaml
+cloud:
+  provider: aws
+  terraform: terraform
+  vars: { cg_whitelist: ["{{ inputs.PLAYER_CIDR }}"], region: us-east-1 }
+  env: { AWS_REGION: us-east-1 }
+  before: [keys.sh]
+  apply_retries: 1
+  requires: [jq, "python3 -c 'import boto3'"]
+inputs: [PLAYER_CIDR]
+```

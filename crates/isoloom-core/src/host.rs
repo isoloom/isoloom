@@ -157,6 +157,41 @@ pub fn all() -> Vec<Readiness> {
     out
 }
 
+/// What a cloud-services module needs on this machine besides Terraform (`cloud.requires`):
+/// target `cloud-services`, ready when every entry is there. None without `cloud.requires`.
+pub fn requirements(spec: &crate::model::Spec) -> Option<Readiness> {
+    let (run, ..) = real_host();
+    requirements_with(spec, &run)
+}
+
+/// [`requirements`], with `run` running a program (as [`Host::run`]).
+pub fn requirements_with(spec: &crate::model::Spec, run: &dyn Fn(&str, &[&str]) -> Option<String>) -> Option<Readiness> {
+    let cloud = spec.cloud.as_ref().filter(|c| !c.requires.is_empty())?;
+    let mut notes = Vec::new();
+    for r in &cloud.requires {
+        let r = r.trim();
+        // A bare name is looked up on the PATH; anything else is a shell command that must pass.
+        let bare = !r.contains(char::is_whitespace);
+        let probe = if bare {
+            format!("command -v {}", crate::shell::quote(r))
+        } else {
+            r.to_string()
+        };
+        let found = run("sh", &["-c", &probe]).is_some();
+        notes.push(match (found, bare) {
+            (true, _) => r.to_string(),
+            (false, true) => format!("! `{r}` isn't installed"),
+            (false, false) => format!("! `{r}` failed"),
+        });
+    }
+    Some(Readiness {
+        target: Target::CloudServices,
+        cloud: Some(cloud.provider.id().to_string()),
+        ready: notes.iter().all(|n| !n.starts_with('!')),
+        notes,
+    })
+}
+
 pub const CLOUDS: &[&str] = &["aws", "azure", "gcp", "digitalocean", "linode", "oci"];
 
 /// Why KVM can't be used here, on Linux: no `/dev/kvm` (virtualization off, or a VM without

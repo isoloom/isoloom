@@ -7,7 +7,12 @@ set -eu
 cd "$(dirname "$0")"
 here="$(pwd)"
 export TF_DATA_DIR="$here/.terraform"
-module='../../terraform'
+src='../../terraform'
+module="$here/module"
+if [ ! -d "$module" ]; then
+  mkdir -p "$module"
+  tar -C "$src" -cf - --exclude=.terraform --exclude='*.tfstate' --exclude='*.tfstate.*' . | tar -C "$module" -xf -
+fi
 terraform -chdir="$module" init -input=false >&2
 set -- -var-file="$here/terraform.tfvars.json"
 [ ! -f "$here/inputs.tfvars.json" ] || set -- "$@" -var-file="$here/inputs.tfvars.json"
