@@ -105,6 +105,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         "  config.vm.provider \"vmware_esxi\" do |v|\n    v.esxi_hostname = ENV.fetch(\"ESXI_HOSTNAME\", \"\")\n    v.esxi_hostport = ENV.fetch(\"ESXI_HOSTPORT\", \"22\").to_i\n    v.esxi_username = ENV.fetch(\"ESXI_USERNAME\", \"root\")\n    v.esxi_password = \"env:ESXI_PASSWORD\"\n    v.esxi_disk_store = ENV[\"ESXI_DATASTORE\"] if ENV[\"ESXI_DATASTORE\"]\n    v.esxi_virtual_network = [ENV.fetch(\"ESXI_VIRTUAL_NETWORK\", \"VM Network\").split(\",\").first.strip]\n    v.guest_name = {}\n    v.guest_numvcpus = {cpus}\n    v.guest_memsize = {mem}\n  end",
         rb(&format!("{}-docker", spec.name))
     );
+    out.push_str(&super::vagrant::constraints_step(spec, "  ", "config"));
     out.push_str("  config.vm.provision \"shell\", name: \"docker\", inline: \"command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh\"\n");
     // The project, its generated Compose file included.
     out.push_str("  config.vm.provision \"isoloom_project\", name: \"project\", generated: true\n");

@@ -146,6 +146,57 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     if spec.networks.is_empty() && spec.cloud.is_none() {
         add("networks", "declare at least one network".into());
     }
+    // Constraints: URLs where URLs go, registry mirrors as a registry and path.
+    if let Some(c) = &spec.constraints {
+        let url = |v: &str| (v.starts_with("http://") || v.starts_with("https://")) && v.len() > "https://".len() && !v.contains(char::is_whitespace);
+        if let Some(px) = &c.proxy {
+            if px.http.is_none() && px.https.is_none() {
+                add(
+                    "constraints.proxy",
+                    "give `http` (and `https` when it differs), e.g. http://proxy.corp:3128".into(),
+                );
+            }
+            for (k, v) in [("http", &px.http), ("https", &px.https)] {
+                if let Some(v) = v.as_deref().filter(|v| !url(v)) {
+                    add(&format!("constraints.proxy.{k}"), format!("`{v}`: a URL, e.g. http://proxy.corp:3128"));
+                }
+            }
+            for (i, v) in px.no_proxy.iter().enumerate() {
+                if v.trim().is_empty() || v.contains(char::is_whitespace) || v.contains(',') {
+                    add(
+                        &format!("constraints.proxy.no_proxy[{i}]"),
+                        format!("`{v}`: one name, domain (.corp) or block per entry"),
+                    );
+                }
+            }
+        }
+        for (registry, mirror) in &c.registries {
+            if registry.is_empty() || registry.contains('/') || registry.contains("://") {
+                add(
+                    &format!("constraints.registries.{registry}"),
+                    "the key is a registry's host, e.g. docker.io or ghcr.io".into(),
+                );
+            }
+            if mirror.contains("://") || mirror.trim().is_empty() || mirror.contains(char::is_whitespace) || mirror.starts_with('/') {
+                add(
+                    &format!("constraints.registries.{registry}"),
+                    format!("`{mirror}`: the mirror as an image prefix, host and path without a scheme, e.g. registry.corp/dockerhub"),
+                );
+            }
+        }
+        if let Some(m) = &c.mirrors {
+            for (k, v) in [("debian", &m.debian), ("ubuntu", &m.ubuntu), ("pypi", &m.pypi), ("npm", &m.npm)] {
+                if let Some(v) = v.as_deref().filter(|v| !url(v)) {
+                    add(&format!("constraints.mirrors.{k}"), format!("`{v}`: a URL, e.g. http://mirror.corp/{k}"));
+                }
+            }
+        }
+        for (i, v) in c.ntp.iter().enumerate() {
+            if v.trim().is_empty() || v.contains(char::is_whitespace) {
+                add(&format!("constraints.ntp[{i}]"), format!("`{v}`: a time server's name or address"));
+            }
+        }
+    }
     // Cloud services: a module and what it exposes, no machines.
     if let Some(c) = &spec.cloud {
         if !spec.machines.is_empty() {

@@ -217,6 +217,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         "    m.vm.provider \"virtualbox\" do |v|\n      v.name = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n{nics}    end\n",
         rb(&format!("{} · containers", spec.name))
     ));
+    host.push_str(&super::vagrant::constraints_step(spec, "    ", "m"));
     host.push_str("    m.vm.provision \"shell\", name: \"docker\", inline: \"command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh\"\n");
     // The project, with this Compose file from Isoloom's outputs.
     host.push_str("    m.vm.provision \"isoloom_project\", name: \"project\", extra: [\".isoloom/hybrid/compose.yml\"]\n");
