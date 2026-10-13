@@ -1292,6 +1292,92 @@ fn aws_session_env() -> Vec<(String, String)> {
         .collect()
 }
 
+/// A unique name for one deployment of an environment: `isoloom-<name>[-<instance>]-<8 hex>`.
+fn deployment_name(name: &str, instance: Option<u8>) -> String {
+    use std::hash::{BuildHasher, Hasher};
+    let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+    h.write_u128(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+    );
+    h.write_u32(std::process::id());
+    let suffix = instance.map(|n| format!("-{n}")).unwrap_or_default();
+    format!("isoloom-{name}{suffix}-{:08x}", h.finish() as u32)
+}
+
+/// After `down`: the resources still tagged `isoloom-instance=<this deployment>` in the cloud,
+/// listed (never deleted). AWS only, through the Resource Groups Tagging API (`aws` CLI), in the
+/// region `cloud.env` or `cloud.vars.region` names. The name is forgotten once nothing is left.
+fn cloud_leftovers(spec: &core::Spec, wd: &std::path::Path) {
+    let file = wd.join("isoloom-instance");
+    let Some(id) = std::fs::read_to_string(&file).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) else {
+        return;
+    };
+    let Some(c) = &spec.cloud else { return };
+    if c.provider != core::model::CloudProvider::Aws {
+        let _ = std::fs::remove_file(&file);
+        return;
+    }
+    let mut cmd = std::process::Command::new("aws");
+    cmd.args(["resourcegroupstaggingapi", "get-resources", "--tag-filters"])
+        .arg(format!("Key=isoloom-instance,Values={id}"))
+        .args(["--query", "ResourceTagMappingList[].ResourceARN", "--output", "json"])
+        .envs(&c.env)
+        .envs(aws_session_env())
+        .stderr(std::process::Stdio::null());
+    // The region: `cloud.env`'s, else `cloud.vars.region` as applied (an input's value from
+    // inputs.tfvars.json), else the user's own environment. Unknown, the CLI's default is
+    // searched, and the name is kept whatever it finds.
+    let region_env = ["AWS_REGION", "AWS_DEFAULT_REGION"];
+    let mut known = region_env.iter().any(|k| c.env.contains_key(*k));
+    if !known {
+        let applied = || -> Option<String> {
+            let v = c.vars.get("region")?;
+            if core::CloudServices::inputs_in(v).is_empty() {
+                return v.as_str().map(String::from);
+            }
+            let inputs: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(wd.join("inputs.tfvars.json")).ok()?).ok()?;
+            inputs["region"].as_str().map(String::from)
+        };
+        if let Some(r) = applied().filter(|r| !r.is_empty() && !r.contains("{{")) {
+            cmd.args(["--region", &r]);
+            known = true;
+        } else {
+            known = region_env.iter().any(|k| std::env::var(k).is_ok_and(|v| !v.is_empty()));
+        }
+    }
+    let arns: Vec<String> = match cmd.output() {
+        Ok(o) if o.status.success() => serde_json::from_slice(&o.stdout).unwrap_or_default(),
+        Ok(_) => {
+            eprintln!("note: couldn't list what is left tagged isoloom-instance={id} (`aws resourcegroupstaggingapi get-resources` failed)");
+            return;
+        }
+        Err(_) => {
+            eprintln!("note: install the aws CLI to list what is left tagged isoloom-instance={id}");
+            return;
+        }
+    };
+    if arns.is_empty() {
+        if known {
+            let _ = std::fs::remove_file(&file);
+        } else {
+            eprintln!(
+                "note: nothing tagged isoloom-instance={id} in the aws CLI's default region; the region isn't known (set AWS_REGION in `cloud.env`), so the name is kept for the next `down`"
+            );
+        }
+        return;
+    }
+    eprintln!(
+        "\nStill in the cloud, tagged isoloom-instance={id} ({}; created outside Terraform, or still being deleted). Not deleted:",
+        arns.len()
+    );
+    for a in &arns {
+        eprintln!("  {a}");
+    }
+}
+
 /// A cloud-services environment's outputs, by the spec's names: `outputs.sh` read (empty when
 /// it isn't deployed or Terraform can't say).
 fn cloud_outputs(dir: &std::path::Path, instance: Option<u8>) -> indexmap::IndexMap<String, String> {
@@ -1547,8 +1633,13 @@ fn run_cmd(
         }
     };
     // Cloud services cost from the first resource: recorded before the apply, so `status` shows
-    // them deploying (and what a failed apply left).
+    // them deploying (and what a failed apply left). The deployment's own name, for the module to
+    // tag what it creates (`isoloom-instance`), is kept until `down` finds nothing left.
     if !down && t == core::Target::CloudServices {
+        let file = wd.join("isoloom-instance");
+        if !file.exists() {
+            std::fs::write(&file, format!("{}\n", deployment_name(&spec.name, instance)))?;
+        }
         record(false);
     }
     let mut cmd = std::process::Command::new(&program);
@@ -1577,6 +1668,11 @@ fn run_cmd(
                 for line in lifecycle::udp_forwards(&spec) {
                     eprintln!("warning: vagrant-libvirt doesn't forward UDP ports: {line} isn't reachable from this host (use the machine's address)");
                 }
+            }
+            // What the cloud still holds with this deployment's tag, once Terraform destroyed
+            // what it knew of (log groups, service-linked roles, secrets pending deletion).
+            if down && t == core::Target::CloudServices {
+                cloud_leftovers(&spec, &wd);
             }
             // The spec's message, now that the environment is up.
             if !down && t == core::Target::CloudServices {

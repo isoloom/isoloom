@@ -12,7 +12,8 @@
 .isoloom-*/
 
 # What `isoloom run cloud-services` writes next to the state: the module's copy, the
-# launch-time inputs, the marker of an apply in progress.
+# launch-time inputs, the marker of an apply in progress, the deployment's name.
 .isoloom/cloud-services/module/
 .isoloom/cloud-services/inputs.tfvars.json
 .isoloom/cloud-services/deploying
+.isoloom/cloud-services/isoloom-instance

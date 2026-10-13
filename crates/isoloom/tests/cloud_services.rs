@@ -10,7 +10,7 @@ use std::process::{Command, Output};
 /// counts its applies, waits for `$FAKE_TF_WAIT` to exist when set, fails until the
 /// `$FAKE_TF_FAIL_UNTIL`th apply, then writes a state with one resource.
 const FAKE_TERRAFORM: &str = r#"#!/bin/sh
-echo "$PWD|$*" >> "$FAKE_TF_DIR/log"
+echo "$PWD|$*|${TF_VAR_isoloom_instance:-}" >> "$FAKE_TF_DIR/log"
 case "$1" in version) echo '{"terraform_version":"1.9.0"}'; exit 0;; esac
 dir="${1#-chdir=}"; shift
 state=
@@ -28,6 +28,12 @@ case "$1" in
   destroy) echo '{"resources":[]}' > "$state" ;;
   output) echo '{}' ;;
 esac
+"#;
+
+/// A stand-in for the aws CLI: logs its arguments, prints `$FAKE_AWS_ARNS` (else `[]`).
+const FAKE_AWS: &str = r#"#!/bin/sh
+echo "$*" >> "$FAKE_TF_DIR/aws.log"
+echo "${FAKE_AWS_ARNS:-[]}"
 "#;
 
 struct Lab {
@@ -52,10 +58,12 @@ impl Lab {
             format!("version: 1\nname: fake-cloud\ncloud:\n  provider: aws\n  terraform: terraform\n{cloud_fields}"),
         )
         .unwrap();
-        let fake = bin.join("terraform");
-        std::fs::write(&fake, FAKE_TERRAFORM).unwrap();
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        for (name, script) in [("terraform", FAKE_TERRAFORM), ("aws", FAKE_AWS)] {
+            let fake = bin.join(name);
+            std::fs::write(&fake, script).unwrap();
+            std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         Lab { root, project, home, bin, tf }
     }
 
@@ -69,6 +77,7 @@ impl Lab {
             .env("AWS_ACCESS_KEY_ID", "fake")
             .env("FAKE_TF_DIR", &self.tf)
             .env_remove("FAKE_TF_WAIT")
+            .env_remove("FAKE_AWS_ARNS")
             .env_remove("FAKE_TF_FAIL_UNTIL");
         c
     }
@@ -217,4 +226,68 @@ fn a_renamed_module_file_leaves_the_copy_and_a_failed_apply_keeps_its_code() {
     let module = lab.out().join("module");
     assert!(module.join("site.tf").is_file());
     assert!(!module.join("main.tf").exists(), "the old name is still applied");
+}
+
+#[test]
+fn down_lists_what_is_left_with_the_deployments_tag() {
+    let lab = Lab::new("leftovers", "  vars: { region: eu-west-3 }\n");
+    let o = lab.isoloom(&["run", "cloud-services"]);
+    assert!(o.status.success(), "{}", text(&o));
+    let id = read(&lab.out().join("isoloom-instance")).trim().to_string();
+    assert!(id.starts_with("isoloom-fake-cloud-") && id.len() == "isoloom-fake-cloud-".len() + 8, "{id}");
+    // Terraform gets it as `var.isoloom_instance`.
+    let log = read(&lab.tf.join("log"));
+    assert!(log.lines().any(|l| l.contains(" apply ") && l.ends_with(&format!("|{id}"))), "{log}");
+
+    let arn = "arn:aws:logs:eu-west-3:123456789012:log-group:/aws/lambda/x";
+    let o = lab
+        .command(&["down", "cloud-services"])
+        .env("FAKE_AWS_ARNS", format!("[\"{arn}\"]"))
+        .output()
+        .unwrap();
+    assert!(o.status.success(), "{}", text(&o));
+    assert!(text(&o).contains(&format!("tagged isoloom-instance={id} (1;")), "{}", text(&o));
+    assert!(text(&o).contains(&format!("  {arn}")), "{}", text(&o));
+    let aws = read(&lab.tf.join("aws.log"));
+    assert!(
+        aws.contains(&format!(
+            "resourcegroupstaggingapi get-resources --tag-filters Key=isoloom-instance,Values={id} "
+        )),
+        "{aws}"
+    );
+    assert!(aws.trim_end().ends_with("--region eu-west-3"), "{aws}");
+    // Kept while something is left, forgotten once nothing is.
+    assert!(lab.out().join("isoloom-instance").exists());
+    let o = lab.isoloom(&["down", "cloud-services"]);
+    assert!(o.status.success(), "{}", text(&o));
+    assert!(!text(&o).contains("Still in the cloud"), "{}", text(&o));
+    assert!(!lab.out().join("isoloom-instance").exists());
+}
+
+#[test]
+fn leftovers_use_the_applied_region_and_keep_the_name_when_it_is_unknown() {
+    // The region from an input: the value applied, read back at `down`.
+    let lab = Lab::new("region-input", "  vars: { region: \"{{ inputs.REGION }}\" }\ninputs: [REGION]\n");
+    let o = lab.command(&["run", "cloud-services"]).env("REGION", "ap-south-1").output().unwrap();
+    assert!(o.status.success(), "{}", text(&o));
+    let o = lab.isoloom(&["down", "cloud-services"]);
+    assert!(o.status.success(), "{}", text(&o));
+    let aws = read(&lab.tf.join("aws.log"));
+    assert!(aws.trim_end().ends_with("--region ap-south-1"), "{aws}");
+    assert!(!lab.out().join("isoloom-instance").exists());
+
+    // No region anywhere: the CLI's default is searched, and an empty answer forgets nothing.
+    let lab = Lab::new("region-unknown", "");
+    let o = lab.isoloom(&["run", "cloud-services"]);
+    assert!(o.status.success(), "{}", text(&o));
+    let o = lab
+        .command(&["down", "cloud-services"])
+        .env_remove("AWS_REGION")
+        .env_remove("AWS_DEFAULT_REGION")
+        .output()
+        .unwrap();
+    assert!(o.status.success(), "{}", text(&o));
+    assert!(!read(&lab.tf.join("aws.log")).contains("--region"));
+    assert!(text(&o).contains("the name is kept"), "{}", text(&o));
+    assert!(lab.out().join("isoloom-instance").exists());
 }

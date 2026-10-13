@@ -36,12 +36,15 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     for (k, v) in &cloud.env {
         env.push_str(&format!("export {k}={}\n", shell::quote(v)));
     }
+    // The name of this deployment (`isoloom run` writes it): the module can tag what it creates
+    // with it (`var.isoloom_instance`), so `down` lists what is left with that tag.
+    let tag = "[ ! -f \"$here/isoloom-instance\" ] || export TF_VAR_isoloom_instance=\"$(cat \"$here/isoloom-instance\")\"\n";
     let prelude = |what: &str| {
         let mut s = String::from("#!/bin/sh\n");
         s.push_str(&header("#"));
         s.push_str(&format!("# {what}\n"));
         s.push_str(&format!(
-            "# The services of `{}`: the Terraform module `{}`, in the user's {} account.\nset -eu\ncd \"$(dirname \"$0\")\"\nhere=\"$(pwd)\"\nexport TF_DATA_DIR=\"$here/.terraform\"\n{env}src={src}\nmodule=\"$here/module\"\n",
+            "# The services of `{}`: the Terraform module `{}`, in the user's {} account.\nset -eu\ncd \"$(dirname \"$0\")\"\nhere=\"$(pwd)\"\nexport TF_DATA_DIR=\"$here/.terraform\"\n{env}{tag}src={src}\nmodule=\"$here/module\"\n",
             spec.name,
             cloud.terraform,
             cloud.provider.id()
