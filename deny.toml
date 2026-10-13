@@ -1,0 +1,8 @@
+# cargo-deny, run by CI's audit job (`cargo deny check advisories`).
+
+[advisories]
+ignore = [
+  # unsafe-libyaml (under serde_yaml_ng) is archived upstream: an "unmaintained" notice, with no
+  # known vulnerability. Drop this once the YAML parsing moves to a maintained crate.
+  { id = "RUSTSEC-2024-0449", reason = "unmaintained only (no vulnerability); used through serde_yaml_ng until the YAML crate is replaced" },
+]
