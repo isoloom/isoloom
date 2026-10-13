@@ -1224,7 +1224,8 @@ run_play() {
 }
 "#;
 
-#[cfg(test)]
+// The retry helpers run on the Linux controller VM; the test drives them with a POSIX `sh`.
+#[cfg(all(test, unix))]
 mod retry_tests {
     use super::RETRIES;
 

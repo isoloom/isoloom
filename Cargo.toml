@@ -5,7 +5,7 @@ members = ["crates/isoloom-core", "crates/isoloom"]
 [workspace.package]
 version = "0.10.1"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 repository = "https://github.com/isoloom/isoloom"
 publish = false
 

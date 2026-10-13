@@ -63,7 +63,8 @@ fn archive(dir: &Path, root: &Path, generated: bool, out: &str) -> String {
     assert!(st.success(), "the archive wasn't written");
     let list = Command::new("tar").arg("-tvzf").arg(dir.join(out)).output().unwrap();
     assert!(list.status.success(), "tar can't read it: {}", String::from_utf8_lossy(&list.stderr));
-    String::from_utf8(list.stdout).unwrap()
+    // Lossy: Windows' bsdtar lists names in the console's code page, not UTF-8.
+    String::from_utf8_lossy(&list.stdout).into_owned()
 }
 
 /// A fresh folder for one test.
