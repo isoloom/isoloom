@@ -102,6 +102,8 @@ fn a_before_step_must_exist_in_the_project() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+// Through `sh` (Windows has its own lookup, tested in `host`).
+#[cfg(not(windows))]
 #[test]
 fn requires_are_looked_up_or_run() {
     use isoloom_core::host::requirements_with;
