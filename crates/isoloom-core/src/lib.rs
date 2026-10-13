@@ -62,7 +62,7 @@ use std::path::{Path, PathBuf};
 #[allow(deprecated)]
 pub use generate::qemu_refusal;
 pub use generate::resolved;
-pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, generate_instance, refusal, refusal_on};
+pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, generate_instance, project_copies, refusal, refusal_on};
 pub use model::{
     Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target, Tc, Vlan,
 };

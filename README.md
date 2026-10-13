@@ -82,6 +82,7 @@ isoloom connect shell     # the `shell` tool: a toolbox on every network (tools:
 isoloom graph -o lab.svg  # the environment as a diagram (D2 or Graphviz)
 isoloom report services   # tables: addressing, services, wiring, resources
 isoloom defaults          # the defaults in effect (images, Vagrant provider, cloud regions) and their sources
+isoloom chart --version 4.2.1   # the Helm chart (.isoloom/kubernetes/chart/), packaged with helm
 isoloom profiles          # the project's profiles (profiles/<name>.yml), each checked against the spec
 isoloom run TARGET [DIR]  # generate, then bring the environment up with the target's own tool
 isoloom test TARGET [DIR] # run the checks against it: the spec's, and the ones derived from it
@@ -123,6 +124,7 @@ docker compose -f .isoloom/docker/compose.yml up -d --wait          # containers
 docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
 cd .isoloom/vagrant && vagrant up                                    # one VM per machine
 kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -
+helm install env .isoloom/kubernetes/chart -n env --create-namespace && helm test env -n env   # the same, as a chart
 ```
 
 Checks come in three kinds, and `isoloom test` runs them all from inside the environment:

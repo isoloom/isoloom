@@ -239,3 +239,11 @@ fn a_profile_applies_to_every_command_and_pins_its_target() {
     assert_eq!(o.status.code(), Some(2));
     assert!(stderr(&o).contains("no profile `small` (profiles here: big)"), "{}", stderr(&o));
 }
+
+#[test]
+fn chart_wants_a_semantic_version() {
+    let home = scratch("chart-version-home");
+    let o = isoloom(&home, &["chart", &example("hello-stack"), "--version", "v1.2"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(stderr(&o).contains("a semantic version, like 4.2.1"), "{}", stderr(&o));
+}

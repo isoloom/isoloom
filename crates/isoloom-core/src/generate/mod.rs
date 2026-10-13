@@ -221,6 +221,36 @@ fn target_files_raw(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, G
     }
 }
 
+/// The project's own files a target carries with it, read from the project folder `dir`: the
+/// Helm chart's copies of the scripts its pods run (`chart/files/project/`), so the chart works
+/// away from the project. Generators only see the spec, so whoever writes `files` adds these:
+/// `isoloom generate`, `run` and `check` do.
+pub fn project_copies(files: &[GeneratedFile], dir: &std::path::Path) -> Result<Vec<GeneratedFile>, String> {
+    let mut out = Vec::new();
+    for f in files.iter().filter(|f| f.path.ends_with("/kubernetes/kustomization.yaml")) {
+        let base = f.path.trim_end_matches("kustomization.yaml");
+        // The kustomization lists them as `- <key>=../../<path in the project>`.
+        for line in f.contents.lines() {
+            let Some((key, path)) = line.trim().strip_prefix("- ").and_then(|l| l.split_once('=')) else {
+                continue;
+            };
+            let Some(path) = path.strip_prefix("../../") else { continue };
+            // A file the project doesn't have yet is `validate`'s to report (and the chart's
+            // `required` names it at install): generating goes on without it.
+            let contents = match std::fs::read_to_string(dir.join(path)) {
+                Ok(c) => c,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(format!("{path} (copied into the Helm chart): {e}")),
+            };
+            out.push(GeneratedFile {
+                path: format!("{base}{}/{}/{key}", kubernetes::CHART, kubernetes::CHART_PROJECT_FILES),
+                contents,
+            });
+        }
+    }
+    Ok(out)
+}
+
 /// Every target the spec allows and that has a generator: the files, and why the others
 /// weren't generated.
 pub fn generate_all(spec: &Spec) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
