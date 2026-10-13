@@ -40,6 +40,23 @@ spec:
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
+      - name: seed-data
+        image: redis:7-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - /.isoloom-probe/busybox
+        - sh
+        - -c
+        - 'd=/isoloom-seed; m="$d/.isoloom-seeding"; b=/.isoloom-probe/busybox; [ -d ''/data'' ] || exit 0; for f in "$d"/* "$d"/.[!.]* "$d"/..?*; do if [ -e "$f" ] || [ -L "$f" ]; then case "$f" in "$d/lost+found" | "$m") ;; *) [ -e "$m" ] || exit 0; $b rm -rf "$f" ;; esac; fi; done; : > "$m" && $b cp -a ''/data/.'' "$d/" && $b rm -f "$m"'
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        volumeMounts:
+        - name: vol-data
+          mountPath: /isoloom-seed
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
       containers:
       - name: cache
         image: redis:7-alpine

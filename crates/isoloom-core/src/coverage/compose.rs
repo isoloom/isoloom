@@ -352,7 +352,7 @@ fn rows() -> Vec<(String, Support)> {
         (
             "services.*.volumes",
             Partial {
-                from: "machines.*.volumes (and read-only mounts of init and check scripts)",
+                from: "machines.*.volumes (seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts)",
                 gap: "data shared between machines",
             },
         ),

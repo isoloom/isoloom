@@ -514,6 +514,44 @@ fn kubernetes_turns_networks_and_reach_into_network_policies() {
 }
 
 #[test]
+fn kubernetes_seeds_a_volume_from_the_image_before_the_init_jobs() {
+    // `volumes: { ctf: /chroot }` over an image path: on Docker the named volume starts with the
+    // image's files; the claim does too, from an init container of the machine's image.
+    let spec = parse(
+        "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  chal:\n    networks: { app: 10 }\n    volumes: { ctf: /chroot }\n    docker: { image: \"gcr.io/distroless/static\", init: [flag.sh] }\n",
+    )
+    .expect("parses");
+    let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
+    let seed = env.find("- name: seed-ctf").expect("a seed init container");
+    let init = env.find("initContainers:").expect("init containers");
+    let containers = env.find("containers:\n      - name: chal").expect("the machine");
+    // An init container: done before the machine and its init jobs (a container of the pod) start.
+    assert!(init < seed && seed < containers, "{env}");
+    let block = &env[seed..containers];
+    // The machine's image, run by Isoloom's busybox (no shell needed from the image), as root,
+    // the claim at a path of its own, copied into only while empty (a `lost+found` aside).
+    assert!(block.contains("image: gcr.io/distroless/static"), "{block}");
+    assert!(block.contains("- /.isoloom-probe/busybox\n        - sh"), "{block}");
+    assert!(block.contains("runAsUser: 0"), "{block}");
+    assert!(block.contains("name: vol-ctf\n          mountPath: /isoloom-seed"), "{block}");
+    // Its script, as Kubernetes reads it.
+    let docs: Vec<serde_yaml_ng::Value> = env.split("\n---\n").filter_map(|d| serde_yaml_ng::from_str(d).ok()).collect();
+    let deploy = docs.iter().find(|d| d["kind"] == "Deployment").expect("the machine's Deployment");
+    let inits = deploy["spec"]["template"]["spec"]["initContainers"].as_sequence().unwrap();
+    let seed_c = inits.iter().find(|c| c["name"] == "seed-ctf").unwrap();
+    let script = seed_c["command"][3].as_str().unwrap();
+    assert!(script.contains("[ -d '/chroot' ] || exit 0"), "{script}");
+    assert!(script.contains("lost+found"), "{script}");
+    assert!(script.contains("$b cp -a '/chroot/.' \"$d/\""), "{script}");
+    // A marker stands while copying: a failed copy is cleared and done again, not taken as seeded.
+    assert!(script.contains(": > \"$m\" && $b cp -a") && script.ends_with("&& $b rm -f \"$m\""), "{script}");
+    assert!(script.contains("[ -e \"$m\" ] || exit 0; $b rm -rf \"$f\""), "{script}");
+    // The busybox it runs is copied in first, even though the machine has no services to probe.
+    assert!(env[init..seed].contains("- name: isoloom-probe\n        image: busybox"), "{env}");
+    assert!(env.contains("- name: isoloom-probe\n        emptyDir: {}"), "{env}");
+}
+
+#[test]
 fn kubernetes_publishes_and_keeps_offline_machines_inside() {
     let (_, spec) = example("hello-stack");
     let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");

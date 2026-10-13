@@ -10,9 +10,11 @@
 //! - Offline machines: an egress policy keeps them inside the environment (and DNS).
 //! - `publish`: a LoadBalancer Service on the published port (local clusters such as OrbStack,
 //!   Docker Desktop and k3s answer on localhost).
-//! - Volumes: a PersistentVolumeClaim each. `init:` jobs: a container in the machine's pod
-//!   (same network and volumes), run once the machine answers. `depends_on`: init containers
-//!   that wait for the dependencies' services.
+//! - Volumes: a PersistentVolumeClaim each, seeded from the image as Docker seeds a named
+//!   volume: an init container of the machine's image copies what the image has at the path
+//!   into the claim while it is empty (see [`seed_container`]). `init:` jobs: a container in
+//!   the machine's pod (same network and volumes), run once the machine answers.
+//!   `depends_on`: init containers that wait for the dependencies' services.
 //! - Checks: a Job per position in `.isoloom/kubernetes/checks/`, with the networks (labels) of
 //!   the machine it stands for, so the same policies apply to it.
 //! - Addresses: Kubernetes picks pod addresses; names, ports and reachability are kept.
@@ -160,6 +162,45 @@ fn unsupported(spec: &Spec) -> Option<String> {
 
 /// The emptyDir holding Isoloom's probe, and the init container filling it.
 const PROBE_VOLUME: &str = "isoloom-probe";
+/// Where a seed init container sees the claim it fills.
+const SEED_DIR: &str = "/isoloom-seed";
+/// In the claim while a seed copy runs (see [`seed_container`]).
+const SEED_MARKER: &str = ".isoloom-seeding";
+
+/// An init container that gives volume `v` (mounted at `path`) the image's files at that path
+/// while the claim is empty, as Docker does for a named volume the first time it is mounted: a
+/// machine declaring `volumes: { ctf: /chroot }` keeps the image's `/chroot` and its init jobs
+/// add to it. It runs the machine's image (its files) with Isoloom's static busybox (no shell
+/// or `cp` needed from the image: distroless and `scratch` images are seeded too), as root so
+/// `cp -a` keeps owners and modes. Empty means nothing in the claim but a `lost+found` (ext4
+/// claims have one); a path the image doesn't have leaves the claim empty. Once seeded, or
+/// written by the machine, a claim is never seeded again (its data survives restarts).
+///
+/// A `.isoloom-seeding` marker stands in the claim while the copy runs: a copy that failed (the
+/// claim too small for the image's files) fails the pod, and the next try finds the marker,
+/// clears what the last one left and copies again, instead of taking a half-filled claim as
+/// seeded.
+fn seed_container(image: &str, v: &str, path: &str) -> Value {
+    let src = shell::quote(&format!("{}/.", path.trim_end_matches('/')));
+    let script = format!(
+        "d={SEED_DIR}; m=\"$d/{SEED_MARKER}\"; b={PROBE_DIR}/busybox; [ -d {path} ] || exit 0; for f in \"$d\"/* \"$d\"/.[!.]* \"$d\"/..?*; do if [ -e \"$f\" ] || [ -L \"$f\" ]; then case \"$f\" in \"$d/lost+found\" | \"$m\") ;; *) [ -e \"$m\" ] || exit 0; $b rm -rf \"$f\" ;; esac; fi; done; : > \"$m\" && $b cp -a {src} \"$d/\" && $b rm -f \"$m\"",
+        path = shell::quote(path),
+    );
+    map([
+        ("name", s(format!("seed-{v}"))),
+        ("image", s(image)),
+        ("imagePullPolicy", s("IfNotPresent")),
+        ("command", list([s(format!("{PROBE_DIR}/busybox")), s("sh"), s("-c"), s(script)])),
+        ("securityContext", map([("runAsUser", Value::from(0)), ("runAsGroup", Value::from(0))])),
+        (
+            "volumeMounts",
+            list([
+                map([("name", s(format!("vol-{v}"))), ("mountPath", s(SEED_DIR))]),
+                map([("name", s(PROBE_VOLUME)), ("mountPath", s(PROBE_DIR)), ("readOnly", Value::Bool(true))]),
+            ]),
+        ),
+    ])
+}
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     if let Some(what) = unsupported(spec) {
@@ -286,7 +327,9 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         pod.insert(s("hostname"), s(name.as_str()));
         // Wait for the machines it depends on: their services answer.
         let mut waits: Vec<Value> = Vec::new();
-        if !m.ready_ports().is_empty() {
+        // Isoloom's busybox: for the readiness probe and for seeding the volumes.
+        let needs_probe = !m.ready_ports().is_empty() || !m.volumes.is_empty();
+        if needs_probe {
             waits.push(map([
                 ("name", s(PROBE_VOLUME)),
                 ("image", s(PROBE_IMAGE)),
@@ -294,6 +337,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 ("volumeMounts", list([map([("name", s(PROBE_VOLUME)), ("mountPath", s("/probe"))])])),
             ]));
         }
+        // The volumes start with the image's files (before the machine and its init jobs).
+        waits.extend(m.volumes.iter().map(|(v, path)| seed_container(&image, v, path)));
         waits.extend(m.depends_on.iter().filter_map(|dep| {
             let ports: Vec<u16> = spec.machines[dep].ready_ports();
             (!ports.is_empty()).then(|| {
@@ -341,7 +386,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 ("configMap", map([("name", s(SCRIPTS)), ("defaultMode", Value::from(0o755))])),
             ]));
         }
-        if !m.ready_ports().is_empty() {
+        if needs_probe {
             volumes.push(map([("name", s(PROBE_VOLUME)), ("emptyDir", Value::Mapping(Default::default()))]));
         }
         for (i, _) in m.tmpfs.iter().enumerate() {
