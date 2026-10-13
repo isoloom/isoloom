@@ -116,13 +116,36 @@ answers from the controller), **declared** (`http`, `tcp`, `exec`, with `from`,
 ## Layout
 
 - `crates/isoloom-core`: the format as a library (parse, validate, derive targets, generators).
-  Other Rust tools can embed it directly. What other tools can rely on is documented in
-  [docs/cloud-modules.md](docs/cloud-modules.md) (the cloud modules' variables and outputs) and
-  [docs/registry.md](docs/registry.md) (`~/.isoloom/status.yml`).
+  Other Rust tools can embed it directly (see [Using the library](#using-the-library)).
 - `crates/isoloom`: the command line.
 - `examples/`: environments used as tests, from a two-machine app and a segmented network to an
   Active Directory domain, Cisco routers and cloud services. Those with a committed `.isoloom/`
   are checked against the generators in CI.
+
+## Using the library
+
+`isoloom-core` isn't on crates.io: depend on it from git, pinned to a release tag.
+
+```toml
+isoloom-core = { git = "https://github.com/isoloom/isoloom", tag = "v0.10.1" }
+```
+
+- **Supported surface**: the crate root (`load`, `parse`, `validate`, `validate_files`,
+  `derive`, `generate`, `refusal`, `totals`, the model types) and the modules `model`,
+  `validate`, `targets`, `generate` (with `resolved`, the snapshot), `checks`, `instance`,
+  `defaults`, `registry` and `host`. Every other public module (`clones`, `groups`, `vlans`,
+  `ignore`, `images`, `import`, `coverage`, `report`, `schema`, `shell`) is internal: public for
+  the command line, and may change in any release.
+- **Versions**: while Isoloom is at 0.x, a breaking change to the supported surface bumps the
+  minor version (0.10 -> 0.11), never the patch, and the CHANGELOG lists it under a
+  "Breaking (library)" line. A new public field or enum variant isn't breaking (a new spec key
+  is one): get the model's types by parsing a spec rather than writing struct literals. CI
+  reports every pull request's API changes (`cargo semver-checks`, against the base and the
+  last tag) in its summary.
+- **Files**: `~/.isoloom/status.yml` has a `version:` and is documented in
+  [docs/registry.md](docs/registry.md); the cloud modules' variables and outputs in
+  [docs/cloud-modules.md](docs/cloud-modules.md); the resolved snapshot
+  (`.isoloom/resolved.json`) carries its own `version`.
 
 ## Status
 

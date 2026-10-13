@@ -485,7 +485,7 @@ pub struct Render<'a> {
 }
 
 /// Single-quoted for sh (the same as [`crate::shell::quote`]).
-pub use crate::shell::quote as sq;
+use crate::shell::quote as sq;
 
 /// Escaped for the inside of a double-quoted sh string.
 fn dq(s: &str) -> String {
