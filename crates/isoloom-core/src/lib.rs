@@ -15,10 +15,10 @@
 //!
 //! - **Supported**: the items at the crate root ([`load`], [`load_with`], [`parse`], [`find`],
 //!   [`validate()`], [`validate_files`], [`derive`](fn@derive), [`effective`], [`generate()`],
-//!   [`generate_all`], [`generate_instance`], [`refusal`], [`totals`], the re-exported model
-//!   types) and the modules [`model`], [`validate`](mod@validate), [`targets`],
-//!   [`generate`](mod@generate) (with [`resolved`], the snapshot), [`checks`] (the check plan
-//!   and the runner's output lines), [`instance`], [`defaults`], [`registry`]
+//!   [`generate_all`], [`generate_instance`], [`refusal`], [`refusal_on`], [`totals`], the
+//!   re-exported model types) and the modules [`model`], [`validate`](mod@validate),
+//!   [`targets`], [`generate`](mod@generate) (with [`resolved`], the snapshot), [`checks`] (the
+//!   check plan and the runner's output lines), [`instance`], [`defaults`], [`registry`]
 //!   (`~/.isoloom/status.yml`, see `docs/registry.md`) and [`host`].
 //! - **Internal**: every other module ([`clones`], [`groups`], [`vlans`], [`ignore`], [`images`],
 //!   [`import`], [`coverage`], [`report`], [`schema`], [`shell`]) is public for the `isoloom`
@@ -58,8 +58,10 @@ pub mod vlans;
 
 use std::path::{Path, PathBuf};
 
+#[allow(deprecated)]
+pub use generate::qemu_refusal;
 pub use generate::resolved;
-pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, generate_instance, qemu_refusal, refusal};
+pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, generate_instance, refusal, refusal_on};
 pub use model::{
     Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target, Tc, Vlan,
 };

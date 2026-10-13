@@ -552,7 +552,7 @@ when a table disagrees with what Isoloom really generates.
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `advanced_network` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit) |
+| `advanced_network` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit) |
 | `arch` | Yes | Yes | From `machines.*.arch` (emulated when the host's CPU is another) |
 | `control_port` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `cpu` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
@@ -572,13 +572,13 @@ when a table disagrees with what Isoloom really generates.
 | `mcast_addr` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
 | `memory` | Yes | Yes | From `machines.*.resources` |
 | `net_device` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `net_mode` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit) |
+| `net_mode` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit) |
 | `no_daemonize` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `other_default` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `qemu_bin` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `qemu_dir` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `smp` | Yes | Yes | From `machines.*.resources.cpus` |
-| `socket_opts` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit) |
+| `socket_opts` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit) |
 | `socket_vmnet_client` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
 | `socket_vmnet_socket` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
 | `ssh_auto_correct` | Yes | Yes | Always: each VM forwards SSH from its own host port |

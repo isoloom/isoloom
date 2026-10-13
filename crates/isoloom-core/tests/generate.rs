@@ -869,7 +869,7 @@ fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
         "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    services: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\nprovision:\n  - ansible: ansible/main.yml\n",
     )
     .unwrap();
-    assert_eq!(isoloom_core::qemu_refusal(&spec), None);
+    assert_eq!(isoloom_core::refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     assert!(vf.contains("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"]"));
     // QEMU boots machines in parallel unless told not to: the controller would run its play
@@ -906,11 +906,19 @@ fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
 #[test]
 fn qemu_refuses_more_than_two_vms_on_a_network() {
     let three = parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian-12 }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian-12 }\n  c:\n    networks: { lab: 12 }\n    vm: { os: debian-12 }\n",
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian-12, provision: [p.sh] }\n  c:\n    networks: { lab: 12 }\n    vm: { os: debian-12, provision: [p.sh] }\n",
     )
     .unwrap();
-    let why = isoloom_core::qemu_refusal(&three).expect("three VMs on one network");
+    let why = isoloom_core::refusal_on(&three, Target::Vagrant, Some("qemu")).expect("three VMs on one network");
     assert!(why.contains("network `lab` has 3 VMs"), "{why}");
+    // Only QEMU: Vagrant on another provider, or whatever the provider, runs it.
+    assert_eq!(isoloom_core::refusal_on(&three, Target::Vagrant, Some("virtualbox")), None);
+    assert_eq!(isoloom_core::refusal_on(&three, Target::Vagrant, None), None);
+    assert_eq!(isoloom_core::refusal(&three, Target::Vagrant), None);
+    // The deprecated question still answers the same, for the tools that ask it.
+    #[allow(deprecated)]
+    let old = isoloom_core::qemu_refusal(&three);
+    assert_eq!(old.as_deref(), Some(why.as_str()));
     let vf = &generate(&three, Target::Vagrant).unwrap()[0].contents;
     // Still generated (for every other provider); the QEMU block says why it has no network.
     assert!(provider_block(vf, "a", "qemu").contains("# No private network on QEMU: network `lab` has 3 VMs"));

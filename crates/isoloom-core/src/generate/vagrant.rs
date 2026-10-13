@@ -15,7 +15,8 @@
 //! - On QEMU (vagrant-qemu), a machine boots its libvirt-format box with its own CPU, emulated
 //!   when the host's is another (x86 Windows on an Apple Silicon Mac: slow, so longer timeouts).
 //!   Without root, QEMU links exactly two VMs per network (a socket listen/connect pair), each
-//!   on one network; see [`qemu_refusal`].
+//!   on one network; [`refusal_on`](crate::refusal_on) with `Some("qemu")` says when a spec
+//!   doesn't fit.
 
 use std::fmt::Write;
 use std::net::Ipv4Addr;
@@ -821,8 +822,8 @@ fn qemu_port(env: &str, net: &str) -> u16 {
 }
 
 /// Why this environment's VMs can't all have their networks under Vagrant's QEMU provider, if
-/// they can't, so a tool can ask before offering QEMU.
-pub fn qemu_refusal(spec: &Spec) -> Option<String> {
+/// they can't ([`super::refusal_on`] asks it for `qemu`).
+pub(crate) fn qemu_refusal(spec: &Spec) -> Option<String> {
     let plan = checks::plan(spec);
     let in_their_place = networks_in_place_of_machines(spec, &plan);
     let with_controller = !spec.provision.is_empty() || !controller_checks(spec, &plan, &in_their_place).is_empty();

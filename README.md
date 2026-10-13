@@ -131,7 +131,7 @@ isoloom-core = { git = "https://github.com/isoloom/isoloom", tag = "v0.10.1" }
 ```
 
 - **Supported surface**: the crate root (`load`, `parse`, `validate`, `validate_files`,
-  `derive`, `generate`, `refusal`, `totals`, the model types) and the modules `model`,
+  `derive`, `generate`, `refusal`, `refusal_on`, `totals`, the model types) and the modules `model`,
   `validate`, `targets`, `generate` (with `resolved`, the snapshot), `checks`, `instance`,
   `defaults`, `registry` and `host`. Every other public module (`clones`, `groups`, `vlans`,
   `ignore`, `images`, `import`, `coverage`, `report`, `schema`, `shell`) is internal: public for

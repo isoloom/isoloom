@@ -379,7 +379,7 @@ fn qemu(s: &str) -> Option<Support> {
         "disk_resize" => DISK,
         "advanced_network" | "net_mode" | "socket_opts" => Partial {
             from: "machines.*.networks",
-            gap: "without root, QEMU links exactly two VMs per network, each VM on one network (`qemu_refusal` says when a spec doesn't fit)",
+            gap: "without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit)",
         },
         "socket_vmnet_client" | "socket_vmnet_socket" | "vmnet_interface" | "tap_device" | "mcast_addr" | "extra_netdev_args" => Planned {
             note: "more than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac)",

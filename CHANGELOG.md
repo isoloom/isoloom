@@ -7,6 +7,10 @@
 - `~/.isoloom/status.yml` starts with `version: 1` (`registry::Registry::version`, `registry::VERSION`), written on every save; a file without it reads as version 1, and unknown fields are still ignored. Build a `Registry` with `Registry::default()`. (#108)
 - Breaking (library): `checks::sq`, `vlans::vlan_network`, `groups::RESERVED`, `registry::rfc3339` and `defaults::at_path` are no longer public. (#108)
 
+### One "can this run here" question
+- `refusal_on(spec, target, provider)`: `refusal` for a target run with a given provider (the name its tool knows it by, as `defaults.yml` sets it). Today only `vagrant` on `qemu` refuses more (without root, QEMU links two VMs per network, each VM on one); `None` is `refusal`. `isoloom run vagrant` asks it for `vagrant.provider` from the defaults and refuses up front instead of failing in `vagrant up`. `qemu_refusal` is deprecated (a thin wrapper, same answers): use `refusal_on(spec, Target::Vagrant, Some("qemu"))`, which also says why Vagrant can't run the spec at all. (#107)
+- `cloud.hourly_usd` is documented for what it is: the author's estimate of the hourly cost, for whoever runs the environment. `isoloom run cloud-services` says it before applying, and the resolved snapshot carries it. The registry's `project` (docs/registry.md) is documented for anyone who brings a Compose file up under another project name; `isoloom run` never sets it. (#107)
+
 ### `isoloom provision`
 - `isoloom provision [machine...] [--target t]`: the environment's provisioning again, on a running environment, in place, for a step that failed or was interrupted (a host that stopped answering) without an hour of rebuild. With `provision:` steps, the controller (booted if halted, halted again after) gets the project's current files and runs the playbooks again, limited to the named machines (`--limit`); without, the named machines' own `vm.provision` steps run again (`vagrant provision`). Steps are meant to be idempotent. Local VMs (vagrant, docker-vm, hybrid) for now.
 

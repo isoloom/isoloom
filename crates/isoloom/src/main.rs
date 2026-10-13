@@ -1416,6 +1416,17 @@ fn run_cmd(
             )
             .into());
         }
+        // The provider in the defaults can refuse what the target alone runs (QEMU's two-VM links).
+        if t == core::Target::Vagrant
+            && let Some(p) = &defaults.vagrant.provider
+            && let Some(why) = core::refusal_on(&spec, t, Some(p))
+        {
+            return Err(format!(
+                "`{}` can't run this environment on the `{p}` provider (defaults: vagrant.provider): {why}",
+                t.id()
+            )
+            .into());
+        }
     }
     if t == core::Target::External && !down {
         lifecycle::external_up(dir, &spec, instance)?;
@@ -1439,6 +1450,9 @@ fn run_cmd(
         && !down
         && let Some(c) = &spec.cloud
     {
+        if let Some(h) = c.hourly_usd {
+            eprintln!("note: about ${h:.2} an hour while it exists (cloud.hourly_usd); `isoloom down` destroys it");
+        }
         let mut values = serde_json::Map::new();
         let mut missing = Vec::new();
         for (k, v) in &c.vars {

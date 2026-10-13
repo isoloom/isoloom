@@ -25,7 +25,6 @@ pub mod resolved;
 mod router;
 mod trunks;
 mod vagrant;
-pub use vagrant::qemu_refusal;
 
 use std::fmt;
 use std::net::Ipv4Addr;
@@ -300,6 +299,32 @@ pub fn refusal(spec: &Spec, target: Target) -> Option<String> {
         Err(GenerateError::Unsupported { what, .. }) => Some(what),
         _ => None,
     }
+}
+
+/// [`refusal`], for a target run with a given provider: why `target` can't run this spec when
+/// its tool uses `provider`, if it can't. `provider` is the name the target's tool knows it by,
+/// as `defaults.yml` sets it: for Vagrant, `vagrant up --provider` (`virtualbox`, `libvirt`,
+/// `qemu`, ...). `None` is the target whatever the provider, which is [`refusal`].
+///
+/// Today only `vagrant` on `qemu` refuses more: without root, QEMU links exactly two VMs per
+/// network, and each VM is on one network. `isoloom run vagrant` asks it for the provider in
+/// the defaults before starting; a tool offering a provider can ask before it does.
+pub fn refusal_on(spec: &Spec, target: Target, provider: Option<&str>) -> Option<String> {
+    refusal(spec, target).or_else(|| match (target, provider) {
+        (Target::Vagrant, Some("qemu")) => vagrant::qemu_refusal(spec),
+        _ => None,
+    })
+}
+
+/// Why this environment's VMs can't all have their networks under Vagrant's QEMU provider, if
+/// they can't. Only the QEMU part of the answer: it doesn't say whether Vagrant can run the spec
+/// at all.
+#[deprecated(
+    since = "0.11.0",
+    note = "use `refusal_on(spec, Target::Vagrant, Some(\"qemu\"))`, which also says why Vagrant can't run the spec at all"
+)]
+pub fn qemu_refusal(spec: &Spec) -> Option<String> {
+    vagrant::qemu_refusal(spec)
 }
 
 /// The spec's first validation problem, as `refusal` reports it.

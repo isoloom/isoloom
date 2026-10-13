@@ -23,9 +23,11 @@ pub struct Entry {
     /// The cloud module, for the cloud targets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<String>,
-    /// The Compose project name, when a tool embedding Isoloom ran the Compose file under its
-    /// own (`docker compose -p`); else the file's `name:`. `status`, `connect`, `exec` and
-    /// `capture` pass it, or Compose would look for an environment that isn't there.
+    /// The Compose project name, when the Compose file was brought up under another name than
+    /// its own `name:` (`docker compose -p`): by whatever started it that way, which records
+    /// the name here. `isoloom run` never sets it (it uses the file's name, and `--instance`
+    /// for copies). `status`, `connect`, `exec`, `capture` and `down` pass it, or Compose would
+    /// look for an environment that isn't there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
     /// When `run` finished, as RFC 3339 (UTC).
