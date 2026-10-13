@@ -59,7 +59,6 @@ const ARCH: Support = Planned {
 const WINDOWS: Support = Planned {
     note: "with Windows guests (which make an environment VM-only)",
 };
-const HYPERV_HOSTS: Support = Planned { note: "with Hyper-V hosts" };
 const RESOURCES: Support = Emitted { from: "machines.*.resources" };
 const VM_NAME: Support = Emitted {
     from: "(the environment and machine names, as the VM's display name)",
@@ -340,9 +339,17 @@ fn parallels(s: &str) -> Option<Support> {
 
 fn hyperv(s: &str) -> Option<Support> {
     Some(match s {
-        "cpus" | "memory" | "vmname" => HYPERV_HOSTS,
-        "linked_clone" | "differencing_disk" => LINKED_CLONE,
-        "maxmemory" | "enable_virtualization_extensions" => HOST_TUNING,
+        "cpus" | "memory" => RESOURCES,
+        "vmname" => Emitted {
+            from: "(the environment and machine names, as the VM's name in Hyper-V)",
+        },
+        "linked_clone" => LINKED_CLONE_ON,
+        "differencing_disk" => LINKED_CLONE,
+        "enable_virtualization_extensions" => Emitted {
+            from: "machines.*.privileged (nested virtualization)",
+        },
+        "maxmemory" => HOST_TUNING,
+        // Isoloom's networks are private switches with an adapter per VM (Vagrant's triggers).
         "vlan_id" => PRIVATE_NETWORKS,
         "mac" => NotPortable {
             why: "cloud VMs get their MAC address from the provider",

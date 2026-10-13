@@ -17,6 +17,9 @@
 //!   Without root, QEMU links exactly two VMs per network (a socket listen/connect pair), each
 //!   on one network; [`refusal_on`](crate::refusal_on) with `Some("qemu")` says when a spec
 //!   doesn't fit.
+//! - On Hyper-V, Vagrant puts a VM's adapters on one switch and sets no address: each network is
+//!   a private switch, each VM an adapter there with a fixed MAC, and its address is set in the
+//!   guest (see `vagrant_hyperv.rb` and [`HyperV`]).
 
 use std::fmt::Write;
 use std::net::Ipv4Addr;
@@ -41,6 +44,10 @@ pub(super) const PROJECT_RB: &str = concat!(
     include_str!("untar.ps1"),
     "PS1\n"
 );
+
+/// The Ruby that gives VMs their networks on Hyper-V (`vagrant_hyperv.rb`): only the `vagrant`
+/// output's Vagrantfile carries it.
+const HYPERV_RB: &str = include_str!("vagrant_hyperv.rb");
 
 /// Unpacks the project's tar.gz on Windows (`$archive`, `$dest`, `$strip` set before it).
 pub(super) const UNTAR_PS1: &str = include_str!("untar.ps1");
@@ -88,6 +95,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     out.push_str("# This host's CPU as QEMU names it: a machine built for another one runs emulated there.\n");
     out.push_str("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"aarch64\" : \"x86_64\"\n");
     out.push_str(PROJECT_RB);
+    out.push_str(HYPERV_RB);
     out.push('\n');
     if !spec.inputs.is_empty() {
         out.push_str("# Values provided at launch (empty when unset).\nINPUTS = {\n");
@@ -227,7 +235,24 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 .filter(|_| windows)
                 .map(|(net, octet)| (address(spec, net, *octet), cidr_len(spec, net))),
         };
-        providers(&mut out, &label, &format!("{}-{name}", spec.name), cpus, mem, &nets, libvirt_box, &qemu);
+        let hyperv = HyperV {
+            env: &spec.name,
+            boxed: image.hyperv.clone(),
+            nics: m.networks.iter().map(|(net, octet)| nic(spec, net, address(spec, net, *octet))).collect(),
+            windows,
+            nested: m.privileged,
+        };
+        providers(
+            &mut out,
+            &label,
+            &format!("{}-{name}", spec.name),
+            cpus,
+            mem,
+            &nets,
+            libvirt_box,
+            &qemu,
+            &hyperv,
+        );
 
         if windows {
             windows_steps(spec, name, m, vm, &mut out);
@@ -548,6 +573,7 @@ fn tool_vm(spec: &Spec, index: usize, out: &mut String, links: &IndexMap<String,
         &all,
         Some(HELPER_LIBVIRT_BOX),
         &Qemu::helper(&links[TOOL_SHELL]),
+        &HyperV::helper(spec, spec.networks.keys().map(|n| (n.as_str(), cidr(n).tool(index)))),
     );
     let hosts: Vec<String> = spec
         .machines
@@ -606,7 +632,7 @@ const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
 /// its display name, `guest` its ESXi guest name, `nets` the networks it is on, `libvirt_box`
 /// the box libvirt uses instead of the VirtualBox one (if any), `qemu` how QEMU runs it.
 #[allow(clippy::too_many_arguments)]
-fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, nets: &[&str], libvirt_box: Option<&str>, qemu: &Qemu) {
+fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, nets: &[&str], libvirt_box: Option<&str>, qemu: &Qemu, hyperv: &HyperV) {
     let label = rb(label);
     let _ = writeln!(
         out,
@@ -642,6 +668,175 @@ fn providers(out: &mut String, label: &str, guest: &str, cpus: u32, mem: u32, ne
             );
         }
     }
+    hyperv_block(out, guest, cpus, mem, hyperv);
+}
+
+/// How a VM runs under Vagrant's Hyper-V provider.
+struct HyperV<'a> {
+    /// The environment's name (its networks' switches are named after it).
+    env: &'a str,
+    boxed: images::HyperVBox,
+    /// Its adapters on the networks, in order.
+    nics: Vec<Nic<'a>>,
+    windows: bool,
+    /// Nested virtualization (`privileged`): the VM runs VMs of its own.
+    nested: bool,
+}
+
+/// A VM's adapter on one network, and its address there.
+struct Nic<'a> {
+    net: &'a str,
+    ip: Ipv4Addr,
+    len: u8,
+    mask: Ipv4Addr,
+}
+
+fn nic<'a>(spec: &Spec, net: &'a str, ip: Ipv4Addr) -> Nic<'a> {
+    Nic {
+        net,
+        ip,
+        len: cidr_len(spec, net),
+        mask: netmask(spec, net),
+    }
+}
+
+impl<'a> HyperV<'a> {
+    /// Isoloom's own Debian VMs (router, tool shell) at these addresses.
+    fn helper(spec: &'a Spec, at: impl Iterator<Item = (&'a str, Ipv4Addr)>) -> Self {
+        HyperV {
+            env: &spec.name,
+            boxed: images::HyperVBox::Other {
+                name: images::HYPERV_DEBIAN_12.0.into(),
+                version: Some(images::HYPERV_DEBIAN_12.1.into()),
+            },
+            nics: at.map(|(net, ip)| nic(spec, net, ip)).collect(),
+            windows: false,
+            nested: false,
+        }
+    }
+
+    /// The private switch of a network.
+    fn switch(&self, net: &str) -> String {
+        format!("isoloom-{}-{net}", self.env)
+    }
+}
+
+/// The MAC address of a VM's adapter on a network under Hyper-V: locally administered, stable
+/// for the VM and network, so the guest finds the adapter whatever it names it.
+fn hyperv_mac(guest: &str, net: &str) -> [u8; 6] {
+    // FNV-1a: stable across builds and platforms (unlike std's hasher).
+    let mut h: u32 = 0x811c_9dc5;
+    for b in format!("{guest}/{net}").bytes() {
+        h = (h ^ u32::from(b)).wrapping_mul(0x0100_0193);
+    }
+    let b = h.to_be_bytes();
+    [0x02, 0x15, b[0], b[1], b[2], b[3]]
+}
+
+fn mac_text(mac: [u8; 6], sep: &str, upper: bool) -> String {
+    let s = mac.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(sep);
+    if upper { s.to_uppercase() } else { s }
+}
+
+/// The Hyper-V provider block, and the triggers giving the VM its networks there: the switches
+/// before Vagrant picks the first adapter's, the adapters before it starts, their addresses in
+/// the guest once it answers (before its provisioning), the switches gone with the last VM.
+fn hyperv_block(out: &mut String, guest: &str, cpus: u32, mem: u32, hv: &HyperV) {
+    out.push_str("    m.vm.provider \"hyperv\" do |v, o|\n");
+    match &hv.boxed {
+        images::HyperVBox::Main => {}
+        images::HyperVBox::Other { name, version } => {
+            // Another box (or version) than the main one: the main one's pin isn't its.
+            let _ = writeln!(
+                out,
+                "      o.vm.box = {}\n      o.vm.box_version = {}",
+                rb(name),
+                rb(version.as_deref().unwrap_or(">= 0"))
+            );
+        }
+        images::HyperVBox::Missing => out.push_str("      # No Hyper-V build of this box is known: give one with `vm.image.hyperv`.\n"),
+    }
+    let _ = writeln!(
+        out,
+        "      v.vmname = {}\n      v.cpus = {cpus}\n      v.memory = {mem}\n      v.linked_clone = true",
+        rb(guest)
+    );
+    if hv.nested {
+        out.push_str("      v.enable_virtualization_extensions = true\n");
+    }
+    // Hyper-V reads only `bridge` here: the switch of the VM's first adapter.
+    out.push_str("      o.vm.network \"private_network\", bridge: HYPERV_SWITCH\n    end\n");
+    let switches = hv.nics.iter().map(|n| rb(&hv.switch(n.net))).collect::<Vec<_>>().join(", ");
+    let _ = writeln!(
+        out,
+        "    m.trigger.before :\"VagrantPlugins::HyperV::Action::Configure\", type: :action do |t|\n      t.ruby {{ |_, _| IsoloomHyperV.switches([{switches}]) }}\n    end"
+    );
+    if hv.nics.is_empty() {
+        return;
+    }
+    let attach = hv
+        .nics
+        .iter()
+        .map(|n| format!("[{}, {}]", rb(&hv.switch(n.net)), rb(&mac_text(hyperv_mac(guest, n.net), "", true))))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let _ = writeln!(
+        out,
+        "    m.trigger.before :\"VagrantPlugins::HyperV::Action::StartInstance\", type: :action do |t|\n      t.ruby {{ |_, machine| IsoloomHyperV.attach(machine, [{attach}]) }}\n    end"
+    );
+    let (script, tag) = if hv.windows {
+        (hyperv_windows_addresses(guest, &hv.nics), "PS1")
+    } else {
+        (hyperv_linux_addresses(guest, &hv.nics), "SH")
+    };
+    let _ = writeln!(
+        out,
+        "    m.trigger.before :\"Vagrant::Action::Builtin::SetHostname\", type: :action do |t|\n      t.ruby do |_, machine|\n        IsoloomHyperV.address(machine, <<~'{tag}') if machine.provider_name == :hyperv\n{}        {tag}\n      end\n    end",
+        indent(&script, 10)
+    );
+    let _ = writeln!(
+        out,
+        "    m.trigger.after :\"VagrantPlugins::HyperV::Action::DeleteVM\", type: :action do |t|\n      t.ruby {{ |_, _| IsoloomHyperV.prune([{switches}]) }}\n    end"
+    );
+}
+
+/// A Linux VM's addresses on its networks under Hyper-V: each adapter found by its MAC, its
+/// address set with `ip` (NetworkManager told to leave it alone), by a unit run at every boot
+/// (systemd, or OpenRC's `local` on Alpine), and now.
+fn hyperv_linux_addresses(guest: &str, nics: &[Nic]) -> String {
+    let lines: String = nics
+        .iter()
+        .map(|n| format!("lab {} {}/{}\n", mac_text(hyperv_mac(guest, n.net), ":", false), n.ip, n.len))
+        .collect();
+    let unmanaged = nics
+        .iter()
+        .map(|n| format!("mac:{}", mac_text(hyperv_mac(guest, n.net), ":", false)))
+        .collect::<Vec<_>>()
+        .join(";");
+    format!(
+        "set -e\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/lab-net.sh <<'NET'\n#!/bin/sh\n# This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.\nlab() {{\n  for d in /sys/class/net/*; do\n    [ \"$(cat \"$d/address\" 2>/dev/null)\" = \"$1\" ] || continue\n    IF=${{d##*/}}\n    if command -v nmcli >/dev/null; then nmcli device set \"$IF\" managed no 2>/dev/null || true; fi\n    ip link set \"$IF\" up\n    ip -4 addr show dev \"$IF\" | grep -q \" $2 \" || ip addr add \"$2\" dev \"$IF\"\n    return 0\n  done\n  echo \"isoloom: no network adapter with MAC $1\" >&2\n  return 1\n}}\n{lines}NET\nchmod +x /etc/isoloom/lab-net.sh\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf\nfi\nif [ -d /run/systemd/system ]; then\n  cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'\n[Unit]\nDescription=Addresses on the isoloom networks\nAfter=network-pre.target NetworkManager.service systemd-networkd.service\nBefore=network-online.target isoloom-routes.service\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/lab-net.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\n  systemctl daemon-reload\n  systemctl enable -q isoloom-lab-net.service\nelif command -v rc-update >/dev/null; then\n  printf '#!/bin/sh\\nexec /etc/isoloom/lab-net.sh\\n' > /etc/local.d/isoloom-lab-net.start\n  chmod +x /etc/local.d/isoloom-lab-net.start\n  rc-update add local default >/dev/null\nfi\n/etc/isoloom/lab-net.sh\n"
+    )
+}
+
+/// A Windows VM's addresses on its networks under Hyper-V: each adapter found by its MAC, a
+/// static address (kept across restarts) set through WMI, as on every Windows since 2008 R2,
+/// its network then Private where the cmdlet exists.
+fn hyperv_windows_addresses(guest: &str, nics: &[Nic]) -> String {
+    let items = nics
+        .iter()
+        .map(|n| {
+            format!(
+                "@{{ mac = '{}'; ip = '{}'; mask = '{}' }}",
+                mac_text(hyperv_mac(guest, n.net), ":", true),
+                n.ip,
+                n.mask
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "$ErrorActionPreference = 'Stop'\nforeach ($n in @({items})) {{\n  $c = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {{ $_.MACAddress -eq $n.mac }} | Select-Object -First 1\n  if (-not $c) {{ throw ('no network adapter with MAC ' + $n.mac) }}\n  if (@($c.IPAddress) -notcontains $n.ip) {{\n    $r = $c.EnableStatic(@($n.ip), @($n.mask))\n    if ($r.ReturnValue -gt 1) {{ throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }}\n  }}\n  if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) {{ Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }}\n  'lab network: ' + $n.ip + ' on ' + $c.Description\n}}\n"
+    )
 }
 
 /// The define names of Isoloom's own VMs (the router's is [`router::NAME`]).
@@ -870,6 +1065,7 @@ fn router_vm(spec: &Spec, out: &mut String, links: &IndexMap<String, Link>) {
         &router_nets,
         Some(HELPER_LIBVIRT_BOX),
         &Qemu::helper(&links[router::NAME]),
+        &HyperV::helper(spec, router::networks(spec).map(|n| (n.as_str(), router::address(spec, n)))),
     );
     let script = format!(
         "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{}",
@@ -1020,6 +1216,11 @@ fn controller_vm(spec: &Spec, out: &mut String, on_controller: &[&checks::Resolv
         &all,
         (bx == super::CONTROLLER_BOX).then_some(super::CONTROLLER_BOX),
         &Qemu::helper(&links[CONTROLLER]),
+        // Its box (Alpine's, or the spec's own) has a Hyper-V build.
+        &HyperV {
+            boxed: images::HyperVBox::Main,
+            ..HyperV::helper(spec, spec.networks.keys().map(|n| (n.as_str(), cidr(n).controller())))
+        },
     );
     // Every machine by name, at its address on its first network (the controller is on all).
     let hosts: Vec<String> = spec

@@ -175,6 +175,38 @@ fn kvm_problem(h: &Host) -> Option<String> {
     None
 }
 
+/// Hyper-V's management service state (`Running`, `Stopped`, or `Missing` when Hyper-V isn't
+/// installed) and the user's rights over it (`admin`: elevated; `hyperv-admin`: a member of
+/// Hyper-V Administrators; `user`), in one line. No double quotes: it goes through a command line.
+const HYPERV_PROBE: &str = "$s = Get-Service vmms -ErrorAction SilentlyContinue; \
+    $p = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent()); \
+    $r = if ($p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { 'admin' } \
+    elseif ($p.IsInRole([Security.Principal.SecurityIdentifier]'S-1-5-32-578')) { 'hyperv-admin' } else { 'user' }; \
+    if ($s) { $s.Status.ToString() + ' ' + $r } else { 'Missing ' + $r }";
+
+/// Hyper-V, on a Windows host: `Ok` when Vagrant can use it from this shell, `Err` with the reason
+/// when it can't (off, or the shell isn't elevated: Vagrant's Hyper-V provider needs an
+/// administrator or a member of Hyper-V Administrators). `None` elsewhere.
+fn hyperv(h: &Host, windows: bool) -> Option<Result<String, String>> {
+    if !windows {
+        return None;
+    }
+    let out = (h.run)("powershell", &["-NoProfile", "-NonInteractive", "-Command", HYPERV_PROBE]).unwrap_or_default();
+    let mut words = out.split_whitespace();
+    let (state, rights) = (words.next().unwrap_or("Missing"), words.next().unwrap_or("user"));
+    Some(match (state, rights) {
+        ("Running", "admin" | "hyperv-admin") => Ok(match (h.env)("ISOLOOM_HYPERV_SWITCH") {
+            Some(s) => format!("Hyper-V (switch {s})"),
+            None => "Hyper-V".to_string(),
+        }),
+        ("Running", _) => Err("Hyper-V is on, but Vagrant needs an elevated shell for it (run as administrator, or join Hyper-V Administrators)".into()),
+        ("Missing", _) => Err(
+            "Hyper-V isn't turned on (Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All, then restart; Windows Pro, Enterprise or Server)".into(),
+        ),
+        (other, _) => Err(format!("Hyper-V's service (vmms) is {}, not running", other.to_lowercase())),
+    })
+}
+
 /// Checks a target against a host.
 pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
     let mut notes: Vec<String> = Vec::new();
@@ -233,6 +265,14 @@ pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
             if plugins.contains("vagrant-vmware-esxi") {
                 providers.push("ESXi".to_string());
             }
+            // Hyper-V comes with Windows: on when its service runs, usable from an elevated shell.
+            let mut hyperv_note = None;
+            match hyperv(h, cfg!(windows)) {
+                Some(Ok(p)) => providers.push(p),
+                Some(Err(why)) if why.contains("elevated") => hyperv_note = Some(why),
+                Some(Err(why)) => unusable = unusable.or(Some(why)),
+                None => {}
+            }
             if target == Target::Hybrid {
                 need(
                     providers.iter().find(|p| p.starts_with("VirtualBox")).cloned(),
@@ -241,8 +281,15 @@ pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
             } else {
                 need(
                     (!providers.is_empty()).then(|| format!("providers: {}", providers.join(", "))),
-                    &unusable.unwrap_or_else(|| "no Vagrant provider found (VirtualBox, VMware, Parallels, libvirt, UTM, QEMU or ESXi)".to_string()),
+                    &hyperv_note
+                        .clone()
+                        .or(unusable)
+                        .unwrap_or_else(|| "no Vagrant provider found (VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU or ESXi)".to_string()),
                 );
+                // Another provider will do, but say why Hyper-V won't from here.
+                if let Some(why) = hyperv_note.filter(|_| !providers.is_empty()) {
+                    notes.push(why);
+                }
             }
         }
         Target::Kubernetes => {
@@ -449,6 +496,42 @@ mod tests {
         assert!(!r.ready && r.summary().contains("no /dev/kvm"), "{r:?}");
         let r = probe(true, false);
         assert!(!r.ready && r.summary().contains("kvm and libvirt groups"), "{r:?}");
+    }
+
+    #[test]
+    fn hyperv_counts_on_windows_from_an_elevated_shell() {
+        let probe = |answer: &'static str, switch: Option<&'static str>| {
+            let run = move |p: &str, _: &[&str]| (p == "powershell").then(|| answer.to_string());
+            let env = move |k: &str| (k == "ISOLOOM_HYPERV_SWITCH").then(|| switch.map(str::to_string)).flatten();
+            let no = |_: &Path| false;
+            hyperv(
+                &Host {
+                    run: &run,
+                    env: &env,
+                    exists: &no,
+                    opens: &no,
+                    home: PathBuf::new(),
+                },
+                true,
+            )
+        };
+        assert_eq!(probe("Running admin", None), Some(Ok("Hyper-V".to_string())));
+        assert_eq!(probe("Running hyperv-admin", Some("LabNAT")), Some(Ok("Hyper-V (switch LabNAT)".to_string())));
+        assert!(probe("Running user", None).unwrap().unwrap_err().contains("elevated shell"));
+        assert!(probe("Missing admin", None).unwrap().unwrap_err().contains("isn't turned on"));
+        assert!(probe("Stopped admin", None).unwrap().unwrap_err().contains("stopped, not running"));
+        // Not on Windows: nothing to probe.
+        let run = |_: &str, _: &[&str]| None;
+        let env = |_: &str| None;
+        let no = |_: &Path| false;
+        let h = Host {
+            run: &run,
+            env: &env,
+            exists: &no,
+            opens: &no,
+            home: PathBuf::new(),
+        };
+        assert_eq!(hyperv(&h, false), None);
     }
 
     #[test]

@@ -512,6 +512,10 @@ pub struct VmImage {
     /// (e.g. `peru/windows-server-2019-standard-x64-eval`).
     #[serde(default)]
     pub qemu: Option<String>,
+    /// The box Vagrant's Hyper-V provider boots instead, when `vagrant` has no Hyper-V build
+    /// (its latest version that has one).
+    #[serde(default)]
+    pub hyperv: Option<String>,
     /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
     #[serde(default)]
     pub winrm: Option<Winrm>,
