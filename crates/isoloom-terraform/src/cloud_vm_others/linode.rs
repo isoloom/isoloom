@@ -208,7 +208,7 @@ resource "linode_vpc_subnet" "env" {{
 
         // Its set-up over SSH: single network, so no secondary NIC (mac_expr is never called).
         let redirects = redirects(m);
-        let cmds = linux_setup_cmds(spec, name, m, vm, &lab, &redirects, &|_| String::new());
+        let cmds = linux_setup_cmds(spec, name, &lab, &redirects, &|_| String::new());
 
         let mut deps: Vec<String> = vec!["linode_firewall.env".to_string()];
         deps.extend(

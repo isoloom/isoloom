@@ -31,7 +31,12 @@ fn proxmox_runs_environment_playbooks_from_a_controller() {
     assert!(tf.contains("test -f /var/lib/isoloom/ready"));
     assert!(tf.contains("ansible-playbook -i /etc/isoloom/inventory.ini"));
     // It starts after every machine exists.
-    assert!(tf.contains("depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm."));
+    let vm = &tf[tf.find("resource \"proxmox_virtual_environment_vm\" \"isoloom_controller\"").unwrap()..];
+    let deps = &vm[vm.find("depends_on = [").unwrap()..];
+    assert!(
+        deps.contains("proxmox_virtual_environment_vm.isoloom_router") && deps.contains("proxmox_virtual_environment_vm.web"),
+        "{deps}"
+    );
 }
 
 #[test]
@@ -41,5 +46,5 @@ fn proxmox_without_environment_provisioning_has_no_controller() {
     assert!(!tf.contains("isoloom_controller"));
     assert!(!tf.contains("tls_private_key"));
     // Without a controller, the isoloom user exists only when the operator gives a key.
-    assert!(tf.contains("users = var.ssh_public_key == \"\" ? [] : [{"));
+    assert!(tf.contains("= var.ssh_public_key == \"\" ? [] : [{"), "{tf}");
 }

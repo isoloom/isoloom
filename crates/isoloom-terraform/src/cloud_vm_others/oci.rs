@@ -300,7 +300,7 @@ resource "oci_core_instance" "{id}" {{
         // Its set-up over SSH, shared with the other drivers. Single network: no secondary VNIC,
         // so the MAC closure is never called.
         let redir = redirects(m);
-        let cmds = linux_setup_cmds(spec, name, m, vm, &lab, &redir, &|_| String::new());
+        let cmds = linux_setup_cmds(spec, name, &lab, &redir, &|_| String::new());
 
         let mut prov = format!(
             "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [oci_core_instance.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \\\"${{abspath(local_file.isoloom_project.filename)}}\\\" -C \\\"${{dirname(local.root)}}\\\" \\\"${{basename(local.root)}}\\\"\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"

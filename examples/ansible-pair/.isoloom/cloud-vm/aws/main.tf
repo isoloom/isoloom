@@ -8,14 +8,8 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.0"
-    }
+    aws = { source = "hashicorp/aws", version = "~> 6.0" }
+    tls = { source = "hashicorp/tls", version = "~> 4.0" }
   }
 }
 
@@ -23,17 +17,21 @@ variable "region" {
   type    = string
   default = "eu-west-3"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -49,7 +47,12 @@ variable "expires_at" {
 provider "aws" {
   region = var.region
   default_tags {
-    tags = { "isoloom-environment" = "ansible-pair", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+    tags = {
+      isoloom-environment = "ansible-pair"
+      managed-by          = "isoloom"
+      isoloom-instance    = local.name
+      isoloom-expires-at  = var.expires_at
+    }
   }
 }
 
@@ -172,9 +175,6 @@ resource "terraform_data" "web" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -186,10 +186,10 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
       "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
-      "printf '%s\\n' '10.63.0.20 cache' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.63.0.20 cache'\\'' >> /etc/hosts'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -244,9 +244,6 @@ resource "terraform_data" "cache" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-cache.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -258,10 +255,10 @@ resource "terraform_data" "cache" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
       "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
-      "printf '%s\\n' '10.63.0.10 web' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.63.0.10 web'\\'' >> /etc/hosts'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -324,9 +321,6 @@ resource "terraform_data" "isoloom_controller" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-controller.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -338,35 +332,32 @@ resource "terraform_data" "isoloom_controller" {
     content     = tls_private_key.controller.private_key_openssh
     destination = "/tmp/isoloom-controller-key"
   }
+  provisioner "file" {
+    content     = "[linux]\nweb ansible_host=10.63.0.10 ansible_user=admin\ncache ansible_host=10.63.0.20 ansible_user=admin maxmemory='\"64mb\"'\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n\n[pair]\nweb\ncache\n"
+    destination = "/tmp/isoloom-inventory.ini"
+  }
   provisioner "remote-exec" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo mkdir -p /etc/isoloom && sudo install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && rm -f /tmp/isoloom-controller-key",
-      "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null",
-      "[ -x /opt/ansible/bin/ansible-playbook ] || { sudo python3 -m venv /opt/ansible && sudo /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }",
-      "printf '%s' '[linux]\nweb ansible_host=10.63.0.10 ansible_user=admin\ncache ansible_host=10.63.0.20 ansible_user=admin maxmemory='\\''\"64mb\"'\\''\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n\n[pair]\nweb\ncache\n' | sudo tee /etc/isoloom/inventory.ini >/dev/null",
-      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}\ncd /opt/isoloom/ansible\nretry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\",\"tools\":[\"curl\",\"jq\"],\"cache_port\":6379}'\\'' site.yml\n'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.63.0.10 web'\\'' '\\''10.63.0.20 cache'\\'' >> /etc/hosts'",
+      "sudo sh -c 'mkdir -p /etc/isoloom && install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && install -m 0644 /tmp/isoloom-inventory.ini /etc/isoloom/inventory.ini && rm -f /tmp/isoloom-controller-key /tmp/isoloom-inventory.ini'",
+      "sudo sh -c 'DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null'",
+      "sudo sh -c '[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q '\\''ansible-core>=2.15,<2.17'\\'' pywinrm; }'",
+      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}\ncd /opt/isoloom/ansible\nretry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\",\"tools\":[\"curl\",\"jq\"],\"cache_port\":6379}'\\'' site.yml'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [terraform_data.web, terraform_data.cache]
 }
 
 output "machines" {
-  value = {
-    web   = aws_instance.web.public_ip
-    cache = aws_instance.cache.public_ip
-  }
+  value = { web = aws_instance.web.public_ip, cache = aws_instance.cache.public_ip }
 }
 
 output "ssh_users" {
-  value = {
-    web   = "admin"
-    cache = "admin"
-  }
+  value = { web = "admin", cache = "admin" }
 }
 
 output "ip" {
@@ -380,9 +371,27 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "networks", machine = "controller", host = aws_eip.isoloom_controller.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh" },
-    { position = "web", machine = "web", host = aws_instance.web.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" },
-    { position = "cache", machine = "cache", host = aws_instance.cache.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh" }
+    {
+      position = "networks"
+      machine  = "controller"
+      host     = aws_eip.isoloom_controller.public_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"
+    },
+    {
+      position = "web"
+      machine  = "web"
+      host     = aws_instance.web.public_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh"
+    },
+    {
+      position = "cache"
+      machine  = "cache"
+      host     = aws_instance.cache.public_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh"
+    }
   ]
 }
 

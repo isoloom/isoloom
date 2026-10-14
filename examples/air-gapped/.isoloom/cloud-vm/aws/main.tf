@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
+    aws = { source = "hashicorp/aws", version = "~> 6.0" }
   }
 }
 
@@ -19,17 +16,21 @@ variable "region" {
   type    = string
   default = "eu-west-3"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -45,7 +46,12 @@ variable "expires_at" {
 provider "aws" {
   region = var.region
   default_tags {
-    tags = { "isoloom-environment" = "air-gapped", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+    tags = {
+      isoloom-environment = "air-gapped"
+      managed-by          = "isoloom"
+      isoloom-instance    = local.name
+      isoloom-expires-at  = var.expires_at
+    }
   }
 }
 
@@ -163,9 +169,6 @@ resource "terraform_data" "store" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-store.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -177,12 +180,11 @@ resource "terraform_data" "store" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '192.168.62.10 app' | sudo tee -a /etc/hosts >/dev/null",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/store.sh'",
-      "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
-      "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 192.168.62.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.62.10 app'\\'' >> /etc/hosts'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/store.sh'\\'''",
+      "sudo sh -c 'command -v nft >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    ip daddr != { 192.168.62.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft\nprintf '\\''%s\\n'\\'' '\\''[Unit]'\\'' '\\''Description=Isoloom: no new connection leaves the environment'\\'' '\\''After=network.target'\\'' '\\'''\\'' '\\''[Service]'\\'' '\\''Type=oneshot'\\'' '\\''ExecStart=/usr/sbin/nft -f /etc/isoloom-egress.nft'\\'' '\\'''\\'' '\\''[Install]'\\'' '\\''WantedBy=multi-user.target'\\'' > /etc/systemd/system/isoloom-egress.service && (systemctl enable isoloom-egress.service 2>/dev/null || true)'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -237,9 +239,6 @@ resource "terraform_data" "app" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-app.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -251,30 +250,23 @@ resource "terraform_data" "app" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '192.168.62.20 store' | sudo tee -a /etc/hosts >/dev/null",
-      "sh -c 'i=0; until (bash -c '\\''</dev/tcp/store/6379'\\'' 2>/dev/null || nc -z -w 2 store 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"store didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"store answers\"'",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/app.sh'",
-      "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
-      "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 192.168.62.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.62.20 store'\\'' >> /etc/hosts'",
+      "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/store/6379'\\'' 2>/dev/null || nc -z -w 2 store 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"store didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"store answers\"'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/app.sh'\\'''",
+      "sudo sh -c 'command -v nft >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    ip daddr != { 192.168.62.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft\nprintf '\\''%s\\n'\\'' '\\''[Unit]'\\'' '\\''Description=Isoloom: no new connection leaves the environment'\\'' '\\''After=network.target'\\'' '\\'''\\'' '\\''[Service]'\\'' '\\''Type=oneshot'\\'' '\\''ExecStart=/usr/sbin/nft -f /etc/isoloom-egress.nft'\\'' '\\'''\\'' '\\''[Install]'\\'' '\\''WantedBy=multi-user.target'\\'' > /etc/systemd/system/isoloom-egress.service && (systemctl enable isoloom-egress.service 2>/dev/null || true)'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [terraform_data.store]
 }
 
 output "machines" {
-  value = {
-    store = aws_instance.store.public_ip
-    app   = aws_instance.app.public_ip
-  }
+  value = { store = aws_instance.store.public_ip, app = aws_instance.app.public_ip }
 }
 
 output "ssh_users" {
-  value = {
-    store = "admin"
-    app   = "admin"
-  }
+  value = { store = "admin", app = "admin" }
 }
 
 output "ip" {
@@ -288,8 +280,20 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "store", machine = "store", host = aws_instance.store.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/store.sh" },
-    { position = "app", machine = "app", host = aws_instance.app.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/app.sh" }
+    {
+      position = "store"
+      machine  = "store"
+      host     = aws_instance.store.public_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/store.sh"
+    },
+    {
+      position = "app"
+      machine  = "app"
+      host     = aws_instance.app.public_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/app.sh"
+    }
   ]
 }
 

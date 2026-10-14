@@ -81,22 +81,30 @@ fn proxmox_runs_what_follows_a_reboot_at_the_next_boot() {
     let tf = &tf[..at(tf, "\n}\n")];
     // cloud-init runs the steps before the first reboot, then restarts the machine.
     let runcmd = &tf[at(tf, "runcmd = [")..];
-    let runcmd = &runcmd[..at(runcmd, "]\n      power_state")];
+    let runcmd = &runcmd[..at(runcmd, "]\n      power_state = {")];
     assert!(runcmd.contains("sh kernel.sh"));
     assert!(!runcmd.contains("middle.sh") && !runcmd.contains("last.sh") && !runcmd.contains("/var/lib/isoloom/ready"));
     assert!(runcmd.contains("echo 1 > /var/lib/isoloom/next-boot && systemctl enable isoloom-steps.service"));
-    assert!(tf.contains("power_state = { mode = \"reboot\""));
+    assert!(tf.contains("mode      = \"reboot\""), "{tf}");
     // The unit runs each part at the following boots: the first ends with the next reboot, the
     // last with the ready marker and the unit's end.
-    assert!(tf.contains("path = \"/etc/systemd/system/isoloom-steps.service\""));
-    let boot1 = &tf[at(tf, "boot-1.sh\", permissions = \"0700\", content = ")..];
-    let boot1 = &boot1[..at(boot1, " }")];
-    assert!(boot1.contains("sh middle.sh\\necho 2 > /var/lib/isoloom/next-boot\\nsystemctl --no-block reboot"));
-    let boot2 = &tf[at(tf, "boot-2.sh\", permissions = \"0700\", content = ")..];
-    let boot2 = &boot2[..at(boot2, " }")];
-    assert!(boot2.contains("sh last.sh\\nmkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready\\nsystemctl disable isoloom-steps.service"));
-    // Inputs stay in /etc/isoloom (kept across boots).
-    assert!(boot2.contains(". /etc/isoloom/inputs.env"));
+    assert!(tf.contains("\"/etc/systemd/system/isoloom-steps.service\""));
+    let boot1 = &tf[at(tf, "boot-1.sh\"")..];
+    let boot1 = &boot1[..at(boot1, "\n        }")];
+    assert!(boot1.contains("sh middle.sh"), "{boot1}");
+    assert!(
+        boot1.contains("\\necho 2 > /var/lib/isoloom/next-boot\\nsystemctl --no-block reboot"),
+        "{boot1}"
+    );
+    let boot2 = &tf[at(tf, "boot-2.sh\"")..];
+    let boot2 = &boot2[..at(boot2, "\n        }")];
+    assert!(boot2.contains("sh last.sh"), "{boot2}");
+    assert!(
+        boot2.contains("echo ready > /var/lib/isoloom/ready'\\nsystemctl disable isoloom-steps.service"),
+        "{boot2}"
+    );
+    // Inputs are kept out of /tmp (emptied at boot).
+    assert!(boot2.contains(". /var/lib/isoloom/inputs.env"), "{boot2}");
 }
 
 #[test]
@@ -129,7 +137,7 @@ fn the_clouds_reconnect_after_each_reboot() {
         // The inputs leave /tmp (emptied at boot) before the first restart.
         let kernel = at(box_, "sh kernel.sh");
         assert!(
-            at(box_, "sudo install -m 600 /tmp/isoloom-inputs.env /var/lib/isoloom/inputs.env") < kernel,
+            at(box_, "install -m 600 /tmp/isoloom-inputs.env /var/lib/isoloom/inputs.env") < kernel,
             "{cloud}"
         );
         assert!(!box_.contains(". /tmp/isoloom-inputs.env"), "{cloud}");

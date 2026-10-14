@@ -7,15 +7,8 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    proxmox = {
-      source  = "bpg/proxmox"
-      version = "~> 0.115"
-    }
-    # The controller's SSH key (environment-level provisioning).
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.0"
-    }
+    proxmox = { source = "bpg/proxmox", version = "~> 0.115" }
+    tls     = { source = "hashicorp/tls", version = "~> 4.0" }
   }
 }
 
@@ -23,69 +16,83 @@ variable "proxmox_endpoint" {
   type        = string
   description = "https://<server>:8006/"
 }
+
 variable "proxmox_api_token" {
   type        = string
   default     = ""
   sensitive   = true
   description = "user@realm!name=secret; or use proxmox_username and proxmox_password"
 }
+
 variable "proxmox_username" {
   type    = string
   default = "root@pam"
 }
+
 variable "proxmox_password" {
   type      = string
   default   = ""
   sensitive = true
 }
+
 variable "proxmox_insecure" {
   type        = bool
   default     = true
   description = "Accept the server's self-signed certificate"
 }
+
 variable "proxmox_ssh_username" {
   type        = string
   default     = "root"
   description = "Uploading cloud-init snippets goes over SSH to the node"
 }
+
 variable "proxmox_ssh_private_key_file" {
   type    = string
   default = ""
 }
+
 variable "proxmox_ssh_address" {
   type        = string
   default     = ""
   description = "The node's SSH address, when the API reports one this machine can't reach"
 }
+
 variable "node" {
   type    = string
   default = "pve"
 }
+
 variable "datastore" {
   type        = string
   default     = "local-lvm"
   description = "Where VM disks go"
 }
+
 variable "image_datastore" {
   type        = string
   default     = "local"
   description = "A datastore with 'iso' content, for cloud images"
 }
+
 variable "snippets_datastore" {
   type        = string
   default     = "local"
   description = "A datastore with 'snippets' content, for cloud-init"
 }
+
 variable "uplink_bridge" {
   type        = string
   default     = "vmbr0"
   description = "The bridge the router reaches the internet through"
 }
+
 variable "slot" {
   type        = number
   default     = 1
   description = "1 to 99, unique per environment on this server (SDN ids are short)"
 }
+
 variable "ssh_public_key" {
   type        = string
   default     = ""
@@ -113,21 +120,12 @@ provider "proxmox" {
   }
 }
 
+# The project, written to /opt/isoloom in each machine that has steps; the `isoloom` user on every VM.
 locals {
-  zone = "iso${var.slot}"
-  # The project, written to /opt/isoloom in each machine that has steps.
-  root = abspath("${path.module}/../..")
-  project_files = [for f in local.project_paths : {
-    path     = "/opt/isoloom/${f}"
-    encoding = "b64"
-    content  = filebase64("${local.root}/${f}")
-  }]
-  users = var.ssh_public_key == "" ? [] : [{
-    name                = "isoloom"
-    sudo                = "ALL=(ALL) NOPASSWD:ALL"
-    shell               = "/bin/bash"
-    ssh_authorized_keys = [var.ssh_public_key]
-  }]
+  zone          = "iso${var.slot}"
+  root          = abspath("${path.module}/../..")
+  project_files = [for f in local.project_paths : { path = "/opt/isoloom/${f}", encoding = "b64", content = filebase64("${local.root}/${f}") }]
+  users         = var.ssh_public_key == "" ? [] : [{ name = "isoloom", sudo = "ALL=(ALL) NOPASSWD:ALL", shell = "/bin/bash", ssh_authorized_keys = [var.ssh_public_key] }]
 }
 
 # The environment's networks: an SDN simple zone, a VNet per network.
@@ -146,12 +144,12 @@ resource "proxmox_sdn_applier" "env" {
   depends_on = [proxmox_sdn_vnet.app]
 }
 
+# The `debian-12` cloud image, per environment: a shared file would go with whichever environment is destroyed first.
 resource "proxmox_download_file" "debian_12" {
-  node_name    = var.node
-  datastore_id = var.image_datastore
-  content_type = "iso"
-  url          = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
-  # Per environment: a shared file would go with whichever environment is destroyed first.
+  node_name           = var.node
+  datastore_id        = var.image_datastore
+  content_type        = "iso"
+  url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
 }
@@ -163,34 +161,50 @@ resource "proxmox_virtual_environment_file" "router" {
   content_type = "snippets"
   source_raw {
     file_name = "iso${var.slot}-router.yaml"
-    data = "#cloud-config\n${yamlencode({
+    data = format("#cloud-config\n%s", yamlencode({
       hostname = "isoloom-router"
       users    = local.users
       packages = ["nftables", "qemu-guest-agent"]
       write_files = [
-        { path = "/etc/systemd/network/10-wan.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:00:00:00", var.slot)}", "", "[Network]", "DHCP=yes"]) },
-        { path = "/etc/nftables.conf", content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr { 10.83.0.0/24 } ip daddr != { 10.83.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.83.0.0/24 } ip daddr != { 10.83.0.0/24 } masquerade\n  }\n}\n" },
+        {
+          path    = "/etc/systemd/network/10-wan.network"
+          content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:00:00:00", var.slot)}", "", "[Network]", "DHCP=yes"])
+        },
+        {
+          path    = "/etc/nftables.conf"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr { 10.83.0.0/24 } ip daddr != { 10.83.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.83.0.0/24 } ip daddr != { 10.83.0.0/24 } masquerade\n  }\n}\n"
+        },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
-        { path = "/etc/systemd/network/20-app.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}", "", "[Network]", "Address=10.83.0.254/24", "ConfigureWithoutCarrier=yes"]) }
+        {
+          path = "/etc/systemd/network/20-app.network"
+          content = join("\n", [
+            "[Match]",
+            "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}",
+            "",
+            "[Network]",
+            "Address=10.83.0.254/24",
+            "ConfigureWithoutCarrier=yes"
+          ])
+        }
       ]
       runcmd = [
-        ["sysctl", "-p", "/etc/sysctl.d/90-isoloom.conf"],
-        ["systemctl", "enable", "systemd-networkd"],
-        ["systemctl", "restart", "systemd-networkd"],
-        ["systemctl", "enable", "--now", "nftables"],
-        ["nft", "-f", "/etc/nftables.conf"],
-        ["systemctl", "enable", "--now", "qemu-guest-agent"],
+        "sysctl -p /etc/sysctl.d/90-isoloom.conf",
+        "systemctl enable systemd-networkd",
+        "systemctl restart systemd-networkd",
+        "systemctl enable --now nftables",
+        "nft -f /etc/nftables.conf",
+        "systemctl enable --now qemu-guest-agent"
       ]
-    })}"
+    }))
   }
 }
 
+# The guest agent reports its uplink address (DHCP), for the published ports.
 resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "tuned-web"]
   on_boot   = false
-  # Its uplink address (DHCP), for the published ports.
   agent {
     enabled = true
   }
@@ -238,17 +252,17 @@ resource "proxmox_virtual_environment_file" "web" {
   content_type = "snippets"
   source_raw {
     file_name = "iso${var.slot}-web.yaml"
-    data = "#cloud-config\n${yamlencode({
+    data = format("#cloud-config\n%s", yamlencode({
       hostname    = "web"
       users       = local.users
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        ["sh", "-c", "set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '^(APP_MODE)=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s 'APP_MODE=production\n' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '[Manager]\\nDefaultEnvironment=%s\\n' '\"APP_MODE=production\"' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nprintf %s 'net.core.somaxconn = 4096\n' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\nmkdir -p /etc/security/limits.d && printf %s '* soft nofile 8192\n* hard nofile 16384\nroot soft nofile 8192\nroot hard nofile 16384\n' > /etc/security/limits.d/90-isoloom.conf\nprintf %s '[Manager]\nDefaultLimitNOFILE=8192:16384\n' > /etc/systemd/system.conf.d/90-isoloom-limits.conf\nsystemctl daemon-reexec 2>/dev/null || true\n"],
-        ["sh", "-c", "cd /opt/isoloom && sh provision/web.sh"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
+        "sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(APP_MODE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''APP_MODE=production\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"APP_MODE=production\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nprintf %s '\\''net.core.somaxconn = 4096\n'\\'' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\nmkdir -p /etc/security/limits.d && printf %s '\\''* soft nofile 8192\n* hard nofile 16384\nroot soft nofile 8192\nroot hard nofile 16384\n'\\'' > /etc/security/limits.d/90-isoloom.conf\nprintf %s '\\''[Manager]\nDefaultLimitNOFILE=8192:16384\n'\\'' > /etc/systemd/system.conf.d/90-isoloom-limits.conf\nsystemctl daemon-reexec 2>/dev/null || true'",
+        "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
+        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
       ]
-    })}"
+    }))
   }
 }
 
@@ -303,9 +317,7 @@ output "address" {
 
 # The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
 output "machines" {
-  value = {
-    "web" = "10.83.0.10"
-  }
+  value = { web = "10.83.0.10" }
 }
 
 output "ssh_user" {
@@ -315,7 +327,13 @@ output "ssh_user" {
 # The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
 output "checks" {
   value = [
-    { position = "web", machine = "web", host = "10.83.0.10", user = "isoloom", script = ".isoloom/proxmox/checks/web.sh" }
+    {
+      position = "web"
+      machine  = "web"
+      host     = "10.83.0.10"
+      user     = "isoloom"
+      script   = ".isoloom/proxmox/checks/web.sh"
+    }
   ]
 }
 

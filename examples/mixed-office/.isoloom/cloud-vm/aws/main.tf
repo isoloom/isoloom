@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
+    aws = { source = "hashicorp/aws", version = "~> 6.0" }
   }
 }
 
@@ -19,17 +16,21 @@ variable "region" {
   type    = string
   default = "eu-west-3"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -45,7 +46,12 @@ variable "expires_at" {
 provider "aws" {
   region = var.region
   default_tags {
-    tags = { "isoloom-environment" = "mixed-office", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+    tags = {
+      isoloom-environment = "mixed-office"
+      managed-by          = "isoloom"
+      isoloom-instance    = local.name
+      isoloom-expires-at  = var.expires_at
+    }
   }
 }
 
@@ -161,6 +167,7 @@ resource "aws_security_group" "files01" {
   }
 }
 
+# No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.
 resource "aws_instance" "files01" {
   ami                         = data.aws_ami.windows_server_2019.id
   instance_type               = "c7i-flex.large"
@@ -168,19 +175,7 @@ resource "aws_instance" "files01" {
   private_ip                  = "192.168.58.10"
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.files01.id]
-  # No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.
-  user_data = <<-EOT
-    <powershell>
-    $p = ConvertTo-SecureString '${random_password.windows.result}' -AsPlainText -Force
-    New-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null
-    Add-LocalGroupMember -Group Administrators -Member isoloom
-    Enable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null
-    Set-Item WSMan:\localhost\Service\AllowUnencrypted $true
-    Set-Item WSMan:\localhost\Service\Auth\Basic $true
-    New-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null
-    ${var.auto_stop_minutes > 0 ? "Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(${var.auto_stop_minutes})) -User SYSTEM -RunLevel Highest -Force | Out-Null" : ""}
-    </powershell>
-  EOT
+  user_data                   = "<powershell>\n$p = ConvertTo-SecureString '${random_password.windows.result}' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n${var.auto_stop_minutes > 0 ? "Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(${var.auto_stop_minutes})) -User SYSTEM -RunLevel Highest -Force | Out-Null" : ""}\n</powershell>\n"
   root_block_device {
     volume_size = 50
   }
@@ -198,7 +193,9 @@ resource "terraform_data" "files01_name" {
     timeout  = "30m"
   }
   provisioner "remote-exec" {
-    inline = ["powershell -NoProfile -Command \"if ($env:COMPUTERNAME -ne 'FILES01') { Rename-Computer -NewName 'files01' -Force; shutdown /r /t 10 }\""]
+    inline = [
+      "powershell -NoProfile -Command \"if ($env:COMPUTERNAME -ne 'FILES01') { Rename-Computer -NewName 'files01' -Force; shutdown /r /t 10 }\""
+    ]
   }
 }
 
@@ -225,7 +222,7 @@ resource "terraform_data" "files01" {
     destination = "C:/Windows/Temp/isoloom-project.tgz"
   }
   provisioner "file" {
-    content     = "$ErrorActionPreference = 'Stop'\nif ($env:COMPUTERNAME -ne 'FILES01') { throw \"still named $env:COMPUTERNAME: the rename hasn't taken effect\" }\nAdd-Content -Path \"$env:windir\\System32\\drivers\\etc\\hosts\" -Value @('192.168.58.20 intranet')\nNew-NetFirewallRule -DisplayName 'isoloom 445' -Direction Inbound -Protocol TCP -LocalPort 445 -Action Allow | Out-Null\n$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n# The project into a Windows machine: unpacks the tar.gz $archive into $dest (replacing an older\n# copy), leaving out the archive's first $strip folders. Plain .NET (GZipStream), so it runs on\n# every Windows Isoloom supports: PowerShell 2.0 and later, and no tar.exe before Windows Server\n# 2019. Symbolic links are left out (counted).\n& {\n  $ErrorActionPreference = 'Stop'\n  $sep = [IO.Path]::DirectorySeparatorChar\n  $new = \"$dest.new\"\n  if (Test-Path $new) { Remove-Item $new -Recurse -Force }\n  [void][IO.Directory]::CreateDirectory($new)\n  $file = New-Object IO.FileStream($archive, [IO.FileMode]::Open, [IO.FileAccess]::Read)\n  $in = New-Object IO.Compression.GZipStream($file, [IO.Compression.CompressionMode]::Decompress)\n  $utf8 = New-Object Text.UTF8Encoding($false)\n  $header = New-Object byte[] 512\n  $chunk = New-Object byte[] 65536\n  function Fill([byte[]]$b, [int]$n) {\n    $got = 0\n    while ($got -lt $n) {\n      $r = $in.Read($b, $got, $n - $got)\n      if ($r -le 0) { throw \"$archive ends early\" }\n      $got += $r\n    }\n  }\n  function Field([int]$at, [int]$len) {\n    $end = [Array]::IndexOf($header, [byte]0, $at, $len)\n    if ($end -lt 0) { $end = $at + $len }\n    $utf8.GetString($header, $at, $end - $at)\n  }\n  # Copies $size bytes to $out (or skips them, with no $out), then the padding after them.\n  function Body([long]$size, $out) {\n    $left = $size\n    while ($left -gt 0) {\n      $n = [int][Math]::Min([long]$chunk.Length, $left)\n      Fill $chunk $n\n      if ($out) { $out.Write($chunk, 0, $n) }\n      $left -= $n\n    }\n    $pad = [int]((512 - $size % 512) % 512)\n    if ($pad) { Fill $chunk $pad }\n  }\n  $pax = @{}\n  $links = 0\n  $files = 0\n  while ($true) {\n    Fill $header 512\n    if ($header[148] -eq 0) { break } # the end: zero blocks have no checksum\n    $type = [char]$header[156]\n    $sizeText = (Field 124 12).Trim()\n    $size = [long]0\n    if ($sizeText) { $size = [Convert]::ToInt64($sizeText, 8) }\n    if ($pax['size']) { $size = [long]$pax['size'] }\n    if ($type -eq 'x') {\n      # pax records (\"<length> key=value\\n\"): a long path, a large size, for the next entry.\n      $ms = New-Object IO.MemoryStream\n      Body $size $ms\n      $b = $ms.ToArray()\n      $i = 0\n      while ($i -lt $b.Length) {\n        $sp = [Array]::IndexOf($b, [byte]32, $i)\n        $len = [int]$utf8.GetString($b, $i, $sp - $i)\n        $eq = [Array]::IndexOf($b, [byte]61, $sp)\n        $pax[$utf8.GetString($b, $sp + 1, $eq - $sp - 1)] = $utf8.GetString($b, $eq + 1, $i + $len - $eq - 2)\n        $i += $len\n      }\n      continue\n    }\n    if ($type -eq 'L' -or $type -eq 'K') {\n      # GNU tar's long name (or link target) for the next entry.\n      $ms = New-Object IO.MemoryStream\n      Body $size $ms\n      if ($type -eq 'L') { $pax['path'] = $utf8.GetString($ms.ToArray()).TrimEnd([char]0) }\n      continue\n    }\n    $name = Field 0 100\n    $prefix = Field 345 155\n    if ($prefix) { $name = \"$prefix/$name\" }\n    if ($pax['path']) { $name = $pax['path'] }\n    $pax = @{}\n    $parts = @($name.Split('/') | Where-Object { $_ -ne '' -and $_ -ne '.' })\n    if ($parts.Count -le $strip) { Body $size $null; continue }\n    $path = Join-Path $new ([string]::Join([string]$sep, [string[]]($parts[$strip..($parts.Count - 1)])))\n    if ($type -eq '5' -or $type -eq '0' -or $type -eq [char]0) {\n      # A name Windows can't take (`:`, `*`, too long...) is left out, with a warning.\n      $out = $null\n      try {\n        if ($type -eq '5') {\n          [void][IO.Directory]::CreateDirectory($path)\n        } else {\n          [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path))\n          $out = [IO.File]::Create($path)\n        }\n      } catch {\n        Write-Warning \"Not copied: $name ($($_.Exception.Message))\"\n        Body $size $null\n        continue\n      }\n      if ($out) {\n        try { Body $size $out } finally { $out.Close() }\n        $files++\n      } else {\n        Body $size $null\n      }\n    } else {\n      if ($type -eq '2') { $links++ }\n      Body $size $null\n    }\n  }\n  $in.Close()\n  if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }\n  Move-Item $new $dest\n  Remove-Item $archive -Force\n  $note = ''\n  if ($links) { $note = \" ($links symbolic links left out)\" }\n  \"$files files in $dest$note\"\n}\nSet-Location C:\\isoloom\n& powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\isoloom\\provision\\share.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }\nNew-Item -ItemType Directory -Force C:\\ProgramData\\isoloom | Out-Null; Set-Content C:\\ProgramData\\isoloom\\ready 'ready'\n"
+    content     = "$ErrorActionPreference = 'Stop'\nif ($env:COMPUTERNAME -ne 'FILES01') { throw \"still named $env:COMPUTERNAME: the rename hasn't taken effect\" }\nNew-NetFirewallRule -DisplayName 'isoloom 445' -Direction Inbound -Protocol TCP -LocalPort 445 -Action Allow | Out-Null\n$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n# The project into a Windows machine: unpacks the tar.gz $archive into $dest (replacing an older\n# copy), leaving out the archive's first $strip folders. Plain .NET (GZipStream), so it runs on\n# every Windows Isoloom supports: PowerShell 2.0 and later, and no tar.exe before Windows Server\n# 2019. Symbolic links are left out (counted).\n& {\n  $ErrorActionPreference = 'Stop'\n  $sep = [IO.Path]::DirectorySeparatorChar\n  $new = \"$dest.new\"\n  if (Test-Path $new) { Remove-Item $new -Recurse -Force }\n  [void][IO.Directory]::CreateDirectory($new)\n  $file = New-Object IO.FileStream($archive, [IO.FileMode]::Open, [IO.FileAccess]::Read)\n  $in = New-Object IO.Compression.GZipStream($file, [IO.Compression.CompressionMode]::Decompress)\n  $utf8 = New-Object Text.UTF8Encoding($false)\n  $header = New-Object byte[] 512\n  $chunk = New-Object byte[] 65536\n  function Fill([byte[]]$b, [int]$n) {\n    $got = 0\n    while ($got -lt $n) {\n      $r = $in.Read($b, $got, $n - $got)\n      if ($r -le 0) { throw \"$archive ends early\" }\n      $got += $r\n    }\n  }\n  function Field([int]$at, [int]$len) {\n    $end = [Array]::IndexOf($header, [byte]0, $at, $len)\n    if ($end -lt 0) { $end = $at + $len }\n    $utf8.GetString($header, $at, $end - $at)\n  }\n  # Copies $size bytes to $out (or skips them, with no $out), then the padding after them.\n  function Body([long]$size, $out) {\n    $left = $size\n    while ($left -gt 0) {\n      $n = [int][Math]::Min([long]$chunk.Length, $left)\n      Fill $chunk $n\n      if ($out) { $out.Write($chunk, 0, $n) }\n      $left -= $n\n    }\n    $pad = [int]((512 - $size % 512) % 512)\n    if ($pad) { Fill $chunk $pad }\n  }\n  $pax = @{}\n  $links = 0\n  $files = 0\n  while ($true) {\n    Fill $header 512\n    if ($header[148] -eq 0) { break } # the end: zero blocks have no checksum\n    $type = [char]$header[156]\n    $sizeText = (Field 124 12).Trim()\n    $size = [long]0\n    if ($sizeText) { $size = [Convert]::ToInt64($sizeText, 8) }\n    if ($pax['size']) { $size = [long]$pax['size'] }\n    if ($type -eq 'x') {\n      # pax records (\"<length> key=value\\n\"): a long path, a large size, for the next entry.\n      $ms = New-Object IO.MemoryStream\n      Body $size $ms\n      $b = $ms.ToArray()\n      $i = 0\n      while ($i -lt $b.Length) {\n        $sp = [Array]::IndexOf($b, [byte]32, $i)\n        $len = [int]$utf8.GetString($b, $i, $sp - $i)\n        $eq = [Array]::IndexOf($b, [byte]61, $sp)\n        $pax[$utf8.GetString($b, $sp + 1, $eq - $sp - 1)] = $utf8.GetString($b, $eq + 1, $i + $len - $eq - 2)\n        $i += $len\n      }\n      continue\n    }\n    if ($type -eq 'L' -or $type -eq 'K') {\n      # GNU tar's long name (or link target) for the next entry.\n      $ms = New-Object IO.MemoryStream\n      Body $size $ms\n      if ($type -eq 'L') { $pax['path'] = $utf8.GetString($ms.ToArray()).TrimEnd([char]0) }\n      continue\n    }\n    $name = Field 0 100\n    $prefix = Field 345 155\n    if ($prefix) { $name = \"$prefix/$name\" }\n    if ($pax['path']) { $name = $pax['path'] }\n    $pax = @{}\n    $parts = @($name.Split('/') | Where-Object { $_ -ne '' -and $_ -ne '.' })\n    if ($parts.Count -le $strip) { Body $size $null; continue }\n    $path = Join-Path $new ([string]::Join([string]$sep, [string[]]($parts[$strip..($parts.Count - 1)])))\n    if ($type -eq '5' -or $type -eq '0' -or $type -eq [char]0) {\n      # A name Windows can't take (`:`, `*`, too long...) is left out, with a warning.\n      $out = $null\n      try {\n        if ($type -eq '5') {\n          [void][IO.Directory]::CreateDirectory($path)\n        } else {\n          [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path))\n          $out = [IO.File]::Create($path)\n        }\n      } catch {\n        Write-Warning \"Not copied: $name ($($_.Exception.Message))\"\n        Body $size $null\n        continue\n      }\n      if ($out) {\n        try { Body $size $out } finally { $out.Close() }\n        $files++\n      } else {\n        Body $size $null\n      }\n    } else {\n      if ($type -eq '2') { $links++ }\n      Body $size $null\n    }\n  }\n  $in.Close()\n  if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }\n  Move-Item $new $dest\n  Remove-Item $archive -Force\n  $note = ''\n  if ($links) { $note = \" ($links symbolic links left out)\" }\n  \"$files files in $dest$note\"\n}\nAdd-Content -Path \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\" -Value @('192.168.58.20 intranet')\nSet-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'provision/share.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }\nNew-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready\n"
     destination = "C:/ProgramData/isoloom/setup.ps1"
   }
   provisioner "remote-exec" {
@@ -291,9 +288,6 @@ resource "terraform_data" "intranet" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-intranet.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -305,28 +299,22 @@ resource "terraform_data" "intranet" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '192.168.58.10 files01' | sudo tee -a /etc/hosts >/dev/null",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/intranet.sh'",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.58.10 files01'\\'' >> /etc/hosts'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/intranet.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting tcp dport 8083 redirect to :80",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
 
 output "machines" {
-  value = {
-    files01  = aws_instance.files01.public_ip
-    intranet = aws_instance.intranet.public_ip
-  }
+  value = { files01 = aws_instance.files01.public_ip, intranet = aws_instance.intranet.public_ip }
 }
 
 output "ssh_users" {
-  value = {
-    files01  = "isoloom"
-    intranet = "admin"
-  }
+  value = { files01 = "isoloom", intranet = "admin" }
 }
 
 output "ip" {
@@ -340,14 +328,18 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "intranet", machine = "intranet", host = aws_instance.intranet.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/intranet.sh" }
+    {
+      position = "intranet"
+      machine  = "intranet"
+      host     = aws_instance.intranet.public_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/intranet.sh"
+    }
   ]
 }
 
 output "published" {
-  value = {
-    "intranet/80" = "${aws_instance.intranet.public_ip}:8083"
-  }
+  value = { "intranet/80" = "${aws_instance.intranet.public_ip}:8083" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

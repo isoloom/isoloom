@@ -12,10 +12,15 @@ isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
+hcl-rs.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
 insta.workspace = true
+
+# The `hcl-rs` package's library is named `hcl`, which cargo-machete doesn't match.
+[package.metadata.cargo-machete]
+ignored = ["hcl-rs"]
 
 [lints]
 workspace = true

@@ -7,15 +7,8 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    proxmox = {
-      source  = "bpg/proxmox"
-      version = "~> 0.115"
-    }
-    # The controller's SSH key (environment-level provisioning).
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.0"
-    }
+    proxmox = { source = "bpg/proxmox", version = "~> 0.115" }
+    tls     = { source = "hashicorp/tls", version = "~> 4.0" }
   }
 }
 
@@ -23,69 +16,83 @@ variable "proxmox_endpoint" {
   type        = string
   description = "https://<server>:8006/"
 }
+
 variable "proxmox_api_token" {
   type        = string
   default     = ""
   sensitive   = true
   description = "user@realm!name=secret; or use proxmox_username and proxmox_password"
 }
+
 variable "proxmox_username" {
   type    = string
   default = "root@pam"
 }
+
 variable "proxmox_password" {
   type      = string
   default   = ""
   sensitive = true
 }
+
 variable "proxmox_insecure" {
   type        = bool
   default     = true
   description = "Accept the server's self-signed certificate"
 }
+
 variable "proxmox_ssh_username" {
   type        = string
   default     = "root"
   description = "Uploading cloud-init snippets goes over SSH to the node"
 }
+
 variable "proxmox_ssh_private_key_file" {
   type    = string
   default = ""
 }
+
 variable "proxmox_ssh_address" {
   type        = string
   default     = ""
   description = "The node's SSH address, when the API reports one this machine can't reach"
 }
+
 variable "node" {
   type    = string
   default = "pve"
 }
+
 variable "datastore" {
   type        = string
   default     = "local-lvm"
   description = "Where VM disks go"
 }
+
 variable "image_datastore" {
   type        = string
   default     = "local"
   description = "A datastore with 'iso' content, for cloud images"
 }
+
 variable "snippets_datastore" {
   type        = string
   default     = "local"
   description = "A datastore with 'snippets' content, for cloud-init"
 }
+
 variable "uplink_bridge" {
   type        = string
   default     = "vmbr0"
   description = "The bridge the router reaches the internet through"
 }
+
 variable "slot" {
   type        = number
   default     = 1
   description = "1 to 99, unique per environment on this server (SDN ids are short)"
 }
+
 variable "ssh_public_key" {
   type        = string
   default     = ""
@@ -113,21 +120,19 @@ provider "proxmox" {
   }
 }
 
+# The project, written to /opt/isoloom in each machine that has steps; the `isoloom` user on every VM.
 locals {
-  zone = "iso${var.slot}"
-  # The project, written to /opt/isoloom in each machine that has steps.
-  root = abspath("${path.module}/../..")
-  project_files = [for f in local.project_paths : {
-    path     = "/opt/isoloom/${f}"
-    encoding = "b64"
-    content  = filebase64("${local.root}/${f}")
-  }]
-  users = [{
-    name                = "isoloom"
-    sudo                = "ALL=(ALL) NOPASSWD:ALL"
-    shell               = "/bin/bash"
-    ssh_authorized_keys = compact([var.ssh_public_key, trimspace(tls_private_key.controller.public_key_openssh)])
-  }]
+  zone          = "iso${var.slot}"
+  root          = abspath("${path.module}/../..")
+  project_files = [for f in local.project_paths : { path = "/opt/isoloom/${f}", encoding = "b64", content = filebase64("${local.root}/${f}") }]
+  users = [
+    {
+      name                = "isoloom"
+      sudo                = "ALL=(ALL) NOPASSWD:ALL"
+      shell               = "/bin/bash"
+      ssh_authorized_keys = compact([var.ssh_public_key, trimspace(tls_private_key.controller.public_key_openssh)])
+    }
+  ]
 }
 
 # The environment's networks: an SDN simple zone, a VNet per network.
@@ -151,12 +156,12 @@ resource "proxmox_sdn_applier" "env" {
   depends_on = [proxmox_sdn_vnet.lab]
 }
 
+# The `debian-12` cloud image, per environment: a shared file would go with whichever environment is destroyed first.
 resource "proxmox_download_file" "debian_12" {
-  node_name    = var.node
-  datastore_id = var.image_datastore
-  content_type = "iso"
-  url          = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
-  # Per environment: a shared file would go with whichever environment is destroyed first.
+  node_name           = var.node
+  datastore_id        = var.image_datastore
+  content_type        = "iso"
+  url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
 }
@@ -168,34 +173,50 @@ resource "proxmox_virtual_environment_file" "router" {
   content_type = "snippets"
   source_raw {
     file_name = "iso${var.slot}-router.yaml"
-    data = "#cloud-config\n${yamlencode({
+    data = format("#cloud-config\n%s", yamlencode({
       hostname = "isoloom-router"
       users    = local.users
       packages = ["nftables", "qemu-guest-agent"]
       write_files = [
-        { path = "/etc/systemd/network/10-wan.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:00:00:00", var.slot)}", "", "[Network]", "DHCP=yes"]) },
-        { path = "/etc/nftables.conf", content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr { 10.63.0.0/24 } ip daddr != { 10.63.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.63.0.0/24 } ip daddr != { 10.63.0.0/24 } masquerade\n  }\n}\n" },
+        {
+          path    = "/etc/systemd/network/10-wan.network"
+          content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:00:00:00", var.slot)}", "", "[Network]", "DHCP=yes"])
+        },
+        {
+          path    = "/etc/nftables.conf"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr { 10.63.0.0/24 } ip daddr != { 10.63.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.63.0.0/24 } ip daddr != { 10.63.0.0/24 } masquerade\n  }\n}\n"
+        },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
-        { path = "/etc/systemd/network/20-lab.network", content = join("\n", ["[Match]", "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}", "", "[Network]", "Address=10.63.0.254/24", "ConfigureWithoutCarrier=yes"]) }
+        {
+          path = "/etc/systemd/network/20-lab.network"
+          content = join("\n", [
+            "[Match]",
+            "MACAddress=${format("02:15:%02x:01:%02x:00", var.slot, 0)}",
+            "",
+            "[Network]",
+            "Address=10.63.0.254/24",
+            "ConfigureWithoutCarrier=yes"
+          ])
+        }
       ]
       runcmd = [
-        ["sysctl", "-p", "/etc/sysctl.d/90-isoloom.conf"],
-        ["systemctl", "enable", "systemd-networkd"],
-        ["systemctl", "restart", "systemd-networkd"],
-        ["systemctl", "enable", "--now", "nftables"],
-        ["nft", "-f", "/etc/nftables.conf"],
-        ["systemctl", "enable", "--now", "qemu-guest-agent"],
+        "sysctl -p /etc/sysctl.d/90-isoloom.conf",
+        "systemctl enable systemd-networkd",
+        "systemctl restart systemd-networkd",
+        "systemctl enable --now nftables",
+        "nft -f /etc/nftables.conf",
+        "systemctl enable --now qemu-guest-agent"
       ]
-    })}"
+    }))
   }
 }
 
+# The guest agent reports its uplink address (DHCP), for the published ports.
 resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "ansible-pair"]
   on_boot   = false
-  # Its uplink address (DHCP), for the published ports.
   agent {
     enabled = true
   }
@@ -243,16 +264,16 @@ resource "proxmox_virtual_environment_file" "web" {
   content_type = "snippets"
   source_raw {
     file_name = "iso${var.slot}-web.yaml"
-    data = "#cloud-config\n${yamlencode({
+    data = format("#cloud-config\n%s", yamlencode({
       hostname    = "web"
       users       = local.users
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = []
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.63.0.20 cache' >> /etc/hosts"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
+        "sh -c 'printf '\\''%s\\n'\\'' '\\''10.63.0.20 cache'\\'' >> /etc/hosts'",
+        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
       ]
-    })}"
+    }))
   }
 }
 
@@ -304,16 +325,16 @@ resource "proxmox_virtual_environment_file" "cache" {
   content_type = "snippets"
   source_raw {
     file_name = "iso${var.slot}-cache.yaml"
-    data = "#cloud-config\n${yamlencode({
+    data = format("#cloud-config\n%s", yamlencode({
       hostname    = "cache"
       users       = local.users
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = []
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.63.0.10 web' >> /etc/hosts"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
+        "sh -c 'printf '\\''%s\\n'\\'' '\\''10.63.0.10 web'\\'' >> /etc/hosts'",
+        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
       ]
-    })}"
+    }))
   }
 }
 
@@ -365,20 +386,31 @@ resource "proxmox_virtual_environment_file" "controller" {
   content_type = "snippets"
   source_raw {
     file_name = "iso${var.slot}-controller.yaml"
-    data = "#cloud-config\n${yamlencode({
-      hostname    = "isoloom-controller"
-      users       = local.users
-      packages    = ["python3-venv", "curl", "netcat-openbsd", "openssh-client"]
-      write_files = concat(local.project_files, [{ path = "/etc/isoloom/id_ed25519", permissions = "0600", content = tls_private_key.controller.private_key_openssh }, { path = "/etc/isoloom/inventory.ini", permissions = "0644", content = "[linux]\nweb ansible_host=10.63.0.10 ansible_user=isoloom\ncache ansible_host=10.63.0.20 ansible_user=isoloom maxmemory='\"64mb\"'\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n\n[pair]\nweb\ncache\n" }])
+    data = format("#cloud-config\n%s", yamlencode({
+      hostname = "isoloom-controller"
+      users    = local.users
+      packages = ["python3-venv", "curl", "netcat-openbsd", "openssh-client"]
+      write_files = concat(local.project_files, [
+        {
+          path        = "/etc/isoloom/id_ed25519"
+          permissions = "0600"
+          content     = tls_private_key.controller.private_key_openssh
+        },
+        {
+          path        = "/etc/isoloom/inventory.ini"
+          permissions = "0644"
+          content     = "[linux]\nweb ansible_host=10.63.0.10 ansible_user=isoloom\ncache ansible_host=10.63.0.20 ansible_user=isoloom maxmemory='\"64mb\"'\n\n[windows]\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[webservers]\nweb\n\n[caches]\ncache\n\n[pair]\nweb\ncache\n"
+        }
+      ])
       runcmd = [
-        ["sh", "-c", "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' >> /etc/hosts"],
-        ["sh", "-c", "python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm"],
-        ["sh", "-c", "i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.63.0.10 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo 'web not ready'; exit 1; }; sleep 5; done"],
-        ["sh", "-c", "i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.63.0.20 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo 'cache not ready'; exit 1; }; sleep 5; done"],
-        ["sh", "-c", "sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}\ncd /opt/isoloom/ansible\nretry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\",\"tools\":[\"curl\",\"jq\"],\"cache_port\":6379}'\\'' site.yml\n'"],
-        ["sh", "-c", "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"]
+        "sh -c 'printf '\\''%s\\n'\\'' '\\''10.63.0.10 web'\\'' '\\''10.63.0.20 cache'\\'' >> /etc/hosts'",
+        "sh -c '[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q '\\''ansible-core>=2.15,<2.17'\\'' pywinrm; }'",
+        "sh -c 'i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.63.0.10 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo '\\''web not ready'\\''; exit 1; }; sleep 5; done'",
+        "sh -c 'i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.63.0.20 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo '\\''cache not ready'\\''; exit 1; }; sleep 5; done'",
+        "sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}\ncd /opt/isoloom/ansible\nretry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '\\''{\"greeting\":\"hello from ansible\",\"tools\":[\"curl\",\"jq\"],\"cache_port\":6379}'\\'' site.yml'",
+        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
       ]
-    })}"
+    }))
   }
 }
 
@@ -427,7 +459,11 @@ resource "proxmox_virtual_environment_vm" "isoloom_controller" {
     type = "l26"
   }
   serial_device {}
-  depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.web, proxmox_virtual_environment_vm.cache]
+  depends_on = [
+    proxmox_virtual_environment_vm.isoloom_router,
+    proxmox_virtual_environment_vm.web,
+    proxmox_virtual_environment_vm.cache
+  ]
 }
 
 locals {
@@ -440,10 +476,7 @@ output "address" {
 
 # The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
 output "machines" {
-  value = {
-    "web"   = "10.63.0.10"
-    "cache" = "10.63.0.20"
-  }
+  value = { web = "10.63.0.10", cache = "10.63.0.20" }
 }
 
 output "ssh_user" {
@@ -453,9 +486,27 @@ output "ssh_user" {
 # The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
 output "checks" {
   value = [
-    { position = "networks", machine = "controller", host = "10.63.0.253", user = "isoloom", script = ".isoloom/proxmox/checks/networks.sh" },
-    { position = "web", machine = "web", host = "10.63.0.10", user = "isoloom", script = ".isoloom/proxmox/checks/web.sh" },
-    { position = "cache", machine = "cache", host = "10.63.0.20", user = "isoloom", script = ".isoloom/proxmox/checks/cache.sh" }
+    {
+      position = "networks"
+      machine  = "controller"
+      host     = "10.63.0.253"
+      user     = "isoloom"
+      script   = ".isoloom/proxmox/checks/networks.sh"
+    },
+    {
+      position = "web"
+      machine  = "web"
+      host     = "10.63.0.10"
+      user     = "isoloom"
+      script   = ".isoloom/proxmox/checks/web.sh"
+    },
+    {
+      position = "cache"
+      machine  = "cache"
+      host     = "10.63.0.20"
+      user     = "isoloom"
+      script   = ".isoloom/proxmox/checks/cache.sh"
+    }
   ]
 }
 

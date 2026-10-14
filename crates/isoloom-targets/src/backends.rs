@@ -1,7 +1,7 @@
-//! The registry of backends, one per generated target. Compose, external, docker-vm and hybrid
-//! render the plan; the targets not migrated yet go through [`LegacyBackend`], which runs today's
-//! generator on the spec the plan was built from, with the text post-passes it still needs, so
-//! their output is unchanged.
+//! The registry of backends, one per generated target. Compose, external, docker-vm, hybrid,
+//! Proxmox and cloud-vm render the plan; the targets not migrated yet go through
+//! [`LegacyBackend`], which runs today's generator on the spec the plan was built from, with
+//! the text post-passes it still needs, so their output is unchanged.
 
 use isoloom_compose::ComposeBackend;
 use isoloom_external::ExternalBackend;
@@ -10,7 +10,9 @@ use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::backend::{Backend, Files, RenderError};
 use isoloom_render::{GenerateError, constraints, project};
 use isoloom_spec::model::{Spec, Target};
-use isoloom_terraform::{cloud_docker, cloud_services, cloud_vm, proxmox};
+use isoloom_terraform::cloud_vm::CloudVmBackend;
+use isoloom_terraform::proxmox::ProxmoxBackend;
+use isoloom_terraform::{cloud_docker, cloud_services};
 use isoloom_vagrant::{DockerVmBackend, HybridBackend, vagrant};
 
 /// A generator that predates the plan: a pure function of the spec.
@@ -96,8 +98,8 @@ static CLOUD_DOCKER: LegacyBackend = legacy(Target::CloudDocker, cloud_docker_fi
 static KUBERNETES: LegacyBackend = legacy(Target::Kubernetes, kubernetes::generate);
 static HYBRID: HybridBackend = HybridBackend;
 static VAGRANT: LegacyBackend = legacy(Target::Vagrant, vagrant::generate);
-static PROXMOX: LegacyBackend = legacy(Target::Proxmox, proxmox::generate);
-static CLOUD_VM: LegacyBackend = legacy(Target::CloudVm, cloud_vm::generate);
+static PROXMOX: ProxmoxBackend = ProxmoxBackend;
+static CLOUD_VM: CloudVmBackend = CloudVmBackend;
 static EXTERNAL: ExternalBackend = ExternalBackend;
 static CLOUD_SERVICES: LegacyBackend = legacy(Target::CloudServices, cloud_services::generate);
 

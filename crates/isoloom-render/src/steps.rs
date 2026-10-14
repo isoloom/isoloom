@@ -198,7 +198,13 @@ fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> String {
 /// Records this boot and restarts; the backend runs the next steps once the machine is back,
 /// starting with [`reboot_check`].
 fn reboot() -> String {
-    format!("mkdir -p /var/lib/isoloom && cp {BOOT_ID} /var/lib/isoloom/boot-id\n(sleep 2 && reboot) >/dev/null 2>&1 &\n")
+    format!("{}(sleep 2 && reboot) >/dev/null 2>&1 &\n", record_boot())
+}
+
+/// Records this boot's id, for [`reboot_check`]: a transport that restarts the machine itself
+/// (Terraform's `remote-exec`) runs it before restarting.
+pub fn record_boot() -> String {
+    format!("mkdir -p /var/lib/isoloom && cp {BOOT_ID} /var/lib/isoloom/boot-id\n")
 }
 
 /// After a reboot step: fails when the machine didn't actually restart.
@@ -207,12 +213,13 @@ pub fn reboot_check() -> String {
 }
 
 /// Offline: no new connection leaves the environment's networks (each network's block is
-/// allowed, everything else new is dropped).
+/// allowed, everything else new is dropped), now and at every boot (a unit loads the rules).
 fn egress(env: &Environment) -> String {
     let lab = env.networks.values().map(|n| n.cidr.as_str()).collect::<Vec<_>>().join(", ");
     format!(
         "command -v nft >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)\n\
-         printf '%s\\n' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    ip daddr != {{ {lab} }} ct state new drop' '  }}' '}}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft\n"
+         printf '%s\\n' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    ip daddr != {{ {lab} }} ct state new drop' '  }}' '}}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft\n\
+         printf '%s\\n' '[Unit]' 'Description=Isoloom: no new connection leaves the environment' 'After=network.target' '' '[Service]' 'Type=oneshot' 'ExecStart=/usr/sbin/nft -f /etc/isoloom-egress.nft' '' '[Install]' 'WantedBy=multi-user.target' > /etc/systemd/system/isoloom-egress.service && (systemctl enable isoloom-egress.service 2>/dev/null || true)\n"
     )
 }
 
