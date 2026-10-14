@@ -1089,7 +1089,7 @@ fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
         dc.contains("if \"x86_64\" != HOST_ARCH\n        v.smp = \"cpus=1\"\n        o.vm.boot_timeout = 3600"),
         "{dc}"
     );
-    assert!(dc.contains("o.winrm.retry_limit = 180"), "{dc}");
+    assert!(dc.contains("o.winrm.max_tries = 180"), "{dc}");
     assert!(
         dc.contains("New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 192.168.56.10 -PrefixLength 24"),
         "{dc}"

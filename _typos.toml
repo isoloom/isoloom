@@ -12,3 +12,5 @@ exportfs = "exportfs"
 # Misspelled keys on purpose: the tests check they are refused.
 provder = "provder"
 targt = "targt"
+# Puppet's fact tool, a Vagrant provisioner option.
+facter = "facter"

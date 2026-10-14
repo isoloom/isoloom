@@ -201,7 +201,7 @@ fn emulated(r: &mut Ruby, a: Arch, windows: bool) {
         r.assign("v.smp", Value::str("cpus=1"));
         r.assign("o.vm.boot_timeout", 3600u32);
         if windows {
-            r.assign("o.winrm.retry_limit", 180u32);
+            r.assign("o.winrm.max_tries", 180u32);
             r.assign("o.winrm.timeout", 1800u32);
         }
     });

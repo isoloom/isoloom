@@ -156,8 +156,8 @@ what Isoloom does with the feature: `Emitted`, `Partial`, `Equivalent`, `InImage
 1. Pin the format's machine-readable definition under `crates/isoloom-coverage/coverage/`
    (the Compose schema JSON, Vagrant's config classes as `.txt`, Terraform provider resource
    lists) and note where it came from. `scripts/terraform-resources.sh` and
-   `scripts/vagrant-settings.py` refresh the existing ones.
-2. Write the module (see `compose.rs`, `vagrant.rs`, `terraform.rs`): a `format()` returning
+   `scripts/refresh-vagrant.py` refresh the existing ones.
+2. Write the module (see `compose.rs`, `vagrant/`, `terraform.rs`): a `format()` returning
    the `Format`, with every feature of the definition classified.
 3. Register it in `formats()`.
 4. Extend `crates/isoloom-coverage/tests/coverage.rs`: the rows are exactly the definition's
