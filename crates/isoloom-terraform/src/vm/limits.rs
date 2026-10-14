@@ -46,3 +46,15 @@ pub fn fixed_mtu(env: &Environment, cloud: &str) -> Option<String> {
     let (name, _) = env.networks.iter().find(|(_, n)| n.mtu.is_some())?;
     Some(format!("network `{name}` sets its `mtu`: {cloud} has no setting for a network's MTU"))
 }
+
+/// A cloud that gives each interface the IPv6 address derived from the machine's octet: why it
+/// refuses a network that leaves the address to the target (`ipv6.addresses: auto`).
+pub fn derived_ipv6(env: &Environment, cloud: &str) -> Option<String> {
+    let (name, _) = env
+        .networks
+        .iter()
+        .find(|(_, n)| n.ipv6.as_ref().is_some_and(|v| v.addresses == isoloom_spec::model::Ipv6Addresses::Auto))?;
+    Some(format!(
+        "network `{name}` leaves IPv6 addresses to the target (`ipv6.addresses: auto`): Isoloom gives each {cloud} interface the address derived from the machine's octet, so use `static`"
+    ))
+}

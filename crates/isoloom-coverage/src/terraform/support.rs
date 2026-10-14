@@ -162,10 +162,6 @@ pub const LINODE_IPV6: Support = NotPortable {
 pub const DIGITALOCEAN_IPV6: Support = NotPortable {
     why: "DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one): Isoloom refuses IPv6 networks on DigitalOcean",
 };
-/// IPv6 on Oracle Cloud: its VCNs take unique local prefixes, not written yet.
-pub const OCI_IPV6: Support = Planned {
-    note: "dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then",
-};
 /// A reserved or extra public IPv4 address.
 pub const PUBLIC_IP: Support = NotPortable {
     why: "a reserved, shared or extra public address: local targets have no public addresses, and Isoloom reaches each machine at the one its VM gets",

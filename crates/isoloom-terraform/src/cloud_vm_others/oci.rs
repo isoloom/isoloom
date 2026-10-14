@@ -4,6 +4,10 @@
 //! networks. Each network has its own security list (`network`), and a network a machine routes
 //! goes through it. Linux labs: the backend refuses Windows and a controller.
 //!
+//! A dual-stack network carries the spec's IPv6 block as its subnet's prefix, and each VNIC on it
+//! an address from that prefix (`ipv6`). An IPv6-only network is refused by the plan: machines
+//! are set up over their public IPv4 address, and a private prefix never reaches the internet.
+//!
 //! Each machine's published ports open on its own VNIC only, through a network security group
 //! of its own; the subnet's security list holds what every machine shares (the VCN, SSH).
 //!
@@ -26,6 +30,7 @@ use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
 use crate::vm::{gateways, os, own_image, res, vms};
 
+mod ipv6;
 mod network;
 mod published;
 
@@ -42,7 +47,8 @@ const RULES: Rules = Rules {
     networks: Networks::Several,
     limits: shared::limits(
         "arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images)",
-        "dual-stack virtual cloud networks on Oracle Cloud come later",
+        // The VCN takes the spec's blocks as its private IPv6 prefixes (`network`).
+        None,
         None,
     ),
     has_image: |os| matches!(os, "debian-12" | "debian-13" | "ubuntu-22.04" | "ubuntu-24.04"),
@@ -82,6 +88,7 @@ impl Backend for OciBackend {
             .map(|r| r.to_string())
             .or_else(|| shared::refusal(env, &RULES))
             .or_else(|| network::refusal(env))
+            .or_else(|| ipv6::refusal(env))
     }
 }
 
@@ -225,7 +232,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
         ))
         .add_attribute(("boot_volume_size_in_gbs", number(u64::from(boot))))
         .build();
-    let vnic = primary_vnic(name, &net, &address, forwards, published::group(name, mp, m));
+    let vnic = ipv6::vnic(env, mp, &net, primary_vnic(name, &net, &address, forwards, published::group(name, mp, m))).build();
     let script = shutdown_script();
     let metadata = object([
         ("ssh_authorized_keys", reference("var.ssh_public_key")),
@@ -248,6 +255,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
     vnics(env, name, m);
     let mac = |n: &str| call("lower", [reference(&format!("data.oci_core_vnic.{id}_{}.mac_address", res(n)))]);
     let mut at_boot = cloud::interfaces(env, &mp.addresses, &mac);
+    at_boot.extend(ipv6::at_boot(env, name, mp));
     at_boot.extend(gateways::at_boot(mp));
     let machine = linux::Machine {
         env,
@@ -262,7 +270,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
 
 /// The instance's first VNIC, on its first network at its address, with its published ports'
 /// group when it has one.
-fn primary_vnic(name: &str, net: &str, address: &str, forwards: bool, group: Option<Expression>) -> Block {
+fn primary_vnic(name: &str, net: &str, address: &str, forwards: bool, group: Option<Expression>) -> BlockBuilder {
     let mut vnic = Block::builder("create_vnic_details")
         .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", res(net)))))
         .add_attribute(("private_ip", string(address)))
@@ -272,21 +280,22 @@ fn primary_vnic(name: &str, net: &str, address: &str, forwards: bool, group: Opt
     if let Some(group) = group {
         vnic = vnic.add_attribute(("nsg_ids", list([group])));
     }
-    vnic.build()
+    vnic
 }
 
 /// A VNIC on each network after the first, at the machine's address there (forwarding, as the
 /// first), and its MAC address, which finds it at boot.
 fn vnics(env: &Environment, name: &str, m: &mut Module) {
     let id = res(name);
-    for (net, address) in env.machines[name].addresses.iter().skip(1) {
+    let mp = &env.machines[name];
+    for (net, address) in mp.addresses.iter().skip(1) {
         let nic = format!("{id}_{}", res(net));
         let details = Block::builder("create_vnic_details")
             .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", res(net)))))
             .add_attribute(("private_ip", string(address.to_string())))
             .add_attribute(("assign_public_ip", boolean(false)))
-            .add_attribute(("skip_source_dest_check", boolean(true)))
-            .build();
+            .add_attribute(("skip_source_dest_check", boolean(true)));
+        let details = ipv6::vnic(env, mp, net, details).build();
         m.block(
             resource("oci_core_vnic_attachment", &nic)
                 .add_attribute(("instance_id", reference(&format!("oci_core_instance.{id}.id"))))

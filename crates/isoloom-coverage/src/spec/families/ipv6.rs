@@ -86,18 +86,20 @@ pub const PROXMOX: &[(&str, Status)] = &vm(Done {
     proof: "dual-stack",
 });
 
-/// The clouds' (each cloud refuses with its own reason).
+/// The clouds' (each cloud that can't keep the spec's block refuses with its own reason).
 pub const CLOUD_VM: &[(&str, Status)] = &[
     (
         "networks.*.ipv6.cidr",
-        Planned {
-            note: "a cloud network that keeps the spec's IPv6 block (Azure and Oracle Cloud take unique local blocks)",
+        Done {
+            how: "the cloud network keeps the spec's block: an address space and subnet prefix on Azure, a private prefix of the VCN and its subnet's on Oracle Cloud; each interface its derived address, rules mirroring the IPv4 ones (not run on a real host)",
+            proof: "dual-stack",
         },
     ),
     (
         "networks.*.ipv6.addresses",
-        Planned {
-            note: "with IPv6 cloud networks",
+        Done {
+            how: "`auto` on Oracle Cloud: the VNIC asks for an address in the subnet's prefix, and the set-up reads the one Oracle Cloud picked back from Terraform (not run on a real host)",
+            proof: PROBE,
         },
     ),
     (

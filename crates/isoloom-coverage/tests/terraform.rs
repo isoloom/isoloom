@@ -191,14 +191,21 @@ const PROXMOX_FIXTURES: &[&str] = &[
     "version: 1\nname: lxc\nnetworks:\n  lan: { cidr: 10.30.0.0/24, mtu: 1400 }\n  office: { cidr: 10.31.0.0/16, vlans: { 10: { cidr: 10.31.10.0/24 } } }\nmachines:\n  web: { networks: { lan: 10, office.vlan10: 10 }, rate_limit: 10mbit, environment: { MODE: lab }, docker: { image: 'nginx:1.27', idle: true, lxc: true } }\n",
 ];
 
-/// The modules generated for [`PROXMOX_FIXTURES`].
-fn proxmox_fixture_modules() -> Vec<String> {
-    PROXMOX_FIXTURES
+/// Whole environments with what no example needs, on the clouds (not run on a real host): a
+/// machine on two dual-stack networks, the first leaving its IPv6 addresses to the cloud (Oracle
+/// Cloud's secondary VNIC at its derived address on an IPv6 subnet).
+const CLOUD_FIXTURES: &[&str] = &[
+    "version: 1\nname: v6\nnetworks:\n  a: { cidr: 10.30.0.0/24, ipv6: { cidr: 'fd00:30::/64', addresses: auto } }\n  b: { cidr: 10.31.0.0/24, ipv6: { cidr: 'fd00:31::/64' } }\nmachines:\n  web: { networks: { a: 10, b: 10 }, vm: { os: debian-12, provision: [s.sh] } }\n",
+];
+
+/// The modules generated for some whole-environment fixtures on `target`.
+fn fixture_modules(fixtures: &[&str], target: Target) -> Vec<String> {
+    fixtures
         .iter()
         .flat_map(|text| {
             let spec = isoloom_spec::parse(text).unwrap();
             assert_eq!(isoloom_spec::validate(&spec), vec![], "{text}");
-            isoloom_targets::generate(&spec, Target::Proxmox).unwrap()
+            isoloom_targets::generate(&spec, target).unwrap()
         })
         .filter(|f| Path::new(&f.path).extension().is_some_and(|x| x == "tf"))
         .map(|f| f.contents)
@@ -214,7 +221,8 @@ fn written_by_table(tables: &[Format]) -> BTreeMap<&'static str, BTreeSet<String
         .flat_map(|m| module_files(m).into_iter().map(move |t| (format!(".isoloom/{m}"), t)));
     let fixtures = own_image_modules()
         .into_iter()
-        .chain(proxmox_fixture_modules())
+        .chain(fixture_modules(PROXMOX_FIXTURES, Target::Proxmox))
+        .chain(fixture_modules(CLOUD_FIXTURES, Target::CloudVm))
         .map(|t| ("the fixtures".to_string(), t));
     for (module, text) in examples.chain(fixtures) {
         for key in written_keys(&text) {

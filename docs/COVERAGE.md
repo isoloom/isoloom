@@ -32,7 +32,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Terraform: Google Cloud](#terraform-google-cloud) | 94% | 117 | 109 | 2 | 6 |
 | [Terraform: DigitalOcean](#terraform-digitalocean) | 100% | 35 | 35 | 0 | 0 |
 | [Terraform: Linode](#terraform-linode) | 100% | 54 | 54 | 0 | 0 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 89% | 196 | 176 | 0 | 20 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 99% | 193 | 192 | 0 | 1 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 100% | 86 | 86 | 0 | 0 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
@@ -5944,7 +5944,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Oracle Cloud
 
-89% of 196 portable features (176 done, 0 partly, 20 to do; 1482 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
+99% of 193 portable features (192 done, 0 partly, 1 to do; 1482 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -6035,7 +6035,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `oci_core_instance_pool` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_instance_pool_instance` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_internet_gateway` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_ipv6` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `oci_core_ipv6` | Yes | Another way | Via networks.*.ipv6: the `ipv6address_ipv6subnet_cidr_pair_details` of each VNIC's `create_vnic_details` (oci_core_instance, oci_core_vnic_attachment), the same IPv6 address made with the VNIC |
 | `oci_core_listing_resource_version_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `oci_core_nat_gateway` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `oci_core_network_security_group` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
@@ -6319,7 +6319,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `availability_config.is_live_migration_preferred` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `availability_config.recovery_action` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `create_vnic_details` | Yes | Yes | Written by the generator |
-| `create_vnic_details.assign_ipv6ip` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.assign_ipv6ip` | Yes | Yes | Written by the generator |
 | `create_vnic_details.assign_private_dns_record` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `create_vnic_details.assign_public_ip` | Yes | Yes | Written by the generator |
 | `create_vnic_details.defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -6334,10 +6334,10 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `create_vnic_details.subnet_cidr` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `create_vnic_details.subnet_id` | Yes | Yes | Written by the generator |
 | `create_vnic_details.vlan_id` | No | No | A cloud carries no 802.1Q tags between VMs (Google Cloud's VLAN interfaces and Oracle Cloud's VLANs end at its own virtual switch): Isoloom gives each VLAN a subnet of its own, and a machine on several an interface on each |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Yes | Written by the generator |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Yes | Written by the generator |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Another way | Via networks.*.ipv6: `ipv6address_ipv6subnet_cidr_pair_details.ipv6address`, the address itself (an `auto` network's is Oracle Cloud's pick) |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr` | Yes | Yes | Written by the generator |
 | `instance_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `instance_options.are_legacy_imds_endpoints_disabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `launch_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -6587,8 +6587,8 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `ipv4cidr_blocks` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `ipv6cidr_block` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `ipv6cidr_blocks` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `ipv6cidr_block` | Yes | Yes | Written by the generator |
+| `ipv6cidr_blocks` | Yes | Another way | Via networks.*.ipv6: `ipv6cidr_block`, the subnet's one /64 prefix (Oracle Cloud gives a subnet one IPv6 prefix, a network has one block) |
 | `prohibit_internet_ingress` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `prohibit_public_ip_on_vnic` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `route_table_id` | Yes | Yes | Written by the generator |
@@ -6611,13 +6611,13 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `dns_label` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
-| `ipv6private_cidr_blocks` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `is_ipv6enabled` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `is_oracle_gua_allocation_enabled` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `ipv6private_cidr_blocks` | Yes | Yes | Written by the generator |
+| `is_ipv6enabled` | Yes | Yes | Written by the generator |
+| `is_oracle_gua_allocation_enabled` | Yes | Yes | Written by the generator |
 | `security_attributes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `byoipv6cidr_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `byoipv6cidr_details.byoipv6range_id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `byoipv6cidr_details.ipv6cidr_block` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `byoipv6cidr_details` | No | No | A public IPv6 range the account owns, imported into Oracle Cloud (validated against its registry record) and advertised to the internet: no local target announces an address range, and the spec's block is a VCN private prefix whatever its range |
+| `byoipv6cidr_details.byoipv6range_id` | No | No | A public IPv6 range the account owns, imported into Oracle Cloud (validated against its registry record) and advertised to the internet: no local target announces an address range, and the spec's block is a VCN private prefix whatever its range |
+| `byoipv6cidr_details.ipv6cidr_block` | No | No | A public IPv6 range the account owns, imported into Oracle Cloud (validated against its registry record) and advertised to the internet: no local target announces an address range, and the spec's block is a VCN private prefix whatever its range |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
@@ -6632,7 +6632,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `instance_id` | Yes | Yes | Written by the generator |
 | `nic_index` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `create_vnic_details` | Yes | Yes | Written by the generator |
-| `create_vnic_details.assign_ipv6ip` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.assign_ipv6ip` | Yes | Yes | Written by the generator |
 | `create_vnic_details.assign_private_dns_record` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `create_vnic_details.assign_public_ip` | Yes | Yes | Written by the generator |
 | `create_vnic_details.defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -6648,10 +6648,10 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `create_vnic_details.subnet_cidr` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `create_vnic_details.subnet_id` | Yes | Yes | Written by the generator |
 | `create_vnic_details.vlan_id` | No | No | A cloud carries no 802.1Q tags between VMs (Google Cloud's VLAN interfaces and Oracle Cloud's VLANs end at its own virtual switch): Isoloom gives each VLAN a subnet of its own, and a machine on several an interface on each |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Yes | Written by the generator |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Yes | Written by the generator |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Another way | Via networks.*.ipv6: `ipv6address_ipv6subnet_cidr_pair_details.ipv6address`, the address itself (an `auto` network's is Oracle Cloud's pick) |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr` | Yes | Yes | Written by the generator |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
@@ -8137,8 +8137,8 @@ is marked ✗, with its reason below.
 | `networks.*.vlans.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `networks.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ◐ | ✗ | ✗ | ✗ | ✗ | ◐ | ✓ | n/a | n/a |
-| `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
-| `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
+| `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | n/a | ✓ |
+| `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.only` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✗ |
 | `networks.*.external` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
 | `networks.*.bridged.interface` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
@@ -8315,11 +8315,11 @@ is marked ✗, with its reason below.
 | proxmox | 81% of 121 | 98 | 2 | 3 | 18 |
 | esxi | 65% of 120 | 78 | 1 | 3 | 38 |
 | aws | 62% of 126 | 71 | 16 | 6 | 33 |
-| azure | 61% of 126 | 71 | 14 | 7 | 34 |
+| azure | 62% of 126 | 72 | 14 | 6 | 34 |
 | gcp | 62% of 126 | 71 | 15 | 7 | 33 |
 | digitalocean | 49% of 126 | 58 | 9 | 6 | 53 |
 | linode | 56% of 126 | 65 | 12 | 6 | 43 |
-| oci | 56% of 126 | 65 | 13 | 6 | 42 |
+| oci | 58% of 126 | 67 | 13 | 6 | 40 |
 | cloud-docker | 77% of 122 | 93 | 3 | 0 | 26 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
 | external | 45% of 85 | 34 | 9 | 16 | 26 |
@@ -8348,12 +8348,12 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **gcp**: A Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network (`networks.*.gateway`)
 - **linode**: Machine `a` is on several networks: a Linode instance has one VPC interface (`networks.*.gateway`)
 - **hybrid, esxi**: Network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`, `networks.*.ipv6.only`)
-- **aws**: Network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks (`networks.*.ipv6.cidr`)
-- **gcp**: Network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept (`networks.*.ipv6.cidr`)
-- **digitalocean**: Network `lan` is IPv6: DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one) (`networks.*.ipv6.cidr`)
-- **linode**: Network `lan` is IPv6: a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept (`networks.*.ipv6.cidr`)
-- **oci**: Network `lan` is IPv6: dual-stack virtual cloud networks on Oracle Cloud come later (`networks.*.ipv6.cidr`)
-- **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static` (`networks.*.ipv6.addresses`)
+- **aws**: Network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)
+- **gcp**: Network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)
+- **digitalocean**: Network `lan` is IPv6: DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one) (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)
+- **linode**: Network `lan` is IPv6: a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)
+- **vagrant, proxmox**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static` (`networks.*.ipv6.addresses`)
+- **azure**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`): Isoloom gives each Azure interface the address derived from the machine's octet, so use `static` (`networks.*.ipv6.addresses`)
 - **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci, external**: Network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport) (`networks.*.ipv6.only`)
 - **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)

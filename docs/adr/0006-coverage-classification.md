@@ -107,6 +107,16 @@ are written and now checked against every module that writes them.
 | libvirt `tpm_path` | Planned | Tooling | The host's own TPM passed through: the emulated TPM (`tpm_type`) gives each VM one of its own. |
 | ESXi `guestos` | Planned | Equivalent | The plugin's older name for `guest_guestos`, which Isoloom writes. |
 
+## Re-decided rows (IPv6 on Oracle Cloud)
+
+| Row | Was | Now | Why |
+| --- | --- | --- | --- |
+| `oci_core_ipv6` | Planned | Equivalent | An IPv6 address object on a VNIC. Each VNIC's `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` makes the same object with the VNIC (the provider's instance and VNIC attachment both take it), so a separate resource adds nothing. |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Planned | Equivalent | "An OCID that specifies a previously-reserved ipv6" (the provider's documentation): the VNIC gets the same address that `ipv6address` names directly. |
+| `oci_core_subnet.ipv6cidr_blocks` | Planned | Equivalent | The list form of `ipv6cidr_block`. Oracle Cloud's IPv6 documentation says "The subnet can only have one IPv6 prefix", and a spec network has one block. |
+| `oci_core_vcn.byoipv6cidr_details` and its keys | Planned | Not portable | Bring your own IPv6 needs a public range the account imported (a `ByoipRange`, validated against its registry record) that Oracle Cloud advertises to the internet. No local target announces an address range. The spec's block, global or unique local, goes in `ipv6private_cidr_blocks`, which takes "ULA or Private IPv6" prefixes and routes none of them to the internet. |
+| `oci_core_vcn.is_oracle_gua_allocation_enabled` | Planned | Emitted | Written `false`: the spec's block is the network's only IPv6 prefix, without Oracle's public /56 beside it. |
+
 ## The spec table's cells
 
 The spec table runs the other way: a row per field of an Isoloom spec, a column per output (each

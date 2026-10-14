@@ -3,15 +3,30 @@
 
 use super::support::{
     ACCOUNT, ADDRESSES, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS,
-    IMAGES, LOCATION, MANAGED, NAT, NESTED, OCI_IPV6, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
+    IMAGES, LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
-use crate::Support::{self, Equivalent};
+use crate::Support::{self, Equivalent, NotPortable};
 
 /// What a network security group's rule could carry beyond the published ports Isoloom opens
 /// with it.
 const IN_LIST: Support = Equivalent {
     via: "the network's security list, which carries its egress and ICMP rules (oci_core_security_list)",
+};
+
+/// An IPv6 address object of its own: the VNIC's `create_vnic_details` makes the same one.
+const IPV6_WITH_VNIC: Support = Equivalent {
+    via: "networks.*.ipv6: the `ipv6address_ipv6subnet_cidr_pair_details` of each VNIC's `create_vnic_details` (oci_core_instance, oci_core_vnic_attachment), the same IPv6 address made with the VNIC",
+};
+
+/// A previously reserved IPv6 address object, named instead of the address itself.
+const RESERVED_IPV6: Support = Equivalent {
+    via: "networks.*.ipv6: `ipv6address_ipv6subnet_cidr_pair_details.ipv6address`, the address itself (an `auto` network's is Oracle Cloud's pick)",
+};
+
+/// Bring your own IPv6: a public range the account imported and Oracle Cloud advertises.
+const BYOIPV6: Support = NotPortable {
+    why: "a public IPv6 range the account owns, imported into Oracle Cloud (validated against its registry record) and advertised to the internet: no local target announces an address range, and the spec's block is a VCN private prefix whatever its range",
 };
 
 /// Volumes the instance's `launch_volume_attachments` blocks create and attach.
@@ -45,7 +60,7 @@ const TYPES: Rules = &[
     (NAT, "core_nat_gateway"),
     (PUBLIC_IP, "core_public_ip"),
     (ADDRESSES, "core_private_ip"),
-    (OCI_IPV6, "core_ipv6"),
+    (IPV6_WITH_VNIC, "core_ipv6"),
     (CLOUD_VLANS, "core_vlan"),
     (BACKUP, "core_boot_volume"),
     (CREATED_WITH_INSTANCE, "core_volume core_volume_attachment"),
@@ -127,6 +142,8 @@ const WRITTEN: &[(&str, &str)] = &[
         "oci_core_instance",
         "launch_volume_attachments launch_volume_attachments.display_name launch_volume_attachments.type launch_volume_attachments.launch_create_volume_details launch_volume_attachments.launch_create_volume_details.compartment_id launch_volume_attachments.launch_create_volume_details.display_name launch_volume_attachments.launch_create_volume_details.size_in_gbs launch_volume_attachments.launch_create_volume_details.volume_creation_type availability_domain compartment_id create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.hostname_label
         create_vnic_details.nsg_ids create_vnic_details.private_ip create_vnic_details.skip_source_dest_check create_vnic_details.subnet_id
+        create_vnic_details.assign_ipv6ip create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details
+        create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr
         display_name metadata shape shape_config shape_config.memory_in_gbs
         platform_config platform_config.is_measured_boot_enabled platform_config.is_secure_boot_enabled
         platform_config.is_trusted_platform_module_enabled platform_config.type shape_config.ocpus source_details
@@ -158,13 +175,18 @@ const WRITTEN: &[(&str, &str)] = &[
     ("oci_core_route_table_attachment", "route_table_id subnet_id"),
     (
         "oci_core_subnet",
-        "cidr_block compartment_id display_name route_table_id security_list_ids vcn_id",
+        "cidr_block compartment_id display_name ipv6cidr_block route_table_id security_list_ids vcn_id",
     ),
-    ("oci_core_vcn", "cidr_block cidr_blocks compartment_id display_name"),
+    (
+        "oci_core_vcn",
+        "cidr_block cidr_blocks compartment_id display_name ipv6private_cidr_blocks is_ipv6enabled is_oracle_gua_allocation_enabled",
+    ),
     (
         "oci_core_vnic_attachment",
         "create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.private_ip create_vnic_details.skip_source_dest_check
-        create_vnic_details.subnet_id display_name instance_id",
+        create_vnic_details.subnet_id create_vnic_details.assign_ipv6ip create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details
+        create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr
+        display_name instance_id",
     ),
 ];
 
@@ -220,11 +242,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "hostname_label image subnet_id shape_config.vcpus source_details.instance_source_image_filter_details
                 source_details.instance_source_image_filter_details.* create_vnic_details.private_ip_id create_vnic_details.subnet_cidr",
             ),
-            (
-                OCI_IPV6,
-                "create_vnic_details.assign_ipv6ip create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details
-                create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.*",
-            ),
+            (RESERVED_IPV6, "create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id"),
             (CLOUD_NAMES, "create_vnic_details.assign_private_dns_record"),
             (CLOUD_VLANS, "create_vnic_details.vlan_id"),
             (
@@ -273,7 +291,12 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (CLOUD_NAMES, "dns_label"),
             (CLOUD_RESOLVER, "dhcp_options_id"),
             (ALIAS, "ipv4cidr_blocks"),
-            (OCI_IPV6, "ipv6cidr_block ipv6cidr_blocks"),
+            (
+                Equivalent {
+                    via: "networks.*.ipv6: `ipv6cidr_block`, the subnet's one /64 prefix (Oracle Cloud gives a subnet one IPv6 prefix, a network has one block)",
+                },
+                "ipv6cidr_blocks",
+            ),
             (ALIAS, "prohibit_internet_ingress prohibit_public_ip_on_vnic"),
         ],
     ),
@@ -281,10 +304,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         "oci_core_vcn",
         &[
             (CLOUD_NAMES, "dns_label"),
-            (
-                OCI_IPV6,
-                "ipv6private_cidr_blocks is_ipv6enabled is_oracle_gua_allocation_enabled byoipv6cidr_details byoipv6cidr_details.*",
-            ),
+            (BYOIPV6, "byoipv6cidr_details byoipv6cidr_details.*"),
             (CLOUD, "security_attributes"),
         ],
     ),
@@ -299,11 +319,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (CLOUD_NAMES, "create_vnic_details.assign_private_dns_record"),
             (CLOUD_VLANS, "create_vnic_details.vlan_id"),
-            (
-                OCI_IPV6,
-                "create_vnic_details.assign_ipv6ip create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details
-                create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.*",
-            ),
+            (RESERVED_IPV6, "create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id"),
         ],
     ),
     ("data.oci_core_private_ips", &[(ALIAS, "ip_state lifetime vlan_id vnic_id filter filter.*")]),

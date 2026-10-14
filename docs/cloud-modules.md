@@ -93,6 +93,18 @@ Every cloud keeps each network's exact range and each machine's address on it. W
 
 Published ports open only on the machine that publishes them, on every cloud.
 
+A dual-stack network (`ipv6:`) keeps its block on Azure (an address space of the virtual
+network and its subnet's prefix) and on Oracle Cloud: the VCN takes every block as a private
+prefix (`ipv6private_cidr_blocks`, `is_ipv6enabled`) with no Oracle-allocated public prefix beside
+them (`is_oracle_gua_allocation_enabled = false`), and the subnet takes its network's
+(`ipv6cidr_block`). Each VNIC asks for an address there (`assign_ipv6ip`): the machine's derived
+one (`ipv6address_ipv6subnet_cidr_pair_details`), or with `addresses: auto` the one Oracle Cloud
+picks, which the set-up reads back from Terraform and puts on the interface. The security lists
+mirror the IPv4 rules on the IPv6 blocks, ICMPv6 "packet too big" included. No IPv6 route leaves
+the VCN: Oracle Cloud routes no private prefix to the internet, so machines go out over IPv4.
+AWS, Google Cloud, DigitalOcean and Linode refuse IPv6 networks: none of their networks takes a
+block the spec picks.
+
 On a network a machine routes (`gateway:`), the cloud keeps the subnet's first address for its
 own router, so the gateway machine sits at the network's router address (its last usable address,
 unused on such a network), and the hosts files say so. It forwards, its source and

@@ -275,28 +275,31 @@ An IPv6 /64 block, unique local (`fd00:20::/64`) or global. A machine at octet 1
 
 - **Type:** string
 - **Example:** `networks: { lan: { ipv6: { cidr: 'fd00:20::/64' } } }`
-- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `proxmox`, `cloud-docker`, `external`
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `proxmox`, `cloud-vm` (azure), `cloud-vm` (oci), `cloud-docker`, `external`
 - **Refused by:** `hybrid`, `esxi`: network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet
 - **Refused by:** `cloud-vm` (aws): network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks
 - **Refused by:** `cloud-vm` (gcp): network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept
 - **Refused by:** `cloud-vm` (digitalocean): network `lan` is IPv6: DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one)
 - **Refused by:** `cloud-vm` (linode): network `lan` is IPv6: a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept
-- **Refused by:** `cloud-vm` (oci): network `lan` is IPv6: dual-stack virtual cloud networks on Oracle Cloud come later
-- **Planned for:** `cloud-vm` (azure)
 - **Not used by:** `cloud-services`
 
 ### `networks.*.ipv6.addresses`
 
-How machines get their IPv6 address: `static` (default), the one derived from their octet, or `auto`, the one the target hands out (Docker's address management, the cluster's). Isoloom's own addresses stay fixed either way.
+How machines get their IPv6 address: `static` (default), the one derived from their octet, or `auto`, the one the target hands out (Docker's address management, the cluster's, Oracle Cloud's). Isoloom's own addresses stay fixed either way.
 
 - **Type:** string
 - **Allowed:**
   - `static`: Derived from the machine's octet, the same on every target.
   - `auto`: Handed out by the target.
 - **Example:** `networks: { lan: { ipv6: { cidr: 'fd00:20::/64', addresses: auto } } }`
-- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `external`
-- **Refused by:** `vagrant`, `proxmox`, `cloud-vm` (every cloud): network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-vm` (oci), `cloud-docker`, `external`
+- **Refused by:** `vagrant`, `proxmox`: network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`
 - **Refused by:** `hybrid`, `esxi`: network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet
+- **Refused by:** `cloud-vm` (aws): network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks
+- **Refused by:** `cloud-vm` (azure): network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`): Isoloom gives each Azure interface the address derived from the machine's octet, so use `static`
+- **Refused by:** `cloud-vm` (gcp): network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept
+- **Refused by:** `cloud-vm` (digitalocean): network `lan` is IPv6: DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one)
+- **Refused by:** `cloud-vm` (linode): network `lan` is IPv6: a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept
 - **Not used by:** `cloud-services`
 
 ### `networks.*.ipv6.only`

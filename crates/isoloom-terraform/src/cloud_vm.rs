@@ -61,6 +61,9 @@ pub fn capabilities() -> Capabilities {
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Ipv6,
+        // Addresses the cloud hands out: Oracle Cloud picks one in the subnet's prefix; Azure
+        // refuses it on its own, and the other clouds refuse IPv6 altogether.
+        Feature::Ipv6Auto,
         // Given on AWS (NitroTPM), Azure, Google Cloud and Oracle Cloud; DigitalOcean and Linode
         // refuse it on their own.
         Feature::Tpm,
