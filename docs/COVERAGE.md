@@ -31,11 +31,14 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [cloud-init](#cloud-init) | 95% | 80 | 76 | 0 | 4 |
 | [Ansible inventory](#ansible-inventory) | 95% | 31 | 28 | 3 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
+| [Kubernetes](#kubernetes) | 88% | 192 | 170 | 1 | 21 |
+| [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
+| [Helm](#helm) | 94% | 19 | 18 | 0 | 1 |
 
 Done includes features produced another way, or set in the image. The lists come from the
 formats themselves (every key of the Compose schema, every setting of Vagrant and each provider
 plugin, every resource type of each Terraform provider); tests fail on an unclassified entry, when
-an example's generated file (Compose, Vagrantfile, Terraform) writes a key or resource type its
+an example's generated file (Compose, Vagrantfile, Terraform, Kubernetes, Kustomize, Helm) writes a key or resource type its
 table doesn't mark as written, or when one marked as written appears in no example's output.
 Only what the examples generate is checked: a feature no example uses can still be misclassified.
 
@@ -1564,3 +1567,486 @@ And 1007 other resource types: this cloud's managed services (databases, storage
 | `check` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
 | `escape` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
 | `syntax` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+
+## Kubernetes
+
+88% of 192 portable features (170 done, 1 partly, 21 to do; 358 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+
+### Instructions
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `Kinds: Binding` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: ComponentStatus` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: ConfigMap` | Yes | Yes | The project's scripts the pods run: `init:` jobs, checks |
+| `Kinds: ControllerRevision` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: CronJob` | Yes | In the image | A scheduled task is the machine's own (cron in its image or its set-up) |
+| `Kinds: DaemonSet` | n/a | No | One pod per node: the cluster's agents, not an environment's machines |
+| `Kinds: Deployment` | Yes | Yes | From `machines` (one pod each) |
+| `Kinds: Endpoints` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: Event` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: IPAddress` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: Ingress` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
+| `Kinds: IngressClass` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: Job` | Yes | Yes | From `checks` (a Job per position; `helm test` Pods in the chart) |
+| `Kinds: LimitRange` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: Namespace` | Yes | Yes | The environment's own namespace, from its name and instance |
+| `Kinds: NetworkPolicy` | Yes | Yes | From networks and reach |
+| `Kinds: Node` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: PersistentVolume` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: PersistentVolumeClaim` | Yes | Yes | From `volumes` |
+| `Kinds: Pod` | Yes | Yes | From `checks` (a Job per position; `helm test` Pods in the chart) |
+| `Kinds: PodTemplate` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: ReplicaSet` | Yes | Another way | Via a Deployment of one replica, with its claims |
+| `Kinds: ReplicationController` | Yes | Another way | Via a Deployment of one replica, with its claims |
+| `Kinds: ResourceQuota` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: Secret` | Yes | Yes | From `inputs` (in the chart) |
+| `Kinds: Service` | Yes | Yes | From `machines.*.services` (its name for the others, and what it publishes) |
+| `Kinds: ServiceAccount` | n/a | No | An identity for the Kubernetes API: machines don't call it |
+| `Kinds: ServiceCIDR` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
+| `Kinds: StatefulSet` | Yes | Another way | Via a Deployment of one replica, with its claims |
+| `Namespace: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `Namespace: kind` | Yes | Yes | Every object Isoloom writes |
+| `Namespace: metadata` | Yes | Yes | Every object Isoloom writes |
+| `Namespace: spec` | n/a | No | A namespace's finalizers: how the API deletes it |
+| `NamespaceSpec: finalizers` | n/a | No | How the API names and deletes objects: Isoloom names each one |
+| `Deployment: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `Deployment: kind` | Yes | Yes | Every object Isoloom writes |
+| `Deployment: metadata` | Yes | Yes | Every object Isoloom writes |
+| `Deployment: spec` | Yes | Yes | Every object Isoloom writes |
+| `DeploymentSpec: minReadySeconds` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `DeploymentSpec: paused` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `DeploymentSpec: progressDeadlineSeconds` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `DeploymentSpec: replicas` | Yes | Yes | One: a machine is one pod |
+| `DeploymentSpec: revisionHistoryLimit` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `DeploymentSpec: selector` | Yes | Yes | From `machines` |
+| `DeploymentSpec: strategy` | Yes | Yes | Recreate: its claims are mounted by one pod at a time |
+| `DeploymentSpec: template` | Yes | Yes | From `machines` |
+| `DeploymentStrategy: rollingUpdate` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `DeploymentStrategy: type` | Yes | Yes | Recreate: its claims are mounted by one pod at a time |
+| `PodTemplateSpec: metadata` | Yes | Yes | From `machines` |
+| `PodTemplateSpec: spec` | Yes | Yes | From `machines` |
+| `Pod: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `Pod: kind` | Yes | Yes | Every object Isoloom writes |
+| `Pod: metadata` | Yes | Yes | Every object Isoloom writes |
+| `Pod: spec` | Yes | Yes | Every object Isoloom writes |
+| `PodSpec: activeDeadlineSeconds` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: affinity` | Yes | Yes | From `volumes` (a machine sharing a volume runs on its owner's node) |
+| `PodSpec: automountServiceAccountToken` | n/a | No | Access to the Kubernetes API: machines don't call it |
+| `PodSpec: containers` | Yes | Yes | From `machines` (the machine's container, and one for its `init:` jobs) |
+| `PodSpec: dnsConfig` | Yes | Yes | From `machines.*.dns` |
+| `PodSpec: dnsPolicy` | Yes | Yes | From `machines.*.dns` |
+| `PodSpec: enableServiceLinks` | n/a | No | Access to the Kubernetes API: machines don't call it |
+| `PodSpec: ephemeralContainers` | n/a | No | Debugging containers added to a running pod |
+| `PodSpec: evictionResponders` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: hostAliases` | Yes | Not yet | The spec's `aliases`: Kubernetes gives no fixed pod address to point them at |
+| `PodSpec: hostIPC` | No | No | Shares the node's own namespaces: cloud VMs have no host to share |
+| `PodSpec: hostNetwork` | No | No | Shares the node's own namespaces: cloud VMs have no host to share |
+| `PodSpec: hostPID` | No | No | Shares the node's own namespaces: cloud VMs have no host to share |
+| `PodSpec: hostUsers` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSpec: hostname` | Yes | Yes | The machine's name |
+| `PodSpec: hostnameOverride` | Yes | Another way | Via `hostname`, the machine's name |
+| `PodSpec: imagePullSecrets` | n/a | No | Credentials of a private registry: the cluster's setup |
+| `PodSpec: initContainers` | Yes | Yes | From `machines.*.depends_on` (waits for the dependencies' services), and Isoloom's probe and volume seeds |
+| `PodSpec: nodeName` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: nodeSelector` | Yes | Yes | From `machines.*.arch` (a node of the machine's architecture) |
+| `PodSpec: os` | Yes | Not yet | Windows machines in Windows containers (Windows makes an environment VM-only today) |
+| `PodSpec: overhead` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSpec: preemptionPolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: priority` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: priorityClassName` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: readinessGates` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: resourceClaims` | Yes | Not yet | Device passthrough (GPUs), where the cluster offers it |
+| `PodSpec: resources` | Yes | Another way | Via each container's `resources` |
+| `PodSpec: restartPolicy` | Yes | Yes | From `checks` (run once) |
+| `PodSpec: runtimeClassName` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSpec: schedulerName` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: schedulingGates` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: schedulingGroup` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: securityContext` | Yes | Yes | From `machines.*.sysctls` |
+| `PodSpec: serviceAccount` | n/a | No | Access to the Kubernetes API: machines don't call it |
+| `PodSpec: serviceAccountName` | n/a | No | Access to the Kubernetes API: machines don't call it |
+| `PodSpec: setHostnameAsFQDN` | Yes | Not yet | The machine's `dns.domain` as its fully qualified name |
+| `PodSpec: shareProcessNamespace` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSpec: subdomain` | Yes | Not yet | The machine's `dns.domain` as its fully qualified name |
+| `PodSpec: terminationGracePeriodSeconds` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: tolerations` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: topologySpreadConstraints` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodSpec: volumes` | Yes | Yes | From `volumes, machines.*.tmpfs and machines.*.shm_size` |
+| `Container: args` | Yes | Not yet | A machine's own `command` (the image's default runs today) |
+| `Container: command` | Yes | Yes | From `machines.*.docker.idle and machines.*.docker.init` (and Isoloom's own containers) |
+| `Container: env` | Yes | Yes | From `machines.*.environment and machines.*.inputs` |
+| `Container: envFrom` | Yes | Another way | Via `env`, one variable at a time |
+| `Container: image` | Yes | Yes | From `machines.*.docker.image` (or the image the project builds; a value of its own in the chart) |
+| `Container: imagePullPolicy` | Yes | Yes | IfNotPresent: an image built on the node is used as it is |
+| `Container: lifecycle` | Yes | Another way | Via machines.*.docker.init: a container beside the machine's, run once it answers |
+| `Container: livenessProbe` | n/a | No | Restarts a container Kubernetes finds unhealthy: the cluster's self-healing, not the machine's behavior |
+| `Container: name` | Yes | Yes | The machine's name |
+| `Container: ports` | Yes | Yes | From `machines.*.services` |
+| `Container: readinessProbe` | Yes | Partly | From `machines.*.services` (ready when its services' ports answer; dormant ones aren't waited for); not yet: a custom healthcheck command |
+| `Container: resizePolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `Container: resources` | Yes | Yes | From `machines.*.resources` |
+| `Container: restartPolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `Container: restartPolicyRules` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `Container: securityContext` | Yes | Yes | From `machines.*.privileged and machines.*.read_only` |
+| `Container: startupProbe` | Yes | Another way | Via `readinessProbe`, which waits as long as the machine takes to start |
+| `Container: stdin` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
+| `Container: stdinOnce` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
+| `Container: terminationMessagePath` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `Container: terminationMessagePolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `Container: tty` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
+| `Container: volumeDevices` | Yes | Not yet | Raw data disks, with persistent volumes and data disks |
+| `Container: volumeMounts` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
+| `Container: workingDir` | Yes | In the image | The image's WORKDIR |
+| `ContainerPort: containerPort` | Yes | Yes | From `machines.*.services[].port` |
+| `ContainerPort: hostIP` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
+| `ContainerPort: hostPort` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
+| `ContainerPort: name` | n/a | No | A name for the port within Kubernetes: Isoloom refers to ports by number |
+| `ContainerPort: protocol` | Yes | Yes | From `machines.*.services[].protocol` |
+| `EnvVar: name` | Yes | Yes | From `machines.*.environment` (and Isoloom's own variables) |
+| `EnvVar: value` | Yes | Yes | From `machines.*.environment` (and Isoloom's own variables) |
+| `EnvVar: valueFrom` | Yes | Yes | From `machines.*.inputs` |
+| `EnvVarSource: configMapKeyRef` | Yes | Another way | Via `value`: environment values are written as they are |
+| `EnvVarSource: fieldRef` | n/a | No | Access to the Kubernetes API: machines don't call it |
+| `EnvVarSource: fileKeyRef` | Yes | Another way | Via `value`: environment values are written as they are |
+| `EnvVarSource: resourceFieldRef` | n/a | No | Access to the Kubernetes API: machines don't call it |
+| `EnvVarSource: secretKeyRef` | Yes | Yes | From `machines.*.inputs` |
+| `SecretKeySelector: key` | Yes | Yes | From `machines.*.inputs` (the inputs' Secret) |
+| `SecretKeySelector: name` | Yes | Yes | From `machines.*.inputs` (the inputs' Secret) |
+| `SecretKeySelector: optional` | Yes | Yes | From `inputs` (an unset input is empty) |
+| `ResourceRequirements: claims` | Yes | Not yet | Device passthrough (GPUs), where the cluster offers it |
+| `ResourceRequirements: limits` | Yes | Yes | From `machines.*.resources` (cpus, memory_mb) |
+| `ResourceRequirements: requests` | n/a | No | What the scheduler reserves on a node: the limits are the machine's size |
+| `Probe: exec` | Yes | Yes | From `machines.*.services` (Isoloom's port probe, the same on every target) |
+| `Probe: failureThreshold` | Yes | Yes | Every 5 seconds, for up to 5 minutes |
+| `Probe: grpc` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
+| `Probe: httpGet` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
+| `Probe: initialDelaySeconds` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
+| `Probe: periodSeconds` | Yes | Yes | Every 5 seconds, for up to 5 minutes |
+| `Probe: successThreshold` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
+| `Probe: tcpSocket` | Yes | Another way | Via `exec`: Isoloom's port probe checks every service port, TCP and UDP |
+| `Probe: terminationGracePeriodSeconds` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `Probe: timeoutSeconds` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
+| `ExecAction: command` | Yes | Yes | From `machines.*.services` (Isoloom's port probe, the same on every target) |
+| `SecurityContext: allowPrivilegeEscalation` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `SecurityContext: appArmorProfile` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `SecurityContext: capabilities` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `SecurityContext: privileged` | Yes | Yes | From `machines.*.privileged` |
+| `SecurityContext: procMount` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `SecurityContext: readOnlyRootFilesystem` | Yes | Yes | From `machines.*.read_only` |
+| `SecurityContext: runAsGroup` | Yes | Yes | The volumes' seeds run as root, to copy any file |
+| `SecurityContext: runAsNonRoot` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `SecurityContext: runAsUser` | Yes | Yes | The volumes' seeds run as root, to copy any file |
+| `SecurityContext: seLinuxOptions` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `SecurityContext: seccompProfile` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `SecurityContext: windowsOptions` | Yes | Not yet | Windows machines in Windows containers (Windows makes an environment VM-only today) |
+| `PodSecurityContext: appArmorProfile` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: fsGroup` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: fsGroupChangePolicy` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: runAsGroup` | Yes | Another way | Via each container's `securityContext` |
+| `PodSecurityContext: runAsNonRoot` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: runAsUser` | Yes | Another way | Via each container's `securityContext` |
+| `PodSecurityContext: seLinuxChangePolicy` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: seLinuxOptions` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: seccompProfile` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: supplementalGroups` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: supplementalGroupsPolicy` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
+| `PodSecurityContext: sysctls` | Yes | Yes | From `machines.*.sysctls` |
+| `PodSecurityContext: windowsOptions` | Yes | Not yet | Windows machines in Windows containers (Windows makes an environment VM-only today) |
+| `Sysctl: name` | Yes | Yes | From `machines.*.sysctls` |
+| `Sysctl: value` | Yes | Yes | From `machines.*.sysctls` |
+| `PodDNSConfig: nameservers` | Yes | Yes | From `machines.*.dns.servers` |
+| `PodDNSConfig: options` | Yes | Not yet | Resolver options (`ndots`, `timeout`), which every machine's resolver has |
+| `PodDNSConfig: searches` | Yes | Yes | From `machines.*.dns.search` |
+| `Affinity: nodeAffinity` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `Affinity: podAffinity` | Yes | Yes | From `volumes` (a machine sharing a volume runs on its owner's node) |
+| `Affinity: podAntiAffinity` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodAffinity: preferredDuringSchedulingIgnoredDuringExecution` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodAffinity: requiredDuringSchedulingIgnoredDuringExecution` | Yes | Yes | From `volumes` (a machine sharing a volume runs on its owner's node) |
+| `PodAffinityTerm: labelSelector` | Yes | Yes | From `volumes` (a machine sharing a volume runs on its owner's node) |
+| `PodAffinityTerm: matchLabelKeys` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodAffinityTerm: mismatchLabelKeys` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodAffinityTerm: namespaceSelector` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodAffinityTerm: namespaces` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
+| `PodAffinityTerm: topologyKey` | Yes | Yes | From `volumes` (a machine sharing a volume runs on its owner's node) |
+| `LabelSelector: matchExpressions` | Yes | Another way | Via `matchLabels` |
+| `LabelSelector: matchLabels` | Yes | Yes | From machines and networks (the labels the selectors and policies match) |
+| `Volume: awsElasticBlockStore` | No | No | One storage system's plugin: no other target has it |
+| `Volume: azureDisk` | No | No | One storage system's plugin: no other target has it |
+| `Volume: azureFile` | No | No | One storage system's plugin: no other target has it |
+| `Volume: cephfs` | No | No | One storage system's plugin: no other target has it |
+| `Volume: cinder` | No | No | One storage system's plugin: no other target has it |
+| `Volume: configMap` | Yes | Yes | The project's scripts the pods run: `init:` jobs, checks |
+| `Volume: csi` | No | No | One storage system's plugin: no other target has it |
+| `Volume: downwardAPI` | n/a | No | The pod's own details and API tokens as files: machines don't read them |
+| `Volume: emptyDir` | Yes | Yes | From `machines.*.tmpfs and machines.*.shm_size` (and Isoloom's probe) |
+| `Volume: ephemeral` | Yes | Another way | Via `emptyDir`, scratch space that goes with the pod |
+| `Volume: fc` | No | No | One storage system's plugin: no other target has it |
+| `Volume: flexVolume` | No | No | One storage system's plugin: no other target has it |
+| `Volume: flocker` | No | No | One storage system's plugin: no other target has it |
+| `Volume: gcePersistentDisk` | No | No | One storage system's plugin: no other target has it |
+| `Volume: gitRepo` | n/a | No | Deprecated by Kubernetes |
+| `Volume: glusterfs` | No | No | One storage system's plugin: no other target has it |
+| `Volume: hostPath` | No | No | A folder of the node: cloud VMs share no files with a host |
+| `Volume: image` | n/a | No | Another image's files as a volume: the machine's image holds its files |
+| `Volume: iscsi` | No | No | One storage system's plugin: no other target has it |
+| `Volume: name` | Yes | Yes | From `volumes` (and Isoloom's own: the scripts, the probe) |
+| `Volume: nfs` | No | No | One storage system's plugin: no other target has it |
+| `Volume: persistentVolumeClaim` | Yes | Yes | From `machines.*.volumes` |
+| `Volume: photonPersistentDisk` | No | No | One storage system's plugin: no other target has it |
+| `Volume: portworxVolume` | No | No | One storage system's plugin: no other target has it |
+| `Volume: projected` | n/a | No | The pod's own details and API tokens as files: machines don't read them |
+| `Volume: quobyte` | No | No | One storage system's plugin: no other target has it |
+| `Volume: rbd` | No | No | One storage system's plugin: no other target has it |
+| `Volume: scaleIO` | No | No | One storage system's plugin: no other target has it |
+| `Volume: secret` | Yes | Not yet | Real secrets: files a machine reads, not environment variables |
+| `Volume: storageos` | No | No | One storage system's plugin: no other target has it |
+| `Volume: vsphereVolume` | No | No | One storage system's plugin: no other target has it |
+| `VolumeMount: bindMountOptions` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
+| `VolumeMount: mountPath` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
+| `VolumeMount: mountPropagation` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
+| `VolumeMount: name` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
+| `VolumeMount: readOnly` | Yes | Yes | Isoloom's probe, mounted read-only |
+| `VolumeMount: recursiveReadOnly` | Yes | Another way | Via `readOnly` |
+| `VolumeMount: subPath` | Yes | Not yet | A machine's `files`, each mounted at its own path |
+| `VolumeMount: subPathExpr` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
+| `PersistentVolumeClaimVolumeSource: claimName` | Yes | Yes | From `volumes` |
+| `PersistentVolumeClaimVolumeSource: readOnly` | Yes | Another way | Via the mount's `readOnly` |
+| `ConfigMapVolumeSource: defaultMode` | Yes | Yes | The project's scripts, executable |
+| `ConfigMapVolumeSource: defaultUser` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
+| `ConfigMapVolumeSource: items` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
+| `ConfigMapVolumeSource: name` | Yes | Yes | The project's scripts, executable |
+| `ConfigMapVolumeSource: optional` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
+| `EmptyDirVolumeSource: medium` | Yes | Yes | From `machines.*.tmpfs and machines.*.shm_size` (in memory) |
+| `EmptyDirVolumeSource: mode` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
+| `EmptyDirVolumeSource: sizeLimit` | Yes | Yes | From `machines.*.tmpfs and machines.*.shm_size` (in memory) |
+| `PersistentVolumeClaim: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `PersistentVolumeClaim: kind` | Yes | Yes | Every object Isoloom writes |
+| `PersistentVolumeClaim: metadata` | Yes | Yes | Every object Isoloom writes |
+| `PersistentVolumeClaim: spec` | Yes | Yes | Every object Isoloom writes |
+| `PersistentVolumeClaimSpec: accessModes` | Yes | Yes | From `volumes` (ReadWriteOnce: a shared volume's machines run on one node) |
+| `PersistentVolumeClaimSpec: dataSource` | n/a | No | A claim cloned from a snapshot: snapshots are `isoloom snapshot`'s |
+| `PersistentVolumeClaimSpec: dataSourceRef` | n/a | No | A claim cloned from a snapshot: snapshots are `isoloom snapshot`'s |
+| `PersistentVolumeClaimSpec: resources` | Yes | Yes | From `volumes` (1Gi each) |
+| `PersistentVolumeClaimSpec: selector` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
+| `PersistentVolumeClaimSpec: storageClassName` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
+| `PersistentVolumeClaimSpec: volumeAttributesClassName` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
+| `PersistentVolumeClaimSpec: volumeMode` | Yes | Not yet | Raw data disks, with persistent volumes and data disks |
+| `PersistentVolumeClaimSpec: volumeName` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
+| `VolumeResourceRequirements: limits` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
+| `VolumeResourceRequirements: requests` | Yes | Yes | From `volumes` (1Gi each) |
+| `Service: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `Service: kind` | Yes | Yes | Every object Isoloom writes |
+| `Service: metadata` | Yes | Yes | Every object Isoloom writes |
+| `Service: spec` | Yes | Yes | Every object Isoloom writes |
+| `ServiceSpec: allocateLoadBalancerNodePorts` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: clusterIP` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: clusterIPs` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: externalIPs` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
+| `ServiceSpec: externalName` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: externalTrafficPolicy` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: healthCheckNodePort` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: internalTrafficPolicy` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: ipFamilies` | Yes | Not yet | With IPv6 networks |
+| `ServiceSpec: ipFamilyPolicy` | Yes | Not yet | With IPv6 networks |
+| `ServiceSpec: loadBalancerClass` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: loadBalancerIP` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
+| `ServiceSpec: loadBalancerSourceRanges` | Yes | Another way | Via the published port's NetworkPolicy |
+| `ServiceSpec: ports` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServiceSpec: publishNotReadyAddresses` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: selector` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServiceSpec: sessionAffinity` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: sessionAffinityConfig` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: trafficDistribution` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServiceSpec: type` | Yes | Yes | From `machines.*.services[].publish` (a LoadBalancer Service) |
+| `ServicePort: appProtocol` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
+| `ServicePort: name` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServicePort: nodePort` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
+| `ServicePort: port` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServicePort: protocol` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServicePort: targetPort` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `NetworkPolicy: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `NetworkPolicy: kind` | Yes | Yes | Every object Isoloom writes |
+| `NetworkPolicy: metadata` | Yes | Yes | Every object Isoloom writes |
+| `NetworkPolicy: spec` | Yes | Yes | Every object Isoloom writes |
+| `NetworkPolicySpec: egress` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicySpec: ingress` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicySpec: podSelector` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicySpec: policyTypes` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicyIngressRule: from` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicyIngressRule: ports` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicyEgressRule: ports` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicyEgressRule: to` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicyPeer: ipBlock` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicyPeer: namespaceSelector` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `NetworkPolicyPeer: podSelector` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
+| `IPBlock: cidr` | Yes | Yes | From `machines.*.services[].publish and offline networks` (anyone in, or nothing out) |
+| `IPBlock: except` | n/a | No | Carves addresses out of a range: Isoloom's rules name whole networks |
+| `NetworkPolicyPort: endPort` | Yes | Another way | Via `port`, one rule per port |
+| `NetworkPolicyPort: port` | Yes | Yes | From `reach[].ports and machines.*.services[].publish` |
+| `NetworkPolicyPort: protocol` | Yes | Yes | From `reach[].ports and machines.*.services[].publish` |
+| `Job: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `Job: kind` | Yes | Yes | Every object Isoloom writes |
+| `Job: metadata` | Yes | Yes | Every object Isoloom writes |
+| `Job: spec` | Yes | Yes | Every object Isoloom writes |
+| `JobSpec: activeDeadlineSeconds` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: backoffLimit` | Yes | Yes | From `checks` (run once: a failure is a result) |
+| `JobSpec: backoffLimitPerIndex` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: completionMode` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: completions` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: managedBy` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: manualSelector` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: maxFailedIndexes` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: parallelism` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: podFailurePolicy` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: podReplacementPolicy` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: scheduling` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: selector` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: successPolicy` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: suspend` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `JobSpec: template` | Yes | Yes | From `checks` (a Job per position) |
+| `JobSpec: ttlSecondsAfterFinished` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
+| `ConfigMap: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `ConfigMap: binaryData` | Yes | Yes | The project's scripts, read from the chart's files |
+| `ConfigMap: data` | Yes | Another way | Via `binaryData`, which keeps a script byte for byte |
+| `ConfigMap: immutable` | n/a | No | An API safeguard: Isoloom replaces the object when the spec changes |
+| `ConfigMap: kind` | Yes | Yes | Every object Isoloom writes |
+| `ConfigMap: metadata` | Yes | Yes | Every object Isoloom writes |
+| `Secret: apiVersion` | Yes | Yes | Every object Isoloom writes |
+| `Secret: data` | Yes | Yes | From `inputs` (in the chart) |
+| `Secret: immutable` | n/a | No | An API safeguard: Isoloom replaces the object when the spec changes |
+| `Secret: kind` | Yes | Yes | Every object Isoloom writes |
+| `Secret: metadata` | Yes | Yes | Every object Isoloom writes |
+| `Secret: stringData` | Yes | Another way | Via `data` |
+| `Secret: type` | Yes | Yes | Opaque |
+| `ObjectMeta: annotations` | Yes | Yes | From `checks` (`helm test` hooks, in the chart) |
+| `ObjectMeta: creationTimestamp` | n/a | No | Written by the cluster, not by a manifest |
+| `ObjectMeta: deletionGracePeriodSeconds` | n/a | No | Written by the cluster, not by a manifest |
+| `ObjectMeta: deletionTimestamp` | n/a | No | Written by the cluster, not by a manifest |
+| `ObjectMeta: finalizers` | n/a | No | How the API names and deletes objects: Isoloom names each one |
+| `ObjectMeta: generateName` | n/a | No | How the API names and deletes objects: Isoloom names each one |
+| `ObjectMeta: generation` | n/a | No | Written by the cluster, not by a manifest |
+| `ObjectMeta: labels` | Yes | Yes | From machines and networks (the labels the selectors and policies match) |
+| `ObjectMeta: managedFields` | n/a | No | Written by the cluster, not by a manifest |
+| `ObjectMeta: name` | Yes | Yes | Every object Isoloom writes |
+| `ObjectMeta: namespace` | Yes | Another way | Via the kustomization's `namespace` and the Helm release's |
+| `ObjectMeta: ownerReferences` | n/a | No | How the API names and deletes objects: Isoloom names each one |
+| `ObjectMeta: resourceVersion` | n/a | No | Written by the cluster, not by a manifest |
+| `ObjectMeta: selfLink` | n/a | No | Written by the cluster, not by a manifest |
+| `ObjectMeta: uid` | n/a | No | Written by the cluster, not by a manifest |
+
+## Kustomize
+
+100% of 15 portable features (15 done, 0 partly, 0 to do; 46 features in all). From SchemaStore's kustomization.json (pinned).
+
+### Instructions
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `Kustomization: apiVersion` | Yes | Yes | The manifests, and the checks' Jobs beside them |
+| `Kustomization: bases` | n/a | No | Kustomizations layered on others: Isoloom's is one layer |
+| `Kustomization: buildMetadata` | n/a | No | Kustomize's plugins and build settings: no effect on the environment |
+| `Kustomization: commonAnnotations` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: commonLabels` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: components` | n/a | No | Kustomizations layered on others: Isoloom's is one layer |
+| `Kustomization: configMapGenerator` | Yes | Yes | The project's scripts the pods run: `init:` jobs, checks |
+| `Kustomization: configurations` | n/a | No | Kustomize's plugins and build settings: no effect on the environment |
+| `Kustomization: crds` | n/a | No | Custom resource definitions: Isoloom writes built-in kinds only |
+| `Kustomization: generatorOptions` | Yes | Yes | The project's scripts the pods run: `init:` jobs, checks |
+| `Kustomization: generators` | n/a | No | Kustomize's plugins and build settings: no effect on the environment |
+| `Kustomization: helmCharts` | n/a | No | Helm inside Kustomize: Isoloom writes the chart beside the manifests |
+| `Kustomization: helmGlobals` | n/a | No | Helm inside Kustomize: Isoloom writes the chart beside the manifests |
+| `Kustomization: images` | Yes | Another way | Via the chart's `images` values |
+| `Kustomization: inventory` | n/a | No | Kustomize's plugins and build settings: no effect on the environment |
+| `Kustomization: kind` | Yes | Yes | The manifests, and the checks' Jobs beside them |
+| `Kustomization: labels` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: metadata` | n/a | No | Kustomize's plugins and build settings: no effect on the environment |
+| `Kustomization: namePrefix` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: nameSuffix` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: namespace` | Yes | Yes | The environment's namespace |
+| `Kustomization: openapi` | n/a | No | Kustomize's plugins and build settings: no effect on the environment |
+| `Kustomization: patches` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: patchesJson6902` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: patchesStrategicMerge` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: replacements` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: replicas` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: resources` | Yes | Yes | The manifests, and the checks' Jobs beside them |
+| `Kustomization: secretGenerator` | Yes | Another way | Via the chart's inputs Secret, from its values |
+| `Kustomization: sortOptions` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `Kustomization: transformers` | n/a | No | Kustomize's plugins and build settings: no effect on the environment |
+| `Kustomization: validators` | n/a | No | Kustomize's plugins and build settings: no effect on the environment |
+| `Kustomization: vars` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `ConfigMapArgs: KVSources` | Yes | Another way | Via `files`: each script as it is |
+| `ConfigMapArgs: behavior` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `ConfigMapArgs: env` | Yes | Another way | Via `files`: each script as it is |
+| `ConfigMapArgs: envs` | Yes | Another way | Via `files`: each script as it is |
+| `ConfigMapArgs: files` | Yes | Yes | The project's scripts the pods run: `init:` jobs, checks |
+| `ConfigMapArgs: literals` | Yes | Another way | Via `files`: each script as it is |
+| `ConfigMapArgs: name` | Yes | Yes | The project's scripts the pods run: `init:` jobs, checks |
+| `ConfigMapArgs: namespace` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `ConfigMapArgs: options` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `GeneratorOptions: annotations` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `GeneratorOptions: disableNameSuffixHash` | Yes | Yes | The pods name the scripts' ConfigMap as it is |
+| `GeneratorOptions: immutable` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+| `GeneratorOptions: labels` | n/a | No | Edits the objects it builds: Isoloom writes them as they should be |
+
+## Helm
+
+94% of 19 portable features (18 done, 0 partly, 1 to do; 52 features in all). From SchemaStore's chart.json (pinned) and Helm 3.16's chart documentation.
+
+### Instructions
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `Chart: annotations` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `Chart: apiVersion` | Yes | Yes | V2 |
+| `Chart: appVersion` | Yes | Yes | 0.1.0; `isoloom chart --version` packages another |
+| `Chart: dependencies` | n/a | No | Charts within the chart: an environment is one chart |
+| `Chart: deprecated` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `Chart: description` | Yes | Yes | From `name` (the environment it installs) |
+| `Chart: home` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `Chart: icon` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `Chart: keywords` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `Chart: kubeVersion` | n/a | No | The cluster versions the chart accepts: Isoloom writes objects every supported version has |
+| `Chart: maintainers` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `Chart: name` | Yes | Yes | From `name` |
+| `Chart: sources` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `Chart: type` | Yes | Yes | Application |
+| `Chart: version` | Yes | Yes | 0.1.0; `isoloom chart --version` packages another |
+| `ChartDependencies: alias` | n/a | No | Charts within the chart: an environment is one chart |
+| `ChartDependencies: condition` | n/a | No | Charts within the chart: an environment is one chart |
+| `ChartDependencies: depends-on` | n/a | No | Charts within the chart: an environment is one chart |
+| `ChartDependencies: import-values` | n/a | No | Charts within the chart: an environment is one chart |
+| `ChartDependencies: name` | n/a | No | Charts within the chart: an environment is one chart |
+| `ChartDependencies: repository` | n/a | No | Charts within the chart: an environment is one chart |
+| `ChartDependencies: tags` | n/a | No | Charts within the chart: an environment is one chart |
+| `ChartDependencies: version` | n/a | No | Charts within the chart: an environment is one chart |
+| `ChartMaintainers: email` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `ChartMaintainers: name` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `ChartMaintainers: url` | n/a | No | How the chart is listed in a repository: no effect on the environment |
+| `Chart files: Chart.yaml` | Yes | Yes | The chart itself |
+| `Chart files: values.yaml` | Yes | Yes | From `machines` (each one's image) and inputs |
+| `Chart files: values.schema.json` | Yes | Not yet | The values' schema (`images`, `inputs`), so `helm install` rejects a mistyped value |
+| `Chart files: templates/` | Yes | Yes | The environment's objects, its scripts and its inputs |
+| `Chart files: templates/NOTES.txt` | Yes | Yes | From `checks` (how to run them after an install) |
+| `Chart files: templates/_helpers.tpl` | n/a | No | Named templates shared by a chart's templates: Isoloom writes each object whole |
+| `Chart files: templates/tests/` | Yes | Yes | From `checks` (a `helm test` Pod per position) |
+| `Chart files: .Files` | Yes | Yes | From checks and the project's scripts (read into ConfigMaps) |
+| `Chart files: charts/` | n/a | No | Charts within the chart: an environment is one chart |
+| `Chart files: crds/` | No | No | Custom resource definitions are cluster-wide: no other target has them |
+| `Chart files: Chart.lock` | n/a | No | Charts within the chart: an environment is one chart |
+| `Chart files: LICENSE` | n/a | No | The chart's packaging and documentation: no effect on the environment |
+| `Chart files: README.md` | n/a | No | The chart's packaging and documentation: no effect on the environment |
+| `Chart files: .helmignore` | n/a | No | The chart's packaging and documentation: no effect on the environment |
+| `Hooks: pre-install` | Yes | Another way | Via init containers, which wait for each machine's dependencies |
+| `Hooks: post-install` | Yes | Another way | Via machines.*.docker.init: a container beside the machine's, run once it answers |
+| `Hooks: pre-delete` | n/a | No | Steps around Helm's own operations: an environment has no tear-down steps |
+| `Hooks: post-delete` | n/a | No | Steps around Helm's own operations: an environment has no tear-down steps |
+| `Hooks: pre-upgrade` | Yes | Another way | Via init containers, which wait for each machine's dependencies |
+| `Hooks: post-upgrade` | Yes | Another way | Via machines.*.docker.init: a container beside the machine's, run once it answers |
+| `Hooks: pre-rollback` | n/a | No | Steps around Helm's own operations: an environment has no tear-down steps |
+| `Hooks: post-rollback` | n/a | No | Steps around Helm's own operations: an environment has no tear-down steps |
+| `Hooks: test` | Yes | Yes | From `checks` (`helm test` runs them) |
+| `Hooks: helm.sh/hook-weight` | n/a | No | Orders hooks of one kind: Isoloom's checks are independent |
+| `Hooks: helm.sh/hook-delete-policy` | Yes | Yes | From `checks` (a run replaces the last one's Pods) |
+| `Hooks: helm.sh/resource-policy` | n/a | No | Keeps an object when the release is deleted: `isoloom down` removes everything |

@@ -1,0 +1,129 @@
+//! Volumes: what a pod mounts, and the claims Isoloom's volumes are.
+
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
+
+const PLUGIN: Support = NotPortable {
+    why: "one storage system's plugin: no other target has it",
+};
+const CLUSTER_STORAGE: Support = Tooling {
+    note: "the cluster's storage setup: Isoloom's claims take its default",
+};
+const MOUNT_DETAIL: Support = Tooling {
+    note: "a mount detail of the node: Isoloom mounts whole volumes, read-write",
+};
+const TMPFS: Support = Emitted {
+    from: "machines.*.tmpfs and machines.*.shm_size (in memory)",
+};
+
+/// What Isoloom does with a field of the volumes' definitions.
+pub(super) fn classify(definition: &str, field: &str) -> Option<Support> {
+    match definition {
+        "Volume" => volume(field),
+        "VolumeMount" => mount(field),
+        "PersistentVolumeClaimVolumeSource" | "ConfigMapVolumeSource" | "EmptyDirVolumeSource" => source(definition, field),
+        "PersistentVolumeClaimSpec" | "VolumeResourceRequirements" => claim(definition, field),
+        _ => None,
+    }
+}
+
+fn volume(field: &str) -> Option<Support> {
+    Some(match field {
+        "name" => Emitted {
+            from: "volumes (and Isoloom's own: the scripts, the probe)",
+        },
+        "persistentVolumeClaim" => Emitted { from: "machines.*.volumes" },
+        "configMap" => Emitted {
+            from: "(the project's scripts the pods run: `init:` jobs, checks)",
+        },
+        "emptyDir" => Emitted {
+            from: "machines.*.tmpfs and machines.*.shm_size (and Isoloom's probe)",
+        },
+        "secret" => Planned {
+            note: "real secrets: files a machine reads, not environment variables",
+        },
+        "ephemeral" => Equivalent {
+            via: "`emptyDir`, scratch space that goes with the pod",
+        },
+        "projected" | "downwardAPI" => Tooling {
+            note: "the pod's own details and API tokens as files: machines don't read them",
+        },
+        "hostPath" => NotPortable {
+            why: "a folder of the node: cloud VMs share no files with a host",
+        },
+        "image" => Tooling {
+            note: "another image's files as a volume: the machine's image holds its files",
+        },
+        "gitRepo" => Tooling {
+            note: "deprecated by Kubernetes",
+        },
+        "awsElasticBlockStore"
+        | "azureDisk"
+        | "azureFile"
+        | "cephfs"
+        | "cinder"
+        | "csi"
+        | "fc"
+        | "flexVolume"
+        | "flocker"
+        | "gcePersistentDisk"
+        | "glusterfs"
+        | "iscsi"
+        | "nfs"
+        | "photonPersistentDisk"
+        | "portworxVolume"
+        | "quobyte"
+        | "rbd"
+        | "scaleIO"
+        | "storageos"
+        | "vsphereVolume" => PLUGIN,
+        _ => return None,
+    })
+}
+
+fn mount(field: &str) -> Option<Support> {
+    Some(match field {
+        "name" | "mountPath" => Emitted {
+            from: "machines.*.volumes, machines.*.tmpfs and machines.*.shm_size",
+        },
+        "readOnly" => Emitted {
+            from: "(Isoloom's probe, mounted read-only)",
+        },
+        "subPath" => Planned {
+            note: "a machine's `files`, each mounted at its own path",
+        },
+        "recursiveReadOnly" => Equivalent { via: "`readOnly`" },
+        "subPathExpr" | "mountPropagation" | "bindMountOptions" => MOUNT_DETAIL,
+        _ => return None,
+    })
+}
+
+fn source(definition: &str, field: &str) -> Option<Support> {
+    Some(match (definition, field) {
+        ("PersistentVolumeClaimVolumeSource", "claimName") => Emitted { from: "volumes" },
+        ("PersistentVolumeClaimVolumeSource", "readOnly") => Equivalent { via: "the mount's `readOnly`" },
+        ("ConfigMapVolumeSource", "name" | "defaultMode") => Emitted {
+            from: "(the project's scripts, executable)",
+        },
+        ("ConfigMapVolumeSource", "items" | "optional" | "defaultUser") | ("EmptyDirVolumeSource", "mode") => MOUNT_DETAIL,
+        ("EmptyDirVolumeSource", "medium" | "sizeLimit") => TMPFS,
+        _ => return None,
+    })
+}
+
+fn claim(definition: &str, field: &str) -> Option<Support> {
+    Some(match (definition, field) {
+        ("PersistentVolumeClaimSpec", "accessModes") => Emitted {
+            from: "volumes (ReadWriteOnce: a shared volume's machines run on one node)",
+        },
+        ("PersistentVolumeClaimSpec", "resources") | ("VolumeResourceRequirements", "requests") => Emitted { from: "volumes (1Gi each)" },
+        ("PersistentVolumeClaimSpec", "volumeMode") => Planned {
+            note: "raw data disks, with persistent volumes and data disks",
+        },
+        ("PersistentVolumeClaimSpec", "dataSource" | "dataSourceRef") => Tooling {
+            note: "a claim cloned from a snapshot: snapshots are `isoloom snapshot`'s",
+        },
+        ("PersistentVolumeClaimSpec", "selector" | "storageClassName" | "volumeAttributesClassName" | "volumeName")
+        | ("VolumeResourceRequirements", "limits") => CLUSTER_STORAGE,
+        _ => return None,
+    })
+}

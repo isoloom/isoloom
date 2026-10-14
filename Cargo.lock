@@ -462,6 +462,7 @@ dependencies = [
  "isoloom-render",
  "isoloom-spec",
  "isoloom-targets",
+ "serde",
  "serde_json",
  "serde_yaml_ng",
 ]
