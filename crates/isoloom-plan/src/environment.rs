@@ -261,9 +261,8 @@ impl Environment {
         let spec = &laid_out;
         let router = routing::needed(spec).then(|| routing::networks(spec).map(|n| (n.clone(), routing::address(spec, n))).collect());
         let machines: IndexMap<String, MachinePlan> = spec.machines.iter().map(|(n, m)| (n.clone(), machine(spec, target, n, m))).collect();
-        let container = |n: &str| machines.get(n).is_some_and(|m| m.shape == MachineShape::Container);
         let mut requirements = requirements::of(spec);
-        requirements.extend(requirements::mixed_shapes(spec, container));
+        requirements.extend(requirements::mixed_shapes(spec, |n| machines.get(n).map(|m| m.shape)));
         Environment {
             name: spec.name.clone(),
             target,

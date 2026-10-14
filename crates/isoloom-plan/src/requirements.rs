@@ -8,6 +8,7 @@ use std::fmt;
 use isoloom_spec::model::Spec;
 
 use crate::checks::{self, Position, Probe};
+use crate::environment::MachineShape;
 
 /// A capability a backend may have: the kind of a [`Requirement`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -169,16 +170,18 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
 }
 
 /// What mixing containers and VMs in one environment asks for: a shared volume mounted by both,
-/// a VM waiting for a container. `container` says whether a machine is a container on the
-/// target; nothing comes out where every machine has the same shape.
-pub fn mixed_shapes(spec: &Spec, container: impl Fn(&str) -> bool) -> Vec<Requirement> {
+/// a VM waiting for a container. `shape` is each machine's shape on the target; only containers
+/// and VMs count (an external or supplied machine is neither), so nothing comes out unless the
+/// target runs both.
+pub fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+    let is = |name: &str, s: MachineShape| shape(name) == Some(s);
     let volumes = spec.volumes.keys().filter(|v| {
         let users = spec.volume_users(v);
-        users.iter().any(|u| container(u)) && users.iter().any(|u| !container(u))
+        users.iter().any(|u| is(u, MachineShape::Container)) && users.iter().any(|u| is(u, MachineShape::Vm))
     });
     let mut out: Vec<Requirement> = volumes.map(|v| Requirement::VolumeAcrossShapes { volume: v.clone() }).collect();
-    for (name, m) in spec.machines.iter().filter(|(n, _)| !container(n)) {
-        if let Some(dep) = m.depends_on.iter().find(|d| container(d)) {
+    for (name, m) in spec.machines.iter().filter(|(n, _)| is(n, MachineShape::Vm)) {
+        if let Some(dep) = m.depends_on.iter().find(|d| is(d, MachineShape::Container)) {
             out.push(Requirement::VmDependsOnContainer {
                 vm: name.clone(),
                 container: dep.clone(),

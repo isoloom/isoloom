@@ -144,3 +144,27 @@ fn hybrid_forwards_a_fixed_published_port() {
     let forward = "m.vm.network \"forwarded_port\", guest: 8080, host: 8080, host_ip: \"127.0.0.1\"\n";
     assert!(file(&files, "hybrid/Vagrantfile").contains(forward));
 }
+
+#[test]
+fn only_containers_and_vms_make_an_environment_mixed() {
+    // An external machine waiting for a container is neither a VM nor a container: the Docker
+    // targets still render the environment.
+    let text = "version: 1\nname: x\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  cache:\n    networks: { lab: 20 }\n    services: [{ port: 6379 }]\n    docker: { image: redis }\n  web:\n    networks: { lab: 10 }\n    depends_on: [cache]\n    external: { address: 10.9.0.10 }\n";
+    let spec = isoloom_spec::parse(text).expect("parses");
+    for target in [Target::DockerVm, Target::Hybrid] {
+        assert!(Environment::build(&spec, target, None).requirements.is_empty(), "{target:?}");
+    }
+}
+
+#[test]
+fn hybrid_forwards_a_published_tool() {
+    let mut spec = mixed("").spec().clone();
+    let tools = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    docker: { image: alpine }\ntools:\n  web-ui: { image: \"nginx:1\", port: 80, publish: 9090 }\n";
+    spec.tools = isoloom_spec::parse(tools).expect("parses").tools;
+    let files = HybridBackend.render(&Environment::build(&spec, Target::Hybrid, None)).expect("renders");
+    let compose = file(&files, "hybrid/compose.yml");
+    assert!(compose.contains("    - 9090:80\n"), "{compose}");
+    assert!(compose.contains("      isoloom-publish: null\n"), "{compose}");
+    let forward = "m.vm.network \"forwarded_port\", guest: 9090, host: 9090, host_ip: \"127.0.0.1\"\n";
+    assert!(file(&files, "hybrid/Vagrantfile").contains(forward));
+}

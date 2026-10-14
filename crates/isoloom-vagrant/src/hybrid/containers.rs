@@ -5,7 +5,7 @@
 
 use indexmap::IndexMap;
 use isoloom_compose::file::{ComposeFile, Network, Service};
-use isoloom_plan::{Environment, MachinePlan, MachineShape};
+use isoloom_plan::{Environment, MachineShape, PublishedPort};
 use isoloom_render::backend::RenderError;
 use isoloom_render::{GeneratedFile, header, router};
 use isoloom_spec::model::{Protocol, Spec, Target};
@@ -40,8 +40,9 @@ pub(super) fn render(env: &Environment) -> Result<Containers, RenderError> {
     let vm_hosts = vm_hosts(env);
     let mut published = Vec::new();
     for (name, svc) in &mut compose.services {
-        if let Some(mp) = alone.machines.get(name).filter(|m| !m.ports.is_empty()) {
-            publish(svc, mp, &mut published);
+        let ports = ports_of(&alone, name);
+        if !ports.is_empty() {
+            publish(svc, &ports, &mut published);
         }
         svc.depends_on.retain(|k, _| names.contains(k));
         if !svc.networks.is_empty() {
@@ -89,12 +90,28 @@ fn vm_hosts(env: &Environment) -> Vec<String> {
         .collect()
 }
 
-/// A container with published ports: each at its fixed host port, on every address of the
-/// Docker host (Vagrant forwards it to this machine's loopback), through Docker's bridge network
+/// The ports service `name` publishes: a machine's, or a tool's web UI (TCP).
+fn ports_of(env: &Environment, name: &str) -> Vec<PublishedPort> {
+    if let Some(mp) = env.machines.get(name) {
+        return mp.ports.clone();
+    }
+    let tool = name.strip_prefix("isoloom-tool-").and_then(|t| env.spec().tools.get(t));
+    match tool.map(|t| (t.port, t.publish)) {
+        Some((Some(port), Some(publish))) => vec![PublishedPort {
+            port,
+            publish,
+            protocol: Protocol::Tcp,
+            fixed: true,
+        }],
+        _ => Vec::new(),
+    }
+}
+
+/// A service with published ports: each at its fixed host port, on every address of the Docker
+/// host (Vagrant forwards it to this machine's loopback), through Docker's bridge network
 /// (macvlan can't publish), its default route staying on its lab networks.
-fn publish(svc: &mut Service, mp: &MachinePlan, published: &mut Vec<(u16, Protocol)>) {
-    svc.ports = mp
-        .ports
+fn publish(svc: &mut Service, ports: &[PublishedPort], published: &mut Vec<(u16, Protocol)>) {
+    svc.ports = ports
         .iter()
         .map(|p| {
             published.push((p.publish, p.protocol));
