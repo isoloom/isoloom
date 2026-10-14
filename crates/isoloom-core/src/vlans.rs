@@ -9,7 +9,7 @@
 
 use indexmap::IndexMap;
 
-use crate::model::{Network, Reach, Spec};
+use crate::model::{Network, Reach, Spec, Vlan};
 use crate::validate::Cidr;
 
 /// The network a VLAN becomes: `office` + 10 -> `office-vlan10`.
@@ -53,7 +53,16 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, String> {
     if spec.networks.values().all(|n| n.vlans.is_empty()) {
         return Ok(spec);
     }
-    // Checks first: ids, blocks inside the LAN, no clash with a network already named so.
+    check_vlans(&spec)?;
+    rename_attachments(&mut spec);
+    let (networks, covers) = flat_networks(&spec);
+    spec.reach = flat_reach(&spec.reach, &covers);
+    spec.networks = networks;
+    Ok(spec)
+}
+
+/// Checks first: ids, blocks inside the LAN, no clash with a network already named so.
+fn check_vlans(spec: &Spec) -> Result<(), String> {
     for (lan, net) in &spec.networks {
         if net.vlans.is_empty() {
             continue;
@@ -81,28 +90,36 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, String> {
             }
         }
     }
+    Ok(())
+}
 
-    // Machines: `office.vlan10` -> `office-vlan10`.
+/// Machines: `office.vlan10` -> `office-vlan10`.
+fn rename_attachments(spec: &mut Spec) {
+    let networks = &spec.networks;
     for m in spec.machines.values_mut() {
         m.networks = m
             .networks
             .iter()
             .map(|(name, octet)| {
                 let flat = match vlan_ref(name) {
-                    Some((lan, id)) if spec.networks.get(lan).is_some_and(|n| n.vlans.contains_key(&id)) => vlan_network(lan, id),
+                    Some((lan, id)) if networks.get(lan).is_some_and(|n| n.vlans.contains_key(&id)) => vlan_network(lan, id),
                     _ => name.clone(),
                 };
                 (flat, *octet)
             })
             .collect();
     }
-    let joined_directly = |lan: &str| spec.machines.values().any(|m| m.networks.contains_key(lan));
+}
 
-    // The networks, in the order written: each LAN with VLANs replaced by its VLANs (after the
-    // LAN itself, when machines join it directly).
+/// What a name in `reach` covers: a LAN, all its networks; a VLAN (`office.vlan10`), its own.
+type Covers = IndexMap<String, Vec<String>>;
+
+/// The networks, in the order written: each LAN with VLANs replaced by its VLANs (after the
+/// LAN itself, when machines join it directly). With what each name in `reach` covers.
+fn flat_networks(spec: &Spec) -> (IndexMap<String, Network>, Covers) {
+    let joined_directly = |lan: &str| spec.machines.values().any(|m| m.networks.contains_key(lan));
     let mut networks: IndexMap<String, Network> = IndexMap::new();
-    // What a name in `reach` covers.
-    let mut covers: IndexMap<String, Vec<String>> = IndexMap::new();
+    let mut covers = Covers::new();
     for (lan, net) in &spec.networks {
         if net.vlans.is_empty() {
             networks.insert(lan.clone(), net.clone());
@@ -121,34 +138,40 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, String> {
         }
         for (id, vlan) in &net.vlans {
             let flat = vlan_network(lan, *id);
-            networks.insert(
-                flat.clone(),
-                Network {
-                    cidr: vlan.cidr.clone(),
-                    internet: vlan.internet.unwrap_or(net.internet),
-                    gateway: None,
-                    docker: None,
-                    vlans: IndexMap::new(),
-                    // The LAN's switch, on each of its VLANs (the LAN itself is gone).
-                    switch: net.switch.clone(),
-                    // A VLAN carries no impairment of its own (set it on a network the router is on).
-                    tc: None,
-                    vlan: Some((lan.clone(), *id)),
-                },
-            );
+            networks.insert(flat.clone(), vlan_as_network(lan, net, *id, vlan));
             covers.insert(format!("{lan}.vlan{id}"), vec![flat.clone()]);
             all.push(flat);
         }
         covers.insert(lan.clone(), all);
     }
+    (networks, covers)
+}
 
+/// VLAN `id` of LAN `lan` (`net`) as a network of its own.
+fn vlan_as_network(lan: &str, net: &Network, id: u16, vlan: &Vlan) -> Network {
+    Network {
+        cidr: vlan.cidr.clone(),
+        internet: vlan.internet.unwrap_or(net.internet),
+        gateway: None,
+        docker: None,
+        vlans: IndexMap::new(),
+        // The LAN's switch, on each of its VLANs (the LAN itself is gone).
+        switch: net.switch.clone(),
+        // A VLAN carries no impairment of its own (set it on a network the router is on).
+        tc: None,
+        vlan: Some((lan.to_string(), id)),
+    }
+}
+
+/// The `reach` rules between the networks the names cover (none from a network to itself).
+fn flat_reach(reach: &[Reach], covers: &Covers) -> Vec<Reach> {
     let expand = |name: &str| covers.get(name).cloned().unwrap_or_else(|| vec![name.to_string()]);
-    let mut reach: Vec<Reach> = Vec::new();
-    for r in &spec.reach {
+    let mut out: Vec<Reach> = Vec::new();
+    for r in reach {
         for from in expand(&r.from) {
             for to in expand(&r.to) {
                 if from != to {
-                    reach.push(Reach {
+                    out.push(Reach {
                         from: from.clone(),
                         to,
                         ports: r.ports.clone(),
@@ -157,10 +180,7 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, String> {
             }
         }
     }
-
-    spec.networks = networks;
-    spec.reach = reach;
-    Ok(spec)
+    out
 }
 
 #[cfg(test)]
