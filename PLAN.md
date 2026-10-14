@@ -327,6 +327,7 @@ Now safe, because the net is in place.
 2. **Delete `isoloom-coverage`.** Its schema checks are covered by `verify`, and its capability declarations stay in the backends.
 3. **Delete the committed example outputs.** The snapshots replace them.
 4. **Delete the compatibility debt** and fix the small debts: the Ruby-dependent test, the dead-code fixtures.
+- **Keep `isoloom targets` (and its refusal reasons) working without the runtime crate.** The characterization snapshots call it (today it reaches into the runtime for `--host`).
 5. **Apply the engineering standard to Isoloom:** the repository layout (3b), `xtask` replacing `scripts/*.sh`, the dependency-direction test, `rust-toolchain.toml`, and the ratchet **driven to zero**. Every move is proven output-neutral by the snapshots.
 
 **Exit:** green net; a smaller workspace in the target layout; the ratchet in place.
@@ -340,6 +341,13 @@ One real lab, end to end: the new spec, Isoloom, run manifest, runner, launcher.
    - `overrides:`.
 
    It lowers into today's plan IR.
+- **Design input from the 376 CTF lab specs** (`~/code/isoloom-corpus/corpus-features.md`):
+  - **Containers:** 344 labs are container-only, and 409 of 479 container machines build from a local folder. So `app:` with a build recipe comes first.
+  - **The flag pattern:** 330 labs repeat it (an input, an init script, a named volume). It deserves a first-class, generic construct, such as an input materialised into a file at start-up.
+  - **Networks:** every lab has one network, and 327 have no internet.
+  - **Checks:** 822 in all (http, script, tcp, with `wait`).
+  - **VMs:** 19 VM labs, mostly Windows and GOAD-style, run with an Ansible controller.
+  - **Messages:** 371 reference port fields by path, so the new names must be stable.
 2. **Rewrite by hand** the examples and that one lab (invoice-portal-api) in the new syntax. Old `docker:`/`vm:` blocks become `app:`, with one recipe both forms derive from.
 3. **Run manifest v0 for the `docker` target:** commands, readiness, outputs and check runners. Its JSON schema and fixtures live in Isoloom, and both repositories test against them.
 4. **The runner skeleton** in `isoloom/isothrum`: the manifest executor and the Docker driver, extracted from the launcher's runtime (its most proven code).
