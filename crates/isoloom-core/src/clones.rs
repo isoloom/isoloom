@@ -29,75 +29,105 @@ pub fn name(base: &str, index: u8) -> String {
     format!("{base}-{index:02}")
 }
 
+/// Base machine name -> its clones' names.
+type Clones = IndexMap<String, Vec<String>>;
+
 /// Expands every machine with a `count` into its clones, in place, and rewrites the places
 /// that name the base machine. Returns base name -> clone names.
-pub fn expand(doc: &mut Value) -> Result<IndexMap<String, Vec<String>>, String> {
-    let mut clones: IndexMap<String, Vec<String>> = IndexMap::new();
-    let Value::Mapping(top) = doc else { return Ok(clones) };
+pub fn expand(doc: &mut Value) -> Result<Clones, String> {
+    let Value::Mapping(top) = doc else { return Ok(Clones::new()) };
     let Some(Value::Mapping(machines)) = top.get(key("machines")).cloned() else {
-        return Ok(clones);
+        return Ok(Clones::new());
     };
-    let mut expanded = Mapping::new();
-    for (k, v) in &machines {
-        let (Some(base), Value::Mapping(m)) = (k.as_str(), v) else {
-            expanded.insert(k.clone(), v.clone());
-            continue;
-        };
-        let count = match m.get(key("count")) {
-            None | Some(Value::Null) => {
-                expanded.insert(k.clone(), v.clone());
-                continue;
-            }
-            Some(Value::Number(n)) => n
-                .as_u64()
-                .filter(|n| (2..=u64::from(MAX)).contains(n))
-                .ok_or_else(|| format!("machines.{base}.count: 2 to {MAX} (one machine needs no count)"))?,
-            Some(_) => return Err(format!("machines.{base}.count: a number of machines, 2 to {MAX}")),
-        };
-        if matches!(m.get(key("access")), Some(Value::Bool(true))) {
-            return Err(format!("machines.{base}.count: the access machine is one machine; leave `count` out"));
-        }
-        let mut names = Vec::new();
-        for i in 1..=count as u8 {
-            let mut clone = m.clone();
-            clone.remove(key("count"));
-            if let Some(Value::Mapping(nets)) = clone.get_mut(key("networks")) {
-                for (_, octet) in nets.iter_mut() {
-                    if let Some(o) = octet.as_u64() {
-                        *octet = Value::Number((o + u64::from(i) - 1).into());
-                    }
-                }
-            }
-            let n = name(base, i);
-            expanded.insert(key(&n), Value::Mapping(clone));
-            names.push(n);
-        }
-        clones.insert(base.to_string(), names);
-    }
+    let (expanded, clones) = expand_machines(&machines)?;
     if clones.is_empty() {
         return Ok(clones);
     }
     top.insert(key("machines"), Value::Mapping(expanded));
+    expand_members(top, &clones);
+    expand_checks(top, &clones);
+    one_machine_fields(top, &clones)?;
+    Ok(clones)
+}
 
-    // Where the base is named, every clone is meant.
-    let expand_list = |list: &mut Value| {
-        if let Value::Sequence(items) = list {
-            let mut out = Vec::new();
-            for item in items.iter() {
-                match item.as_str().and_then(|s| clones.get(s)) {
-                    Some(names) => out.extend(names.iter().map(|n| key(n))),
-                    None => out.push(item.clone()),
-                }
-            }
-            *items = out;
+/// The machines with each counted one replaced by its clones, and the clones of each.
+fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), String> {
+    let mut clones = Clones::new();
+    let mut expanded = Mapping::new();
+    for (k, v) in machines {
+        let (Some(base), Value::Mapping(m)) = (k.as_str(), v) else {
+            expanded.insert(k.clone(), v.clone());
+            continue;
+        };
+        let Some(count) = count_of(base, m)? else {
+            expanded.insert(k.clone(), v.clone());
+            continue;
+        };
+        let mut names = Vec::new();
+        for i in 1..=count {
+            let n = name(base, i);
+            expanded.insert(key(&n), Value::Mapping(clone_of(m, i)));
+            names.push(n);
         }
+        clones.insert(base.to_string(), names);
+    }
+    Ok((expanded, clones))
+}
+
+/// A machine's `count` (None without one), checked.
+fn count_of(base: &str, m: &Mapping) -> Result<Option<u8>, String> {
+    let count = match m.get(key("count")) {
+        None | Some(Value::Null) => return Ok(None),
+        Some(Value::Number(n)) => n
+            .as_u64()
+            .and_then(|n| u8::try_from(n).ok())
+            .filter(|n| (2..=MAX).contains(n))
+            .ok_or_else(|| format!("machines.{base}.count: 2 to {MAX} (one machine needs no count)"))?,
+        Some(_) => return Err(format!("machines.{base}.count: a number of machines, 2 to {MAX}")),
     };
+    if matches!(m.get(key("access")), Some(Value::Bool(true))) {
+        return Err(format!("machines.{base}.count: the access machine is one machine; leave `count` out"));
+    }
+    Ok(Some(count))
+}
+
+/// Clone `i` (from 1) of machine `m`: no `count`, each address `i - 1` further along.
+fn clone_of(m: &Mapping, i: u8) -> Mapping {
+    let mut clone = m.clone();
+    clone.remove(key("count"));
+    if let Some(Value::Mapping(nets)) = clone.get_mut(key("networks")) {
+        for (_, octet) in nets.iter_mut() {
+            if let Some(o) = octet.as_u64() {
+                *octet = Value::Number((o + u64::from(i) - 1).into());
+            }
+        }
+    }
+    clone
+}
+
+/// A list of machine names with each base replaced by its clones.
+fn expand_list(list: &mut Value, clones: &Clones) {
+    if let Value::Sequence(items) = list {
+        let mut out = Vec::new();
+        for item in items.iter() {
+            match item.as_str().and_then(|s| clones.get(s)) {
+                Some(names) => out.extend(names.iter().map(|n| key(n))),
+                None => out.push(item.clone()),
+            }
+        }
+        *items = out;
+    }
+}
+
+/// Where the base is named, every clone is meant: `depends_on`, a group's members, the
+/// groups of a provisioning step.
+fn expand_members(top: &mut Mapping, clones: &Clones) {
     if let Some(Value::Mapping(machines)) = top.get_mut(key("machines")) {
         for (_, m) in machines.iter_mut() {
             if let Value::Mapping(m) = m
                 && let Some(deps) = m.get_mut(key("depends_on"))
             {
-                expand_list(deps);
+                expand_list(deps, clones);
             }
         }
     }
@@ -106,7 +136,7 @@ pub fn expand(doc: &mut Value) -> Result<IndexMap<String, Vec<String>>, String> 
             if let Value::Mapping(g) = g
                 && let Some(members) = g.get_mut(key("members"))
             {
-                expand_list(members);
+                expand_list(members, clones);
             }
         }
     }
@@ -116,47 +146,53 @@ pub fn expand(doc: &mut Value) -> Result<IndexMap<String, Vec<String>>, String> 
                 && let Some(Value::Mapping(groups)) = step.get_mut(key("groups"))
             {
                 for (_, members) in groups.iter_mut() {
-                    expand_list(members);
+                    expand_list(members, clones);
                 }
             }
         }
     }
-    // A check from the base runs from each clone.
-    if let Some(Value::Sequence(checks)) = top.get_mut(key("checks")) {
-        let mut out = Vec::new();
-        for c in checks.iter() {
-            match c {
-                Value::Mapping(m) if m.get(key("from")).and_then(Value::as_str).is_some_and(|f| clones.contains_key(f)) => {
-                    let base = m.get(key("from")).and_then(Value::as_str).unwrap_or_default().to_string();
-                    for n in &clones[&base] {
-                        let mut each = m.clone();
-                        each.insert(key("from"), key(n));
-                        if let Some(Value::String(name)) = each.get_mut(key("name")) {
-                            name.push_str(&format!(" ({n})"));
-                        }
-                        out.push(Value::Mapping(each));
+}
+
+/// A check from the base runs from each clone.
+fn expand_checks(top: &mut Mapping, clones: &Clones) {
+    let Some(Value::Sequence(checks)) = top.get_mut(key("checks")) else { return };
+    let mut out = Vec::new();
+    for c in checks.iter() {
+        match c {
+            Value::Mapping(m) if m.get(key("from")).and_then(Value::as_str).is_some_and(|f| clones.contains_key(f)) => {
+                let base = m.get(key("from")).and_then(Value::as_str).unwrap_or_default().to_string();
+                for n in &clones[&base] {
+                    let mut each = m.clone();
+                    each.insert(key("from"), key(n));
+                    if let Some(Value::String(name)) = each.get_mut(key("name")) {
+                        name.push_str(&format!(" ({n})"));
                     }
-                }
-                other => out.push(other.clone()),
-            }
-        }
-        *checks = out;
-    }
-    // A gateway, or a LAN's switch, is one machine.
-    if let Some(Value::Mapping(nets)) = top.get(key("networks")) {
-        for (n, net) in nets {
-            for field in ["gateway", "switch"] {
-                if let Value::Mapping(net) = net
-                    && let Some(m) = net.get(key(field)).and_then(Value::as_str)
-                    && clones.contains_key(m)
-                {
-                    return Err(format!(
-                        "networks.{}.{field}: `{m}` has a count; a {field} is one machine",
-                        n.as_str().unwrap_or_default()
-                    ));
+                    out.push(Value::Mapping(each));
                 }
             }
+            other => out.push(other.clone()),
         }
     }
-    Ok(clones)
+    *checks = out;
+}
+
+/// A gateway, or a LAN's switch, is one machine.
+fn one_machine_fields(top: &Mapping, clones: &Clones) -> Result<(), String> {
+    let Some(Value::Mapping(nets)) = top.get(key("networks")) else {
+        return Ok(());
+    };
+    for (n, net) in nets {
+        for field in ["gateway", "switch"] {
+            if let Value::Mapping(net) = net
+                && let Some(m) = net.get(key(field)).and_then(Value::as_str)
+                && clones.contains_key(m)
+            {
+                return Err(format!(
+                    "networks.{}.{field}: `{m}` has a count; a {field} is one machine",
+                    n.as_str().unwrap_or_default()
+                ));
+            }
+        }
+    }
+    Ok(())
 }

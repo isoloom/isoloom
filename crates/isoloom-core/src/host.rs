@@ -113,48 +113,43 @@ pub fn real_host() -> (
 
 /// Checks a target against the real host.
 pub fn check(target: Target, cloud: Option<&str>) -> Readiness {
-    let (run, env, exists, opens, home) = real_host();
-    check_with(
-        target,
-        cloud,
-        &Host {
-            run: &run,
-            env: &env,
-            exists: &exists,
-            opens: &opens,
-            home,
-        },
-    )
+    with_real_host(|host| check_with(target, cloud, host))
 }
 
 /// Every target (each cloud for the cloud targets) against the real host.
 pub fn all() -> Vec<Readiness> {
+    with_real_host(|host| {
+        let mut out = Vec::new();
+        for t in Target::ALL {
+            match t {
+                // A cloud-services environment names its own cloud: `doctor` checks the three.
+                Target::CloudServices => {
+                    for c in ["aws", "azure", "gcp"] {
+                        out.push(check_with(t, Some(c), host));
+                    }
+                }
+                Target::CloudDocker | Target::CloudVm => {
+                    for c in CLOUDS {
+                        out.push(check_with(t, Some(c), host));
+                    }
+                }
+                _ => out.push(check_with(t, None, host)),
+            }
+        }
+        out
+    })
+}
+
+/// Runs `f` with the real host.
+fn with_real_host<R>(f: impl FnOnce(&Host) -> R) -> R {
     let (run, env, exists, opens, home) = real_host();
-    let host = Host {
+    f(&Host {
         run: &run,
         env: &env,
         exists: &exists,
         opens: &opens,
         home,
-    };
-    let mut out = Vec::new();
-    for t in Target::ALL {
-        match t {
-            // A cloud-services environment names its own cloud: `doctor` checks the three.
-            Target::CloudServices => {
-                for c in ["aws", "azure", "gcp"] {
-                    out.push(check_with(t, Some(c), &host));
-                }
-            }
-            Target::CloudDocker | Target::CloudVm => {
-                for c in CLOUDS {
-                    out.push(check_with(t, Some(c), &host));
-                }
-            }
-            _ => out.push(check_with(t, None, &host)),
-        }
-    }
-    out
+    })
 }
 
 pub const CLOUDS: &[&str] = &["aws", "azure", "gcp", "digitalocean", "linode", "oci"];
@@ -175,247 +170,232 @@ fn kvm_problem(h: &Host) -> Option<String> {
     None
 }
 
+/// What was found on the host, and whether anything needed is missing.
+struct Notes {
+    lines: Vec<String>,
+    ok: bool,
+}
+
+impl Notes {
+    fn new() -> Notes {
+        Notes { lines: Vec::new(), ok: true }
+    }
+
+    /// Notes what was found, or (marked with `!`) what is missing and makes the target not ready.
+    fn need(&mut self, found: Option<String>, missing: &str) {
+        match found {
+            Some(f) => self.lines.push(f),
+            None => {
+                self.lines.push(format!("! {missing}"));
+                self.ok = false;
+            }
+        }
+    }
+}
+
 /// Checks a target against a host.
 pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
-    let mut notes: Vec<String> = Vec::new();
-    let mut ok = true;
-    let mut need = |found: Option<String>, missing: &str| match found {
-        Some(f) => notes.push(f),
-        None => {
-            notes.push(format!("! {missing}"));
-            ok = false;
-        }
-    };
+    let mut notes = Notes::new();
     match target {
-        Target::Docker | Target::Hosted => {
-            need(
-                (h.run)("docker", &["version", "--format", "{{.Server.Version}}"]).map(|v| format!("Docker {v}")),
-                "docker isn't installed or its daemon isn't running",
-            );
-            need(
-                (h.run)("docker", &["compose", "version", "--short"])
-                    .filter(|v| !v.starts_with('1'))
-                    .map(|v| format!("Compose {v}")),
-                "docker compose v2 isn't available",
-            );
-        }
-        Target::Vagrant | Target::DockerVm | Target::Hybrid => {
-            need(
-                (h.run)("vagrant", &["--version"]),
-                "vagrant isn't installed (https://developer.hashicorp.com/vagrant/install)",
-            );
-            let plugins = (h.run)("vagrant", &["plugin", "list"]).unwrap_or_default();
-            let mut providers = Vec::new();
-            if let Some(v) = (h.run)("VBoxManage", &["--version"]) {
-                providers.push(format!("VirtualBox {v}"));
-            }
-            if (h.run)("vmrun", &["-T", "ws", "list"]).is_some() || plugins.contains("vagrant-vmware-desktop") {
-                providers.push("VMware".to_string());
-            }
-            if (h.run)("prlctl", &["--version"]).is_some() {
-                providers.push("Parallels".to_string());
-            }
-            // libvirt runs its VMs on KVM: with the plugin and virsh but no usable /dev/kvm,
-            // `vagrant up` fails at boot, so it doesn't count (and the reason is given below).
-            let mut unusable = None;
-            if plugins.contains("vagrant-libvirt") && (h.run)("virsh", &["--version"]).is_some() {
-                match kvm_problem(h) {
-                    None => providers.push("libvirt".to_string()),
-                    Some(why) => unusable = Some(format!("libvirt can't run: {why}")),
-                }
-            }
-            if plugins.contains("vagrant_utm") {
-                providers.push("UTM".to_string());
-            }
-            if plugins.contains("vagrant-qemu") {
-                providers.push("QEMU".to_string());
-            }
-            if plugins.contains("vagrant-vmware-esxi") {
-                providers.push("ESXi".to_string());
-            }
-            if target == Target::Hybrid {
-                need(
-                    providers.iter().find(|p| p.starts_with("VirtualBox")).cloned(),
-                    "hybrid needs VirtualBox (promiscuous interfaces are set per provider; VirtualBox only for now)",
-                );
-            } else {
-                need(
-                    (!providers.is_empty()).then(|| format!("providers: {}", providers.join(", "))),
-                    &unusable.unwrap_or_else(|| "no Vagrant provider found (VirtualBox, VMware, Parallels, libvirt, UTM, QEMU or ESXi)".to_string()),
-                );
-            }
-        }
-        Target::Kubernetes => {
-            need(
-                (h.run)("kubectl", &["version", "--client", "-o", "yaml"]).map(|_| "kubectl".to_string()),
-                "kubectl isn't installed",
-            );
-            need(
-                (h.run)("kubectl", &["config", "current-context"]).map(|c| format!("context {c}")),
-                "no current kubectl context",
-            );
-            need(
-                (h.run)("kubectl", &["cluster-info", "--request-timeout=5s"]).map(|_| "cluster reachable".to_string()),
-                "the cluster doesn't answer (kubectl cluster-info)",
-            );
-        }
+        Target::Docker | Target::Hosted => docker(h, &mut notes),
+        Target::Vagrant | Target::DockerVm | Target::Hybrid => vagrant(target, h, &mut notes),
+        Target::Kubernetes => kubernetes(h, &mut notes),
         Target::External => {
-            need((h.run)("ssh", &["-G", "localhost"]).map(|_| "ssh".to_string()), "ssh isn't installed");
+            notes.need((h.run)("ssh", &["-G", "localhost"]).map(|_| "ssh".to_string()), "ssh isn't installed");
         }
         Target::Proxmox => {
-            need(
-                (h.run)("terraform", &["version", "-json"]).map(|_| "Terraform".to_string()),
-                "terraform isn't installed",
-            );
-            need((h.env)("PROXMOX_VE_ENDPOINT").map(|e| format!("endpoint {e}")), "PROXMOX_VE_ENDPOINT isn't set");
-            need(
-                (h.env)("PROXMOX_VE_API_TOKEN")
-                    .map(|_| "API token".to_string())
-                    .or_else(|| (h.env)("PROXMOX_VE_USERNAME").map(|_| "username/password".to_string())),
-                "no Proxmox credentials (PROXMOX_VE_API_TOKEN, or PROXMOX_VE_USERNAME and PROXMOX_VE_PASSWORD)",
-            );
+            terraform(h, &mut notes);
+            proxmox(h, &mut notes);
         }
         Target::CloudDocker | Target::CloudVm | Target::CloudServices => {
-            need(
-                (h.run)("terraform", &["version", "-json"]).map(|_| "Terraform".to_string()),
-                "terraform isn't installed",
-            );
-            match cloud.unwrap_or("aws") {
-                "aws" => need(
-                    (h.env)("AWS_ACCESS_KEY_ID")
-                        .map(|_| "AWS keys in the environment".to_string())
-                        .or_else(|| (h.env)("AWS_PROFILE").map(|p| format!("AWS profile {p}")))
-                        .or_else(|| (h.exists)(&h.home.join(".aws/credentials")).then(|| "~/.aws/credentials".to_string()))
-                        // `aws login` and SSO keep their session under ~/.aws/login or ~/.aws/sso.
-                        .or_else(|| (h.exists)(&h.home.join(".aws/config")).then(|| "~/.aws/config (aws login or SSO)".to_string())),
-                    "no AWS credentials (AWS_ACCESS_KEY_ID, AWS_PROFILE or ~/.aws/credentials; `aws login`)",
-                ),
-                "azure" => need(
-                    (h.env)("ARM_CLIENT_ID")
-                        .map(|_| "Azure service principal in the environment".to_string())
-                        .or_else(|| (h.run)("az", &["account", "show", "--query", "name", "-o", "tsv"]).map(|n| format!("Azure account {n}"))),
-                    "not logged in to Azure (`az login`, or ARM_CLIENT_ID/ARM_CLIENT_SECRET/ARM_TENANT_ID)",
-                ),
-                "gcp" => need(
-                    (h.env)("GOOGLE_APPLICATION_CREDENTIALS")
-                        .map(|_| "GOOGLE_APPLICATION_CREDENTIALS".to_string())
-                        .or_else(|| {
-                            (h.exists)(&h.home.join(".config/gcloud/application_default_credentials.json"))
-                                .then(|| "gcloud application default credentials".to_string())
-                        }),
-                    "no Google Cloud credentials (`gcloud auth application-default login`)",
-                ),
-                "digitalocean" => need(
-                    (h.env)("DIGITALOCEAN_TOKEN").map(|_| "DIGITALOCEAN_TOKEN".to_string()),
-                    "DIGITALOCEAN_TOKEN isn't set",
-                ),
-                "linode" => need((h.env)("LINODE_TOKEN").map(|_| "LINODE_TOKEN".to_string()), "LINODE_TOKEN isn't set"),
-                "oci" => need(
-                    (h.exists)(&h.home.join(".oci/config"))
-                        .then(|| "~/.oci/config".to_string())
-                        .or_else(|| (h.env)("OCI_CLI_USER").map(|_| "OCI environment".to_string())),
-                    "no Oracle Cloud configuration (~/.oci/config)",
-                ),
-                other => need(None, &format!("unknown cloud `{other}` (aws, azure, gcp, digitalocean, linode, oci)")),
-            }
+            terraform(h, &mut notes);
+            let (found, missing) = cloud_credentials(cloud.unwrap_or("aws"), h);
+            notes.need(found, &missing);
         }
     }
     Readiness {
         target,
         cloud: cloud.map(str::to_string),
-        ready: ok,
-        notes,
+        ready: notes.ok,
+        notes: notes.lines,
     }
+}
+
+fn docker(h: &Host, notes: &mut Notes) {
+    notes.need(
+        (h.run)("docker", &["version", "--format", "{{.Server.Version}}"]).map(|v| format!("Docker {v}")),
+        "docker isn't installed or its daemon isn't running",
+    );
+    notes.need(
+        (h.run)("docker", &["compose", "version", "--short"])
+            .filter(|v| !v.starts_with('1'))
+            .map(|v| format!("Compose {v}")),
+        "docker compose v2 isn't available",
+    );
+}
+
+fn vagrant(target: Target, h: &Host, notes: &mut Notes) {
+    notes.need(
+        (h.run)("vagrant", &["--version"]),
+        "vagrant isn't installed (https://developer.hashicorp.com/vagrant/install)",
+    );
+    let (providers, unusable) = vagrant_providers(h);
+    if target == Target::Hybrid {
+        notes.need(
+            providers.iter().find(|p| p.starts_with("VirtualBox")).cloned(),
+            "hybrid needs VirtualBox (promiscuous interfaces are set per provider; VirtualBox only for now)",
+        );
+    } else {
+        notes.need(
+            (!providers.is_empty()).then(|| format!("providers: {}", providers.join(", "))),
+            &unusable.unwrap_or_else(|| "no Vagrant provider found (VirtualBox, VMware, Parallels, libvirt, UTM, QEMU or ESXi)".to_string()),
+        );
+    }
+}
+
+/// The Vagrant providers found (each with its version where known), and why libvirt can't be
+/// used when its plugin is there but KVM isn't.
+fn vagrant_providers(h: &Host) -> (Vec<String>, Option<String>) {
+    let plugins = (h.run)("vagrant", &["plugin", "list"]).unwrap_or_default();
+    let mut providers = Vec::new();
+    if let Some(v) = (h.run)("VBoxManage", &["--version"]) {
+        providers.push(format!("VirtualBox {v}"));
+    }
+    if (h.run)("vmrun", &["-T", "ws", "list"]).is_some() || plugins.contains("vagrant-vmware-desktop") {
+        providers.push("VMware".to_string());
+    }
+    if (h.run)("prlctl", &["--version"]).is_some() {
+        providers.push("Parallels".to_string());
+    }
+    // libvirt runs its VMs on KVM: with the plugin and virsh but no usable /dev/kvm,
+    // `vagrant up` fails at boot, so it doesn't count (and the reason is given instead).
+    let mut unusable = None;
+    if plugins.contains("vagrant-libvirt") && (h.run)("virsh", &["--version"]).is_some() {
+        match kvm_problem(h) {
+            None => providers.push("libvirt".to_string()),
+            Some(why) => unusable = Some(format!("libvirt can't run: {why}")),
+        }
+    }
+    for (plugin, provider) in [("vagrant_utm", "UTM"), ("vagrant-qemu", "QEMU"), ("vagrant-vmware-esxi", "ESXi")] {
+        if plugins.contains(plugin) {
+            providers.push(provider.to_string());
+        }
+    }
+    (providers, unusable)
+}
+
+fn kubernetes(h: &Host, notes: &mut Notes) {
+    notes.need(
+        (h.run)("kubectl", &["version", "--client", "-o", "yaml"]).map(|_| "kubectl".to_string()),
+        "kubectl isn't installed",
+    );
+    notes.need(
+        (h.run)("kubectl", &["config", "current-context"]).map(|c| format!("context {c}")),
+        "no current kubectl context",
+    );
+    notes.need(
+        (h.run)("kubectl", &["cluster-info", "--request-timeout=5s"]).map(|_| "cluster reachable".to_string()),
+        "the cluster doesn't answer (kubectl cluster-info)",
+    );
+}
+
+fn terraform(h: &Host, notes: &mut Notes) {
+    notes.need(
+        (h.run)("terraform", &["version", "-json"]).map(|_| "Terraform".to_string()),
+        "terraform isn't installed",
+    );
+}
+
+fn proxmox(h: &Host, notes: &mut Notes) {
+    notes.need((h.env)("PROXMOX_VE_ENDPOINT").map(|e| format!("endpoint {e}")), "PROXMOX_VE_ENDPOINT isn't set");
+    notes.need(
+        (h.env)("PROXMOX_VE_API_TOKEN")
+            .map(|_| "API token".to_string())
+            .or_else(|| (h.env)("PROXMOX_VE_USERNAME").map(|_| "username/password".to_string())),
+        "no Proxmox credentials (PROXMOX_VE_API_TOKEN, or PROXMOX_VE_USERNAME and PROXMOX_VE_PASSWORD)",
+    );
+}
+
+/// A cloud's credentials as found on the host, and what to say when they aren't.
+fn cloud_credentials(cloud: &str, h: &Host) -> (Option<String>, String) {
+    let (found, missing) = match cloud {
+        "aws" => (
+            (h.env)("AWS_ACCESS_KEY_ID")
+                .map(|_| "AWS keys in the environment".to_string())
+                .or_else(|| (h.env)("AWS_PROFILE").map(|p| format!("AWS profile {p}")))
+                .or_else(|| (h.exists)(&h.home.join(".aws/credentials")).then(|| "~/.aws/credentials".to_string()))
+                // `aws login` and SSO keep their session under ~/.aws/login or ~/.aws/sso.
+                .or_else(|| (h.exists)(&h.home.join(".aws/config")).then(|| "~/.aws/config (aws login or SSO)".to_string())),
+            "no AWS credentials (AWS_ACCESS_KEY_ID, AWS_PROFILE or ~/.aws/credentials; `aws login`)",
+        ),
+        "azure" => (
+            (h.env)("ARM_CLIENT_ID")
+                .map(|_| "Azure service principal in the environment".to_string())
+                .or_else(|| (h.run)("az", &["account", "show", "--query", "name", "-o", "tsv"]).map(|n| format!("Azure account {n}"))),
+            "not logged in to Azure (`az login`, or ARM_CLIENT_ID/ARM_CLIENT_SECRET/ARM_TENANT_ID)",
+        ),
+        "gcp" => (
+            (h.env)("GOOGLE_APPLICATION_CREDENTIALS")
+                .map(|_| "GOOGLE_APPLICATION_CREDENTIALS".to_string())
+                .or_else(|| {
+                    (h.exists)(&h.home.join(".config/gcloud/application_default_credentials.json"))
+                        .then(|| "gcloud application default credentials".to_string())
+                }),
+            "no Google Cloud credentials (`gcloud auth application-default login`)",
+        ),
+        "digitalocean" => (
+            (h.env)("DIGITALOCEAN_TOKEN").map(|_| "DIGITALOCEAN_TOKEN".to_string()),
+            "DIGITALOCEAN_TOKEN isn't set",
+        ),
+        "linode" => ((h.env)("LINODE_TOKEN").map(|_| "LINODE_TOKEN".to_string()), "LINODE_TOKEN isn't set"),
+        "oci" => (
+            (h.exists)(&h.home.join(".oci/config"))
+                .then(|| "~/.oci/config".to_string())
+                .or_else(|| (h.env)("OCI_CLI_USER").map(|_| "OCI environment".to_string())),
+            "no Oracle Cloud configuration (~/.oci/config)",
+        ),
+        other => return (None, format!("unknown cloud `{other}` (aws, azure, gcp, digitalocean, linode, oci)")),
+    };
+    (found, missing.to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[allow(clippy::type_complexity)]
-    fn host<'a>(
-        tools: &'a [&str],
-        envs: &'a [(&str, &str)],
-    ) -> (
-        impl Fn(&str, &[&str]) -> Option<String> + 'a,
-        impl Fn(&str) -> Option<String> + 'a,
-        impl Fn(&Path) -> bool,
-    ) {
-        let run = move |p: &str, _: &[&str]| tools.contains(&p).then(|| format!("{p} 1.0"));
-        let env = move |k: &str| envs.iter().find(|(e, _)| *e == k).map(|(_, v)| v.to_string());
+    /// Checks a target on a host where only `tools` run and only `envs` are set.
+    fn check_on(target: Target, cloud: Option<&str>, tools: &[&str], envs: &[(&str, &str)]) -> Readiness {
+        let run = |p: &str, _: &[&str]| tools.contains(&p).then(|| format!("{p} 1.0"));
+        let env = |k: &str| envs.iter().find(|(e, _)| *e == k).map(|(_, v)| v.to_string());
         let exists = |_: &Path| false;
-        (run, env, exists)
+        check_with(
+            target,
+            cloud,
+            &Host {
+                run: &run,
+                env: &env,
+                exists: &exists,
+                opens: &exists,
+                home: PathBuf::new(),
+            },
+        )
     }
 
     #[test]
     fn docker_needs_the_daemon_and_compose() {
-        let (run, env, exists) = host(&["docker"], &[]);
-        let r = check_with(
-            Target::Docker,
-            None,
-            &Host {
-                run: &run,
-                env: &env,
-                exists: &exists,
-                opens: &exists,
-                home: PathBuf::new(),
-            },
-        );
+        let r = check_on(Target::Docker, None, &["docker"], &[]);
         assert!(r.ready, "{r:?}");
-        let (run, env, exists) = host(&[], &[]);
-        let r = check_with(
-            Target::Docker,
-            None,
-            &Host {
-                run: &run,
-                env: &env,
-                exists: &exists,
-                opens: &exists,
-                home: PathBuf::new(),
-            },
-        );
+        let r = check_on(Target::Docker, None, &[], &[]);
         assert!(!r.ready && r.summary().contains("docker isn't installed"));
     }
 
     #[test]
     fn vagrant_needs_a_provider_and_hybrid_virtualbox() {
-        let (run, env, exists) = host(&["vagrant"], &[]);
-        let r = check_with(
-            Target::Vagrant,
-            None,
-            &Host {
-                run: &run,
-                env: &env,
-                exists: &exists,
-                opens: &exists,
-                home: PathBuf::new(),
-            },
-        );
+        let r = check_on(Target::Vagrant, None, &["vagrant"], &[]);
         assert!(!r.ready && r.summary().contains("no Vagrant provider"));
-        let (run, env, exists) = host(&["vagrant", "prlctl"], &[]);
-        let r = check_with(
-            Target::Vagrant,
-            None,
-            &Host {
-                run: &run,
-                env: &env,
-                exists: &exists,
-                opens: &exists,
-                home: PathBuf::new(),
-            },
-        );
+        let r = check_on(Target::Vagrant, None, &["vagrant", "prlctl"], &[]);
         assert!(r.ready && r.summary().contains("Parallels"));
-        let r = check_with(
-            Target::Hybrid,
-            None,
-            &Host {
-                run: &run,
-                env: &env,
-                exists: &exists,
-                opens: &exists,
-                home: PathBuf::new(),
-            },
-        );
+        let r = check_on(Target::Hybrid, None, &["vagrant", "prlctl"], &[]);
         assert!(!r.ready && r.summary().contains("VirtualBox"));
     }
 
@@ -453,17 +433,10 @@ mod tests {
 
     #[test]
     fn clouds_need_terraform_and_their_credentials() {
-        let (run, env, exists) = host(&["terraform"], &[("DIGITALOCEAN_TOKEN", "t")]);
-        let h = Host {
-            run: &run,
-            env: &env,
-            exists: &exists,
-            opens: &exists,
-            home: PathBuf::new(),
-        };
-        assert!(check_with(Target::CloudVm, Some("digitalocean"), &h).ready);
-        let aws = check_with(Target::CloudDocker, Some("aws"), &h);
+        let (tools, envs) = (&["terraform"][..], &[("DIGITALOCEAN_TOKEN", "t")][..]);
+        assert!(check_on(Target::CloudVm, Some("digitalocean"), tools, envs).ready);
+        let aws = check_on(Target::CloudDocker, Some("aws"), tools, envs);
         assert!(!aws.ready && aws.summary().contains("no AWS credentials"));
-        assert!(!check_with(Target::Proxmox, None, &h).ready);
+        assert!(!check_on(Target::Proxmox, None, tools, envs).ready);
     }
 }
