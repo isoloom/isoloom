@@ -3,11 +3,12 @@
 //! `.isoloom/cloud-vm/checks/`.
 //!
 //! AWS is the target's reference cloud: its limits refuse the whole target ([`aws::refusal`]),
-//! and it renders from the plan through the VM core (`crate::vm`). The other clouds are drivers
-//! that still read the spec (`crate::cloud_vm_others`): a cloud whose own refusal fires drops
-//! only its module (best-effort: a lab runs on the clouds whose model fits it). Their modules
-//! still get the text passes they were written for (the project lists, the constraints'
-//! preamble); AWS's needs none.
+//! and it renders from the plan through the VM core (`crate::vm`). The other clouds are each a
+//! backend of their own ([`CLOUDS`]: DigitalOcean, Linode, Oracle Cloud), or drivers that still
+//! read the spec (`crate::cloud_vm_others::DRIVERS`: Azure, Google Cloud): a cloud whose own
+//! refusal fires drops only its module (best-effort: a lab runs on the clouds whose model fits
+//! it). The drivers' modules still get the text passes they were written for (the project lists,
+//! the constraints' preamble); the backends' need none.
 
 pub mod aws;
 pub mod legacy;
@@ -55,7 +56,7 @@ impl Backend for CloudVmBackend {
             return Err(unsupported(what));
         }
         let mut files = vec![aws::render(env).map_err(|e| unsupported(format!("the AWS module couldn't be written: {e}")))?];
-        files.extend(others(env));
+        files.extend(others(env)?);
         files.extend(checks::runners(env, DIR));
         Ok(files)
     }
@@ -71,8 +72,33 @@ fn unsupported(what: String) -> RenderError {
     RenderError::Generate(GenerateError::Unsupported { target: Target::CloudVm, what })
 }
 
-/// The other clouds' modules, for the clouds whose model fits the spec, with their text passes.
-fn others(env: &Environment) -> Files {
+/// The clouds rendered from the plan besides AWS, each a backend of its own: a cloud whose
+/// refusal fires drops only its module.
+pub static CLOUDS: &[(&str, &dyn Backend)] = &[
+    ("digitalocean", &crate::cloud_vm_others::digitalocean::DigitalOceanBackend),
+    ("linode", &crate::cloud_vm_others::linode::LinodeBackend),
+    ("oci", &crate::cloud_vm_others::oci::OciBackend),
+];
+
+/// Each cloud of [`CLOUDS`] and why it would refuse `env`, if it would.
+pub fn cloud_refusals(env: &Environment) -> Vec<(&'static str, Option<String>)> {
+    CLOUDS.iter().map(|(name, b)| (*name, b.refusal(env))).collect()
+}
+
+/// The other clouds' modules, for the clouds whose model fits the spec: the backends', then the
+/// drivers' with their text passes. A cloud that accepts the spec and still fails to render
+/// fails the target (its module isn't dropped silently).
+fn others(env: &Environment) -> Result<Files, RenderError> {
+    let mut files = Files::new();
+    for (_, b) in CLOUDS.iter().filter(|(_, b)| b.refusal(env).is_none()) {
+        files.extend(b.render(env)?);
+    }
+    files.extend(legacy_drivers(env));
+    Ok(files)
+}
+
+/// The clouds still reading the spec, with their text passes.
+fn legacy_drivers(env: &Environment) -> Files {
     let spec = env.spec();
     let mut files: Files = crate::cloud_vm_others::DRIVERS
         .iter()

@@ -1,6 +1,6 @@
-//! The string-built helpers of the cloud drivers not on the plan yet (Azure, Google Cloud,
-//! DigitalOcean, Linode, Oracle): their modules keep calling these until each moves onto the VM
-//! core (`crate::vm`), which replaces them. AWS no longer uses them.
+//! The string-built helpers of the cloud drivers not on the plan yet (Azure, Google Cloud):
+//! their modules keep calling these until each moves onto the VM core (`crate::vm`), which
+//! replaces them. AWS, DigitalOcean, Linode and Oracle Cloud no longer use them.
 //!
 //! A Terraform expression inside a set-up command is marked with [`tf_expr`] and interpolated by
 //! [`hcl_cmd`]; on the core, a command is a `Template` instead.

@@ -43,6 +43,11 @@ pub fn index(expr: Expression, i: u64) -> Expression {
     Traversal::new(expr, [TraversalOperator::Index(number(i))]).into()
 }
 
+/// `expr.name`: an attribute of an expression that isn't a plain path (`list[0].id`).
+pub fn attr(expr: Expression, name: &str) -> Expression {
+    Traversal::new(expr, [TraversalOperator::GetAttr(Identifier::sanitized(name))]).into()
+}
+
 /// A function call.
 pub fn call(name: &str, args: impl IntoIterator<Item = Expression>) -> Expression {
     let mut c = FuncCall::new(Identifier::sanitized(name));
