@@ -285,7 +285,9 @@ mod tests {
 
     #[test]
     fn a_key_that_is_a_keyword_is_quoted() {
-        let b = Block::builder("x").add_attribute(("m", object([("for", number(1)), ("web", number(2))]))).build();
+        let b = Block::builder("x")
+            .add_attribute(("m", object([("for", number(1)), ("web", number(2))])))
+            .build();
         assert_eq!(rendered(b), "x {\n  m = { \"for\" = 1, web = 2 }\n}\n");
     }
 
