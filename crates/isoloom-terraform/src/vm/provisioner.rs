@@ -14,6 +14,16 @@ pub enum Connection {
         /// The user it logs in as.
         user: String,
     },
+    /// SSH through a jump host (the router, the only VM on the host's own network), the same
+    /// user and key on both.
+    SshVia {
+        /// The machine's address, from the jump host.
+        host: Expression,
+        /// The user it logs in as, on both.
+        user: String,
+        /// The jump host's address.
+        bastion: Expression,
+    },
     /// WinRM over HTTP, as `isoloom` with a password.
     WinRm {
         /// The machine's address.
@@ -67,6 +77,15 @@ pub struct Provisioner {
 use isoloom_render::secrets::REACH_DIR;
 
 impl Provisioner {
+    /// The same set-up, reached through `bastion` when it goes over SSH.
+    #[must_use]
+    pub fn via(mut self, bastion: Expression) -> Provisioner {
+        if let Connection::Ssh { host, user } = self.connection {
+            self.connection = Connection::SshVia { host, user, bastion };
+        }
+        self
+    }
+
     /// The `terraform_data` block.
     pub fn block(self) -> Block {
         let mut b = Block::builder("resource")
@@ -98,7 +117,7 @@ impl Provisioner {
 /// (the password stays in Terraform's state, where `isoloom run` reads it).
 fn announce(name: &str, c: &Connection) -> Block {
     let (host, user, suffix) = match c {
-        Connection::Ssh { host, user } => (host.clone(), user.as_str(), ""),
+        Connection::Ssh { host, user } | Connection::SshVia { host, user, .. } => (host.clone(), user.as_str(), ""),
         Connection::WinRm { host, ntlm, .. } => (host.clone(), "isoloom", if *ntlm { " winrm-ntlm" } else { " winrm" }),
     };
     let mut command = Template::text("mkdir -p \"");
@@ -113,12 +132,22 @@ fn announce(name: &str, c: &Connection) -> Block {
 
 fn connection(c: &Connection) -> Block {
     let b = Block::builder("connection");
+    let key = || call("file", [call("pathexpand", [reference("var.ssh_private_key_file")])]);
     match c {
         Connection::Ssh { host, user } => b
             .add_attribute(("type", string("ssh")))
             .add_attribute(("host", host.clone()))
             .add_attribute(("user", string(user.as_str())))
-            .add_attribute(("private_key", call("file", [call("pathexpand", [reference("var.ssh_private_key_file")])])))
+            .add_attribute(("private_key", key()))
+            .add_attribute(("timeout", string("10m"))),
+        Connection::SshVia { host, user, bastion } => b
+            .add_attribute(("type", string("ssh")))
+            .add_attribute(("host", host.clone()))
+            .add_attribute(("user", string(user.as_str())))
+            .add_attribute(("private_key", key()))
+            .add_attribute(("bastion_host", bastion.clone()))
+            .add_attribute(("bastion_user", string(user.as_str())))
+            .add_attribute(("bastion_private_key", key()))
             .add_attribute(("timeout", string("10m"))),
         Connection::WinRm { host, password, ntlm } => {
             let b = b

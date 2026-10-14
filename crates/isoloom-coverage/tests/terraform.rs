@@ -20,6 +20,7 @@ fn examples() -> PathBuf {
 /// docker-vm's Proxmox module, and each cloud's cloud-vm and cloud-docker modules.
 const MODULES: &[&str] = &[
     "proxmox",
+    "esxi",
     "docker-vm/proxmox",
     "cloud-vm/aws",
     "cloud-vm/azure",

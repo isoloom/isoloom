@@ -222,6 +222,7 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "vagrant": "needs `vm:` on r1, r2, host-a, host-b",
       "proxmox": "needs `docker.lxc` or `vm:` on r1, r2, host-a, host-b",
+      "esxi": "needs `vm:` on r1, r2, host-a, host-b",
       "cloud-vm": "needs `vm:` on r1, r2, host-a, host-b",
       "external": "needs `external:` on r1, r2, host-a, host-b",
       "cloud-services": "left out by `targets:`"

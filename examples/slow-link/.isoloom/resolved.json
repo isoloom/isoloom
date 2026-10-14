@@ -162,6 +162,7 @@
       "kubernetes",
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm"
     ],
     "generated": [
@@ -170,7 +171,8 @@
       "docker-vm",
       "cloud-docker",
       "vagrant",
-      "proxmox"
+      "proxmox",
+      "esxi"
     ],
     "refused": {
       "kubernetes": "link impairment (`tc`) needs a router in the path; Kubernetes has none",

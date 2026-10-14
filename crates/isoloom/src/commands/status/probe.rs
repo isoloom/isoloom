@@ -22,7 +22,7 @@ pub fn probe(e: &Entry) -> String {
         Target::Kubernetes => kubernetes(e),
         Target::CloudServices => Ok(cloud_services(&out)),
         Target::External => Ok(external(&out)),
-        Target::Proxmox | Target::CloudVm | Target::CloudDocker => terraform(e, &out),
+        Target::Proxmox | Target::Esxi | Target::CloudVm | Target::CloudDocker => terraform(e, &out),
     };
     result.unwrap_or_else(|why| format!("unknown ({why})"))
 }
@@ -154,7 +154,7 @@ fn external(out: &Path) -> String {
 
 fn terraform(e: &Entry, out: &Path) -> Result<String, String> {
     let module = match e.target {
-        Target::Proxmox => out.join("proxmox"),
+        Target::Proxmox | Target::Esxi => out.join(e.target.id()),
         Target::CloudVm => out.join("cloud-vm").join(e.cloud.as_deref().unwrap_or("aws")),
         _ => out.join("cloud-docker").join(e.cloud.as_deref().unwrap_or("aws")),
     };

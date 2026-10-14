@@ -27,6 +27,7 @@ pub struct Variable {
     default: Option<Expression>,
     sensitive: bool,
     description: Option<String>,
+    validation: Option<(Expression, String)>,
 }
 
 impl Variable {
@@ -38,7 +39,23 @@ impl Variable {
             default: None,
             sensitive: false,
             description: None,
+            validation: None,
         }
+    }
+
+    /// The variable with a type that is an expression (`map(string)`).
+    #[must_use]
+    pub fn typed(mut self, ty: Expression) -> Variable {
+        self.ty = ty;
+        self
+    }
+
+    /// The variable with a `validation` block: Terraform refuses a value failing `condition`,
+    /// with `message`.
+    #[must_use]
+    pub fn validated(mut self, condition: Expression, message: &str) -> Variable {
+        self.validation = Some((condition, message.to_string()));
+        self
     }
 
     /// The variable with a default.
@@ -73,6 +90,14 @@ impl Variable {
         }
         if let Some(d) = self.description {
             b = b.add_attribute(("description", string(d)));
+        }
+        if let Some((condition, message)) = self.validation {
+            b = b.add_block(
+                Block::builder("validation")
+                    .add_attribute(("condition", condition))
+                    .add_attribute(("error_message", string(message)))
+                    .build(),
+            );
         }
         b.build()
     }

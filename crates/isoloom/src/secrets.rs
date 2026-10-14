@@ -85,8 +85,8 @@ pub fn deliver(p: &Prepared, values: &Values, cmd: &mut Command) -> Res<()> {
         Target::Kubernetes => kubernetes(p, values),
         // The VM targets: written on each machine over its own connection (`vms`).
         Target::Vagrant | Target::DockerVm | Target::Hybrid | Target::Proxmox | Target::CloudVm | Target::CloudDocker | Target::External => Ok(()),
-        // Its backend refuses a spec with secrets.
-        Target::CloudServices => Err(Failure::new(ErrorCode::Unsupported, "`cloud-services` doesn't deliver secrets").into()),
+        // Their backends refuse a spec with secrets.
+        Target::CloudServices | Target::Esxi => Err(Failure::new(ErrorCode::Unsupported, format!("`{}` doesn't deliver secrets", p.target.id())).into()),
     }
 }
 

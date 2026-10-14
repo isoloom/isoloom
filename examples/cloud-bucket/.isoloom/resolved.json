@@ -35,6 +35,7 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "vagrant": "left out by `targets:`",
       "proxmox": "left out by `targets:`",
+      "esxi": "left out by `targets:`",
       "cloud-vm": "left out by `targets:`",
       "external": "left out by `targets:`"
     },

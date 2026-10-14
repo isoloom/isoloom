@@ -82,3 +82,7 @@ pub const PROXMOX: &[(&str, Status)] = &[
         },
     ),
 ];
+
+/// What the ESXi module states apart from the Proxmox family it inherits from: it runs no LXC
+/// container (its `mtu` and `rate_limit` cells come from its backend's refusals).
+pub const ESXI: &[(&str, Status)] = &[NOT_LXC];

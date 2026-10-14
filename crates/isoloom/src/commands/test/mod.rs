@@ -155,7 +155,7 @@ fn runners(ctx: &Ctx, t: Target) -> Res<(Vec<Runner>, Option<PathBuf>)> {
         Target::Kubernetes => local::kubernetes(ctx)?,
         Target::CloudVm => (remote::cloud_vm(ctx)?, None),
         Target::CloudDocker => (remote::cloud_docker(ctx)?, None),
-        Target::Proxmox => (remote::proxmox(ctx)?, None),
+        Target::Proxmox | Target::Esxi => (remote::behind_router(ctx, t.id())?, None),
         Target::External => (remote::external(ctx)?, None),
     })
 }

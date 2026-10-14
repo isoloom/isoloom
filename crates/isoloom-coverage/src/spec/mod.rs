@@ -74,6 +74,11 @@ impl Row {
 /// What the field's rendering states for `output`, before asking its backend: hybrid combines
 /// Compose (its containers) and Vagrant (its VMs). `None` when the tables don't state it.
 pub fn claim(path: &str, output: Output) -> Option<Status> {
+    if output == Output::Esxi
+        && let Some((_, s)) = families::links::ESXI.iter().find(|(p, _)| *p == path)
+    {
+        return Some(*s);
+    }
     match output.family() {
         Some(f) => families::status(f, path),
         None => Some(families::status(Family::Compose, path)?.combine(families::status(Family::Vagrant, path)?)),

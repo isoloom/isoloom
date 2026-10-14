@@ -21,7 +21,7 @@ use crate::{Res, cloud_services, external, output, secrets, spec, target};
 
 #[derive(clap::Args)]
 pub struct Args {
-    /// The target to run (docker, vagrant, docker-vm, hybrid, kubernetes, proxmox,
+    /// The target to run (docker, vagrant, docker-vm, hybrid, kubernetes, proxmox, esxi,
     /// cloud-docker, cloud-vm). Omitted, the single derived target, or an error listing them.
     target: Option<String>,
     #[arg(default_value = ".")]

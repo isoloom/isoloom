@@ -42,6 +42,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
     Target::Hybrid,
     Target::Vagrant,
     Target::Proxmox,
+    Target::Esxi,
     Target::CloudVm,
     Target::External,
     Target::CloudServices,

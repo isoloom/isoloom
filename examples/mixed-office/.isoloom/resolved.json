@@ -120,6 +120,7 @@
       "hybrid",
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm"
     ],
     "generated": [
@@ -128,7 +129,9 @@
       "proxmox",
       "cloud-vm"
     ],
-    "refused": {},
+    "refused": {
+      "esxi": "machine `files01` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+    },
     "not_possible": {
       "docker": "needs `docker:` on files01",
       "hosted": "needs `docker:` on files01",

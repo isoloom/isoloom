@@ -24,6 +24,8 @@ pub enum Target {
     Vagrant,
     /// One VM per machine on the user's Proxmox.
     Proxmox,
+    /// One VM per machine on the user's standalone ESXi host (Terraform, no vCenter).
+    Esxi,
     /// One cloud VM per machine.
     CloudVm,
     /// Machines that already exist, reached over SSH at the addresses the spec gives
@@ -36,7 +38,7 @@ pub enum Target {
 
 impl Target {
     /// Every target, in the order they are listed (`isoloom targets`, the snapshot).
-    pub const ALL: [Target; 11] = [
+    pub const ALL: [Target; 12] = [
         Target::Docker,
         Target::Hosted,
         Target::DockerVm,
@@ -45,6 +47,7 @@ impl Target {
         Target::Hybrid,
         Target::Vagrant,
         Target::Proxmox,
+        Target::Esxi,
         Target::CloudVm,
         Target::External,
         Target::CloudServices,
@@ -54,7 +57,7 @@ impl Target {
     pub fn needs(self) -> Shape {
         match self {
             Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes => Shape::Docker,
-            Target::Vagrant | Target::CloudVm => Shape::Vm,
+            Target::Vagrant | Target::Esxi | Target::CloudVm => Shape::Vm,
             Target::Proxmox => Shape::VmOrLxc,
             Target::Hybrid => Shape::Either,
             Target::External => Shape::External,
@@ -73,6 +76,7 @@ impl Target {
             Target::Hybrid => "hybrid",
             Target::Vagrant => "vagrant",
             Target::Proxmox => "proxmox",
+            Target::Esxi => "esxi",
             Target::CloudVm => "cloud-vm",
             Target::External => "external",
             Target::CloudServices => "cloud-services",

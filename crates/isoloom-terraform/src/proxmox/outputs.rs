@@ -15,6 +15,12 @@ use crate::vm::{controller, vms};
 /// The outputs.
 pub fn blocks(env: &Environment, m: &mut Module) {
     m.block(router_address(env));
+    behind_router(env, DIR, m);
+}
+
+/// The outputs of a target whose machines sit behind its router (Proxmox, ESXi; `dir` is its
+/// folder), once `local.router_address` holds the router's uplink address.
+pub(crate) fn behind_router(env: &Environment, dir: &str, m: &mut Module) {
     m.block(output("address", reference("local.router_address")));
     let published: Vec<(String, Expression)> = env
         .spec()
@@ -44,9 +50,9 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         output("machines", object(machines)),
     );
     m.block(output("ssh_user", string("isoloom")));
-    if let Some(checks) = output_block(env, DIR, Invocation::Script, &|p| runner(env, p)) {
+    if let Some(checks) = output_block(env, dir, Invocation::Script, &|p| runner(env, p)) {
         m.commented(
-            "The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.",
+            &format!("The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test {dir}`."),
             checks,
         );
     }

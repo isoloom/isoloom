@@ -121,6 +121,7 @@
       "kubernetes",
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm"
     ],
     "generated": [
@@ -131,6 +132,7 @@
       "kubernetes",
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm"
     ],
     "refused": {},

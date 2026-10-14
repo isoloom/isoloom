@@ -79,21 +79,27 @@ pub fn cloud_docker(ctx: &Ctx) -> Res<Vec<Runner>> {
     Ok(runners)
 }
 
-/// Proxmox: each runner piped to its machine over SSH, through the router.
-pub fn proxmox(ctx: &Ctx) -> Res<Vec<Runner>> {
-    let outputs = terraform::output(&ctx.out.join("proxmox"))?;
+/// Proxmox and ESXi (`dir`, the target's folder): each runner piped to its machine over SSH,
+/// through the router.
+pub fn behind_router(ctx: &Ctx, dir: &str) -> Res<Vec<Runner>> {
+    let outputs = terraform::output(&ctx.out.join(dir))?;
     let router = outputs["address"]
         .as_str()
-        .ok_or_else(|| fail(ErrorCode::NotRunning, "the module has no `address` output: run `isoloom run proxmox` first"))?
+        .ok_or_else(|| {
+            fail(
+                ErrorCode::NotRunning,
+                format!("the module has no `address` output: run `isoloom run {dir}` first"),
+            )
+        })?
         .to_string();
-    let list = checks_output(&outputs, "proxmox")?;
+    let list = checks_output(&outputs, dir)?;
     let runners = list
         .iter()
         .map(|entry| {
             let host = entry["host"].as_str().unwrap_or_default();
             let user = entry["user"].as_str().unwrap_or("isoloom");
             let position = entry["position"].as_str().unwrap_or_default();
-            let script = ctx.out.join("proxmox/checks").join(format!("{position}.sh"));
+            let script = ctx.out.join(dir).join("checks").join(format!("{position}.sh"));
             let mut r = ssh_runner(ctx.ssh_key, user, host, &format!("{}sh -s", ctx.derived_prefix()), false);
             r.args.insert(0, format!("isoloom@{router}"));
             r.args.insert(0, "-J".to_string());

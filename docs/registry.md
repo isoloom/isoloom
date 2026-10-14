@@ -45,7 +45,7 @@ Each entry of `environments`:
 |---|---|---|
 | `name` | yes | The spec's `name`. |
 | `dir` | yes | The project folder, as an absolute path. |
-| `target` | yes | The target id: `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`, `hybrid`, `vagrant`, `proxmox`, `cloud-vm`, `external`, `cloud-services`. |
+| `target` | yes | The target id: `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`, `hybrid`, `vagrant`, `proxmox`, `esxi`, `cloud-vm`, `external`, `cloud-services`. |
 | `instance` | no | The instance number (1-99), when the environment was run with `--instance`. Its outputs live in `.isoloom-<n>/`. |
 | `cloud` | no | The cloud whose module was applied (`aws`, `azure`, ...), for `cloud-vm` and `cloud-docker`. |
 | `project` | no | Docker and hosted only: the Compose project name, when the Compose file was brought up under another name than its own `name:` (`docker compose -p <project>`), so the containers are labelled with that name. Whatever started it that way (a script, a tool running several copies under names of its own) records the name here. `isoloom run` never sets it: it uses the file's `name:`, and `--instance` for copies. When it's set, `status`, `connect`, `exec`, `capture` and `down` pass `-p <project>`; without it, Compose would look for an environment that isn't there. A later `isoloom run` of the same environment keeps it. |

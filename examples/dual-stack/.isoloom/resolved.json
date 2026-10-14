@@ -160,6 +160,7 @@
       "kubernetes",
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm"
     ],
     "generated": [
@@ -172,7 +173,9 @@
       "proxmox",
       "cloud-vm"
     ],
-    "refused": {},
+    "refused": {
+      "esxi": "network `front` is IPv6 (`ipv6`), which this target's networks don't carry yet"
+    },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "needs `external:` on web",

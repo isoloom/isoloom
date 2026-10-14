@@ -112,12 +112,14 @@
     "possible": [
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm",
       "external"
     ],
     "generated": [
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm",
       "external"
     ],

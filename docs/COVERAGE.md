@@ -26,7 +26,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 20 | 20 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
 | [Terraform: Proxmox](#terraform-proxmox) | 93% | 181 | 170 | 0 | 11 |
-| [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
+| [Terraform: ESXi](#terraform-esxi) | 77% | 35 | 27 | 0 | 8 |
 | [Terraform: AWS](#terraform-aws) | 78% | 130 | 102 | 0 | 28 |
 | [Terraform: Azure](#terraform-azure) | 83% | 135 | 113 | 0 | 22 |
 | [Terraform: Google Cloud](#terraform-google-cloud) | 73% | 97 | 70 | 2 | 25 |
@@ -2149,17 +2149,89 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: ESXi
 
-0% of 4 portable features (0 done, 0 partly, 4 to do; 5 features in all). From josenk/esxi 1.10.3 (its resource types).
+77% of 35 portable features (27 done, 0 partly, 8 to do; 57 features in all). From josenk/esxi 1.10.3 (its resource types, and the schema of what Isoloom writes; not run on a real host).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `esxi_guest` | Yes | Not yet | With the ESXi generator: a VM per machine, a port group per network |
-| `esxi_portgroup` | Yes | Not yet | With the ESXi generator: a VM per machine, a port group per network |
+| `esxi_guest` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network |
+| `esxi_portgroup` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network |
 | `esxi_resource_pool` | n/a | No | Where the host places the VMs: no change in behavior |
-| `esxi_virtual_disk` | Yes | Not yet | With the ESXi generator: a VM per machine, a port group per network |
-| `esxi_vswitch` | Yes | Not yet | With the ESXi generator: a VM per machine, a port group per network |
+| `esxi_virtual_disk` | Yes | Another way | Via `resources.disk_gb`: the machine's one disk (`boot_disk_size`), which holds its volumes' paths, as on Vagrant's ESXi provider |
+| `esxi_vswitch` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network |
+
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `esxi_hostname` | Yes | Yes | Written by the generator |
+| `esxi_hostport` | Yes | Yes | Written by the generator |
+| `esxi_hostssl` | Yes | Yes | Written by the generator |
+| `esxi_password` | Yes | Yes | Written by the generator |
+| `esxi_username` | Yes | Yes | Written by the generator |
+
+### esxi_guest
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `boot_disk_size` | Yes | Yes | Written by the generator |
+| `boot_disk_type` | n/a | No | How the host allocates the disk (thin or thick): no change in behavior |
+| `boot_firmware` | Yes | Not yet | With a machine's own boot on ESXi (`vm.boot`), as on Proxmox |
+| `clone_from_vm` | n/a | No | Another source for a VM's image (a VM or OVF files already on the host): Isoloom deploys the OVA of `images` |
+| `disk_store` | Yes | Yes | Written by the generator |
+| `guest_name` | Yes | Yes | Written by the generator |
+| `guest_shutdown_timeout` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `guest_startup_timeout` | Yes | Yes | Written by the generator |
+| `guestinfo` | Yes | Yes | Written by the generator |
+| `guestos` | Yes | Not yet | With Windows guests on the ESXi target (a Linux OVA keeps its own) |
+| `host_ovf` | n/a | No | Another source for a VM's image (a VM or OVF files already on the host): Isoloom deploys the OVA of `images` |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `memsize` | Yes | Yes | Written by the generator |
+| `notes` | Yes | Yes | Written by the generator |
+| `numvcpus` | Yes | Yes | Written by the generator |
+| `ovf_properties_timer` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `ovf_source` | Yes | Yes | Written by the generator |
+| `power` | Yes | Yes | Written by the generator |
+| `resource_pool_name` | n/a | No | Where the host places the VMs: no change in behavior |
+| `virthwver` | No | No | Tunes the ESXi host for the VM or the vSwitch (virtual hardware version, link discovery): no other target exposes it |
+| `network_interfaces` | Yes | Yes | Written by the generator |
+| `network_interfaces.mac_address` | Yes | Yes | Written by the generator |
+| `network_interfaces.nic_type` | Yes | Yes | Written by the generator |
+| `network_interfaces.virtual_network` | Yes | Yes | Written by the generator |
+| `ovf_properties` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
+| `ovf_properties.key` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
+| `ovf_properties.value` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
+| `virtual_disks` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `virtual_disks.slot` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `virtual_disks.virtual_disk_id` | Yes | Not yet | With data disks: persistent volumes on VMs |
+
+### esxi_portgroup
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `forged_transmits` | No | No | A vSwitch's security policy (promiscuous mode, MAC changes, forged transmits): no other target's networks have one |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `mac_changes` | No | No | A vSwitch's security policy (promiscuous mode, MAC changes, forged transmits): no other target's networks have one |
+| `name` | Yes | Yes | Written by the generator |
+| `promiscuous_mode` | No | No | A vSwitch's security policy (promiscuous mode, MAC changes, forged transmits): no other target's networks have one |
+| `vlan` | Yes | Yes | Written by the generator |
+| `vswitch` | Yes | Yes | Written by the generator |
+
+### esxi_vswitch
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `forged_transmits` | No | No | A vSwitch's security policy (promiscuous mode, MAC changes, forged transmits): no other target's networks have one |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `link_discovery_mode` | No | No | Tunes the ESXi host for the VM or the vSwitch (virtual hardware version, link discovery): no other target exposes it |
+| `mac_changes` | No | No | A vSwitch's security policy (promiscuous mode, MAC changes, forged transmits): no other target's networks have one |
+| `mtu` | Yes | Not yet | A network's MTU |
+| `name` | Yes | Yes | Written by the generator |
+| `ports` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `promiscuous_mode` | No | No | A vSwitch's security policy (promiscuous mode, MAC changes, forged transmits): no other target's networks have one |
+| `uplink` | Yes | Not yet | With `bridged` networks on ESXi: a network on the host's own uplink (each network is on its own vSwitch with none) |
+| `uplink.name` | Yes | Not yet | With `bridged` networks on ESXi: a network on the host's own uplink (each network is on its own vSwitch with none) |
 
 ## Terraform: AWS
 
@@ -7485,174 +7557,174 @@ is marked ✗, with its reason below.
 
 ✓ done · ◐ partial · planned · ✗ refused by the backend · n/a: means nothing for this output · info: descriptive only · core: read by Isoloom itself
 
-| Field | docker | hosted | kubernetes | helm | kustomize | vagrant | docker-vm | hybrid | proxmox | aws | azure | gcp | digitalocean | linode | oci | cloud-docker | cloud-services | external |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `version` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core |
-| `name` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | core |
-| `networks.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
-| `networks.*.tc.delay` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
-| `networks.*.tc.jitter` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
-| `networks.*.tc.loss` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
-| `networks.*.tc.rate` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
-| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
-| `networks.*.docker.cidr` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `networks.*.vlans.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
-| `networks.*.switch` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `networks.*.vlans.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
-| `networks.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
-| `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | n/a |
-| `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
-| `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
-| `networks.*.ipv6.only` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✗ |
-| `networks.*.external` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `networks.*.bridged.interface` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `networks.*.bridged.dhcp` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `networks.*.bridged.default_route` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `networks.*.bridged.vlan` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `reach[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
-| `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
-| `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
-| `inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
-| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `machines.*.networks` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
-| `machines.*.services[].port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `cloud.provider` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `cloud.terraform` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `cloud.vars` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `cloud.outputs` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `cloud.hourly_usd` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `cloud.before` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `cloud.env` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `cloud.apply_retries` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `cloud.requires` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `machines.*.services[].name` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
-| `machines.*.services[].publish` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
-| `machines.*.services[].fixed` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
-| `machines.*.services[].dormant` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `machines.*.services[].protocol` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `machines.*.services[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
-| `machines.*.services[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
-| `machines.*.inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
-| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `machines.*.environment` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
-| `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
-| `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
-| `machines.*.aliases` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
-| `machines.*.arch` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `machines.*.rate_limit` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
-| `machines.*.privileged` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.nested_virtualization` | ✗ | ✗ | ✗ | ✗ | ✗ | ◐ | ✗ | ✗ | ✓ | ◐ | ✗ | ◐ | ✗ | ✗ | ◐ | ✗ | n/a | n/a |
-| `machines.*.gpus.count` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ◐ | ◐ | ◐ | ◐ | ◐ | ✗ | ✗ | n/a | n/a |
-| `machines.*.gpus.ids` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `machines.*.gpus.driver` | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | n/a | ◐ | ◐ | ◐ | ◐ | ◐ | ✗ | ✗ | n/a | n/a |
-| `machines.*.gpus.capabilities` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✗ | n/a | n/a |
-| `machines.*.gpus.options` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✗ | n/a | n/a |
-| `machines.*.devices[].host` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `machines.*.devices[].guest` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `machines.*.devices[].permissions` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `machines.*.read_only` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.tmpfs` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.shm_size` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.dns.servers` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
-| `machines.*.dns.search` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
-| `machines.*.dns.domain` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
-| `machines.*.dns.options` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
-| `machines.*.resources.cpus` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
-| `machines.*.resources.memory_mb` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
-| `machines.*.resources.disk_gb` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
-| `machines.*.command` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.working_dir` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.before` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.healthcheck.test` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.healthcheck.http.port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.healthcheck.http.path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.healthcheck.interval` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.healthcheck.timeout` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.healthcheck.retries` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.healthcheck.start_period` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.depends_on` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
-| `volumes.*.owner` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | planned |
-| `machines.*.volumes` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
-| `machines.*.files[].path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.files[].source` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.files[].content` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.files[].uid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
-| `machines.*.files[].gid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
-| `machines.*.files[].mode` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
-| `machines.*.access` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `machines.*.docker.image` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.build` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.dockerfile` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.target` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.args` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.init` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.appliance` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.firmware` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.config` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.idle` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.docker.lxc` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.os` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | n/a | n/a | ◐ |
-| `machines.*.vm.image.vagrant` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.vagrant_version` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.qemu` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.hyperv` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.winrm` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.winssh` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.box_url` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.box_server_url` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.proxmox` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| `machines.*.vm.image.aws` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
-| `machines.*.vm.image.azure` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
-| `machines.*.vm.image.gcp` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
-| `machines.*.vm.image.digitalocean` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
-| `machines.*.vm.image.linode` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
-| `machines.*.vm.image.oci` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
-| `machines.*.vm.boot.kernel` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.initrd` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.cmdline` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.dtb` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.loader` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.nvram` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.network.tftp_root` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.network.file` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.network.server` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.firmware` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.firmware_format` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.order` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ◐ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.provision` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ◐ |
-| `machines.*.vm.tpm` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ◐ | n/a | n/a | n/a |
-| `provision[].ansible` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
-| `provision[].inventory` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
-| `provision[].groups` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
-| `provision[].vars` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
-| `provision[].host_vars` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
-| `controller` | ✗ | ✗ | n/a | n/a | n/a | ✓ | ✗ | planned | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `provision[].requirements` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | planned |
-| `checks[]` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | ✓ | ◐ |
-| `checks[].name` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `checks[].http` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].tcp` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].method` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].headers` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].body` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].contains` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].follow` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].send` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].exec` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `checks[].script` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
-| `checks[].expect` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `checks[].wait` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `targets` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core |
-| `tools` | ✓ | ✓ | planned | planned | planned | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
-| `machines.*.external.address` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | ✓ |
-| `machines.*.external.user` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | ✓ |
-| `machines.*.external.port` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | ✓ |
-| `machines.*.external.key` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | ✓ |
-| `message` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `machines.*.count` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core |
-| `common` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core |
-| `groups` | core | core | core | core | core | ✓ | core | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | core | n/a | ✓ |
+| Field | docker | hosted | kubernetes | helm | kustomize | vagrant | docker-vm | hybrid | proxmox | esxi | aws | azure | gcp | digitalocean | linode | oci | cloud-docker | cloud-services | external |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `version` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core |
+| `name` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | core |
+| `networks.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
+| `networks.*.tc.delay` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
+| `networks.*.tc.jitter` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
+| `networks.*.tc.loss` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
+| `networks.*.tc.rate` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
+| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `networks.*.docker.cidr` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `networks.*.vlans.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
+| `networks.*.switch` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `networks.*.vlans.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
+| `networks.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
+| `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | n/a |
+| `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
+| `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
+| `networks.*.ipv6.only` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✗ |
+| `networks.*.external` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.interface` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.dhcp` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.default_route` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.vlan` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `reach[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
+| `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
+| `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
+| `inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
+| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.networks` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
+| `machines.*.services[].port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `cloud.provider` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `cloud.terraform` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `cloud.vars` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `cloud.outputs` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `cloud.hourly_usd` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `cloud.before` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `cloud.env` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `cloud.apply_retries` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `cloud.requires` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `machines.*.services[].name` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
+| `machines.*.services[].publish` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
+| `machines.*.services[].fixed` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
+| `machines.*.services[].dormant` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.services[].protocol` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.services[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
+| `machines.*.services[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
+| `machines.*.inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
+| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.environment` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
+| `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
+| `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
+| `machines.*.aliases` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
+| `machines.*.arch` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.rate_limit` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `machines.*.privileged` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.nested_virtualization` | ✗ | ✗ | ✗ | ✗ | ✗ | ◐ | ✗ | ✗ | ✓ | ✗ | ◐ | ✗ | ◐ | ✗ | ✗ | ◐ | ✗ | n/a | n/a |
+| `machines.*.gpus.count` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ◐ | ◐ | ◐ | ◐ | ◐ | ✗ | ✗ | n/a | n/a |
+| `machines.*.gpus.ids` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.gpus.driver` | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | n/a | n/a | ◐ | ◐ | ◐ | ◐ | ◐ | ✗ | ✗ | n/a | n/a |
+| `machines.*.gpus.capabilities` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✗ | n/a | n/a |
+| `machines.*.gpus.options` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✗ | n/a | n/a |
+| `machines.*.devices[].host` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.devices[].guest` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.devices[].permissions` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.read_only` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.tmpfs` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.shm_size` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.dns.servers` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.dns.search` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.dns.domain` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.dns.options` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.resources.cpus` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.resources.memory_mb` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
+| `machines.*.resources.disk_gb` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.command` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.working_dir` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.before` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.test` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.http.port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.http.path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.interval` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.timeout` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.retries` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.start_period` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.depends_on` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
+| `volumes.*.owner` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | planned |
+| `machines.*.volumes` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
+| `machines.*.files[].path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.files[].source` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.files[].content` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.files[].uid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
+| `machines.*.files[].gid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
+| `machines.*.files[].mode` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
+| `machines.*.access` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.docker.image` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.build` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.dockerfile` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.target` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.args` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.init` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.appliance` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.firmware` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.config` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.idle` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.lxc` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.os` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | n/a | n/a | ◐ |
+| `machines.*.vm.image.vagrant` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.vagrant_version` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.qemu` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.hyperv` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.winrm` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.winssh` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.box_url` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.box_server_url` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.proxmox` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.aws` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.azure` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.gcp` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.digitalocean` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.linode` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.oci` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.boot.kernel` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.initrd` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.cmdline` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.dtb` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.loader` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.nvram` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.network.tftp_root` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.network.file` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.network.server` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.firmware` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.firmware_format` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.order` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ◐ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.provision` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ◐ |
+| `machines.*.vm.tpm` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✗ | ◐ | ◐ | ◐ | ✗ | ✗ | ◐ | n/a | n/a | n/a |
+| `provision[].ansible` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
+| `provision[].inventory` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
+| `provision[].groups` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
+| `provision[].vars` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
+| `provision[].host_vars` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
+| `controller` | ✗ | ✗ | n/a | n/a | n/a | ✓ | ✗ | planned | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `provision[].requirements` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | planned |
+| `checks[]` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | ✓ | ◐ |
+| `checks[].name` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `checks[].http` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].tcp` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].method` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].headers` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].body` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].contains` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].follow` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].send` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].exec` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `checks[].script` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
+| `checks[].expect` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `checks[].wait` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `targets` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core |
+| `tools` | ✓ | ✓ | planned | planned | planned | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.external.address` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | ✓ |
+| `machines.*.external.user` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | ✓ |
+| `machines.*.external.port` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | ✓ |
+| `machines.*.external.key` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | ✓ |
+| `message` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
+| `machines.*.count` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core |
+| `common` | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core | core |
+| `groups` | core | core | core | core | core | ✓ | core | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | core | n/a | ✓ |
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -7665,6 +7737,7 @@ is marked ✗, with its reason below.
 | docker-vm | 78% of 112 | 86 | 3 | 0 | 23 |
 | hybrid | 66% of 137 | 88 | 5 | 7 | 37 |
 | proxmox | 82% of 112 | 91 | 2 | 3 | 16 |
+| esxi | 67% of 111 | 74 | 1 | 3 | 33 |
 | aws | 61% of 117 | 64 | 15 | 6 | 32 |
 | azure | 60% of 117 | 64 | 14 | 7 | 32 |
 | gcp | 61% of 117 | 64 | 15 | 6 | 32 |
@@ -7683,7 +7756,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **aws, azure**: Link impairment (`tc`) needs a router in the path; the cloud's security groups have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
 - **gcp**: Link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
 - **digitalocean, linode, oci**: Link impairment (`tc`) needs a router in the path; the cloud's firewalls have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
-- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does) (`networks.*.mtu`)
+- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does) (`networks.*.mtu`)
 - **digitalocean**: DigitalOcean cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
 - **linode**: Linode cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
 - **oci**: Oracle Cloud cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
@@ -7691,8 +7764,9 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **kubernetes, helm, kustomize**: Networks with a `gateway` machine on Kubernetes come later (`networks.*.gateway`)
 - **hybrid**: Networks with a `gateway` machine in hybrid environments come later (`networks.*.gateway`)
 - **proxmox**: Networks with a `gateway` machine on Proxmox come later (`networks.*.gateway`)
+- **esxi**: Networks with a `gateway` machine on ESXi come later (`networks.*.gateway`)
 - **aws, azure, gcp**: Networks with a `gateway` machine in the cloud come later (`networks.*.gateway`)
-- **hybrid**: Network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`, `networks.*.ipv6.only`)
+- **hybrid, esxi**: Network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`, `networks.*.ipv6.only`)
 - **aws**: Network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks (`networks.*.ipv6.cidr`)
 - **gcp**: Network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept (`networks.*.ipv6.cidr`)
 - **digitalocean**: Network `lan` is IPv6: DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one) (`networks.*.ipv6.cidr`)
@@ -7700,9 +7774,11 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **oci**: Network `lan` is IPv6: dual-stack virtual cloud networks on Oracle Cloud come later (`networks.*.ipv6.cidr`)
 - **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static` (`networks.*.ipv6.addresses`)
 - **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci, external**: Network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport) (`networks.*.ipv6.only`)
-- **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
-- **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)
+- **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
+- **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)
 - **vagrant**: Network `home`: Vagrant's bridged networks take no VLAN tag (Proxmox does) (`networks.*.bridged.vlan`)
+- **esxi**: Machine `a` gets `secrets`, and this target has no machine `isoloom run` can hand them to (`secrets`, `machines.*.secrets`)
+- **esxi**: Machine `a`: ESXi runs x86-64 VMs only (`machines.*.arch`)
 - **aws**: Machine `a`: arm64 on AWS comes later (Graviton instances and arm64 AMIs) (`machines.*.arch`)
 - **azure**: Machine `a`: arm64 on Azure comes later (Arm-based sizes and arm64 images) (`machines.*.arch`)
 - **gcp**: Machine `a`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images) (`machines.*.arch`)
@@ -7710,12 +7786,13 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **linode**: Machine `a`: arm64 on Linode comes later (it has no arm64 plans) (`machines.*.arch`)
 - **oci**: Machine `a`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images) (`machines.*.arch`)
 - **cloud-docker**: Machine `a`: arm64 on a cloud VM comes later (Graviton instances and arm64 images) (`machines.*.arch`)
-- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Machine `a` sets a `rate_limit`, which this target doesn't apply yet (the proxmox target does, on its network devices) (`machines.*.rate_limit`)
+- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Machine `a` sets a `rate_limit`, which this target doesn't apply yet (the proxmox target does, on its network devices) (`machines.*.rate_limit`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, cloud-docker**: Machine `a` runs VMs inside (`nested_virtualization`), which a container can't: it runs as a VM on the VM targets (`machines.*.nested_virtualization`)
+- **esxi**: Machine `a` runs VMs inside (`nested_virtualization`): this target's VMs can't nest (Vagrant, Proxmox, AWS, Google Cloud and Oracle Cloud can) (`machines.*.nested_virtualization`)
 - **azure**: Machine `a`: nested virtualization (`nested_virtualization`) on Azure comes later (AWS, Google Cloud and Oracle Cloud have it) (`machines.*.nested_virtualization`)
 - **digitalocean**: Machine `a`: nested virtualization (`nested_virtualization`) on DigitalOcean comes later (AWS, Google Cloud and Oracle Cloud have it) (`machines.*.nested_virtualization`)
 - **linode**: Machine `a`: nested virtualization (`nested_virtualization`) on Linode comes later (AWS, Google Cloud and Oracle Cloud have it) (`machines.*.nested_virtualization`)
-- **vagrant**: Machine `a` asks for GPUs (`gpus`): Vagrant passes no GPU to a local VM (Proxmox and the cloud targets do) (`machines.*.gpus.count`, `machines.*.gpus.ids`, `machines.*.gpus.driver`, `machines.*.gpus.capabilities`, `machines.*.gpus.options`)
+- **vagrant, esxi**: Machine `a` asks for GPUs (`gpus`): Vagrant passes no GPU to a local VM (Proxmox and the cloud targets do) (`machines.*.gpus.count`, `machines.*.gpus.ids`, `machines.*.gpus.driver`, `machines.*.gpus.capabilities`, `machines.*.gpus.options`)
 - **docker-vm, hybrid, cloud-docker**: Machine `a` asks for GPUs (`gpus`): its container runs on a VM Isoloom creates, which has no GPU (the `docker` and `kubernetes` targets give the host's) (`machines.*.gpus.count`, `machines.*.gpus.ids`, `machines.*.gpus.driver`, `machines.*.gpus.capabilities`, `machines.*.gpus.options`)
 - **proxmox**: Machine `a`: Proxmox passes the server's GPUs by name: list them in `gpus.ids` (PCI addresses such as 0000:01:00.0, or resource mappings) (`machines.*.gpus.count`)
 - **oci**: Machine `a`: GPUs on Oracle Cloud come later (its GPU shapes are fixed, not the flexible shape every machine has, and take images built for them) (`machines.*.gpus.count`, `machines.*.gpus.ids`, `machines.*.gpus.driver`)
@@ -7727,16 +7804,17 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **linode**: Machine `a`: a Linode VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids` (`machines.*.gpus.ids`)
 - **kubernetes, helm, kustomize**: Machine `a`: `gpus.options` are Docker's GPU driver options, which Kubernetes has no place for (`machines.*.gpus.options`)
 - **kubernetes, helm, kustomize, docker-vm, hybrid, cloud-docker**: Machine `a` is given host devices (`devices`): only a container on your own Docker host reaches them (the `docker` target), not one in a VM Isoloom creates or a Kubernetes pod (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
-- **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` is given host devices (`devices`): a VM has its own virtual devices, so only a container gets the host's (a GPU reaches a VM through `gpus`) (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
+- **vagrant, proxmox, esxi, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` is given host devices (`devices`): a VM has its own virtual devices, so only a container gets the host's (a GPU reaches a VM through `gpus`) (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
 - **external**: Machine `a` sets its own process (`command`, `working_dir`, `before` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it (`machines.*.command`, `machines.*.working_dir`, `machines.*.before`, `machines.*.healthcheck.test`, `machines.*.healthcheck.http.port`, `machines.*.healthcheck.http.path`, `machines.*.healthcheck.interval`, `machines.*.healthcheck.timeout`, `machines.*.healthcheck.retries`, `machines.*.healthcheck.start_period`)
 - **digitalocean**: DigitalOcean cloud-vm takes single-machine labs so far (it can't pin private addresses) (`machines.*.depends_on`, `volumes.*.owner`, `machines.*.access`)
 - **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`)
 - **external**: Machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook (`machines.*.files[].path`, `machines.*.files[].source`, `machines.*.files[].content`, `machines.*.files[].uid`, `machines.*.files[].gid`, `machines.*.files[].mode`)
 - **hybrid**: Machine `r` is a network appliance (`docker.appliance`), which runs on the Docker targets (`machines.*.docker.appliance`, `machines.*.docker.firmware`, `machines.*.docker.config`)
-- **hybrid, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`, `machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`, `machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`, `machines.*.vm.boot.firmware`, `machines.*.vm.boot.firmware_format`, `machines.*.vm.boot.order`)
+- **hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`, `machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`, `machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`, `machines.*.vm.boot.firmware`, `machines.*.vm.boot.firmware_format`, `machines.*.vm.boot.order`)
 - **proxmox**: Machine `a` sets `vm.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`)
 - **proxmox**: Machine `a` sets `vm.boot.loader`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`)
 - **proxmox**: Machine `a` sets `vm.boot.network`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`)
+- **esxi**: Machine `a` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do) (`machines.*.vm.tpm`)
 - **digitalocean**: Machine `a` asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none (`machines.*.vm.tpm`)
 - **linode**: Machine `a` asks for a virtual TPM (`vm.tpm: true`): Linode gives none (`machines.*.vm.tpm`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, cloud-docker**: Environment-level provisioning (`provision:`) runs on VM targets for now (`provision[].ansible`, `provision[].inventory`, `provision[].groups`, `provision[].vars`, `provision[].host_vars`, `controller`, `provision[].requirements`)
