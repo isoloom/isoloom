@@ -18,7 +18,10 @@
 pub mod cloud_init;
 pub mod compose;
 pub mod dockerfile;
+pub mod helm;
 pub mod inventory;
+pub mod kubernetes;
+pub mod kustomize;
 pub mod spec;
 pub mod terraform;
 pub mod vagrant;
@@ -221,6 +224,7 @@ pub fn formats() -> Vec<Format> {
     all.extend(vagrant::formats());
     all.extend(terraform::formats());
     all.extend([cloud_init::format(), inventory::format(), dockerfile::format()]);
+    all.extend([kubernetes::format(), kustomize::format(), helm::format()]);
     all
 }
 
@@ -244,8 +248,9 @@ pub fn written_problems(f: &Format, written: &std::collections::BTreeSet<String>
     problems
 }
 
-/// A feature's section in the reference table, and its name within it.
-pub fn section(key: &str) -> (&'static str, &str) {
+/// A feature's section in the reference table, and its name within it. A key naming its
+/// section before `: ` (`PodSpec: hostname`, from a schema's definitions) is in that section.
+pub fn section(key: &str) -> (&str, &str) {
     if let Some(rest) = key.strip_prefix("resource ") {
         return ("Resource types", rest);
     }
@@ -280,7 +285,7 @@ pub fn section(key: &str) -> (&'static str, &str) {
             return (title, if title == "Other settings" { key } else { rest });
         }
     }
-    ("Top level", key)
+    key.split_once(": ").unwrap_or(("Top level", key))
 }
 
 /// The whole coverage page as Markdown: the rule, the score per format, then a reference
@@ -305,7 +310,7 @@ pub fn markdown() -> String {
             s.to_do
         );
     }
-    md.push_str("\nDone includes features produced another way, or set in the image. The lists come from the\nformats themselves (every key of the Compose schema, every setting of Vagrant and each provider\nplugin, every resource type of each Terraform provider); tests fail on an unclassified entry, when\nan example's generated file (Compose, Vagrantfile, Terraform) writes a key or resource type its\ntable doesn't mark as written, or when one marked as written appears in no example's output.\nOnly what the examples generate is checked: a feature no example uses can still be misclassified.\n");
+    md.push_str("\nDone includes features produced another way, or set in the image. The lists come from the\nformats themselves (every key of the Compose schema, every setting of Vagrant and each provider\nplugin, every resource type of each Terraform provider); tests fail on an unclassified entry, when\nan example's generated file (Compose, Vagrantfile, Terraform, Kubernetes, Kustomize, Helm) writes a key or resource type its\ntable doesn't mark as written, or when one marked as written appears in no example's output.\nOnly what the examples generate is checked: a feature no example uses can still be misclassified.\n");
     for f in &formats {
         let _ = write!(md, "\n## {}\n\n{}. From {}.\n", f.name, capitalize(&f.summary()), f.source);
         let mut current = "";
