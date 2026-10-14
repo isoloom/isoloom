@@ -51,7 +51,13 @@ The spec describes both once, and the user picks a tool per layer: Terraform + A
 | Syntax | One form: `os` plus `service`(s) from the catalogue, or a generic custom `app` (own image, or a build recipe). A small per-target `overrides:` handles rare platform specifics. No `docker:`/`vm:` blocks. |
 | Catalogue | Data-driven entries: a container form (official image, or a build from the OS base image), a VM form (official Galaxy content only, else our own role), and a parity contract. |
 | Breadth | Every current target stays ("it's the deal"), placed in tiers. |
-| Tiers | **Tier 1:** proven by real runs (locally now, in CI later). **Tier 2:** generated and validated by the official validators. **Tier 3:** experimental. The tier is shown in the matrix and in the CLI. |
+| Tiers | **Tier 1:** proven by real runs from every host platform the target exists on (macOS, Windows, Linux). **Tier 2:** generated and validated by the official validators. **Tier 3:** experimental. The tier is shown in the matrix and in the CLI. |
+| Host platforms | Every running platform is supported: macOS, Windows and Linux. The CLI ships for all three, and generated output must run from all three hosts: no `sh`-only `local-exec`, no host path separators or line endings baked in, no tool assumed that a host lacks. A target that only exists on some hosts (Hyper-V on Windows, libvirt on Linux, Parallels and UTM on macOS) is proven on those. |
+| CM tools in 1.0 | Ansible, cloud-init, shell/PowerShell and Dockerfile. Puppet, Chef, Salt and PowerShell DSC follow in 1.x. |
+| IaC tools in 1.0 | The current families: Compose, Kubernetes/Helm/Kustomize, Vagrant (every provider), Terraform/OpenTofu for Proxmox, ESXi and the six clouds. Pulumi and Podman: not yet. |
+| Secrets | A conversion layer per tool: the spec names secrets and where they come from, and each output gets that tool's native mechanism. Values never land in a generated file. On clouds that means the cloud's own store: AWS Secrets Manager or SSM, Azure Key Vault, Google Secret Manager, OCI Vault. Where a cloud has none (DigitalOcean, Linode), a documented fallback is used. |
+| Terraform provider | Dropped for 1.0 (recommended; the maintainer had no preference). In a converter, Terraform users point a `module` at the generated folder or use the published registry modules. Revisit later as an Isothrum provider that runs labs. |
+| Isothrum licence | GPL-3.0, like GNS3. Isoloom stays Apache-2.0, which GPL-3.0 code may use. |
 | Compatibility | Fresh start: no aliases or deprecations carried into 1.0 (`services:`, old OS names, `qemu_refusal`...). Old specs move with a one-time `isoloom migrate`. |
 | Workflow | Local development on `main`. No PRs, no CI (all workflows disabled), no releases. The checks run locally. At the first satisfying version: squash the history, re-enable CI, tag 1.0.0. |
 | Docs | Written at the end, inside the repo. The website is rewritten from them. |
@@ -147,13 +153,20 @@ Make the codebase smaller before building on it.
 
 0. **Configuration backends** next to the infrastructure ones: Ansible, cloud-init, shell/PowerShell and Dockerfile (plus Puppet, Chef, Salt and DSC per the scope decision), with the pairing rules.
 1. **Renders forms, not blocks.** Each backend renders the resolved forms instead of reading `docker:`/`vm:`.
-2. **Secrets map to each tool's native mechanism.** No value is ever written into a generated file.
-   - Compose: `secrets:` from the environment or files.
-   - Kubernetes: Secret references with a documented creation step.
-   - Terraform: sensitive variables, and the cloud secret stores where a target has one.
-   - Vagrant: host environment plus a provisioner.
+2. **The secrets conversion layer.**
+   - **In the spec:** secrets are declared by name, source and destination, never by value.
+   - **In each output:** the tool's native mechanism.
+     - Compose: `secrets:`.
+     - Kubernetes: Secret references, or External Secrets.
+     - Vagrant: host environment plus a provisioner.
+     - Ansible: Ansible Vault references.
+     - Terraform on each cloud: the cloud's own store (AWS Secrets Manager or SSM, Azure Key Vault, Google Secret Manager, OCI Vault), read by the machine at boot through its identity.
+     - Proxmox and ESXi: a provisioner from the host environment.
+     - DigitalOcean and Linode: a documented fallback, since they have no store.
+     - Later, the Puppet, Chef and Salt equivalents.
+   - **The run manifest** lists the secret slots so a runner can fill them.
+   - **A leak test** proves no value reaches any generated file, on every target.
 
-   Each trade-off is stated.
 3. **Checks become native artefacts:** Compose healthchecks plus a test service, Helm test pods or a Kubernetes Job, Terraform `check` blocks or a script, an Ansible checks playbook for VMs, and a portable `checks/` bundle.
 4. **The run manifest.** Each target also writes a versioned manifest, the contract with Isothrum: commands and order, readiness, outputs, check runners and secret slots. It is pure conversion: deterministic and snapshot-tested. An optional thin `isoloom up/down` may read it and call the native tools, with no state of its own.
 5. **The capability matrix and tiers.**
@@ -188,9 +201,12 @@ Make the codebase smaller before building on it.
    Salvage the generate-everything pipeline from `v1/security-scanning`.
 2. **Combinations.** Property-based generation of random valid specs; every target's output must pass `verify`.
 3. **Cloud semantics without clouds.** `terraform test` with mock providers asserts the routing, gateway, firewall and per-machine port logic.
-4. **Tier 1 real runs, locally:** Docker, kind, VirtualBox and QEMU, using the native tools on the generated files.
+4. **Tier 1 real runs, using the native tools on the generated files.**
+   - Locally on macOS now: Docker, kind, VirtualBox, QEMU.
+   - Windows and Linux hosts once CI is re-enabled after the squash. CI runs a host matrix of macOS, Windows and Linux, plus KVM for libvirt and Hyper-V on Windows.
+5. **Host neutrality checks:** generated output is scanned for host-specific assumptions (shell-only `local-exec`, path separators, line endings). Tests run the CLI's generation on all three hosts in CI.
 
-**Exit:** `verify` is green on all examples and on 10,000 random specs. The Tier 1 real runs pass, and the tier list is set from evidence.
+**Exit:** `verify` is green on all examples and on 10,000 random specs. The Tier 1 real runs pass on macOS locally, and the tier list is set from evidence. The Windows and Linux host proof completes once CI is back.
 
 ### Phase 6: The overall review pass
 
@@ -210,7 +226,7 @@ Then the security review of secrets handling and of every place that writes cred
 - **VS Code extension** updated to the new syntax, `matrix` and `verify`.
 - **Packages:** Homebrew, winget, Scoop, apt and rpm, and a CLI container image.
 - **Terraform/OpenTofu registry modules** published from the generated output.
-- **To decide:** the Terraform provider. Today it wraps the runtime. Either reshape it into a data source that returns generated files, or drop it.
+- **Terraform provider:** dropped for 1.0. Keep the `isoloom/terraform-provider-isoloom` repository archived and private. Revisit as an Isothrum provider.
 - **Out of Isoloom (runtime work):** drift detection, upgrades, snapshots, persistence checks, the deployment hub, the cloud reaper, PR preview environments and the test library. They belong to the launcher or a later product, and are not part of 1.0.
 
 ### Phase 8: Docs, squash, release
@@ -222,7 +238,7 @@ Then the security review of secrets handling and of every place that writes cred
 
 ### Phase 9: The Isothrum runner
 
-1. **Create the runner engine** in `isoloom/isothrum` (a crate plus a CLI). It executes Isoloom run manifests.
+1. **Create the runner engine** in `isoloom/isothrum` (a crate plus a CLI), under GPL-3.0 like GNS3. It executes Isoloom run manifests, on macOS, Windows and Linux hosts.
 2. **Port into it:**
    - the launcher's runtime: lifecycle, locks, deploy worker, drivers, recovery, reaper, budgets, remote servers;
    - Isoloom's moved run part: secrets delivery, host readiness, registry, WinRM retries.
@@ -240,13 +256,12 @@ Then the security review of secrets handling and of every place that writes cred
 
 ## 5. Open decisions
 
-0. **Isothrum runner licence:** open source like Isoloom, or private. Its editor stays in Isothrum as the source of dynamic specs (decided).
+1. **The launcher and the GPL-3.0 runner.** A program that links a GPL-3.0 library must itself be GPL-compatible. Two ways keep the launcher's own licence free:
+   - **Process boundary:** the launcher talks to the runner through its CLI or a daemon API, never by linking it.
+   - **CLA:** you keep the right to relicense your own runner code, through a contributor licence agreement for outside contributions.
 
-1. **The CM tools for 1.0.** Recommended: Ansible, cloud-init, shell/PowerShell and Dockerfile in 1.0, and Puppet, Chef, Salt and DSC in 1.x. Or all of them in 1.0, if the 1.0 promise must cover CM fully.
-2. **The IaC tool list for 1.0.** "Every other IaC tool": confirm the current families, and whether to add Pulumi, Podman (Compose and Quadlet) or others for 1.0 or 1.x.
-3. **The Terraform provider:** reshape it into a files data source, or drop it.
-4. **Secrets on clouds:** sensitive Terraform variables (simple, but values sit in Terraform state), or the cloud secret stores (safer, more work).
-5. **Tier 1 membership** beyond Docker, kind, VirtualBox and QEMU. Proxmox and the clouds need real infrastructure, so they stay Tier 2 until then.
+   Decide before Phase 9.
+2. **Pulumi and Podman:** revisit after 1.0.
 
 ## 6. Salvage branches (local, not pushed)
 
