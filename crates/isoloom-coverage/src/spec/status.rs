@@ -47,9 +47,8 @@ pub enum Status {
 pub const PROBE: &str = "(probe)";
 
 /// A VM or existing-host output's cell for secrets: written on the machine by `isoloom run`.
-pub const SECRETS_ON_VMS: Status = Status::Partial {
-    how: "written by `isoloom run` over the machine's own SSH (kept root-only under /var/lib/isoloom/secrets, then placed at their paths with their owner and mode), before its provision steps, `before` steps and command; the set-up waits for them, and no generated file holds a value",
-    gap: "a Windows machine with secrets is refused: delivery over WinRM comes later",
+pub const SECRETS_ON_VMS: Status = Status::Done {
+    how: "written by `isoloom run` over the machine's own connection (SSH; WinRM or OpenSSH on Windows), kept where only root (SYSTEM and Administrators on Windows) reads them, then placed at their paths (Linux: their owner and mode, 0400 by default) before its provision steps, `before` steps and command, and again at every boot; the set-up waits for them, and no generated file holds a value",
     proof: PROBE,
 };
 

@@ -147,28 +147,10 @@ pub fn delivery_input(values: &[(String, SecretValue)], names: &[String]) -> Opt
     let mut out = Vec::new();
     for name in names {
         let (_, v) = values.iter().find(|(n, _)| n == name)?;
-        out.extend(base64(v.0.as_bytes()).into_bytes());
+        out.extend(isoloom_spec::shell::base64(v.0.as_bytes()).into_bytes());
         out.push(b'\n');
     }
     Some(out)
-}
-
-/// Standard base64 (RFC 4648), padded, on one line.
-fn base64(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let b = [chunk[0], chunk.get(1).copied().unwrap_or(0), chunk.get(2).copied().unwrap_or(0)];
-        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
-        for i in 0..4 {
-            if i <= chunk.len() {
-                out.push(char::from(ALPHABET[((n >> (18 - 6 * i)) & 63) as usize]));
-            } else {
-                out.push('=');
-            }
-        }
-    }
-    out
 }
 
 /// The store a source reads from, with the commands found on the `PATH`.

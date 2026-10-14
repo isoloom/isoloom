@@ -17,6 +17,7 @@ use crate::tools::{kubectl, process};
 use crate::{Res, output, spec};
 
 pub mod vms;
+pub mod windows;
 
 /// The secrets' values, by name, in the spec's order.
 pub type Values = Vec<(String, SecretValue)>;

@@ -7513,7 +7513,7 @@ is marked ✗, with its reason below.
 | `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
-| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
+| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.networks` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
 | `machines.*.services[].port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `cloud.provider` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
@@ -7533,7 +7533,7 @@ is marked ✗, with its reason below.
 | `machines.*.services[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.services[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
-| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
+| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.environment` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
@@ -7661,19 +7661,19 @@ is marked ✗, with its reason below.
 | kubernetes | 70% of 104 | 67 | 12 | 1 | 24 |
 | helm | 70% of 104 | 67 | 12 | 1 | 24 |
 | kustomize | 70% of 104 | 67 | 12 | 1 | 24 |
-| vagrant | 80% of 117 | 86 | 17 | 0 | 14 |
+| vagrant | 81% of 117 | 88 | 15 | 0 | 14 |
 | docker-vm | 78% of 112 | 86 | 3 | 0 | 23 |
-| hybrid | 65% of 137 | 86 | 7 | 7 | 37 |
-| proxmox | 81% of 112 | 89 | 4 | 3 | 16 |
-| aws | 60% of 117 | 62 | 17 | 6 | 32 |
-| azure | 59% of 117 | 62 | 16 | 7 | 32 |
-| gcp | 60% of 117 | 62 | 17 | 6 | 32 |
-| digitalocean | 48% of 117 | 51 | 11 | 6 | 49 |
-| linode | 50% of 117 | 53 | 12 | 6 | 46 |
-| oci | 50% of 117 | 53 | 12 | 6 | 46 |
+| hybrid | 66% of 137 | 88 | 5 | 7 | 37 |
+| proxmox | 82% of 112 | 91 | 2 | 3 | 16 |
+| aws | 61% of 117 | 64 | 15 | 6 | 32 |
+| azure | 60% of 117 | 64 | 14 | 7 | 32 |
+| gcp | 61% of 117 | 64 | 15 | 6 | 32 |
+| digitalocean | 49% of 117 | 53 | 9 | 6 | 49 |
+| linode | 51% of 117 | 55 | 10 | 6 | 46 |
+| oci | 51% of 117 | 55 | 10 | 6 | 46 |
 | cloud-docker | 77% of 112 | 85 | 3 | 0 | 24 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 49% of 76 | 32 | 11 | 14 | 19 |
+| external | 50% of 76 | 34 | 9 | 14 | 19 |
 
 ### Refusals
 

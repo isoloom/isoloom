@@ -98,6 +98,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             crate::UNTAR_PS1
         )),
         Step::Files { files } => Some(crate::machine_files::windows(files)),
+        Step::Secrets => env.machines.get(machine).map(|mp| crate::secrets::windows::step(machine, &mp.secrets)),
         Step::Run {
             path,
             kind: RunKind::PowerShell,

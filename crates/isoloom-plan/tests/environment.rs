@@ -169,7 +169,7 @@ fn a_machine_process_is_required_and_planned_as_steps() {
 }
 
 #[test]
-fn secrets_come_before_what_reads_them_and_windows_is_refused() {
+fn secrets_come_before_what_reads_them_on_linux_and_windows() {
     let spec = isoloom_spec::parse(
         "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nsecrets:\n  db: { env: DB }\nmachines:\n  web:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [web.sh] }\n    files: [{ path: /etc/a, content: x }]\n    secrets: [db]\n    command: [serve]\n  win:\n    networks: { lan: 11 }\n    vm: { os: windows-server-2022 }\n    secrets: [db]\n",
     )
@@ -181,7 +181,7 @@ fn secrets_come_before_what_reads_them_and_windows_is_refused() {
     assert!(at(|s| matches!(s, Step::Files { .. })) < secrets, "{steps:?}");
     assert!(secrets < at(|s| matches!(s, Step::Run { .. })), "{steps:?}");
     assert!(secrets < at(|s| *s == Step::Command), "{steps:?}");
-    assert!(env.requirements.contains(&Requirement::WindowsSecrets { machine: "win".into() }));
-    let why = refusal(&env.requirements, &Capabilities::of([Feature::Secrets, Feature::MachineProcess])).expect("refused");
-    assert!(why.to_string().contains("doesn't reach a Windows guest over WinRM"), "{why}");
+    // A Windows machine gets its secrets like any VM: nothing beyond `Secrets` is asked.
+    assert!(env.machines["win"].lifecycle.contains(&Step::Secrets));
+    assert!(refusal(&env.requirements, &Capabilities::of([Feature::Secrets, Feature::MachineProcess])).is_none());
 }

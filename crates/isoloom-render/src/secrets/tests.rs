@@ -86,7 +86,7 @@ fn no_value_is_in_a_script() {
     assert!(sh.contains("install -D -o 1000 -g 0 -m 0400 /var/lib/isoloom/secrets/db '/etc/app/db'"), "{sh}");
     assert_eq!(
         place(&[file("x", "/run/secrets/x", None, None)]),
-        "install -D -o 0 -g 0 -m 0444 /var/lib/isoloom/secrets/x '/run/secrets/x'\n"
+        "install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/x '/run/secrets/x'\n"
     );
 }
 
@@ -95,7 +95,7 @@ fn the_step_waits_then_places_at_every_boot() {
     let sh = step("web", &[file("db", "/run/secrets/db", None, None)]);
     assert!(sh.starts_with("set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
     assert!(sh.contains("systemctl enable isoloom-apply-secrets.service"), "{sh}");
-    assert!(sh.contains("install -D -o 0 -g 0 -m 0444"), "{sh}");
+    assert!(sh.contains("install -D -o 0 -g 0 -m 0400"), "{sh}");
     let check = std::process::Command::new("sh").arg("-n").arg("-c").arg(&sh).status().unwrap();
     assert!(check.success());
 }

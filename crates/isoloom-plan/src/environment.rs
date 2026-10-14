@@ -317,7 +317,6 @@ impl Environment {
         requirements.extend(requirements::mixed_shapes(spec, |n| machines.get(n).map(|m| m.shape)));
         requirements.extend(crate::machine_files::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
         requirements.extend(requirements::tpm(&machines));
-        requirements.extend(requirements::windows_secrets(&machines));
         requirements.extend(crate::boot::requirements(&machines));
         requirements.extend(hardware::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
         Environment {

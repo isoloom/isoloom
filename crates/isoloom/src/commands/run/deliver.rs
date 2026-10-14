@@ -37,6 +37,7 @@ pub fn before_external(p: &Prepared, ask: &Ask, values: &Values) -> Res<()> {
     if recipients.is_empty() {
         return Ok(());
     }
+    reachable(&recipients)?;
     let at = Scope::step(Some(p.target.id()), "secrets");
     output::announce(&at, None, "Delivering the secrets");
     let missed = vms::deliver(p, &place, values, recipients, &vms::for_at_most(AFTER));
@@ -57,6 +58,7 @@ pub fn run_tool(p: &Prepared, ask: &Ask, values: &Values, cmd: &mut Command, at:
     if recipients.is_empty() {
         return process::run_step(cmd, at);
     }
+    reachable(&recipients)?;
     vms::forget_announcements(p, &place);
     let (status, missed) = if p.target == Target::Proxmox {
         (process::run_step(cmd, at)?, recipients.into_iter().map(not_tried).collect())
@@ -107,6 +109,11 @@ fn alongside(d: &Delivery, recipients: Vec<Recipient>, cmd: &mut Command, at: &S
     });
     let missed = missed.map_err(|_| Failure::new(ErrorCode::Io, "delivering the secrets stopped unexpectedly"))?;
     Ok((status?, missed))
+}
+
+/// An error before the tool starts when a recipient can't be reached from this host.
+fn reachable(recipients: &[Recipient]) -> Res<()> {
+    vms::reachable(recipients).map_err(|why| Failure::new(ErrorCode::ToolMissing, why).into())
 }
 
 /// An error naming every recipient left without its secrets.

@@ -54,8 +54,12 @@ checks:                          # plus the checks Isoloom derives from services
 - **Secrets stay secret.** `secrets:` names where each value lives (the runner's environment, a
   file, Vault, SOPS); a machine lists the ones it gets, as files. `isoloom run` reads them and
   hands them to the target's own mechanism (Compose secrets, a Kubernetes Secret) or, on a VM
-  or a Docker host, writes them over the machine's own SSH while its set-up waits for them: no
-  value is ever in `.isoloom/`, the snapshot, cloud-init, Terraform's state or a log.
+  or a Docker host, writes them over the machine's own connection (SSH; WinRM or OpenSSH on
+  Windows) while its set-up waits for them: no value is ever in `.isoloom/`, the snapshot,
+  cloud-init, Terraform's state or a log. A file is `0444` in a container (as Compose and
+  Kubernetes do), `0400` on a Linux VM, whose other users shouldn't read it, and readable by
+  SYSTEM and Administrators only on Windows. Delivering over WinRM needs `python3` with
+  `pywinrm` on the runner.
 
 ```yaml
 secrets:

@@ -93,18 +93,19 @@ impl Provisioner {
     }
 }
 
-/// A `local-exec` writing `<user>@<address>` to `<module>/.isoloom-reach/<name>`: an address,
-/// never a secret.
+/// A `local-exec` writing `<user>@<address>` to `<module>/.isoloom-reach/<name>`, followed on
+/// Windows by how WinRM authenticates (`winrm`, or `winrm-ntlm`): an address, never a secret
+/// (the password stays in Terraform's state, where `isoloom run` reads it).
 fn announce(name: &str, c: &Connection) -> Block {
-    let (host, user) = match c {
-        Connection::Ssh { host, user } => (host.clone(), user.as_str()),
-        Connection::WinRm { host, .. } => (host.clone(), "isoloom"),
+    let (host, user, suffix) = match c {
+        Connection::Ssh { host, user } => (host.clone(), user.as_str(), ""),
+        Connection::WinRm { host, ntlm, .. } => (host.clone(), "isoloom", if *ntlm { " winrm-ntlm" } else { " winrm" }),
     };
     let mut command = Template::text("mkdir -p \"");
     command.push_expr(reference("path.module"));
     command.push_text(format!("/{REACH_DIR}\" && echo \"{user}@"));
     command.push_expr(host);
-    command.push_text("\" > \"");
+    command.push_text(format!("{suffix}\" > \""));
     command.push_expr(reference("path.module"));
     command.push_text(format!("/{REACH_DIR}/{name}\""));
     provisioner("local-exec").add_attribute(("command", command.into_expression())).build()

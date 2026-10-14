@@ -30,7 +30,7 @@ pub use machine::{Arch, Machine, Protocol, Resources, ScalarSchema, Service};
 pub use machine_file::{DEFAULT_FILE_MODE, MachineFile};
 pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
 pub use process::{CommandLine, Healthcheck, HttpCheck, seconds};
-pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, secret_variable};
+pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, is_drive_path, secret_variable};
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, TOOL_RECIPES, Tool, ULIMITS, Ulimit};
 pub use target::{Shape, Target};
 

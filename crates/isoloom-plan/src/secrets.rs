@@ -15,13 +15,22 @@ pub struct SecretFile {
     pub uid: Option<u32>,
     /// Its group id, when the spec sets one (root otherwise).
     pub gid: Option<u32>,
-    /// Its mode, when the spec sets one ([`DEFAULT_MODE`] otherwise).
+    /// Its mode, when the spec sets one ([`DEFAULT_MODE`] in a container, [`VM_DEFAULT_MODE`] on
+    /// a Linux VM otherwise).
     pub mode: Option<u32>,
 }
 
-/// The mode a secret file has when the spec sets none: readable by every user of the machine,
-/// as Compose and Kubernetes both default to.
+/// The mode a container's secret file has when the spec sets none: readable by every user of
+/// the container, as Compose and Kubernetes both default to. A container usually runs one
+/// process as one user, so this is what its image expects.
 pub const DEFAULT_MODE: u32 = 0o444;
+
+/// The mode a Linux VM's secret file has when the spec sets none: readable by its owner only
+/// (root, or the spec's `uid`). A VM has other users (its login account, its services), and a
+/// secret readable by all of them would be one any of them could leak; the process that needs
+/// it runs as root or as the `uid` the spec gives the file. A Windows VM's file has no mode: it
+/// is readable by SYSTEM and Administrators only.
+pub const VM_DEFAULT_MODE: u32 = 0o400;
 
 impl SecretFile {
     /// The file a machine's `secrets` entry places.
