@@ -168,3 +168,45 @@ pub fn probe(field: &str) -> Option<&'static str> {
         _ => return None,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        CLOUD_BOOT, CLOUD_IMAGES, CONTAINER_BOOT, CONTAINER_IMAGES, EXTERNAL_BOOT, EXTERNAL_IMAGES, IMAGE_BOOTS_ITSELF, NOT_A_VM, OTHER_TARGETS, PROXMOX_BOOT,
+        PROXMOX_IMAGES, VAGRANT_BOOT, VAGRANT_IMAGES, boot, cloud, images,
+    };
+    use crate::spec::status::PROBE;
+    use crate::spec::status::{EXISTING_HOST, Status};
+
+    /// Each table's statuses, read back in the helper's order.
+    fn statuses(rows: &[(&str, Status)]) -> Vec<Status> {
+        rows.iter().map(|(_, s)| *s).collect()
+    }
+
+    /// The tables are built at compile time; building them again at run time proves the helpers
+    /// give the same rows in the same order (and lets line coverage see them run).
+    #[test]
+    fn every_image_table_is_the_helper_s_rows() {
+        for table in [CONTAINER_IMAGES, EXTERNAL_IMAGES, VAGRANT_IMAGES, PROXMOX_IMAGES, CLOUD_IMAGES] {
+            let s = statuses(table);
+            let clouds = [s[3], s[4], s[5], s[6], s[7], s[8]];
+            assert_eq!(images(s[0], s[2], &clouds).as_slice(), table);
+        }
+        assert_eq!(images(NOT_A_VM, NOT_A_VM, &[NOT_A_VM; 6]).as_slice(), CONTAINER_IMAGES);
+        assert_eq!(images(EXISTING_HOST, EXISTING_HOST, &[EXISTING_HOST; 6]).as_slice(), EXTERNAL_IMAGES);
+        assert_eq!(VAGRANT_IMAGES[2].1, OTHER_TARGETS);
+        assert_eq!(cloud("an AMI"), Status::Done { how: "an AMI", proof: PROBE });
+    }
+
+    #[test]
+    fn every_boot_table_is_the_helper_s_rows() {
+        for table in [CONTAINER_BOOT, EXTERNAL_BOOT, VAGRANT_BOOT, PROXMOX_BOOT, CLOUD_BOOT] {
+            let s = statuses(table);
+            assert_eq!(boot(s[0], s[9], s[10], s[11]).as_slice(), table);
+        }
+        assert_eq!(
+            boot(IMAGE_BOOTS_ITSELF, IMAGE_BOOTS_ITSELF, IMAGE_BOOTS_ITSELF, IMAGE_BOOTS_ITSELF).as_slice(),
+            CLOUD_BOOT
+        );
+    }
+}
