@@ -13,8 +13,8 @@ use crate::kustomize::{SCRIPTS, key};
 use crate::machine::{Machine, udp};
 use crate::network::MACHINE_LABEL;
 use crate::objects::{
-    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, DnsConfig, EmptyDir, EnvVar, Exec, Image, Labels, Limits, NameValue, PodAffinity,
-    PodSecurity, PodSpec, Probe, Resources, SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
+    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, Image, Labels, Limits, NameValue, PodAffinity, PodSecurity,
+    PodSpec, Probe, Resources, SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
 };
 
 // Isoloom's static busybox (the probe needs nothing from the machine's image) and its utility
@@ -49,9 +49,10 @@ pub(crate) fn spec(m: &Machine) -> PodSpec {
             value: v.clone(),
         })
         .collect();
-    let dns = m.spec.dns.as_ref().filter(|d| !d.servers.is_empty() || !d.search.is_empty());
+    let (dns_policy, dns_config) = crate::dns::config(m.spec.dns.as_ref());
     PodSpec {
         hostname: Some(m.name.to_string()),
+        subdomain: crate::dns::subdomain(m.spec.dns.as_ref()),
         affinity: beside_owners(m),
         // Namespaced sysctls are the pod's (the kubelet allows the safe ones; others need its
         // --allowed-unsafe-sysctls).
@@ -60,12 +61,10 @@ pub(crate) fn spec(m: &Machine) -> PodSpec {
         containers,
         // Scheduled on a node of the machine's architecture.
         node_selector: Labels::from([("kubernetes.io/arch".to_string(), m.plan.arch.id().to_string())]),
-        // A resolver of its own (the lab's domain controller): servers and search domains.
-        dns_policy: dns.map(|_| "None"),
-        dns_config: dns.map(|d| DnsConfig {
-            nameservers: d.servers.clone(),
-            searches: d.search.clone(),
-        }),
+        // A resolver of its own (the lab's domain controller), or the cluster's with the
+        // machine's search domains and options.
+        dns_policy,
+        dns_config,
         volumes: volumes(m),
         ..PodSpec::default()
     }

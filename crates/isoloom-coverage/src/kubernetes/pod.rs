@@ -37,13 +37,16 @@ pub(super) fn classify(definition: &str, field: &str) -> Option<Support> {
         "ContainerPort" | "Probe" | "ExecAction" | "ResourceRequirements" => container_parts(definition, field),
         "EnvVar" | "EnvVarSource" | "SecretKeySelector" => environment(definition, field),
         "SecurityContext" => security(field),
-        "PodSecurityContext" | "Sysctl" | "PodDNSConfig" => pod_settings(definition, field),
+        "PodSecurityContext" | "Sysctl" | "PodDNSConfig" | "PodDNSConfigOption" => pod_settings(definition, field),
         "Affinity" | "PodAffinity" | "PodAffinityTerm" => affinity(definition, field),
         _ => None,
     }
 }
 
 fn pod_spec(field: &str) -> Option<Support> {
+    if let Some(s) = pod_names(field) {
+        return Some(s);
+    }
     Some(match field {
         "containers" => Emitted {
             from: "machines (the machine's container, and one for its `init:` jobs)",
@@ -63,12 +66,6 @@ fn pod_spec(field: &str) -> Option<Support> {
         "securityContext" => Emitted { from: "machines.*.sysctls" },
         "volumes" => Emitted {
             from: "volumes, machines.*.tmpfs and machines.*.shm_size",
-        },
-        "hostAliases" => Planned {
-            note: "the spec's `aliases`: Kubernetes gives no fixed pod address to point them at",
-        },
-        "subdomain" | "setHostnameAsFQDN" => Planned {
-            note: "the machine's `dns.domain` as its fully qualified name",
         },
         "os" => WINDOWS,
         "resourceClaims" => DEVICES,
@@ -100,6 +97,23 @@ fn pod_spec(field: &str) -> Option<Support> {
         | "terminationGracePeriodSeconds"
         | "tolerations"
         | "topologySpreadConstraints" => SCHEDULING,
+        _ => return None,
+    })
+}
+
+/// How the pod is named: its full name, the other names it answers to.
+fn pod_names(field: &str) -> Option<Support> {
+    Some(match field {
+        "hostAliases" => NotPortable {
+            why: "it points names at fixed addresses, and a pod has none: the spec's `aliases` name a machine, which Kubernetes reaches only by its Service's name (no dots), so Kubernetes refuses `aliases`",
+        },
+        "subdomain" => Partial {
+            from: "machines.*.dns.domain, as one label (`corp.local` is `corp-local`)",
+            gap: "the pod's full name is `<machine>.<subdomain>.<namespace>.svc.<cluster domain>`: Kubernetes names pods under the cluster's domain, not `dns.domain`",
+        },
+        "setHostnameAsFQDN" => Equivalent {
+            via: "`subdomain`: the pod's full name is in its hosts file (`hostname -f`), and its hostname stays the short name, as on every other target",
+        },
         _ => return None,
     })
 }
@@ -237,8 +251,11 @@ fn pod_settings(definition: &str, field: &str) -> Option<Support> {
             from: "machines.*.dns.servers",
         },
         ("PodDNSConfig", "searches") => Emitted { from: "machines.*.dns.search" },
-        ("PodDNSConfig", "options") => Planned {
-            note: "resolver options (`ndots`, `timeout`), which every machine's resolver has",
+        ("PodDNSConfigOption", "name" | "value") => Emitted {
+            from: "machines.*.dns.options (`name` or `name:value`)",
+        },
+        ("PodDNSConfig", "options") => Emitted {
+            from: "machines.*.dns.options (with the cluster's resolver unless the machine has servers of its own)",
         },
         _ => return None,
     })

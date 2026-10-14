@@ -134,6 +134,12 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.dns.options",
+        NotApplicable {
+            why: "a VM sets its resolver options in its own provisioning",
+        },
+    ),
+    (
         "machines.*.resources.cpus",
         Done {
             how: "the VM's CPUs on every provider",
@@ -186,6 +192,7 @@ pub const CELLS: &[(&str, Status)] = &[
     ("machines.*.docker.image", NOT_A_CONTAINER),
     ("machines.*.docker.build", NOT_A_CONTAINER),
     ("machines.*.docker.dockerfile", NOT_A_CONTAINER),
+    ("machines.*.docker.target", NOT_A_CONTAINER),
     ("machines.*.docker.args", NOT_A_CONTAINER),
     ("machines.*.docker.init", NOT_A_CONTAINER),
     ("machines.*.docker.appliance", NOT_A_CONTAINER),

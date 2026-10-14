@@ -20,7 +20,7 @@
 //! - Addresses: Kubernetes picks pod addresses; names, ports and reachability are kept.
 //! - Images: as the plan resolves them (through the registry mirrors), Isoloom's own included.
 //! - The Helm chart in `.isoloom/kubernetes/chart/` ([`chart`]): the machines' images and the
-//!   inputs as values, the checks as `helm test` Pods, the project's scripts under
+//!   inputs as values (typed by `values.schema.json`, so a mistyped one is rejected), the checks as `helm test` Pods, the project's scripts under
 //!   `files/project/` (copied there by the command line, see [`project_copies`]).
 //!
 //! What Kubernetes can't do is refused from the plan's requirements: environment-level
@@ -42,6 +42,7 @@
 
 pub mod chart;
 mod checks;
+mod dns;
 mod ipv6;
 pub mod kustomize;
 mod machine;
@@ -49,6 +50,7 @@ mod network;
 pub mod objects;
 pub mod pod;
 mod render;
+mod values_schema;
 
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::backend::{Backend, Files, RenderError};

@@ -166,7 +166,7 @@ machines:
     read_only: true
     tmpfs: [/tmp, /run]
     shm_size: 256m
-    dns: { servers: [10.0.0.1], search: [lab.local], domain: lab.local }
+    dns: { servers: [10.0.0.1], search: [lab.local], domain: lab.local, options: ["ndots:2"] }
     environment: { MODE: x }
     sysctls: { net.core.somaxconn: 1024 }
     ulimits: { nofile: 1024 }
@@ -181,7 +181,7 @@ machines:
   h:
     count: 2
     networks: { out: 10 }
-    docker: { build: h, dockerfile: h.Dockerfile, args: { A: b } }
+    docker: { build: h, dockerfile: h.Dockerfile, target: lab, args: { A: b } }
 provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, host_vars: { fw: { a: b } }, requirements: req.yml }]
 controller: { image: { vagrant: x/y }, resources: { cpus: 1, memory_mb: 512 } }
 common: { resources: { cpus: 1 } }

@@ -65,6 +65,7 @@ impl Table {
                     image: Some(image.clone()),
                     build: None,
                     dockerfile: None,
+                    target: None,
                     args: IndexMap::new(),
                     init: Vec::new(),
                     idle: false,

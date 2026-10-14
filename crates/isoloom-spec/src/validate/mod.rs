@@ -12,6 +12,7 @@ mod cidr;
 mod cidr6;
 mod cloud;
 mod constraints;
+mod dns;
 mod files;
 mod groups;
 mod ipv6;
@@ -104,6 +105,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     networks::management(spec, &mut p);
     volumes::shared(spec, &mut p);
     machines::each(spec, &blocks, &mut p);
+    dns::options(spec, &mut p);
     machines::cycle(spec, &mut p);
     provision::controller(spec, &mut p);
     provision::steps(spec, &mut p);

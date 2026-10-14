@@ -549,6 +549,7 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "existing-hosts · cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["vhv.enable"] = "TRUE"
     end
     m.vm.provider "parallels" do |v|
       v.name = "existing-hosts · cache"

@@ -51,6 +51,7 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
     }
     if let Some(dns) = &m.dns {
         svc.dns.clone_from(&dns.servers);
+        svc.dns_opt.clone_from(&dns.options);
         svc.dns_search.clone_from(&dns.search);
         svc.domainname.clone_from(&dns.domain);
     }
@@ -107,6 +108,7 @@ fn build_of(env: &Environment, b: &isoloom_plan::environment::Build) -> Build {
     Build {
         context: format!("{ROOT}/{}", b.context),
         dockerfile: b.dockerfile.as_ref().map(|f| relative_to(&b.context, f)),
+        target: b.target.clone(),
         args: constraints
             .into_iter()
             .filter(|(k, _)| !b.args.contains_key(k))

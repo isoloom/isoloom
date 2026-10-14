@@ -3,24 +3,20 @@
 use super::{DISK, HOST_TUNING, LINKED_CLONE, MAC, MORE_DISKS, TOOLING, USER_SETUP, WINDOWS};
 use crate::{
     Support,
-    Support::{Emitted, Planned, Tooling},
+    Support::{Emitted, Equivalent, Tooling},
 };
 
 pub(super) fn classify(s: &str) -> Option<Support> {
-    const ESXI: Support = Planned {
-        note: "with the ESXi provider block (not verified on an ESXi host yet)",
-    };
+    if let Some(via) = legacy(s) {
+        return Some(Equivalent { via });
+    }
     Some(match s {
         "guest_numvcpus" | "guest_memsize" => Emitted { from: "machines.*.resources" },
         "guest_name" => Emitted {
             from: "the environment and machine names",
         },
-        "numvcpus" | "memsize" | "vmname" | "guest_name_prefix" | "vmname_prefix" => ESXI,
         "esxi_virtual_network" => Emitted {
             from: "networks: a port group per network, from ESXI_VIRTUAL_NETWORK",
-        },
-        "virtual_network" => Planned {
-            note: "the plugin's older name for esxi_virtual_network",
         },
         "esxi_hostname" | "esxi_hostport" | "esxi_username" | "esxi_password" | "esxi_disk_store" => Emitted {
             from: "the ESXI_* environment variables (the host is the user's)",
@@ -55,6 +51,20 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         | "guest_username"
         | "ssh_username"
         | "saved_ipaddress" => TOOLING,
+        _ => return None,
+    })
+}
+
+/// The plugin's older names, which it copies into the newer ones Isoloom writes (with a warning
+/// to migrate), and the name prefix, which only names a VM Vagrant gives no name: Isoloom names
+/// every one.
+fn legacy(s: &str) -> Option<&'static str> {
+    Some(match s {
+        "numvcpus" => "guest_numvcpus (the plugin's newer name for it)",
+        "memsize" => "guest_memsize (the plugin's newer name for it)",
+        "vmname" => "guest_name (the plugin's newer name for it)",
+        "virtual_network" => "esxi_virtual_network (the plugin's newer name for it)",
+        "guest_name_prefix" | "vmname_prefix" => "guest_name: every VM is named (`<env>-<machine>`), so the plugin never makes up a name with a prefix",
         _ => return None,
     })
 }

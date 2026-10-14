@@ -38,6 +38,7 @@ struct Machine {
     image: Option<String>,
     build: Option<String>,
     dockerfile: Option<String>,
+    target: Option<String>,
     args: Vec<(String, String)>,
 }
 

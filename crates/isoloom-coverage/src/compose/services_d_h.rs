@@ -1,7 +1,7 @@
 //! Service keys from `deploy` to `hostname`, `deploy` and `healthcheck` included.
 
 use super::{CLOUD_SIZES, DEVICES, GPUS, IMAGE, LEGACY, NO_CONTAINER_ON_VMS, STAY_UP, SWARM, TOOLING};
-use crate::Support::{self, Emitted, Equivalent, Partial, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, Partial, Tooling};
 
 /// Service keys from `deploy` to `hostname`.
 pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
@@ -105,8 +105,8 @@ pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
     ),
     (
         "services.*.dns_opt",
-        Planned {
-            note: "resolver options, beside machines.*.dns",
+        Emitted {
+            from: "machines.*.dns.options (and the Kubernetes dnsConfig)",
         },
     ),
     (

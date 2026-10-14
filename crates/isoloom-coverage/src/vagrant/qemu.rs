@@ -3,7 +3,7 @@
 use super::{HOST_TUNING, IMAGE_BOOTS, RESOURCES, TOOLING, USER_SETUP};
 use crate::{
     Support,
-    Support::{Emitted, Partial, Planned},
+    Support::{Emitted, Equivalent, Planned, Tooling},
 };
 
 pub(super) fn classify(s: &str) -> Option<Support> {
@@ -15,15 +15,23 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         "arch" => Emitted {
             from: "machines.*.arch (emulated when the host's CPU is another)",
         },
-        "disk_resize" => Planned {
-            note: "machines.*.resources.disk_gb, once the box's own size is known: the plugin makes the disk an overlay of that size, and one below the box's truncates it",
+        "disk_resize" => Emitted {
+            from: "machines.*.resources.disk_gb, above the box's own size only (read from the box with qemu-img): the disk is an overlay of the box's, and a smaller one would cut it",
         },
-        "advanced_network" | "net_mode" | "socket_opts" => Partial {
-            from: "machines.*.networks",
-            gap: "without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit)",
+        "advanced_network" | "net_mode" | "socket_opts" => Emitted {
+            from: "machines.*.networks: two VMs as a listen/connect pair, any other number through a hub (a QEMU process with no machine), no root; a VM is on one network (`refusal_on` with `qemu` refuses one on more)",
         },
-        "socket_vmnet_client" | "socket_vmnet_socket" | "vmnet_interface" | "tap_device" | "mcast_addr" | "extra_netdev_args" => Planned {
-            note: "more than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac)",
+        "mcast_addr" => Equivalent {
+            via: "socket_opts to the network's hub: any number of VMs without root, on a Mac too, where multicast doesn't send",
+        },
+        "tap_device" | "socket_vmnet_client" | "socket_vmnet_socket" => Equivalent {
+            via: "socket_opts to the network's hub: the same network between the VMs, without root (a TAP device and the socket_vmnet daemon need it)",
+        },
+        "vmnet_interface" => Planned {
+            note: "with `public_network` (a network bridged to the outside); vmnet-bridged needs root on the Mac",
+        },
+        "extra_netdev_args" => Tooling {
+            note: "options of the NAT adapter Vagrant reaches the VM through (user-mode networking), not of the lab's networks",
         },
         "ssh_auto_correct" => Emitted {
             from: "(always: each VM forwards SSH from its own host port)",

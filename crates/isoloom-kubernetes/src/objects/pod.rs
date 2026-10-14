@@ -24,6 +24,10 @@ pub struct PodSpec {
     /// The machine's name, as its own hostname.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hostname: Option<String>,
+    /// Its domain's label: the pod's full name is `<hostname>.<subdomain>.<namespace>.svc.<cluster
+    /// domain>` (in its hosts file, so `hostname -f` answers it).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subdomain: Option<String>,
     /// Where it may run (beside the owners of the volumes it shares).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub affinity: Option<Affinity>,
@@ -100,4 +104,25 @@ pub struct DnsConfig {
     /// Its search domains.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub searches: Vec<String>,
+    /// Its resolver options (`ndots`, `timeout`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<DnsOption>,
+}
+
+/// A resolver option: `name`, and `value` when it takes one.
+#[derive(Debug, Clone, Serialize)]
+pub struct DnsOption {
+    /// The option (`ndots`).
+    pub name: String,
+    /// Its value (`2`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+}
+
+impl DnsOption {
+    /// An option as resolv.conf writes it: `name` or `name:value`.
+    pub fn parse(option: &str) -> DnsOption {
+        let (name, value) = option.split_once(':').map_or((option, None), |(n, v)| (n, Some(v.to_string())));
+        DnsOption { name: name.to_string(), value }
+    }
 }

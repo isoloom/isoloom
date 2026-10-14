@@ -15,6 +15,8 @@ use crate::vm::{os, res};
 pub fn blocks(env: &Environment, name: &str, m: &mut Module) {
     let mp = &env.machines[name];
     let mut config = CloudConfig::new(name, reference("local.users"));
+    let domain = env.spec().machines.get(name).and_then(|m| m.dns.as_ref()?.domain.as_deref());
+    config.fqdn = domain.map(|d| format!("{name}.{d}"));
     config.packages = ["nftables", "curl", "netcat-openbsd"].map(String::from).to_vec();
     if needs_project(env, name) {
         config.file_lists.push(reference("local.project_files"));

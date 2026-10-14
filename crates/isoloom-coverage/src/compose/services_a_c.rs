@@ -1,7 +1,7 @@
 //! Service keys from `annotations` to `cpuset`, `build` included.
 
 use super::{BUILD, CLOUD_SIZES, FILES, NO_CONTAINER_ON_VMS, TOOLING, WINDOWS_CONTAINERS};
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Tooling};
 
 /// Service keys from `annotations` to `cpuset`.
 pub(super) const SERVICES_A_C: &[(&str, Support)] = &[
@@ -73,8 +73,8 @@ pub(super) const SERVICES_A_C: &[(&str, Support)] = &[
     ("services.*.build.pull", BUILD),
     (
         "services.*.build.target",
-        Planned {
-            note: "a build stage, beside machines.*.docker.dockerfile",
+        Emitted {
+            from: "machines.*.docker.target (a stage of the Dockerfile)",
         },
     ),
     ("services.*.build.shm_size", BUILD),

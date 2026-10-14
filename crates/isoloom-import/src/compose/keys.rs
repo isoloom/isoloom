@@ -85,6 +85,7 @@ impl Import<'_> {
             if let Some(f) = dockerfile(&context, b) {
                 m.dockerfile = Some(f);
             }
+            m.target = b.get("target").and_then(str_of);
             self.build_args(svc, b, m);
         }
         m.build = Some(context);
@@ -236,8 +237,8 @@ fn build_context(v: &Value) -> (String, Vec<String>) {
             b.get("context").and_then(str_of).unwrap_or_else(|| ".".into()),
             b.iter()
                 .filter_map(|(k, v)| Some((k.as_str()?, v)))
-                // The context, the Dockerfile and fixed build args carry over.
-                .filter(|(k, _)| !matches!(*k, "context" | "dockerfile" | "args"))
+                // The context, the Dockerfile, its stage and fixed build args carry over.
+                .filter(|(k, _)| !matches!(*k, "context" | "dockerfile" | "target" | "args"))
                 .map(|(k, _)| k.to_string())
                 .collect::<Vec<_>>(),
         ),

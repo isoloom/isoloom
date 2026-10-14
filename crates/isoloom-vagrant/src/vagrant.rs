@@ -15,8 +15,12 @@
 //!   that list them.
 //! - On QEMU (vagrant-qemu), a machine boots its libvirt-format box with its own CPU, emulated
 //!   when the host's is another (x86 Windows on an Apple Silicon Mac: slow, so longer timeouts).
-//!   Without root, QEMU links exactly two VMs per network (a socket listen/connect pair), each
-//!   on one network; [`qemu_refusal`] says when a spec doesn't fit.
+//!   Without root, two VMs on a network link as a socket listen/connect pair, and any other
+//!   number through a hub (a QEMU process with no machine), each VM on one network;
+//!   [`qemu_refusal`] says when a spec doesn't fit. A disk size grows the box's disk, never
+//!   below the box's own.
+//! - On UTM (vagrant_utm), a VM gets no private network; [`utm_refusal`] refuses a spec whose
+//!   VMs are on one.
 //! - On Hyper-V, Vagrant puts a VM's adapters on one switch and sets no address: each network
 //!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
 //!   guest ([`hyperv`]); [`hyperv_refusal`] says when a machine has no Hyper-V box.
@@ -144,6 +148,7 @@ pub fn render_in(env: &Environment, layout: &Layout) -> Result<Files, RenderErro
     };
     let mut r = Ruby::new();
     preamble(&mut r, env, layout.dir);
+    qemu_preamble(&mut r, env, &links);
     let mut runners = Vec::new();
     r.block("Vagrant.configure(\"2\")", "config", |r| {
         settings(r, env);
@@ -185,6 +190,27 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.blank();
     vagrantfile::inputs(r, &env.spec().inputs);
     esxi(r, env);
+    r.blank();
+}
+
+/// QEMU's helpers ([`qemu::QEMU_RB`]) and its networks' hubs, when a VM needs them.
+fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu::Link>) {
+    let machines = env.machines.values().any(|m| m.shape == MachineShape::Vm && m.size.disk_gb.is_some());
+    let controller = links.contains_key(CONTROLLER) && isoloom_render::controller_size(env.spec()).2.is_some();
+    let sized = machines || controller;
+    if !qemu::needs_ruby(links, sized) {
+        return;
+    }
+    r.text(qemu::QEMU_RB);
+    let hubs = qemu::hubs(links);
+    if !hubs.is_empty() {
+        r.comment("QEMU: each network's hub ports, one a VM, in the order they start.");
+        r.hash(
+            "QEMU_HUBS",
+            hubs.iter()
+                .map(|(net, ports)| (Value::str(net), Value::array(ports.iter().map(|p| Value::from(*p))))),
+        );
+    }
     r.blank();
 }
 
@@ -230,6 +256,21 @@ pub fn qemu_refusal(spec: &Spec) -> Option<String> {
     let checks = checks::Checks::of(&env, &in_their_place);
     let with_controller = env.controller.is_some() || !checks.controller.is_empty();
     qemu::refusal(qemu::links(&env, with_controller))
+}
+
+/// Why this environment's VMs can't all have their networks under Vagrant's UTM provider, if
+/// they can't: vagrant_utm (0.1.6) sets up no private network (it only forwards ports to the
+/// VM's shared network), so a VM on one of the spec's networks would silently have none.
+/// `refusal_on` asks it for `utm`.
+pub fn utm_refusal(spec: &Spec) -> Option<String> {
+    let env = Environment::build(spec, Target::Vagrant, None);
+    let in_their_place = checks::in_their_place(&env);
+    let checks = checks::Checks::of(&env, &in_their_place);
+    let with_controller = env.controller.is_some() || !checks.controller.is_empty();
+    let (name, _) = qemu::links(&env, with_controller).into_iter().find(|(_, l)| *l != qemu::Link::None)?;
+    Some(format!(
+        "`{name}` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
+    ))
 }
 
 /// Why this environment's VMs can't all boot under Vagrant's Hyper-V provider, if they can't:

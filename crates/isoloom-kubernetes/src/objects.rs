@@ -11,7 +11,7 @@ pub use container::{
     Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, Limits, Probe, Resources, SecretKey, SecretSource, Volume, VolumeMount, VolumeSource,
 };
 pub use networking::{IpBlock, NetworkPolicySpec, Peer, PolicyPort, Rule, ServicePort, ServiceSpec};
-pub use pod::{Affinity, AffinityTerm, DnsConfig, NameValue, PodAffinity, PodSecurity, PodSpec, PodTemplate};
+pub use pod::{Affinity, AffinityTerm, DnsConfig, DnsOption, NameValue, PodAffinity, PodSecurity, PodSpec, PodTemplate};
 
 use indexmap::IndexMap;
 use serde::{Serialize, Serializer};

@@ -47,6 +47,7 @@ pub const TABLED: &[&str] = &[
     "PodSecurityContext",
     "Sysctl",
     "PodDNSConfig",
+    "PodDNSConfigOption",
     "Affinity",
     "PodAffinity",
     "PodAffinityTerm",

@@ -7,7 +7,7 @@ use isoloom_spec::images;
 use isoloom_spec::model::Arch;
 
 use super::hyperv::{self, HyperV};
-use super::qemu::Link;
+use super::qemu::{HubPort, Link};
 use crate::ruby::{Call, Ruby, Value};
 
 /// A VM's size: CPUs, memory (MB), and the disk (GB) when set. The disk is a minimum: a box
@@ -38,6 +38,8 @@ impl Size {
 pub struct Qemu<'a> {
     /// The libvirt-format box QEMU boots instead of the main one.
     pub boxed: Option<&'a str>,
+    /// The main box, which QEMU boots when `boxed` is `None`.
+    pub main: &'a str,
     /// The machine's CPU; `None` for Isoloom's own VMs, which run on the host's.
     pub arch: Option<Arch>,
     /// Its link on its private network.
@@ -51,6 +53,7 @@ impl<'a> Qemu<'a> {
     pub fn helper(link: &'a Link) -> Self {
         Qemu {
             boxed: Some(images::QEMU_DEBIAN_12),
+            main: images::QEMU_DEBIAN_12,
             arch: None,
             link,
             windows_address: None,
@@ -93,6 +96,9 @@ pub fn blocks(r: &mut Ruby, g: &Guest) {
     desktop(r, "parallels", g, true);
     desktop(r, "utm", g, false);
     r.block(provider("qemu"), "v, o", |r| qemu(r, g.size, &g.qemu));
+    if let Link::Hub(h) = g.qemu.link {
+        hub_triggers(r, h);
+    }
     r.block(provider("vmware_esxi"), "v", |r| esxi(r, g));
     libvirt(r, g);
     hyperv::block(r, &g.vm_name, g.size, &g.hyperv);
@@ -119,6 +125,10 @@ fn vmware(r: &mut Ruby, g: &Guest) {
         r.assign("v.vmx[\"displayName\"]", Value::str(&g.label));
         r.assign("v.vmx[\"numvcpus\"]", Value::str(&g.size.cpus.to_string()));
         r.assign("v.vmx[\"memsize\"]", Value::str(&g.size.mem.to_string()));
+        if g.hyperv.nested {
+            // Nested virtualization (`privileged`), as Hyper-V's `enable_virtualization_extensions`.
+            r.assign("v.vmx[\"vhv.enable\"]", Value::str("TRUE"));
+        }
     });
 }
 
@@ -149,8 +159,9 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
     });
 }
 
-/// The QEMU (vagrant-qemu) provider. No `disk_resize`: the plugin makes the VM's disk an overlay
-/// of that size on the box's, and a size below the box's truncates it (its file system is lost).
+/// The QEMU (vagrant-qemu) provider. `disk_resize` comes from `IsoloomQemu.disk`: the plugin
+/// makes the VM's disk an overlay of that size on the box's, and a size below the box's would
+/// truncate it (its file system lost), so it is set only above the box's own size.
 fn qemu(r: &mut Ruby, size: Size, q: &Qemu) {
     if let Some(b) = q.boxed {
         // A box of its own: the main box's version pin isn't one of its versions.
@@ -166,6 +177,10 @@ fn qemu(r: &mut Ruby, size: Size, q: &Qemu) {
     r.assign("v.memory", Value::str(&format!("{}M", size.mem)));
     // Each VM forwards SSH from its own host port (the plugin's default is one fixed port).
     r.assign("v.ssh_auto_correct", true);
+    if let Some(gb) = size.disk {
+        let main = Value::str(q.boxed.unwrap_or(q.main));
+        r.assign("v.disk_resize", Value::raw(format!("IsoloomQemu.disk({main}, {gb})")));
+    }
     link(r, q.link);
     if let Some(a) = q.arch {
         emulated(r, a, q.windows_address.is_some());
@@ -177,16 +192,36 @@ fn qemu(r: &mut Ruby, size: Size, q: &Qemu) {
 }
 
 fn link(r: &mut Ruby, l: &Link) {
-    match l {
-        Link::None => {}
-        Link::Socket(opts) => {
-            r.assign("v.advanced_network", true);
-            r.assign("v.net_mode", Value::sym("socket"));
-            r.assign("v.socket_opts", Value::str(opts));
+    if let Link::Refused(why) = l {
+        r.comment(&format!("No private network on QEMU: {why}."));
+    }
+    if let Some(opts) = l.socket_opts() {
+        if let Link::Hub(h) = l {
+            r.comment(&format!("Port {} of network `{}`'s hub (see IsoloomQemu).", h.port, h.net));
         }
-        Link::Refused(why) => {
-            r.comment(&format!("No private network on QEMU: {why}."));
-        }
+        r.assign("v.advanced_network", true);
+        r.assign("v.net_mode", Value::sym("socket"));
+        r.assign("v.socket_opts", Value::str(&opts));
+    }
+}
+
+/// The hub of the VM's network, started before QEMU starts the VM and, after the network's
+/// first VM is destroyed (the last, as `vagrant destroy` goes), stopped. Action triggers: only
+/// QEMU runs these actions, so no other provider runs (or prints) them.
+fn hub_triggers(r: &mut Ruby, h: &HubPort) {
+    let net = Value::str(&h.net);
+    let trigger = |when: &str, action: &str| {
+        Call::new(format!("m.trigger.{when}"))
+            .arg(Value::raw(format!(":\"VagrantPlugins::QEMU::Action::{action}\"")))
+            .kw("type", Value::sym("action"))
+    };
+    r.block(trigger("before", "StartInstance"), "t", |r| {
+        r.line(format_args!("t.ruby {{ |_, _| IsoloomQemu.hub({net}, QEMU_HUBS[{net}]) }}"));
+    });
+    if h.first {
+        r.block(trigger("after", "Destroy"), "t", |r| {
+            r.line(format_args!("t.ruby {{ |_, _| IsoloomQemu.stop({net}) }}"));
+        });
     }
 }
 

@@ -21,6 +21,10 @@ pub struct DockerImpl {
     /// image of your own around a vendored project's source, without moving that source.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dockerfile: Option<String>,
+    /// The stage of a multi-stage Dockerfile to build (`FROM ... AS <target>`), when not its
+    /// last: the lab's image beside the release one, from one Dockerfile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
     /// Build arguments (`ARG`s of the Dockerfile), fixed values.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub args: IndexMap<String, String>,
@@ -123,6 +127,11 @@ pub struct Dns {
     /// The machine's own domain name.
     #[serde(default)]
     pub domain: Option<String>,
+    /// Resolver options, as resolv.conf's `options` line writes them: `name` or `name:value`
+    /// (`ndots:2`, `timeout:1`, `attempts:3`, `rotate`). A container's `dns_opt`, a pod's
+    /// `dnsConfig` options.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<String>,
 }
 
 /// A machine's own image, per target, instead of the built-in one for its OS.

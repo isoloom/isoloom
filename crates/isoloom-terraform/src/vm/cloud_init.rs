@@ -21,6 +21,9 @@ const REBOOT_DIR: &str = "/var/lib/isoloom";
 pub struct CloudConfig {
     /// The machine's host name.
     pub hostname: String,
+    /// Its full name (`<hostname>.<domain>`), when it has a domain: the hosts file's entry for
+    /// it, the host name staying the short one.
+    pub fqdn: Option<String>,
     /// Its users (an expression: the module's `local.users`).
     pub users: Expression,
     /// Packages cloud-init installs.
@@ -42,6 +45,7 @@ impl CloudConfig {
     pub fn new(hostname: &str, users: Expression) -> CloudConfig {
         CloudConfig {
             hostname: hostname.to_string(),
+            fqdn: None,
             users,
             packages: Vec::new(),
             bootcmd: Vec::new(),
@@ -54,11 +58,9 @@ impl CloudConfig {
 
     /// The document: `#cloud-config` then the YAML Terraform encodes.
     pub fn document(self) -> Expression {
-        let mut items = vec![
-            ("hostname", string(self.hostname)),
-            ("users", self.users),
-            ("packages", list(self.packages.into_iter().map(string))),
-        ];
+        let mut items = vec![("hostname", string(self.hostname))];
+        items.extend(self.fqdn.map(|f| ("fqdn", string(f))));
+        items.extend([("users", self.users), ("packages", list(self.packages.into_iter().map(string)))]);
         if !self.bootcmd.is_empty() {
             items.push(("bootcmd", list(self.bootcmd.into_iter().map(string))));
         }
