@@ -25,10 +25,10 @@ use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 use isoloom_spec::images::is_windows as is_windows_os;
 use isoloom_spec::validate::Cidr;
 
-use crate::vm::cloud;
 use crate::vm::limits::Limits;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
+use crate::vm::{cloud, own_image};
 use crate::vm::{controller, is_windows, os, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -77,7 +77,8 @@ pub fn instance_type(memory_mb: u32) -> &'static str {
 }
 
 /// Why AWS can't run this environment, if it can't: its limits, then its address rules and
-/// images. This refuses the whole `cloud-vm` target (AWS is its reference cloud).
+/// images (a machine's own AMI stands in for its OS's). This refuses the whole `cloud-vm` target
+/// (AWS is its reference cloud).
 pub fn refusal(env: &Environment) -> Option<String> {
     LIMITS.refusal(env).or_else(|| networks_refusal(env)).or_else(|| machines_refusal(env))
 }
@@ -99,7 +100,7 @@ pub use crate::vm::cloud::windows_udp_redirect;
 fn machines_refusal(env: &Environment) -> Option<String> {
     for (name, m) in &env.spec().machines {
         let Some(vm) = &m.vm else { continue };
-        if image(&vm.os).is_none() {
+        if image(&vm.os).is_none() && own_image::of_machine(m, own_image::aws).is_none() {
             return Some(format!(
                 "machine `{name}`: no AWS image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)",
                 vm.os
@@ -205,7 +206,10 @@ fn base(env: &Environment) -> Vec<Block> {
 
 /// An AMI lookup per OS (the controller's among them).
 fn amis(env: &Environment) -> Vec<Block> {
-    let mut oses: Vec<&str> = vms(env).filter_map(|(_, mp)| os(mp)).collect();
+    let mut oses: Vec<&str> = vms(env)
+        .filter(|(_, mp)| own_image::of(mp, own_image::aws).is_none())
+        .filter_map(|(_, mp)| os(mp))
+        .collect();
     if controller::needed(env) {
         oses.push(controller::OS);
     }

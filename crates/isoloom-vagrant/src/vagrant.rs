@@ -25,6 +25,7 @@
 //!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
 //!   guest ([`hyperv`]); [`hyperv_refusal`] says when a machine has no Hyper-V box.
 
+mod boot;
 mod bridged;
 mod checks;
 mod helpers;
@@ -81,6 +82,8 @@ pub fn capabilities() -> Capabilities {
         // Given on VirtualBox, libvirt and Hyper-V; `provider_refusal` refuses the others.
         Feature::Tpm,
         Feature::MachineProcess,
+        // The libvirt provider boots it; `provider_refusal` says which providers can't.
+        Feature::OwnBoot,
     ])
 }
 
@@ -295,14 +298,18 @@ pub fn libvirt_refusal(spec: &Spec) -> Option<String> {
 
 /// Why this environment's VMs can't all run under Vagrant's `provider` (as `vagrant up
 /// --provider` names it), if they can't: a machine requiring a TPM the provider doesn't give,
-/// then QEMU's and UTM's networks, Hyper-V's boxes and libvirt's bridged networks. `refusal_on` asks it.
+/// then QEMU's and UTM's networks, Hyper-V's boxes and libvirt's bridged networks, then a
+/// machine's own boot, which only libvirt (and QEMU, for UEFI's format) boots. `refusal_on`
+/// asks it.
 pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
     let env = Environment::build(spec, Target::Vagrant, None);
-    windows::tpm_refusal(&env, provider).or_else(|| match provider {
-        "qemu" => qemu_refusal(spec),
-        "utm" => utm_refusal(spec),
-        "hyperv" => hyperv_refusal(spec),
-        "libvirt" => libvirt_refusal(spec),
-        _ => None,
-    })
+    windows::tpm_refusal(&env, provider)
+        .or_else(|| match provider {
+            "qemu" => qemu_refusal(spec),
+            "utm" => utm_refusal(spec),
+            "hyperv" => hyperv_refusal(spec),
+            "libvirt" => libvirt_refusal(spec),
+            _ => None,
+        })
+        .or_else(|| boot::refusal(&env, provider))
 }

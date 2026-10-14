@@ -106,7 +106,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
     }
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
-        if image(&vm.os).is_none() {
+        if image(&vm.os).is_none() && crate::vm::own_image::of_machine(m, crate::vm::own_image::azure).is_none() {
             return Some(format!(
                 "machine `{name}`: no Azure image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)",
                 vm.os

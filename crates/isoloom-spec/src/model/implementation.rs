@@ -96,6 +96,10 @@ pub struct VmImpl {
     /// refuses the environment. `false` gives none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tpm: Option<bool>,
+    /// How it boots, when not the way its image does: its own kernel, firmware, boot order or
+    /// network boot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boot: Option<super::Boot>,
 }
 
 /// The `vm.provision` step that restarts a Linux machine; the steps after it run once the
@@ -141,7 +145,7 @@ pub struct Dns {
 }
 
 /// A machine's own image, per target, instead of the built-in one for its OS.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VmImage {
     /// A Vagrant box name (e.g. `StefanScherer/windows_2019`).
@@ -166,6 +170,37 @@ pub struct VmImage {
     /// `vagrant` account. Not with `winrm`.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub winssh: bool,
+    /// Where Vagrant downloads the `vagrant` box from, when it isn't on Vagrant Cloud: a URL, or
+    /// a `.box` file in the project (list its folder in `.isoloomignore`, or the project copied
+    /// into every VM carries it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub box_url: Option<String>,
+    /// The box server Vagrant looks the `vagrant` box up on, instead of Vagrant Cloud (a
+    /// private registry).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub box_server_url: Option<String>,
+    /// The Proxmox image: a cloud image's URL (the server downloads it), or the id of a template
+    /// VM on the node (cloned).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxmox: Option<String>,
+    /// The AWS image: an AMI id (`ami-0123...`) in the module's region.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aws: Option<String>,
+    /// The Azure image: a managed image's or gallery image version's resource id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azure: Option<String>,
+    /// The Google Cloud image: `projects/<project>/global/images/<image>` (or `.../family/<f>`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gcp: Option<String>,
+    /// The DigitalOcean image: a slug or a custom image's id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digitalocean: Option<String>,
+    /// The Linode image: `linode/<distribution>` or `private/<id>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub linode: Option<String>,
+    /// The Oracle Cloud image: its OCID (`ocid1.image...`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oci: Option<String>,
 }
 
 /// The controller's settings (`controller:`), the fields a machine uses for the same things.

@@ -14,4 +14,6 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::outside::PROXMOX,
     super::machine_files::VM,
     super::process::VM,
+    super::own_image::PROXMOX_IMAGES,
+    super::own_image::PROXMOX_BOOT,
 ];

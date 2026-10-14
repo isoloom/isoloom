@@ -10,6 +10,7 @@ mod ipv6;
 mod kubernetes;
 mod machine_files;
 mod outside;
+pub mod own_image;
 mod process;
 mod proxmox;
 pub mod shared;

@@ -182,7 +182,7 @@ fn machine(path: &str) -> Option<&'static str> {
         "external.user" => "{ external: { user: admin } }",
         "external.port" => "{ external: { port: 2222 } }",
         "external.key" => "{ external: { key: ~/.ssh/lab } }",
-        _ => return None,
+        field => return super::families::own_image::probe(field),
     })
 }
 

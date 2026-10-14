@@ -14,7 +14,7 @@ use super::hyperv::{HyperV, Nic};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{self, Os};
-use super::{Ctx, checks, windows};
+use super::{Ctx, boot, checks, windows};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
 
@@ -30,6 +30,7 @@ pub fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
     define(r, name, |r| {
         boxed(r, &image, mp.arch, name, os);
+        boot::source(r, mp.vm_image.as_ref());
         if os == Os::Windows {
             windows::communicator(r, mp.winrm);
         }
@@ -85,8 +86,10 @@ pub fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr)
         .kw("ip", Value::str(&ip.to_string()))
         .kw("netmask", Value::str(&netmask(env.spec(), net).to_string()))
         .kw("virtualbox__intnet", Value::str(&netname))
-        .kw("libvirt__network_name", Value::str(&netname))
-        .kw("libvirt__dhcp_enabled", false);
+        .kw("libvirt__network_name", Value::str(&netname));
+    // Every VM on the network carries its network boot: libvirt creates the network with the
+    // options of the first VM that comes up on it.
+    call = boot::network(call, isoloom_plan::boot::network_boots(&env.machines).get(net));
     if let Some(v6) = &env.networks[net].ipv6 {
         call = call
             .kw("libvirt__guest_ipv6", Value::str("yes"))
@@ -120,6 +123,7 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
         size: Size::of(mp.size, isoloom_spec::DEFAULT_CPUS, isoloom_spec::DEFAULT_MEMORY_MB),
         nets: mp.addresses.keys().map(String::as_str).collect(),
         libvirt_box: image.libvirt.as_deref(),
+        boot: mp.boot.as_ref(),
         qemu: Qemu {
             boxed: image.qemu.as_deref(),
             main: &image.name,

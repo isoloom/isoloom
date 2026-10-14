@@ -12,7 +12,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
 use isoloom_spec::images;
-use isoloom_spec::model::{Arch, Constraints, External, Machine, MachineFile, Protocol, Spec, Target, Tc, Ulimit, Winrm};
+use isoloom_spec::model::{Arch, Boot, Constraints, External, Machine, MachineFile, Protocol, Spec, Target, Tc, Ulimit, VmImage, Winrm};
 use isoloom_spec::validate::docker_cidrs;
 use isoloom_spec::windows::{self, Tpm};
 
@@ -138,6 +138,11 @@ pub struct MachinePlan {
     pub arch: Arch,
     /// What it runs from, on this target.
     pub image: Option<Image>,
+    /// The VM's own image per target (`vm.image`: a box URL, a Proxmox or cloud image), when
+    /// the spec gives one.
+    pub vm_image: Option<VmImage>,
+    /// How the VM boots, when not the way its image does (`vm.boot`).
+    pub boot: Option<Boot>,
     /// The machines it waits for, as the spec lists them.
     pub depends_on: Vec<String>,
     /// The set-up steps of a VM, in order (empty for the other shapes).
@@ -305,6 +310,7 @@ impl Environment {
         requirements.extend(requirements::mixed_shapes(spec, |n| machines.get(n).map(|m| m.shape)));
         requirements.extend(crate::machine_files::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
         requirements.extend(requirements::tpm(&machines));
+        requirements.extend(crate::boot::requirements(&machines));
         Environment {
             name: spec.name.clone(),
             target,
@@ -431,6 +437,8 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
             .unwrap_or_default(),
         arch: m.arch,
         image: image(spec, shape, name, m),
+        vm_image: m.vm.as_ref().and_then(|v| v.image.clone()),
+        boot: m.vm.as_ref().and_then(|v| v.boot.clone()),
         depends_on: m.depends_on.clone(),
         lifecycle: if shape == MachineShape::Vm {
             let mut steps = lifecycle::of(spec, name, m);

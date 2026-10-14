@@ -155,9 +155,11 @@ pub fn cloud_refusals(spec: &Spec, target: Target) -> Option<(Vec<&'static str>,
 /// Today `vagrant` refuses more on some providers: a machine requiring a TPM (`vm.tpm: true`)
 /// anywhere but `virtualbox`, `libvirt` and `hyperv`; on `qemu`, a VM is on one network (QEMU
 /// gives it one); on `utm`, a VM is on none (vagrant_utm has no private networks); on `hyperv`,
-/// a machine whose OS has no known Hyper-V box needs `vm.image.hyperv`; and `qemu`, `hyperv`
-/// and `libvirt` have no bridged networks yet. `isoloom run vagrant` asks it for the provider in
-/// the defaults before starting; a tool offering a provider can ask before it does.
+/// a machine whose OS has no known Hyper-V box needs `vm.image.hyperv`; `qemu`, `hyperv` and
+/// `libvirt` have no bridged networks yet; a machine booting its own way (`vm.boot`) runs on
+/// `libvirt` (on `qemu` with UEFI and `firmware_format` only). `isoloom run vagrant` asks it
+/// for the provider in the defaults before starting; a tool offering a provider can ask before
+/// it does.
 pub fn refusal_on(spec: &Spec, target: Target, provider: Option<&str>) -> Option<String> {
     refusal(spec, target).or_else(|| match (target, provider) {
         (Target::Vagrant, Some(p)) => vagrant::provider_refusal(spec, p),

@@ -1,7 +1,7 @@
 //! Proxmox (bpg/proxmox): its resource types, and the arguments of what the proxmox target and
 //! docker-vm's Proxmox module write.
 
-use super::support::{ALIAS, ARCH, CREDENTIALS, DEVICES, FIREWALL, FIRMWARE, MTU, ORDER, PRIVATE_DNS, PROTECT, PROXMOX_IPV6, SERVER, SHARED, TC, TPM, VLANS};
+use super::support::{ALIAS, ARCH, CREDENTIALS, DEVICES, FIREWALL, MTU, ORDER, PRIVATE_DNS, PROTECT, PROXMOX_IPV6, SERVER, SHARED, TC, TPM, VLANS};
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
 
@@ -110,8 +110,8 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     (
         "proxmox_virtual_environment_vm",
-        "agent agent.enabled bios clone clone.full clone.vm_id cpu cpu.cores cpu.type disk disk.datastore_id disk.file_id disk.interface
-        disk.size efi_disk efi_disk.datastore_id efi_disk.type initialization initialization.datastore_id initialization.dns
+        "agent agent.enabled bios boot_order clone clone.full clone.vm_id cpu cpu.cores cpu.type disk disk.datastore_id disk.file_id disk.interface
+        disk.size efi_disk efi_disk.datastore_id efi_disk.file_format efi_disk.pre_enrolled_keys efi_disk.type initialization initialization.datastore_id initialization.dns
         initialization.dns.servers initialization.ip_config initialization.ip_config.ipv4 initialization.ip_config.ipv4.address
         initialization.ip_config.ipv4.gateway initialization.type initialization.user_data_file_id machine memory memory.dedicated name
         network_device network_device.bridge network_device.mac_address node_name on_boot operating_system operating_system.type
@@ -168,7 +168,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 memory.hugepages memory.keep_hugepages memory.shared numa numa.* cpu.numa cpu.sockets agent.trim smbios smbios.* rng rng.*
                 watchdog watchdog.* amd_sev amd_sev.* audio_device audio_device.*",
             ),
-            (FIRMWARE, "bios machine efi_disk efi_disk.* acpi boot_order"),
+            (SERVER, "acpi"),
             (ARCH, "cpu.architecture cpu.flags"),
             (TPM, "tpm_state tpm_state.*"),
             (DEVICES, "hostpci hostpci.* usb usb.*"),

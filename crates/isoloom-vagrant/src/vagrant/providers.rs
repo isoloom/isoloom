@@ -4,10 +4,11 @@
 use std::net::Ipv4Addr;
 
 use isoloom_spec::images;
-use isoloom_spec::model::Arch;
+use isoloom_spec::model::{Arch, Boot};
 
 use isoloom_spec::windows::Tpm;
 
+use super::boot;
 use super::hyperv::{self, HyperV};
 use super::qemu::{HubPort, Link};
 use super::windows;
@@ -77,6 +78,8 @@ pub struct Guest<'a> {
     pub nets: Vec<&'a str>,
     /// The box libvirt uses instead of the main one, if any.
     pub libvirt_box: Option<&'a str>,
+    /// How it boots, when not the way its box does (libvirt and QEMU).
+    pub boot: Option<&'a Boot>,
     /// How QEMU runs it.
     pub qemu: Qemu<'a>,
     /// How Hyper-V runs it.
@@ -107,7 +110,10 @@ pub fn blocks(r: &mut Ruby, g: &Guest) {
     vmware(r, g);
     desktop(r, "parallels", g, true, |_| {});
     desktop(r, "utm", g, false, |_| {});
-    r.block(provider("qemu"), "v, o", |r| qemu(r, g.size, &g.qemu));
+    r.block(provider("qemu"), "v, o", |r| {
+        qemu(r, g.size, &g.qemu);
+        g.boot.into_iter().for_each(|b| boot::qemu(r, b));
+    });
     if let Link::Hub(h) = g.qemu.link {
         hub_triggers(r, h);
     }
@@ -173,6 +179,7 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
         if g.tpm.is_some() {
             windows::libvirt_tpm(r);
         }
+        g.boot.into_iter().for_each(|b| boot::libvirt(r, b));
     });
 }
 

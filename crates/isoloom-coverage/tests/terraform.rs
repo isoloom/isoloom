@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use hcl::{Block, Body, Structure};
 use isoloom_coverage::{Format, formats, written_problems};
+use isoloom_spec::model::Target;
 
 fn examples() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
@@ -123,15 +124,54 @@ fn owner<'a>(tables: &'a [Format], key: &str) -> Option<&'a Format> {
     tables.iter().find(|f| f.rows.iter().any(|(k, _)| *k == anchor))
 }
 
-/// Every key written by any module, grouped by the table it belongs to.
+/// Machines with images and boots of their own, which no example needs: every cloud's own
+/// image (and a cloud image's URL on Proxmox), a Windows machine's own Azure image, and a
+/// Proxmox template booted through UEFI in an order of its own.
+const OWN_IMAGES: &[(&str, Target)] = &[
+    (
+        "web: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh], image: { proxmox: 'https://images.example/d.qcow2', aws: ami-0abc, azure: /subscriptions/s/resourceGroups/g/providers/Microsoft.Compute/images/d, gcp: projects/p/global/images/d, digitalocean: '4242', linode: private/42, oci: ocid1.image.oc1..d } } }",
+        Target::CloudVm,
+    ),
+    (
+        "dc: { networks: { lan: 10 }, vm: { os: windows-server-2022, provision: [s.ps1], image: { azure: /subscriptions/s/resourceGroups/g/providers/Microsoft.Compute/images/w } } }",
+        Target::CloudVm,
+    ),
+    (
+        "web: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh], image: { proxmox: '9000' }, boot: { firmware: uefi, firmware_format: raw, order: [hd, network] } } }",
+        Target::Proxmox,
+    ),
+];
+
+/// The modules generated for [`OWN_IMAGES`].
+fn own_image_modules() -> Vec<String> {
+    let mut out = Vec::new();
+    for (machine, target) in OWN_IMAGES {
+        let text = format!("version: 1\nname: own\nnetworks: {{ lan: {{ cidr: 10.30.0.0/24 }} }}\nmachines:\n  {machine}\n");
+        let spec = isoloom_spec::parse(&text).unwrap();
+        assert_eq!(isoloom_spec::validate(&spec), vec![], "{machine}");
+        let files = isoloom_targets::generate(&spec, *target).unwrap();
+        out.extend(
+            files
+                .into_iter()
+                .filter(|f| Path::new(&f.path).extension().is_some_and(|x| x == "tf"))
+                .map(|f| f.contents),
+        );
+    }
+    out
+}
+
+/// Every key written by any module (the examples', then the [`OWN_IMAGES`] fixtures'), grouped
+/// by the table it belongs to.
 fn written_by_table(tables: &[Format]) -> BTreeMap<&'static str, BTreeSet<String>> {
     let mut by: BTreeMap<&'static str, BTreeSet<String>> = BTreeMap::new();
-    for module in MODULES {
-        for text in module_files(module) {
-            for key in written_keys(&text) {
-                let table = owner(tables, &key).unwrap_or_else(|| panic!(".isoloom/{module}: writes `{key}`, which no Terraform table lists"));
-                by.entry(table.name).or_default().insert(key);
-            }
+    let examples = MODULES
+        .iter()
+        .flat_map(|m| module_files(m).into_iter().map(move |t| (format!(".isoloom/{m}"), t)));
+    let fixtures = own_image_modules().into_iter().map(|t| ("the own-image fixtures".to_string(), t));
+    for (module, text) in examples.chain(fixtures) {
+        for key in written_keys(&text) {
+            let table = owner(tables, &key).unwrap_or_else(|| panic!("{module}: writes `{key}`, which no Terraform table lists"));
+            by.entry(table.name).or_default().insert(key);
         }
     }
     by

@@ -153,6 +153,16 @@ the provider (the defaults' `vagrant.provider`, or `VAGRANT_DEFAULT_PROVIDER`). 
 a Hyper-V box (debian-13, ubuntu-14.04, fedora-42) need `vm.image.hyperv`; `isoloom run vagrant`
 refuses them on Hyper-V until they have one.
 
+A machine can boot an image of its own: `vm.image.vagrant` with `box_url` (a URL, or a `.box`
+file in the project) or `box_server_url` (a private box server); `vm.image.proxmox` (a cloud
+image's URL, or a template VM's id to clone); `vm.image.aws`, `azure`, `gcp`, `digitalocean`,
+`linode`, `oci` (each cloud's image id). `vm.os` still says what the image is. `vm.boot` boots it
+its own way: `kernel` with `initrd`, `cmdline` and `dtb`, the `firmware` (`bios` or `uefi`), a UEFI
+`loader` with its `nvram`, the boot `order`, and a `network` boot (`tftp_root`, `file`, `server`)
+on its first network. Vagrant's libvirt provider boots all of it, QEMU UEFI with its
+`firmware_format`, Proxmox the firmware (OVMF with an EFI disk) and the order; the other
+providers and targets refuse such a machine and say why.
+
 Checks come in three kinds, and `isoloom test` runs them all from inside the environment:
 **derived** from the spec (every service answers from the machines `reach` lets through and from
 nowhere else; offline networks stay offline; without a Linux machine to run them, every service

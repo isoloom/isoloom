@@ -21,7 +21,9 @@
 //!   in `.isoloom/proxmox/checks/<position>.sh` are piped to them by `isoloom test proxmox`
 //!   (the `checks` output says which runs where).
 
+mod boot;
 mod controller;
+mod image;
 mod machine;
 pub(crate) mod module;
 mod outputs;
@@ -74,16 +76,19 @@ fn image_url(os: &str) -> Option<&'static str> {
 }
 
 /// Why Proxmox can't run this environment, if it can't: its limits, then a Linux machine with
-/// no cloud image, then what a Windows machine can't have here yet.
+/// no cloud image (its own image stands in for its OS's), then what a Windows machine can't
+/// have here yet, then a boot of its own Proxmox has no setting for.
 pub fn refusal(env: &Environment) -> Option<String> {
     LIMITS.refusal(env).or_else(|| {
         vms(env)
             .find_map(|(name, mp)| {
                 let os = os(mp).unwrap_or_default();
-                (!is_windows(os) && image_url(os).is_none())
+                (!is_windows(os) && image_url(os).is_none() && !image::has_own(mp))
                     .then(|| format!("machine `{name}`: no Proxmox image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)"))
             })
             .or_else(|| windows::refusal(env))
+            .or_else(|| image::refusal(env))
+            .or_else(|| boot::refusal(env))
     })
 }
 
@@ -114,6 +119,8 @@ impl Backend for ProxmoxBackend {
             Feature::BridgedNetworks,
             Feature::Tpm,
             Feature::MachineProcess,
+            // A machine's firmware and boot order; its own `refusal` says what Proxmox can't boot.
+            Feature::OwnBoot,
         ])
     }
 

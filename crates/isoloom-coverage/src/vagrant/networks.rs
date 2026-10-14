@@ -1,7 +1,7 @@
 //! The options of `config.vm.network`: forwarded ports, private networks (with the
 //! provider-scoped `virtualbox__` and `libvirt__` options) and public networks.
 
-use super::{HOST_TUNING, IMAGE_BOOTS, IPV6, MAC, NETWORKS, USER_SETUP, pairs, table};
+use super::{HOST_TUNING, IPV6, MAC, NETWORKS, USER_SETUP, pairs, table};
 use crate::{
     Format, Support,
     Support::{Emitted, Equivalent, NotPortable, Tooling},
@@ -114,13 +114,21 @@ fn libvirt(o: &str) -> Option<Support> {
             from: "networks (a libvirt network each, named after the environment)",
         },
         "dhcp_enabled" => Emitted {
-            from: "(off: machines get fixed addresses)",
+            from: "(off: machines get fixed addresses; on where a machine boots from the network, `vm.boot.network`)",
         },
         "network_address" | "netmask" | "host_ip" => Equivalent {
             via: "`ip` and `netmask`: libvirt derives the network from them",
         },
         "dhcp_start" | "dhcp_stop" => FIXED_ADDRESSES,
-        "dhcp_bootp_file" | "dhcp_bootp_server" | "tftp_root" => IMAGE_BOOTS,
+        "dhcp_bootp_file" => Emitted {
+            from: "machines.*.vm.boot.network.file (on the machine's first network, DHCP on)",
+        },
+        "dhcp_bootp_server" => Emitted {
+            from: "machines.*.vm.boot.network.server",
+        },
+        "tftp_root" => Emitted {
+            from: "machines.*.vm.boot.network.tftp_root",
+        },
         "forward_mode" => Equivalent {
             via: "networks.*.internet (out through Isoloom's router, the same on every target)",
         },

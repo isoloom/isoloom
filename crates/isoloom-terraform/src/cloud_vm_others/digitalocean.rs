@@ -16,7 +16,7 @@ use crate::vm::cloud::{self, Reach, auto_stop, shutdown_script, tag_list};
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
-use crate::vm::{os, res, vms};
+use crate::vm::{os, own_image, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
 const SUB: &str = "digitalocean";
@@ -32,6 +32,7 @@ const RULES: Rules = Rules {
     has_image: |os| image(os).is_some(),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
     tpm: false,
+    own: own_image::digitalocean,
 };
 
 /// The `cloud-vm` module on DigitalOcean.
@@ -141,7 +142,7 @@ fn network(env: &Environment, m: &mut Module) {
 fn droplet(env: &Environment, name: &str, m: &mut Module) {
     let mp = &env.machines[name];
     let id = res(name);
-    let slug = image(os(mp).unwrap_or_default()).unwrap_or_default();
+    let slug = own_image::of(mp, own_image::digitalocean).unwrap_or_else(|| image(os(mp).unwrap_or_default()).unwrap_or_default());
     m.block(
         resource("digitalocean_droplet", &id)
             .add_attribute(("name", cloud::name_with(&format!("-{name}"))))

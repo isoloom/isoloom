@@ -121,7 +121,7 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "azurerm_linux_virtual_machine",
         "admin_ssh_key admin_ssh_key.public_key admin_ssh_key.username admin_username custom_data location name network_interface_ids
-        os_disk os_disk.caching os_disk.disk_size_gb os_disk.storage_account_type resource_group_name size source_image_reference
+        os_disk os_disk.caching os_disk.disk_size_gb os_disk.storage_account_type resource_group_name size source_image_id source_image_reference
         secure_boot_enabled source_image_reference.offer source_image_reference.publisher source_image_reference.sku
         source_image_reference.version tags vtpm_enabled",
     ),
@@ -147,7 +147,7 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "azurerm_windows_virtual_machine",
         "admin_password admin_username computer_name location name network_interface_ids os_disk os_disk.caching os_disk.disk_size_gb
-        os_disk.storage_account_type resource_group_name size source_image_reference source_image_reference.offer
+        os_disk.storage_account_type resource_group_name size source_image_id source_image_reference source_image_reference.offer
         source_image_reference.publisher source_image_reference.sku source_image_reference.version tags winrm_listener
         winrm_listener.protocol",
     ),
@@ -185,7 +185,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 termination_notification termination_notification.*",
             ),
             (ALIAS, "os_disk.name user_data os_managed_disk_id"),
-            (IMAGES, "source_image_id"),
             (TPM, "secure_boot_enabled vtpm_enabled"),
             (ALIAS, "admin_password disable_password_authentication computer_name"),
         ],
@@ -210,7 +209,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 termination_notification termination_notification.*",
             ),
             (ALIAS, "os_disk.name user_data os_managed_disk_id"),
-            (IMAGES, "source_image_id"),
             (WINDOWS_TPM, "secure_boot_enabled vtpm_enabled"),
             (
                 CLOUD,

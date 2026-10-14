@@ -19,7 +19,7 @@ use crate::vm::cloud::{self, Reach, auto_stop, name_with, shutdown_script};
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
-use crate::vm::{os, res, vms};
+use crate::vm::{os, own_image, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
 const SUB: &str = "oci";
@@ -38,6 +38,7 @@ const RULES: Rules = Rules {
     has_image: |_| true,
     images: "Ubuntu 22.04/24.04",
     tpm: true,
+    own: own_image::oci,
 };
 
 /// The `cloud-vm` module on Oracle Cloud.
@@ -154,7 +155,10 @@ fn named(b: BlockBuilder) -> BlockBuilder {
 
 /// The newest Canonical Ubuntu for the shape, one lookup per version the machines use.
 fn images(env: &Environment, m: &mut Module) {
-    let mut versions: Vec<&str> = vms(env).map(|(_, mp)| ubuntu(os(mp).unwrap_or_default())).collect();
+    let mut versions: Vec<&str> = vms(env)
+        .filter(|(_, mp)| own_image::of(mp, own_image::oci).is_none())
+        .map(|(_, mp)| ubuntu(os(mp).unwrap_or_default()))
+        .collect();
     versions.sort_unstable();
     versions.dedup();
     for v in versions {
@@ -257,7 +261,10 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
     let boot = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50);
     let source = Block::builder("source_details")
         .add_attribute(("source_type", string("image")))
-        .add_attribute(("source_id", attr(index(images, 0), "id")))
+        .add_attribute((
+            "source_id",
+            own_image::of(mp, own_image::oci).map_or_else(|| attr(index(images, 0), "id"), string),
+        ))
         .add_attribute(("boot_volume_size_in_gbs", number(u64::from(boot))))
         .build();
     let vnic = Block::builder("create_vnic_details")

@@ -52,6 +52,7 @@ fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ip
         size,
         nets: at.iter().map(|(net, _)| *net).collect(),
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
+        boot: None,
         qemu: Qemu::helper(link),
         hyperv: HyperV::helper(env, at),
         tpm: None,

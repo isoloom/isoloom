@@ -180,7 +180,12 @@ machines:
     access: false
     aliases: [api.example.test]
     docker: { image: a, init: [x.sh], idle: true, appliance: cisco-iol, config: r.cfg, firmware: f.bin }
-    vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1", qemu: x/z, hyperv: x/h, winrm: ssl, winssh: true }, tpm: true }
+    vm:
+      os: debian-12
+      provision: [x.sh]
+      image: { vagrant: x/y, vagrant_version: "1", qemu: x/z, hyperv: x/h, winrm: ssl, winssh: true, box_url: x.box, box_server_url: "https://b", proxmox: "9000", aws: ami-1, azure: /subscriptions/s, gcp: projects/p/global/images/i, digitalocean: "1", linode: private/1, oci: ocid1.image.x }
+      tpm: true
+      boot: { firmware: uefi, kernel: /k, initrd: /i, cmdline: c, dtb: /d, loader: /l, nvram: /n, firmware_format: raw, order: [network], network: { tftp_root: /t, file: f, server: 10.0.0.1 } }
     external: { address: 192.168.1.2, user: admin, port: 2222, key: ~/.ssh/lab }
   h:
     count: 2

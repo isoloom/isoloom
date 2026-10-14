@@ -111,7 +111,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
                 "machine `{name}`: GCP multi-NIC comes later (each interface needs its own VPC network)"
             ));
         }
-        if image(&vm.os).is_none() {
+        if image(&vm.os).is_none() && crate::vm::own_image::of_machine(m, crate::vm::own_image::gcp).is_none() {
             return Some(format!("machine `{name}`: no GCP image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04)", vm.os));
         }
         if let Some((net, _)) = m.networks.iter().find(|(_, o)| **o == 1) {

@@ -4,6 +4,7 @@
 
 pub mod addressing;
 pub mod ansible;
+pub mod boot;
 pub mod checks;
 pub mod environment;
 pub mod images;

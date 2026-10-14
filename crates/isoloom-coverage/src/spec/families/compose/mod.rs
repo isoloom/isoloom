@@ -14,4 +14,6 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::outside::COMPOSE,
     super::machine_files::COMPOSE,
     super::process::COMPOSE,
+    super::own_image::CONTAINER_IMAGES,
+    super::own_image::CONTAINER_BOOT,
 ];

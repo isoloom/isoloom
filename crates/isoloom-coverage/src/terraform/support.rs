@@ -19,9 +19,9 @@ pub const CLOUD_WRITTEN: Support = Emitted {
 pub const ENVIRONMENT: Support = Planned {
     note: "with the cloud generator (one VM per machine on its own networks)",
 };
-/// A machine's own image.
-pub const IMAGES: Support = Planned {
-    note: "custom cloud images: a machine's own image, as on the local targets",
+/// Making or sharing a machine image: a machine boots one made beforehand, by its id.
+pub const IMAGES: Support = Equivalent {
+    via: "machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id",
 };
 /// The environment's names served by the platform.
 pub const PRIVATE_DNS: Support = Planned {
@@ -193,10 +193,6 @@ pub const ICMP: Support = Planned { note: "ICMP in reach rules" };
 /// No internet on a network.
 pub const OFFLINE: Support = Planned {
     note: "`networks.*.internet: false` enforced by the cloud",
-};
-/// Firmware and boot.
-pub const FIRMWARE: Support = Planned {
-    note: "with custom images and boot (firmware, machine type, boot order)",
 };
 /// Another CPU architecture.
 pub const ARCH: Support = Planned {

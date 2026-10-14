@@ -5,7 +5,7 @@
 use super::{DISK, MORE_DISKS, NETWORKS, NO_SHARED_FOLDERS, PROVISIONERS, PUSH, TOOLING, USER_SETUP, VM, kinds, names, pairs, table};
 use crate::{
     Format, Support,
-    Support::{Emitted, Equivalent, NotPortable, Planned, Tooling},
+    Support::{Emitted, Equivalent, NotPortable, Tooling},
 };
 
 /// The "Vagrant" table.
@@ -135,8 +135,11 @@ fn machine(s: &str) -> Option<Support> {
         "box_version" => Emitted {
             from: "machines.*.vm.image.vagrant_version, or a built-in pin",
         },
-        "box_url" | "box_server_url" => Planned {
-            note: "custom images (a box URL, a Proxmox template, a cloud image)",
+        "box_url" => Emitted {
+            from: "machines.*.vm.image.box_url (a URL, or a .box file in the project)",
+        },
+        "box_server_url" => Emitted {
+            from: "machines.*.vm.image.box_server_url",
         },
         "communicator" | "guest" => Emitted {
             from: "vm.os (Windows uses WinRM, plain HTTP or SSL per the box's `image.winrm`)",

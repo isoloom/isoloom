@@ -16,7 +16,7 @@ use crate::vm::cloud::{self, Reach, auto_stop, name_with, shutdown_script, tag_l
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
-use crate::vm::{os, res, vms};
+use crate::vm::{os, own_image, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
 const SUB: &str = "linode";
@@ -32,6 +32,7 @@ const RULES: Rules = Rules {
     has_image: |os| image(os).is_some(),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
     tpm: false,
+    own: own_image::linode,
 };
 
 /// The `cloud-vm` module on Linode.
@@ -211,7 +212,10 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
             .add_attribute(("label", name_with(&format!("-{name}"))))
             .add_attribute(("region", reference("var.region")))
             .add_attribute(("type", string(plan(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))))
-            .add_attribute(("image", string(image(os(mp).unwrap_or_default()).unwrap_or_default())))
+            .add_attribute((
+                "image",
+                string(own_image::of(mp, own_image::linode).unwrap_or_else(|| image(os(mp).unwrap_or_default()).unwrap_or_default())),
+            ))
             .add_attribute(("authorized_keys", list([call("trimspace", [reference("var.ssh_public_key")])])))
             .add_attribute(("root_pass", reference(&format!("random_password.{id}.result"))))
             .add_attribute(("booted", boolean(true)))

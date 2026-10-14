@@ -2,6 +2,7 @@
 //! networks, who reaches whom, the services that answer) and, per machine, how each kind of
 //! target produces it (`docker:` and/or `vm:`).
 
+mod boot;
 mod bridged;
 mod checks;
 mod cloud;
@@ -16,6 +17,7 @@ mod secrets;
 mod shared;
 mod target;
 
+pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
 pub(crate) use checks::is_yaml_file;
 pub use checks::{Check, Declared, Expect};
 pub use cloud::{CloudProvider, CloudServices};

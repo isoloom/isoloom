@@ -11,7 +11,7 @@ use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 use super::{image, machine_type, public_ip, user, vpc_does};
 use crate::vm::cloud::{self, name_with, resource};
 use crate::vm::linux::{self, Hooks};
-use crate::vm::{controller, os, res};
+use crate::vm::{controller, os, own_image, res};
 
 /// A Linux machine: what may reach it, its instance, its set-up over SSH.
 pub fn linux(env: &Environment, name: &str, m: &mut Module) {
@@ -29,6 +29,7 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         id: &id,
         who: name,
         os,
+        own: own_image::of(mp, own_image::gcp),
         memory: mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
         disk: Some(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)),
         on: (net, *address),
@@ -124,6 +125,8 @@ struct Instance<'a> {
     /// Its name in the cloud (`<env>-<who>`), and its tag.
     who: &'a str,
     os: &'a str,
+    /// Its own image (`vm.image.gcp`), instead of its OS's.
+    own: Option<&'a str>,
     memory: u32,
     /// Its boot disk in GB (the image's size when `None`).
     disk: Option<u32>,
@@ -136,8 +139,9 @@ struct Instance<'a> {
 /// An instance at its address with a public one; its user from the `ssh-keys` metadata; the
 /// auto-stop scheduled at first boot.
 fn instance(i: &Instance) -> Block {
-    let (image, user) = image(i.os).unwrap_or_default();
-    let mut params = Block::builder("initialize_params").add_attribute(("image", string(image)));
+    let (image, _) = image(i.os).unwrap_or_default();
+    let user = user(i.os);
+    let mut params = Block::builder("initialize_params").add_attribute(("image", string(i.own.unwrap_or(image))));
     if let Some(gb) = i.disk {
         params = params.add_attribute(("size", number(u64::from(gb))));
     }
@@ -189,6 +193,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
         id,
         who: "controller",
         os: controller::OS,
+        own: None,
         memory,
         disk,
         on: (net, address),

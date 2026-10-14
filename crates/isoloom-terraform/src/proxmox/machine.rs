@@ -33,7 +33,7 @@ pub fn blocks(env: &Environment, name: &str, m: &mut Module) {
         }
         cloud_init::machine(env, name, &mut config);
         m.commented(&format!("Machine `{name}`."), snippet(&res(name), name, config.document()));
-        Boot::Image(res(os(mp).unwrap_or_default()))
+        super::image::boot(name, mp).unwrap_or_else(|| Boot::Image(res(os(mp).unwrap_or_default())))
     };
     m.block(vm(env, name, boot).block(env));
 }
@@ -74,6 +74,7 @@ fn vm(env: &Environment, name: &str, boot: Boot) -> Vm {
         ),
         boot,
         tpm: mp.tpm.is_some(),
+        own_boot: mp.boot.clone(),
         agent: false,
         nics,
         dns: Some(dns(env, name)),
@@ -156,6 +157,9 @@ pub fn ip_config(address: &str, gateway: Option<String>) -> Block {
 pub enum Boot {
     /// A cloud image (its `proxmox_download_file` resource's name), as a new disk.
     Image(String),
+    /// A full clone of a Linux template on the node, by id (`vm.image.proxmox`): its disk grown
+    /// to the machine's size, cloud-init as on a cloud image.
+    Clone(u32),
     /// A full clone of a Windows template (`var.<variable>`): UEFI, cloudbase-init reading its
     /// configuration drive. The template's disk is kept, grown to `disk` GB when the spec sizes it.
     Template {
@@ -183,6 +187,8 @@ pub struct Vm {
     pub boot: Boot,
     /// Whether it has a virtual TPM 2.0 (its state on the VM datastore).
     pub tpm: bool,
+    /// Its own firmware and boot order (`vm.boot`).
+    pub own_boot: Option<isoloom_spec::model::Boot>,
     /// Whether the guest agent reports its addresses.
     pub agent: bool,
     /// Its network devices.
@@ -216,6 +222,7 @@ impl Vm {
             // Windows 11 and its TPM need UEFI on a Q35 machine; the template is made so.
             b = b.add_attribute(("bios", string("ovmf"))).add_attribute(("machine", string("q35")));
         }
+        b = super::boot::add(b, self.own_boot.as_ref());
         if self.agent {
             b = b.add_block(Block::builder("agent").add_attribute(("enabled", boolean(true))).build());
         }
@@ -240,11 +247,11 @@ impl Vm {
         }
         b = b.add_block(init.add_blocks(self.ips).build());
         let ostype = match self.boot {
-            Boot::Image(_) => "l26",
+            Boot::Image(_) | Boot::Clone(_) => "l26",
             Boot::Template { ostype, .. } => ostype,
         };
         b = b.add_block(Block::builder("operating_system").add_attribute(("type", string(ostype))).build());
-        if let Boot::Image(_) = self.boot {
+        if !matches!(self.boot, Boot::Template { .. }) {
             b = b.add_block(Block::builder("serial_device").build());
         }
         b.add_attribute(("depends_on", list(self.depends_on))).build()
@@ -266,6 +273,10 @@ impl Vm {
         let mut out = Vec::new();
         match &self.boot {
             Boot::Image(image) => out.push(disk(Some(reference(&format!("proxmox_download_file.{image}.id"))), self.size.2)),
+            Boot::Clone(id) => {
+                out.push(super::image::clone(number((*id).into())));
+                out.push(disk(None, self.size.2));
+            }
             Boot::Template { variable, disk: size, .. } => {
                 out.push(
                     Block::builder("clone")
