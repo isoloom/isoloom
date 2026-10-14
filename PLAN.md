@@ -144,7 +144,10 @@ isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ─
 
 ## 3b. Engineering standard (every repository, every phase)
 
-Clean code is built in as we go, not left for a later pass. Each rule is **enforced by a tool**, or it isn't a rule.
+**All clean code principles are respected in all three codebases** (maintainer, 2026-10-15). Clean code is built in as we go, not left for a later pass.
+- **Enforced by a tool** wherever a tool can check it.
+- **Otherwise checked by the review checklist below** at the end of every phase.
+- **The target is zero violations in every repository by 1.0,** not just "no worse".
 
 ### Design rules
 - **Functional core, imperative shell.** Parsing, validation, planning, rendering and manifest building are pure functions over data, with no I/O, no clock and no environment. All I/O (processes, files, network, Tauri) sits in a thin shell at the edge. The pure core is unit-testable without mocks.
@@ -195,13 +198,39 @@ Clean code is built in as we go, not left for a later pass. Each rule is **enfor
 - **Every bug fix starts with a failing test.**
 - **Fast and deterministic:** no sleeps, no network in unit tests. The unit suite of each repository runs in under a minute.
 
-### Ratchet
-- Each repository has `quality-baseline.json`: the current count of violations per rule, such as oversized files, long functions, `allow`s and `any`s. A check fails if any count goes **up**.
-- Every phase must bring the counts **down** in the code it touches (the boy-scout rule). The ratchet is what replaces launcher issue #150.
+### Principles and how each is checked
+
+| Principle | Checked by |
+|---|---|
+| Meaningful, consistent names; one vocabulary | review checklist, `typos` |
+| Small functions that do one thing; one level of abstraction | clippy `too_many_lines` 60, cognitive complexity 15, eslint `max-lines-per-function` |
+| Few arguments; no flag arguments | clippy `too_many_arguments` 5, `fn_params_excessive_bools`; review (enums over booleans) |
+| Single responsibility, small modules | file ≤ 400 LOC (TS components ≤ 200), the module layout in 3b, review |
+| Open/closed, Liskov, interface segregation, dependency inversion | ports-and-adapters traits, small traits, review |
+| DRY | duplicate-code check (`jscpd` across Rust and TS), review |
+| KISS and YAGNI | review: no speculative abstractions, no unused generality; `cargo machete` and `knip` for unused deps and exports |
+| Command-query separation; no hidden side effects | functional core, pure functions, review |
+| Law of Demeter | review: no long call chains through other objects' internals |
+| Errors as types, not codes or strings; no null | typed errors, `Option`/`Result`, no `unwrap`/`expect`/`panic`, TS `strictNullChecks` |
+| Clean boundaries with third-party code | adapters around tools, processes, Tauri, HTTP and SDKs |
+| Clean tests (F.I.R.S.T.: fast, independent, repeatable, self-validating, timely); one concept per test | unit suite under a minute, no sleeps or network, review |
+| Comments explain *why*; no commented-out code, no noise | review, the eslint and clippy rules for commented-out code |
+| Formatting | rustfmt, prettier |
+| No dead code | `dead_code` at deny, `cargo machete`, `knip` |
+
+### Ratchet to zero
+- Each repository has `quality-baseline.json`: the current count of violations per rule, such as oversized files, long functions, `allow`s, `any`s and duplicates.
+- A check fails if any count goes **up**, and every phase drives the counts **down**. The ratchet replaces launcher issue #150.
+- **All counts reach zero before the 1.0 release:**
+  - Isoloom by the end of Phase 1;
+  - Isothrum when the runner lands (Phase 2–3);
+  - the launcher's non-runtime code in Phase 0.6;
+  - the launcher's runtime as it moves into the runner.
+- The only allowed exceptions are local `#[allow]` or `eslint-disable` lines with a written reason, listed in the baseline and reviewed.
 
 ### Process
 - **Every change:** format, lint, test, the ratchet and the dependency-direction check, all through `check-all`.
-- **Every phase ends with a review pass** over its own diff: a code review for bugs, then a simplify pass for duplication and dead code. Findings are fixed before the next phase starts.
+- **Every phase ends with a review pass** over its own diff: a code review for bugs, a simplify pass for duplication and dead code, and the principles table as a checklist. Findings are fixed before the next phase starts.
 - **Dev tasks are `cargo xtask` commands, not shell scripts,** so they run the same on macOS, Windows and Linux. `scripts/*.sh` move into `xtask` in Phase 1.
 
 ### Repository layouts
@@ -287,7 +316,7 @@ Sizes: S is about a day of focused work, M a few days, L about a week. There are
 4. **Local multi-repository setup.** Clone `isoloom`, `isothrum` and the launcher side by side, with `[patch]` path dependencies. One `check-all` script runs every repository's checks.
 5. **Cross-platform check (decided).** A manual-only GitHub workflow that runs `check-all` on macOS, Windows and Linux on demand. No PRs and no automatic runs. Without it, Windows and Linux bugs surface only after the squash.
 
-6. **The engineering standard in the launcher and Isothrum:** lint configs at the 3b levels, the ratchet baseline, the dependency-direction check, `check-all` wiring, and the launcher's folder reorganization (everything except `runtime/`).
+6. **The engineering standard in the launcher:** lint configs at the 3b levels, the ratchet, the dependency-direction check, `check-all` wiring, the folder reorganization (everything except `runtime/`), and the non-runtime code driven to zero violations.
 
 **Exit:** snapshots and `verify` are green or baselined, and `check-all` passes.
 
@@ -298,7 +327,7 @@ Now safe, because the net is in place.
 2. **Delete `isoloom-coverage`.** Its schema checks are covered by `verify`, and its capability declarations stay in the backends.
 3. **Delete the committed example outputs.** The snapshots replace them.
 4. **Delete the compatibility debt** and fix the small debts: the Ruby-dependent test, the dead-code fixtures.
-5. **Apply the engineering standard to Isoloom:** the repository layout (3b), `xtask` replacing `scripts/*.sh`, the dependency-direction test, the ratchet baseline, and `rust-toolchain.toml`. Every move is proven output-neutral by the snapshots.
+5. **Apply the engineering standard to Isoloom:** the repository layout (3b), `xtask` replacing `scripts/*.sh`, the dependency-direction test, `rust-toolchain.toml`, and the ratchet **driven to zero**. Every move is proven output-neutral by the snapshots.
 
 **Exit:** green net; a smaller workspace in the target layout; the ratchet in place.
 
