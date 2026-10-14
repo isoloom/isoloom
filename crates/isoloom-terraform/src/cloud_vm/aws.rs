@@ -169,6 +169,7 @@ pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_bu
     m.blocks(variables(env));
     m.blocks(base(env));
     network::blocks(env, &mut m);
+    crate::vm::private_dns::aws(env, &mut m);
     if vms(env).any(|(_, mp)| is_windows(mp)) {
         m.commented(
             "The Windows machines' administrator password (user isoloom), for WinRM.",

@@ -23,9 +23,45 @@ pub const ENVIRONMENT: Support = Planned {
 pub const IMAGES: Support = Equivalent {
     via: "machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id",
 };
-/// The environment's names served by the platform.
-pub const PRIVATE_DNS: Support = Planned {
-    note: "private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS",
+/// Another way to bind a private zone to the environment's network than the one written.
+pub const ZONE_BINDING: Support = Equivalent {
+    via: "dns.private: the zone is bound to the environment's network where it is written (the Route 53 zone's `vpc`, the Azure link, the Cloud DNS zone's networks, the view attached to the VCN's resolver)",
+};
+/// The cloud's own names for its VMs.
+pub const CLOUD_NAMES: Support = Equivalent {
+    via: "dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels",
+};
+/// The network's resolver.
+pub const CLOUD_RESOLVER: Support = Equivalent {
+    via: "dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options)",
+};
+/// Aliases as names of their own.
+pub const ALIAS_RECORDS: Support = Equivalent {
+    via: "dns.private: every alias is an A record of its own, at its machine's address",
+};
+/// Records the spec has nothing for.
+pub const OTHER_RECORDS: Support = NotPortable {
+    why: "mail, service and text records: Docker's DNS and the local targets' hosts files map names to addresses only",
+};
+/// Proxmox SDN's DNS.
+pub const SDN_DNS: Support = Equivalent {
+    via: "dns.private: each VM's hosts file carries the names under the zone's domain, its search domain (the SDN zone's DNS needs a PowerDNS server registered in the datacenter, outside the environment)",
+};
+/// A Proxmox LXC container's names.
+pub const ROUTER_DNS: Support = Equivalent {
+    via: "dns.private: the router's dnsmasq, a container's resolver, answers every name and alias under the zone's domain too",
+};
+/// Reverse names.
+pub const REVERSE_DNS: Support = Planned {
+    note: "reverse names: PTR records in a reverse zone per network, beside the private zone (`dns.private`)",
+};
+/// IPv6 names in the private zone.
+pub const PRIVATE_DNS_IPV6: Support = Planned {
+    note: "AAAA records in the private zone, with IPv6 networks on cloud-vm",
+};
+/// What a written private zone resource can also do, with no change for the environment.
+pub const ZONE_SETTINGS: Support = Tooling {
+    note: "a private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same",
 };
 /// Public names.
 pub const PUBLIC_DNS: Support = NotPortable {

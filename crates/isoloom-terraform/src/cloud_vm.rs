@@ -71,6 +71,9 @@ pub fn capabilities() -> Capabilities {
         Feature::VmGpus,
         // A size that nests and the cloud's switch (refused by the clouds that have none).
         Feature::NestedVirtualization,
+        // The cloud's private zone (AWS, Azure, Google Cloud, Oracle Cloud), and every VM's
+        // hosts file (on DigitalOcean and Linode, which have no private DNS, the hosts file only).
+        Feature::PrivateDns,
     ])
 }
 

@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# The environment's names in a private DNS zone: every machine's name and aliases also resolve
+# under `corp.internal` (web.corp.internal, www.corp.internal, client.corp.internal). The platform's
+# own DNS serves them where it has one (a Route 53 private hosted zone on AWS, an Azure private
+# DNS zone, a Cloud DNS private zone on Google Cloud, a private view on Oracle Cloud, Docker's
+# DNS on the Docker targets); every VM's hosts file carries them too.
+version: 1
+name: private-names
+
+dns:
+  private: true
+  domain: corp.internal
+
+networks:
+  office: { cidr: 10.84.0.0/24 }
+
+machines:
+  web:
+    networks: { office: 10 }
+    aliases: [www]
+    services: [{ port: 80, http: true }]
+    docker: { image: "nginx:1.27" }
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
+  # A client: it reaches the web server by its names in the zone.
+  client:
+    networks: { office: 20 }
+    docker: { image: "debian:12-slim", idle: true }
+    vm:
+      os: debian-12
+      provision: [provision/client.sh]
+
+checks:
+  - name: the web server answers at its alias in the private zone
+    from: client
+    http: http://www.corp.internal/
+  - name: the client's name resolves in the private zone
+    from: web
+    exec: getent hosts client.corp.internal

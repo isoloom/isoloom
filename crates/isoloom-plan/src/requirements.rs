@@ -77,6 +77,8 @@ pub enum Feature {
     NetworkMtu,
     /// A bandwidth cap on a machine's links (`rate_limit`).
     RateLimit,
+    /// Names served under the environment's private DNS zone (`dns.private`).
+    PrivateDns,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -204,6 +206,11 @@ pub enum Requirement {
         /// The first such machine.
         machine: String,
     },
+    /// The environment's names are served under a private DNS zone.
+    PrivateDns {
+        /// The zone's domain.
+        domain: String,
+    },
 }
 
 impl Requirement {
@@ -235,6 +242,7 @@ impl Requirement {
             Requirement::Hardware { need, .. } => need.feature(),
             Requirement::NetworkMtu { .. } => Feature::NetworkMtu,
             Requirement::RateLimit { .. } => Feature::RateLimit,
+            Requirement::PrivateDns { .. } => Feature::PrivateDns,
         }
     }
 }
@@ -303,6 +311,12 @@ impl fmt::Display for Requirement {
             Requirement::Hardware { machine, need } => need.reason(machine, f),
             Requirement::NetworkMtu { network } => crate::links::no_mtu(f, network),
             Requirement::RateLimit { machine } => crate::links::no_rate_limit(f, machine),
+            // Only Kubernetes and existing hosts lack it: a cluster names Services under its own
+            // domain, and Isoloom leaves an existing host's resolver and hosts file as they are.
+            Requirement::PrivateDns { domain } => write!(
+                f,
+                "the names are served under a private zone (`dns.private`, `{domain}`), and this target has no DNS or hosts file Isoloom sets: a cluster names Services under its own domain, an existing host keeps its own resolver"
+            ),
         }
     }
 }
@@ -393,6 +407,7 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
     out.extend(limits(spec));
     out.extend(crate::ipv6::requirements(spec));
     out.extend(crate::links::requirements(spec));
+    out.extend(crate::private_dns::requirements(spec));
     out
 }
 

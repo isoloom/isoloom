@@ -43,6 +43,7 @@ pub mod linux;
 pub mod module;
 pub mod nested;
 pub mod own_image;
+pub mod private_dns;
 pub mod provisioner;
 pub mod versions;
 pub mod windows;

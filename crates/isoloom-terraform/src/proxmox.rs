@@ -141,6 +141,9 @@ impl Backend for ProxmoxBackend {
             Feature::RateLimit,
             // A VM may wait for an LXC container (`docker.lxc`) as for a VM.
             Feature::VmAfterContainer,
+            // The SDN zone's DNS needs a PowerDNS server outside the environment: each VM's
+            // hosts file carries the names, and the zone's domain is its search domain.
+            Feature::PrivateDns,
         ])
     }
 

@@ -25,14 +25,14 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: QEMU](#vagrant-qemu) | 92% | 14 | 13 | 0 | 1 |
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 20 | 20 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
-| [Terraform: Proxmox](#terraform-proxmox) | 93% | 181 | 170 | 0 | 11 |
+| [Terraform: Proxmox](#terraform-proxmox) | 96% | 181 | 175 | 0 | 6 |
 | [Terraform: ESXi](#terraform-esxi) | 77% | 35 | 27 | 0 | 8 |
-| [Terraform: AWS](#terraform-aws) | 78% | 130 | 102 | 0 | 28 |
-| [Terraform: Azure](#terraform-azure) | 83% | 135 | 113 | 0 | 22 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 73% | 97 | 70 | 2 | 25 |
+| [Terraform: AWS](#terraform-aws) | 86% | 138 | 120 | 0 | 18 |
+| [Terraform: Azure](#terraform-azure) | 92% | 145 | 134 | 0 | 11 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 79% | 110 | 86 | 2 | 22 |
 | [Terraform: DigitalOcean](#terraform-digitalocean) | 87% | 32 | 28 | 0 | 4 |
 | [Terraform: Linode](#terraform-linode) | 82% | 52 | 43 | 0 | 9 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 56% | 173 | 98 | 0 | 75 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 67% | 194 | 130 | 0 | 64 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
@@ -1517,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-93% of 181 portable features (170 done, 0 partly, 11 to do; 558 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
+96% of 181 portable features (175 done, 0 partly, 6 to do; 558 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1726,13 +1726,13 @@ Only what the examples generate is checked: a feature no example uses can still 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `dhcp` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `dns` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `dns_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `dns` | Yes | Another way | Via dns.private: each VM's hosts file carries the names under the zone's domain, its search domain (the SDN zone's DNS needs a PowerDNS server registered in the datacenter, outside the environment) |
+| `dns_zone` | Yes | Another way | Via dns.private: each VM's hosts file carries the names under the zone's domain, its search domain (the SDN zone's DNS needs a PowerDNS server registered in the datacenter, outside the environment) |
 | `id` | Yes | Yes | Written by the generator |
 | `ipam` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `mtu` | Yes | Yes | Written by the generator |
 | `nodes` | Yes | Yes | Written by the generator |
-| `reverse_dns` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `reverse_dns` | Yes | Another way | Via dns.private: each VM's hosts file carries the names under the zone's domain, its search domain (the SDN zone's DNS needs a PowerDNS server registered in the datacenter, outside the environment) |
 
 ### proxmox_virtual_environment_container
 
@@ -1800,7 +1800,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `initialization.entrypoint` | Yes | Yes | Written by the generator |
 | `initialization.hostname` | Yes | Yes | Written by the generator |
 | `initialization.dns` | Yes | Yes | Written by the generator |
-| `initialization.dns.domain` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `initialization.dns.domain` | Yes | Another way | Via dns.private: the router's dnsmasq, a container's resolver, answers every name and alias under the zone's domain too |
 | `initialization.dns.server` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.dns.servers` | Yes | Yes | Written by the generator |
 | `initialization.ip_config` | Yes | Yes | Written by the generator |
@@ -2080,7 +2080,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `initialization.user_data_file_id` | Yes | Yes | Written by the generator |
 | `initialization.vendor_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.dns` | Yes | Yes | Written by the generator |
-| `initialization.dns.domain` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `initialization.dns.domain` | Yes | Yes | Written by the generator |
 | `initialization.dns.servers` | Yes | Yes | Written by the generator |
 | `initialization.ip_config` | Yes | Yes | Written by the generator |
 | `initialization.ip_config.ipv4` | Yes | Yes | Written by the generator |
@@ -2235,7 +2235,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: AWS
 
-78% of 130 portable features (102 done, 0 partly, 28 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
+86% of 138 portable features (120 done, 0 partly, 18 to do; 2491 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -2522,11 +2522,11 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_rolesanywhere_trust_anchor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_route` | Yes | Another way | Via the arguments that wire the same things inline: `vpc_id` of aws_internet_gateway, `network_interface` of aws_eip, an aws_route_table_association for every subnet (the main route table serves none), `security_groups` of aws_network_interface and the `route` blocks of aws_route_table |
 | `aws_route53_query_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_route53_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `aws_route53_record` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_route53_records_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_route53_vpc_association_authorization` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `aws_route53_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `aws_route53_zone_association` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `aws_route53_vpc_association_authorization` | Yes | Another way | Via dns.private: the zone is bound to the environment's network where it is written (the Route 53 zone's `vpc`, the Azure link, the Cloud DNS zone's networks, the view attached to the VCN's resolver) |
+| `aws_route53_zone` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `aws_route53_zone_association` | Yes | Another way | Via dns.private: the zone is bound to the environment's network where it is written (the Route 53 zone's `vpc`, the Azure link, the Cloud DNS zone's networks, the view attached to the VCN's resolver) |
 | `aws_route_table` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_route_table_association` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_savingsplans_savings_plan` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -2577,8 +2577,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_vpc_block_public_access_exclusion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_block_public_access_options` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_vpc_dhcp_options` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `aws_vpc_dhcp_options_association` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `aws_vpc_dhcp_options` | Yes | Another way | Via dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options) |
+| `aws_vpc_dhcp_options_association` | Yes | Another way | Via dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options) |
 | `aws_vpc_encryption_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_ipam` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_ipam_organization_admin_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3201,6 +3201,69 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `network_interface_id` | Yes | Yes | Written by the generator |
 | `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 
+### aws_route53_record
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allow_overwrite` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `health_check_id` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `multivalue_answer_routing_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `name` | Yes | Yes | Written by the generator |
+| `records` | Yes | Yes | Written by the generator |
+| `set_identifier` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `ttl` | Yes | Yes | Written by the generator |
+| `type` | Yes | Yes | Written by the generator |
+| `zone_id` | Yes | Yes | Written by the generator |
+| `alias` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `alias.evaluate_target_health` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `alias.name` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `alias.zone_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `cidr_routing_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `cidr_routing_policy.collection_id` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `cidr_routing_policy.location_name` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `failover_routing_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `failover_routing_policy.type` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geolocation_routing_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geolocation_routing_policy.continent` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geolocation_routing_policy.country` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geolocation_routing_policy.subdivision` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geoproximity_routing_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geoproximity_routing_policy.aws_region` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geoproximity_routing_policy.bias` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geoproximity_routing_policy.local_zone_group` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geoproximity_routing_policy.coordinates` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geoproximity_routing_policy.coordinates.latitude` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `geoproximity_routing_policy.coordinates.longitude` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `latency_routing_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `latency_routing_policy.region` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+| `weighted_routing_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `weighted_routing_policy.weight` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+
+### aws_route53_zone
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `comment` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `delegation_set_id` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `enable_accelerated_recovery` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `force_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+| `vpc` | Yes | Yes | Written by the generator |
+| `vpc.vpc_id` | Yes | Yes | Written by the generator |
+| `vpc.vpc_region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+
 ### aws_route_table
 
 | Key | Every target | Implemented | Notes |
@@ -3293,7 +3356,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `customer_owned_ipv4_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `enable_dns64` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `enable_lni_at_device_index` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `enable_resource_name_dns_a_record_on_launch` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `enable_resource_name_dns_a_record_on_launch` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `enable_resource_name_dns_aaaa_record_on_launch` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `ipv4_ipam_pool_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -3305,7 +3368,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `map_customer_owned_ip_on_launch` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `map_public_ip_on_launch` | Yes | Yes | Written by the generator |
 | `outpost_arn` | n/a | No | Where in the account or region the resource lives: no change in behavior |
-| `private_dns_hostname_type_on_launch` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `private_dns_hostname_type_on_launch` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 | `tags` | Yes | Yes | Written by the generator |
 | `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -3320,8 +3383,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | --- | --- | --- | --- |
 | `assign_generated_ipv6_cidr_block` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `cidr_block` | Yes | Yes | Written by the generator |
-| `enable_dns_hostnames` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `enable_dns_support` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `enable_dns_hostnames` | Yes | Yes | Written by the generator |
+| `enable_dns_support` | Yes | Yes | Written by the generator |
 | `enable_network_address_usage_metrics` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `instance_tenancy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -3389,7 +3452,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: Azure
 
-83% of 135 portable features (113 done, 0 partly, 22 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+92% of 145 portable features (134 done, 0 partly, 11 to do; 1599 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3518,15 +3581,12 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_policy_virtual_machine_configuration_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_portal_dashboard` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_portal_tenant_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_private_dns_a_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `azurerm_private_dns_aaaa_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `azurerm_private_dns_cname_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `azurerm_private_dns_mx_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `azurerm_private_dns_ptr_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `azurerm_private_dns_srv_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `azurerm_private_dns_txt_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `azurerm_private_dns_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `azurerm_private_dns_zone_virtual_network_link` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_a_record` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `azurerm_private_dns_aaaa_record` | Yes | Not yet | AAAA records in the private zone, with IPv6 networks on cloud-vm |
+| `azurerm_private_dns_cname_record` | Yes | Another way | Via dns.private: every alias is an A record of its own, at its machine's address |
+| `azurerm_private_dns_ptr_record` | Yes | Not yet | Reverse names: PTR records in a reverse zone per network, beside the private zone (`dns.private`) |
+| `azurerm_private_dns_zone` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `azurerm_private_dns_zone_virtual_network_link` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_proximity_placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_public_ip` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_recovery_services_vault` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -3604,7 +3664,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_virtual_machine_scale_set_packet_capture` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_virtual_machine_scale_set_standby_pool` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_virtual_network` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_virtual_network_dns_servers` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_virtual_network_dns_servers` | Yes | Another way | Via dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options) |
 | `azurerm_windows_virtual_machine` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_windows_virtual_machine_scale_set` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 
@@ -3814,10 +3874,10 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `accelerated_networking_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `auxiliary_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `auxiliary_sku` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `dns_servers` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `dns_servers` | Yes | Another way | Via dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options) |
 | `edge_zone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
-| `internal_dns_name_label` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `internal_dns_name_label` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `ip_forwarding_enabled` | Yes | Yes | Written by the generator |
 | `location` | Yes | Yes | Written by the generator |
 | `name` | Yes | Yes | Written by the generator |
@@ -3876,6 +3936,61 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `security_rule.source_port_range` | Yes | Yes | Written by the generator |
 | `security_rule.source_port_ranges` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
 | `tags` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_private_dns_a_record
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `private_dns_zone_id` | Yes | Yes | Written by the generator |
+| `records` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `ttl` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_private_dns_zone
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `soa_record` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `soa_record.email` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `soa_record.expire_time` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `soa_record.minimum_ttl` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `soa_record.refresh_time` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `soa_record.retry_time` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `soa_record.tags` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `soa_record.ttl` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_private_dns_zone_virtual_network_link
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `private_dns_zone_id` | Yes | Yes | Written by the generator |
+| `registration_enabled` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
+| `resolution_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `tags` | Yes | Yes | Written by the generator |
+| `virtual_network_id` | Yes | Yes | Written by the generator |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
@@ -3967,7 +4082,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | --- | --- | --- | --- |
 | `address_space` | Yes | Yes | Written by the generator |
 | `bgp_community` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `dns_servers` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `dns_servers` | Yes | Another way | Via dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options) |
 | `edge_zone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `flow_timeout_in_minutes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
@@ -4111,11 +4226,11 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `winrm_listener.certificate_url` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `winrm_listener.protocol` | Yes | Yes | Written by the generator |
 
-And 894 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 897 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Google Cloud
 
-73% of 97 portable features (70 done, 2 partly, 25 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+79% of 110 portable features (86 done, 2 partly, 22 to do; 1951 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4278,12 +4393,12 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `google_contact_center_insights_qa_scorecard` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_contact_center_insights_qa_scorecard_revision` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_contact_center_insights_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `google_dns_managed_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `google_dns_managed_zone` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `google_dns_managed_zone_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_dns_managed_zone_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_dns_managed_zone_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `google_dns_policy` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `google_dns_record_set` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `google_dns_policy` | Yes | Another way | Via dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options) |
+| `google_dns_record_set` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `google_essential_contacts_contact` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_folder` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_folder_access_approval_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -4883,6 +4998,117 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### google_dns_managed_zone
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `dns_name` | Yes | Yes | Written by the generator |
+| `force_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `labels` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `project` | Yes | Yes | Written by the generator |
+| `visibility` | Yes | Yes | Written by the generator |
+| `cloud_logging_config` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `cloud_logging_config.enable_logging` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config.kind` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config.non_existence` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config.state` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config.default_key_specs` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config.default_key_specs.algorithm` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config.default_key_specs.key_length` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config.default_key_specs.key_type` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `dnssec_config.default_key_specs.kind` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `forwarding_config` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `forwarding_config.target_name_servers` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `forwarding_config.target_name_servers.domain_name` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `forwarding_config.target_name_servers.forwarding_path` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `forwarding_config.target_name_servers.ipv4_address` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `forwarding_config.target_name_servers.ipv6_address` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `peering_config` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `peering_config.target_network` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `peering_config.target_network.network_url` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `private_visibility_config` | Yes | Yes | Written by the generator |
+| `private_visibility_config.gke_clusters` | No | No | One of this cloud's managed services (databases, queues, functions, clusters, storage...): no other VM target has it |
+| `private_visibility_config.gke_clusters.gke_cluster_name` | No | No | One of this cloud's managed services (databases, queues, functions, clusters, storage...): no other VM target has it |
+| `private_visibility_config.networks` | Yes | Yes | Written by the generator |
+| `private_visibility_config.networks.network_url` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### google_dns_record_set
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `managed_zone` | Yes | Yes | Written by the generator |
+| `name` | Yes | Yes | Written by the generator |
+| `project` | Yes | Yes | Written by the generator |
+| `rrdatas` | Yes | Yes | Written by the generator |
+| `ttl` | Yes | Yes | Written by the generator |
+| `type` | Yes | Yes | Written by the generator |
+| `routing_policy` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.enable_geo_fencing` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.health_check` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.location` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.rrdatas` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.external_endpoints` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.internal_load_balancers` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.internal_load_balancers.ip_address` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.internal_load_balancers.ip_protocol` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.internal_load_balancers.load_balancer_type` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.internal_load_balancers.network_url` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.internal_load_balancers.port` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.internal_load_balancers.project` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.geo.health_checked_targets.internal_load_balancers.region` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.enable_geo_fencing_for_backups` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.trickle_ratio` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.location` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.rrdatas` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.external_endpoints` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.internal_load_balancers` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.internal_load_balancers.ip_address` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.internal_load_balancers.ip_protocol` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.internal_load_balancers.load_balancer_type` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.internal_load_balancers.network_url` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.internal_load_balancers.port` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.internal_load_balancers.project` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.backup_geo.health_checked_targets.internal_load_balancers.region` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.external_endpoints` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.internal_load_balancers` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.internal_load_balancers.ip_address` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.internal_load_balancers.ip_protocol` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.internal_load_balancers.load_balancer_type` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.internal_load_balancers.network_url` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.internal_load_balancers.port` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.internal_load_balancers.project` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.primary_backup.primary.internal_load_balancers.region` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.rrdatas` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.weight` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.external_endpoints` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.internal_load_balancers` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.internal_load_balancers.ip_address` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.internal_load_balancers.ip_protocol` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.internal_load_balancers.load_balancer_type` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.internal_load_balancers.network_url` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.internal_load_balancers.port` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.internal_load_balancers.project` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `routing_policy.wrr.health_checked_targets.internal_load_balancers.region` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
 
 ### google_project
 
@@ -5562,7 +5788,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Oracle Cloud
 
-56% of 173 portable features (98 done, 0 partly, 75 to do; 1361 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
+67% of 194 portable features (130 done, 0 partly, 64 to do; 1431 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5645,7 +5871,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `oci_core_default_drg_route_table` | n/a | No | The account's default network: Isoloom builds its own |
 | `oci_core_default_route_table` | n/a | No | The account's default network: Isoloom builds its own |
 | `oci_core_default_security_list` | n/a | No | The account's default network: Isoloom builds its own |
-| `oci_core_dhcp_options` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `oci_core_dhcp_options` | Yes | Another way | Via dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options) |
 | `oci_core_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `oci_core_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_instance_configuration` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -5686,12 +5912,11 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `oci_disaster_recovery_dr_plan` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `oci_disaster_recovery_dr_plan_execution` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `oci_disaster_recovery_dr_protection_group` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
-| `oci_dns_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `oci_dns_resolver` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `oci_dns_resolver_endpoint` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `oci_dns_rrset` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `oci_dns_view` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `oci_dns_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `oci_dns_record` | Yes | Another way | Via dns.private: every alias is an A record of its own, at its machine's address |
+| `oci_dns_resolver` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_dns_rrset` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_dns_view` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_dns_zone` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_events_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `oci_identity_api_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `oci_identity_auth_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -5861,6 +6086,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `oci_core_images` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_core_vcn_dns_resolver_association` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_identity_availability_domains` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 
 ### Settings
@@ -5937,7 +6163,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `availability_config.recovery_action` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `create_vnic_details` | Yes | Yes | Written by the generator |
 | `create_vnic_details.assign_ipv6ip` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
-| `create_vnic_details.assign_private_dns_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `create_vnic_details.assign_private_dns_record` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `create_vnic_details.assign_public_ip` | Yes | Yes | Written by the generator |
 | `create_vnic_details.defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `create_vnic_details.display_name` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -6186,9 +6412,9 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `cidr_block` | Yes | Yes | Written by the generator |
 | `compartment_id` | Yes | Yes | Written by the generator |
 | `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
-| `dhcp_options_id` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `dhcp_options_id` | Yes | Another way | Via dns.private: the network's default resolver answers the private zone (Azure's 168.63.129.16, Cloud DNS's default policy, the VCN's default DHCP options) |
 | `display_name` | Yes | Yes | Written by the generator |
-| `dns_label` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `dns_label` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `ipv4cidr_blocks` | Yes | Not yet | With several addresses on one network |
@@ -6213,7 +6439,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `compartment_id` | Yes | Yes | Written by the generator |
 | `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `display_name` | Yes | Yes | Written by the generator |
-| `dns_label` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `dns_label` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `ipv6private_cidr_blocks` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
@@ -6223,6 +6449,93 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `byoipv6cidr_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `byoipv6cidr_details.byoipv6range_id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `byoipv6cidr_details.ipv6cidr_block` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_dns_resolver
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `display_name` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `resolver_id` | Yes | Yes | Written by the generator |
+| `scope` | Yes | Yes | Written by the generator |
+| `attached_views` | Yes | Yes | Written by the generator |
+| `attached_views.view_id` | Yes | Yes | Written by the generator |
+| `rules` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `rules.action` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `rules.client_address_conditions` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `rules.destination_addresses` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `rules.qname_cover_conditions` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `rules.source_endpoint_name` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_dns_rrset
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `domain` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `rtype` | Yes | Yes | Written by the generator |
+| `scope` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `view_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `zone_name_or_id` | Yes | Yes | Written by the generator |
+| `items` | Yes | Yes | Written by the generator |
+| `items.domain` | Yes | Yes | Written by the generator |
+| `items.rdata` | Yes | Yes | Written by the generator |
+| `items.rtype` | Yes | Yes | Written by the generator |
+| `items.ttl` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_dns_view
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `display_name` | Yes | Yes | Written by the generator |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `scope` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_dns_zone
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `dnssec_state` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `resolution_mode` | n/a | No | A private zone's management (its SOA timers, protection, delegation, logging, a record's routing policy across endpoints): the names answer the same |
+| `scope` | Yes | Yes | Written by the generator |
+| `view_id` | Yes | Yes | Written by the generator |
+| `zone_type` | Yes | Yes | Written by the generator |
+| `external_downstreams` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `external_downstreams.address` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `external_downstreams.port` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `external_downstreams.tsig_key_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `external_masters` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `external_masters.address` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `external_masters.port` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `external_masters.tsig_key_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
@@ -6246,6 +6559,13 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `filter.regex` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `filter.values` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 
+### data.oci_core_vcn_dns_resolver_association
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `vcn_id` | Yes | Yes | Written by the generator |
+
 ### data.oci_identity_availability_domains
 
 | Key | Every target | Implemented | Notes |
@@ -6257,7 +6577,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `filter.regex` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 | `filter.values` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 
-And 733 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 734 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: utility providers
 
@@ -7584,6 +7904,8 @@ is marked ✗, with its reason below.
 | `reach[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
+| `dns.private` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `dns.domain` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
 | `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.networks` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
@@ -7728,25 +8050,25 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 86% of 112 | 95 | 3 | 0 | 14 |
-| hosted | 86% of 112 | 95 | 3 | 0 | 14 |
-| kubernetes | 70% of 104 | 67 | 12 | 1 | 24 |
-| helm | 70% of 104 | 67 | 12 | 1 | 24 |
-| kustomize | 70% of 104 | 67 | 12 | 1 | 24 |
-| vagrant | 81% of 117 | 88 | 15 | 0 | 14 |
-| docker-vm | 78% of 112 | 86 | 3 | 0 | 23 |
-| hybrid | 66% of 137 | 88 | 5 | 7 | 37 |
-| proxmox | 82% of 112 | 91 | 2 | 3 | 16 |
-| esxi | 67% of 111 | 74 | 1 | 3 | 33 |
-| aws | 61% of 117 | 64 | 15 | 6 | 32 |
-| azure | 60% of 117 | 64 | 14 | 7 | 32 |
-| gcp | 61% of 117 | 64 | 15 | 6 | 32 |
-| digitalocean | 49% of 117 | 53 | 9 | 6 | 49 |
-| linode | 51% of 117 | 55 | 10 | 6 | 46 |
-| oci | 51% of 117 | 55 | 10 | 6 | 46 |
-| cloud-docker | 77% of 112 | 85 | 3 | 0 | 24 |
+| docker | 86% of 114 | 97 | 3 | 0 | 14 |
+| hosted | 86% of 114 | 97 | 3 | 0 | 14 |
+| kubernetes | 68% of 106 | 67 | 12 | 1 | 26 |
+| helm | 68% of 106 | 67 | 12 | 1 | 26 |
+| kustomize | 68% of 106 | 67 | 12 | 1 | 26 |
+| vagrant | 81% of 119 | 90 | 15 | 0 | 14 |
+| docker-vm | 78% of 114 | 88 | 3 | 0 | 23 |
+| hybrid | 66% of 139 | 90 | 5 | 7 | 37 |
+| proxmox | 82% of 114 | 93 | 2 | 3 | 16 |
+| esxi | 67% of 113 | 76 | 1 | 3 | 33 |
+| aws | 61% of 119 | 66 | 15 | 6 | 32 |
+| azure | 61% of 119 | 66 | 14 | 7 | 32 |
+| gcp | 61% of 119 | 66 | 15 | 6 | 32 |
+| digitalocean | 50% of 119 | 55 | 9 | 6 | 49 |
+| linode | 52% of 119 | 57 | 10 | 6 | 46 |
+| oci | 52% of 119 | 57 | 10 | 6 | 46 |
+| cloud-docker | 77% of 114 | 87 | 3 | 0 | 24 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 50% of 76 | 34 | 9 | 14 | 19 |
+| external | 49% of 78 | 34 | 9 | 14 | 21 |
 
 ### Refusals
 
@@ -7777,6 +8099,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)
 - **vagrant**: Network `home`: Vagrant's bridged networks take no VLAN tag (Proxmox does) (`networks.*.bridged.vlan`)
+- **kubernetes, helm, kustomize, external**: The names are served under a private zone (`dns.private`, `probe.internal`), and this target has no DNS or hosts file Isoloom sets: a cluster names Services under its own domain, an existing host keeps its own resolver (`dns.private`, `dns.domain`)
 - **esxi**: Machine `a` gets `secrets`, and this target has no machine `isoloom run` can hand them to (`secrets`, `machines.*.secrets`)
 - **esxi**: Machine `a`: ESXi runs x86-64 VMs only (`machines.*.arch`)
 - **aws**: Machine `a`: arm64 on AWS comes later (Graviton instances and arm64 AMIs) (`machines.*.arch`)

@@ -126,6 +126,9 @@ impl Backend for EsxiBackend {
             Feature::Ulimits,
             Feature::TrafficControl,
             Feature::MachineProcess,
+            // No DNS on a standalone host: each VM's hosts file carries the names under the
+            // zone's domain, its search domain.
+            Feature::PrivateDns,
         ])
     }
 

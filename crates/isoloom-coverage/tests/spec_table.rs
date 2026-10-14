@@ -156,6 +156,7 @@ networks:
   corp: { cidr: 10.3.0.0/24, external: corp-net }
   home: { cidr: 10.4.0.0/24, bridged: { interface: en0, dhcp: true, default_route: true, vlan: 20 } }
 reach: [{ from: out, to: dmz, ports: [80] }]
+dns: { private: true, domain: every.internal }
 inputs: [TOKEN]
 secrets: { token: { env: TOKEN } }
 volumes: { data: { owner: fw } }

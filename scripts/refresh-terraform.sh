@@ -108,15 +108,17 @@ extract aws hashicorp/aws 6.67.0 \
   resource:aws_instance resource:aws_vpc resource:aws_vpc_ipv4_cidr_block_association resource:aws_subnet \
   resource:aws_internet_gateway resource:aws_route_table resource:aws_route_table_association \
   resource:aws_security_group resource:aws_network_interface resource:aws_network_interface_attachment \
-  resource:aws_eip resource:aws_key_pair data:aws_ami data:aws_availability_zones
+  resource:aws_eip resource:aws_key_pair resource:aws_route53_zone resource:aws_route53_record data:aws_ami data:aws_availability_zones
 extract azure hashicorp/azurerm 5.8.0 \
   resource:azurerm_resource_group resource:azurerm_virtual_network resource:azurerm_subnet \
   resource:azurerm_public_ip resource:azurerm_network_security_group resource:azurerm_network_interface \
   resource:azurerm_network_interface_security_group_association resource:azurerm_linux_virtual_machine \
-  resource:azurerm_windows_virtual_machine
+  resource:azurerm_windows_virtual_machine resource:azurerm_private_dns_zone \
+  resource:azurerm_private_dns_zone_virtual_network_link resource:azurerm_private_dns_a_record
 extract google hashicorp/google 8.5.0 \
   resource:google_project resource:google_project_service resource:google_compute_network \
-  resource:google_compute_subnetwork resource:google_compute_firewall resource:google_compute_instance
+  resource:google_compute_subnetwork resource:google_compute_firewall resource:google_compute_instance \
+  resource:google_dns_managed_zone resource:google_dns_record_set
 extract digitalocean digitalocean/digitalocean 2.103.0 \
   resource:digitalocean_vpc resource:digitalocean_ssh_key resource:digitalocean_droplet resource:digitalocean_firewall
 extract linode linode/linode 4.7.0 \
@@ -125,7 +127,8 @@ extract oci oracle/oci 9.8.0 \
   resource:oci_core_vcn resource:oci_core_internet_gateway resource:oci_core_route_table \
   resource:oci_core_security_list resource:oci_core_subnet resource:oci_core_instance \
   resource:oci_core_network_security_group resource:oci_core_network_security_group_security_rule \
-  data:oci_core_images data:oci_identity_availability_domains
+  resource:oci_dns_view resource:oci_dns_zone resource:oci_dns_rrset resource:oci_dns_resolver \
+  data:oci_core_images data:oci_identity_availability_domains data:oci_core_vcn_dns_resolver_association
 extract esxi josenk/esxi 1.10.3 \
   resource:esxi_guest resource:esxi_portgroup resource:esxi_vswitch
 # The utility providers the modules use beside each platform's (keys, passwords, files, waits),

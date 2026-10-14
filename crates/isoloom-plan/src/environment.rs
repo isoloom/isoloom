@@ -63,6 +63,8 @@ pub struct Environment {
     pub images: Images,
     /// The Ansible inventory groups and their members (see [`ansible::groups`]).
     pub inventory_groups: IndexMap<String, Vec<String>>,
+    /// The private DNS zone, when `dns.private` is on: its domain and records.
+    pub private_dns: Option<crate::private_dns::PrivateDns>,
     spec: Spec,
 }
 
@@ -111,7 +113,8 @@ pub struct MachinePlan {
     pub addresses: IndexMap<String, Ipv4Addr>,
     /// Its IPv6 address on each IPv6 network that derives them (not on `addresses: auto` ones).
     pub addresses6: IndexMap<String, Ipv6Addr>,
-    /// Its names: its own, then its aliases.
+    /// Its names: its own, then its aliases, then (with `dns.private`) each of them under the
+    /// private zone's domain.
     pub names: Vec<String>,
     /// Routes to the networks it isn't on.
     pub routes: Vec<Route>,
@@ -339,6 +342,7 @@ impl Environment {
             requirements,
             images: Images::of(spec),
             inventory_groups: ansible::groups(spec),
+            private_dns: crate::private_dns::plan(&laid_out),
             spec: laid_out.clone(),
         }
     }
@@ -422,7 +426,10 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         shape,
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
         addresses6: ipv6::addresses(spec, m),
-        names: std::iter::once(name).chain(m.aliases.iter().map(String::as_str)).map(String::from).collect(),
+        names: crate::private_dns::with_domain(
+            spec,
+            std::iter::once(name).chain(m.aliases.iter().map(String::as_str)).map(String::from).collect(),
+        ),
         routes: routing::routes(spec, name, m).into_iter().map(|(cidr, via)| Route { cidr, via }).collect(),
         routes6: if target == Target::CloudVm { Vec::new() } else { ipv6::routes(spec, m) },
         default_gateway: routing::default_gateway(spec, name, m),

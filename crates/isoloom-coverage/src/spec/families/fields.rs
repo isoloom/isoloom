@@ -27,6 +27,8 @@ pub const FIELDS: &[&str] = &[
     "reach[].from",
     "reach[].to",
     "reach[].ports",
+    "dns.private",
+    "dns.domain",
     "inputs",
     "secrets",
     "machines.*.networks",

@@ -2,8 +2,8 @@
 //! the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DISKS, GCP_IPV6, GPU_SCHEDULING, IMAGES, LOCATION,
-    MANAGED, MONITORING, MTU, NAT, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT,
+    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CPUS, CREDENTIALS, DISKS, GCP_IPV6, GPU_SCHEDULING,
+    IMAGES, LOCATION, MANAGED, MONITORING, MTU, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -50,7 +50,7 @@ const TYPES: Rules = &[
         "compute_network_firewall_policy* compute_region_network_firewall_policy* os_login_ssh_public_key",
     ),
     (IMAGES, "compute_image"),
-    (PRIVATE_DNS, "dns_managed_zone dns_record_set dns_policy"),
+    (CLOUD_RESOLVER, "dns_policy"),
     (PUBLIC_DNS, "clouddomains_* site_verification_*"),
     (
         PLACEMENT,
@@ -110,8 +110,8 @@ const TYPES: Rules = &[
 const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
-        "google_compute_firewall google_compute_instance google_compute_network google_compute_subnetwork google_project
-        google_project_service",
+        "google_compute_firewall google_compute_instance google_compute_network google_compute_subnetwork google_dns_managed_zone
+        google_dns_record_set google_project google_project_service",
     ),
     ("provider", "region"),
     (
@@ -127,6 +127,12 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     ("google_compute_network", "auto_create_subnetworks name project"),
     ("google_compute_subnetwork", "ip_cidr_range name network project region"),
+    (
+        "google_dns_managed_zone",
+        "dns_name name private_visibility_config private_visibility_config.networks private_visibility_config.networks.network_url
+        project visibility",
+    ),
+    ("google_dns_record_set", "managed_zone name project rrdatas ttl type"),
     ("google_project", "auto_create_network billing_account deletion_policy name org_id project_id"),
     ("google_project_service", "disable_on_destroy project service"),
 ];
@@ -147,6 +153,16 @@ const SETTINGS: Rules = &[
 
 /// The arguments Isoloom leaves out, per resource type or data source.
 const ARGUMENTS: &[(&str, Rules)] = &[
+    (
+        "google_dns_managed_zone",
+        &[
+            (PROTECT, "deletion_policy force_destroy"),
+            (ZONE_SETTINGS, "cloud_logging_config.* dnssec_config.*"),
+            (CLOUD_NETWORK, "forwarding_config.* peering_config.*"),
+            (MANAGED, "private_visibility_config.gke_clusters.*"),
+        ],
+    ),
+    ("google_dns_record_set", &[(PROTECT, "deletion_policy"), (ZONE_SETTINGS, "routing_policy.*")]),
     (
         "google_compute_firewall",
         &[

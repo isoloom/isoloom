@@ -159,6 +159,7 @@ pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_bu
     );
     project(env, &mut m);
     network(env, &mut m);
+    crate::vm::private_dns::gcp(env, own_project(), &mut m);
     if controller::needed(env) {
         m.commented("The controller's own key: it runs the playbooks over SSH on every machine.", controller::key());
     }

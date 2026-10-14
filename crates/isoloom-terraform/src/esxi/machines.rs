@@ -62,7 +62,13 @@ pub fn machine(env: &Environment, name: &str, i: usize, m: &mut Module) {
             mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB),
         ),
         nics,
-        dns: (servers, dns.and_then(|d| d.domain.clone())),
+        // Its own domain, else the private zone's (`dns.private`), whose names its hosts file
+        // carries: ESXi has no DNS of its own to serve them.
+        dns: (
+            servers,
+            dns.and_then(|d| d.domain.clone())
+                .or_else(|| env.private_dns.as_ref().map(|z| z.domain.clone())),
+        ),
         user_data: CloudConfig::new(name, reference("local.users")).document(),
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],

@@ -1,0 +1,95 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: private-names
+networks:
+  office:
+    cidr: 10.84.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+dns:
+  private: true
+  domain: corp.internal
+inputs: []
+machines:
+  web:
+    networks:
+      office: 10
+    aliases:
+      - www
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 80
+        name: ~
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "nginx:1.27"
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+  client:
+    networks:
+      office: 20
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "debian:12-slim"
+      build: ~
+      init: []
+      idle: true
+    vm:
+      os: debian-12
+      provision:
+        - provision/client.sh
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the web server answers at its alias in the private zone
+    from: client
+    http: "http://www.corp.internal/"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: ~
+    wait: ~
+  - name: "the client's name resolves in the private zone"
+    from: web
+    http: ~
+    tcp: ~
+    exec: getent hosts client.corp.internal
+    script: ~
+    expect: ~
+    wait: ~
+targets: ~

@@ -1,7 +1,7 @@
 //! The VPC, its subnets, and each machine's security group.
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Module, list, number, object, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, number, object, string};
 
 use super::{first_zone, r};
 use crate::vm::res;
@@ -13,8 +13,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     let Some((_, first)) = nets.first() else { return };
     m.commented(
         "The environment's networks: one VPC, a subnet per network with its exact range.",
-        resource("aws_vpc", "env")
-            .add_attribute(("cidr_block", string(first.as_str())))
+        dns_hostnames(env, resource("aws_vpc", "env").add_attribute(("cidr_block", string(first.as_str()))))
             .add_attribute(("tags", object([("Name", r("local.name"))])))
             .build(),
     );
@@ -46,6 +45,16 @@ pub fn blocks(env: &Environment, m: &mut Module) {
             .add_attribute(("public_key", r("var.ssh_public_key")))
             .build(),
     );
+}
+
+/// With a private zone (`dns.private`), the VPC's DNS support and host names on: a private
+/// hosted zone answers only in a VPC that has both.
+fn dns_hostnames(env: &Environment, vpc: BlockBuilder) -> BlockBuilder {
+    if env.private_dns.is_none() {
+        return vpc;
+    }
+    vpc.add_attribute(("enable_dns_support", boolean(true)))
+        .add_attribute(("enable_dns_hostnames", boolean(true)))
 }
 
 /// A network's subnet (after its block joins the VPC, unless it is the VPC's own) and its route

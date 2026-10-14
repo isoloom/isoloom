@@ -122,6 +122,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     machine_files::check(spec, &mut p);
     windows::check(spec, &mut p);
     process::check(spec, &mut p);
+    dns::private(spec, &mut p);
     machines::cycle(spec, &mut p);
     boot::check(spec, &mut p);
     provision::controller(spec, &mut p);

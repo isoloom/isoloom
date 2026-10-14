@@ -2,8 +2,9 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, DISKS, EGRESS_RULES, ENVIRONMENT, ICMP, IMAGES, LOCATION,
-    MANAGED, NAT, NESTED, OCI_IPV6, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, PUBLIC_IP, ROUTER, SOURCE_PORTS, TAGS, TPM, VLANS, VM_AGENT,
+    ACCOUNT, ADDRESSES, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, DISKS,
+    EGRESS_RULES, ENVIRONMENT, ICMP, IMAGES, LOCATION, MANAGED, NAT, NESTED, OCI_IPV6, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, ROUTER, SOURCE_PORTS, TAGS,
+    TPM, VLANS, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -45,9 +46,10 @@ const TYPES: Rules = &[
     (VLANS, "core_vlan"),
     (BACKUP, "core_boot_volume"),
     (DISKS, "core_volume core_volume_attachment"),
-    (PRIVATE_DNS, "core_dhcp_options"),
+    (CLOUD_RESOLVER, "core_dhcp_options"),
     (IMAGES, "core_image core_compute_image_capability_schema core_shape_management"),
-    (PRIVATE_DNS, "dns_zone dns_rrset dns_record dns_view dns_resolver dns_resolver_endpoint"),
+    (ALIAS_RECORDS, "dns_record"),
+    (CLOUD_NETWORK, "dns_resolver_endpoint"),
     (
         PUBLIC_DNS,
         "dns_action_create_zone_from_zone_file dns_steering_policy* dns_tsig_key dns_zone_promote_dnssec_key_version
@@ -97,16 +99,24 @@ const TYPES: Rules = &[
 const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
-        "data.oci_core_images data.oci_identity_availability_domains oci_core_instance oci_core_internet_gateway
-        oci_core_network_security_group oci_core_network_security_group_security_rule oci_core_route_table oci_core_security_list
-        oci_core_subnet oci_core_vcn",
+        "data.oci_core_images data.oci_core_vcn_dns_resolver_association data.oci_identity_availability_domains oci_core_instance
+        oci_core_internet_gateway oci_core_network_security_group oci_core_network_security_group_security_rule oci_core_route_table
+        oci_core_security_list oci_core_subnet oci_core_vcn oci_dns_resolver oci_dns_rrset oci_dns_view oci_dns_zone",
     ),
     ("provider", "region"),
     (
         "data.oci_core_images",
         "compartment_id operating_system operating_system_version shape sort_by sort_order",
     ),
+    ("data.oci_core_vcn_dns_resolver_association", "vcn_id"),
     ("data.oci_identity_availability_domains", "compartment_id"),
+    ("oci_dns_resolver", "attached_views attached_views.view_id resolver_id scope"),
+    (
+        "oci_dns_rrset",
+        "domain items items.domain items.rdata items.rtype items.ttl rtype zone_name_or_id",
+    ),
+    ("oci_dns_view", "compartment_id display_name scope"),
+    ("oci_dns_zone", "compartment_id name scope view_id zone_type"),
     (
         "oci_core_instance",
         "availability_domain compartment_id create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.hostname_label
@@ -153,6 +163,15 @@ const SETTINGS: Rules = &[(
 
 /// The arguments Isoloom leaves out, per resource type or data source.
 const ARGUMENTS: &[(&str, Rules)] = &[
+    ("oci_dns_resolver", &[(ALIAS, "compartment_id"), (CLOUD_NETWORK, "rules.*")]),
+    ("oci_dns_rrset", &[(ALIAS, "compartment_id scope view_id")]),
+    (
+        "oci_dns_zone",
+        &[
+            (ZONE_SETTINGS, "dnssec_state resolution_mode"),
+            (CLOUD_NETWORK, "external_downstreams.* external_masters.*"),
+        ],
+    ),
     (
         "oci_core_instance",
         &[
@@ -190,7 +209,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "create_vnic_details.assign_ipv6ip create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details
                 create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.*",
             ),
-            (PRIVATE_DNS, "create_vnic_details.assign_private_dns_record"),
+            (CLOUD_NAMES, "create_vnic_details.assign_private_dns_record"),
             (VLANS, "create_vnic_details.vlan_id"),
             (DISKS, "launch_volume_attachments launch_volume_attachments.*"),
         ],
@@ -238,7 +257,8 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         "oci_core_subnet",
         &[
             (LOCATION, "availability_domain"),
-            (PRIVATE_DNS, "dns_label dhcp_options_id"),
+            (CLOUD_NAMES, "dns_label"),
+            (CLOUD_RESOLVER, "dhcp_options_id"),
             (ADDRESSES, "ipv4cidr_blocks"),
             (OCI_IPV6, "ipv6cidr_block ipv6cidr_blocks"),
             (ALIAS, "prohibit_internet_ingress prohibit_public_ip_on_vnic"),
@@ -247,7 +267,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
     (
         "oci_core_vcn",
         &[
-            (PRIVATE_DNS, "dns_label"),
+            (CLOUD_NAMES, "dns_label"),
             (
                 OCI_IPV6,
                 "ipv6private_cidr_blocks is_ipv6enabled is_oracle_gua_allocation_enabled byoipv6cidr_details byoipv6cidr_details.*",

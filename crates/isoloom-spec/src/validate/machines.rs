@@ -153,7 +153,7 @@ fn resources(s: &Subject, p: &mut Problems) {
 }
 
 /// Whether `a` is a DNS name (lowercase labels, each at most 63 characters).
-fn dns_name(a: &str) -> bool {
+pub(super) fn dns_name(a: &str) -> bool {
     a.len() <= 253
         && a.split('.').all(|l| {
             !l.is_empty()
