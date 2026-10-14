@@ -113,6 +113,13 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "secrets",
+        crate::spec::status::Status::Done {
+            how: "the `isoloom-secrets` Secret, created by `isoloom run` from the stores (never in the manifests or the chart)",
+            proof: crate::spec::status::PROBE,
+        },
+    ),
+    (
         "provision[].ansible",
         Planned {
             note: "a controller pod running the playbooks",

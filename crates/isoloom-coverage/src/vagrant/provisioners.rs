@@ -128,7 +128,7 @@ fn ansible(o: &str) -> Option<Support> {
 fn ansible_rest(o: &str) -> Option<Support> {
     Some(match o {
         "vault_password_file" | "ask_vault_pass" => Planned {
-            note: "secrets: an Ansible vault's password",
+            note: "an Ansible vault's password as a secret, with secrets on the VM targets",
         },
         "tags" | "skip_tags" | "start_at_task" => Tooling {
             note: "running part of a playbook: a debugging aid",

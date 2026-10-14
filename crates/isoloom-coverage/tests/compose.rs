@@ -180,6 +180,20 @@ machines:
     dns: { options: ["ndots:2", "timeout:1"] }
     docker: { build: app, target: lab }
 "#,
+    // Secrets: the top-level `secrets` and `services.*.secrets` with a path, owner and mode.
+    r"
+version: 1
+name: secrets
+networks: { lan: { cidr: 10.9.0.0/24 } }
+secrets:
+  db-password: { env: DB_PASSWORD }
+  tls-key: { file: tls.key }
+machines:
+  web:
+    networks: { lan: 10 }
+    docker: { image: nginx:alpine }
+    secrets: [db-password, { source: tls-key, target: /etc/ssl/app.key, uid: 101, gid: 101, mode: 0400 }]
+",
 ];
 
 /// Every Compose file Isoloom writes for `spec`, on every target that writes one.

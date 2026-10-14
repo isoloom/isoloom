@@ -54,6 +54,9 @@ pub fn probe(path: &str) -> Option<String> {
         }
         "inputs" => "inputs: [TOKEN]".to_string(),
         "machines.*.inputs" => "{ inputs: [TOKEN], machines: { a: { inputs: [TOKEN] } } }".to_string(),
+        "secrets" | "machines.*.secrets" => {
+            "{ secrets: { token: { env: TOKEN } }, machines: { a: { secrets: [token, { source: token, target: /etc/app/token, mode: 0400 }] } } }".to_string()
+        }
         "machines.*.depends_on" => format!("machines: {{ {B}, depends_on: [a] }} }}"),
         "machines.*.access" => format!("machines: {{ {B}, access: true }} }}"),
         "volumes.*.owner" => {

@@ -168,6 +168,9 @@ pub struct VolumeMount {
     /// Whether it can't write to it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub read_only: bool,
+    /// One file of the volume alone, mounted at the path (a secret's key).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_path: Option<String>,
 }
 
 impl VolumeMount {
@@ -177,6 +180,7 @@ impl VolumeMount {
             name: name.into(),
             mount_path: path.into(),
             read_only: false,
+            sub_path: None,
         }
     }
 
@@ -219,6 +223,26 @@ pub enum VolumeSource {
     },
     /// Scratch space, on disk or in memory.
     EmptyDir(EmptyDir),
+    /// Some keys of a Secret, as files.
+    Secret {
+        /// The Secret.
+        #[serde(rename = "secretName")]
+        secret_name: String,
+        /// Its keys, each with its file's name and mode.
+        items: Vec<KeyToPath>,
+    },
+}
+
+/// A key of a Secret as a file of its volume.
+#[derive(Debug, Clone, Serialize)]
+pub struct KeyToPath {
+    /// The key.
+    pub key: String,
+    /// The file's name in the volume.
+    pub path: String,
+    /// The file's mode.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<u32>,
 }
 
 /// Scratch space; empty is on the node's disk (`{}`).

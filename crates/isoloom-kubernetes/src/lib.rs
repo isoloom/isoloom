@@ -50,6 +50,7 @@ mod network;
 pub mod objects;
 pub mod pod;
 mod render;
+pub mod secrets;
 mod values_schema;
 
 use isoloom_plan::{Capabilities, Environment, Feature};
@@ -67,12 +68,13 @@ pub const CHART: &str = "chart";
 pub const CHART_PROJECT_FILES: &str = "files/project";
 
 /// What Kubernetes can render: IPv6 networks of every kind (the cluster picks pod addresses,
-/// so a network's IPv6 side sets the Services' IP families). No controller (no `provision:`,
-/// no Ansible checks), `exec` checks run inside a container, no network appliances, Service
-/// names have no dots, no gateway machine routes a network, containers have no ulimits, and
-/// with no router in the path there is nothing to impair links with.
+/// so a network's IPv6 side sets the Services' IP families) and secrets (a Secret `isoloom run`
+/// creates). No controller (no `provision:`, no Ansible checks), `exec` checks run inside a
+/// container, no network appliances, Service names have no dots, no gateway machine routes a
+/// network, containers have no ulimits, with no router in the path there is nothing to impair
+/// links with, and a Secret volume's files belong to root.
 pub fn capabilities() -> Capabilities {
-    Capabilities::of([Feature::Ipv6, Feature::Ipv6Only, Feature::Ipv6Auto])
+    Capabilities::of([Feature::Ipv6, Feature::Ipv6Only, Feature::Ipv6Auto, Feature::Secrets])
 }
 
 /// The `kubernetes` target's backend.

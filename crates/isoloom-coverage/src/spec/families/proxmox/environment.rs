@@ -114,6 +114,7 @@ pub const CELLS: &[(&str, Status)] = &[
             proof: "supplier-portal-api",
         },
     ),
+    ("secrets", crate::spec::status::SECRETS_ON_VMS),
     (
         "provision[].ansible",
         Done {

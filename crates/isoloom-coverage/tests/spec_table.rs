@@ -155,12 +155,14 @@ networks:
   office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, switch: fw, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
 reach: [{ from: out, to: dmz, ports: [80] }]
 inputs: [TOKEN]
+secrets: { token: { env: TOKEN } }
 volumes: { data: { owner: fw } }
 machines:
   fw:
     networks: { out: 2, dmz: 1 }
     services: [{ port: 80, name: web, http: true, tls: true, publish: 8080, fixed: true }, { port: 4444, dormant: true }, { port: 53, protocol: udp }]
     inputs: [TOKEN]
+    secrets: [token, { source: token, target: /etc/app/token, uid: 0, gid: 0, mode: 0400 }]
     arch: amd64
     privileged: true
     read_only: true

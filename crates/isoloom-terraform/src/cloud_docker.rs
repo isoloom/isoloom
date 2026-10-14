@@ -90,9 +90,10 @@ impl Backend for CloudDockerBackend {
         Target::CloudDocker
     }
 
-    /// Compose's: the VM runs the Compose file, so it can render what Compose can.
+    /// Compose's but secrets: the VM runs the Compose file, so it can render what Compose can,
+    /// but `isoloom run` hands secrets only to a Compose it starts on this machine.
     fn capabilities(&self) -> Capabilities {
-        isoloom_compose::render::capabilities()
+        isoloom_compose::render::capabilities_on_a_vm()
     }
 
     /// The `docker` target's Compose file (and the files it mounts), then a module per cloud.

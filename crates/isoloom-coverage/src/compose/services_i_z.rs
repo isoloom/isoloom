@@ -1,6 +1,6 @@
 //! Service keys from `image` to `working_dir`, long-form `ports` and `volumes` included.
 
-use super::{CLOUD_SIZES, IMAGE, IPV6, LEGACY, MODEL_RUNNER, NO_CONTAINER_ON_VMS, SECRETS, SHARED_NAMESPACE, SHORT_PORTS, SHORT_VOLUMES, SWARM, TOOLING};
+use super::{CLOUD_SIZES, IMAGE, IPV6, LEGACY, MODEL_RUNNER, NO_CONTAINER_ON_VMS, SHARED_NAMESPACE, SHORT_PORTS, SHORT_VOLUMES, SWARM, TOOLING};
 use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
 
 /// Service keys from `image` to `working_dir`.
@@ -241,12 +241,37 @@ pub(super) const SERVICES_I_Z: &[(&str, Support)] = &[
             via: "machines.*.count (identical machines, each with its own name and address)",
         },
     ),
-    ("services.*.secrets", SECRETS),
-    ("services.*.secrets[].source", SECRETS),
-    ("services.*.secrets[].target", SECRETS),
-    ("services.*.secrets[].uid", SECRETS),
-    ("services.*.secrets[].gid", SECRETS),
-    ("services.*.secrets[].mode", SECRETS),
+    ("services.*.secrets", Emitted { from: "machines.*.secrets" }),
+    (
+        "services.*.secrets[].source",
+        Emitted {
+            from: "machines.*.secrets[].source",
+        },
+    ),
+    (
+        "services.*.secrets[].target",
+        Emitted {
+            from: "machines.*.secrets[].target (default /run/secrets/<name>)",
+        },
+    ),
+    (
+        "services.*.secrets[].uid",
+        Emitted {
+            from: "machines.*.secrets[].uid",
+        },
+    ),
+    (
+        "services.*.secrets[].gid",
+        Emitted {
+            from: "machines.*.secrets[].gid",
+        },
+    ),
+    (
+        "services.*.secrets[].mode",
+        Emitted {
+            from: "machines.*.secrets[].mode",
+        },
+    ),
     ("services.*.security_opt", NO_CONTAINER_ON_VMS),
     (
         "services.*.shm_size",

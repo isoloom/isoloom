@@ -56,6 +56,14 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.secrets",
+        crate::spec::status::Status::Partial {
+            how: "a Secret volume, each key mounted at its path with its mode (the `init` container's too)",
+            gap: "`uid` and `gid` are refused: a Secret volume's files belong to root",
+            proof: crate::spec::status::PROBE,
+        },
+    ),
+    (
         "machines.*.environment",
         Done {
             how: "the container's env (and its `init` container's)",

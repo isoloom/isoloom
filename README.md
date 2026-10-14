@@ -49,6 +49,20 @@ checks:                          # plus the checks Isoloom derives from services
   five of a machine; the spec stays short when a fleet gets the same box, size and playbook.
 - **Generic.** Nothing is specific to one use: launch-time values reach machines through
   `inputs:`, and `access: true` marks the machine a user lands on.
+- **Secrets stay secret.** `secrets:` names where each value lives (the runner's environment, a
+  file, Vault, SOPS); a machine lists the ones it gets, as files. `isoloom run` reads them and
+  hands them to the target's own mechanism (Compose secrets, a Kubernetes Secret): no value is
+  ever in `.isoloom/`, the snapshot or a log.
+
+```yaml
+secrets:
+  db-password: { env: DB_PASSWORD }               # or { file: ~/.lab/db }, { vault: 'secret/app#db' }, { sops: 'enc.yaml#db.password' }
+machines:
+  db:
+    secrets: [db-password]                        # /run/secrets/db-password
+  web:
+    secrets: [{ source: db-password, target: /etc/app/db, uid: 101, gid: 101, mode: 0400 }]
+```
 
 ## Install
 

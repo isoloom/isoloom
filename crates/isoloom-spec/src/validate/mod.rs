@@ -4,7 +4,7 @@
 //!
 //! [`validate`] runs one validator per section of the spec, in a fixed order (the order of
 //! the problems is part of the output): the top level, constraints, cloud services, networks,
-//! reach rules, machines (with their settings, volumes and services), provisioning and the
+//! reach rules, inputs and secrets, machines (with their settings, volumes and services), provisioning and the
 //! controller, tools, link impairment, the message, groups, checks and targets.
 
 mod checks;
@@ -20,6 +20,7 @@ mod machines;
 mod networks;
 mod provision;
 mod reach;
+mod secrets;
 mod services;
 mod settings;
 mod targets;
@@ -99,6 +100,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     networks::gateways(spec, &blocks, &mut p);
     reach::check(spec, &mut p);
     top::inputs(spec, &mut p);
+    secrets::check(spec, &mut p);
     machines::declared(spec, &mut p);
     machines::appliances(spec, &mut p);
     networks::switches(spec, &mut p);

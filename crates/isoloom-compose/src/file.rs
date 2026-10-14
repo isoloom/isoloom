@@ -16,6 +16,9 @@ pub struct ComposeFile {
     /// Its named volumes.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
     pub volumes: IndexMap<String, Labelled>,
+    /// Its secrets, each read from a variable of Compose's own environment.
+    #[serde(skip_serializing_if = "IndexMap::is_empty")]
+    pub secrets: IndexMap<String, Secret>,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference.
@@ -101,6 +104,9 @@ pub struct Service {
     /// Mounts: bind mounts and named volumes (`source:target[:ro]`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub volumes: Vec<String>,
+    /// The secrets it gets, as files.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub secrets: Vec<ServiceSecret>,
     /// How Docker decides the container is healthy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<Healthcheck>,
@@ -306,6 +312,31 @@ pub struct Subnet {
     /// Where Docker picks the addresses it hands out, away from the fixed ones.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ip_range: Option<String>,
+}
+
+/// A secret of the file: where Compose reads its value when it creates the containers.
+#[derive(Debug, Clone, Serialize)]
+pub struct Secret {
+    /// The variable of Compose's own environment holding the value (never the containers').
+    pub environment: String,
+}
+
+/// A secret a service gets: which one, at what path, owned by whom, with what mode.
+#[derive(Debug, Clone, Serialize)]
+pub struct ServiceSecret {
+    /// The file's secret.
+    pub source: String,
+    /// The file's absolute path in the container.
+    pub target: String,
+    /// Its owner's user id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
+    /// Its group id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gid: Option<String>,
+    /// Its mode, in octal (`"0440"`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
 }
 
 /// A named volume: only Isoloom's labels.

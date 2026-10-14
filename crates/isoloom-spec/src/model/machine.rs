@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Dns, DockerImpl, External, Ulimit, VmImpl};
+use super::{Dns, DockerImpl, External, MachineSecret, Ulimit, VmImpl};
 
 /// A machine's CPU architecture. Every target has one: a container platform, a box
 /// architecture, a cloud instance family. Defaults to x86-64.
@@ -103,6 +103,11 @@ pub struct Machine {
     /// The spec inputs this machine receives (only these).
     #[serde(default)]
     pub inputs: Vec<String>,
+    /// The secrets this machine gets, as files (never environment variables): a name from the
+    /// top-level `secrets` (`/run/secrets/<name>`), or `{ source, target, uid, gid, mode }`.
+    /// Delivered by `isoloom run` when the machine starts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub secrets: Vec<MachineSecret>,
     /// CPUs, memory and disk for the machine (a VM's size, a container's limits). Default: 1
     /// CPU, 1024 MB, 20 GB.
     #[serde(default)]

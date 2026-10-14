@@ -17,12 +17,14 @@ use serde_yaml_ng::Value;
 
 const CHART: &str = ".isoloom/kubernetes/chart/";
 
-/// What no example sets but the generator writes: a machine's environment, sysctls and resolver
-/// options.
+/// What no example sets but the generator writes: a machine's environment, sysctls, resolver
+/// options and secrets.
 const FIXTURE: &str = r#"
 version: 1
 name: kubernetes-fixture
 networks: { lan: { cidr: 10.9.0.0/24 } }
+secrets:
+  db-password: { env: DB_PASSWORD }
 machines:
   app:
     networks: { lan: 10 }
@@ -30,6 +32,7 @@ machines:
     environment: { MODE: lab }
     sysctls: { net.ipv4.ip_unprivileged_port_start: "0" }
     dns: { options: ["ndots:2"] }
+    secrets: [{ source: db-password, target: /etc/app/db-password, mode: 0400 }]
 "#;
 
 /// Every example's Kubernetes files, as `(path, contents)`, from the examples Kubernetes takes,

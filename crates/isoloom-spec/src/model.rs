@@ -9,6 +9,7 @@ mod implementation;
 mod ipv6;
 mod machine;
 mod network;
+mod secrets;
 mod shared;
 mod target;
 
@@ -20,6 +21,7 @@ pub use implementation::{Appliance, Controller, Dns, DockerImpl, KNOWN_OS, Provi
 pub use ipv6::{Ipv6, Ipv6Addresses};
 pub use machine::{Arch, Machine, Protocol, Resources, ScalarSchema, Service};
 pub use network::{Network, NetworkDocker, Reach, Tc, Vlan};
+pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, secret_variable};
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, TOOL_RECIPES, Tool, ULIMITS, Ulimit};
 pub use target::{Shape, Target};
 
@@ -44,6 +46,11 @@ pub struct Spec {
     /// Values a runner may provide at launch (e.g. tokens). Never baked into images.
     #[serde(default)]
     pub inputs: Vec<String>,
+    /// Secrets, by kebab-case name: where `isoloom run` reads each value on the runner (`env`,
+    /// `file`, `vault`, `sops`). A machine lists the ones it gets in its own `secrets`, as
+    /// files. Values never reach a generated file, the resolved snapshot or a log.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub secrets: IndexMap<String, SecretSource>,
     /// The environment's machines, by name, started in the order written (after their
     /// `depends_on`).
     #[serde(default)]

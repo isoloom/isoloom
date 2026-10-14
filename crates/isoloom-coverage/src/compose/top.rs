@@ -1,6 +1,6 @@
 //! The top-level keys, then the networks, volumes, configs, secrets and models a file declares.
 
-use super::{FILES, LEGACY_NAME, MODEL_RUNNER, SECRETS, TOOLING};
+use super::{FILES, LEGACY_NAME, MODEL_RUNNER, TOOLING};
 use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
 
 /// The top-level keys, `include` items included.
@@ -15,7 +15,7 @@ pub(super) const TOP: &[(&str, Support)] = &[
     ("models", MODEL_RUNNER),
     ("networks", Emitted { from: "networks" }),
     ("volumes", Emitted { from: "machines.*.volumes" }),
-    ("secrets", SECRETS),
+    ("secrets", Emitted { from: "secrets" }),
     ("configs", FILES),
     (
         "jobs",
@@ -176,9 +176,24 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
             note: "Compose scopes names to the environment",
         },
     ),
-    ("secrets.*.environment", SECRETS),
-    ("secrets.*.file", SECRETS),
-    ("secrets.*.external", SECRETS),
+    (
+        "secrets.*.environment",
+        Emitted {
+            from: "secrets (every store: `isoloom run` reads the value and sets `ISOLOOM_SECRET_<NAME>` for Compose alone)",
+        },
+    ),
+    (
+        "secrets.*.file",
+        Equivalent {
+            via: "secrets.*.file: `isoloom run` reads the file and hands its value to Compose as `environment`",
+        },
+    ),
+    (
+        "secrets.*.external",
+        Equivalent {
+            via: "secrets.*.vault and secrets.*.sops: stores outside the file, read by `isoloom run`",
+        },
+    ),
     ("secrets.*.external.name", LEGACY_NAME),
     ("secrets.*.labels", TOOLING),
     (

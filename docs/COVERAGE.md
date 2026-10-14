@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 71% | 150 | 105 | 4 | 41 |
+| [Docker Compose](#docker-compose) | 78% | 150 | 115 | 4 | 31 |
 | [Vagrant](#vagrant) | 90% | 42 | 38 | 0 | 4 |
 | [Vagrant: networks](#vagrant-networks) | 81% | 38 | 31 | 0 | 7 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
@@ -37,7 +37,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 95% | 31 | 28 | 3 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 91% | 193 | 176 | 2 | 15 |
+| [Kubernetes](#kubernetes) | 91% | 201 | 183 | 3 | 15 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
 | [Helm](#helm) | 100% | 19 | 19 | 0 | 0 |
 
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-71% of 150 portable features (105 done, 4 partly, 41 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+78% of 150 portable features (115 done, 4 partly, 31 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -66,7 +66,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `models` | No | No | Served by Docker's model runner: VMs and the cloud have none |
 | `networks` | Yes | Yes | From `networks` |
 | `volumes` | Yes | Yes | From `machines.*.volumes` |
-| `secrets` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `secrets` | Yes | Yes | From `secrets` |
 | `configs` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
 | `jobs` | Yes | Another way | Via docker.init (one-shot jobs) |
 
@@ -319,12 +319,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `restart` | Yes | Yes | Always unless-stopped: machines stay up like VMs |
 | `runtime` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `scale` | Yes | Another way | Via machines.*.count (identical machines, each with its own name and address) |
-| `secrets` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
-| `secrets[].source` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
-| `secrets[].target` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
-| `secrets[].uid` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
-| `secrets[].gid` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
-| `secrets[].mode` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `secrets` | Yes | Yes | From `machines.*.secrets` |
+| `secrets[].source` | Yes | Yes | From `machines.*.secrets[].source` |
+| `secrets[].target` | Yes | Yes | From `machines.*.secrets[].target` (default /run/secrets/<name>) |
+| `secrets[].uid` | Yes | Yes | From `machines.*.secrets[].uid` |
+| `secrets[].gid` | Yes | Yes | From `machines.*.secrets[].gid` |
+| `secrets[].mode` | Yes | Yes | From `machines.*.secrets[].mode` |
 | `security_opt` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `shm_size` | Yes | Yes | From `machines.*.shm_size` (and a Memory emptyDir on Kubernetes) |
 | `stdin_open` | n/a | No | Compose tooling, not the environment's behavior |
@@ -416,9 +416,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `name` | n/a | No | Compose scopes names to the environment |
-| `environment` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
-| `file` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
-| `external` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `environment` | Yes | Yes | From `secrets` (every store: `isoloom run` reads the value and sets `ISOLOOM_SECRET_<NAME>` for Compose alone) |
+| `file` | Yes | Another way | Via secrets.*.file: `isoloom run` reads the file and hands its value to Compose as `environment` |
+| `external` | Yes | Another way | Via secrets.*.vault and secrets.*.sops: stores outside the file, read by `isoloom run` |
 | `external.name` | n/a | No | Legacy spelling of `name` |
 | `labels` | n/a | No | Compose tooling, not the environment's behavior |
 | `driver` | No | No | Docker secret drivers have no VM equivalent |
@@ -712,7 +712,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `file: source` | Yes | Another way | Via `isoloom_project` copies the project into each VM |
 | `ansible: ask_become_pass` | n/a | No | How Vagrant installs and runs Ansible |
 | `ansible: ask_sudo_pass` | n/a | No | How Vagrant installs and runs Ansible |
-| `ansible: ask_vault_pass` | Yes | Not yet | Secrets: an Ansible vault's password |
+| `ansible: ask_vault_pass` | Yes | Not yet | An Ansible vault's password as a secret, with secrets on the VM targets |
 | `ansible: become` | Yes | Another way | Via the playbook's own `become` |
 | `ansible: become_user` | Yes | Another way | Via the playbook's own `become` |
 | `ansible: compatibility_mode` | n/a | No | How Vagrant installs and runs Ansible |
@@ -737,7 +737,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ansible: sudo` | Yes | Another way | Via the playbook's own `become` |
 | `ansible: sudo_user` | Yes | Another way | Via the playbook's own `become` |
 | `ansible: tags` | n/a | No | Running part of a playbook: a debugging aid |
-| `ansible: vault_password_file` | Yes | Not yet | Secrets: an Ansible vault's password |
+| `ansible: vault_password_file` | Yes | Not yet | An Ansible vault's password as a secret, with secrets on the VM targets |
 | `ansible: verbose` | n/a | No | How Vagrant installs and runs Ansible |
 | `ansible: version` | n/a | No | How Vagrant installs and runs Ansible |
 | `ansible_local: become` | Yes | Another way | Via the playbook's own `become` |
@@ -767,7 +767,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ansible_local: sudo_user` | Yes | Another way | Via the playbook's own `become` |
 | `ansible_local: tags` | n/a | No | Running part of a playbook: a debugging aid |
 | `ansible_local: tmp_path` | n/a | No | How Vagrant installs and runs Ansible |
-| `ansible_local: vault_password_file` | Yes | Not yet | Secrets: an Ansible vault's password |
+| `ansible_local: vault_password_file` | Yes | Not yet | An Ansible vault's password as a secret, with secrets on the VM targets |
 | `ansible_local: verbose` | n/a | No | How Vagrant installs and runs Ansible |
 | `ansible_local: version` | n/a | No | How Vagrant installs and runs Ansible |
 | `chef_solo: add_recipe` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
@@ -6748,7 +6748,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-91% of 193 portable features (176 done, 2 partly, 15 to do; 360 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+91% of 201 portable features (183 done, 3 partly, 15 to do; 369 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -6979,7 +6979,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `Volume: quobyte` | No | No | One storage system's plugin: no other target has it |
 | `Volume: rbd` | No | No | One storage system's plugin: no other target has it |
 | `Volume: scaleIO` | No | No | One storage system's plugin: no other target has it |
-| `Volume: secret` | Yes | Not yet | Real secrets: files a machine reads, not environment variables |
+| `Volume: secret` | Yes | Yes | From `machines.*.secrets` (keys of the `isoloom-secrets` Secret, which `isoloom run` creates) |
 | `Volume: storageos` | No | No | One storage system's plugin: no other target has it |
 | `Volume: vsphereVolume` | No | No | One storage system's plugin: no other target has it |
 | `VolumeMount: bindMountOptions` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
@@ -6988,7 +6988,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `VolumeMount: name` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
 | `VolumeMount: readOnly` | Yes | Yes | Isoloom's probe, mounted read-only |
 | `VolumeMount: recursiveReadOnly` | Yes | Another way | Via `readOnly` |
-| `VolumeMount: subPath` | Yes | Not yet | A machine's `files`, each mounted at its own path |
+| `VolumeMount: subPath` | Yes | Partly | From `machines.*.secrets` (each secret's key at its path); not yet: a machine's `files`, each mounted at its own path |
 | `VolumeMount: subPathExpr` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
 | `PersistentVolumeClaimVolumeSource: claimName` | Yes | Yes | From `volumes` |
 | `PersistentVolumeClaimVolumeSource: readOnly` | Yes | Another way | Via the mount's `readOnly` |
@@ -7000,6 +7000,15 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `EmptyDirVolumeSource: medium` | Yes | Yes | From `machines.*.tmpfs and machines.*.shm_size` (in memory) |
 | `EmptyDirVolumeSource: mode` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
 | `EmptyDirVolumeSource: sizeLimit` | Yes | Yes | From `machines.*.tmpfs and machines.*.shm_size` (in memory) |
+| `SecretVolumeSource: defaultMode` | Yes | Another way | Via each key's `mode` |
+| `SecretVolumeSource: defaultUser` | Yes | Not yet | A secret's `uid` on Kubernetes, once the clusters Isoloom targets all have it |
+| `SecretVolumeSource: items` | Yes | Yes | From `machines.*.secrets` (the machine's own secrets only) |
+| `SecretVolumeSource: optional` | n/a | No | `isoloom run` creates the Secret before the pods start: a missing secret stops the run instead |
+| `SecretVolumeSource: secretName` | Yes | Yes | From `secrets` (the `isoloom-secrets` Secret) |
+| `KeyToPath: key` | Yes | Yes | From `machines.*.secrets` (the machine's own secrets only) |
+| `KeyToPath: mode` | Yes | Yes | From `machines.*.secrets[].mode` (default 0444) |
+| `KeyToPath: path` | Yes | Yes | From `machines.*.secrets` (the machine's own secrets only) |
+| `KeyToPath: user` | Yes | Not yet | A secret's `uid` on Kubernetes, once the clusters Isoloom targets all have it |
 | `PersistentVolumeClaim: apiVersion` | Yes | Yes | Every object Isoloom writes |
 | `PersistentVolumeClaim: kind` | Yes | Yes | Every object Isoloom writes |
 | `PersistentVolumeClaim: metadata` | Yes | Yes | Every object Isoloom writes |
@@ -7264,6 +7273,7 @@ is marked ✗, with its reason below.
 | `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
+| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `machines.*.networks` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
 | `machines.*.services[].port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `cloud.provider` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
@@ -7283,6 +7293,7 @@ is marked ✗, with its reason below.
 | `machines.*.services[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.services[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
+| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `machines.*.environment` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
@@ -7355,24 +7366,24 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 91% of 78 | 71 | 0 | 0 | 7 |
-| hosted | 91% of 78 | 71 | 0 | 0 | 7 |
-| kubernetes | 75% of 70 | 48 | 10 | 1 | 11 |
-| helm | 75% of 70 | 48 | 10 | 1 | 11 |
-| kustomize | 75% of 70 | 48 | 10 | 1 | 11 |
-| vagrant | 94% of 68 | 63 | 3 | 0 | 2 |
-| docker-vm | 91% of 78 | 71 | 0 | 0 | 7 |
-| hybrid | 79% of 87 | 68 | 3 | 7 | 9 |
-| proxmox | 88% of 66 | 58 | 1 | 3 | 4 |
-| aws | 68% of 66 | 40 | 11 | 6 | 9 |
-| azure | 68% of 66 | 40 | 11 | 7 | 8 |
-| gcp | 68% of 66 | 40 | 11 | 6 | 9 |
-| digitalocean | 49% of 66 | 29 | 7 | 6 | 24 |
-| linode | 53% of 66 | 31 | 8 | 6 | 21 |
-| oci | 53% of 66 | 31 | 8 | 6 | 21 |
-| cloud-docker | 89% of 78 | 70 | 0 | 0 | 8 |
+| docker | 91% of 80 | 73 | 0 | 0 | 7 |
+| hosted | 91% of 80 | 73 | 0 | 0 | 7 |
+| kubernetes | 75% of 72 | 49 | 11 | 1 | 11 |
+| helm | 75% of 72 | 49 | 11 | 1 | 11 |
+| kustomize | 75% of 72 | 49 | 11 | 1 | 11 |
+| vagrant | 92% of 70 | 63 | 3 | 0 | 4 |
+| docker-vm | 88% of 80 | 71 | 0 | 0 | 9 |
+| hybrid | 78% of 89 | 68 | 3 | 7 | 11 |
+| proxmox | 86% of 68 | 58 | 1 | 3 | 6 |
+| aws | 66% of 68 | 40 | 11 | 6 | 11 |
+| azure | 66% of 68 | 40 | 11 | 7 | 10 |
+| gcp | 66% of 68 | 40 | 11 | 6 | 11 |
+| digitalocean | 47% of 68 | 29 | 7 | 6 | 26 |
+| linode | 51% of 68 | 31 | 8 | 6 | 23 |
+| oci | 51% of 68 | 31 | 8 | 6 | 23 |
+| cloud-docker | 87% of 80 | 70 | 0 | 0 | 10 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 65% of 56 | 32 | 9 | 14 | 1 |
+| external | 62% of 58 | 32 | 9 | 14 | 3 |
 
 ### Refusals
 
@@ -7398,6 +7409,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **oci**: Network `lan` is IPv6: dual-stack virtual cloud networks on Oracle Cloud come later (`networks.*.ipv6.cidr`)
 - **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static` (`networks.*.ipv6.addresses`)
 - **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci, external**: Network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport) (`networks.*.ipv6.only`)
+- **vagrant, docker-vm, hybrid, proxmox, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Machine `a` gets `secrets`, which `isoloom run` delivers on the Docker and Kubernetes targets for now (`secrets`, `machines.*.secrets`)
 - **proxmox**: Machine `a`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts) (`machines.*.arch`)
 - **aws**: Machine `a`: arm64 on AWS comes later (Graviton instances and arm64 AMIs) (`machines.*.arch`)
 - **azure**: Machine `a`: arm64 on Azure comes later (Arm-based sizes and arm64 images) (`machines.*.arch`)

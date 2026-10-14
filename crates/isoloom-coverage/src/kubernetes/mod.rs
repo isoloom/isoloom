@@ -57,6 +57,8 @@ pub const TABLED: &[&str] = &[
     "PersistentVolumeClaimVolumeSource",
     "ConfigMapVolumeSource",
     "EmptyDirVolumeSource",
+    "SecretVolumeSource",
+    "KeyToPath",
     "PersistentVolumeClaim",
     "PersistentVolumeClaimSpec",
     "VolumeResourceRequirements",

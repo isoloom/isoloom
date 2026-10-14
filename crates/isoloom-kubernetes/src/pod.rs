@@ -158,6 +158,7 @@ fn mounts(m: &Machine) -> Vec<VolumeMount> {
     if m.probed() {
         out.push(VolumeMount::read_only(PROBE_VOLUME, PROBE_DIR));
     }
+    out.extend(crate::secrets::mounts(m));
     out
 }
 
@@ -293,6 +294,7 @@ fn volumes(m: &Machine) -> Vec<Volume> {
     if let Some(shm) = &m.spec.shm_size {
         out.push(volume("dshm".into(), memory(Some(shm))));
     }
+    out.extend(crate::secrets::volume(m));
     out
 }
 

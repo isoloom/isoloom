@@ -51,6 +51,7 @@ pub const CELLS: &[(&str, Status)] = &[
             note: "passed to the machine's steps",
         },
     ),
+    ("machines.*.secrets", crate::spec::status::SECRETS_ON_VMS),
     (
         "machines.*.environment",
         Planned {

@@ -42,6 +42,7 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
         environment: environment(env, mp),
         ports: mp.ports.iter().copied().map(port).collect(),
         volumes: mp.volumes.iter().map(|v| format!("{}:{}", v.key, v.path)).collect(),
+        secrets: super::secrets::of_machine(mp),
         restart: Some("unless-stopped".into()),
         ..Service::default()
     };
@@ -277,6 +278,7 @@ fn init_jobs(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, servi
             entrypoint: vec!["/bin/sh".into(), mounted.clone()],
             network_mode: Some(format!("service:{name}")),
             environment: environment(env, mp),
+            secrets: super::secrets::of_machine(mp),
             restart: Some("no".into()),
             ..Service::default()
         };
