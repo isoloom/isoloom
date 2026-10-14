@@ -400,8 +400,8 @@ end
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
 # - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
 #   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, and stops with the network's first VM,
-#   which `vagrant destroy` destroys last.
+#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
+#   network's last VM is destroyed: destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -443,6 +443,15 @@ module IsoloomQemu
     log = File.join(hubs_dir, "#{net}.log")
     ok = system(*args, out: log, err: log)
     fail!("the hub of network `#{net}` didn't start (#{args.first}): see #{log}") unless ok
+  end
+
+  # Stops the network's hub once none of its VMs (`vms`, by define name) is left besides the
+  # one just destroyed. A VM is left while Vagrant keeps its id: a halted one still holds its
+  # port, and the hub starts again for it anyway if stopped.
+  def self.release(net, vms, env, gone)
+    left = vms.reject { |vm| vm == gone.to_s }
+    return if left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
+    stop(net)
   end
 
   # Stops the network's hub, if it runs.

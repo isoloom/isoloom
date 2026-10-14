@@ -229,9 +229,10 @@ fn link(r: &mut Ruby, l: &Link) {
     }
 }
 
-/// The hub of the VM's network, started before QEMU starts the VM and, after the network's
-/// first VM is destroyed (the last, as `vagrant destroy` goes), stopped. Action triggers: only
-/// QEMU runs these actions, so no other provider runs (or prints) them.
+/// The hub of the VM's network, started before QEMU starts the VM (unless it runs) and stopped
+/// once the network's last VM is destroyed, whichever VM that is: `vagrant destroy <vm>` alone
+/// leaves the hub to the VMs still there. Action triggers: only QEMU runs these actions, so no
+/// other provider runs (or prints) them.
 fn hub_triggers(r: &mut Ruby, h: &HubPort) {
     let net = Value::str(&h.net);
     let trigger = |when: &str, action: &str| {
@@ -240,13 +241,13 @@ fn hub_triggers(r: &mut Ruby, h: &HubPort) {
             .kw("type", Value::sym("action"))
     };
     r.block(trigger("before", "StartInstance"), "t", |r| {
-        r.line(format_args!("t.ruby {{ |_, _| IsoloomQemu.hub({net}, QEMU_HUBS[{net}]) }}"));
+        r.line(format_args!("t.ruby {{ |_, _| IsoloomQemu.hub({net}, QEMU_HUBS[{net}].values) }}"));
     });
-    if h.first {
-        r.block(trigger("after", "Destroy"), "t", |r| {
-            r.line(format_args!("t.ruby {{ |_, _| IsoloomQemu.stop({net}) }}"));
-        });
-    }
+    r.block(trigger("after", "Destroy"), "t", |r| {
+        r.line(format_args!(
+            "t.ruby {{ |env, machine| IsoloomQemu.release({net}, QEMU_HUBS[{net}].keys, env, machine.name) }}"
+        ));
+    });
 }
 
 /// Emulated (another CPU than the host's) runs many times slower: booting and WinRM get far

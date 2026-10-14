@@ -400,8 +400,8 @@ end
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
 # - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
 #   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, and stops with the network's first VM,
-#   which `vagrant destroy` destroys last.
+#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
+#   network's last VM is destroyed: destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -445,6 +445,15 @@ module IsoloomQemu
     fail!("the hub of network `#{net}` didn't start (#{args.first}): see #{log}") unless ok
   end
 
+  # Stops the network's hub once none of its VMs (`vms`, by define name) is left besides the
+  # one just destroyed. A VM is left while Vagrant keeps its id: a halted one still holds its
+  # port, and the hub starts again for it anyway if stopped.
+  def self.release(net, vms, env, gone)
+    left = vms.reject { |vm| vm == gone.to_s }
+    return if left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
+    stop(net)
+  end
+
   # Stops the network's hub, if it runs.
   def self.stop(net)
     pid = running(net)
@@ -470,9 +479,9 @@ module IsoloomQemu
     gb * 1024**3 > sizes.max ? "#{gb}G" : nil
   end
 end
-# QEMU: each network's hub ports, one a VM, in the order they start.
+# QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "app" => [34694],
+  "app" => { "web" => 34694 },
 }
 
 Vagrant.configure("2") do |config|
@@ -528,10 +537,10 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, _| IsoloomQemu.hub("app", QEMU_HUBS["app"]) }
+      t.ruby { |_, _| IsoloomQemu.hub("app", QEMU_HUBS["app"].values) }
     end
     m.trigger.after :"VagrantPlugins::QEMU::Action::Destroy", type: :action do |t|
-      t.ruby { |_, _| IsoloomQemu.stop("app") }
+      t.ruby { |env, machine| IsoloomQemu.release("app", QEMU_HUBS["app"].keys, env, machine.name) }
     end
     m.vm.provider "vmware_esxi" do |v|
       v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
