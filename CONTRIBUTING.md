@@ -74,3 +74,7 @@ cd examples/hello-stack && isoloom run docker . && git diff --exit-code -- .isol
   and lists what was deliberately left out.
 - Add a CHANGELOG line for anything a user or embedder notices; a breaking change to the
   supported library surface gets a "Breaking (library)" line.
+
+## License
+
+By contributing, you agree that your contributions are licensed under the [Apache License, Version 2.0](LICENSE), the license of the project.
