@@ -16,7 +16,7 @@ networks:
 machines:
   web:
     networks: { app: 10 }
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     docker: { image: nginx }
     vm: { os: debian-12 }
 ";

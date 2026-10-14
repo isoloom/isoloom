@@ -105,7 +105,7 @@ pub fn user_data(env: &Environment, name: &str) -> Expression {
     if mp.lifecycle.iter().any(|s| matches!(s, Step::Run { .. })) {
         t.append(project_files());
     }
-    let mut ps: Vec<String> = env.spec().machines[name].services.iter().flat_map(crate::vm::windows::firewall).collect();
+    let mut ps: Vec<String> = env.spec().machines[name].ports.iter().flat_map(crate::vm::windows::firewall).collect();
     ps.extend(
         mp.lifecycle
             .iter()

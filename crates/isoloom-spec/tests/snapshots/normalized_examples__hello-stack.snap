@@ -16,13 +16,14 @@ machines:
   cache:
     networks:
       app: 20
+    os: debian@12
     arch: amd64
     privileged: false
     read_only: false
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 6379
         name: redis
         http: false
@@ -47,13 +48,14 @@ machines:
   web:
     networks:
       app: 10
+    os: debian@12
     arch: amd64
     privileged: false
     read_only: false
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 80
         name: ~
         http: true
@@ -144,4 +146,4 @@ checks:
     expect: 405
     wait: ~
 targets: ~
-message: "The page answers at http://localhost:{{ machines.web.services.0.publish }}/ (and at\nhttp://web/ from inside). The cache at {{ machines.cache.addresses.app }}:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
+message: "The page answers at http://localhost:{{ machines.web.ports.0.publish }}/ (and at\nhttp://web/ from inside). The cache at {{ machines.cache.addresses.app }}:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"

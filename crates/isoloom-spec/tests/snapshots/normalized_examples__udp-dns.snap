@@ -31,7 +31,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 53
         name: dns
         http: false
@@ -65,7 +65,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services: []
+    ports: []
     inputs: []
     resources: ~
     depends_on:
@@ -88,4 +88,4 @@ provision: []
 checks:
   - checks/resolve.sh
 targets: ~
-message: "The DNS server answers at {{ machines.dns.addresses.servers }}:53 (UDP and TCP), and on\n127.0.0.1:{{ machines.dns.services.0.publish }}/udp from this machine:\ndig @127.0.0.1 -p {{ machines.dns.services.0.publish }} www.lab.test\n"
+message: "The DNS server answers at {{ machines.dns.addresses.servers }}:53 (UDP and TCP), and on\n127.0.0.1:{{ machines.dns.ports.0.publish }}/udp from this machine:\ndig @127.0.0.1 -p {{ machines.dns.ports.0.publish }} www.lab.test\n"

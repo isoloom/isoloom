@@ -95,7 +95,7 @@ characters, is the filesystem's label.
 ```yaml
 machines:
   db:
-    vm: { os: debian-12, provision: [provision/db.sh] }
+    vm: { os: debian@12, provision: [provision/db.sh] }
     disks:
       data: { size_gb: 50, fs: xfs, mount: /var/lib/postgresql }
       scratch: { size_gb: 10, fs: raw }

@@ -90,7 +90,7 @@ fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
     }
     c.ports = m
         .spec
-        .services
+        .ports
         .iter()
         .map(|sv| ContainerPort {
             container_port: sv.port,

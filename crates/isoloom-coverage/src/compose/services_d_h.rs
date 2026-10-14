@@ -135,7 +135,7 @@ pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
     (
         "services.*.expose",
         Equivalent {
-            via: "machines.*.services (every port is reachable on the machine's networks)",
+            via: "machines.*.ports (every port is reachable on the machine's networks)",
         },
     ),
     ("services.*.extends", TOOLING),
@@ -158,7 +158,7 @@ pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
     (
         "services.*.healthcheck",
         Emitted {
-            from: "machines.*.services and machines.*.healthcheck (a probe of every port, and the machine's own check beside it)",
+            from: "machines.*.ports and machines.*.healthcheck (a probe of every port, and the machine's own check beside it)",
         },
     ),
     (

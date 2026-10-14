@@ -24,7 +24,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 3207
         name: mysql
         http: false
@@ -59,7 +59,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 3206
         name: portal
         http: true

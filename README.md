@@ -24,16 +24,16 @@ networks:
 machines:
   database:
     networks: { lab: 32 }
-    services: [{ port: 5432, name: postgres }]
+    ports: [{ port: 5432, name: postgres }]
     docker: { image: "postgres:16" }                            # as a container
-    vm: { os: debian-12, provision: [provision/database.sh] }   # as a VM (native, no Docker)
+    vm: { os: debian@12, provision: [provision/database.sh] }   # as a VM (native, no Docker)
   web:
     networks: { lab: 31 }
-    services: [{ port: 80, http: true, publish: 8080 }]
+    ports: [{ port: 80, http: true, publish: 8080 }]
     depends_on: [database]
     docker: { build: build/web }
-    vm: { os: debian-12, provision: [provision/web.sh] }
-checks:                  # plus the checks Isoloom derives from services and reach
+    vm: { os: debian@12, provision: [provision/web.sh] }
+checks:                  # plus the checks Isoloom derives from ports and reach
   - { from: web, tcp: "database:5432" }
 ```
 

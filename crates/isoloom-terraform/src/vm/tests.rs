@@ -19,7 +19,7 @@ networks:
 machines:
   a:
     networks: { lab: 10 }
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     inputs: [TOKEN]
     vm: { os: debian-12, provision: [one.sh, reboot, two.sh] }
   b:

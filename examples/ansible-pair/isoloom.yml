@@ -11,7 +11,7 @@ networks:
 # Both machines are the same kind of box: said once in `common:` (each still declares `vm: {}`,
 # the implementation it has). The `pair` group sizes them together and is an inventory group too.
 common:
-  vm: { os: debian-12 }
+  vm: { os: debian@12 }
 
 groups:
   pair:
@@ -21,12 +21,12 @@ groups:
 machines:
   web:
     networks: { lab: 10 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     vm: {}
 
   cache:
     networks: { lab: 20 }
-    services: [{ port: 6379, name: redis }]
+    ports: [{ port: 6379, name: redis }]
     vm: {}
 
 provision:

@@ -21,18 +21,18 @@ reach:
 machines:
   intranet:
     networks: { servers: 10 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     docker:
       image: "nginx:1.27-alpine"
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/intranet.sh]
 
   staff:
     access: true
     networks: { office.vlan10: 10 }
     vm:
-      os: debian-12
+      os: debian@12
 
   guest:
     networks: { office.vlan20: 10 }
@@ -40,7 +40,7 @@ machines:
       image: "alpine:3.20"
       idle: true
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/guest.sh]
 
   admin:
@@ -49,7 +49,7 @@ machines:
       image: "alpine:3.20"
       idle: true
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/guest.sh]
 
 checks:

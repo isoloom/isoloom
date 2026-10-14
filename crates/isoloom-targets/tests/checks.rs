@@ -78,7 +78,7 @@ fn windows_machines_are_not_vantage_points() {
 
 /// Windows only: a domain controller on two networks and a workstation, no `checks:` of their
 /// own.
-const WINDOWS_ONLY: &str = "version: 1\nname: win\nnetworks:\n  corp: { cidr: 10.9.0.0/24 }\n  vault: { cidr: 10.9.1.0/24 }\nmachines:\n  dc: { networks: { corp: 10, vault: 10 }, services: [{ port: 389 }], vm: { os: windows-server-2022, provision: [p.ps1] } }\n  ws: { networks: { corp: 20 }, services: [{ port: 443, http: true, tls: true }], vm: { os: windows-server-2025, provision: [p.ps1] } }\n";
+const WINDOWS_ONLY: &str = "version: 1\nname: win\nnetworks:\n  corp: { cidr: 10.9.0.0/24 }\n  vault: { cidr: 10.9.1.0/24 }\nmachines:\n  dc: { networks: { corp: 10, vault: 10 }, ports: [{ port: 389 }], vm: { os: windows-server-2022, provision: [p.ps1] } }\n  ws: { networks: { corp: 20 }, ports: [{ port: 443, http: true, tls: true }], vm: { os: windows-server-2025, provision: [p.ps1] } }\n";
 
 #[test]
 fn without_a_machine_to_run_them_derived_checks_stand_on_the_networks() {
@@ -163,7 +163,7 @@ fn hybrid_checks_from_the_controller_when_only_containers_could() {
     assert!(!vagrant.contains("from the networks"), "{vagrant}");
 }
 
-const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, services: [{ port: 80, http: true }], docker: { image: nginx } }\n  user: { access: true, networks: { lab: 20 } }\n";
+const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, ports: [{ port: 80, http: true }], docker: { image: nginx } }\n  user: { access: true, networks: { lab: 20 } }\n";
 
 fn problems(yaml: &str) -> Vec<String> {
     validate(&parse(yaml).expect("parses")).into_iter().map(|p| p.to_string()).collect()

@@ -8,7 +8,7 @@ use std::net::Ipv4Addr;
 use indexmap::IndexMap;
 use serde_json::Value;
 
-use super::yaml::{DraftYaml, Header, ServiceEntry};
+use super::yaml::{DraftYaml, Header, PortEntry};
 use super::{Draft, NoteKind, Notes, cidr_text, label, network_names};
 use crate::validate::Cidr;
 
@@ -384,7 +384,7 @@ impl<'a> Import<'a> {
         for m in machines {
             y.machine(&m.name);
             y.machine_networks(m.networks.iter().map(|(k, o)| (&names[k], *o)));
-            y.services(m.publish.iter().map(|&(port, host, udp)| ServiceEntry {
+            y.ports(m.publish.iter().map(|&(port, host, udp)| PortEntry {
                 port,
                 udp,
                 publish: Some(host),

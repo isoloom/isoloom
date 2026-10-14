@@ -231,7 +231,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `env_file[].format` | Yes | Another way | Via inputs |
 | `env_file[].required` | Yes | Another way | Via inputs |
 | `environment` | Yes | Yes | From `machines.*.environment and machines.*.inputs` |
-| `expose` | Yes | Another way | Via machines.*.services (every port is reachable on the machine's networks) |
+| `expose` | Yes | Another way | Via machines.*.ports (every port is reachable on the machine's networks) |
 | `extends` | n/a | No | Compose tooling, not the environment's behavior |
 | `extends.service` | n/a | No | Compose tooling, not the environment's behavior |
 | `extends.file` | n/a | No | Compose tooling, not the environment's behavior |
@@ -244,7 +244,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `gpus[].driver` | Yes | Another way | Via machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads) |
 | `gpus[].options` | Yes | Another way | Via machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads) |
 | `group_add` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
-| `healthcheck` | Yes | Yes | From `machines.*.services and machines.*.healthcheck` (a probe of every port, and the machine's own check beside it) |
+| `healthcheck` | Yes | Yes | From `machines.*.ports and machines.*.healthcheck` (a probe of every port, and the machine's own check beside it) |
 | `healthcheck.disable` | n/a | No | Turns off the image's own check: Isoloom's readiness is its own probe |
 | `healthcheck.interval` | Yes | Yes | From `machines.*.healthcheck.interval` (else Isoloom's probe pace) |
 | `healthcheck.retries` | Yes | Yes | From `machines.*.healthcheck.retries` (else Isoloom's probe pace) |
@@ -258,7 +258,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ipc` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `isolation` | No | No | Windows containers only |
 | `label_file` | n/a | No | Compose tooling, not the environment's behavior |
-| `labels` | Yes | Yes | From `machines.*.services` (isoloom.service.<name>, for tools reading the containers); isoloom.managed and isoloom.environment on every service, for `isoloom gc` |
+| `labels` | Yes | Yes | From `machines.*.ports` (isoloom.port.<name>, for tools reading the containers); isoloom.managed and isoloom.environment on every service, for `isoloom gc` |
 | `links` | n/a | No | Legacy; replaced by networks |
 | `logging` | n/a | No | Where the runner collects logs |
 | `logging.driver` | n/a | No | Where the runner collects logs |
@@ -287,7 +287,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `pid` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `pids_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `platform` | Yes | Yes | From `machines.*.arch` (pinned on every container, so the machine runs the same on an x86-64 or an ARM host) |
-| `ports` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback; `/udp` with `protocol: udp`) |
+| `ports` | Yes | Yes | From `machines.*.ports[].publish` (on the host's loopback; `/udp` with `protocol: udp`) |
 | `ports[].name` | n/a | No | Names the port for tools |
 | `ports[].mode` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
 | `ports[].host_ip` | Yes | Another way | Via the short form Isoloom writes (`host_ip:published:target/protocol`) |
@@ -489,7 +489,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `forwarded_port` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback; `protocol: "udp"` with `protocol: udp`) |
+| `forwarded_port` | Yes | Yes | From `machines.*.ports[].publish` (on the host's loopback; `protocol: "udp"` with `protocol: udp`) |
 | `private_network` | Yes | Yes | From `networks and machines.*.networks` |
 | `public_network` | Yes | Yes | From `networks.*.bridged` (the host's LAN, through the interface it names; not on QEMU, Hyper-V or libvirt yet) |
 
@@ -573,12 +573,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | --- | --- | --- | --- |
 | `forwarded_port: auto_correct` | n/a | No | Vagrant moving a forward to a free host port: published ports are fixed |
 | `forwarded_port: disabled` | Yes | Yes | A Windows box's own RDP forward, turned off so VMs don't compete for the host port |
-| `forwarded_port: guest` | Yes | Yes | From `machines.*.services[].publish` |
-| `forwarded_port: guest_ip` | Yes | Another way | Via machines.*.services[].port (forwarded to the machine itself) |
-| `forwarded_port: host` | Yes | Yes | From `machines.*.services[].publish` |
+| `forwarded_port: guest` | Yes | Yes | From `machines.*.ports[].publish` |
+| `forwarded_port: guest_ip` | Yes | Another way | Via machines.*.ports[].port (forwarded to the machine itself) |
+| `forwarded_port: host` | Yes | Yes | From `machines.*.ports[].publish` |
 | `forwarded_port: host_ip` | Yes | Yes | The host's loopback: a published port isn't open to the LAN |
 | `forwarded_port: id` | Yes | Yes | A Windows box's own RDP forward, turned off so VMs don't compete for the host port |
-| `forwarded_port: protocol` | Yes | Yes | From `machines.*.services[].protocol` |
+| `forwarded_port: protocol` | Yes | Yes | From `machines.*.ports[].protocol` |
 | `private_network: adapter` | n/a | No | Which adapter and host network the provider uses |
 | `private_network: adapter_ip` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
 | `private_network: auto_config` | Yes | Yes | Off for the hybrid target's Docker host: its containers take the addresses on those networks |
@@ -1496,7 +1496,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `dockerfile` | Yes | Another way | Via machines.*.docker.dockerfile, in the Compose output |
 | `email` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `env` | Yes | Another way | Via machines.*.environment, in the Compose output |
-| `expose` | Yes | Another way | Via machines.*.services[].port, in the Compose output |
+| `expose` | Yes | Another way | Via machines.*.ports[].port, in the Compose output |
 | `force_host_vm` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `git_repo` | Yes | Another way | Via machines.*.docker.build, in the Compose output |
 | `has_ssh` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -1505,7 +1505,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `link` | Yes | Another way | Via networks (machines reach each other by name), in the Compose output |
 | `name` | Yes | Another way | Via the environment and machine names, in the Compose output |
 | `password` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `ports` | Yes | Another way | Via machines.*.services[].publish, in the Compose output |
+| `ports` | Yes | Another way | Via machines.*.ports[].publish, in the Compose output |
 | `privileged` | Yes | Another way | Via machines.*.privileged, in the Compose output |
 | `pull` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `remains_running` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -7748,15 +7748,15 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `COPY --parents` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
 | `ENTRYPOINT` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
 | `ENV` | Yes | Another way | Via machines.*.environment (set on the machine itself) |
-| `EXPOSE` | Yes | Another way | Via machines.*.services (every port is reachable on the machine's networks) |
+| `EXPOSE` | Yes | Another way | Via machines.*.ports (every port is reachable on the machine's networks) |
 | `FROM` | Yes | Yes | From `machines.*.docker.appliance` (the emulator's base image, through the registry mirrors) |
 | `FROM --platform` | Yes | Another way | Via machines.*.arch (Compose's platform for the build) |
-| `HEALTHCHECK` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
-| `HEALTHCHECK --interval` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
-| `HEALTHCHECK --retries` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
-| `HEALTHCHECK --start-interval` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
-| `HEALTHCHECK --start-period` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
-| `HEALTHCHECK --timeout` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK` | Yes | Another way | Via machines.*.ports (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --interval` | Yes | Another way | Via machines.*.ports (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --retries` | Yes | Another way | Via machines.*.ports (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --start-interval` | Yes | Another way | Via machines.*.ports (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --start-period` | Yes | Another way | Via machines.*.ports (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --timeout` | Yes | Another way | Via machines.*.ports (Isoloom probes every port, in Compose's healthcheck) |
 | `LABEL` | n/a | No | Image metadata: no effect on the machine |
 | `MAINTAINER` | n/a | No | Image metadata: no effect on the machine |
 | `ONBUILD` | n/a | No | Runs in images built from this one, not in this machine |
@@ -7812,7 +7812,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `Kinds: ReplicationController` | Yes | Another way | Via a Deployment of one replica, with its claims |
 | `Kinds: ResourceQuota` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
 | `Kinds: Secret` | Yes | Yes | From `inputs` (in the chart) |
-| `Kinds: Service` | Yes | Yes | From `machines.*.services` (its name for the others, and what it publishes) |
+| `Kinds: Service` | Yes | Yes | From `machines.*.ports` (its name for the others, and what it publishes) |
 | `Kinds: ServiceAccount` | n/a | No | An identity for the Kubernetes API: machines don't call it |
 | `Kinds: ServiceCIDR` | n/a | No | Cluster administration: what the cluster runs on, not what an environment is |
 | `Kinds: StatefulSet` | Yes | Another way | Via a Deployment of one replica, with its claims |
@@ -7893,14 +7893,14 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `Container: lifecycle` | Yes | Another way | Via machines.*.docker.init: a container beside the machine's, run once it answers |
 | `Container: livenessProbe` | n/a | No | Restarts a container Kubernetes finds unhealthy: the cluster's self-healing, not the machine's behavior |
 | `Container: name` | Yes | Yes | The machine's name |
-| `Container: ports` | Yes | Yes | From `machines.*.services` |
-| `Container: readinessProbe` | Yes | Yes | From `machines.*.services and machines.*.healthcheck` (ready when its services' ports answer, dormant ones aside, and its own check passes) |
+| `Container: ports` | Yes | Yes | From `machines.*.ports` |
+| `Container: readinessProbe` | Yes | Yes | From `machines.*.ports and machines.*.healthcheck` (ready when its services' ports answer, dormant ones aside, and its own check passes) |
 | `Container: resizePolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Container: resources` | Yes | Yes | From `machines.*.resources` |
 | `Container: restartPolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Container: restartPolicyRules` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Container: securityContext` | Yes | Yes | From `machines.*.privileged and machines.*.read_only` |
-| `Container: startupProbe` | Yes | Yes | From `machines.*.services, when machines.*.healthcheck.http is the readiness probe` (the ports answer first) |
+| `Container: startupProbe` | Yes | Yes | From `machines.*.ports, when machines.*.healthcheck.http is the readiness probe` (the ports answer first) |
 | `Container: stdin` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
 | `Container: stdinOnce` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
 | `Container: terminationMessagePath` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
@@ -7909,11 +7909,11 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `Container: volumeDevices` | Yes | Yes | From `machines.*.disks with `fs: raw`` |
 | `Container: volumeMounts` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
 | `Container: workingDir` | Yes | Yes | From `machines.*.working_dir` |
-| `ContainerPort: containerPort` | Yes | Yes | From `machines.*.services[].port` |
+| `ContainerPort: containerPort` | Yes | Yes | From `machines.*.ports[].port` |
 | `ContainerPort: hostIP` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
 | `ContainerPort: hostPort` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
 | `ContainerPort: name` | n/a | No | A name for the port within Kubernetes: Isoloom refers to ports by number |
-| `ContainerPort: protocol` | Yes | Yes | From `machines.*.services[].protocol` |
+| `ContainerPort: protocol` | Yes | Yes | From `machines.*.ports[].protocol` |
 | `EnvVar: name` | Yes | Yes | From `machines.*.environment` (and Isoloom's own variables) |
 | `EnvVar: value` | Yes | Yes | From `machines.*.environment` (and Isoloom's own variables) |
 | `EnvVar: valueFrom` | Yes | Yes | From `machines.*.inputs` |
@@ -7928,7 +7928,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `ResourceRequirements: claims` | Yes | Another way | Via machines.*.gpus, as the device plugin's resource in `limits` (`nvidia.com/gpu`, `amd.com/gpu`, `gpu.intel.com/i915`) |
 | `ResourceRequirements: limits` | Yes | Yes | From `machines.*.resources` (cpus, memory_mb) and machines.*.gpus (the device plugin's resource) |
 | `ResourceRequirements: requests` | n/a | No | What the scheduler reserves on a node: the limits are the machine's size |
-| `Probe: exec` | Yes | Yes | From `machines.*.services and machines.*.healthcheck.test` (Isoloom's port probe, the same on every target, and the machine's own command) |
+| `Probe: exec` | Yes | Yes | From `machines.*.ports and machines.*.healthcheck.test` (Isoloom's port probe, the same on every target, and the machine's own command) |
 | `Probe: failureThreshold` | Yes | Yes | From `machines.*.healthcheck.retries` (else for up to 5 minutes) |
 | `Probe: grpc` | Yes | Another way | Via machines.*.healthcheck.test: a gRPC health client the image carries (`grpc_health_probe`) |
 | `Probe: httpGet` | Yes | Yes | From `machines.*.healthcheck.http` |
@@ -7938,7 +7938,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `Probe: tcpSocket` | Yes | Another way | Via `exec`: Isoloom's port probe checks every service port, TCP and UDP |
 | `Probe: terminationGracePeriodSeconds` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Probe: timeoutSeconds` | Yes | Yes | From `machines.*.healthcheck.timeout` |
-| `ExecAction: command` | Yes | Yes | From `machines.*.services and machines.*.healthcheck.test` (Isoloom's port probe, the same on every target, and the machine's own command) |
+| `ExecAction: command` | Yes | Yes | From `machines.*.ports and machines.*.healthcheck.test` (Isoloom's port probe, the same on every target, and the machine's own command) |
 | `HTTPGetAction: host` | Yes | Another way | Via the pod's own address, the default: the healthcheck requests the machine itself |
 | `HTTPGetAction: httpHeaders` | Yes | Another way | Via machines.*.healthcheck.test: a command that requests the page as it needs (headers, HTTPS) |
 | `HTTPGetAction: path` | Yes | Yes | From `machines.*.healthcheck.http` |
@@ -8082,19 +8082,19 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `ServiceSpec: loadBalancerClass` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
 | `ServiceSpec: loadBalancerIP` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
 | `ServiceSpec: loadBalancerSourceRanges` | Yes | Another way | Via the published port's NetworkPolicy |
-| `ServiceSpec: ports` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServiceSpec: ports` | Yes | Yes | From `machines.*.ports` (and their `publish`) |
 | `ServiceSpec: publishNotReadyAddresses` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
-| `ServiceSpec: selector` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServiceSpec: selector` | Yes | Yes | From `machines.*.ports` (and their `publish`) |
 | `ServiceSpec: sessionAffinity` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
 | `ServiceSpec: sessionAffinityConfig` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
 | `ServiceSpec: trafficDistribution` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
-| `ServiceSpec: type` | Yes | Yes | From `machines.*.services[].publish` (a LoadBalancer Service) |
+| `ServiceSpec: type` | Yes | Yes | From `machines.*.ports[].publish` (a LoadBalancer Service) |
 | `ServicePort: appProtocol` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
-| `ServicePort: name` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServicePort: name` | Yes | Yes | From `machines.*.ports` (and their `publish`) |
 | `ServicePort: nodePort` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
-| `ServicePort: port` | Yes | Yes | From `machines.*.services` (and their `publish`) |
-| `ServicePort: protocol` | Yes | Yes | From `machines.*.services` (and their `publish`) |
-| `ServicePort: targetPort` | Yes | Yes | From `machines.*.services` (and their `publish`) |
+| `ServicePort: port` | Yes | Yes | From `machines.*.ports` (and their `publish`) |
+| `ServicePort: protocol` | Yes | Yes | From `machines.*.ports` (and their `publish`) |
+| `ServicePort: targetPort` | Yes | Yes | From `machines.*.ports` (and their `publish`) |
 | `NetworkPolicy: apiVersion` | Yes | Yes | Every object Isoloom writes |
 | `NetworkPolicy: kind` | Yes | Yes | Every object Isoloom writes |
 | `NetworkPolicy: metadata` | Yes | Yes | Every object Isoloom writes |
@@ -8110,11 +8110,11 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `NetworkPolicyPeer: ipBlock` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
 | `NetworkPolicyPeer: namespaceSelector` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
 | `NetworkPolicyPeer: podSelector` | Yes | Yes | From networks and reach (deny by default; a network's machines reach each other) |
-| `IPBlock: cidr` | Yes | Yes | From `machines.*.services[].publish and offline networks` (anyone in, or nothing out) |
+| `IPBlock: cidr` | Yes | Yes | From `machines.*.ports[].publish and offline networks` (anyone in, or nothing out) |
 | `IPBlock: except` | n/a | No | Carves addresses out of a range: Isoloom's rules name whole networks |
 | `NetworkPolicyPort: endPort` | Yes | Another way | Via `port`, one rule per port |
-| `NetworkPolicyPort: port` | Yes | Yes | From `reach[].ports and machines.*.services[].publish` |
-| `NetworkPolicyPort: protocol` | Yes | Yes | From `reach[].ports and machines.*.services[].publish` |
+| `NetworkPolicyPort: port` | Yes | Yes | From `reach[].ports and machines.*.ports[].publish` |
+| `NetworkPolicyPort: protocol` | Yes | Yes | From `reach[].ports and machines.*.ports[].publish` |
 | `Job: apiVersion` | Yes | Yes | Every object Isoloom writes |
 | `Job: kind` | Yes | Yes | Every object Isoloom writes |
 | `Job: metadata` | Yes | Yes | Every object Isoloom writes |
@@ -8325,7 +8325,7 @@ is marked ✗, with its reason below.
 | `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.networks` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
 | `machines.*.networks[]` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | n/a | n/a | n/a |
-| `machines.*.services[].port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.ports[].port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `cloud.provider` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
 | `cloud.terraform` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
 | `cloud.vars` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
@@ -8335,19 +8335,20 @@ is marked ✗, with its reason below.
 | `cloud.env` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
 | `cloud.apply_retries` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
 | `cloud.requires` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
-| `machines.*.services[].name` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
-| `machines.*.services[].publish` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
-| `machines.*.services[].fixed` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
-| `machines.*.services[].dormant` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `machines.*.services[].protocol` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
-| `machines.*.services[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
-| `machines.*.services[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
+| `machines.*.ports[].name` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
+| `machines.*.ports[].publish` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
+| `machines.*.ports[].fixed` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
+| `machines.*.ports[].dormant` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.ports[].protocol` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.ports[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
+| `machines.*.ports[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
 | `machines.*.secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.environment` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.aliases` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
+| `machines.*.os` | planned | planned | planned | planned | planned | ✓ | planned | planned | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned | n/a | ✓ |
 | `machines.*.arch` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
 | `machines.*.rate_limit` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `machines.*.privileged` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
@@ -8481,25 +8482,25 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 88% of 122 | 108 | 0 | 0 | 14 |
-| hosted | 88% of 122 | 108 | 0 | 0 | 14 |
-| kubernetes | 70% of 116 | 76 | 12 | 1 | 27 |
-| helm | 70% of 116 | 76 | 12 | 1 | 27 |
-| kustomize | 70% of 116 | 76 | 12 | 1 | 27 |
-| vagrant | 81% of 127 | 95 | 16 | 0 | 16 |
-| docker-vm | 79% of 122 | 97 | 0 | 0 | 25 |
-| hybrid | 66% of 150 | 98 | 3 | 7 | 42 |
-| proxmox | 82% of 127 | 104 | 2 | 3 | 18 |
-| esxi | 76% of 121 | 92 | 1 | 3 | 25 |
-| aws | 62% of 127 | 72 | 16 | 6 | 33 |
-| azure | 63% of 127 | 73 | 15 | 6 | 33 |
-| gcp | 62% of 127 | 72 | 16 | 7 | 32 |
-| digitalocean | 49% of 127 | 58 | 9 | 6 | 54 |
-| linode | 56% of 127 | 66 | 12 | 6 | 43 |
-| oci | 58% of 127 | 68 | 13 | 6 | 40 |
-| cloud-docker | 78% of 122 | 96 | 0 | 0 | 26 |
+| docker | 87% of 123 | 108 | 0 | 1 | 14 |
+| hosted | 87% of 123 | 108 | 0 | 1 | 14 |
+| kubernetes | 70% of 117 | 76 | 12 | 2 | 27 |
+| helm | 70% of 117 | 76 | 12 | 2 | 27 |
+| kustomize | 70% of 117 | 76 | 12 | 2 | 27 |
+| vagrant | 81% of 128 | 96 | 16 | 0 | 16 |
+| docker-vm | 78% of 123 | 97 | 0 | 1 | 25 |
+| hybrid | 65% of 151 | 98 | 3 | 8 | 42 |
+| proxmox | 82% of 128 | 105 | 2 | 3 | 18 |
+| esxi | 76% of 122 | 93 | 1 | 3 | 25 |
+| aws | 63% of 128 | 73 | 16 | 6 | 33 |
+| azure | 63% of 128 | 74 | 15 | 6 | 33 |
+| gcp | 63% of 128 | 73 | 16 | 7 | 32 |
+| digitalocean | 49% of 128 | 59 | 9 | 6 | 54 |
+| linode | 57% of 128 | 67 | 12 | 6 | 43 |
+| oci | 58% of 128 | 69 | 13 | 6 | 40 |
+| cloud-docker | 78% of 123 | 96 | 0 | 1 | 26 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 45% of 85 | 34 | 9 | 16 | 26 |
+| external | 45% of 86 | 35 | 9 | 16 | 26 |
 
 ### Refusals
 

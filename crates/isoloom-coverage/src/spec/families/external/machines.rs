@@ -13,33 +13,33 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
-        "machines.*.services[].port",
+        "machines.*.ports[].port",
         Done {
             how: "derived checks from the other hosts expect it to answer",
             proof: "existing-hosts",
         },
     ),
     (
-        "machines.*.services[].publish",
+        "machines.*.ports[].publish",
         NotApplicable {
             why: "an existing host is reached at its own address: nothing to forward",
         },
     ),
     (
-        "machines.*.services[].fixed",
+        "machines.*.ports[].fixed",
         NotApplicable {
             why: "an existing host is reached at its own address: nothing to forward",
         },
     ),
     (
-        "machines.*.services[].dormant",
+        "machines.*.ports[].dormant",
         Done {
             how: "left out of the derived checks that expect an answer",
             proof: PROBE,
         },
     ),
     (
-        "machines.*.services[].protocol",
+        "machines.*.ports[].protocol",
         Done {
             how: "`udp`: left out of the derived checks; `reach` checks TCP",
             proof: PROBE,
@@ -69,6 +69,13 @@ pub const CELLS: &[(&str, Status)] = &[
         "machines.*.aliases",
         Planned {
             note: "/etc/hosts entries over SSH",
+        },
+    ),
+    (
+        "machines.*.os",
+        Done {
+            how: "the inventory's `linux` or `windows` group, as `vm.os`, which defaults to it",
+            proof: PROBE,
         },
     ),
     (

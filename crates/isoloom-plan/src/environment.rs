@@ -494,7 +494,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
 }
 
 fn published(m: &Machine) -> Vec<PublishedPort> {
-    m.services
+    m.ports
         .iter()
         .filter_map(|s| {
             s.publish.map(|publish| PublishedPort {

@@ -89,7 +89,7 @@ fn rules(env: &Environment, name: &str) -> Vec<Block> {
         f.push(("macro", string("Ping")));
         out.push(accept(&comment, f));
     }
-    for p in &spec.machines[name].services {
+    for p in &spec.machines[name].ports {
         if p.publish.is_some() {
             let f = vec![("proto", string(p.protocol.id())), ("dport", string(p.port.to_string()))];
             out.push(accept("published", f));

@@ -123,10 +123,10 @@ fn switch(spec: &Spec, lan: &str, sw: &str, switched: &[(&str, &str)], p: &mut P
             ),
         );
     }
-    if !m.services.is_empty() || !m.aliases.is_empty() {
+    if !m.ports.is_empty() || !m.aliases.is_empty() {
         p.add(
             format!("machines.{sw}"),
-            format!("`{sw}` switches LAN `{lan}` and has no address on the environment's networks: no `services` or `aliases`"),
+            format!("`{sw}` switches LAN `{lan}` and has no address on the environment's networks: no `ports` or `aliases`"),
         );
     }
     true

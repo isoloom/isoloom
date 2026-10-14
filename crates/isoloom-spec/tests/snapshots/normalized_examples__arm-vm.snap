@@ -22,7 +22,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 22
         name: ~
         http: false

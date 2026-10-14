@@ -28,10 +28,10 @@ pub(crate) fn behind_router(env: &Environment, dir: &str, m: &mut Module) {
         .iter()
         .filter(|(_, m)| !m.networks.is_empty())
         .flat_map(|(name, m)| {
-            m.services.iter().filter_map(move |sv| {
+            m.ports.iter().filter_map(move |sv| {
                 let h = sv.publish?;
                 let at = Template::new().with_expr(reference("local.router_address")).with_text(format!(":{h}"));
-                Some((format!("{name}/{}", m.service_label(sv)), at.into_expression()))
+                Some((format!("{name}/{}", m.port_label(sv)), at.into_expression()))
             })
         })
         .collect();

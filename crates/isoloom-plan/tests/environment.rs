@@ -23,13 +23,13 @@ machines:
     networks: { front: 10 }
     aliases: [www]
     depends_on: [db]
-    services: [{ port: 80, publish: 8080 }]
+    ports: [{ port: 80, publish: 8080 }]
     volumes: { shared: /srv/data }
     docker: { image: nginx }
     vm: { os: debian-12, provision: [web.sh] }
   db:
     networks: { back: 20, front: 20 }
-    services: [{ port: 5432 }]
+    ports: [{ port: 5432 }]
     volumes: { shared: /var/data, own: /var/lib/db }
     docker: { image: postgres }
     vm: { os: debian-12, provision: [setup.sh] }

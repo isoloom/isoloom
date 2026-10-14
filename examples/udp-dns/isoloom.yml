@@ -16,13 +16,13 @@ reach:
 machines:
   dns:
     networks: { servers: 53 }
-    services:
+    ports:
       - { port: 53, protocol: udp, name: dns, publish: 10053 }
       - { port: 53, name: dns }
     docker:
       build: build/dns
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/dns.sh]
 
   client:
@@ -33,7 +33,7 @@ machines:
       image: "alpine:3.20"
       idle: true
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/client.sh]
 
 checks:
@@ -41,5 +41,5 @@ checks:
 
 message: |
   The DNS server answers at {{ machines.dns.addresses.servers }}:53 (UDP and TCP), and on
-  127.0.0.1:{{ machines.dns.services.0.publish }}/udp from this machine:
-  dig @127.0.0.1 -p {{ machines.dns.services.0.publish }} www.lab.test
+  127.0.0.1:{{ machines.dns.ports.0.publish }}/udp from this machine:
+  dig @127.0.0.1 -p {{ machines.dns.ports.0.publish }} www.lab.test

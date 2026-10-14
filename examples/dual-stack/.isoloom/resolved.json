@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "dual-stack",
   "instance": null,
   "inputs": [],
@@ -57,7 +57,7 @@
       "docker_addresses": {
         "back": "10.67.20.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,
@@ -82,6 +82,8 @@
       ],
       "default_gateway": null,
       "offline": true,
+      "os_family": "debian",
+      "os_version": "12",
       "ipv6_addresses": {
         "back": "fd00:67:20::10"
       }
@@ -102,7 +104,7 @@
       "docker_addresses": {
         "front": "10.67.10.10"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -120,6 +122,8 @@
       ],
       "default_gateway": null,
       "offline": false,
+      "os_family": "debian",
+      "os_version": "12",
       "ipv6_addresses": {
         "front": "fd00:67:10::10"
       }

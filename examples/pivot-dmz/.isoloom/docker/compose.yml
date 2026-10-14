@@ -79,8 +79,8 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.80: tcp:80
-      isoloom.service.22: tcp:22
+      isoloom.port.80: tcp:80
+      isoloom.port.22: tcp:22
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
     restart: unless-stopped
@@ -140,7 +140,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.8080: tcp:8080
+      isoloom.port.8080: tcp:8080
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
     restart: unless-stopped
@@ -195,7 +195,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.5432: tcp:5432
+      isoloom.port.5432: tcp:5432
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
     restart: unless-stopped

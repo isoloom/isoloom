@@ -42,7 +42,7 @@ machines:
       - { path: /etc/app/site.conf, source: conf/site.conf }
   web:
     networks: { lan: 11 }
-    services: [{ port: 8000 }]
+    ports: [{ port: 8000 }]
     docker: { image: "python:3-alpine" }
     command: [python3, -m, http.server, "8000"]
     working_dir: /srv

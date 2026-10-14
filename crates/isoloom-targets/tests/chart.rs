@@ -83,7 +83,7 @@ networks: { app: { cidr: 10.60.0.0/24 } }
 machines:
   web:
     networks: { app: 10 }
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     inputs: [API_KEY]
     docker: { image: nginx }
 message: |

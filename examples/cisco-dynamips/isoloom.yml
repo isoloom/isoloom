@@ -32,7 +32,7 @@ machines:
 
   host-b:
     networks: { site-b: 10 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     docker: { image: "nginx:1.27-alpine" }
 
 checks:

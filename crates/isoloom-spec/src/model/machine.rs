@@ -1,4 +1,4 @@
-//! A machine as seen from outside: its services, architecture, resources and the settings it
+//! A machine as seen from outside: its OS, ports, architecture, resources and the settings it
 //! carries for every target.
 
 use indexmap::IndexMap;
@@ -64,6 +64,12 @@ pub struct Machine {
     /// application has baked in, like `api.example.com`), on every network it is on.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
+    /// The machine's OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the
+    /// family alone for its pinned default version (`debian` is `debian@12`). The older names
+    /// (`debian-12`) are read too. `vm.os` defaults to it, and a machine with neither `docker:`
+    /// nor `vm:` runs as a VM of this OS (`vm: { os }`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub os: Option<String>,
     /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
     #[serde(default)]
     pub arch: Arch,
@@ -129,10 +135,11 @@ pub struct Machine {
     /// login's (`limits.d`). Kubernetes has none per container.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub ulimits: IndexMap<String, Ulimit>,
-    /// The ports the machine answers on: what is published, opened by `reach`, waited for and
-    /// checked.
+    /// The ports the machine answers on, each with its protocol, an HTTP probe and whether it
+    /// is published or dormant: what is published, opened by `reach`, waited for and checked.
+    /// Named `services` before 1.0, a key still read, with a warning, for at least one release.
     #[serde(default)]
-    pub services: Vec<Service>,
+    pub ports: Vec<Port>,
     /// The spec's `inputs` this machine receives, by name: only these reach it.
     #[serde(default)]
     pub inputs: Vec<String>,
@@ -160,11 +167,11 @@ pub struct Machine {
     /// machine with `before` restates its whole process in `command`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub before: Vec<String>,
-    /// When the machine counts as healthy beyond its services' ports answering: a command or a
+    /// When the machine counts as healthy beyond its ports answering: a command or a
     /// page, with its pace. Checked beside the port probe, never instead of it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<Healthcheck>,
-    /// Machines that must be ready (their services answering) before this one starts.
+    /// Machines that must be ready (their ports answering) before this one starts.
     #[serde(default)]
     pub depends_on: Vec<String>,
     /// Data that survives restarts and re-creation of the machine, until the environment is
@@ -209,18 +216,18 @@ pub struct Machine {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
-pub struct Service {
-    /// The port the service listens on inside the machine (what the other machines and the
+pub struct Port {
+    /// The port the machine listens on (what the other machines and the
     /// checks connect to).
     pub port: u16,
-    /// A name for the service (`web`, `api`): how outputs and messages refer to it. Default:
+    /// A name for the port (`web`, `api`): how outputs and messages refer to it. Default:
     /// its port.
     #[serde(default)]
     pub name: Option<String>,
     /// It speaks HTTP: derived checks request a page instead of only connecting.
     #[serde(default)]
     pub http: bool,
-    /// It speaks TLS (HTTPS for an `http` service): probes and checks use TLS, certificates
+    /// It speaks TLS (HTTPS for an `http` port): probes and checks use TLS, certificates
     /// unchecked (lab services sign their own).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tls: bool,
@@ -234,19 +241,19 @@ pub struct Service {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fixed: bool,
     /// Only answers later, once something wakes it (the bind shell an exploit opens): declared,
-    /// published and opened by `reach` like any service, but nothing waits for it (healthcheck,
+    /// published and opened by `reach` like any port, but nothing waits for it (healthcheck,
     /// readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub dormant: bool,
     /// `tcp` (default) or `udp` (DNS, SNMP, TFTP, syslog): published, forwarded and opened as
     /// UDP. UDP has no handshake, so nothing waits for it (healthcheck, readiness probe,
     /// `depends_on`) and no derived check probes it: a check of your own says how (`exec: dig`).
-    /// A port served over both is two services, one per protocol.
+    /// A port served over both is two entries, one per protocol.
     #[serde(default, skip_serializing_if = "Protocol::is_tcp")]
     pub protocol: Protocol,
 }
 
-/// A service's transport protocol.
+/// A port's transport protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
@@ -266,32 +273,32 @@ impl Protocol {
         }
     }
 
-    /// Whether this is TCP, the default (a service without `protocol`).
+    /// Whether this is TCP, the default (a port without `protocol`).
     pub fn is_tcp(&self) -> bool {
         *self == Protocol::Tcp
     }
 }
 
 impl Machine {
-    /// How outputs name one of its services (published outputs, Compose labels): its `name`,
-    /// else its port. A UDP service is `<port>-udp`, and `<name>-udp` when a TCP service of the
+    /// How outputs name one of its ports (published outputs, Compose labels): its `name`,
+    /// else its port. A UDP port is `<port>-udp`, and `<name>-udp` when a TCP port of the
     /// machine has the same name (DNS's `dns` over both protocols), so the two never share a key.
-    pub fn service_label(&self, s: &Service) -> String {
+    pub fn port_label(&self, s: &Port) -> String {
         match &s.name {
             None if s.protocol.is_tcp() => s.port.to_string(),
             None => format!("{}-udp", s.port),
-            Some(n) if !s.protocol.is_tcp() && self.services.iter().any(|o| o.protocol.is_tcp() && o.name.as_ref() == Some(n)) => {
+            Some(n) if !s.protocol.is_tcp() && self.ports.iter().any(|o| o.protocol.is_tcp() && o.name.as_ref() == Some(n)) => {
                 format!("{n}-udp")
             }
             Some(n) => n.clone(),
         }
     }
 
-    /// The ports Isoloom waits for before the machine counts as ready: its TCP services but the
+    /// The ports Isoloom waits for before the machine counts as ready: its TCP ports but the
     /// dormant ones (UDP has no handshake to probe). Empty: nothing to probe (no healthcheck, no
     /// readiness probe).
     pub fn ready_ports(&self) -> Vec<u16> {
-        self.services.iter().filter(|s| !s.dormant && s.protocol.is_tcp()).map(|s| s.port).collect()
+        self.ports.iter().filter(|s| !s.dormant && s.protocol.is_tcp()).map(|s| s.port).collect()
     }
 
     /// Whether anything says when the machine is ready: a port to probe or a healthcheck of its

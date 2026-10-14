@@ -109,10 +109,10 @@ fn workload(definition: &str, field: &str) -> Option<Support> {
 fn service(definition: &str, field: &str) -> Option<Support> {
     Some(match (definition, field) {
         ("ServiceSpec", "ports" | "selector") | ("ServicePort", "name" | "port" | "targetPort" | "protocol") => Emitted {
-            from: "machines.*.services (and their `publish`)",
+            from: "machines.*.ports (and their `publish`)",
         },
         ("ServiceSpec", "type") => Emitted {
-            from: "machines.*.services[].publish (a LoadBalancer Service)",
+            from: "machines.*.ports[].publish (a LoadBalancer Service)",
         },
         ("ServiceSpec", "ipFamilies" | "ipFamilyPolicy") => Emitted {
             from: "networks.*.ipv6 (PreferDualStack; SingleStack IPv6 on IPv6-only networks)",
@@ -132,13 +132,13 @@ fn policy(definition: &str, field: &str) -> Option<Support> {
     Some(match (definition, field) {
         ("NetworkPolicySpec" | "NetworkPolicyIngressRule" | "NetworkPolicyEgressRule" | "NetworkPolicyPeer", _) => POLICY,
         ("IPBlock", "cidr") => Emitted {
-            from: "machines.*.services[].publish and offline networks (anyone in, or nothing out)",
+            from: "machines.*.ports[].publish and offline networks (anyone in, or nothing out)",
         },
         ("IPBlock", "except") => Tooling {
             note: "carves addresses out of a range: Isoloom's rules name whole networks",
         },
         ("NetworkPolicyPort", "port" | "protocol") => Emitted {
-            from: "reach[].ports and machines.*.services[].publish",
+            from: "reach[].ports and machines.*.ports[].publish",
         },
         ("NetworkPolicyPort", "endPort") => Equivalent {
             via: "`port`, one rule per port",

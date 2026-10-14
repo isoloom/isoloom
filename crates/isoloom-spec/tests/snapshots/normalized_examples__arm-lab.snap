@@ -29,7 +29,7 @@ machines:
       search:
         - arm.lab
       domain: arm.lab
-    services:
+    ports:
       - port: 80
         name: ~
         http: true

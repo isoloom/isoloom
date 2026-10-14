@@ -13,35 +13,35 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
-        "machines.*.services[].port",
+        "machines.*.ports[].port",
         Done {
             how: "machines depending on it wait until it answers",
             proof: "segmented",
         },
     ),
     (
-        "machines.*.services[].publish",
+        "machines.*.ports[].publish",
         Done {
             how: "forwarded by the router from its uplink address; the `published` output lists them",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].fixed",
+        "machines.*.ports[].fixed",
         Done {
             how: "the router forwards `publish` as is",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].dormant",
+        "machines.*.ports[].dormant",
         Done {
             how: "left out of the dependency waits; no derived check expects it to answer",
             proof: "segmented",
         },
     ),
     (
-        "machines.*.services[].protocol",
+        "machines.*.ports[].protocol",
         Done {
             how: "`udp`: the router forwards a published port as UDP; left out of the dependency waits; `reach` opens TCP and UDP",
             proof: "udp-dns",
@@ -81,6 +81,13 @@ pub const CELLS: &[(&str, Status)] = &[
         Done {
             how: "in every VM's hosts file after the machine's name",
             proof: PROBE,
+        },
+    ),
+    (
+        "machines.*.os",
+        Done {
+            how: "the machine's cloud image or template: `vm.os` defaults to it, and a machine with neither `docker:` nor `vm:` is a VM of it",
+            proof: "hello-stack",
         },
     ),
     (

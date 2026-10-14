@@ -16,12 +16,12 @@ networks:
 machines:
   web:
     networks: { lab: 10 }
-    services: [{ port: 80, publish: 8080 }, { port: 53, protocol: udp, publish: 5353 }]
+    ports: [{ port: 80, publish: 8080 }, { port: 53, protocol: udp, publish: 5353 }]
     resources: { cpus: 2, memory_mb: 4096, disk_gb: 30 }
     docker: { image: nginx }
   db:
     networks: { lab: 11 }
-    services: [{ port: 5432, publish: 15432 }]
+    ports: [{ port: 5432, publish: 15432 }]
     docker: { image: postgres }
 ";
 

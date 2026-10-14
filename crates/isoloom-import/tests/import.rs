@@ -38,15 +38,15 @@ fn what_the_format_expresses_is_carried_over() {
     let web = &spec.machines["web"];
     // The fixed address's last octet survives re-addressing.
     assert_eq!(web.networks["front"], 10);
-    assert_eq!(web.services.iter().map(|s| s.port).collect::<Vec<_>>(), [80]);
-    assert_eq!(web.services[0].publish, Some(8080), "the host port carries over");
+    assert_eq!(web.ports.iter().map(|s| s.port).collect::<Vec<_>>(), [80]);
+    assert_eq!(web.ports[0].publish, Some(8080), "the host port carries over");
     assert_eq!(web.inputs, ["API_TOKEN"]);
     assert_eq!(spec.inputs, ["API_TOKEN"]);
     let r = web.resources.unwrap();
     assert_eq!((r.cpus, r.memory_mb), (Some(1), Some(256)));
     assert_eq!(web.depends_on, ["cache"]);
     assert_eq!(web.docker.as_ref().unwrap().image.as_deref(), Some("nginx:1.27-alpine"));
-    assert_eq!(spec.machines["cache"].services[0].port, 6379, "expose becomes a service");
+    assert_eq!(spec.machines["cache"].ports[0].port, 6379, "expose becomes a service");
     assert_eq!(spec.machines["cache"].volumes["cache-data"].path(), "/data", "a named volume carries over");
 }
 
@@ -108,7 +108,7 @@ fn published_ports_read_every_compose_form() {
         "services:\n  a:\n    image: x\n    ports: [\"127.0.0.1:8443:443\", \"${WEB_PORT:-8080}:80\", \"9000\", { target: 5432, published: 15432 }]\n";
     let d = draft(compose, "x", "compose.yaml").unwrap();
     let spec = parse(&d.yaml).unwrap();
-    let svc = |p: u16| spec.machines["a"].services.iter().find(|s| s.port == p).unwrap().publish;
+    let svc = |p: u16| spec.machines["a"].ports.iter().find(|s| s.port == p).unwrap().publish;
     assert_eq!((svc(443), svc(80), svc(9000), svc(5432)), (Some(8443), Some(8080), None, Some(15432)));
     assert!(has(&d, NoteKind::Changed, "services.a.ports", "no fixed host port for 9000"));
 }
@@ -121,7 +121,7 @@ fn udp_ports_are_imported_as_udp_services() {
     assert_eq!(validate(&spec), vec![], "{}", d.yaml);
     let svc = |p: u16, udp: bool| {
         spec.machines["dns"]
-            .services
+            .ports
             .iter()
             .find(|s| s.port == p && s.protocol.is_tcp() != udp)
             .unwrap_or_else(|| panic!("{p} udp={udp}: {}", d.yaml))
@@ -148,7 +148,7 @@ fn a_key_set_twice_keeps_the_last_value_as_compose_does() {
     let d = draft(compose, "x", "compose.yaml").unwrap();
     let spec = parse(&d.yaml).unwrap();
     assert_eq!(validate(&spec), vec![]);
-    assert_eq!(spec.machines["api"].services.iter().map(|s| s.port).collect::<Vec<_>>(), [8080]);
+    assert_eq!(spec.machines["api"].ports.iter().map(|s| s.port).collect::<Vec<_>>(), [8080]);
     assert!(has(&d, NoteKind::InImage, "services.api.environment", "MONGO_PORT=27019, MONGO_HOST=db"));
     assert!(has(
         &d,
@@ -180,7 +180,7 @@ fn a_vagrantfile_with_a_loop_becomes_a_valid_spec() {
     assert_eq!(spec.networks["lab"].cidr, "192.168.33.0/24");
     let web = &spec.machines["web"];
     assert_eq!(web.networks["lab"], 10);
-    assert_eq!((web.services[0].port, web.services[0].publish), (80, Some(8080)));
+    assert_eq!((web.ports[0].port, web.ports[0].publish), (80, Some(8080)));
     assert_eq!(web.resources.unwrap().memory_mb, Some(1024));
     assert_eq!(spec.machines["db"].resources.unwrap().memory_mb, Some(2048));
     let vm = web.vm.as_ref().unwrap();
@@ -200,7 +200,7 @@ fn a_udp_forwarded_port_is_imported_as_a_udp_service() {
     let d = isoloom_import::vagrant::draft(&rec, "classic", "Vagrantfile").unwrap();
     let spec = parse(&d.yaml).unwrap();
     assert_eq!(validate(&spec), vec![], "{}", d.yaml);
-    let s = &spec.machines["web"].services[1];
+    let s = &spec.machines["web"].ports[1];
     assert_eq!((s.port, s.publish, s.protocol), (514, Some(1514), isoloom_spec::model::Protocol::Udp));
 }
 

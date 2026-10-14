@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "pivot-dmz",
   "instance": null,
   "inputs": [],
@@ -68,7 +68,7 @@
         "dmz": "10.30.10.10",
         "internal": "10.30.20.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,
@@ -98,7 +98,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "app": {
       "access": false,
@@ -117,7 +119,7 @@
       "docker_addresses": {
         "internal": "10.30.20.20"
       },
-      "services": [
+      "ports": [
         {
           "port": 8080,
           "name": null,
@@ -145,7 +147,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "db": {
       "access": false,
@@ -164,7 +168,7 @@
       "docker_addresses": {
         "internal": "10.30.20.30"
       },
-      "services": [
+      "ports": [
         {
           "port": 5432,
           "name": null,
@@ -192,7 +196,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "user": {
       "access": true,
@@ -210,7 +216,7 @@
       "docker_addresses": {
         "access": "10.30.99.10"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -231,7 +237,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "kali",
+      "os_version": "rolling"
     }
   },
   "start_order": [

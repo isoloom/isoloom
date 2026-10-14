@@ -23,7 +23,7 @@ const METADATA: Support = Tooling {
     note: "image metadata: no effect on the machine",
 };
 const PROBE: Support = Equivalent {
-    via: "machines.*.services (Isoloom probes every port, in Compose's healthcheck)",
+    via: "machines.*.ports (Isoloom probes every port, in Compose's healthcheck)",
 };
 
 /// The Dockerfile table.
@@ -72,7 +72,7 @@ const ROWS: &[(&str, Support)] = &[
     (
         "EXPOSE",
         Equivalent {
-            via: "machines.*.services (every port is reachable on the machine's networks)",
+            via: "machines.*.ports (every port is reachable on the machine's networks)",
         },
     ),
     (

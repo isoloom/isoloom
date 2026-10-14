@@ -25,7 +25,7 @@ networks:
 machines:
   web:
     networks: { lab: 10 }
-    services: [{ port: 80, http: true, publish: 8080 }]
+    ports: [{ port: 80, http: true, publish: 8080 }]
     vm: { os: debian-12, provision: [p.sh] }
 ",
     );
@@ -56,7 +56,7 @@ networks:
 machines:
   web:
     networks: { a: 10 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     vm: { os: debian-12 }
   box:
     networks: { b: 10 }

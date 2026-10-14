@@ -255,12 +255,11 @@ fn readiness(env: &Environment, mp: &MachinePlan, m: &Machine, svc: &mut Service
         });
     }
     // What the machine serves, for tools reading the running containers (dashboards, runners):
-    // `isoloom.service.<name>: "<http|tcp|udp>:<port>"` (an unnamed UDP service's key is
+    // `isoloom.port.<name>: "<http|tcp|udp>:<port>"` (an unnamed UDP port's key is
     // `<port>-udp`, so a port served over both keeps both).
-    for sv in &m.services {
+    for sv in &m.ports {
         let kind = if sv.http { "http" } else { sv.protocol.id() };
-        svc.labels
-            .insert(format!("isoloom.service.{}", m.service_label(sv)), format!("{kind}:{}", sv.port));
+        svc.labels.insert(format!("isoloom.port.{}", m.port_label(sv)), format!("{kind}:{}", sv.port));
     }
 }
 

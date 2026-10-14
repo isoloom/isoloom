@@ -48,7 +48,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.8000: tcp:8000
+      isoloom.port.8000: tcp:8000
       isoloom.managed: 'true'
       isoloom.environment: own-process
     restart: unless-stopped
@@ -80,7 +80,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.9000: tcp:9000
+      isoloom.port.9000: tcp:9000
       isoloom.managed: 'true'
       isoloom.environment: own-process
     restart: unless-stopped

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### `ports:` and `os: <family>@<version>`
+- **Breaking changes:**
+  - Spec: a machine's `services` (its ports, protocols, HTTP probes, published and dormant ones) is renamed `ports`. The old key is still read for at least one release (docs/stability.md): `isoloom validate` warns (`⚠ machines.web.services: ...`, and a `warnings` list in `--json`) until it is renamed, and a machine that sets both is refused. Every example, guide and the spec reference use `ports`.
+  - `resolved.json` is `resolved_version` 2: each machine's `services` is `ports`, so a message's `{{ machines.web.services.0.publish }}` is `{{ machines.web.ports.0.publish }}` (the old path is refused with that hint).
+  - Compose labels: `isoloom.service.<name>` is `isoloom.port.<name>`.
+  - `isoloom report services` is `isoloom report ports` (`services` still works).
+  - Library: `isoloom_spec::Service` is `Port`, `Machine::services` is `ports`, `Machine::service_label` is `port_label`; `Stage::Renamed`; `Spec::warnings`.
+- Spec: a machine takes `os: <family>@<version>` (`debian@12`, `windows-server@2022`), or a family alone for its pinned default (`debian` is `debian@12`, `ubuntu` 24.04, `windows` 11, `windows-server` 2022; the table is in the getting-started guide). `vm.os` defaults to it and takes the same syntax; when both are set they must agree. A machine with an `os` and neither `docker:` nor `vm:` is a VM of that OS. The families are `debian`, `ubuntu`, `rocky`, `alma`, `alpine`, `kali`, `fedora`, `centos`, `windows` and `windows-server`, mapped onto the image table's names, which stay valid (`debian-12`, `kali`). An unknown family or version is refused with the known ones. `resolved.json` records each machine's `os_family` and `os_version`. The schema offers every spelling.
+- Image table: `alpine-3.19` (`alpine@3.19`), on Vagrant (the controller's own box, `generic/alpine319`); the other targets refuse it with the reason.
+- Coverage: the spec table's `services[]` rows are `ports[]`, and a `machines.*.os` row (done on the VM targets; planned on the container ones, where the service catalogue will give it a container form).
+- New (library): `isoloom_spec::os` (`resolve`, `FAMILIES`, `Os`, `OsError`), `isoloom_spec::renamed`, `isoloom_spec::warnings`.
+
 ### Several addresses on one network
 - Spec: a machine's address on a network can be a list, `networks: { lan: [10, 11, 12] }`: the first is its primary address (the one its name resolves to), the others are on the same interface. `validate` rejects an address written twice, one outside the network's usable range, one another machine has, and a list on an outside (`external`, `bridged`) network. `count:` clones move every address along. The schema takes a number or a list.
 - Every VM target: a new set-up step (`Step::MoreAddresses`) puts each further address on the interface holding the primary one (`ip addr replace`, now and at every boot and link change on Vagrant; `New-NetIPAddress -SkipAsSource` on Windows). Every hosts file names the further addresses after their machine, and the derived checks probe each one (`web:80 at 10.86.0.11 from client`). `resolved.json` lists them (`more_addresses`).

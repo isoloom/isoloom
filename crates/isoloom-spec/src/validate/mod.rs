@@ -4,7 +4,7 @@
 //!
 //! [`validate`] runs one validator per section of the spec, in a fixed order (the order of
 //! the problems is part of the output): the top level, constraints, cloud services, networks,
-//! reach rules, inputs and secrets, machines (with their settings, volumes and services, then
+//! reach rules, inputs and secrets, machines (with their settings, volumes and ports, then
 //! their own process), provisioning and the controller, tools, link impairment, the message,
 //! groups, checks and targets.
 
@@ -23,12 +23,13 @@ mod links;
 mod machine_files;
 mod machines;
 mod networks;
+mod os;
 mod outside;
+mod ports;
 mod process;
 mod provision;
 mod reach;
 mod secrets;
-mod services;
 mod settings;
 mod storage;
 mod targets;
@@ -48,6 +49,12 @@ pub use cidr::{Cidr, DOCKER_BLOCK, PRIVATE, docker_cidrs};
 pub use cidr6::{Cidr6, PREFIX as IPV6_PREFIX};
 pub use files::validate_files;
 pub use settings::CONTAINER_SYSCTLS;
+
+/// What the spec still writes the way it did before 1.0 (a machine's `services`, now `ports`):
+/// warnings, not problems, so the spec stays valid while its author renames them.
+pub fn warnings(spec: &Spec) -> &[Problem] {
+    &spec.warnings
+}
 
 /// One thing wrong with a spec: the field's path and what to do about it.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

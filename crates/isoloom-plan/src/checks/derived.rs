@@ -2,7 +2,7 @@
 //! `reach` lets through and not from the others, and offline networks don't reach the internet.
 
 use super::{Host, HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect, Url, can_run_checks};
-use crate::model::{Machine, Service, Spec};
+use crate::model::{Machine, Port, Spec};
 
 /// Whether `from` may open connections to `to`'s address on `network`, port `port`: they share
 /// the network, or a `reach` rule from one of `from`'s networks opens it.
@@ -41,7 +41,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
             }
             // A UDP service has no handshake: nothing tells "answers" from "blocked" without
             // speaking its protocol, so only the author's checks probe it.
-            for svc in mb.services.iter().filter(|s| s.protocol.is_tcp()) {
+            for svc in mb.ports.iter().filter(|s| s.protocol.is_tcp()) {
                 out.extend(service_from(spec, &position, (a, ma), (b, mb), svc));
             }
         }
@@ -64,7 +64,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
 
 /// The derived checks of machine `b`'s TCP service `svc` from machine `a`: it answers on every
 /// path that is open, or is blocked on all of them when none is.
-fn service_from(spec: &Spec, position: &Position, (a, ma): (&str, &Machine), (b, mb): (&str, &Machine), svc: &Service) -> Vec<Resolved> {
+fn service_from(spec: &Spec, position: &Position, (a, ma): (&str, &Machine), (b, mb): (&str, &Machine), svc: &Port) -> Vec<Resolved> {
     let paths: Vec<(&String, bool)> = mb.networks.keys().map(|n| (n, allowed(spec, ma, n, svc.port))).collect();
     if paths.iter().all(|(_, ok)| !ok) {
         return paths
@@ -133,7 +133,7 @@ pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
     let mut out = Vec::new();
     for (b, mb) in &spec.machines {
         // A dormant service answers only once woken, a UDP one isn't probed, as above.
-        for svc in mb.services.iter().filter(|s| !s.dormant && s.protocol.is_tcp()) {
+        for svc in mb.ports.iter().filter(|s| !s.dormant && s.protocol.is_tcp()) {
             for (host, at) in mb.networks.keys().flat_map(|n| hosts(spec, b, mb, n)) {
                 let name = format!("{b}:{}{at} from the networks", svc.port);
                 out.push(derived_check(name, Position::Networks, answers(host, svc), 30));
@@ -144,7 +144,7 @@ pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
 }
 
 /// The probe that a machine's service answers at `host`.
-fn answers(host: Host, svc: &Service) -> Probe {
+fn answers(host: Host, svc: &Port) -> Probe {
     if svc.http {
         Probe::Http {
             url: Url {

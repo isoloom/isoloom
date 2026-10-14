@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "segmented",
   "instance": null,
   "inputs": [],
@@ -65,7 +65,7 @@
       "docker_addresses": {
         "back": "10.61.20.20"
       },
-      "services": [
+      "ports": [
         {
           "port": 6379,
           "name": "redis",
@@ -95,7 +95,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "web": {
       "access": false,
@@ -114,7 +116,7 @@
       "docker_addresses": {
         "front": "10.61.10.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,
@@ -151,7 +153,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "user": {
       "access": true,
@@ -169,7 +173,7 @@
       "docker_addresses": {
         "access": "10.61.99.10"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -190,7 +194,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [

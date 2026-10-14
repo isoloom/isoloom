@@ -14,9 +14,9 @@ machines:
   box:
     networks: { lab: 10 }
     arch: arm64
-    services: [{ port: 22 }]
+    ports: [{ port: 22 }]
     vm:
-      os: ubuntu-24.04
+      os: ubuntu@24.04
       provision: [provision/setup.sh]
 
 checks:

@@ -175,7 +175,7 @@ const OWN_IMAGES: &[(&str, Target)] = &[
         Target::CloudVm,
     ),
     (
-        "dns: { networks: { lan: 53 }, services: [{ port: 53, protocol: udp, publish: 10053 }], vm: { os: ubuntu-24.04, provision: [s.sh] } }",
+        "dns: { networks: { lan: 53 }, ports: [{ port: 53, protocol: udp, publish: 10053 }], vm: { os: ubuntu-24.04, provision: [s.sh] } }",
         Target::CloudVm,
     ),
     (

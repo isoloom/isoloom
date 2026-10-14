@@ -143,12 +143,12 @@ fn port_name(port: u16, p: Protocol) -> String {
 
 /// Its name, for the other machines: a Service on every port it serves.
 fn service(m: &Machine) -> Option<Manifest> {
-    if m.spec.services.is_empty() {
+    if m.spec.ports.is_empty() {
         return None;
     }
     let ports = m
         .spec
-        .services
+        .ports
         .iter()
         .map(|sv| ServicePort {
             name: port_name(sv.port, sv.protocol),

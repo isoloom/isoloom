@@ -13,7 +13,7 @@ const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }
 #[test]
 fn a_count_becomes_numbered_clones_with_consecutive_addresses() {
     let spec = parse(&format!(
-        "{BASE}groups:\n  fleet: {{ members: [ws], resources: {{ cpus: 2 }} }}\nmachines:\n  dc:\n    networks: {{ lab: 5 }}\n    services: [{{ port: 389 }}]\n    docker: {{ image: dc }}\n  ws:\n    count: 3\n    networks: {{ lab: 20, office: 50 }}\n    depends_on: [dc]\n    services: [{{ port: 22 }}]\n    docker: {{ image: ws, idle: true }}\n  user:\n    access: true\n    networks: {{ lab: 90 }}\n    depends_on: [ws]\nchecks:\n  - {{ name: the dc answers, from: ws, tcp: dc:389 }}\n"
+        "{BASE}groups:\n  fleet: {{ members: [ws], resources: {{ cpus: 2 }} }}\nmachines:\n  dc:\n    networks: {{ lab: 5 }}\n    ports: [{{ port: 389 }}]\n    docker: {{ image: dc }}\n  ws:\n    count: 3\n    networks: {{ lab: 20, office: 50 }}\n    depends_on: [dc]\n    ports: [{{ port: 22 }}]\n    docker: {{ image: ws, idle: true }}\n  user:\n    access: true\n    networks: {{ lab: 90 }}\n    depends_on: [ws]\nchecks:\n  - {{ name: the dc answers, from: ws, tcp: dc:389 }}\n"
     ))
     .unwrap();
     assert_eq!(validate(&spec), vec![]);

@@ -31,7 +31,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.redis: tcp:6379
+      isoloom.port.redis: tcp:6379
       isoloom.managed: 'true'
       isoloom.environment: air-gapped
     restart: unless-stopped
@@ -61,7 +61,7 @@ services:
       store:
         condition: service_healthy
     labels:
-      isoloom.service.80: http:80
+      isoloom.port.80: http:80
       isoloom.managed: 'true'
       isoloom.environment: air-gapped
     restart: unless-stopped

@@ -43,7 +43,7 @@ impl CommandLine {
     }
 }
 
-/// When a machine counts as healthy, besides its services' ports answering: a command that
+/// When a machine counts as healthy, besides its ports answering: a command that
 /// succeeds, or a page that answers. Each target waits for it where it waits for the machine
 /// (Compose's `depends_on` and `up --wait`, Kubernetes' readiness, the end of a VM's set-up).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

@@ -11,12 +11,16 @@ use serde_json::{Map, Value, json};
 use super::{GENERATED_TARGETS, GeneratedFile, address, cloud_refusals, docker_cidrs, on_docker, refusal, router, start_order};
 use crate::checks::{self, HttpExpect, Position, Probe, Resolved, TcpExpect};
 use crate::images;
-use crate::model::{Machine, Protocol, Service, Spec, Target};
+use crate::model::{Machine, Port, Protocol, Spec, Target};
 use crate::targets::{effective, missing, mixed};
 use crate::validate::Cidr;
 
+mod message;
+
+pub use message::{fill, lookup, on_target, render_message, render_message_at, render_message_on, with_published};
+
 /// The format of the snapshot; bumped when a field changes meaning or goes away.
-pub const RESOLVED_VERSION: u32 = 1;
+pub const RESOLVED_VERSION: u32 = 2;
 
 /// Where the snapshot is written, relative to the project folder.
 pub const PATH: &str = ".isoloom/resolved.json";
@@ -140,7 +144,7 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Value {
         "windows": m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os)),
         "addresses": addresses(spec, m),
         "docker_addresses": addresses(docker, m),
-        "services": m.services.iter().map(service).collect::<Vec<_>>(),
+        "ports": m.ports.iter().map(port).collect::<Vec<_>>(),
         "depends_on": m.depends_on,
         "inputs": m.inputs,
         "volumes": m.volumes,
@@ -154,6 +158,7 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Value {
         "default_gateway": router::default_gateway(spec, name, m).map(|a| a.to_string()),
         "offline": !m.networks.keys().any(|n| spec.networks[n].internet) && router::default_gateway(spec, name, m).is_none(),
     });
+    add_os(&mut out, m);
     let v6 = isoloom_plan::ipv6::addresses(spec, m);
     if !v6.is_empty() {
         out["ipv6_addresses"] = v6.iter().map(|(n, a)| (n.clone(), json!(a.to_string()))).collect::<Map<_, _>>().into();
@@ -170,13 +175,25 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Value {
     out
 }
 
+/// The machine's OS resolved, beside its image-table name in `os`: `os_family` and
+/// `os_version`, the pinned default when the spec left the version out (`debian` is 12). From
+/// its own `os`, else its `vm.os`; neither on a container without an `os`.
+fn add_os(out: &mut Value, m: &Machine) {
+    let written = m.os.as_deref().or(m.vm.as_ref().map(|v| v.os.as_str()));
+    if let Some(os) = written.and_then(|t| isoloom_spec::os::resolve(t).ok()) {
+        out["os_family"] = json!(os.family);
+        out["os_version"] = json!(os.version);
+        out["os"] = json!(os.name);
+    }
+}
+
 /// A machine's address on each of its networks, as `on` (the spec, or the spec on Docker) gives them.
 fn addresses(on: &Spec, m: &Machine) -> Map<String, Value> {
     m.networks.iter().map(|(n, o)| (n.clone(), json!(address(on, n, *o).to_string()))).collect()
 }
 
-/// A service; the flags only when set, the protocol only when not TCP.
-fn service(s: &Service) -> Value {
+/// A port; the flags only when set, the protocol only when not TCP.
+fn port(s: &Port) -> Value {
     let mut v = json!({ "port": s.port, "name": s.name, "http": s.http, "publish": s.publish });
     for (key, set) in [("tls", s.tls), ("fixed", s.fixed), ("dormant", s.dormant)] {
         if set {
@@ -238,7 +255,7 @@ fn published(spec: &Spec) -> Vec<Value> {
     spec.machines
         .iter()
         .flat_map(|(name, m)| {
-            m.services.iter().filter_map(move |s| {
+            m.ports.iter().filter_map(move |s| {
                 s.publish
                     .map(|host| with_protocol(json!({ "machine": name, "port": s.port, "host_port": host }), s.protocol))
             })
@@ -390,100 +407,4 @@ fn add_cloud(spec: &Spec, map: &mut Map<String, Value>) {
             }),
         );
     }
-}
-
-/// The spec's `message` with its `{{ path }}` placeholders filled from the snapshot; an error
-/// names a placeholder that points at nothing.
-pub fn render_message(spec: &Spec, instance: Option<u8>) -> Result<Option<String>, String> {
-    let Some(m) = &spec.message else { return Ok(None) };
-    let snapshot = resolve_with(spec, instance);
-    fill(m, &snapshot).map(Some)
-}
-
-/// The message as it reads where the environment runs on `target`: on the targets that run
-/// the Compose file, machines are at their Docker addresses, so `machines.<m>.addresses` is
-/// filled with those (see [`on_target`]).
-pub fn render_message_on(spec: &Spec, instance: Option<u8>, target: Target) -> Result<Option<String>, String> {
-    render_message_at(spec, instance, target, &[])
-}
-
-/// [`render_message_on`] with the host ports the environment really got, as (machine, port,
-/// protocol, host port): local Docker publishes on free ports unless `ISOLOOM_PUBLISH_FIXED` is set, so
-/// `{{ machines.web.services.0.publish }}` must say where it answers (see [`with_published`]).
-pub fn render_message_at(spec: &Spec, instance: Option<u8>, target: Target, published: &[(String, u16, Protocol, u16)]) -> Result<Option<String>, String> {
-    let Some(m) = &spec.message else { return Ok(None) };
-    fill(m, &with_published(on_target(resolve_with(spec, instance), target), published)).map(Some)
-}
-
-/// The snapshot with the host ports the environment really got, as (machine, port, protocol,
-/// host port): each service's `publish` and the `published` list's `host_port`.
-pub fn with_published(mut snapshot: Value, published: &[(String, u16, Protocol, u16)]) -> Value {
-    // A service without `protocol` in the snapshot is TCP.
-    let same = |v: &Value, port: u16, proto: Protocol| v["port"] == port && v["protocol"].as_str().unwrap_or("tcp") == proto.id();
-    for (machine, port, proto, host) in published {
-        let services = snapshot.pointer_mut(&format!("/machines/{machine}/services")).and_then(Value::as_array_mut);
-        for s in services.into_iter().flatten().filter(|s| same(s, *port, *proto)) {
-            s["publish"] = (*host).into();
-        }
-        let listed = snapshot.get_mut("published").and_then(Value::as_array_mut);
-        for p in listed
-            .into_iter()
-            .flatten()
-            .filter(|p| p["machine"] == machine.as_str() && same(p, *port, *proto))
-        {
-            p["host_port"] = (*host).into();
-        }
-    }
-    snapshot
-}
-
-/// The snapshot as seen on `target`: on the Compose targets (Docker, a hosting service, Docker
-/// on a VM or a cloud VM) each machine's `addresses` are its `docker_addresses`, the ones it
-/// really has there (they differ when the spec's networks are outside 10.0.0.0/8, or for an
-/// instance); elsewhere the snapshot is unchanged.
-pub fn on_target(mut snapshot: Value, target: Target) -> Value {
-    if !matches!(target, Target::Docker | Target::Hosted | Target::CloudDocker | Target::DockerVm) {
-        return snapshot;
-    }
-    if let Some(machines) = snapshot.get_mut("machines").and_then(Value::as_object_mut) {
-        for m in machines.values_mut() {
-            if let Some(docker) = m.get("docker_addresses").cloned() {
-                m["addresses"] = docker;
-            }
-        }
-    }
-    snapshot
-}
-
-/// Fills `{{ dotted.path }}` placeholders from a snapshot. Scalars print plainly; lists and
-/// maps as compact JSON.
-pub fn fill(text: &str, snapshot: &Value) -> Result<String, String> {
-    let mut out = String::new();
-    let mut rest = text;
-    while let Some(start) = rest.find("{{") {
-        out.push_str(&rest[..start]);
-        let after = &rest[start + 2..];
-        let Some(end) = after.find("}}") else {
-            return Err("message: a `{{` without its `}}`".into());
-        };
-        let path = after[..end].trim();
-        let value = lookup(snapshot, path).ok_or_else(|| format!("message: `{{{{ {path} }}}}` points at nothing in the snapshot (see `isoloom inspect`)"))?;
-        match value {
-            Value::String(s) => out.push_str(s),
-            Value::Null => {}
-            other => out.push_str(&other.to_string()),
-        }
-        rest = &after[end + 2..];
-    }
-    out.push_str(rest);
-    Ok(out)
-}
-
-/// A dotted path into the snapshot (`machines.web.addresses`, `checks.positions.0.runner`).
-pub fn lookup<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
-    path.split('.').filter(|s| !s.is_empty()).try_fold(value, |v, key| match v {
-        Value::Object(m) => m.get(key),
-        Value::Array(a) => key.parse::<usize>().ok().and_then(|i| a.get(i)),
-        _ => None,
-    })
 }

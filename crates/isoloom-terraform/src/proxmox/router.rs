@@ -127,7 +127,7 @@ pub(crate) fn ruleset(env: &Environment) -> String {
         let Some(addr) = env.machines.get(name).and_then(|mp| mp.addresses.values().next()) else {
             continue;
         };
-        for sv in m.services.iter().filter(|s| s.publish.is_some()) {
+        for sv in m.ports.iter().filter(|s| s.publish.is_some()) {
             let (proto, port, host) = (sv.protocol.id(), sv.port, sv.publish.unwrap_or_default());
             forward.push(format!("ip daddr {addr} {proto} dport {port} ct status dnat accept"));
             let _ = writeln!(dnat, "    ip saddr != {lab} {proto} dport {host} dnat ip to {addr}:{port}");

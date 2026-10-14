@@ -11,11 +11,11 @@ networks:
 machines:
   web:
     networks: { app: 10 }
-    services: [{ port: 80, http: true, publish: 8080 }]
+    ports: [{ port: 80, http: true, publish: 8080 }]
     docker:
       build: build/web
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/web.sh]
 
 checks:

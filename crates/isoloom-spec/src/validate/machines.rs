@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use super::{Blocks, Problems, block, dns_label};
-use crate::model::{Appliance, DockerImpl, KNOWN_OS, Machine, Protocol, Spec, VmImpl};
+use crate::model::{Appliance, DockerImpl, Machine, Protocol, Spec, VmImpl};
 
 /// One machine being checked: the spec, its name and definition, and its path.
 pub(super) struct Subject<'a> {
@@ -67,17 +67,21 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
         addresses(&s, blocks, &mut taken, p);
         more_addresses(&s, blocks, &mut taken, p);
         super::volumes::of_machine(&s, p);
-        super::services::of_machine(&s, &mut published, p);
+        super::ports::of_machine(&s, &mut published, p);
         for (i, input) in m.inputs.iter().enumerate() {
             if !spec.inputs.contains(input) {
                 p.add(format!("{}.inputs[{i}]", s.at), format!("`{input}` isn't declared in the spec's `inputs`"));
             }
         }
-        super::services::depends_on(&s, p);
+        super::ports::depends_on(&s, p);
+        super::os::of_machine(&s, p);
         resources(&s, p);
         aliases(&s, p);
         if m.docker.is_none() && m.vm.is_none() && !m.access {
-            p.add(&s.at, "give the machine at least one implementation: `docker:` and/or `vm:`");
+            p.add(
+                &s.at,
+                "give the machine at least one implementation: `docker:` and/or `vm:` (or an `os:`, a VM of that OS)",
+            );
         }
         if let Some(d) = &m.docker {
             docker(&s.at, d, p);
@@ -262,10 +266,13 @@ fn vm(s: &Subject, v: &VmImpl, p: &mut Problems) {
     if v.os.is_empty() {
         p.add(
             format!("{at}.vm.os"),
-            format!("name the machine's OS (or share one through `common:` or a group): {}", KNOWN_OS.join(", ")),
+            "name the machine's OS with `os: <family>@<version>` (`debian@12`), here or on the machine (or share one through `common:` or a group)",
         );
-    } else if !KNOWN_OS.contains(&v.os.as_str()) {
-        p.add(format!("{at}.vm.os"), format!("unknown OS `{}`; use one of: {}", v.os, KNOWN_OS.join(", ")));
+    } else if s.m.os.as_deref() != Some(v.os.as_str())
+        && let Err(e) = crate::os::resolve(&v.os)
+    {
+        // An `os` copied from the machine's own is reported there, once.
+        p.add(format!("{at}.vm.os"), e.to_string());
     }
     // `reboot` is a Linux step. A Windows machine restarts from the environment's playbooks
     // (`ansible.windows.win_reboot`), which run from the controller and wait for it to come

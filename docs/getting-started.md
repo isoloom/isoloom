@@ -40,15 +40,15 @@ networks:
 machines:
   cache:
     networks: { app: 20 }
-    services: [{ port: 6379, name: redis }]
+    ports: [{ port: 6379, name: redis }]
     docker: { image: "redis:7-alpine" }
-    vm: { os: debian-12, provision: [provision/cache.sh] }
+    vm: { os: debian@12, provision: [provision/cache.sh] }
   web:
     networks: { app: 10 }
-    services: [{ port: 80, http: true, publish: 8080 }]
+    ports: [{ port: 80, http: true, publish: 8080 }]
     depends_on: [cache]
     docker: { build: build/web }
-    vm: { os: debian-12, provision: [provision/web.sh] }
+    vm: { os: debian@12, provision: [provision/web.sh] }
 
 checks:
   - name: the page greets
@@ -74,6 +74,51 @@ isoloom targets --host  # and whether this machine can run each target now
 `isoloom targets` derives the targets from the spec: every machine has `docker:`, so the
 container targets apply; every machine has `vm:`, so the VM targets do too. A `targets:` list in
 the spec can only narrow that.
+
+### Ports
+
+A machine's `ports` are what it answers on: each port with its `protocol` (`tcp` or `udp`),
+whether it speaks HTTP (`http: true`: derived checks request a page) or TLS, a `publish` port on
+your machine's loopback, and `dormant` for one that only answers later. Isoloom publishes them,
+opens them for `reach`, waits for them and checks them. Before 1.0 this key was `services`:
+Isoloom still reads it for at least one release ([stability](stability.md)), and `isoloom validate` warns until it is renamed (a
+machine can't set both).
+
+### The OS
+
+A machine's OS is written `<family>@<version>`, on the machine or in its `vm:`:
+
+```yaml
+machines:
+  dc01:
+    os: windows-server@2022       # vm.os defaults to it
+    vm: { provision: [provision/dc.ps1] }
+  box:
+    os: debian                    # no version: the family's pinned default, debian@12
+    vm: { provision: [provision/box.sh] }
+```
+
+A machine with an `os` and neither `docker:` nor `vm:` is a VM of that OS (`vm: { os }`). When
+the machine and its `vm:` both name one, they must be the same. The families, their versions
+and the version a family alone resolves to (recorded in `.isoloom/resolved.json` as
+`os_family` and `os_version`):
+
+| Family | Versions | Default |
+|---|---|---|
+| `debian` | 11, 12, 13 | 12 |
+| `ubuntu` | 14.04, 16.04, 18.04, 20.04, 22.04, 24.04 | 24.04 |
+| `rocky` | 9 | 9 |
+| `alma` | 9 | 9 |
+| `alpine` | 3.19 (Vagrant only) | 3.19 |
+| `kali` | rolling | rolling |
+| `fedora` | 42 | 42 |
+| `centos` | 7 | 7 |
+| `windows` | 10, 11 | 11 |
+| `windows-server` | 2008r2, 2012r2, 2016, 2019, 2022, 2025 | 2022 |
+
+The older names (`debian-12`, `almalinux-9`, `windows-server-2022`, `kali`) are still read. Each
+target maps an OS to its own image; one it has no image for is refused with the reason
+(`isoloom targets` says which).
 
 ## Run, test, down
 
@@ -152,7 +197,7 @@ isoloom message           # how to use the environment (the spec's message, plac
 isoloom tc set far --delay 200ms   # link impairment on a network, while it runs
 isoloom connect shell     # the `shell` tool: a toolbox on every network (tools: { shell: {} })
 isoloom graph -o lab.svg  # the environment as a diagram (D2 or Graphviz)
-isoloom report services   # tables: addressing, services, wiring, resources
+isoloom report ports      # tables: addressing, ports, wiring, resources
 isoloom defaults          # the defaults in effect (images, Vagrant provider, cloud regions) and their sources
 isoloom chart --version 4.2.1   # the Helm chart (.isoloom/kubernetes/chart/), packaged with helm
 isoloom profiles          # the project's profiles (profiles/<name>.yml), each checked against the spec

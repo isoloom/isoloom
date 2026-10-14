@@ -231,7 +231,7 @@ machines:
   web:
     networks: { lan: 10 }
     inputs: [FLAG]
-    services: [{ port: 8000 }]
+    ports: [{ port: 8000 }]
     docker: { image: python:3-alpine }
     command: [python3, -m, http.server, "8000"]
     working_dir: /srv

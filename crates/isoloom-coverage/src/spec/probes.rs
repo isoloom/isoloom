@@ -14,7 +14,7 @@ networks:
 machines:
   a:
     networks: { lan: 10 }
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     docker: { image: nginx }
     vm: { os: debian-12, provision: [setup.sh] }
     external: { address: 192.0.2.10 }
@@ -148,14 +148,15 @@ fn provision(path: &str) -> String {
 fn machine(path: &str) -> Option<&'static str> {
     Some(match path.strip_prefix("machines.*.")? {
         "networks[]" => "{ networks: { lan: [10, 20] } }",
-        "services[].publish" => "{ services: [{ port: 80, publish: 8080 }] }",
-        "services[].fixed" => "{ services: [{ port: 80, publish: 8080, fixed: true }] }",
-        "services[].dormant" => "{ services: [{ port: 80 }, { port: 4444, dormant: true }] }",
-        "services[].protocol" => "{ services: [{ port: 80 }, { port: 53, protocol: udp }] }",
+        "ports[].publish" => "{ ports: [{ port: 80, publish: 8080 }] }",
+        "ports[].fixed" => "{ ports: [{ port: 80, publish: 8080, fixed: true }] }",
+        "ports[].dormant" => "{ ports: [{ port: 80 }, { port: 4444, dormant: true }] }",
+        "ports[].protocol" => "{ ports: [{ port: 80 }, { port: 53, protocol: udp }] }",
         "environment" => "{ environment: { MODE: lab } }",
         "sysctls" => "{ sysctls: { net.core.somaxconn: 1024 } }",
         "ulimits" => "{ ulimits: { nofile: 1024 } }",
         "aliases" => "{ aliases: [www.probe.test] }",
+        "os" => "{ os: debian@12 }",
         "arch" => "{ arch: arm64 }",
         "privileged" => "{ privileged: true }",
         "read_only" => "{ read_only: true }",

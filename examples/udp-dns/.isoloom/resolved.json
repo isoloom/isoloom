@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "udp-dns",
   "instance": null,
   "inputs": [],
@@ -51,7 +51,7 @@
       "docker_addresses": {
         "servers": "10.66.10.53"
       },
-      "services": [
+      "ports": [
         {
           "port": 53,
           "name": "dns",
@@ -82,7 +82,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "client": {
       "access": true,
@@ -101,7 +103,7 @@
       "docker_addresses": {
         "users": "10.66.20.10"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [
         "dns"
       ],
@@ -120,7 +122,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [

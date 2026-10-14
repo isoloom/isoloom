@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "slow-link",
   "instance": null,
   "inputs": [],
@@ -51,7 +51,7 @@
       "docker_addresses": {
         "far": "10.75.2.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,
@@ -75,7 +75,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "user": {
       "access": true,
@@ -93,7 +95,7 @@
       "docker_addresses": {
         "branch": "10.75.1.10"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -110,7 +112,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [

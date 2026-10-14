@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "arm-vm",
   "instance": null,
   "inputs": [],
@@ -33,7 +33,7 @@
       "docker_addresses": {
         "lab": "10.70.0.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 22,
           "name": null,
@@ -52,7 +52,9 @@
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "ubuntu",
+      "os_version": "24.04"
     }
   },
   "start_order": [

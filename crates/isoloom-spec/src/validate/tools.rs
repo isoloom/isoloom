@@ -57,7 +57,7 @@ pub(super) fn each(spec: &Spec, p: &mut Problems) {
             && spec
                 .machines
                 .values()
-                .any(|m| m.services.iter().any(|s| s.publish == Some(port) && s.protocol.is_tcp()))
+                .any(|m| m.ports.iter().any(|s| s.publish == Some(port) && s.protocol.is_tcp()))
         {
             p.add(format!("{at}.publish"), format!("host port {port} is already published by a machine"));
         }

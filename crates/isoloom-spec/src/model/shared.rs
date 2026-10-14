@@ -10,7 +10,7 @@ use super::{Arch, Dns, Mount, Resources, ScalarSchema, Tmpfs, Virtiofs, VmImage}
 use super::{Machine, Spec};
 
 /// Fields several machines share, through `common:` or a group: everything about how a machine
-/// is built, nothing about what it is (its networks, services and `access` stay its own).
+/// is built, nothing about what it is (its networks, ports and `access` stay its own).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Shared {

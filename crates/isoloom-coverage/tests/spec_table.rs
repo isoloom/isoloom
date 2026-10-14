@@ -181,7 +181,7 @@ volumes: { data: { owner: fw, persistent: true, external: lab-data, virtiofs: { 
 machines:
   fw:
     networks: { out: 2, dmz: 1 }
-    services: [{ port: 80, name: web, http: true, tls: true, publish: 8080, fixed: true }, { port: 4444, dormant: true }, { port: 53, protocol: udp }]
+    ports: [{ port: 80, name: web, http: true, tls: true, publish: 8080, fixed: true }, { port: 4444, dormant: true }, { port: 53, protocol: udp }]
     inputs: [TOKEN]
     secrets: [token, { source: token, target: /etc/app/token, uid: 0, gid: 0, mode: 0400 }]
     arch: amd64
@@ -202,6 +202,7 @@ machines:
     volumes: { data: /data }
     access: false
     aliases: [api.example.test]
+    os: debian@12
     docker: { image: a, init: [x.sh], idle: true, appliance: cisco-iol, config: r.cfg, firmware: f.bin, lxc: false }
     vm:
       os: debian-12

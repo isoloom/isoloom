@@ -31,7 +31,7 @@ machines:
       nofile:
         soft: 8192
         hard: 16384
-    services:
+    ports:
       - port: 80
         name: ~
         http: true

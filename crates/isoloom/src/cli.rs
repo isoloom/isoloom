@@ -12,7 +12,7 @@ use crate::commands::{
 #[command(
     name = "isoloom",
     version,
-    about = "Describe an environment once (machines, networks, services), run it anywhere: Docker, local VMs, Proxmox, cloud."
+    about = "Describe an environment once (machines, networks, ports), run it anywhere: Docker, local VMs, Proxmox, cloud."
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -53,7 +53,7 @@ pub enum Command {
     /// destroy, kubectl delete, or terraform destroy).
     Down(down::Args),
     /// Run the environment's checks against a running target: the spec's (scripts and declared
-    /// probes) and the ones Isoloom derives from `services` and `reach`. One line per check;
+    /// probes) and the ones Isoloom derives from `ports` and `reach`. One line per check;
     /// exits 1 when any fails.
     Test(test::Args),
     /// Run the environment's provisioning again on a running environment, in place: after a
@@ -76,11 +76,11 @@ pub enum Command {
     /// Capture packets on a machine's interface on one of its networks (tcpdump, from inside
     /// the machine's network namespace).
     Capture(capture::Args),
-    /// Draw the environment: networks, machines with their addresses and services, reach rules,
+    /// Draw the environment: networks, machines with their addresses and ports, reach rules,
     /// gateways and the access machine. D2 by default; `--format dot` for Graphviz. With
     /// `-o x.svg` or `-o x.png` the diagram is rendered when `d2` (or `dot`) is installed.
     Graph(graph::Args),
-    /// Print a table about the environment: `addressing`, `services`, `wiring` or `resources`
+    /// Print a table about the environment: `addressing`, `ports`, `wiring` or `resources`
     /// (text, or `--md` for Markdown). `isoloom report list` names them.
     Report(report::Args),
     /// Link impairment on a running environment's router: `show`, `set` (with `--delay`, `--jitter`,

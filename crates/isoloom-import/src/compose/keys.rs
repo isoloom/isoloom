@@ -122,8 +122,11 @@ impl Import<'_> {
         let ports = match container_ports(v) {
             Ok(ports) => ports,
             Err(bad) => {
-                self.notes
-                    .add(kat, NoteKind::Changed, format!("couldn't read port `{bad}`; add it to `services` by hand"));
+                self.notes.add(
+                    kat,
+                    NoteKind::Changed,
+                    format!("couldn't read port `{bad}`; add it to the machine's `ports` by hand"),
+                );
                 return;
             }
         };
@@ -131,7 +134,7 @@ impl Import<'_> {
         let other = other_protocols(v);
         if !other.is_empty() {
             self.notes
-                .add(kat, NoteKind::Changed, format!("{} drafted as TCP: services are TCP or UDP", other.join(", ")));
+                .add(kat, NoteKind::Changed, format!("{} drafted as TCP: a port is TCP or UDP", other.join(", ")));
         }
         if !published {
             return;

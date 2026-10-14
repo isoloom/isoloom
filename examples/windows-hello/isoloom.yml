@@ -11,10 +11,10 @@ networks:
 machines:
   web01:
     networks: { lab: 10 }
-    services: [{ port: 80, http: true, publish: 8082 }]
+    ports: [{ port: 80, http: true, publish: 8082 }]
     resources: { cpus: 2, memory_mb: 3072 }
     vm:
-      os: windows-server-2019
+      os: windows-server@2019
       image:
         vagrant: StefanScherer/windows_2019
         vagrant_version: "2021.05.15"
