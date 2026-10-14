@@ -113,8 +113,9 @@ impl Provisioner {
 }
 
 /// A `local-exec` writing `<user>@<address>` to `<module>/.isoloom-reach/<name>`, followed on
-/// Windows by how WinRM authenticates (`winrm`, or `winrm-ntlm`): an address, never a secret
-/// (the password stays in Terraform's state, where `isoloom run` reads it).
+/// Windows by how WinRM authenticates (`winrm`, or `winrm-ntlm`), or by `via <user>@<address>`
+/// through a jump host: an address, never a secret (the password stays in Terraform's state,
+/// where `isoloom run` reads it).
 fn announce(name: &str, c: &Connection) -> Block {
     let (host, user, suffix) = match c {
         Connection::Ssh { host, user } | Connection::SshVia { host, user, .. } => (host.clone(), user.as_str(), ""),
@@ -124,7 +125,13 @@ fn announce(name: &str, c: &Connection) -> Block {
     command.push_expr(reference("path.module"));
     command.push_text(format!("/{REACH_DIR}\" && echo \"{user}@"));
     command.push_expr(host);
-    command.push_text(format!("{suffix}\" > \""));
+    command.push_text(suffix);
+    // Through a jump host: ` via <user>@<jump host>`.
+    if let Connection::SshVia { bastion, .. } = c {
+        command.push_text(format!(" via {user}@"));
+        command.push_expr(bastion.clone());
+    }
+    command.push_text("\" > \"");
     command.push_expr(reference("path.module"));
     command.push_text(format!("/{REACH_DIR}/{name}\""));
     provisioner("local-exec").add_attribute(("command", command.into_expression())).build()

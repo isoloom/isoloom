@@ -43,6 +43,13 @@ resource esxi_portgroup name
 resource esxi_portgroup promiscuous_mode
 resource esxi_portgroup vlan
 resource esxi_portgroup vswitch
+resource esxi_virtual_disk
+resource esxi_virtual_disk id
+resource esxi_virtual_disk virtual_disk_dir
+resource esxi_virtual_disk virtual_disk_disk_store
+resource esxi_virtual_disk virtual_disk_name
+resource esxi_virtual_disk virtual_disk_size
+resource esxi_virtual_disk virtual_disk_type
 resource esxi_vswitch
 resource esxi_vswitch forged_transmits
 resource esxi_vswitch id

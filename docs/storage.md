@@ -119,5 +119,5 @@ as it is. The disks go with the machine: `down` removes them.
 | Vagrant | An empty disk: `config.vm.disk` on VirtualBox, VMware and Hyper-V, the provider's own setting on libvirt (`storage`) and ESXi (`guest_storage`). The `qemu`, `parallels` and `utm` providers refuse it. |
 | Proxmox | A `disk` block per data disk on the VM (its name as the serial), set up by cloud-init (`disk_setup`, `fs_setup`, `mounts`). An LXC container (`docker.lxc`) refuses it. |
 | Clouds (`cloud-vm`) | A block volume per disk, attached to the VM. See [the cloud modules](cloud-modules.md#data-disks-disks) for each cloud's resource and smallest volume. |
-| `esxi` | Refused: each disk would need an `esxi_virtual_disk` and a guest that attaches it. |
+| `esxi` | An `esxi_virtual_disk` per data disk (thin, on `disk_store`), attached to the VM by SCSI slot (`0:1` on, at most 14), then formatted and mounted by the machine's set-up, found by its size. Not run on a real host. |
 | `hosted`, `external`, `cloud-services` | Refused: Isoloom creates no machine to attach a disk to. |

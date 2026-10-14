@@ -87,6 +87,16 @@ pub const PROXMOX: &[(&str, Status)] = &[
     ),
 ];
 
-/// What the ESXi module states apart from the Proxmox family it inherits from: it runs no LXC
-/// container (its `mtu` and `rate_limit` cells come from its backend's refusals).
-pub const ESXI: &[(&str, Status)] = &[NOT_LXC];
+/// What the ESXi module states apart from the Proxmox family it inherits from: a network's MTU
+/// on its vSwitch, and no LXC container (its `rate_limit` cell comes from its backend's
+/// refusals).
+pub const ESXI: &[(&str, Status)] = &[
+    (
+        "networks.*.mtu",
+        Done {
+            how: "`mtu` on the network's vSwitch, and on each guest interface on it (the machines', the router's, the controller's) in their network configuration (not run on a real host)",
+            proof: PROBE,
+        },
+    ),
+    NOT_LXC,
+];

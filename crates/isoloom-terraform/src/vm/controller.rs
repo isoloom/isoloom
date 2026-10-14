@@ -117,6 +117,13 @@ pub struct Ssh<'a> {
 /// Its set-up over SSH (`terraform_data.isoloom_controller`), once every VM is set up: the
 /// project, its key and the inventory uploaded, Ansible installed, the playbooks run.
 pub fn provisioner(c: Ssh) -> Provisioner {
+    provisioner_waiting(c, &[])
+}
+
+/// [`provisioner`], with `waits` run (as root) once Ansible is installed and before the
+/// playbooks: what the machines Terraform doesn't set up need (a Windows machine's ready
+/// marker, over WinRM).
+pub fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
     let env = c.env;
     let mut cmds: Vec<Template> = vec!["set -e".into(), linux::CLOUD_INIT_WAIT.into()];
     cmds.extend(c.at_boot);
@@ -128,9 +135,11 @@ pub fn provisioner(c: Ssh) -> Provisioner {
         "mkdir -p /etc/isoloom && install -m 0600 {KEY_UPLOAD} /etc/isoloom/id_ed25519 && install -m 0644 {INVENTORY_UPLOAD} /etc/isoloom/inventory.ini && rm -f {KEY_UPLOAD} {INVENTORY_UPLOAD}\n"
     );
     let packages = "DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null\n";
-    for script in [install.as_str(), packages, ANSIBLE, &playbooks(env)] {
+    for script in [install.as_str(), packages, ANSIBLE] {
         cmds.push(as_root(script, true).into());
     }
+    cmds.extend(waits.iter().map(|w| Template::from(as_root(w, true))));
+    cmds.push(as_root(&playbooks(env), true).into());
     cmds.extend(root(steps::linux(env, "", &Step::Ready)));
     Provisioner {
         name: "isoloom_controller".into(),

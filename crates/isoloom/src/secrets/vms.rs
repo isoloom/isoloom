@@ -1,15 +1,16 @@
 //! Secrets on the VM targets: each machine that gets some, and each Docker host whose
 //! containers do, is written to over its own connection (`vagrant ssh`, SSH through the
-//! Proxmox router, SSH to a cloud VM or an existing host; WinRM or OpenSSH to a Windows
-//! machine, see `windows`). The values travel on the connection's standard input, read by a
+//! Proxmox or ESXi router, SSH to a cloud VM or an existing host; WinRM or OpenSSH to a
+//! Windows machine, see `windows`). The values travel on the connection's standard input, read by a
 //! script with no value in it (`isoloom_render::secrets::receive`, or its Windows form), so none
 //! is in a command line, a generated file, the user data, Terraform's state or a Vagrant
 //! provisioner.
 //!
 //! A machine's set-up waits for them (its `Secrets` step) inside the target's tool, so delivery
 //! runs while the tool does: every few seconds, each machine still waiting is tried until it
-//! answers. On Proxmox the tool returns before the set-up (cloud-init) runs, and an existing
-//! host has no set-up of its own: they are delivered to after the tool, and before, instead.
+//! answers. On Proxmox the tool returns before the set-up (cloud-init) runs, as on ESXi for a
+//! Windows machine (cloudbase-init), and an existing host has no set-up of its own: they are
+//! delivered to after the tool, and before, instead.
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -104,6 +105,10 @@ pub fn recipients(p: &Prepared, place: &Place) -> Vec<Recipient> {
         }),
         Target::Proxmox | Target::External => Some(Reach::Exec(name.to_string())),
         Target::CloudVm => Some(Reach::Announced(reach_file(&place.out, "cloud-vm", place.cloud.unwrap_or("aws"), name))),
+        // A Linux machine announces itself as its Terraform set-up starts; a Windows one is set up
+        // by cloudbase-init, reached through the router once the module is applied.
+        Target::Esxi if p.plan.machines.get(name).is_some_and(MachinePlan::is_windows) => Some(Reach::Exec(name.to_string())),
+        Target::Esxi => Some(Reach::Announced(place.out.join("esxi").join(render::REACH_DIR).join(name))),
         _ => None,
     };
     let mut out: Vec<Recipient> = p
@@ -174,6 +179,7 @@ pub fn forget_announcements(p: &Prepared, place: &Place) {
     let module = match p.target {
         Target::CloudVm => place.out.join("cloud-vm").join(place.cloud.unwrap_or("aws")),
         Target::CloudDocker => place.out.join("cloud-docker").join(place.cloud.unwrap_or_default()),
+        Target::Esxi => place.out.join("esxi"),
         _ => return,
     };
     let _ = std::fs::remove_dir_all(module.join(render::REACH_DIR));
@@ -293,13 +299,27 @@ fn command(env: &Env, reach: &Reach, line: &str) -> Result<Command, String> {
         Reach::Exec(machine) => on_machine(env, machine, Some(line), false, false).map_err(|e| e.to_string()),
         Reach::Announced(file) => {
             let text = std::fs::read_to_string(file).map_err(|_| "its address isn't known yet".to_string())?;
-            let (user, host) = text.trim().split_once('@').ok_or("its address isn't known yet")?;
+            let (at, jump) = announced_ssh(&text).ok_or("its address isn't known yet")?;
             let mut c = crate::tools::process::command("ssh");
             c.args(["-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]);
-            c.arg(format!("{user}@{host}")).arg(line);
+            if let Some(j) = jump {
+                c.arg("-J").arg(j);
+            }
+            c.arg(at).arg(line);
             Ok(c)
         }
     }
+}
+
+/// An SSH announcement's `<user>@<address>`, and the jump host after `via` (ESXi's router).
+fn announced_ssh(text: &str) -> Option<(&str, Option<&str>)> {
+    let mut words = text.split_whitespace();
+    let at = words.next().filter(|w| w.contains('@'))?;
+    let jump = match (words.next(), words.next()) {
+        (Some("via"), Some(j)) => Some(j),
+        _ => None,
+    };
+    Some((at, jump))
 }
 
 /// The command reaching a Windows recipient, with the tunnel it goes through (Proxmox): the
@@ -318,7 +338,7 @@ fn windows_command(env: &Env, reach: &Reach, guest: Guest) -> Result<(Command, O
             Ok((windows::ssh(e), None))
         }
         (Reach::Exec(m), _) => {
-            let module = env.dir.join(isoloom_spec::instance::output_dir(env.instance)).join("proxmox");
+            let module = env.dir.join(isoloom_spec::instance::output_dir(env.instance)).join(env.target.id());
             let outputs = crate::tools::terraform::output(&module).map_err(|e| e.to_string())?;
             let router = outputs["address"].as_str().ok_or("the module has no `address` output yet")?;
             let host = outputs["machines"][m.as_str()].as_str().ok_or("its address isn't known yet")?;
@@ -358,6 +378,16 @@ mod tests {
         assert_eq!(of("t", Target::Vagrant), Guest::WindowsWinrm { ssl: true });
         assert_eq!(of("s", Target::Vagrant), Guest::WindowsSsh);
         assert_eq!(of("w", Target::External), Guest::WindowsSsh);
+    }
+
+    #[test]
+    fn an_announcement_may_name_its_jump_host() {
+        assert_eq!(super::announced_ssh("admin@1.2.3.4\n"), Some(("admin@1.2.3.4", None)));
+        assert_eq!(
+            super::announced_ssh("isoloom@10.0.0.10 via isoloom@192.168.1.50\n"),
+            Some(("isoloom@10.0.0.10", Some("isoloom@192.168.1.50")))
+        );
+        assert_eq!(super::announced_ssh(""), None);
     }
 
     #[test]

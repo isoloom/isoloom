@@ -313,8 +313,8 @@ that reaches a cluster exists ([Real targets in CI](real-targets.md#proxmox)).
 ## esxi
 
 **Builds** `.isoloom/esxi/main.tf` (the josenk/esxi provider) for a standalone ESXi host with no
-vCenter: a vSwitch and port group per network, a router VM, and one VM per Linux machine from an
-OVA, set up over SSH through the router. [The `esxi` target](esxi.md) has its variables,
+vCenter: a vSwitch and port group per network, a router VM, and one VM per machine from an
+OVA, a Linux one set up over SSH through the router, a Windows one by cloudbase-init. [The `esxi` target](esxi.md) has its variables,
 outputs and how it compares with Vagrant's ESXi provider.
 
 **The host needs** Terraform, VMware's `ovftool`, `TF_VAR_esxi_hostname` and
@@ -324,11 +324,10 @@ must be on on the ESXi host.
 **Run, test, down:** Terraform in `.isoloom/esxi`, the checks through the router, as on
 `proxmox`.
 
-**Limits.** Refused: Windows machines, arm64, IPv6, networks with a `gateway` machine,
-`secrets`, `external` and `bridged` networks, a machine's own image or boot, a TPM, GPUs,
-nested virtualization, `mtu`, `rate_limit`, and more than nine networks. Data disks are
-refused too. A Linux OS other than
-Ubuntu needs an OVA of yours.
+**Limits.** Refused: arm64, networks with a `gateway` machine, a machine's own image, a boot
+other than its firmware, a TPM, GPUs, nested virtualization, `rate_limit`, more than nine
+networks, and more than 14 data disks on a machine. A Linux OS other than Ubuntu, and Windows,
+need an OVA of yours.
 
 **Not run on a real host.**
 

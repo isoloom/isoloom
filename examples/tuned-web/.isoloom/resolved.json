@@ -94,7 +94,7 @@
     ],
     "refused": {
       "kubernetes": "machine `web` sets `ulimits`: Kubernetes has no per-container process limits",
-      "esxi": "machine `web` has data disks (`disks`), which this target can't attach"
+      "esxi": "machine `web` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",

@@ -71,7 +71,8 @@ pub fn run_tool(p: &Prepared, ask: &Ask, values: &Values, cmd: &mut Command, at:
         }
         return Ok(status);
     }
-    let limit = if p.target == Target::Proxmox {
+    // Proxmox's cloud-init, and ESXi's cloudbase-init on Windows, set up after the tool is done.
+    let limit = if matches!(p.target, Target::Proxmox | Target::Esxi) {
         Duration::from_secs(u64::from(isoloom_render::secrets::DELIVERY_TIMEOUT))
     } else {
         AFTER

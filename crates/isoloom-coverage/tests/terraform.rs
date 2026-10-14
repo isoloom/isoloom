@@ -218,6 +218,13 @@ const CLOUD_FIXTURES: &[&str] = &[
     "version: 1\nname: v6\nnetworks:\n  a: { cidr: 10.30.0.0/24, ipv6: { cidr: 'fd00:30::/64', addresses: auto } }\n  b: { cidr: 10.31.0.0/24, ipv6: { cidr: 'fd00:31::/64' } }\nmachines:\n  web: { networks: { a: 10, b: 10 }, vm: { os: debian-12, provision: [s.sh] } }\n",
 ];
 
+/// Whole environments with what no example needs, on ESXi (not run on a real host): a
+/// machine's own firmware, a network's MTU, bridged networks (one on a NIC of its own), an
+/// existing port group, and data disks.
+const ESXI_FIXTURES: &[&str] = &[
+    "version: 1\nname: lab\nnetworks:\n  lan: { cidr: 10.30.0.0/24, mtu: 9000 }\n  office: { cidr: 192.168.10.0/24, bridged: { interface: vmnic1, vlan: 20 } }\n  home: { cidr: 192.168.1.0/24, bridged: { dhcp: true, default_route: true } }\n  corp: { cidr: 10.50.0.0/24, external: corp-net }\nmachines:\n  web: { networks: { lan: 10, office: 10, home: 0, corp: 5 }, disks: { data: { size_gb: 20, mount: /data } }, vm: { os: debian-12, provision: [s.sh], boot: { firmware: uefi } } }\n",
+];
+
 /// The modules generated for some whole-environment fixtures on `target`.
 fn fixture_modules(fixtures: &[&str], target: Target) -> Vec<String> {
     fixtures
@@ -232,7 +239,7 @@ fn fixture_modules(fixtures: &[&str], target: Target) -> Vec<String> {
         .collect()
 }
 
-/// Every key written by any module (the examples', then the [`OWN_IMAGES`] fixtures'), grouped
+/// Every key written by any module (the examples', then the fixtures'), grouped
 /// by the table it belongs to.
 fn written_by_table(tables: &[Format]) -> BTreeMap<&'static str, BTreeSet<String>> {
     let mut by: BTreeMap<&'static str, BTreeSet<String>> = BTreeMap::new();
@@ -243,6 +250,7 @@ fn written_by_table(tables: &[Format]) -> BTreeMap<&'static str, BTreeSet<String
         .into_iter()
         .chain(fixture_modules(PROXMOX_FIXTURES, Target::Proxmox))
         .chain(fixture_modules(CLOUD_FIXTURES, Target::CloudVm))
+        .chain(fixture_modules(ESXI_FIXTURES, Target::Esxi))
         .map(|t| ("the fixtures".to_string(), t));
     for (module, text) in examples.chain(fixtures) {
         for key in written_keys(&text) {

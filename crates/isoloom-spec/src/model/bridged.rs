@@ -8,8 +8,9 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct Bridged {
     /// The host interface, as the target names it (VirtualBox: `en0: Wi-Fi`; Proxmox: a bridge
-    /// like `vmbr0`). Without it, Vagrant asks when several interfaces could do, and Proxmox
-    /// uses its uplink bridge.
+    /// like `vmbr0`; ESXi: a physical NIC like `vmnic1` that no vSwitch holds, which gets a
+    /// vSwitch of its own). Without it, Vagrant asks when several interfaces could do, Proxmox
+    /// uses its uplink bridge, and ESXi its LAN vSwitch (`uplink_vswitch`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interface: Option<String>,
     /// The machines take their address from the LAN's DHCP server instead of a fixed one in
@@ -20,7 +21,8 @@ pub struct Bridged {
     /// DHCP server gives) instead of the environment's.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub default_route: bool,
-    /// The VLAN tag on the bridge (1-4094), where the target tags a VM's interface (Proxmox).
+    /// The VLAN tag on the bridge (1-4094), where the target tags a VM's interface (Proxmox; on
+    /// ESXi, the port group's).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vlan: Option<u16>,
 }

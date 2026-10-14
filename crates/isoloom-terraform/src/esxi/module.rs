@@ -15,7 +15,12 @@ const MAX_SLOT: u64 = 63;
 
 /// Everything before the router.
 pub fn blocks(env: &Environment, m: &mut Module) {
-    m.block(terraform(&[versions::ESXI, versions::TLS, versions::LOCAL]));
+    let windows = super::windows::any(env);
+    let mut providers = vec![versions::ESXI, versions::TLS, versions::LOCAL];
+    if windows {
+        providers.push(versions::RANDOM);
+    }
+    m.block(terraform(&providers));
     m.blocks(variables(env));
     if !env.spec().inputs.is_empty() {
         m.block(inputs_variable());
@@ -25,6 +30,12 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     if controller::needed(env) {
         m.commented("The controller's own key: it runs the playbooks over SSH on every machine.", controller::key());
     }
+    if windows {
+        m.commented(
+            "The Windows machines' administrator password (user isoloom), for WinRM.",
+            crate::vm::cloud::windows_password(),
+        );
+    }
     for (net, plan) in &env.networks {
         let name = || {
             Template::text("iso")
@@ -32,14 +43,14 @@ pub fn blocks(env: &Environment, m: &mut Module) {
                 .with_text(format!("-{net}"))
                 .into_expression()
         };
-        m.commented(
-            &format!("Network `{net}`: {}, on its own vSwitch with no uplink.", plan.cidr),
-            Block::builder("resource")
-                .add_label("esxi_vswitch")
-                .add_label(res(net))
-                .add_attribute(("name", name()))
-                .build(),
-        );
+        let mut vswitch = Block::builder("resource")
+            .add_label("esxi_vswitch")
+            .add_label(res(net))
+            .add_attribute(("name", name()));
+        if let Some(mtu) = plan.mtu {
+            vswitch = vswitch.add_attribute(("mtu", number(mtu.into())));
+        }
+        m.commented(&format!("Network `{net}`: {}, on its own vSwitch with no uplink.", plan.cidr), vswitch.build());
         // VLAN 4095 passes the machines' own VLAN tags (trunks), and untagged frames as well.
         m.block(
             Block::builder("resource")
@@ -51,6 +62,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
                 .build(),
         );
     }
+    super::outside::blocks(env, m);
 }
 
 /// The OSes the module deploys, the router's and the controller's among them, sorted.
@@ -64,7 +76,7 @@ pub fn oses(env: &Environment) -> Vec<&str> {
 
 fn variables(env: &Environment) -> Vec<Block> {
     let s = |name: &str| Variable::new(name, "string");
-    vec![
+    let mut out = vec![
         s("esxi_hostname").describe("The ESXi host's name or address").block(),
         s("esxi_hostport")
             .default(string("22"))
@@ -84,7 +96,16 @@ fn variables(env: &Environment) -> Vec<Block> {
         s("ssh_private_key_file")
             .describe("The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router")
             .block(),
-    ]
+    ];
+    if super::outside::on_host_vswitch(env) {
+        out.push(
+            s("uplink_vswitch")
+                .default(string("vSwitch0"))
+                .describe("The host's vSwitch on its LAN: the bridged networks' port groups go on it")
+                .block(),
+        );
+    }
+    out
 }
 
 /// `slot`, checked: 1 to [`MAX_SLOT`].
@@ -110,10 +131,15 @@ fn images(env: &Environment) -> Block {
     let needed = list(oses.iter().map(|o| string(*o)));
     let has = call("contains", [call("keys", [reference("var.images")]), reference("os")]);
     let condition = call("alltrue", [for_list("os", needed, has, None)]);
+    let mut description =
+        "An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default; for another OS, an OVA with cloud-init and open-vm-tools".to_string();
+    if super::windows::any(env) {
+        description.push_str("; for Windows, an OVA with VMware Tools and cloudbase-init (its VMware guestinfo service), sysprepped");
+    }
     Variable::new("images", "string")
         .typed(call("map", [reference("string")]))
         .default(object(defaults))
-        .describe("An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default; for another OS, an OVA with cloud-init and open-vm-tools")
+        .describe(&description)
         .validated(condition, &format!("images needs an OVA for each of: {}.", oses.join(", ")))
         .block()
 }

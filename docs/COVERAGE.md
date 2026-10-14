@@ -26,7 +26,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 20 | 20 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
 | [Terraform: Proxmox](#terraform-proxmox) | 100% | 189 | 189 | 0 | 0 |
-| [Terraform: ESXi](#terraform-esxi) | 77% | 35 | 27 | 0 | 8 |
+| [Terraform: ESXi](#terraform-esxi) | 100% | 40 | 40 | 0 | 0 |
 | [Terraform: AWS](#terraform-aws) | 97% | 135 | 131 | 0 | 4 |
 | [Terraform: Azure](#terraform-azure) | 96% | 156 | 151 | 0 | 5 |
 | [Terraform: Google Cloud](#terraform-google-cloud) | 94% | 117 | 109 | 2 | 6 |
@@ -2159,17 +2159,17 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: ESXi
 
-77% of 35 portable features (27 done, 0 partly, 8 to do; 57 features in all). From josenk/esxi 1.10.3 (its resource types, and the schema of what Isoloom writes; not run on a real host).
+100% of 40 portable features (40 done, 0 partly, 0 to do; 63 features in all). From josenk/esxi 1.10.3 (its resource types, and the schema of what Isoloom writes; not run on a real host).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `esxi_guest` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network |
-| `esxi_portgroup` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network |
+| `esxi_guest` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network, a port group on the host's LAN per bridged network, a virtual disk per data disk; not run on a real host |
+| `esxi_portgroup` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network, a port group on the host's LAN per bridged network, a virtual disk per data disk; not run on a real host |
 | `esxi_resource_pool` | n/a | No | Where the host places the VMs: no change in behavior |
-| `esxi_virtual_disk` | Yes | Another way | Via `resources.disk_gb`: the machine's one disk (`boot_disk_size`), which holds its volumes' paths, as on Vagrant's ESXi provider |
-| `esxi_vswitch` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network |
+| `esxi_virtual_disk` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network, a port group on the host's LAN per bridged network, a virtual disk per data disk; not run on a real host |
+| `esxi_vswitch` | Yes | Yes | Written by the esxi target: a VM per machine and the router, a vSwitch and a port group per network, a port group on the host's LAN per bridged network, a virtual disk per data disk; not run on a real host |
 
 ### Settings
 
@@ -2187,14 +2187,14 @@ Only what the examples generate is checked: a feature no example uses can still 
 | --- | --- | --- | --- |
 | `boot_disk_size` | Yes | Yes | Written by the generator |
 | `boot_disk_type` | n/a | No | How the host allocates the disk (thin or thick): no change in behavior |
-| `boot_firmware` | Yes | Not yet | With a machine's own boot on ESXi (`vm.boot`), as on Proxmox |
+| `boot_firmware` | Yes | Yes | Written by the generator |
 | `clone_from_vm` | n/a | No | Another source for a VM's image (a VM or OVF files already on the host): Isoloom deploys the OVA of `images` |
 | `disk_store` | Yes | Yes | Written by the generator |
 | `guest_name` | Yes | Yes | Written by the generator |
 | `guest_shutdown_timeout` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `guest_startup_timeout` | Yes | Yes | Written by the generator |
 | `guestinfo` | Yes | Yes | Written by the generator |
-| `guestos` | Yes | Not yet | With Windows guests on the ESXi target (a Linux OVA keeps its own) |
+| `guestos` | Yes | Yes | Written by the generator |
 | `host_ovf` | n/a | No | Another source for a VM's image (a VM or OVF files already on the host): Isoloom deploys the OVA of `images` |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `memsize` | Yes | Yes | Written by the generator |
@@ -2212,9 +2212,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ovf_properties` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
 | `ovf_properties.key` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
 | `ovf_properties.value` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
-| `virtual_disks` | Yes | Not yet | Machines.*.disks on ESXi: an esxi_virtual_disk each, attached by slot (the target refuses data disks until then) |
-| `virtual_disks.slot` | Yes | Not yet | Machines.*.disks on ESXi: an esxi_virtual_disk each, attached by slot (the target refuses data disks until then) |
-| `virtual_disks.virtual_disk_id` | Yes | Not yet | Machines.*.disks on ESXi: an esxi_virtual_disk each, attached by slot (the target refuses data disks until then) |
+| `virtual_disks` | Yes | Yes | Written by the generator |
+| `virtual_disks.slot` | Yes | Yes | Written by the generator |
+| `virtual_disks.virtual_disk_id` | Yes | Yes | Written by the generator |
 
 ### esxi_portgroup
 
@@ -2228,6 +2228,17 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `vlan` | Yes | Yes | Written by the generator |
 | `vswitch` | Yes | Yes | Written by the generator |
 
+### esxi_virtual_disk
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `virtual_disk_dir` | Yes | Yes | Written by the generator |
+| `virtual_disk_disk_store` | Yes | Yes | Written by the generator |
+| `virtual_disk_name` | Yes | Yes | Written by the generator |
+| `virtual_disk_size` | Yes | Yes | Written by the generator |
+| `virtual_disk_type` | Yes | Yes | Written by the generator |
+
 ### esxi_vswitch
 
 | Key | Every target | Implemented | Notes |
@@ -2236,12 +2247,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `link_discovery_mode` | No | No | Tunes the ESXi host for the VM or the vSwitch (virtual hardware version, link discovery): no other target exposes it |
 | `mac_changes` | No | No | A vSwitch's security policy (promiscuous mode, MAC changes, forged transmits): no other target's networks have one |
-| `mtu` | Yes | Not yet | A network's MTU |
+| `mtu` | Yes | Yes | Written by the generator |
 | `name` | Yes | Yes | Written by the generator |
 | `ports` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `promiscuous_mode` | No | No | A vSwitch's security policy (promiscuous mode, MAC changes, forged transmits): no other target's networks have one |
-| `uplink` | Yes | Not yet | With `bridged` networks on ESXi: a network on the host's own uplink (each network is on its own vSwitch with none) |
-| `uplink.name` | Yes | Not yet | With `bridged` networks on ESXi: a network on the host's own uplink (each network is on its own vSwitch with none) |
+| `uplink` | Yes | Yes | Written by the generator |
+| `uplink.name` | Yes | Yes | Written by the generator |
 
 ## Terraform: AWS
 
@@ -8140,28 +8151,28 @@ is marked ✗, with its reason below.
 | `networks.*.tc.jitter` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
 | `networks.*.tc.loss` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
 | `networks.*.tc.rate` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
-| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `networks.*.docker.cidr` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `networks.*.vlans.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | ✓ |
 | `networks.*.switch` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `networks.*.vlans.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `networks.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ◐ | ✗ | ✗ | ✗ | ✗ | ◐ | ✓ | n/a | n/a |
-| `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | n/a | ✓ |
+| `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.only` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✗ |
-| `networks.*.external` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `networks.*.bridged.interface` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `networks.*.bridged.dhcp` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `networks.*.bridged.default_route` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `networks.*.bridged.vlan` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.external` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.interface` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.dhcp` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.default_route` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.vlan` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
 | `reach[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
 | `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
 | `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
 | `dns.private` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `dns.domain` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
-| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.networks` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
 | `machines.*.services[].port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `cloud.provider` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
@@ -8181,7 +8192,7 @@ is marked ✗, with its reason below.
 | `machines.*.services[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.services[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
-| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.environment` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
@@ -8239,9 +8250,9 @@ is marked ✗, with its reason below.
 | `machines.*.files[].mode` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
 | `machines.*.volumes.*.path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.volumes.*.subpath` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | planned |
-| `machines.*.disks.*.size_gb` | n/a | n/a | ✓ | ✓ | ✓ | ◐ | n/a | ◐ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ✗ |
-| `machines.*.disks.*.fs` | n/a | n/a | ◐ | ◐ | ◐ | ✓ | n/a | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ✗ |
-| `machines.*.disks.*.mount` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.disks.*.size_gb` | n/a | n/a | ✓ | ✓ | ✓ | ◐ | n/a | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ✗ |
+| `machines.*.disks.*.fs` | n/a | n/a | ◐ | ◐ | ◐ | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ✗ |
+| `machines.*.disks.*.mount` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.access` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.docker.image` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.build` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
@@ -8279,7 +8290,7 @@ is marked ✗, with its reason below.
 | `machines.*.vm.boot.network.tftp_root` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
 | `machines.*.vm.boot.network.file` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
 | `machines.*.vm.boot.network.server` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
-| `machines.*.vm.boot.firmware` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.firmware` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
 | `machines.*.vm.boot.firmware_format` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
 | `machines.*.vm.boot.order` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ◐ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
 | `machines.*.vm.provision` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ◐ |
@@ -8328,7 +8339,7 @@ is marked ✗, with its reason below.
 | docker-vm | 78% of 122 | 94 | 3 | 0 | 25 |
 | hybrid | 65% of 149 | 95 | 6 | 7 | 41 |
 | proxmox | 82% of 126 | 103 | 2 | 3 | 18 |
-| esxi | 65% of 120 | 78 | 1 | 3 | 38 |
+| esxi | 76% of 120 | 91 | 1 | 3 | 25 |
 | aws | 62% of 126 | 71 | 16 | 6 | 33 |
 | azure | 62% of 126 | 72 | 14 | 6 | 34 |
 | gcp | 62% of 126 | 71 | 15 | 7 | 33 |
@@ -8347,7 +8358,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **aws, azure**: Link impairment (`tc`) needs a router in the path; the cloud's security groups have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
 - **gcp**: Link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
 - **digitalocean, linode, oci**: Link impairment (`tc`) needs a router in the path; the cloud's firewalls have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
-- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, cloud-docker, external**: Network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does) (`networks.*.mtu`)
+- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, cloud-docker, external**: Network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does) (`networks.*.mtu`)
 - **aws**: Network `lan` sets its `mtu`: AWS has no setting for a network's MTU (`networks.*.mtu`)
 - **azure**: Network `lan` sets its `mtu`: Azure has no setting for a network's MTU (`networks.*.mtu`)
 - **digitalocean**: Network `lan` sets its `mtu`: DigitalOcean has no setting for a network's MTU (`networks.*.mtu`)
@@ -8362,19 +8373,18 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **azure**: Networks with a `gateway` machine in the cloud come later (`networks.*.gateway`)
 - **gcp**: A Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network (`networks.*.gateway`)
 - **linode**: Machine `a` is on several networks: a Linode instance has one VPC interface (`networks.*.gateway`)
-- **hybrid, esxi**: Network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`, `networks.*.ipv6.only`)
+- **hybrid**: Network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`, `networks.*.ipv6.only`)
 - **aws**: Network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)
 - **gcp**: Network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)
 - **digitalocean**: Network `lan` is IPv6: DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one) (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)
 - **linode**: Network `lan` is IPv6: a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)
-- **vagrant, proxmox**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static` (`networks.*.ipv6.addresses`)
+- **vagrant, proxmox, esxi**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static` (`networks.*.ipv6.addresses`)
 - **azure**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`): Isoloom gives each Azure interface the address derived from the machine's octet, so use `static` (`networks.*.ipv6.addresses`)
-- **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci, external**: Network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport) (`networks.*.ipv6.only`)
-- **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
-- **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)
+- **vagrant, proxmox, esxi, aws, azure, gcp, digitalocean, linode, oci, external**: Network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport) (`networks.*.ipv6.only`)
+- **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
+- **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)
 - **vagrant**: Network `home`: Vagrant's bridged networks take no VLAN tag (Proxmox does) (`networks.*.bridged.vlan`)
 - **kubernetes, helm, kustomize, external**: The names are served under a private zone (`dns.private`, `probe.internal`), and this target has no DNS or hosts file Isoloom sets: a cluster names Services under its own domain, an existing host keeps its own resolver (`dns.private`, `dns.domain`)
-- **esxi**: Machine `a` gets `secrets`, and this target has no machine `isoloom run` can hand them to (`secrets`, `machines.*.secrets`)
 - **esxi**: Machine `a`: ESXi runs x86-64 VMs only (`machines.*.arch`)
 - **aws**: Machine `a`: arm64 on AWS comes later (Graviton instances and arm64 AMIs) (`machines.*.arch`)
 - **azure**: Machine `a`: arm64 on Azure comes later (Arm-based sizes and arm64 images) (`machines.*.arch`)
@@ -8408,12 +8418,16 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **vagrant, docker-vm, hybrid, proxmox, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Volume `data` is persistent: it outlives `down` on Docker and Kubernetes, while this target's storage goes with its machines (`volumes.*.persistent`)
 - **vagrant, docker-vm, hybrid, proxmox, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Volume `data` is an existing one (`external`): Docker and Kubernetes mount one by name, this target has none to mount (`volumes.*.external`)
 - **external**: Machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook (`machines.*.files[].path`, `machines.*.files[].source`, `machines.*.files[].content`, `machines.*.files[].uid`, `machines.*.files[].gid`, `machines.*.files[].mode`)
-- **esxi, external**: Machine `a` has data disks (`disks`), which this target can't attach (`machines.*.disks.*.size_gb`, `machines.*.disks.*.fs`, `machines.*.disks.*.mount`)
+- **external**: Machine `a` has data disks (`disks`), which this target can't attach (`machines.*.disks.*.size_gb`, `machines.*.disks.*.fs`, `machines.*.disks.*.mount`)
 - **hybrid**: Machine `r` is a network appliance (`docker.appliance`), which runs on the Docker targets (`machines.*.docker.appliance`, `machines.*.docker.firmware`, `machines.*.docker.config`)
-- **hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`, `machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`, `machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`, `machines.*.vm.boot.firmware`, `machines.*.vm.boot.firmware_format`, `machines.*.vm.boot.order`)
+- **hybrid, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`, `machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`, `machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`, `machines.*.vm.boot.firmware`, `machines.*.vm.boot.firmware_format`, `machines.*.vm.boot.order`)
 - **proxmox**: Machine `a` sets `vm.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`)
+- **esxi**: Machine `a` sets `vm.boot.kernel`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`)
 - **proxmox**: Machine `a` sets `vm.boot.loader`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`)
+- **esxi**: Machine `a` sets `vm.boot.loader`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it (`machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`)
 - **proxmox**: Machine `a` sets `vm.boot.network`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`)
+- **esxi**: Machine `a` sets `vm.boot.order`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it (`machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`, `machines.*.vm.boot.order`)
+- **esxi**: Machine `a` sets `vm.boot.firmware_format`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it (`machines.*.vm.boot.firmware_format`)
 - **esxi**: Machine `a` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do) (`machines.*.vm.tpm`)
 - **digitalocean**: Machine `a` asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none (`machines.*.vm.tpm`)
 - **linode**: Machine `a` asks for a virtual TPM (`vm.tpm: true`): Linode gives none (`machines.*.vm.tpm`)
