@@ -10,7 +10,7 @@
 //!   `check` profile), or `isoloom test docker-vm`.
 //! - Published ports: the VM forwards them from the host's loopback.
 //! - On a Proxmox server: `.isoloom/docker-vm/proxmox/main.tf` (Terraform, bpg/proxmox), one
-//!   VM on the uplink bridge, the same steps over SSH (the cloud-docker module's generator).
+//!   VM on the uplink bridge, the same set-up over SSH as `cloud-docker`'s Docker host.
 //! - ESXi: the vagrant-vmware-esxi provider reads the host from ESXI_HOSTNAME, ESXI_USERNAME
 //!   and ESXI_PASSWORD (and the datastore from ESXI_DATASTORE).
 //!
@@ -19,7 +19,7 @@
 use isoloom_plan::checks::{Position, Probe};
 use isoloom_plan::{Capabilities, Environment, MachineShape};
 use isoloom_render::backend::{self, Backend, Files, RenderError};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, constraints, header, project};
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 use isoloom_spec::model::Target;
 use isoloom_terraform::cloud_docker;
 
@@ -54,7 +54,7 @@ impl Backend for DockerVmBackend {
         let on_docker = Environment::build(env.spec(), Target::Docker, env.instance);
         let mut files = isoloom_compose::render(Target::Docker, &on_docker)?;
         files.push(vagrantfile(env));
-        files.push(proxmox(env));
+        files.push(proxmox(env)?);
         Ok(files)
     }
 }
@@ -221,12 +221,12 @@ fn exec_runs(env: &Environment) -> String {
         .collect()
 }
 
-/// The Proxmox module, from the cloud-docker generator, with the project lists and the
-/// constraints' prelude its Terraform needs.
-fn proxmox(env: &Environment) -> GeneratedFile {
-    let spec = env.spec();
-    let mut f = cloud_docker::other_in(spec, DIR, "proxmox", cloud_docker::PROXMOX);
-    project::terraform(&mut f.contents);
-    constraints::terraform_prelude(spec, std::slice::from_mut(&mut f));
-    f
+/// The Proxmox module: the cloud-docker target's Docker host, on a Proxmox server.
+fn proxmox(env: &Environment) -> Result<GeneratedFile, RenderError> {
+    cloud_docker::proxmox::render(env).map_err(|e| {
+        RenderError::Generate(isoloom_render::GenerateError::Unsupported {
+            target: Target::DockerVm,
+            what: format!("the Proxmox module couldn't be written: {e}"),
+        })
+    })
 }

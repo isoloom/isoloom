@@ -22,7 +22,7 @@ pub enum RenderError {
         /// The requirement it can't meet.
         refusal: Refusal,
     },
-    /// A generator that predates the plan refused the spec (see `LegacyBackend`).
+    /// A backend refused the spec for a reason of its own (a limit of its target).
     Generate(GenerateError),
 }
 

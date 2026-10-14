@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    digitalocean = {
-      source  = "digitalocean/digitalocean"
-      version = "~> 2.0"
-    }
+    digitalocean = { source = "digitalocean/digitalocean", version = "~> 2.0" }
   }
 }
 
@@ -19,9 +16,36 @@ variable "region" {
   type    = string
   default = "fra1"
 }
+
 variable "size" {
   type    = string
   default = "s-2vcpu-4gb"
+}
+
+variable "allowed_cidr" {
+  type        = string
+  description = "Who may reach the VM (SSH and the published ports), e.g. your IP/32"
+}
+
+variable "ssh_public_key" {
+  type = string
+}
+
+variable "ssh_private_key_file" {
+  type        = string
+  description = "The private key of ssh_public_key: Terraform copies the project over SSH"
+}
+
+variable "auto_stop_minutes" {
+  type        = number
+  default     = 0
+  description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
+}
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
 
 resource "terraform_data" "id" {
@@ -65,14 +89,6 @@ resource "digitalocean_firewall" "env" {
     port_range       = "22"
     source_addresses = [var.allowed_cidr]
   }
-  dynamic "inbound_rule" {
-    for_each = []
-    content {
-      protocol         = "tcp"
-      port_range       = tostring(inbound_rule.value)
-      source_addresses = [var.allowed_cidr]
-    }
-  }
   outbound_rule {
     protocol              = "tcp"
     port_range            = "1-65535"
@@ -85,29 +101,6 @@ resource "digitalocean_firewall" "env" {
   }
 }
 
-variable "allowed_cidr" {
-  type        = string
-  description = "Who may reach the VM (SSH and the published ports), e.g. your IP/32"
-}
-variable "ssh_public_key" {
-  type = string
-}
-variable "ssh_private_key_file" {
-  type        = string
-  description = "The private key of ssh_public_key: Terraform copies the project over SSH"
-}
-variable "auto_stop_minutes" {
-  type        = number
-  default     = 0
-  description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
-}
-
-variable "expires_at" {
-  type        = string
-  default     = ""
-  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
-}
-
 # The environment, over SSH: the project, Docker, then the Compose file.
 resource "terraform_data" "environment" {
   triggers_replace = [digitalocean_droplet.env.id]
@@ -118,28 +111,22 @@ resource "terraform_data" "environment" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = [
-      "cloud-init status --wait >/dev/null 2>&1 || true",
-      var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
-      "sudo mkdir -p /opt/isoloom && sudo chown root /opt/isoloom",
-    ]
-  }
-  # The project as an archive: a plain copy drops the executable bits (entrypoint scripts).
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
+    command = "tar -czf \"${path.module}/.isoloom-project-environment.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
-    source      = "${path.module}/.isoloom-project.tgz"
+    source      = "${path.module}/.isoloom-project-environment.tgz"
     destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "remote-exec" {
     inline = [
       "set -e",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
       "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 $(sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml config --services | grep -vx -e writer-init-1) && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up --no-deps --exit-code-from writer-init-1 writer-init-1",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -147,9 +134,11 @@ resource "terraform_data" "environment" {
 output "ip" {
   value = digitalocean_droplet.env.ipv4_address
 }
+
 output "ssh_user" {
   value = "root"
 }
+
 output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }

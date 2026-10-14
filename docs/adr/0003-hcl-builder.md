@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted. Built in Wave 2 (unit 10): `isoloom_render::hcl_builder`, used by Proxmox and AWS; the
-other Terraform backends and Vagrant follow.
+Accepted. Built in Wave 2 (unit 10): `isoloom_render::hcl_builder`, used by Proxmox, AWS and the
+`cloud-docker` modules (with `docker-vm`'s Proxmox module); the other Terraform backends and
+Vagrant follow.
 
 Two findings from building it: `hcl-rs` doesn't align attributes as `terraform fmt` does, so the
 builder writes the layout itself (leaf expressions are still written by `hcl-rs`); and its

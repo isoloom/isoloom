@@ -2,7 +2,8 @@
 //! each target needs it:
 //!
 //! - images: every `image:` of the Compose file and the Kubernetes manifests, and the `FROM`
-//!   of the Dockerfiles Isoloom writes, go through the registry mirrors ([`rewrite_images`]);
+//!   of the Dockerfiles Isoloom writes, go through the registry mirrors ([`rewrite_image`], as each
+//!   backend writes them);
 //! - containers: the machines (never Isoloom's own checks or router) get the proxy and the
 //!   package mirrors as environment variables ([`machine_env`]), their builds the proxy as
 //!   build arguments ([`build_args`]);
@@ -14,8 +15,6 @@ use std::fmt::Write as _;
 
 use crate::model::{Constraints, Spec};
 use crate::shell::quote;
-
-use super::GeneratedFile;
 
 /// The spec's constraints, when it has any that change something.
 pub fn of(spec: &Spec) -> Option<&Constraints> {
@@ -95,98 +94,6 @@ pub fn build_args(spec: &Spec) -> Vec<(String, String)> {
 }
 
 pub use isoloom_plan::images::rewrite_image;
-
-/// Every image the generated files pull, through the registry mirrors: `image:` lines of YAML
-/// (Compose, Kubernetes) and `FROM` lines of the Dockerfiles Isoloom writes. The images the
-/// project builds are tagged locally, not pulled, so they're left alone.
-pub fn rewrite_images(spec: &Spec, files: &mut [GeneratedFile]) {
-    let Some(c) = of(spec).filter(|c| !c.registries.is_empty()) else { return };
-    let built: Vec<String> = spec
-        .machines
-        .iter()
-        .filter_map(|(name, m)| {
-            let d = m.docker.as_ref()?;
-            d.build.as_ref()?;
-            Some(d.image.clone().unwrap_or_else(|| format!("isoloom/{}-{}", spec.name, name)))
-        })
-        .collect();
-    let swap = |image: &str| -> Option<String> {
-        if built.iter().any(|b| b == image) {
-            return None;
-        }
-        let new = rewrite_image(c, image);
-        (new != image).then_some(new)
-    };
-    for f in files.iter_mut() {
-        let yaml = f.path.ends_with(".yml") || f.path.ends_with(".yaml");
-        let dockerfile = f.path.ends_with("/Dockerfile");
-        if !yaml && !dockerfile {
-            continue;
-        }
-        let mut changed = false;
-        let mut out = String::with_capacity(f.contents.len());
-        for line in f.contents.split_inclusive('\n') {
-            let (body, nl) = match line.strip_suffix('\n') {
-                Some(b) => (b, "\n"),
-                None => (line, ""),
-            };
-            let replaced = if yaml { yaml_image(body, &swap) } else { from_line(body, &swap) };
-            match replaced {
-                Some(r) => {
-                    out.push_str(&r);
-                    out.push_str(nl);
-                    changed = true;
-                }
-                None => out.push_str(line),
-            }
-        }
-        if changed {
-            f.contents = out;
-        }
-    }
-}
-
-/// `    image: redis:7` (or `- image: …`, quoted or not) with the image swapped.
-fn yaml_image(line: &str, swap: &impl Fn(&str) -> Option<String>) -> Option<String> {
-    let trimmed = line.trim_start();
-    let indent = &line[..line.len() - trimmed.len()];
-    let (dash, rest) = match trimmed.strip_prefix("- ") {
-        Some(r) => ("- ", r),
-        None => ("", trimmed),
-    };
-    let value = rest.strip_prefix("image: ")?.trim_end();
-    let (q, bare) = match value.chars().next() {
-        Some(q @ ('\'' | '"')) if value.len() >= 2 && value.ends_with(q) => (q.to_string(), &value[1..value.len() - 1]),
-        _ => (String::new(), value),
-    };
-    if bare.is_empty() || bare.contains(' ') || bare.contains('$') {
-        return None;
-    }
-    let new = swap(bare)?;
-    Some(format!("{indent}{dash}image: {q}{new}{q}"))
-}
-
-/// `FROM image [AS name]` with the image swapped.
-fn from_line(line: &str, swap: &impl Fn(&str) -> Option<String>) -> Option<String> {
-    let mut parts = line.split_whitespace();
-    if !parts.next()?.eq_ignore_ascii_case("FROM") {
-        return None;
-    }
-    let mut image = parts.next()?;
-    let mut flags = String::new();
-    while image.starts_with("--") {
-        flags.push_str(image);
-        flags.push(' ');
-        image = parts.next()?;
-    }
-    if image.contains('$') || image == "scratch" {
-        return None;
-    }
-    let new = swap(image)?;
-    let tail: Vec<&str> = parts.collect();
-    let tail = if tail.is_empty() { String::new() } else { format!(" {}", tail.join(" ")) };
-    Some(format!("FROM {flags}{new}{tail}"))
-}
 
 /// The shell (run as root, idempotent) that applies the constraints on a Linux VM, before its
 /// own set-up and steps. `None` when the spec has none.
@@ -288,30 +195,4 @@ pub fn linux_prelude(spec: &Spec) -> Option<String> {
         );
     }
     Some(sh)
-}
-
-/// The preamble in every Linux VM the Terraform modules make: Proxmox's cloud-config gets it as
-/// `bootcmd` (before cloud-init installs packages, at every boot: it's idempotent), the clouds'
-/// first `remote-exec` runs it with sudo once cloud-init is done, before anything else.
-pub fn terraform_prelude(spec: &Spec, files: &mut [GeneratedFile]) {
-    const CLOUD_CONFIG: &str = "data = \"#cloud-config\\n${yamlencode({\n";
-    const FIRST_STEP: &str = "inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", ";
-    // The same first step, one command a line (the cloud-docker modules, then their auto-stop).
-    const FIRST_STEP_LINES: &str = "      \"cloud-init status --wait >/dev/null 2>&1 || true\",\n      var.auto_stop_minutes > 0";
-    let Some(sh) = linux_prelude(spec) else { return };
-    // A blank line after: `terraform fmt` aligns only consecutive attributes.
-    let boot = format!("      bootcmd = [[\"sh\", \"-c\", {}]]\n\n", super::hcl(&sh));
-    let first = format!("{}, ", super::hcl(&format!("sudo sh -c {}", quote(&sh))));
-    for f in files.iter_mut().filter(|f| f.path.ends_with(".tf")) {
-        if f.contents.contains(CLOUD_CONFIG) {
-            f.contents = f.contents.replace(CLOUD_CONFIG, &format!("{CLOUD_CONFIG}{boot}"));
-        }
-        if f.contents.contains(FIRST_STEP) {
-            f.contents = f.contents.replace(FIRST_STEP, &format!("{FIRST_STEP}{first}"));
-        }
-        if f.contents.contains(FIRST_STEP_LINES) {
-            let (wait, rest) = FIRST_STEP_LINES.split_once('\n').expect("two lines");
-            f.contents = f.contents.replace(FIRST_STEP_LINES, &format!("{wait}\n      {}\n{rest}", first.trim_end()));
-        }
-    }
 }

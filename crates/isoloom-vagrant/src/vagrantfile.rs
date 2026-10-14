@@ -67,8 +67,7 @@ pub fn prelude(r: &mut Ruby, env: &Environment, var: &str) {
 
 /// Docker from Docker's own install script, unless the box has it.
 pub fn install_docker(r: &mut Ruby, var: &str) {
-    let script = "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh";
-    r.call(shell(var, "docker").kw("inline", Value::str(script)));
+    r.call(shell(var, "docker").kw("inline", Value::str(steps::INSTALL_DOCKER)));
 }
 
 #[cfg(test)]

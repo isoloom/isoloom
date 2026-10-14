@@ -114,7 +114,7 @@ fn given(name: &str, set: bool) -> Expression {
 }
 
 /// The connection: an API token, else a user and password; SSH to the node for the snippets.
-fn provider() -> Block {
+pub(crate) fn provider() -> Block {
     let token = || given("proxmox_api_token", true);
     let key = || given("proxmox_ssh_private_key_file", true);
     let node = Block::builder("dynamic")

@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 5.0"
-    }
+    azurerm = { source = "hashicorp/azurerm", version = "~> 5.0" }
   }
 }
 
@@ -20,13 +17,41 @@ variable "subscription_id" {
   default     = null
   description = "Default: ARM_SUBSCRIPTION_ID from the environment"
 }
+
 variable "region" {
   type    = string
   default = "swedencentral"
 }
+
 variable "size" {
   type    = string
   default = "Standard_D2als_v6"
+}
+
+variable "allowed_cidr" {
+  type        = string
+  description = "Who may reach the VM (SSH and the published ports), e.g. your IP/32"
+}
+
+variable "ssh_public_key" {
+  type = string
+}
+
+variable "ssh_private_key_file" {
+  type        = string
+  description = "The private key of ssh_public_key: Terraform copies the project over SSH"
+}
+
+variable "auto_stop_minutes" {
+  type        = number
+  default     = 0
+  description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
+}
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
 
 provider "azurerm" {
@@ -44,7 +69,12 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-vlan-office-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "vlan-office", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+  tags = {
+    isoloom-environment = "vlan-office"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "azurerm_resource_group" "env" {
@@ -86,7 +116,7 @@ resource "azurerm_network_security_group" "env" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_ranges    = concat(["22"], [])
+    destination_port_ranges    = ["22"]
     source_address_prefix      = var.allowed_cidr
     destination_address_prefix = "*"
   }
@@ -134,29 +164,6 @@ resource "azurerm_linux_virtual_machine" "env" {
   depends_on = [azurerm_network_interface_security_group_association.env]
 }
 
-variable "allowed_cidr" {
-  type        = string
-  description = "Who may reach the VM (SSH and the published ports), e.g. your IP/32"
-}
-variable "ssh_public_key" {
-  type = string
-}
-variable "ssh_private_key_file" {
-  type        = string
-  description = "The private key of ssh_public_key: Terraform copies the project over SSH"
-}
-variable "auto_stop_minutes" {
-  type        = number
-  default     = 0
-  description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
-}
-
-variable "expires_at" {
-  type        = string
-  default     = ""
-  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
-}
-
 # The environment, over SSH: the project, Docker, then the Compose file.
 resource "terraform_data" "environment" {
   triggers_replace = [azurerm_linux_virtual_machine.env.id]
@@ -167,28 +174,22 @@ resource "terraform_data" "environment" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = [
-      "cloud-init status --wait >/dev/null 2>&1 || true",
-      var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
-      "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom",
-    ]
-  }
-  # The project as an archive: a plain copy drops the executable bits (entrypoint scripts).
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
+    command = "tar -czf \"${path.module}/.isoloom-project-environment.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
-    source      = "${path.module}/.isoloom-project.tgz"
+    source      = "${path.module}/.isoloom-project-environment.tgz"
     destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "remote-exec" {
     inline = [
       "set -e",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
       "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -196,9 +197,11 @@ resource "terraform_data" "environment" {
 output "ip" {
   value = azurerm_public_ip.env.ip_address
 }
+
 output "ssh_user" {
   value = "isoloom"
 }
+
 output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }
