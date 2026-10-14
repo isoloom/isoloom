@@ -59,7 +59,12 @@ pub struct Provisioner {
     pub parts: Vec<Vec<Expression>>,
     /// The resources it waits for.
     pub depends_on: Vec<Expression>,
+    /// The name it tells `isoloom run` how to reach the machine under, before anything else
+    /// (`isoloom_render::secrets::REACH_DIR`): a machine whose set-up waits for its secrets.
+    pub announce: Option<String>,
 }
+
+use isoloom_render::secrets::REACH_DIR;
 
 impl Provisioner {
     /// The `terraform_data` block.
@@ -69,6 +74,9 @@ impl Provisioner {
             .add_label(self.name.as_str())
             .add_attribute(("triggers_replace", list([self.replace_on])))
             .add_block(connection(&self.connection));
+        if let Some(name) = &self.announce {
+            b = b.add_block(announce(name, &self.connection));
+        }
         for u in self.uploads {
             b = b.add_blocks(upload(u));
         }
@@ -83,6 +91,23 @@ impl Provisioner {
         }
         b.build()
     }
+}
+
+/// A `local-exec` writing `<user>@<address>` to `<module>/.isoloom-reach/<name>`: an address,
+/// never a secret.
+fn announce(name: &str, c: &Connection) -> Block {
+    let (host, user) = match c {
+        Connection::Ssh { host, user } => (host.clone(), user.as_str()),
+        Connection::WinRm { host, .. } => (host.clone(), "isoloom"),
+    };
+    let mut command = Template::text("mkdir -p \"");
+    command.push_expr(reference("path.module"));
+    command.push_text(format!("/{REACH_DIR}\" && echo \"{user}@"));
+    command.push_expr(host);
+    command.push_text("\" > \"");
+    command.push_expr(reference("path.module"));
+    command.push_text(format!("/{REACH_DIR}/{name}\""));
+    provisioner("local-exec").add_attribute(("command", command.into_expression())).build()
 }
 
 fn connection(c: &Connection) -> Block {

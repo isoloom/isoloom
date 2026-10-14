@@ -44,7 +44,7 @@ pub(super) fn before(env: &Environment, machine: &str, paths: &[String]) -> Opti
         "The machine's before steps, ahead of its command",
         &script,
         Kind::Once,
-        &[],
+        &secrets_first(mp),
     ))
 }
 
@@ -53,8 +53,20 @@ pub(super) fn command(env: &Environment, machine: &str) -> Option<String> {
     let mp = env.machines.get(machine)?;
     let line = mp.process.command.as_ref()?.argv().iter().map(|a| quote(a)).collect::<Vec<_>>().join(" ");
     let script = format!("{}exec {line}\n", prelude(env, machine, mp));
-    let after: &[&str] = if mp.process.before.is_empty() { &[] } else { &["before"] };
-    Some(boot::service("command", "The machine's own command", &script, Kind::Daemon, after))
+    let mut after = secrets_first(mp);
+    if !mp.process.before.is_empty() {
+        after.push("before");
+    }
+    Some(boot::service("command", "The machine's own command", &script, Kind::Daemon, &after))
+}
+
+/// At boot, a machine's secrets are back in place before its `before` steps and command run.
+fn secrets_first(mp: &MachinePlan) -> Vec<&'static str> {
+    if mp.secrets.is_empty() {
+        Vec::new()
+    } else {
+        vec![crate::secrets::PLACE_SERVICE]
+    }
 }
 
 /// The healthcheck, tried until it passes before the machine is marked ready: the set-up fails

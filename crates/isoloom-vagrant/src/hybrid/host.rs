@@ -74,9 +74,10 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
             .kw("extra", extra),
     );
     r.heredoc(shell("m", "networks"), "inline", "SH", &networks_script(nics));
-    let up = "cd /opt/isoloom && docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900";
+    let secrets = isoloom_render::secrets::host_environment(&isoloom_render::secrets::of_containers(env));
+    let up = format!("{secrets}cd /opt/isoloom && docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900");
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
-    r.call(shell("m", "containers").kw("inline", Value::str(up)).kw_opt("env", inputs));
+    r.call(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", inputs));
 }
 
 /// Sized for every container at once plus Docker's own 1 GB (2 to 16 CPUs), every lab

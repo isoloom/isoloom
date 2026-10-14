@@ -82,6 +82,9 @@ pub fn capabilities() -> Capabilities {
         Feature::BridgedNetworks,
         // Given on VirtualBox, libvirt and Hyper-V; `provider_refusal` refuses the others.
         Feature::Tpm,
+        // Delivered by `isoloom run` over the machine's SSH, owners included.
+        Feature::Secrets,
+        Feature::SecretOwners,
         Feature::MachineProcess,
         // The libvirt provider boots it; `provider_refusal` says which providers can't.
         Feature::OwnBoot,

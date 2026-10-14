@@ -119,6 +119,9 @@ impl Backend for ProxmoxBackend {
             Feature::ExternalNetworks,
             Feature::BridgedNetworks,
             Feature::Tpm,
+            // Delivered by `isoloom run` over the machine's SSH, owners included.
+            Feature::Secrets,
+            Feature::SecretOwners,
             Feature::MachineProcess,
             // A machine's firmware and boot order; its own `refusal` says what Proxmox can't boot.
             Feature::OwnBoot,

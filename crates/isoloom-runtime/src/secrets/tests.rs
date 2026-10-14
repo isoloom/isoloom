@@ -116,3 +116,27 @@ fn a_value_with_a_nul_is_refused() {
     let e = resolve(&s, &lookup(&d)).unwrap_err();
     assert!(e[0].why.contains("NUL"), "{e:?}");
 }
+
+#[test]
+fn base64_is_the_standard_one() {
+    for (raw, enc) in [
+        ("", ""),
+        ("a", "YQ=="),
+        ("ab", "YWI="),
+        ("abc", "YWJj"),
+        ("abcd", "YWJjZA=="),
+        ("abcde", "YWJjZGU="),
+        ("abcdef", "YWJjZGVm"),
+    ] {
+        assert_eq!(base64(raw.as_bytes()), enc);
+    }
+    assert_eq!(base64(&[0xff, 0xfe, 0x00]), "//4A");
+}
+
+#[test]
+fn delivery_input_is_a_line_per_secret_in_order() {
+    let values = vec![("a".to_string(), SecretValue("x\ny".into())), ("b".to_string(), SecretValue(String::new()))];
+    let names = vec!["b".to_string(), "a".to_string()];
+    assert_eq!(delivery_input(&values, &names).unwrap(), b"\neAp5\n".to_vec());
+    assert!(delivery_input(&values, &["c".to_string()]).is_none());
+}

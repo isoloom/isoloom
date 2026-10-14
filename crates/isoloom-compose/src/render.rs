@@ -51,9 +51,9 @@ pub fn capabilities() -> isoloom_plan::Capabilities {
 }
 
 /// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
-/// secrets, which `isoloom run` hands only to a Compose it starts on this machine, existing
-/// networks, which a fresh Docker host VM has none of, and the host's GPUs and devices, which
-/// a VM Isoloom creates doesn't have.
+/// existing networks, which a fresh Docker host VM has none of, and the host's GPUs and
+/// devices, which a VM Isoloom creates doesn't have. Secrets reach the VM over its own
+/// connection (`isoloom run`), and Compose takes them from there.
 pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
     isoloom_plan::Capabilities::of([
         Feature::NetworkAppliances,
@@ -64,6 +64,8 @@ pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
         Feature::Ipv6,
         Feature::Ipv6Only,
         Feature::Ipv6Auto,
+        Feature::Secrets,
+        Feature::SecretOwners,
         Feature::MachineProcess,
     ])
 }

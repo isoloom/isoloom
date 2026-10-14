@@ -152,5 +152,6 @@ pub fn provisioner(c: Ssh) -> Provisioner {
         ],
         parts: vec![cmds.into_iter().map(Template::into_expression).collect()],
         depends_on: super::vms(env).map(|(n, _)| reference(&format!("terraform_data.{}", res(n)))).collect(),
+        announce: None,
     }
 }

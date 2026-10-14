@@ -75,6 +75,7 @@ pub fn provisioner(m: Machine) -> Provisioner {
         parts: parts(&m),
         depends_on: depends_on(m.env, m.name),
         connection: Connection::Ssh { host: m.host, user: m.user },
+        announce: (!mp.secrets.is_empty()).then(|| m.name.to_string()),
     }
 }
 

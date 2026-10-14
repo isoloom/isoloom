@@ -51,6 +51,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
             "mkdir -p {PROJECT_DIR} && tar -xzf {PROJECT_ARCHIVE} -C {PROJECT_DIR} --strip-components=1 && rm -f {PROJECT_ARCHIVE}\n"
         )),
         Step::Files { files } => Some(crate::machine_files::linux(files)),
+        Step::Secrets => env.machines.get(machine).map(|mp| crate::secrets::step(machine, &mp.secrets)),
         Step::Inputs { persist } => (*persist).then(|| format!("mkdir -p /var/lib/isoloom && install -m 600 {INPUTS_FILE} {KEPT_INPUTS_FILE}\n")),
         Step::WaitFor { machine: dep, ports } => Some(format!("{}\n", router::wait_for(dep, ports, WAIT_TIMEOUT))),
         Step::Run { kind: RunKind::PowerShell, .. } => None,

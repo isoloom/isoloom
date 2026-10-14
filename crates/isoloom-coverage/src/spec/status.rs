@@ -46,9 +46,11 @@ pub enum Status {
 /// [`super::probes`]) generates for it, which the tests check.
 pub const PROBE: &str = "(probe)";
 
-/// A VM or existing-host output's cell for secrets: what delivering them there comes with.
-pub const SECRETS_ON_VMS: Status = Status::Planned {
-    note: "secrets on VMs and existing hosts: files written over the machine's connection by `isoloom run`",
+/// A VM or existing-host output's cell for secrets: written on the machine by `isoloom run`.
+pub const SECRETS_ON_VMS: Status = Status::Partial {
+    how: "written by `isoloom run` over the machine's own SSH (kept root-only under /var/lib/isoloom/secrets, then placed at their paths with their owner and mode), before its provision steps, `before` steps and command; the set-up waits for them, and no generated file holds a value",
+    gap: "a Windows machine with secrets is refused: delivery over WinRM comes later",
+    proof: PROBE,
 };
 
 /// A container output's cell for a field of `vm:`.

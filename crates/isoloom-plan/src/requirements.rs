@@ -46,6 +46,8 @@ pub enum Feature {
     Secrets,
     /// A secret file owned by a given user or group (`uid`, `gid`).
     SecretOwners,
+    /// Secrets delivered to a Windows VM (over WinRM).
+    WindowsSecrets,
     /// Joining an existing network by name (`external`), which the target never makes.
     ExternalNetworks,
     /// Bridging a network to an interface of the host (`bridged`).
@@ -144,6 +146,11 @@ pub enum Requirement {
         /// The first machine whose secret does.
         machine: String,
     },
+    /// A Windows VM gets secrets.
+    WindowsSecrets {
+        /// The first such machine.
+        machine: String,
+    },
     /// A network is an existing one, joined by name.
     ExternalNetwork {
         /// The network.
@@ -211,6 +218,7 @@ impl Requirement {
             Requirement::Ipv6Auto { .. } => Feature::Ipv6Auto,
             Requirement::Secrets { .. } => Feature::Secrets,
             Requirement::SecretOwner { .. } => Feature::SecretOwners,
+            Requirement::WindowsSecrets { .. } => Feature::WindowsSecrets,
             Requirement::ExternalNetwork { .. } => Feature::ExternalNetworks,
             Requirement::BridgedNetwork { .. } => Feature::BridgedNetworks,
             Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
@@ -264,14 +272,7 @@ impl fmt::Display for Requirement {
                 f,
                 "network `{network}` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`"
             ),
-            Requirement::Secrets { machine } => write!(
-                f,
-                "machine `{machine}` gets `secrets`, which `isoloom run` delivers on the Docker and Kubernetes targets for now"
-            ),
-            Requirement::SecretOwner { machine } => write!(
-                f,
-                "a secret of machine `{machine}` sets `uid` or `gid`: a Kubernetes Secret volume's files belong to root"
-            ),
+            Requirement::Secrets { .. } | Requirement::SecretOwner { .. } | Requirement::WindowsSecrets { .. } => refused_secrets(self, f),
             Requirement::ExternalNetwork { network, name } => write!(
                 f,
                 "network `{network}` is an existing network (`external: {name}`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones)"
@@ -293,6 +294,25 @@ impl fmt::Display for Requirement {
             Requirement::OwnBoot { machine } => crate::boot::no_own_boot(f, machine),
             Requirement::Hardware { machine, need } => need.reason(machine, f),
         }
+    }
+}
+
+/// Why a target refuses a machine's secrets.
+fn refused_secrets(r: &Requirement, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match r {
+        Requirement::Secrets { machine } => write!(
+            f,
+            "machine `{machine}` gets `secrets`, and this target has no machine `isoloom run` can hand them to"
+        ),
+        Requirement::SecretOwner { machine } => write!(
+            f,
+            "a secret of machine `{machine}` sets `uid` or `gid`: a Kubernetes Secret volume's files belong to root"
+        ),
+        Requirement::WindowsSecrets { machine } => write!(
+            f,
+            "machine `{machine}` runs Windows and gets `secrets`: `isoloom run` writes secrets over SSH, and doesn't reach a Windows guest over WinRM yet"
+        ),
+        _ => Ok(()),
     }
 }
 
@@ -428,6 +448,15 @@ pub fn tpm(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
         .iter()
         .find(|(_, m)| m.shape == MachineShape::Vm && m.tpm == Some(Tpm::Required))
         .map(|(name, _)| Requirement::Tpm { machine: name.clone() })
+}
+
+/// The first Windows VM (or existing Windows host) that gets secrets: `isoloom run` writes
+/// them over SSH, which a Windows guest isn't reached by.
+pub fn windows_secrets(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
+    machines
+        .iter()
+        .find(|(_, m)| matches!(m.shape, MachineShape::Vm | MachineShape::External) && m.is_windows() && !m.secrets.is_empty())
+        .map(|(name, _)| Requirement::WindowsSecrets { machine: name.clone() })
 }
 
 /// The checks' requirements beyond probing from a container: playbooks, and `exec` checks that

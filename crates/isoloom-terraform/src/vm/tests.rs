@@ -112,3 +112,34 @@ fn a_variable_writes_its_attributes_in_order() {
         "variable \"x\" {\n  type        = string\n  default     = \"\"\n  sensitive   = true\n  description = \"d\"\n}\n"
     );
 }
+
+#[test]
+fn a_machine_waiting_for_secrets_announces_its_address_first() {
+    let spec =
+        isoloom_spec::parse(&format!("{SPEC}secrets:\n  db: {{ env: DB }}\n").replace("    inputs: [TOKEN]\n", "    inputs: [TOKEN]\n    secrets: [db]\n"))
+            .unwrap();
+    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
+    let env = Environment::build(&spec, Target::CloudVm, None);
+    let machine = |name| {
+        linux::provisioner(linux::Machine {
+            env: &env,
+            name,
+            replace_on: string("id"),
+            host: isoloom_render::hcl_builder::reference("aws_instance.a.public_ip"),
+            user: "admin".into(),
+            hooks: Hooks::default(),
+        })
+    };
+    let a = machine("a");
+    assert_eq!(a.announce.as_deref(), Some("a"));
+    assert!(machine("b").announce.is_none());
+    let first: Vec<String> = a.parts[0].iter().map(text).collect();
+    assert!(first.iter().any(|c| c.contains("/var/lib/isoloom/secrets/.delivered")), "{first:?}");
+    let mut m = Module::new("");
+    m.block(a.block());
+    let hcl = m.render().unwrap();
+    let announce =
+        hcl.find("mkdir -p \\\"${path.module}/.isoloom-reach\\\" && echo \\\"admin@${aws_instance.a.public_ip}\\\" > \\\"${path.module}/.isoloom-reach/a\\\"");
+    let upload = hcl.find("provisioner \"file\"");
+    assert!(announce.is_some() && announce < upload, "{hcl}");
+}

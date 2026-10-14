@@ -62,6 +62,9 @@ pub fn capabilities() -> Capabilities {
         // Given on AWS (NitroTPM), Azure, Google Cloud and Oracle Cloud; DigitalOcean and Linode
         // refuse it on their own.
         Feature::Tpm,
+        // Delivered by `isoloom run` over the machine's SSH, owners included.
+        Feature::Secrets,
+        Feature::SecretOwners,
         Feature::MachineProcess,
         // A GPU instance type (each cloud's own table; refused where it has none).
         Feature::VmGpus,
