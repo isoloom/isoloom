@@ -242,7 +242,9 @@ Run for real in CI: Docker (hello-stack, air-gapped, segmented, edge-firewall, s
 (hello-stack, segmented). Run by hand: VirtualBox (several examples, Windows Server 2019); on
 AWS, one cloud VM per machine with Ansible provisioning, Docker on a cloud VM, and cloud services
 (cloud-bucket and thirteen AWS labs); Docker on a cloud VM on Azure. Generated and validated
-only: Proxmox, the other clouds, ESXi.
+only: Proxmox, the other clouds, ESXi. The workflows that run VirtualBox, libvirt, Proxmox and the
+six clouds for real are in place. Each one starts once its runner or secrets are provided
+([docs/real-targets.md](docs/real-targets.md)).
 
 Already have a Compose file? `isoloom import compose` drafts the `isoloom.yml` from it: what the
 format expresses goes into the draft, and every other key is listed with why (belongs in the

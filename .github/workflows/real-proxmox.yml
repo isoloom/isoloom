@@ -1,0 +1,152 @@
+# Isoloom on Proxmox VE for real (#145): hello-stack and segmented brought up with
+# `isoloom run proxmox` (VMs, cloud-init, provisioning), tested and torn down, from a
+# self-hosted runner labelled `proxmox` that reaches the cluster's API, its node over SSH and
+# the environment's router. Skipped, not failed, without the PROXMOX_* secrets or without
+# REAL_PROXMOX_RUNNER (a job waiting for a runner that doesn't exist would sit queued for a day).
+# Setting it up: docs/real-targets.md.
+name: Real targets (Proxmox)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "11 3 * * 4" # weekly
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-proxmox
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TARGET: proxmox
+
+jobs:
+  # Whether the runner and the secrets are there. Forks never get here.
+  gate:
+    if: ${{ !github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          RUNNER: ${{ vars.REAL_PROXMOX_RUNNER }}
+          SECRETS: ${{ secrets.PROXMOX_VE_ENDPOINT != '' && secrets.PROXMOX_VE_API_TOKEN != '' && secrets.PROXMOX_SSH_PRIVATE_KEY != '' }}
+        run: |
+          enabled=false
+          if [ "$RUNNER" != true ]; then
+            echo "::notice title=Proxmox skipped::no runner declared (REAL_PROXMOX_RUNNER; docs/real-targets.md)"
+          elif [ "$SECRETS" != true ]; then
+            echo "::notice title=Proxmox skipped::PROXMOX_VE_ENDPOINT, PROXMOX_VE_API_TOKEN or PROXMOX_SSH_PRIVATE_KEY missing (docs/real-targets.md)"
+          else
+            enabled=true
+          fi
+          echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
+
+  proxmox:
+    needs: gate
+    if: ${{ needs.gate.outputs.enabled == 'true' }}
+    runs-on: [self-hosted, proxmox]
+    timeout-minutes: 140
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        example: [hello-stack, segmented]
+    env:
+      EXAMPLE: ${{ matrix.example }}
+      PROXMOX_VE_ENDPOINT: ${{ secrets.PROXMOX_VE_ENDPOINT }}
+      PROXMOX_VE_API_TOKEN: ${{ secrets.PROXMOX_VE_API_TOKEN }}
+      TF_VAR_proxmox_endpoint: ${{ secrets.PROXMOX_VE_ENDPOINT }}
+      TF_VAR_proxmox_api_token: ${{ secrets.PROXMOX_VE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_wrapper: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - name: Build
+        id: build
+        timeout-minutes: 20
+        run: |
+          cargo build -q -p isoloom
+          echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
+          echo "RECORD=$RUNNER_TEMP/record" >> "$GITHUB_ENV"
+          rm -rf "$RUNNER_TEMP/record" && mkdir -p "$RUNNER_TEMP/record"
+
+      # The node's SSH key (cloud-init snippets are uploaded over SSH), a key for this run's VMs,
+      # and the cluster's layout from repository variables; an unset one keeps the module's
+      # default (node `pve`, `local-lvm`, `local`, `vmbr0`).
+      - name: Cluster
+        env:
+          SSH_KEY: ${{ secrets.PROXMOX_SSH_PRIVATE_KEY }}
+          NODE: ${{ vars.PROXMOX_NODE }}
+          DATASTORE: ${{ vars.PROXMOX_DATASTORE }}
+          IMAGE_DATASTORE: ${{ vars.PROXMOX_IMAGE_DATASTORE }}
+          SNIPPETS_DATASTORE: ${{ vars.PROXMOX_SNIPPETS_DATASTORE }}
+          UPLINK_BRIDGE: ${{ vars.PROXMOX_UPLINK_BRIDGE }}
+          SSH_USERNAME: ${{ vars.PROXMOX_SSH_USERNAME }}
+          SSH_ADDRESS: ${{ vars.PROXMOX_SSH_ADDRESS }}
+          INSECURE: ${{ vars.PROXMOX_INSECURE }}
+        run: |
+          umask 077
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/proxmox_node_key"
+          rm -f "$RUNNER_TEMP"/id_ed25519*
+          ssh-keygen -q -t ed25519 -N '' -C "isoloom-ci-$GITHUB_RUN_ID" -f "$RUNNER_TEMP/id_ed25519"
+          {
+            echo "TF_VAR_proxmox_ssh_private_key_file=$RUNNER_TEMP/proxmox_node_key"
+            echo "TF_VAR_ssh_public_key=$(cat "$RUNNER_TEMP/id_ed25519.pub")"
+            for v in NODE:node DATASTORE:datastore IMAGE_DATASTORE:image_datastore SNIPPETS_DATASTORE:snippets_datastore \
+              UPLINK_BRIDGE:uplink_bridge SSH_USERNAME:proxmox_ssh_username SSH_ADDRESS:proxmox_ssh_address INSECURE:proxmox_insecure; do
+              name=${v%%:*}
+              if [ -n "${!name}" ]; then echo "TF_VAR_${v#*:}=${!name}"; fi
+            done
+          } >> "$GITHUB_ENV"
+
+      - name: Run
+        timeout-minutes: 60
+        run: isoloom run "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/run.jsonl"
+      - name: Test
+        timeout-minutes: 15
+        run: isoloom test "$TARGET" "examples/$EXAMPLE" --ssh-key "$RUNNER_TEMP/id_ed25519" --json | tee "$RECORD/test.jsonl"
+      - name: Down
+        id: down
+        if: always() && steps.build.outcome == 'success'
+        timeout-minutes: 20
+        run: isoloom down "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/down.jsonl"
+      # `down` failed: once more (a VM still locked by a task often is the reason), before the
+      # next checkout cleans the Terraform state away. Still failing, the run says so loudly.
+      - name: Down, again
+        if: always() && steps.build.outcome == 'success' && steps.down.outcome != 'success'
+        timeout-minutes: 20
+        run: |
+          sleep 30
+          if ! isoloom down "$TARGET" "examples/$EXAMPLE"; then
+            echo "::error title=Proxmox leftovers::$EXAMPLE may still have VMs on the cluster: check it by hand"
+            exit 1
+          fi
+
+      - name: Record
+        if: always() && steps.build.outcome == 'success'
+        env:
+          RECORD_TARGET: ${{ env.TARGET }}
+          RECORD_EXAMPLE: ${{ matrix.example }}
+        run: |
+          RECORD_MODULE="examples/$EXAMPLE/.isoloom/proxmox" scripts/real-targets/record.sh "$RECORD" >> "$GITHUB_STEP_SUMMARY"
+      - name: Forget the keys
+        if: always()
+        run: rm -f "$RUNNER_TEMP/proxmox_node_key" "$RUNNER_TEMP"/id_ed25519*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && steps.build.outcome == 'success'
+        with:
+          name: record-${{ env.TARGET }}-${{ matrix.example }}
+          path: ${{ runner.temp }}/record/record.json
+          if-no-files-found: warn

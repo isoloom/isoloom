@@ -1,0 +1,121 @@
+# Isoloom on local VMs for real (#145): examples brought up with `isoloom run vagrant`, tested and
+# torn down on a self-hosted runner per Vagrant provider (labels `virtualbox`, `libvirt`). A
+# provider without a runner is skipped, not failed: the repository variable
+# REAL_VAGRANT_PROVIDERS names the providers that have one, because a job waiting for a runner
+# that doesn't exist would sit queued for a day. Setting a runner up: docs/real-targets.md.
+name: Real targets (Vagrant)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "31 2 * * 3" # weekly
+
+permissions:
+  contents: read
+
+# The runners are machines of their own: one run at a time.
+concurrency:
+  group: real-vagrant
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TARGET: vagrant
+
+jobs:
+  # Which (provider, example) pairs run: solo-web and segmented on every provider named in
+  # REAL_VAGRANT_PROVIDERS, windows-hello also on those named in REAL_VAGRANT_WINDOWS (the
+  # runners whose provider and licence allow Windows boxes). Forks never get here.
+  gate:
+    if: ${{ !github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      any: ${{ steps.pick.outputs.any }}
+    steps:
+      - id: pick
+        env:
+          PROVIDERS: ${{ vars.REAL_VAGRANT_PROVIDERS }}
+          WINDOWS: ${{ vars.REAL_VAGRANT_WINDOWS }}
+        run: |
+          pairs=()
+          for p in ${PROVIDERS//,/ }; do
+            case "$p" in
+              virtualbox | libvirt)
+                pairs+=("$p solo-web" "$p segmented")
+                if [[ " ${WINDOWS//,/ } " == *" $p "* ]]; then pairs+=("$p windows-hello"); fi
+                ;;
+              *) echo "::warning title=REAL_VAGRANT_PROVIDERS::unknown provider $p (virtualbox, libvirt)" ;;
+            esac
+          done
+          if [ "${#pairs[@]}" -eq 0 ]; then
+            echo "::notice title=Vagrant skipped::no runner declared (REAL_VAGRANT_PROVIDERS; docs/real-targets.md)"
+          fi
+          echo "matrix=$(printf '%s\n' "${pairs[@]}" | jq -Rsc 'split("\n") | map(select(. != "") | split(" ") | {provider: .[0], example: .[1]})')" >> "$GITHUB_OUTPUT"
+          if [ "${#pairs[@]}" -gt 0 ]; then echo any=true; else echo any=false; fi >> "$GITHUB_OUTPUT"
+
+  vagrant:
+    needs: gate
+    if: ${{ needs.gate.outputs.any == 'true' }}
+    runs-on: [self-hosted, "${{ matrix.provider }}"]
+    timeout-minutes: 140
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include: ${{ fromJSON(needs.gate.outputs.matrix) }}
+    env:
+      EXAMPLE: ${{ matrix.example }}
+      # The defaults' `vagrant.provider`: `isoloom run vagrant` passes it as --provider.
+      ISOLOOM_VAGRANT__PROVIDER: ${{ matrix.provider }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - name: Build
+        id: build
+        timeout-minutes: 20
+        run: |
+          cargo build -q -p isoloom
+          echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
+          echo "RECORD=$RUNNER_TEMP/record" >> "$GITHUB_ENV"
+          rm -rf "$RUNNER_TEMP/record" && mkdir -p "$RUNNER_TEMP/record"
+      - name: Run
+        timeout-minutes: 60
+        run: isoloom run "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/run.jsonl"
+      - name: Test
+        timeout-minutes: 15
+        run: isoloom test "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/test.jsonl"
+      - name: Down
+        id: down
+        if: always() && steps.build.outcome == 'success'
+        timeout-minutes: 20
+        run: isoloom down "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/down.jsonl"
+      # `down` failed or never ran: Vagrant itself destroys what this checkout started, so the
+      # runner's next job starts clean.
+      - name: Destroy what is left
+        if: always() && steps.build.outcome == 'success' && steps.down.outcome != 'success'
+        timeout-minutes: 15
+        working-directory: examples/${{ matrix.example }}/.isoloom/vagrant
+        run: |
+          vagrant destroy -f || true
+          vagrant global-status --prune
+
+      - name: Record
+        if: always() && steps.build.outcome == 'success'
+        env:
+          RECORD_TARGET: ${{ env.TARGET }}
+          RECORD_EXAMPLE: ${{ matrix.example }}
+          RECORD_PROVIDER: ${{ matrix.provider }}
+        run: scripts/real-targets/record.sh "$RECORD" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && steps.build.outcome == 'success'
+        with:
+          name: record-${{ env.TARGET }}-${{ matrix.provider }}-${{ matrix.example }}
+          path: ${{ runner.temp }}/record/record.json
+          if-no-files-found: warn
