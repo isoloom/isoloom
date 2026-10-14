@@ -3,7 +3,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
-use isoloom_terraform::cloud_services::generate;
+use isoloom_plan::Environment;
+use isoloom_render::backend::Backend;
+use isoloom_spec::model::Target;
+use isoloom_terraform::cloud_services::CloudServicesBackend;
 
 const SPEC: &str = r#"version: 1
 name: goat
@@ -22,7 +25,8 @@ cloud:
 fn file(name: &str) -> String {
     let spec = isoloom_spec::parse(SPEC).unwrap();
     assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-    generate(&spec)
+    CloudServicesBackend
+        .render(&Environment::build(&spec, Target::CloudServices, None))
         .unwrap()
         .into_iter()
         .find(|f| f.path == format!(".isoloom/cloud-services/{name}"))

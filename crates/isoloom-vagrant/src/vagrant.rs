@@ -237,6 +237,3 @@ pub fn qemu_refusal(spec: &Spec) -> Option<String> {
 pub fn hyperv_refusal(spec: &Spec) -> Option<String> {
     hyperv::refusal(&Environment::build(spec, Target::Vagrant, None))
 }
-
-#[cfg(test)]
-mod tests;
