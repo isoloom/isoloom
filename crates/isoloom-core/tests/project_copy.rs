@@ -263,7 +263,7 @@ fn the_windows_extractor_unpacks_the_archive() {
         .status()
         .unwrap();
     assert!(st.success());
-    let ps1 = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/generate/untar.ps1");
+    let ps1 = Path::new(env!("CARGO_MANIFEST_DIR")).join("../isoloom-render/src/untar.ps1");
     for (name, strip) in [("ruby", 0), ("host", 1)] {
         let dest = dir.join(format!("{name}-out"));
         let script = format!(
