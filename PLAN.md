@@ -6,7 +6,7 @@ Working document for the local rebuild. It is squashed away with the history at 
 
 | Product | Role | Contains |
 |---|---|---|
-| **Isoloom** (this repo) | Converter: one spec to every IaC tool, and back | Spec, catalogue, plan, backends, import, `verify`, and the **run manifest** each target outputs. Apache-2.0. No runtime. |
+| **Isoloom** (this repo) | Converter: one spec to every IaC **and configuration management** tool, and back | Spec, catalogue, plan, backends, import, `verify`, and the **run manifest** each target outputs. Apache-2.0. No runtime. |
 | **Isothrum runner** (crate and CLI in `isoloom/isothrum`) | Runner: executes what Isoloom generates | One engine with: lifecycle (up, down, park, resume, re-provision); state and locks; a driver per target; secrets delivery; checks; readiness and recovery; reaper and budgets; snapshots, capture and consoles. Shared by both apps below. |
 | **Isothrum desktop app** | UI wrapper with **dynamic specs** | The same logic as the launcher, but the spec is drawn or edited live in Isothrum's lab editor (a drawing compiles to a spec) instead of coming from a fixed catalogue. It uses Isoloom to convert and the Isothrum runner to run. |
 | **Cyber CTF launcher** | UI wrapper with **fixed specs** | Curated CTF lab catalogue, accounts, attack box and player UX. It uses Isoloom to read and convert labs, and the Isothrum runner to run them. |
@@ -28,7 +28,13 @@ Working document for the local rebuild. It is squashed away with the history at 
 
 ## 1. What Isoloom 1.0 is
 
-**One spec, converted to every other infrastructure-as-code tool.**
+**One spec, converted to every other infrastructure-as-code and configuration-management tool.**
+
+Two layers are converted:
+- **Infrastructure (IaC):** networks, VMs, containers, clouds.
+- **Configuration (CM):** what is on each machine: packages, services, files, users, config, commands.
+
+The spec describes both once, and the user picks a tool per layer: Terraform + Ansible, Vagrant + Puppet, Compose + Dockerfile, Proxmox + cloud-init.
 
 - **Isoloom is a converter.** It reads one `isoloom.yml` and writes the native files of each tool: Compose, Kubernetes manifests, Helm, Kustomize, Vagrantfiles, Terraform/OpenTofu modules for Proxmox, ESXi and the clouds, cloud-init, and Ansible inventories and playbooks.
 - **It also does the reverse:** it imports those formats into a spec (`isoloom import`).
@@ -53,6 +59,29 @@ Working document for the local rebuild. It is squashed away with the history at 
 | GitHub | Done: PRs and issues closed, releases and tags deleted, workflows disabled. |
 
 ## 3. Target architecture
+
+**Configuration model.** A small, typed, tool-neutral resource model sits in the plan:
+- `repository`, `package`;
+- `file`, `template`;
+- `user`, `group`;
+- `service`;
+- `command`, with an already-done guard;
+- `firewall rule`.
+
+Catalogue entries and machine settings are written once in it. Configuration backends render native code from it:
+- Ansible tasks and roles;
+- cloud-init;
+- shell and PowerShell;
+- Dockerfile;
+- Puppet manifests, Chef recipes, Salt states, PowerShell DSC.
+
+Parity between the container and VM forms holds by construction, and the parity contract still checks it.
+
+**Pairing rules (IaC × CM):**
+- Vagrant calls Ansible, Puppet, Chef or Salt as native provisioners.
+- Terraform hands off to the chosen CM tool.
+- Container targets bake configuration into the image.
+- cloud-init configures at first boot.
 
 ```
 isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ──► native files
@@ -106,15 +135,17 @@ Make the codebase smaller before building on it.
    - The data format: `entry.yml`, `contract.yml`, roles and the vendored official Galaxy content.
    - The loader, validator and resolution.
    - Salvage from the stopped `v1/catalogue-engine` branch: format, loader, and the start of the nginx entry.
-3. **Plan resolution.**
+3. **The configuration resource model** in the plan. Catalogue entries are written in it, not as raw roles. The plan's current set-up steps (raw shell and PowerShell) move onto it.
+4. **Plan resolution.**
    - `os` + `service`/`app` becomes the container form and the VM form of each machine.
    - Checks (from the parity contract and the spec) become target-neutral check definitions.
-4. **`isoloom migrate`:** rewrites a 0.x spec into the new form, with tests on every old example and on the Cyber CTF labs' specs.
+5. **`isoloom migrate`:** rewrites a 0.x spec into the new form, with tests on every old example and on the Cyber CTF labs' specs.
 
 **Exit:** every example is rewritten in the new syntax, every old spec migrates, and validation errors name the fix.
 
 ### Phase 3: Backends on the new model
 
+0. **Configuration backends** next to the infrastructure ones: Ansible, cloud-init, shell/PowerShell and Dockerfile (plus Puppet, Chef, Salt and DSC per the scope decision), with the pairing rules.
 1. **Renders forms, not blocks.** Each backend renders the resolved forms instead of reading `docker:`/`vm:`.
 2. **Secrets map to each tool's native mechanism.** No value is ever written into a generated file.
    - Compose: `secrets:` from the environment or files.
@@ -151,6 +182,7 @@ Make the codebase smaller before building on it.
    - `docker buildx build --check` and hadolint;
    - `ansible-inventory` and ansible-lint;
    - shellcheck and PSScriptAnalyzer;
+   - CM validators: `ansible-lint`, `puppet parser validate`, `cookstyle`, `salt-call --local state.show_sls`, the DSC compiler;
    - plus the security scanners: Checkov, Trivy and kube-score.
 
    Salvage the generate-everything pipeline from `v1/security-scanning`.
@@ -174,7 +206,7 @@ Then the security review of secrets handling and of every place that writes cred
 
 ### Phase 7: Converter-aligned ecosystem
 
-- **`isoloom import` as the front door:** Compose, Vagrant, Terraform, Helm and Kubernetes into a spec. Recognise catalogue images and propose `service:`. Lossless round trips where the formats allow.
+- **`isoloom import` as the front door:** Compose, Vagrant, Terraform, Helm and Kubernetes into a spec. For CM, 1.0 imports only what maps cleanly: recognised catalogue roles and modules, plain packages, files and services. Arbitrary playbooks don't map back. Recognise catalogue images and propose `service:`. Lossless round trips where the formats allow.
 - **VS Code extension** updated to the new syntax, `matrix` and `verify`.
 - **Packages:** Homebrew, winget, Scoop, apt and rpm, and a CLI container image.
 - **Terraform/OpenTofu registry modules** published from the generated output.
@@ -210,10 +242,11 @@ Then the security review of secrets handling and of every place that writes cred
 
 0. **Isothrum runner licence:** open source like Isoloom, or private. Its editor stays in Isothrum as the source of dynamic specs (decided).
 
-1. **The tool list for 1.0.** "Every other IaC tool": confirm the current families, and whether to add Pulumi, Podman (Compose and Quadlet) or others for 1.0 or 1.x.
-2. **The Terraform provider:** reshape it into a files data source, or drop it.
-3. **Secrets on clouds:** sensitive Terraform variables (simple, but values sit in Terraform state), or the cloud secret stores (safer, more work).
-4. **Tier 1 membership** beyond Docker, kind, VirtualBox and QEMU. Proxmox and the clouds need real infrastructure, so they stay Tier 2 until then.
+1. **The CM tools for 1.0.** Recommended: Ansible, cloud-init, shell/PowerShell and Dockerfile in 1.0, and Puppet, Chef, Salt and DSC in 1.x. Or all of them in 1.0, if the 1.0 promise must cover CM fully.
+2. **The IaC tool list for 1.0.** "Every other IaC tool": confirm the current families, and whether to add Pulumi, Podman (Compose and Quadlet) or others for 1.0 or 1.x.
+3. **The Terraform provider:** reshape it into a files data source, or drop it.
+4. **Secrets on clouds:** sensitive Terraform variables (simple, but values sit in Terraform state), or the cloud secret stores (safer, more work).
+5. **Tier 1 membership** beyond Docker, kind, VirtualBox and QEMU. Proxmox and the clouds need real infrastructure, so they stay Tier 2 until then.
 
 ## 6. Salvage branches (local, not pushed)
 
