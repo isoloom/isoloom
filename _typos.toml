@@ -1,0 +1,14 @@
+# typos (CI's `typos` job): words that are right here although they look like misspellings.
+
+[files]
+# Upstream resource and setting lists, copied as the providers spell them.
+extend-exclude = ["crates/isoloom-coverage/coverage/"]
+
+[default.extend-words]
+# Azure VM sizes (Standard_D2als_v6).
+als = "als"
+# The NFS server's command.
+exportfs = "exportfs"
+# Misspelled keys on purpose: the tests check they are refused.
+provder = "provder"
+targt = "targt"

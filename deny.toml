@@ -1,4 +1,7 @@
-# cargo-deny, run by CI's audit job (`cargo deny check advisories`).
+# cargo-deny, run by CI's `deny` job (`cargo deny check`): advisories, licenses, bans, sources.
+
+[graph]
+all-features = true
 
 [advisories]
 ignore = [
@@ -6,3 +9,30 @@ ignore = [
   # known vulnerability. Drop this once the YAML parsing moves to a maintained crate.
   { id = "RUSTSEC-2024-0449", reason = "unmaintained only (no vulnerability); used through serde_yaml_ng until the YAML crate is replaced" },
 ]
+
+[licenses]
+# The licenses of the current dependencies; a new one is a decision, made by adding it here.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSL-1.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+confidence-threshold = 0.9
+
+[licenses.private]
+# The workspace's own crates are `publish = false` and carry no license field.
+ignore = true
+
+[bans]
+# Two versions of one crate: reported, not refused (it is often a transitive lag).
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
