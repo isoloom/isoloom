@@ -291,3 +291,30 @@ Decided on 2026-10-15:
 | `v1/docs-truth-fixes` | Google Cloud MTU capability cell |
 
 They are deleted at the squash.
+
+## 7. Backlog carried over from GitHub (closed 2026-10-15)
+
+Every issue and PR was closed, and every non-default branch deleted, for the fresh start:
+- **Full archive:** `~/code/github-archive/`, one verified git bundle per repository (every branch, tag and PR ref), plus the issue and PR texts as JSON.
+- **Kept on purpose:**
+  - the launcher's releases and tags, because the installed launchers' updater reads `releases/latest/download/latest.json`;
+  - `isoloom/goad`, a fork of GOAD whose branches and tags are upstream's.
+
+| Item | Carry into |
+|---|---|
+| launcher #227 | Starting a lab always needs sign-in and the backend: allow offline relaunch and/or a practice mode |
+| launcher #225 | Windows dev setup: CRLF checkout fails pnpm check and dirties generated types, sh-based tests fail, local build needs the signing key |
+| launcher #217 | Windows: in-app terminal can't SSH to remote attack boxes (cmd /c quoting); shell scripts break on non-ASCII user names |
+| launcher #178 | Own the Isoloom integration in the launcher |
+| launcher #150 | Clean code: split large files and long functions |
+| launcher #79 | Isoloom and lab images: QEMU x86 emulation, networking and Windows boxes |
+| launcher #78 | Run x86_64 VM labs under QEMU emulation on Apple Silicon |
+| launcher #2 | Adopt Isoloom's lifecycle, checks and defaults features |
+| isothrum #30 | Accounts with Better Auth: Isothrum website (proprietary), after 1.0 |
+| isothrum PR #65 | Isoloom v1 crates in Isothrum: superseded by the path-dependency setup |
+| isothrum PR #66, isothrum-website PR #18 | Editor and engine: IPv6 LANs, a machine's environment, files and command. Re-apply on the editor in 1.x, from the archive |
+
+Placement of the launcher items:
+- #2, #178, #78 and #79 fold into Phases 2–3: the Isoloom integration, the runner, and QEMU and Windows boxes.
+- #150 folds into the engineering standard: the ratchet.
+- #217, #225 and #227 are launcher work for Phase 3 and the release.
