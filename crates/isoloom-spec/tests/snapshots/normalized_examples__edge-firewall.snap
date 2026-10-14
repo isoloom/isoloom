@@ -33,7 +33,7 @@ inputs: []
 machines:
   fw:
     networks:
-      outside: 2
+      outside: 5
       dmz: 1
       lan: 1
     arch: amd64

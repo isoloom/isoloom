@@ -1,7 +1,8 @@
 //! Oracle Cloud (OCI) `cloud-vm`: `.isoloom/cloud-vm/oci/main.tf`, rendered from the plan
-//! through the VM core. One compute instance per machine on one VCN; OCI pins a VNIC's private
-//! IP, so every machine keeps its spec address. Single-network Linux labs only: the backend
-//! refuses several networks, Windows and a controller.
+//! through the VM core. One compute instance per machine on one VCN, a subnet per network; OCI
+//! pins a VNIC's private IP, so every machine keeps its spec address, with a VNIC on each of its
+//! networks. Each network has its own security list (`network`), and a network a machine routes
+//! goes through it. Linux labs: the backend refuses Windows and a controller.
 //!
 //! Each machine's published ports open on its own VNIC only, through a network security group
 //! of its own; the subnet's security list holds what every machine shares (the VCN, SSH).
@@ -10,20 +11,23 @@
 //! Ubuntu for the shape, as the cloud-docker driver does. Oracle Cloud ships no Debian platform
 //! image, so Debian labs run on Ubuntu too; the SSH login is `ubuntu` either way.
 
-use isoloom_plan::{Capabilities, Environment, MachinePlan};
+use isoloom_plan::{Capabilities, Environment};
 use isoloom_render::backend::{Backend, Files, RenderError};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, index, list, number, object, reference, string};
 use isoloom_render::{GeneratedFile, header};
 use isoloom_spec::model::Target;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
-use super::single_network::{self, Rules};
+use super::shared::{self, Networks, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, name_with, shutdown_script};
 use crate::vm::gpus::GpuSizes;
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
-use crate::vm::{os, own_image, res, vms};
+use crate::vm::{gateways, os, own_image, res, vms};
+
+mod network;
+mod published;
 
 /// The module's folder under `.isoloom/cloud-vm/`.
 const SUB: &str = "oci";
@@ -35,10 +39,11 @@ const SHAPE: &str = "VM.Standard.E4.Flex";
 /// Any other OS needs an image of its own (`vm.image.oci`) rather than running Ubuntu in its place.
 const RULES: Rules = Rules {
     cloud: "Oracle Cloud",
-    single_machine: false,
-    limits: single_network::limits(
+    networks: Networks::Several,
+    limits: shared::limits(
         "arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images)",
         "dual-stack virtual cloud networks on Oracle Cloud come later",
+        None,
     ),
     has_image: |os| matches!(os, "debian-12" | "debian-13" | "ubuntu-22.04" | "ubuntu-24.04"),
     images: "Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04",
@@ -64,17 +69,18 @@ impl Backend for OciBackend {
     }
 
     fn capabilities(&self) -> Capabilities {
-        single_network::capabilities()
+        shared::capabilities()
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        single_network::render(env, &RULES, module)
+        shared::render(env, &RULES, module)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
         isoloom_plan::refusal(&env.requirements, &self.capabilities())
             .map(|r| r.to_string())
-            .or_else(|| single_network::refusal(env, &RULES))
+            .or_else(|| shared::refusal(env, &RULES))
+            .or_else(|| network::refusal(env))
     }
 }
 
@@ -105,6 +111,7 @@ const USAGE: &str = "# Start:  terraform -chdir=.isoloom/cloud-vm/oci init && te
 
 /// The module: the images, the VCN, its security list and subnet, each machine, the outputs.
 fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
+    let env = &*gateways::relocated(env);
     let mut m = Module::new(format!("{}{USAGE}", header("#")));
     m.block(terraform(&[versions::OCI, versions::LOCAL]));
     m.block(
@@ -135,11 +142,12 @@ fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builde
             .build(),
     );
     images(env, &mut m);
-    network(env, &mut m);
+    network::blocks(env, &mut m);
     crate::vm::private_dns::oci(env, &mut m);
     for (name, _) in vms(env) {
         instance(env, name, &mut m);
     }
+    network::gateway_routes(env, &mut m);
     let reach = Reach {
         public_ip: &public_ip,
         user: &|_| USER.to_string(),
@@ -148,7 +156,7 @@ fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builde
     cloud::outputs(env, &reach, &mut m);
     m.fragment(&project_lists(true));
     Ok(GeneratedFile {
-        path: single_network::path(SUB),
+        path: shared::path(SUB),
         contents: m.render()?,
     })
 }
@@ -158,6 +166,7 @@ fn public_ip(name: &str) -> Expression {
     reference(&format!("oci_core_instance.{}.public_ip", res(name)))
 }
 
+/// A resource block.
 fn resource(kind: &str, name: &str) -> BlockBuilder {
     Block::builder("resource").add_label(kind).add_label(name)
 }
@@ -189,119 +198,16 @@ fn images(env: &Environment, m: &mut Module) {
     }
 }
 
-/// The VCN with the network's range, routed to the internet; its security list and subnet.
-fn network(env: &Environment, m: &mut Module) {
-    let cidr = env.networks.values().next().map(|n| n.cidr.as_str()).unwrap_or_default();
-    let in_vcn = |b: BlockBuilder| {
-        named(b)
-            .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
-            .add_attribute(("display_name", reference("local.name")))
-    };
-    m.commented(
-        "The environment's one network: a VCN with the spec's range, routed to the internet.",
-        named(resource("oci_core_vcn", "env"))
-            .add_attribute(("cidr_block", string(cidr)))
-            .add_attribute(("display_name", reference("local.name")))
-            .build(),
-    );
-    m.block(in_vcn(resource("oci_core_internet_gateway", "env")).build());
-    let route = Block::builder("route_rules")
-        .add_attribute(("destination", string("0.0.0.0/0")))
-        .add_attribute(("network_entity_id", reference("oci_core_internet_gateway.env.id")))
-        .build();
-    m.block(in_vcn(resource("oci_core_route_table", "env")).add_block(route).build());
-    m.commented(
-        "What may reach every machine: everything inside the VCN, and SSH from allowed_cidr; egress\nopen. A machine's published ports are its own security group's.",
-        security_list(in_vcn(resource("oci_core_security_list", "env")), cidr),
-    );
-    m.block(
-        named(resource("oci_core_subnet", "env"))
-            .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
-            .add_attribute(("cidr_block", string(cidr)))
-            .add_attribute(("display_name", reference("local.name")))
-            .add_attribute(("route_table_id", reference("oci_core_route_table.env.id")))
-            .add_attribute(("security_list_ids", list([reference("oci_core_security_list.env.id")])))
-            .build(),
-    );
-}
-
-/// An ingress rule; on one port of TCP (6) or UDP (17) when `port` is given.
-fn ingress(description: &str, source: Expression, protocol: &str, port: Option<u16>) -> Block {
-    let mut b = Block::builder("ingress_security_rules")
-        .add_attribute(("description", string(description)))
-        .add_attribute(("source", source))
-        .add_attribute(("protocol", string(protocol)));
-    if let Some(p) = port {
-        let options = if protocol == "17" { "udp_options" } else { "tcp_options" };
-        let range = Block::builder(options)
-            .add_attribute(("min", number(u64::from(p))))
-            .add_attribute(("max", number(u64::from(p))))
-            .build();
-        b = b.add_block(range);
-    }
-    b.build()
-}
-
-/// Everything out, everything from the VCN, SSH from `allowed_cidr`.
-fn security_list(b: BlockBuilder, cidr: &str) -> Block {
-    let egress = Block::builder("egress_security_rules")
-        .add_attribute(("destination", string("0.0.0.0/0")))
-        .add_attribute(("protocol", string("all")))
-        .build();
-    let allowed = || reference("var.allowed_cidr");
-    b.add_block(egress)
-        .add_block(ingress("the VCN itself", string(cidr), "all", None))
-        .add_block(ingress("SSH from allowed_cidr", allowed(), "6", Some(22)))
-        .build()
-}
-
-/// A machine's own network security group, with a rule per port it publishes, so a port opens
-/// on the machine that publishes it and no other. Returns the group's id, or `None` when the
-/// machine publishes nothing.
-fn published(name: &str, mp: &MachinePlan, m: &mut Module) -> Option<Expression> {
-    if mp.ports.is_empty() {
-        return None;
-    }
-    let id = res(name);
-    m.commented(
-        &format!("The ports `{name}` publishes, from allowed_cidr: on its VNIC only."),
-        named(resource("oci_core_network_security_group", &id))
-            .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
-            .add_attribute(("display_name", name_with(&format!("-{name}"))))
-            .build(),
-    );
-    let mut ports: Vec<(bool, u16)> = mp.ports.iter().map(|p| (p.protocol.is_tcp(), p.publish)).collect();
-    ports.sort_unstable_by_key(|&(tcp, port)| (!tcp, port));
-    ports.dedup();
-    for (tcp, port) in ports {
-        m.block(published_rule(&id, tcp, port));
-    }
-    Some(reference(&format!("oci_core_network_security_group.{id}.id")))
-}
-
-/// The rule opening one published port (TCP is 6, UDP 17) of group `id`.
-fn published_rule(id: &str, tcp: bool, port: u16) -> Block {
-    let (protocol, options, label) = if tcp { ("6", "tcp_options", "tcp") } else { ("17", "udp_options", "udp") };
-    let range = Block::builder("destination_port_range")
-        .add_attribute(("min", number(u64::from(port))))
-        .add_attribute(("max", number(u64::from(port))))
-        .build();
-    resource("oci_core_network_security_group_security_rule", &format!("{id}_{label}_{port}"))
-        .add_attribute(("network_security_group_id", reference(&format!("oci_core_network_security_group.{id}.id"))))
-        .add_attribute(("description", string("published")))
-        .add_attribute(("direction", string("INGRESS")))
-        .add_attribute(("protocol", string(protocol)))
-        .add_attribute(("source", reference("var.allowed_cidr")))
-        .add_attribute(("source_type", string("CIDR_BLOCK")))
-        .add_block(Block::builder(options).add_block(range).build())
-        .build()
-}
-
 /// A machine's instance at its fixed address, and its set-up over SSH.
 fn instance(env: &Environment, name: &str, m: &mut Module) {
     let mp = &env.machines[name];
     let id = res(name);
-    let address = mp.addresses.values().next().map(ToString::to_string).unwrap_or_default();
+    let Some((net, address)) = mp.addresses.first().map(|(n, a)| (n.clone(), a.to_string())) else {
+        return;
+    };
+    // A gateway forwards traffic that isn't its own; a machine on several networks answers from
+    // the interface its default route leaves by.
+    let forwards = mp.is_gateway || mp.addresses.len() > 1;
     let (ocpus, memory_gb) = sizing(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB));
     let shape = Block::builder("shape_config")
         .add_attribute(("ocpus", number(u64::from(ocpus))))
@@ -318,15 +224,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
         ))
         .add_attribute(("boot_volume_size_in_gbs", number(u64::from(boot))))
         .build();
-    let mut vnic = Block::builder("create_vnic_details")
-        .add_attribute(("subnet_id", reference("oci_core_subnet.env.id")))
-        .add_attribute(("private_ip", string(address.as_str())))
-        .add_attribute(("assign_public_ip", boolean(true)))
-        .add_attribute(("hostname_label", string(name)));
-    if let Some(group) = published(name, mp, m) {
-        vnic = vnic.add_attribute(("nsg_ids", list([group])));
-    }
-    let vnic = vnic.build();
+    let vnic = primary_vnic(name, &net, &address, forwards, published::group(name, mp, m));
     let script = shutdown_script();
     let metadata = object([
         ("ssh_authorized_keys", reference("var.ssh_public_key")),
@@ -345,15 +243,63 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
             .add_attribute(("metadata", metadata))
             .build(),
     );
+    vnics(env, name, m);
+    let mac = |n: &str| call("lower", [reference(&format!("data.oci_core_vnic.{id}_{}.mac_address", res(n)))]);
+    let mut at_boot = cloud::interfaces(env, &mp.addresses, &mac);
+    at_boot.extend(gateways::at_boot(mp));
     let machine = linux::Machine {
         env,
         name,
         replace_on: reference(&format!("oci_core_instance.{id}.id")),
         host: public_ip(name),
         user: USER.into(),
-        hooks: single_network::hooks(mp, Vec::new()),
+        hooks: shared::hooks(mp, at_boot),
     };
     m.block(linux::provisioner(machine).block());
+}
+
+/// The instance's first VNIC, on its first network at its address, with its published ports'
+/// group when it has one.
+fn primary_vnic(name: &str, net: &str, address: &str, forwards: bool, group: Option<Expression>) -> Block {
+    let mut vnic = Block::builder("create_vnic_details")
+        .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", res(net)))))
+        .add_attribute(("private_ip", string(address)))
+        .add_attribute(("assign_public_ip", boolean(true)))
+        .add_attribute(("hostname_label", string(name)))
+        .add_attribute(("skip_source_dest_check", boolean(forwards)));
+    if let Some(group) = group {
+        vnic = vnic.add_attribute(("nsg_ids", list([group])));
+    }
+    vnic.build()
+}
+
+/// A VNIC on each network after the first, at the machine's address there (forwarding, as the
+/// first), and its MAC address, which finds it at boot.
+fn vnics(env: &Environment, name: &str, m: &mut Module) {
+    let id = res(name);
+    for (net, address) in env.machines[name].addresses.iter().skip(1) {
+        let nic = format!("{id}_{}", res(net));
+        let details = Block::builder("create_vnic_details")
+            .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", res(net)))))
+            .add_attribute(("private_ip", string(address.to_string())))
+            .add_attribute(("assign_public_ip", boolean(false)))
+            .add_attribute(("skip_source_dest_check", boolean(true)))
+            .build();
+        m.block(
+            resource("oci_core_vnic_attachment", &nic)
+                .add_attribute(("instance_id", reference(&format!("oci_core_instance.{id}.id"))))
+                .add_attribute(("display_name", name_with(&format!("-{name}-{net}"))))
+                .add_block(details)
+                .build(),
+        );
+        m.block(
+            Block::builder("data")
+                .add_label("oci_core_vnic")
+                .add_label(&nic)
+                .add_attribute(("vnic_id", reference(&format!("oci_core_vnic_attachment.{nic}.vnic_id"))))
+                .build(),
+        );
+    }
 }
 
 /// The AMD shape's platform, when the machine asks for what it gives: a shielded instance for a

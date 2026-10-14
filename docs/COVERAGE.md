@@ -27,12 +27,12 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
 | [Terraform: Proxmox](#terraform-proxmox) | 96% | 181 | 175 | 0 | 6 |
 | [Terraform: ESXi](#terraform-esxi) | 77% | 35 | 27 | 0 | 8 |
-| [Terraform: AWS](#terraform-aws) | 86% | 138 | 120 | 0 | 18 |
-| [Terraform: Azure](#terraform-azure) | 92% | 145 | 134 | 0 | 11 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 79% | 110 | 86 | 2 | 22 |
-| [Terraform: DigitalOcean](#terraform-digitalocean) | 87% | 32 | 28 | 0 | 4 |
-| [Terraform: Linode](#terraform-linode) | 82% | 52 | 43 | 0 | 9 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 67% | 194 | 130 | 0 | 64 |
+| [Terraform: AWS](#terraform-aws) | 91% | 135 | 124 | 0 | 11 |
+| [Terraform: Azure](#terraform-azure) | 95% | 145 | 138 | 0 | 7 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 83% | 109 | 90 | 2 | 17 |
+| [Terraform: DigitalOcean](#terraform-digitalocean) | 90% | 32 | 29 | 0 | 3 |
+| [Terraform: Linode](#terraform-linode) | 98% | 50 | 49 | 0 | 1 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 80% | 206 | 166 | 0 | 40 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
@@ -2235,7 +2235,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: AWS
 
-86% of 138 portable features (120 done, 0 partly, 18 to do; 2491 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
+91% of 135 portable features (124 done, 0 partly, 11 to do; 2491 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -2456,8 +2456,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_licensemanager_grant_accepter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_licensemanager_license_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_main_route_table_association` | Yes | Another way | Via the arguments that wire the same things inline: `vpc_id` of aws_internet_gateway, `network_interface` of aws_eip, an aws_route_table_association for every subnet (the main route table serves none), `security_groups` of aws_network_interface and the `route` blocks of aws_route_table |
-| `aws_nat_gateway` | Yes | Not yet | Private networks reaching the internet through NAT |
-| `aws_nat_gateway_eip_association` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `aws_nat_gateway` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
+| `aws_nat_gateway_eip_association` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `aws_network_acl` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
 | `aws_network_acl_association` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
 | `aws_network_acl_rule` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
@@ -3035,7 +3035,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 | `secondary_private_ips` | Yes | Not yet | With several addresses on one network |
 | `security_groups` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `source_dest_check` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `source_dest_check` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `subnet_id` | Yes | Yes | Written by the generator |
 | `tags` | Yes | Yes | Written by the generator |
 | `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -3171,8 +3171,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ipv6_prefix_count` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `ipv6_prefixes` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `private_ip` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `private_ip_list` | Yes | Not yet | With several addresses on one network |
-| `private_ip_list_enabled` | Yes | Not yet | With several addresses on one network |
+| `private_ip_list` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `private_ip_list_enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `private_ips` | Yes | Yes | Written by the generator |
 | `private_ips_count` | Yes | Not yet | With several addresses on one network |
 | `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
@@ -3280,8 +3280,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `route.gateway_id` | Yes | Yes | Written by the generator |
 | `route.ipv6_cidr_block` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `route.local_gateway_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
-| `route.nat_gateway_id` | Yes | Not yet | Private networks reaching the internet through NAT |
-| `route.network_interface_id` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `route.nat_gateway_id` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
+| `route.network_interface_id` | Yes | Yes | Written by the generator |
 | `route.odb_network_arn` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `route.transit_gateway_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `route.vpc_endpoint_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
@@ -3452,7 +3452,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: Azure
 
-92% of 145 portable features (134 done, 0 partly, 11 to do; 1599 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+95% of 145 portable features (138 done, 0 partly, 7 to do; 1599 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3563,8 +3563,8 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_monitor_scheduled_query_rules_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_monitor_smart_detector_alert_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_monitor_workspace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_nat_gateway` | Yes | Not yet | Private networks reaching the internet through NAT |
-| `azurerm_nat_gateway_public_ip_association` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `azurerm_nat_gateway` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
+| `azurerm_nat_gateway_public_ip_association` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `azurerm_network_connection_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_network_interface` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_network_interface_application_security_group_association` | Yes | Another way | Via the `security_rule` blocks of azurerm_network_security_group, which carry the reach rules |
@@ -3640,7 +3640,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `azurerm_ssh_public_key` | Yes | Another way | Via the `admin_ssh_key` block of the virtual machine, and each NIC's azurerm_network_interface_security_group_association, which puts the same rules on every interface of the subnet |
 | `azurerm_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_subnet_nat_gateway_association` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `azurerm_subnet_nat_gateway_association` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `azurerm_subnet_network_security_group_association` | Yes | Another way | Via the `admin_ssh_key` block of the virtual machine, and each NIC's azurerm_network_interface_security_group_association, which puts the same rules on every interface of the subnet |
 | `azurerm_subnet_route_table_association` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
 | `azurerm_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -4046,7 +4046,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `address_prefixes` | Yes | Yes | Written by the generator |
-| `default_outbound_access_enabled` | Yes | Not yet | `networks.*.internet: false` enforced by the cloud |
+| `default_outbound_access_enabled` | Yes | Yes | Written by the generator |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `name` | Yes | Yes | Written by the generator |
 | `network_security_group_id_wo` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -4230,7 +4230,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 
 ## Terraform: Google Cloud
 
-79% of 110 portable features (86 done, 2 partly, 22 to do; 1951 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+83% of 109 portable features (90 done, 2 partly, 17 to do; 1951 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4367,9 +4367,9 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `google_compute_resource_policy_attachment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_rollout_plan` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_route` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
-| `google_compute_router` | Yes | Not yet | Private networks reaching the internet through NAT |
-| `google_compute_router_nat` | Yes | Not yet | Private networks reaching the internet through NAT |
-| `google_compute_router_nat_address` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `google_compute_router` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
+| `google_compute_router_nat` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
+| `google_compute_router_nat_address` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `google_compute_shared_vpc_host_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_shared_vpc_service_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -4865,7 +4865,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `network_interface.stack_type` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `network_interface.subnetwork` | Yes | Yes | Written by the generator |
 | `network_interface.subnetwork_project` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `network_interface.vlan` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `network_interface.vlan` | No | No | A cloud carries no 802.1Q tags between VMs (Google Cloud's VLAN interfaces and Oracle Cloud's VLANs end at its own virtual switch): Isoloom gives each VLAN a subnet of its own, and a machine on several an interface on each |
 | `network_interface.access_config` | Yes | Yes | Written by the generator |
 | `network_interface.access_config.nat_ip` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `network_interface.access_config.network_tier` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -4944,7 +4944,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `enable_ula_internal_ipv6` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `internal_ipv6_range` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
-| `mtu` | Yes | Not yet | A network's MTU |
+| `mtu` | Yes | Yes | Written by the generator |
 | `name` | Yes | Yes | Written by the generator |
 | `network_firewall_policy_enforcement_order` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `network_profile` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
@@ -5150,7 +5150,7 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: DigitalOcean
 
-87% of 32 portable features (28 done, 0 partly, 4 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
+90% of 32 portable features (29 done, 0 partly, 3 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5175,7 +5175,7 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 | `digitalocean_volume_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `digitalocean_volume_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `digitalocean_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `digitalocean_vpc_nat_gateway` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `digitalocean_vpc_nat_gateway` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 
 ### Settings
 
@@ -5277,7 +5277,7 @@ And 59 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Linode
 
-82% of 52 portable features (43 done, 0 partly, 9 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
+98% of 50 portable features (49 done, 0 partly, 1 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5355,14 +5355,14 @@ And 59 other resource types that only this cloud has: its managed services, netw
 | `inbound.label` | Yes | Yes | Written by the generator |
 | `inbound.ports` | Yes | Yes | Written by the generator |
 | `inbound.protocol` | Yes | Yes | Written by the generator |
-| `outbound` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `outbound.action` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `outbound.description` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `outbound.ipv4` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `outbound` | Yes | Yes | Written by the generator |
+| `outbound.action` | Yes | Yes | Written by the generator |
+| `outbound.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `outbound.ipv4` | Yes | Yes | Written by the generator |
 | `outbound.ipv6` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
-| `outbound.label` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `outbound.ports` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `outbound.protocol` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `outbound.label` | Yes | Yes | Written by the generator |
+| `outbound.ports` | Yes | Yes | Written by the generator |
+| `outbound.protocol` | Yes | Yes | Written by the generator |
 
 ### linode_instance
 
@@ -5387,7 +5387,7 @@ And 59 other resource types that only this cloud has: its managed services, netw
 | `migration_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `network_helper` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `placement_group_externally_managed` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `private_ip` | Yes | Not yet | With several addresses on one network |
+| `private_ip` | n/a | No | The account's default network: Isoloom builds its own |
 | `region` | Yes | Yes | Written by the generator |
 | `resize_disk` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `root_pass` | Yes | Yes | Written by the generator |
@@ -5788,7 +5788,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Oracle Cloud
 
-67% of 194 portable features (130 done, 0 partly, 64 to do; 1431 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
+80% of 206 portable features (166 done, 0 partly, 40 to do; 1482 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5881,18 +5881,17 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `oci_core_internet_gateway` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_ipv6` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `oci_core_listing_resource_version_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `oci_core_nat_gateway` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `oci_core_nat_gateway` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `oci_core_network_security_group` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_network_security_group_security_rule` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_private_ip` | Yes | Not yet | With several addresses on one network |
 | `oci_core_route_table` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_route_table_attachment` | Yes | Another way | Via `route_table_id` of oci_core_subnet |
+| `oci_core_route_table_attachment` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_security_list` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_shape_management` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `oci_core_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_vcn` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_vlan` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
-| `oci_core_vnic_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_vnic_attachment` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `oci_core_volume_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `oci_core_volume_backup` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -6086,7 +6085,9 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `oci_core_images` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_core_private_ips` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_vcn_dns_resolver_association` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_core_vnic` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_identity_availability_domains` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 
 ### Settings
@@ -6173,10 +6174,10 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `create_vnic_details.private_ip` | Yes | Yes | Written by the generator |
 | `create_vnic_details.private_ip_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `create_vnic_details.security_attributes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `create_vnic_details.skip_source_dest_check` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `create_vnic_details.skip_source_dest_check` | Yes | Yes | Written by the generator |
 | `create_vnic_details.subnet_cidr` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `create_vnic_details.subnet_id` | Yes | Yes | Written by the generator |
-| `create_vnic_details.vlan_id` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `create_vnic_details.vlan_id` | No | No | A cloud carries no 802.1Q tags between VMs (Google Cloud's VLAN interfaces and Oracle Cloud's VLANs end at its own virtual switch): Isoloom gives each VLAN a subnet of its own, and a machine on several an interface on each |
 | `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
@@ -6294,8 +6295,8 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `description` | Yes | Yes | Written by the generator |
-| `destination` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `destination_type` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `destination` | Yes | Another way | Via the network's security list, which carries its egress and ICMP rules (oci_core_security_list) |
+| `destination_type` | Yes | Another way | Via the network's security list, which carries its egress and ICMP rules (oci_core_security_list) |
 | `direction` | Yes | Yes | Written by the generator |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `network_security_group_id` | Yes | Yes | Written by the generator |
@@ -6303,9 +6304,9 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `source` | Yes | Yes | Written by the generator |
 | `source_type` | Yes | Yes | Written by the generator |
 | `stateless` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `icmp_options` | Yes | Not yet | ICMP in reach rules |
-| `icmp_options.code` | Yes | Not yet | ICMP in reach rules |
-| `icmp_options.type` | Yes | Not yet | ICMP in reach rules |
+| `icmp_options` | Yes | Another way | Via the network's security list, which carries its egress and ICMP rules (oci_core_security_list) |
+| `icmp_options.code` | Yes | Another way | Via the network's security list, which carries its egress and ICMP rules (oci_core_security_list) |
+| `icmp_options.type` | Yes | Another way | Via the network's security list, which carries its egress and ICMP rules (oci_core_security_list) |
 | `tcp_options` | Yes | Yes | Written by the generator |
 | `tcp_options.destination_port_range` | Yes | Yes | Written by the generator |
 | `tcp_options.destination_port_range.max` | Yes | Yes | Written by the generator |
@@ -6347,6 +6348,18 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
 
+### oci_core_route_table_attachment
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `route_table_id` | Yes | Yes | Written by the generator |
+| `subnet_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
 ### oci_core_security_list
 
 | Key | Every target | Implemented | Notes |
@@ -6358,35 +6371,35 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `vcn_id` | Yes | Yes | Written by the generator |
 | `egress_security_rules` | Yes | Yes | Written by the generator |
-| `egress_security_rules.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `egress_security_rules.description` | Yes | Yes | Written by the generator |
 | `egress_security_rules.destination` | Yes | Yes | Written by the generator |
 | `egress_security_rules.destination_type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `egress_security_rules.protocol` | Yes | Yes | Written by the generator |
 | `egress_security_rules.stateless` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `egress_security_rules.icmp_options` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.icmp_options.code` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.icmp_options.type` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.tcp_options` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.tcp_options.max` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.tcp_options.min` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.tcp_options.source_port_range` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.tcp_options.source_port_range.max` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.tcp_options.source_port_range.min` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.udp_options` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.udp_options.max` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.udp_options.min` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.udp_options.source_port_range` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.udp_options.source_port_range.max` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `egress_security_rules.udp_options.source_port_range.min` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.icmp_options` | Yes | Yes | Written by the generator |
+| `egress_security_rules.icmp_options.code` | Yes | Yes | Written by the generator |
+| `egress_security_rules.icmp_options.type` | Yes | Yes | Written by the generator |
+| `egress_security_rules.tcp_options` | Yes | Yes | Written by the generator |
+| `egress_security_rules.tcp_options.max` | Yes | Yes | Written by the generator |
+| `egress_security_rules.tcp_options.min` | Yes | Yes | Written by the generator |
+| `egress_security_rules.tcp_options.source_port_range` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `egress_security_rules.tcp_options.source_port_range.max` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `egress_security_rules.tcp_options.source_port_range.min` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `egress_security_rules.udp_options` | Yes | Yes | Written by the generator |
+| `egress_security_rules.udp_options.max` | Yes | Yes | Written by the generator |
+| `egress_security_rules.udp_options.min` | Yes | Yes | Written by the generator |
+| `egress_security_rules.udp_options.source_port_range` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `egress_security_rules.udp_options.source_port_range.max` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `egress_security_rules.udp_options.source_port_range.min` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
 | `ingress_security_rules` | Yes | Yes | Written by the generator |
 | `ingress_security_rules.description` | Yes | Yes | Written by the generator |
 | `ingress_security_rules.protocol` | Yes | Yes | Written by the generator |
 | `ingress_security_rules.source` | Yes | Yes | Written by the generator |
 | `ingress_security_rules.source_type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `ingress_security_rules.stateless` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `ingress_security_rules.icmp_options` | Yes | Not yet | ICMP in reach rules |
-| `ingress_security_rules.icmp_options.code` | Yes | Not yet | ICMP in reach rules |
-| `ingress_security_rules.icmp_options.type` | Yes | Not yet | ICMP in reach rules |
+| `ingress_security_rules.icmp_options` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.icmp_options.code` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.icmp_options.type` | Yes | Yes | Written by the generator |
 | `ingress_security_rules.tcp_options` | Yes | Yes | Written by the generator |
 | `ingress_security_rules.tcp_options.max` | Yes | Yes | Written by the generator |
 | `ingress_security_rules.tcp_options.min` | Yes | Yes | Written by the generator |
@@ -6417,7 +6430,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `dns_label` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
 | `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
-| `ipv4cidr_blocks` | Yes | Not yet | With several addresses on one network |
+| `ipv4cidr_blocks` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `ipv6cidr_block` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `ipv6cidr_blocks` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `prohibit_internet_ingress` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -6449,6 +6462,40 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `byoipv6cidr_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `byoipv6cidr_details.byoipv6range_id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `byoipv6cidr_details.ipv6cidr_block` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_core_vnic_attachment
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `display_name` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `instance_id` | Yes | Yes | Written by the generator |
+| `nic_index` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `create_vnic_details` | Yes | Yes | Written by the generator |
+| `create_vnic_details.assign_ipv6ip` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.assign_private_dns_record` | Yes | Another way | Via dns.private: the private zone names each machine (and its aliases) as the spec does, instead of the cloud's names made from IDs, addresses or labels |
+| `create_vnic_details.assign_public_ip` | Yes | Yes | Written by the generator |
+| `create_vnic_details.defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `create_vnic_details.display_name` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `create_vnic_details.freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `create_vnic_details.hostname_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.nsg_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.private_ip` | Yes | Yes | Written by the generator |
+| `create_vnic_details.private_ip_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.route_table_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.security_attributes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `create_vnic_details.skip_source_dest_check` | Yes | Yes | Written by the generator |
+| `create_vnic_details.subnet_cidr` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.subnet_id` | Yes | Yes | Written by the generator |
+| `create_vnic_details.vlan_id` | No | No | A cloud carries no 802.1Q tags between VMs (Google Cloud's VLAN interfaces and Oracle Cloud's VLANs end at its own virtual switch): Isoloom gives each VLAN a subnet of its own, and a machine on several an interface on each |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
@@ -6559,12 +6606,35 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `filter.regex` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `filter.values` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 
+### data.oci_core_private_ips
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `ip_address` | Yes | Yes | Written by the generator |
+| `ip_state` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `lifetime` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet_id` | Yes | Yes | Written by the generator |
+| `vlan_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `vnic_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter.name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter.regex` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter.values` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+
 ### data.oci_core_vcn_dns_resolver_association
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `vcn_id` | Yes | Yes | Written by the generator |
+
+### data.oci_core_vnic
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `vnic_id` | Yes | Yes | Written by the generator |
 
 ### data.oci_identity_availability_domains
 
@@ -6577,7 +6647,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `filter.regex` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 | `filter.values` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 
-And 734 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 735 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: utility providers
 
@@ -7886,13 +7956,13 @@ is marked ✗, with its reason below.
 | `networks.*.tc.jitter` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
 | `networks.*.tc.loss` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
 | `networks.*.tc.rate` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
-| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `networks.*.docker.cidr` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `networks.*.vlans.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
+| `networks.*.vlans.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | ✓ |
 | `networks.*.switch` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `networks.*.vlans.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
+| `networks.*.vlans.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `networks.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
-| `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | n/a |
+| `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ◐ | ✗ | ✗ | ✗ | ✗ | ◐ | ✓ | n/a | n/a |
 | `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.only` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✗ |
@@ -7901,9 +7971,9 @@ is marked ✗, with its reason below.
 | `networks.*.bridged.dhcp` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
 | `networks.*.bridged.default_route` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
 | `networks.*.bridged.vlan` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `reach[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
-| `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
-| `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
+| `reach[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
+| `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
+| `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
 | `dns.private` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `dns.domain` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
@@ -8060,12 +8130,12 @@ is marked ✗, with its reason below.
 | hybrid | 66% of 139 | 90 | 5 | 7 | 37 |
 | proxmox | 82% of 114 | 93 | 2 | 3 | 16 |
 | esxi | 67% of 113 | 76 | 1 | 3 | 33 |
-| aws | 61% of 119 | 66 | 15 | 6 | 32 |
+| aws | 62% of 119 | 66 | 16 | 6 | 31 |
 | azure | 61% of 119 | 66 | 14 | 7 | 32 |
-| gcp | 61% of 119 | 66 | 15 | 6 | 32 |
+| gcp | 61% of 119 | 66 | 15 | 7 | 31 |
 | digitalocean | 50% of 119 | 55 | 9 | 6 | 49 |
-| linode | 52% of 119 | 57 | 10 | 6 | 46 |
-| oci | 52% of 119 | 57 | 10 | 6 | 46 |
+| linode | 55% of 119 | 60 | 12 | 6 | 41 |
+| oci | 55% of 119 | 60 | 13 | 6 | 40 |
 | cloud-docker | 77% of 114 | 87 | 3 | 0 | 24 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
 | external | 49% of 78 | 34 | 9 | 14 | 21 |
@@ -8078,16 +8148,21 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **aws, azure**: Link impairment (`tc`) needs a router in the path; the cloud's security groups have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
 - **gcp**: Link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
 - **digitalocean, linode, oci**: Link impairment (`tc`) needs a router in the path; the cloud's firewalls have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
-- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does) (`networks.*.mtu`)
-- **digitalocean**: DigitalOcean cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
-- **linode**: Linode cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
-- **oci**: Oracle Cloud cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
+- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, esxi, cloud-docker, external**: Network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does) (`networks.*.mtu`)
+- **aws**: Network `lan` sets its `mtu`: AWS has no setting for a network's MTU (`networks.*.mtu`)
+- **azure**: Network `lan` sets its `mtu`: Azure has no setting for a network's MTU (`networks.*.mtu`)
+- **digitalocean**: Network `lan` sets its `mtu`: DigitalOcean has no setting for a network's MTU (`networks.*.mtu`)
+- **linode**: Network `lan` sets its `mtu`: Linode has no setting for a network's MTU (`networks.*.mtu`)
+- **oci**: Network `lan` sets its `mtu`: Oracle Cloud has no setting for a network's MTU (`networks.*.mtu`)
+- **digitalocean**: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`, `machines.*.depends_on`, `volumes.*.owner`, `machines.*.access`)
 - **hybrid**: Machine `sw` is a network appliance (`docker.appliance`), which runs on the Docker targets (`networks.*.switch`)
 - **kubernetes, helm, kustomize**: Networks with a `gateway` machine on Kubernetes come later (`networks.*.gateway`)
 - **hybrid**: Networks with a `gateway` machine in hybrid environments come later (`networks.*.gateway`)
 - **proxmox**: Networks with a `gateway` machine on Proxmox come later (`networks.*.gateway`)
 - **esxi**: Networks with a `gateway` machine on ESXi come later (`networks.*.gateway`)
-- **aws, azure, gcp**: Networks with a `gateway` machine in the cloud come later (`networks.*.gateway`)
+- **azure**: Networks with a `gateway` machine in the cloud come later (`networks.*.gateway`)
+- **gcp**: A Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network (`networks.*.gateway`)
+- **linode**: Machine `a` is on several networks: a Linode instance has one VPC interface (`networks.*.gateway`)
 - **hybrid, esxi**: Network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`, `networks.*.ipv6.only`)
 - **aws**: Network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks (`networks.*.ipv6.cidr`)
 - **gcp**: Network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept (`networks.*.ipv6.cidr`)
@@ -8129,7 +8204,6 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **kubernetes, helm, kustomize, docker-vm, hybrid, cloud-docker**: Machine `a` is given host devices (`devices`): only a container on your own Docker host reaches them (the `docker` target), not one in a VM Isoloom creates or a Kubernetes pod (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
 - **vagrant, proxmox, esxi, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` is given host devices (`devices`): a VM has its own virtual devices, so only a container gets the host's (a GPU reaches a VM through `gpus`) (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
 - **external**: Machine `a` sets its own process (`command`, `working_dir`, `before` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it (`machines.*.command`, `machines.*.working_dir`, `machines.*.before`, `machines.*.healthcheck.test`, `machines.*.healthcheck.http.port`, `machines.*.healthcheck.http.path`, `machines.*.healthcheck.interval`, `machines.*.healthcheck.timeout`, `machines.*.healthcheck.retries`, `machines.*.healthcheck.start_period`)
-- **digitalocean**: DigitalOcean cloud-vm takes single-machine labs so far (it can't pin private addresses) (`machines.*.depends_on`, `volumes.*.owner`, `machines.*.access`)
 - **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`)
 - **external**: Machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook (`machines.*.files[].path`, `machines.*.files[].source`, `machines.*.files[].content`, `machines.*.files[].uid`, `machines.*.files[].gid`, `machines.*.files[].mode`)
 - **hybrid**: Machine `r` is a network appliance (`docker.appliance`), which runs on the Docker targets (`machines.*.docker.appliance`, `machines.*.docker.firmware`, `machines.*.docker.config`)

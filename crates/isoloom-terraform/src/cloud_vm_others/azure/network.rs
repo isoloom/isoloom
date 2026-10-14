@@ -10,7 +10,7 @@ use crate::vm::cloud::{name_with, resource};
 use crate::vm::res;
 
 /// The resource group and the networks: one virtual network, a subnet per network with its
-/// exact range.
+/// exact range, with no default way out when the network is offline.
 pub fn blocks(env: &Environment, m: &mut Module) {
     m.block(
         resource("azurerm_resource_group", "env")
@@ -38,6 +38,9 @@ pub fn blocks(env: &Environment, m: &mut Module) {
                     "address_prefixes",
                     list(std::iter::once(&p.cidr).chain(p.ipv6.as_ref().map(|v| &v.cidr)).map(|c| string(c.as_str()))),
                 ))
+                // An offline network gives an interface without a public address no way out:
+                // the cloud enforces `internet: false` besides the machines' own rules.
+                .add_attribute(("default_outbound_access_enabled", boolean(p.internet)))
                 .build(),
         );
     }

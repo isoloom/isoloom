@@ -57,10 +57,11 @@ fn oci_opens_a_published_port_on_its_machine_only() {
     let m = module(&OciBackend, "hello-stack");
     let list = m.split("resource \"oci_core_security_list\"").nth(1).unwrap();
     let list = list.split("resource \"oci_core_subnet\"").next().unwrap();
+    assert!(list.contains("SSH from allowed_cidr"), "the list read is the shared one");
     assert!(!list.contains("8080"), "the shared security list opens no published port");
     assert!(m.contains("resource \"oci_core_network_security_group\" \"web\""));
     assert!(!m.contains("resource \"oci_core_network_security_group\" \"cache\""), "cache publishes nothing");
-    assert!(m.contains("nsg_ids          = [oci_core_network_security_group.web.id]"));
+    assert!(m.contains("= [oci_core_network_security_group.web.id]"));
     assert!(m.contains("resource \"oci_core_network_security_group_security_rule\" \"web_tcp_8080\""));
 }
 
@@ -90,7 +91,9 @@ fn refusals_keep_their_messages() {
         [
             (
                 "digitalocean",
-                s("DigitalOcean cloud-vm takes single-machine labs so far (it can't pin private addresses)")
+                s(
+                    "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address"
+                )
             ),
             ("linode", None),
             ("oci", None),
@@ -99,9 +102,14 @@ fn refusals_keep_their_messages() {
     assert_eq!(
         refusals("segmented"),
         [
-            ("digitalocean", s("DigitalOcean cloud-vm takes single-network labs so far")),
-            ("linode", s("Linode cloud-vm takes single-network labs so far")),
-            ("oci", s("Oracle Cloud cloud-vm takes single-network labs so far")),
+            (
+                "digitalocean",
+                s(
+                    "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address"
+                )
+            ),
+            ("linode", None),
+            ("oci", None),
         ]
     );
     assert_eq!(refusals("ansible-pair")[1].1, s("Linode cloud-vm has no Ansible controller yet"));

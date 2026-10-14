@@ -83,11 +83,11 @@ data "oci_core_images" "ubuntu_2404" {
   sort_order               = "DESC"
 }
 
-# The environment's one network: a VCN with the spec's range, routed to the internet.
+# The environment's networks: a VCN holding each one's block, routed to the internet.
 resource "oci_core_vcn" "env" {
   compartment_id = var.compartment_id
-  cidr_block     = "192.168.62.0/24"
   display_name   = local.name
+  cidr_block     = "192.168.62.0/24"
 }
 
 resource "oci_core_internet_gateway" "env" {
@@ -106,18 +106,13 @@ resource "oci_core_route_table" "env" {
   }
 }
 
-# What may reach every machine: everything inside the VCN, and SSH from allowed_cidr; egress
-# open. A machine's published ports are its own security group's.
-resource "oci_core_security_list" "env" {
+# Network `lab`: what may reach its machines, and where they may go.
+resource "oci_core_security_list" "lab" {
   compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.env.id
-  display_name   = local.name
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "all"
-  }
+  display_name   = "${local.name}-lab"
   ingress_security_rules {
-    description = "the VCN itself"
+    description = "its own network"
     source      = "192.168.62.0/24"
     protocol    = "all"
   }
@@ -130,15 +125,193 @@ resource "oci_core_security_list" "env" {
       max = 22
     }
   }
+  ingress_security_rules {
+    description = "path MTU discovery"
+    source      = "0.0.0.0/0"
+    protocol    = "1"
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
+  egress_security_rules {
+    description = "its own network"
+    destination = "192.168.62.0/24"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "0.0.0.0/5"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "8.0.0.0/7"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "11.0.0.0/8"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "12.0.0.0/6"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "16.0.0.0/4"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "32.0.0.0/3"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "64.0.0.0/2"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "128.0.0.0/3"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "160.0.0.0/5"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "168.0.0.0/6"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "172.0.0.0/12"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "172.32.0.0/11"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "172.64.0.0/10"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "172.128.0.0/9"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "173.0.0.0/8"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "174.0.0.0/7"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "176.0.0.0/4"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "192.0.0.0/9"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "192.128.0.0/11"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "192.160.0.0/13"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "192.169.0.0/16"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "192.170.0.0/15"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "192.172.0.0/14"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "192.176.0.0/12"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "192.192.0.0/10"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "193.0.0.0/8"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "194.0.0.0/7"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "196.0.0.0/6"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "200.0.0.0/5"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "208.0.0.0/4"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "the internet"
+    destination = "224.0.0.0/3"
+    protocol    = "all"
+  }
+  egress_security_rules {
+    description = "path MTU discovery"
+    destination = "0.0.0.0/0"
+    protocol    = "1"
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
 }
 
-resource "oci_core_subnet" "env" {
+resource "oci_core_subnet" "lab" {
   compartment_id    = var.compartment_id
   vcn_id            = oci_core_vcn.env.id
   cidr_block        = "192.168.62.0/24"
-  display_name      = local.name
+  display_name      = "${local.name}-lab"
   route_table_id    = oci_core_route_table.env.id
-  security_list_ids = [oci_core_security_list.env.id]
+  security_list_ids = [oci_core_security_list.lab.id]
 }
 
 # Machine `store`, at its fixed address 192.168.62.20.
@@ -157,10 +330,11 @@ resource "oci_core_instance" "store" {
     boot_volume_size_in_gbs = 50
   }
   create_vnic_details {
-    subnet_id        = oci_core_subnet.env.id
-    private_ip       = "192.168.62.20"
-    assign_public_ip = true
-    hostname_label   = "store"
+    subnet_id              = oci_core_subnet.lab.id
+    private_ip             = "192.168.62.20"
+    assign_public_ip       = true
+    hostname_label         = "store"
+    skip_source_dest_check = false
   }
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
@@ -213,10 +387,11 @@ resource "oci_core_instance" "app" {
     boot_volume_size_in_gbs = 50
   }
   create_vnic_details {
-    subnet_id        = oci_core_subnet.env.id
-    private_ip       = "192.168.62.10"
-    assign_public_ip = true
-    hostname_label   = "app"
+    subnet_id              = oci_core_subnet.lab.id
+    private_ip             = "192.168.62.10"
+    assign_public_ip       = true
+    hostname_label         = "app"
+    skip_source_dest_check = false
   }
   metadata = {
     ssh_authorized_keys = var.ssh_public_key

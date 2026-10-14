@@ -82,8 +82,10 @@ pub const CELLS: &[(&str, Status)] = &[
     ),
     (
         "networks.*.gateway",
-        Planned {
-            note: "a gateway VM routing its network (source/destination checks off)",
+        Partial {
+            how: "the gateway VM at the network's router address (the cloud keeps .1), forwarding, its source/destination checks off, and route tables sending traffic between the network and the others through it both ways",
+            gap: "the network's machines reach the internet at their own public addresses, not through the gateway",
+            proof: "edge-firewall",
         },
     ),
     (

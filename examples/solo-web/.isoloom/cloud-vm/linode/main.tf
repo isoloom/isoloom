@@ -60,23 +60,22 @@ locals {
   root = abspath("${path.module}/../../..")
 }
 
-# The environment's one network: a VPC with a subnet at its exact range, so every machine keeps
-# its address (10.80.0.0/24).
+# The environment's networks: a VPC with a subnet per network at its exact range, so every
+# machine keeps its address.
 resource "linode_vpc" "env" {
   label  = local.name
   region = var.region
 }
 
-resource "linode_vpc_subnet" "env" {
+resource "linode_vpc_subnet" "app" {
   vpc_id = linode_vpc.env.id
   label  = "app"
   ipv4   = "10.80.0.0/24"
 }
 
-# Who may reach the machines: SSH and the published ports from allowed_cidr, everything from
-# the subnet, the rest dropped. One firewall for every instance.
-resource "linode_firewall" "env" {
-  label           = local.name
+# Machine `web` on `app`: what may reach it, and where it may not go.
+resource "linode_firewall" "web" {
+  label           = "${local.name}-web"
   inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
   inbound {
@@ -141,7 +140,7 @@ resource "linode_instance" "web" {
   }
   interface {
     purpose   = "vpc"
-    subnet_id = linode_vpc_subnet.env.id
+    subnet_id = linode_vpc_subnet.app.id
     ipv4 {
       vpc = "10.80.0.10"
     }
@@ -176,7 +175,7 @@ resource "terraform_data" "web" {
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
-  depends_on = [linode_firewall.env]
+  depends_on = [linode_firewall.web]
 }
 
 output "machines" {

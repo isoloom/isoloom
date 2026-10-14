@@ -11,7 +11,7 @@ use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 use super::network::{controller_group, name_with, resource, security_group};
 use super::{image_user, instance_type, linux_user_data, r, vpc_does};
 use crate::vm::linux::{self, Hooks};
-use crate::vm::{cloud, controller, os, own_image, res, windows};
+use crate::vm::{cloud, controller, gateways, os, own_image, res, windows};
 
 /// The address Terraform reaches a machine at: its instance's own public address on one
 /// network, its Elastic IP on several (AWS doesn't auto-assign one then).
@@ -48,8 +48,10 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
     } else {
         m.block(one_network(env, name, instance));
     }
+    let mut at_boot = cloud::interfaces(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", res(n))));
+    at_boot.extend(gateways::at_boot(mp));
     let hooks = Hooks {
-        at_boot: cloud::interfaces(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", res(n)))),
+        at_boot,
         after_reboot: vec![cloud::reschedule_auto_stop()],
         before_egress: cloud::redirects(mp),
         skip: vpc_does,
@@ -84,6 +86,12 @@ fn one_network(env: &Environment, name: &str, instance: BlockBuilder) -> Block {
     let mp = &env.machines[name];
     let id = res(name);
     let Some((net, addr)) = mp.addresses.first() else { return instance.build() };
+    // A gateway forwards traffic that isn't its own.
+    let instance = if mp.is_gateway {
+        instance.add_attribute(("source_dest_check", boolean(false)))
+    } else {
+        instance
+    };
     instance
         .add_attribute(("subnet_id", r(&format!("aws_subnet.{}.id", res(net)))))
         .add_attribute(("private_ip", string(addr.to_string())))

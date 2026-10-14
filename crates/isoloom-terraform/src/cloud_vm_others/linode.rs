@@ -1,8 +1,10 @@
 //! Linode (Akamai) `cloud-vm`: `.isoloom/cloud-vm/linode/main.tf`, rendered from the plan
-//! through the VM core. One Linode per machine on a single VPC subnet, each with its private
-//! IPv4 pinned (`ipv4.vpc`), so the machines reach each other at exactly the spec's addresses.
-//! Single-network Linux labs only: the backend refuses several networks, Windows and a
-//! controller.
+//! through the VM core. One Linode per machine on its network's VPC subnet, each with its
+//! private IPv4 pinned (`ipv4.vpc`), so the machines reach each other at exactly the spec's
+//! addresses, and a firewall per machine enforcing `reach` both ways and opening only its own
+//! published ports (`network`). Linux labs, a
+//! machine on one network (a Linode has one VPC interface): the backend refuses the rest,
+//! Windows and a controller.
 
 use isoloom_plan::{Capabilities, Environment};
 use isoloom_render::backend::{Backend, Files, RenderError};
@@ -11,7 +13,7 @@ use isoloom_render::{GeneratedFile, header};
 use isoloom_spec::DEFAULT_MEMORY_MB;
 use isoloom_spec::model::Target;
 
-use super::single_network::{self, Rules};
+use super::shared::{self, Networks, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, name_with, shutdown_script, tag_list};
 use crate::vm::gpus::GpuSizes;
 use crate::vm::linux;
@@ -19,16 +21,19 @@ use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
 use crate::vm::{os, own_image, res, vms};
 
+mod network;
+
 /// The module's folder under `.isoloom/cloud-vm/`.
 const SUB: &str = "linode";
 
 /// What Linode takes.
 const RULES: Rules = Rules {
     cloud: "Linode",
-    single_machine: false,
-    limits: single_network::limits(
+    networks: Networks::OnePerMachine,
+    limits: shared::limits(
         "arm64 on Linode comes later (it has no arm64 plans)",
         "a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept",
+        Some("a Linode VPC has no route tables, so no traffic can be sent through a machine"),
     ),
     has_image: |os| image(os).is_some(),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
@@ -59,17 +64,17 @@ impl Backend for LinodeBackend {
     }
 
     fn capabilities(&self) -> Capabilities {
-        single_network::capabilities()
+        shared::capabilities()
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        single_network::render(env, &RULES, module)
+        shared::render(env, &RULES, module)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
         isoloom_plan::refusal(&env.requirements, &self.capabilities())
             .map(|r| r.to_string())
-            .or_else(|| single_network::refusal(env, &RULES))
+            .or_else(|| shared::refusal(env, &RULES))
     }
 }
 
@@ -111,11 +116,7 @@ fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builde
     m.blocks(cloud::variables(env));
     m.block(Block::builder("provider").add_label("linode").build());
     m.blocks(cloud::id_and_locals(env, Vec::new()));
-    network(env, &mut m);
-    m.commented(
-        "Who may reach the machines: SSH and the published ports from allowed_cidr, everything from\nthe subnet, the rest dropped. One firewall for every instance.",
-        firewall(env),
-    );
+    network::blocks(env, &mut m);
     for (name, _) in vms(env) {
         instance(env, name, &mut m);
     }
@@ -127,7 +128,7 @@ fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builde
     cloud::outputs(env, &reach, &mut m);
     m.fragment(&project_lists(true));
     Ok(GeneratedFile {
-        path: single_network::path(SUB),
+        path: shared::path(SUB),
         contents: m.render()?,
     })
 }
@@ -137,67 +138,9 @@ fn public_ip(name: &str) -> Expression {
     call("one", [reference(&format!("linode_instance.{}.ipv4", res(name)))])
 }
 
+/// A resource block.
 fn resource(kind: &str, name: &str) -> BlockBuilder {
     Block::builder("resource").add_label(kind).add_label(name)
-}
-
-/// The network's CIDR.
-fn cidr(env: &Environment) -> &str {
-    env.networks.values().next().map(|n| n.cidr.as_str()).unwrap_or_default()
-}
-
-/// The VPC, and a subnet at the network's exact range.
-fn network(env: &Environment, m: &mut Module) {
-    let (net, cidr) = env.networks.iter().next().map(|(n, p)| (n.as_str(), p.cidr.as_str())).unwrap_or_default();
-    m.commented(
-        &format!("The environment's one network: a VPC with a subnet at its exact range, so every machine keeps\nits address ({cidr})."),
-        resource("linode_vpc", "env")
-            .add_attribute(("label", reference("local.name")))
-            .add_attribute(("region", reference("var.region")))
-            .build(),
-    );
-    m.block(
-        resource("linode_vpc_subnet", "env")
-            .add_attribute(("vpc_id", reference("linode_vpc.env.id")))
-            .add_attribute(("label", string(net)))
-            .add_attribute(("ipv4", string(cidr)))
-            .build(),
-    );
-}
-
-/// An inbound rule.
-fn inbound(label: &str, protocol: &str, ports: Option<String>, from: Expression) -> Block {
-    let mut b = Block::builder("inbound")
-        .add_attribute(("label", string(label)))
-        .add_attribute(("action", string("ACCEPT")))
-        .add_attribute(("protocol", string(protocol)));
-    if let Some(p) = ports {
-        b = b.add_attribute(("ports", string(p)));
-    }
-    b.add_attribute(("ipv4", from)).build()
-}
-
-/// The firewall of every instance.
-fn firewall(env: &Environment) -> Block {
-    let allowed = || list([reference("var.allowed_cidr")]);
-    let subnet = || list([string(cidr(env))]);
-    let mut b = resource("linode_firewall", "env")
-        .add_attribute(("label", reference("local.name")))
-        .add_attribute(("inbound_policy", string("DROP")))
-        .add_attribute(("outbound_policy", string("ACCEPT")))
-        .add_block(inbound("ssh", "TCP", Some("22".into()), allowed()));
-    let published = single_network::published_ports(env);
-    for (udp, label, protocol) in [(false, "published", "TCP"), (true, "published-udp", "UDP")] {
-        let ports: Vec<String> = published.iter().filter(|(p, _)| p.is_tcp() != udp).map(|(_, n)| n.to_string()).collect();
-        if !ports.is_empty() {
-            b = b.add_block(inbound(label, protocol, Some(ports.join(",")), allowed()));
-        }
-    }
-    b.add_block(inbound("vpc-tcp", "TCP", Some("1-65535".into()), subnet()))
-        .add_block(inbound("vpc-udp", "UDP", Some("1-65535".into()), subnet()))
-        .add_block(inbound("vpc-icmp", "ICMP", None, subnet()))
-        .add_attribute(("linodes", list(vms(env).map(|(n, _)| reference(&format!("linode_instance.{}.id", res(n)))))))
-        .build()
 }
 
 /// A machine's root password (for the console: SSH logs in with the key), its instance (a
@@ -205,7 +148,9 @@ fn firewall(env: &Environment) -> Block {
 fn instance(env: &Environment, name: &str, m: &mut Module) {
     let mp = &env.machines[name];
     let id = res(name);
-    let address = mp.addresses.values().next().map(ToString::to_string).unwrap_or_default();
+    let Some((net, address)) = mp.addresses.first().map(|(n, a)| (n.clone(), a.to_string())) else {
+        return;
+    };
     m.block(
         resource("random_password", &id)
             .add_attribute(("length", number(24)))
@@ -218,7 +163,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
     let user_data = call("base64encode", [auto_stop(shutdown_script(), string(""))]);
     let vpc = Block::builder("interface")
         .add_attribute(("purpose", string("vpc")))
-        .add_attribute(("subnet_id", reference("linode_vpc_subnet.env.id")))
+        .add_attribute(("subnet_id", reference(&format!("linode_vpc_subnet.{}.id", res(&net)))))
         .add_block(Block::builder("ipv4").add_attribute(("vpc", string(address))).build())
         .build();
     m.block(
@@ -248,10 +193,10 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
         replace_on: reference(&format!("linode_instance.{id}.id")),
         host: public_ip(name),
         user: USER.into(),
-        hooks: single_network::hooks(mp, vec![Template::text(SUDO)]),
+        hooks: shared::hooks(mp, std::iter::once(Template::text(SUDO)).chain(network::routes(env, &net)).collect()),
     };
     let mut setup = linux::provisioner(machine);
     // The firewall first: the set-up's downloads go through it.
-    setup.depends_on.insert(0, reference("linode_firewall.env"));
+    setup.depends_on.insert(0, reference(&format!("linode_firewall.{id}")));
     m.block(setup.block());
 }

@@ -62,12 +62,12 @@
       "os": "debian-12",
       "windows": false,
       "addresses": {
-        "outside": "10.70.0.2",
+        "outside": "10.70.0.5",
         "dmz": "10.70.10.1",
         "lan": "10.70.20.1"
       },
       "docker_addresses": {
-        "outside": "10.70.0.2",
+        "outside": "10.70.0.5",
         "dmz": "10.70.10.1",
         "lan": "10.70.20.1"
       },
@@ -210,11 +210,11 @@
       "routes": [
         {
           "to": "10.70.10.0/24",
-          "via": "10.70.0.2"
+          "via": "10.70.0.5"
         },
         {
           "to": "10.70.20.0/24",
-          "via": "10.70.0.2"
+          "via": "10.70.0.5"
         }
       ],
       "default_gateway": null,
@@ -258,20 +258,33 @@
       "hosted",
       "docker-vm",
       "cloud-docker",
-      "vagrant"
+      "vagrant",
+      "cloud-vm"
     ],
     "refused": {
       "kubernetes": "machine `aliases` (dotted DNS names) aren't Kubernetes Service names",
       "proxmox": "networks with a `gateway` machine on Proxmox come later",
-      "esxi": "networks with a `gateway` machine on ESXi come later",
-      "cloud-vm": "no cloud can run it (aws, azure, gcp: networks with a `gateway` machine in the cloud come later; digitalocean: DigitalOcean cloud-vm takes single-network labs so far; linode: Linode cloud-vm takes single-network labs so far; oci: Oracle Cloud cloud-vm takes single-network labs so far)"
+      "esxi": "networks with a `gateway` machine on ESXi come later"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "needs `external:` on fw, web, cache",
       "cloud-services": "left out by `targets:`"
     },
-    "clouds": {}
+    "clouds": {
+      "cloud-vm": {
+        "generated": [
+          "aws",
+          "oci"
+        ],
+        "refused": {
+          "azure": "networks with a `gateway` machine in the cloud come later",
+          "gcp": "a Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network",
+          "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
+          "linode": "machine `fw` is on several networks: a Linode instance has one VPC interface"
+        }
+      }
+    }
   },
   "checks": {
     "default_position": "user",
@@ -301,7 +314,7 @@
             "name": "fw:8080 on outside from user",
             "derived": true,
             "kind": "http",
-            "target": "http://10.70.0.2:8080/",
+            "target": "http://10.70.0.5:8080/",
             "expect": "any",
             "wait": 30
           },

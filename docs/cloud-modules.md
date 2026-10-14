@@ -78,6 +78,33 @@ machine's first address.
 Every VM's hosts file carries the same names, so they resolve on DigitalOcean and Linode too,
 and before a zone answers.
 
+### Networks on each cloud (`cloud-vm`)
+
+Every cloud keeps each network's exact range and each machine's address on it. What differs:
+
+| Cloud | Networks | A machine on several | `reach` | `gateway:` |
+|---|---|---|---|---|
+| AWS | a subnet each, in one VPC | an interface each | security groups, inbound | yes: every network inside one /16 |
+| Azure | a subnet each, in one virtual network | an interface each | network security groups, inbound | not yet |
+| Google Cloud | a subnetwork each, in one VPC | not yet (an interface needs a VPC of its own) | firewall rules, inbound | refused: a route can't send traffic between subnetworks of one VPC through a machine |
+| DigitalOcean | one network, one machine | no | firewall | no |
+| Linode | a VPC subnet each | no (an instance has one VPC interface) | a firewall per machine, inbound and outbound | refused: a VPC has no route tables |
+| Oracle Cloud | a subnet each, in one VCN (5 networks at most) | a VNIC each | a security list per network, inbound and outbound | yes |
+
+Published ports open only on the machine that publishes them, on every cloud.
+
+On a network a machine routes (`gateway:`), the cloud keeps the subnet's first address for its
+own router, so the gateway machine sits at the network's router address (its last usable address,
+unused on such a network), and the hosts files say so. It forwards, its source and
+destination checks are off, and each network's route table sends traffic between the routed
+network and the others through it, both ways. The routed network's machines keep their own
+public addresses, so their internet traffic leaves directly rather than through the gateway.
+
+A network with `internet: false` is closed in the machines once they are set up, on every cloud;
+on Azure its subnet also has no default way out (`default_outbound_access_enabled = false`) for
+an interface without a public address. Google Cloud networks have Ethernet's MTU (1500), as on
+every other target.
+
 ### Running a module by hand
 
 ```sh

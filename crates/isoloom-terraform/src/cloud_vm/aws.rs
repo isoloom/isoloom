@@ -18,6 +18,7 @@
 mod machines;
 mod network;
 mod outputs;
+mod routing;
 
 use isoloom_plan::{Environment, Step};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, index, list, null, reference, string};
@@ -30,7 +31,7 @@ use crate::vm::limits::Limits;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::nested;
 use crate::vm::versions;
-use crate::vm::{cloud, own_image};
+use crate::vm::{cloud, gateways, own_image};
 use crate::vm::{controller, is_windows, os, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -39,7 +40,7 @@ const SUB: &str = "aws";
 /// What AWS can't host yet.
 pub const LIMITS: Limits = Limits {
     arm64: Some("arm64 on AWS comes later (Graviton instances and arm64 AMIs)"),
-    gateways: Some("networks with a `gateway` machine in the cloud come later"),
+    gateways: None,
     playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none"),
     ipv6: Some("an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks"),
@@ -114,6 +115,8 @@ pub fn refusal(env: &Environment) -> Option<String> {
     LIMITS
         .refusal(env)
         .or_else(|| networks_refusal(env))
+        .or_else(|| routing::refusal(env))
+        .or_else(|| crate::vm::limits::fixed_mtu(env, "AWS"))
         .or_else(|| machines_refusal(env))
         .or_else(|| gpus::refusal(env, &GPUS))
         .or_else(|| nested::refusal(env, "AWS", true))
@@ -150,7 +153,8 @@ fn machines_refusal(env: &Environment) -> Option<String> {
                 "machine `{name}`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later"
             ));
         }
-        if let Some((net, _)) = m.networks.iter().find(|(_, o)| **o <= 3) {
+        // A gateway machine's gateway address moves to the router's (`vm::gateways`).
+        if let Some((net, _)) = m.networks.iter().find(|(n, o)| **o <= 3 && !gateways::is_gateway_address(env, name, n)) {
             return Some(format!("machine `{name}`: AWS keeps the first addresses of a subnet (.1 to .3) on `{net}`"));
         }
     }
@@ -164,6 +168,7 @@ fn vpc_does(step: &Step) -> bool {
 
 /// The module.
 pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
+    let env = &*gateways::relocated(env);
     let mut m = Module::new(format!("{}{USAGE}", header("#")));
     m.block(terraform(&providers(env)));
     m.blocks(variables(env));

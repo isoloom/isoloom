@@ -2,8 +2,8 @@
 //! the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CPUS, CREDENTIALS, DISKS, GCP_IPV6, GPU_SCHEDULING,
-    IMAGES, LOCATION, MANAGED, MONITORING, MTU, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT, ZONE_SETTINGS,
+    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CPUS, CREDENTIALS, DISKS, GCP_IPV6,
+    GPU_SCHEDULING, IMAGES, LOCATION, MANAGED, MONITORING, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -125,7 +125,7 @@ const WRITTEN: &[(&str, &str)] = &[
         network_interface.subnetwork project shielded_instance_config shielded_instance_config.enable_secure_boot
         shielded_instance_config.enable_vtpm tags zone",
     ),
-    ("google_compute_network", "auto_create_subnetworks name project"),
+    ("google_compute_network", "auto_create_subnetworks mtu name project"),
     ("google_compute_subnetwork", "ip_cidr_range name network project region"),
     (
         "google_dns_managed_zone",
@@ -223,7 +223,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 network_interface.ipv6_access_config network_interface.ipv6_access_config.*",
             ),
             (PUBLIC_DNS, "network_interface.access_config.public_ptr_domain_name"),
-            (VLANS, "network_interface.vlan"),
+            (CLOUD_VLANS, "network_interface.vlan"),
             (
                 TPM,
                 "shielded_instance_config shielded_instance_config.enable_secure_boot shielded_instance_config.enable_vtpm",
@@ -241,7 +241,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (ALIAS, "delete_default_routes_on_create"),
             (GCP_IPV6, "enable_ula_internal_ipv6 internal_ipv6_range"),
-            (MTU, "mtu"),
         ],
     ),
     (

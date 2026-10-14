@@ -90,10 +90,11 @@ resource "azurerm_virtual_network" "env" {
 }
 
 resource "azurerm_subnet" "lab" {
-  name                 = "lab"
-  resource_group_name  = azurerm_resource_group.env.name
-  virtual_network_name = azurerm_virtual_network.env.name
-  address_prefixes     = ["10.63.0.0/24"]
+  name                            = "lab"
+  resource_group_name             = azurerm_resource_group.env.name
+  virtual_network_name            = azurerm_virtual_network.env.name
+  address_prefixes                = ["10.63.0.0/24"]
+  default_outbound_access_enabled = true
 }
 
 # The controller's own key: it runs the playbooks over SSH on every machine.

@@ -3,7 +3,7 @@
 
 use super::support::{
     ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, DISKS,
-    IMAGE_BUILD, IMAGES, LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ROUTER, ZONE_BINDING, ZONE_SETTINGS,
+    IMAGE_BUILD, IMAGES, LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ZONE_BINDING, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -139,7 +139,10 @@ const WRITTEN: &[(&str, &str)] = &[
     ("aws_network_interface_attachment", "device_index instance_id network_interface_id"),
     ("aws_route53_record", "name records ttl type zone_id"),
     ("aws_route53_zone", "name vpc vpc.vpc_id"),
-    ("aws_route_table", "route route.cidr_block route.gateway_id tags vpc_id"),
+    (
+        "aws_route_table",
+        "route route.cidr_block route.gateway_id route.network_interface_id tags vpc_id",
+    ),
     ("aws_route_table_association", "route_table_id subnet_id"),
     (
         "aws_security_group",
@@ -201,7 +204,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 root_block_device.kms_key_id ebs_block_device.iops ebs_block_device.throughput ebs_block_device.kms_key_id
                 ebs_block_device.snapshot_id ebs_block_device.encrypted ephemeral_block_device ephemeral_block_device.*",
             ),
-            (ROUTER, "source_dest_check"),
             (
                 PLACEMENT,
                 "host_id host_resource_group_arn placement_group placement_group_id placement_partition_number tenancy
@@ -212,7 +214,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (ADDRESSES, "secondary_private_ips"),
             (
                 ALIAS,
-                "security_groups user_data_base64 user_data_replace_on_change volume_tags root_block_device.delete_on_termination network_interface
+                "security_groups source_dest_check user_data_base64 user_data_replace_on_change volume_tags root_block_device.delete_on_termination network_interface
                 network_interface.* secondary_network_interface secondary_network_interface.*",
             ),
             (CPUS, "cpu_options.core_count cpu_options.threads_per_core"),
@@ -244,9 +246,9 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (
                 ADDRESSES,
-                "private_ips_count private_ip_list private_ip_list_enabled ipv4_prefix_count ipv4_prefixes",
+                "private_ips_count ipv4_prefix_count ipv4_prefixes",
             ),
-            (ALIAS, "private_ip attachment attachment.*"),
+            (ALIAS, "private_ip private_ip_list private_ip_list_enabled attachment attachment.*"),
             (CLOUD, "interface_type ena_srd_specification ena_srd_specification.*"),
         ],
     ),
@@ -262,7 +264,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (AWS_IPV6, "route.ipv6_cidr_block route.egress_only_gateway_id"),
             (NAT, "route.nat_gateway_id"),
-            (ROUTER, "route.network_interface_id"),
         ],
     ),
     ("aws_route_table_association", &[(LOCATION, "region"), (CLOUD_NETWORK, "gateway_id")]),

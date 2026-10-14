@@ -37,6 +37,7 @@ pub mod checks;
 pub mod cloud;
 pub mod cloud_init;
 pub mod controller;
+pub mod gateways;
 pub mod gpus;
 pub mod limits;
 pub mod linux;
@@ -45,6 +46,7 @@ pub mod nested;
 pub mod own_image;
 pub mod private_dns;
 pub mod provisioner;
+pub mod reach;
 pub mod versions;
 pub mod windows;
 

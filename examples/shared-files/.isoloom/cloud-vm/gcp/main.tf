@@ -102,6 +102,7 @@ resource "google_compute_network" "env" {
   project                 = local.project
   name                    = local.name
   auto_create_subnetworks = false
+  mtu                     = 1500
 }
 
 resource "google_compute_subnetwork" "app" {

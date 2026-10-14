@@ -3,41 +3,52 @@
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, number, object, string};
 
-use super::{first_zone, r};
+use super::{first_zone, r, routing};
 use crate::vm::res;
 
 /// The networks: one VPC, a subnet per network with its exact range (the first network's block
-/// is the VPC's, the others are added to it), a route to the internet, and the key pair.
+/// is the VPC's, the others are added to it; with a gateway machine, one block holds them all),
+/// a route to the internet, and the key pair.
 pub fn blocks(env: &Environment, m: &mut Module) {
     let nets: Vec<(&String, &String)> = env.networks.iter().map(|(n, p)| (n, &p.cidr)).collect();
     let Some((_, first)) = nets.first() else { return };
+    let whole = routing::vpc_block(env);
     m.commented(
         "The environment's networks: one VPC, a subnet per network with its exact range.",
-        dns_hostnames(env, resource("aws_vpc", "env").add_attribute(("cidr_block", string(first.as_str()))))
-            .add_attribute(("tags", object([("Name", r("local.name"))])))
-            .build(),
+        dns_hostnames(
+            env,
+            resource("aws_vpc", "env").add_attribute(("cidr_block", string(whole.as_deref().unwrap_or(first.as_str())))),
+        )
+        .add_attribute(("tags", object([("Name", r("local.name"))])))
+        .build(),
     );
-    for (net, cidr) in nets.iter().skip(1) {
+    if whole.is_none() {
+        for (net, cidr) in nets.iter().skip(1) {
+            m.block(
+                resource("aws_vpc_ipv4_cidr_block_association", &res(net))
+                    .add_attribute(("vpc_id", r("aws_vpc.env.id")))
+                    .add_attribute(("cidr_block", string(cidr.as_str())))
+                    .build(),
+            );
+        }
+    }
+    m.block(resource("aws_internet_gateway", "env").add_attribute(("vpc_id", r("aws_vpc.env.id"))).build());
+    let own_tables = routing::blocks(env, m);
+    if !own_tables {
+        let route = Block::builder("route")
+            .add_attribute(("cidr_block", string("0.0.0.0/0")))
+            .add_attribute(("gateway_id", r("aws_internet_gateway.env.id")))
+            .build();
         m.block(
-            resource("aws_vpc_ipv4_cidr_block_association", &res(net))
+            resource("aws_route_table", "env")
                 .add_attribute(("vpc_id", r("aws_vpc.env.id")))
-                .add_attribute(("cidr_block", string(cidr.as_str())))
+                .add_block(route)
                 .build(),
         );
     }
-    m.block(resource("aws_internet_gateway", "env").add_attribute(("vpc_id", r("aws_vpc.env.id"))).build());
-    let route = Block::builder("route")
-        .add_attribute(("cidr_block", string("0.0.0.0/0")))
-        .add_attribute(("gateway_id", r("aws_internet_gateway.env.id")))
-        .build();
-    m.block(
-        resource("aws_route_table", "env")
-            .add_attribute(("vpc_id", r("aws_vpc.env.id")))
-            .add_block(route)
-            .build(),
-    );
     for (i, (net, cidr)) in nets.iter().enumerate() {
-        m.blocks(subnet(net, cidr, i > 0));
+        let table = if own_tables { res(net) } else { "env".to_string() };
+        m.blocks(subnet(net, cidr, i > 0 && whole.is_none(), &table));
     }
     m.block(
         resource("aws_key_pair", "env")
@@ -57,9 +68,9 @@ fn dns_hostnames(env: &Environment, vpc: BlockBuilder) -> BlockBuilder {
         .add_attribute(("enable_dns_hostnames", boolean(true)))
 }
 
-/// A network's subnet (after its block joins the VPC, unless it is the VPC's own) and its route
-/// table association.
-fn subnet(net: &str, cidr: &str, added: bool) -> [Block; 2] {
+/// A network's subnet (after its block joins the VPC, unless it is the VPC's own) and its
+/// association with route table `table`.
+fn subnet(net: &str, cidr: &str, added: bool, table: &str) -> [Block; 2] {
     let id = res(net);
     let mut s = resource("aws_subnet", &id)
         .add_attribute(("vpc_id", r("aws_vpc.env.id")))
@@ -73,7 +84,7 @@ fn subnet(net: &str, cidr: &str, added: bool) -> [Block; 2] {
         s.build(),
         resource("aws_route_table_association", &id)
             .add_attribute(("subnet_id", r(&format!("aws_subnet.{id}.id"))))
-            .add_attribute(("route_table_id", r("aws_route_table.env.id")))
+            .add_attribute(("route_table_id", r(&format!("aws_route_table.{table}.id"))))
             .build(),
     ]
 }

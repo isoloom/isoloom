@@ -89,24 +89,27 @@ resource "azurerm_virtual_network" "env" {
 }
 
 resource "azurerm_subnet" "office_vlan10" {
-  name                 = "office-vlan10"
-  resource_group_name  = azurerm_resource_group.env.name
-  virtual_network_name = azurerm_virtual_network.env.name
-  address_prefixes     = ["10.70.10.0/24"]
+  name                            = "office-vlan10"
+  resource_group_name             = azurerm_resource_group.env.name
+  virtual_network_name            = azurerm_virtual_network.env.name
+  address_prefixes                = ["10.70.10.0/24"]
+  default_outbound_access_enabled = false
 }
 
 resource "azurerm_subnet" "office_vlan20" {
-  name                 = "office-vlan20"
-  resource_group_name  = azurerm_resource_group.env.name
-  virtual_network_name = azurerm_virtual_network.env.name
-  address_prefixes     = ["10.70.20.0/24"]
+  name                            = "office-vlan20"
+  resource_group_name             = azurerm_resource_group.env.name
+  virtual_network_name            = azurerm_virtual_network.env.name
+  address_prefixes                = ["10.70.20.0/24"]
+  default_outbound_access_enabled = true
 }
 
 resource "azurerm_subnet" "servers" {
-  name                 = "servers"
-  resource_group_name  = azurerm_resource_group.env.name
-  virtual_network_name = azurerm_virtual_network.env.name
-  address_prefixes     = ["10.70.99.0/24"]
+  name                            = "servers"
+  resource_group_name             = azurerm_resource_group.env.name
+  virtual_network_name            = azurerm_virtual_network.env.name
+  address_prefixes                = ["10.70.99.0/24"]
+  default_outbound_access_enabled = false
 }
 
 # Machine `intranet`: what may reach it.

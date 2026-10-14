@@ -16,7 +16,7 @@ reach:
 
 machines:
   fw:
-    networks: { outside: 2, dmz: 1, lan: 1 }
+    networks: { outside: 5, dmz: 1, lan: 1 }
     services: [{ port: 8080, name: status, http: true }]
     docker:
       build: build/fw

@@ -89,10 +89,11 @@ resource "azurerm_virtual_network" "env" {
 }
 
 resource "azurerm_subnet" "office" {
-  name                 = "office"
-  resource_group_name  = azurerm_resource_group.env.name
-  virtual_network_name = azurerm_virtual_network.env.name
-  address_prefixes     = ["10.84.0.0/24"]
+  name                            = "office"
+  resource_group_name             = azurerm_resource_group.env.name
+  virtual_network_name            = azurerm_virtual_network.env.name
+  address_prefixes                = ["10.84.0.0/24"]
+  default_outbound_access_enabled = true
 }
 
 # The environment's names, served by Azure DNS inside the virtual network (`dns.private`).
