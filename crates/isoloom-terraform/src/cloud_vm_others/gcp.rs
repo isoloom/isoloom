@@ -293,7 +293,7 @@ resource "google_compute_network" "env" {{
 
         // Its set-up, over SSH, as on every cloud. No interface step: GCP machines here are
         // single-NIC (multi-NIC is refused).
-        let cmds = linux_setup_cmds(spec, name, m, vm, &lab, &redirects, &|_| String::new());
+        let cmds = linux_setup_cmds(spec, name, &lab, &redirects, &|_| String::new());
 
         let deps: Vec<String> = m
             .depends_on

@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
+    aws = { source = "hashicorp/aws", version = "~> 6.0" }
   }
 }
 
@@ -19,17 +16,21 @@ variable "region" {
   type    = string
   default = "eu-west-3"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -45,7 +46,12 @@ variable "expires_at" {
 provider "aws" {
   region = var.region
   default_tags {
-    tags = { "isoloom-environment" = "solo-web", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+    tags = {
+      isoloom-environment = "solo-web"
+      managed-by          = "isoloom"
+      isoloom-instance    = local.name
+      isoloom-expires-at  = var.expires_at
+    }
   }
 }
 
@@ -170,9 +176,6 @@ resource "terraform_data" "web" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -184,25 +187,21 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting tcp dport 8080 redirect to :80",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
 
 output "machines" {
-  value = {
-    web = aws_instance.web.public_ip
-  }
+  value = { web = aws_instance.web.public_ip }
 }
 
 output "ssh_users" {
-  value = {
-    web = "admin"
-  }
+  value = { web = "admin" }
 }
 
 output "ip" {
@@ -214,9 +213,7 @@ output "ready_file" {
 }
 
 output "published" {
-  value = {
-    "web/80" = "${aws_instance.web.public_ip}:8080"
-  }
+  value = { "web/80" = "${aws_instance.web.public_ip}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

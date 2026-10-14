@@ -484,7 +484,7 @@ fn proxmox_cloud_init_uses_the_machines_declared_resolver() {
     .expect("parses");
     let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
     assert!(tf.contains("servers = [\"10.60.0.2\"]"), "{tf}");
-    assert!(tf.contains("domain = \"arm.lab\""), "{tf}");
+    assert!(tf.contains("domain  = \"arm.lab\""), "{tf}");
     // The machine with no resolver of its own still gets a public one so it can install software.
     assert!(tf.contains("servers = [\"1.1.1.1\"]"), "{tf}");
 }
@@ -629,7 +629,7 @@ fn cloud_vm_runs_windows_over_winrm_with_its_name() {
     // Auto-stop as a scheduled task (a pending shutdown would block the rename's restart).
     assert!(tf.contains("isoloom-auto-stop"));
     // A Windows-only environment: the controller runs the checks.
-    assert!(tf.contains("host = aws_eip.isoloom_controller.public_ip"));
+    assert!(tf.contains("host     = aws_eip.isoloom_controller.public_ip"), "{tf}");
 }
 
 #[test]

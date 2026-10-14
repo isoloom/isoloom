@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### The Terraform VM core; AWS and Proxmox rendered from the plan
+- Proxmox and AWS (`cloud-vm`) render from the plan through one Terraform VM core, and their HCL is built with `hcl-rs` (`isoloom_render::hcl_builder`) instead of format strings. Every Proxmox and AWS module passes `terraform fmt -check`; the layout changes (aligned map entries, one blank line between blocks, long lists and maps one item a line).
+- A machine's set-up runs the plan's steps on both, the same scripts as the other VM targets: Proxmox now applies a network's `tc` on the machines (it was silently dropped), adds the routes to the networks behind the router, and waits 900 s for a dependency (it was 600 s, and a dependency without ports made the wait fail); the constraints' preamble is the `Prelude` step instead of a text pass; the offline egress rule is reloaded at every boot on both targets (a unit); inputs are in `/tmp/isoloom-inputs.env`, kept in `/var/lib/isoloom` when a reboot comes, on both.
+- AWS: the TLS provider is declared whenever there is a controller (a Windows-only environment with checks used it undeclared); the controller's inventory is uploaded as a file; the Windows ready marker is `C:\isoloom\ready`, as on the other targets.
+- Proxmox: a machine that depends on one that isn't a VM there no longer points at a missing resource.
+- Breaking (library): `proxmox::generate` and `cloud_vm::generate` are replaced by `ProxmoxBackend` and `CloudVmBackend`; `cloud_vm::linux_setup_cmds` takes the spec and the machine's name (5 parameters) and lives on in `cloud_vm::legacy` for the clouds not on the core yet.
+
 ### docker-vm and hybrid rendered from the plan
 - `docker-vm` and `hybrid` are backends of their own (`DockerVmBackend`, `HybridBackend`), registered in isoloom-targets: they render the planned `Environment`, and their Vagrantfiles are written with one Ruby builder (`isoloom_vagrant::ruby`: values quoted by `rb`, calls, blocks, heredocs) and shared Vagrantfile pieces (`isoloom_vagrant::vagrantfile`). Hybrid no longer edits generated text: the `vagrant` generator writes into `.isoloom/hybrid/` with the Docker host's block (`vagrant::generate_in`), and the containers' Compose file is the Compose backend's typed file (`isoloom_compose::compose_file`), adapted before it is written.
 - Refusals from the plan: a network's `gateway`, a volume shared by a container and a VM, and a VM that depends on a container are requirements (`Requirement::Gateway`, `VolumeAcrossShapes`, `VmDependsOnContainer`) that hybrid lacks the capability for; docker-vm has Compose's capabilities, so `isoloom targets` reports its refusal as `docker-vm: ...` rather than `docker: ...`.

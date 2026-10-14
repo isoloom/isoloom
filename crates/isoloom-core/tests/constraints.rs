@@ -108,12 +108,20 @@ fn every_linux_vm_runs_the_preamble_first() {
 
     let pve = file(&spec, Target::Proxmox, "proxmox/main.tf");
     assert_eq!(
-        pve.matches("bootcmd = [[\"sh\", \"-c\", ").count(),
+        pve.matches("\"sh -c 'set -e\\n# The proxy").count(),
         pve.matches("#cloud-config").count(),
         "every cloud-config"
     );
 
-    for cloud in ["aws", "azure", "gcp"] {
+    let aws = file(&spec, Target::CloudVm, "cloud-vm/aws/main.tf");
+    // On AWS, the `Prelude` step comes first, right after cloud-init is done, on every VM.
+    assert_eq!(
+        aws.matches("\"cloud-init status --wait >/dev/null 2>&1 || true\",\n      \"sudo sh -c 'set -e\\n# The proxy")
+            .count(),
+        aws.matches("cloud-init status --wait").count(),
+        "{aws}"
+    );
+    for cloud in ["azure", "gcp"] {
         let tf = file(&spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"));
         assert!(tf.contains("\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo sh -c "), "{cloud}");
     }

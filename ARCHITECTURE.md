@@ -56,17 +56,31 @@ then the spec's `groups:`, members limited to the hosts). What differs per targe
 is reached, an `Access`: `Access::vagrant()`, `Access::proxmox()`, `Access::cloud(user_of_os,
 windows_password)`, `Access::external()`. A backend never writes inventory lines itself.
 
+### The Terraform VM core
+
+Proxmox and AWS (the `cloud-vm` target's reference cloud) render from the plan through
+`isoloom_terraform::vm`, written with the HCL builder (`isoloom_render::hcl_builder`: `hcl-rs`
+structures, values escaped by the builder, written in the layout `terraform fmt` keeps). The core
+holds what every VM-per-machine Terraform target shares: a machine's set-up as a `remote-exec`
+transport (connection, project archive, inputs file, the plan's `Step`s run as root, a reboot
+between two provisioners) or a cloud-init transport (the `Prelude` step as `bootcmd`, the others
+as `runcmd`, a unit for what follows a reboot), Windows over WinRM, the controller and its
+inventory, the check runners and the `checks` output, and each target's limits (refusals read
+from the plan). A target adds its resources and hooks (interfaces found by MAC, the auto-stop,
+published-port redirects) and leaves out the steps its platform does itself. The other clouds
+still read the spec through `cloud_vm::legacy` until they move onto the core.
+
 ## Crate map
 
 | Crate | Holds |
 |---|---|
 | `isoloom-spec` | The model, parsing and loading, the JSON schema, normalization (groups, clones, VLANs, profiles, instances, defaults, the image table), validation, shell quoting |
 | `isoloom-plan` | The target-neutral plan: `Environment`, addressing, routing, images, the lifecycle steps, checks, requirements and refusal |
-| `isoloom-render` | The `Backend` trait and shared rendering pieces: addresses, header, Ansible runs, the Ansible inventory, HCL, Ruby and PowerShell quoting, step scripts, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
+| `isoloom-render` | The `Backend` trait and shared rendering pieces: addresses, header, Ansible runs, the Ansible inventory, the HCL builder (`hcl_builder`), HCL, Ruby and PowerShell quoting, step scripts, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
 | `isoloom-compose` | The Docker Compose backend (`docker`, `hosted`, and the Compose file Docker-on-a-VM targets carry), with the network appliances |
 | `isoloom-kubernetes` | The Kubernetes backend: manifests, Kustomize, the Helm chart |
 | `isoloom-vagrant` | The Vagrant backends: `vagrant` (every provider), `docker-vm`, `hybrid`; the Ruby builder (`ruby`) and the Vagrantfile pieces they share (`vagrantfile`) |
-| `isoloom-terraform` | The Terraform backends: Proxmox, one cloud VM per machine (AWS, Azure, GCP, DigitalOcean, Linode, OCI), Docker on one cloud VM, cloud services |
+| `isoloom-terraform` | The Terraform backends: Proxmox, one cloud VM per machine (AWS, Azure, GCP, DigitalOcean, Linode, OCI), Docker on one cloud VM, cloud services; the Terraform VM core (`vm`) the VM targets share |
 | `isoloom-external` | The `external` backend: hosts that already exist |
 | `isoloom-targets` | Dispatch to every backend, refusals, `generate_all`, the resolved snapshot |
 | `isoloom-import` | Drafting a spec from Compose, Vagrant and Terraform files, with notes for what the draft leaves out |
@@ -144,8 +158,8 @@ Enforced now (`deny`, so `cargo clippy --workspace --all-targets -- -D warnings`
   `missing_errors_doc`, `missing_panics_doc`, `doc_markdown`, `similar_names`); `unwrap_used`,
   `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic: `clippy.toml`);
   `print_stdout` (the command line allows it at its root: printing is its interface);
-  `too_many_arguments` above 5 (nine functions carry a targeted, commented `#[allow]`:
-  `linux_setup_cmds` and `windows_machine` in `cloud_vm.rs`, `inbound`, `nic`, `provision` and
+  `too_many_arguments` above 5 (seven functions carry a targeted, commented `#[allow]`:
+  `inbound`, `nic`, `provision` and
   `windows_machine` in `cloud_vm_others/azure.rs`, `providers` in `vagrant.rs`, `appliance` and
   `readiness` in isoloom-compose's `render.rs`).
 

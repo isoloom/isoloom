@@ -8,10 +8,8 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
+    aws = { source = "hashicorp/aws", version = "~> 6.0" }
+    tls = { source = "hashicorp/tls", version = "~> 4.0" }
   }
 }
 
@@ -19,17 +17,21 @@ variable "region" {
   type    = string
   default = "eu-west-3"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -45,7 +47,12 @@ variable "expires_at" {
 provider "aws" {
   region = var.region
   default_tags {
-    tags = { "isoloom-environment" = "windows-hello", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+    tags = {
+      isoloom-environment = "windows-hello"
+      managed-by          = "isoloom"
+      isoloom-instance    = local.name
+      isoloom-expires-at  = var.expires_at
+    }
   }
 }
 
@@ -173,6 +180,7 @@ resource "aws_security_group" "web01" {
   }
 }
 
+# No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.
 resource "aws_instance" "web01" {
   ami                         = data.aws_ami.windows_server_2019.id
   instance_type               = "c7i-flex.large"
@@ -180,19 +188,7 @@ resource "aws_instance" "web01" {
   private_ip                  = "192.168.57.10"
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.web01.id]
-  # No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.
-  user_data = <<-EOT
-    <powershell>
-    $p = ConvertTo-SecureString '${random_password.windows.result}' -AsPlainText -Force
-    New-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null
-    Add-LocalGroupMember -Group Administrators -Member isoloom
-    Enable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null
-    Set-Item WSMan:\localhost\Service\AllowUnencrypted $true
-    Set-Item WSMan:\localhost\Service\Auth\Basic $true
-    New-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null
-    ${var.auto_stop_minutes > 0 ? "Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(${var.auto_stop_minutes})) -User SYSTEM -RunLevel Highest -Force | Out-Null" : ""}
-    </powershell>
-  EOT
+  user_data                   = "<powershell>\n$p = ConvertTo-SecureString '${random_password.windows.result}' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n${var.auto_stop_minutes > 0 ? "Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(${var.auto_stop_minutes})) -User SYSTEM -RunLevel Highest -Force | Out-Null" : ""}\n</powershell>\n"
   root_block_device {
     volume_size = 50
   }
@@ -210,7 +206,9 @@ resource "terraform_data" "web01_name" {
     timeout  = "30m"
   }
   provisioner "remote-exec" {
-    inline = ["powershell -NoProfile -Command \"if ($env:COMPUTERNAME -ne 'WEB01') { Rename-Computer -NewName 'web01' -Force; shutdown /r /t 10 }\""]
+    inline = [
+      "powershell -NoProfile -Command \"if ($env:COMPUTERNAME -ne 'WEB01') { Rename-Computer -NewName 'web01' -Force; shutdown /r /t 10 }\""
+    ]
   }
 }
 
@@ -237,7 +235,7 @@ resource "terraform_data" "web01" {
     destination = "C:/Windows/Temp/isoloom-project.tgz"
   }
   provisioner "file" {
-    content     = "$ErrorActionPreference = 'Stop'\nif ($env:COMPUTERNAME -ne 'WEB01') { throw \"still named $env:COMPUTERNAME: the rename hasn't taken effect\" }\nnetsh interface portproxy add v4tov4 listenport=8082 listenaddress=0.0.0.0 connectport=80 connectaddress=127.0.0.1 | Out-Null\nNew-NetFirewallRule -DisplayName 'isoloom 80' -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow | Out-Null\nNew-NetFirewallRule -DisplayName 'isoloom 8082' -Direction Inbound -Protocol TCP -LocalPort 8082 -Action Allow | Out-Null\n$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n# The project into a Windows machine: unpacks the tar.gz $archive into $dest (replacing an older\n# copy), leaving out the archive's first $strip folders. Plain .NET (GZipStream), so it runs on\n# every Windows Isoloom supports: PowerShell 2.0 and later, and no tar.exe before Windows Server\n# 2019. Symbolic links are left out (counted).\n& {\n  $ErrorActionPreference = 'Stop'\n  $sep = [IO.Path]::DirectorySeparatorChar\n  $new = \"$dest.new\"\n  if (Test-Path $new) { Remove-Item $new -Recurse -Force }\n  [void][IO.Directory]::CreateDirectory($new)\n  $file = New-Object IO.FileStream($archive, [IO.FileMode]::Open, [IO.FileAccess]::Read)\n  $in = New-Object IO.Compression.GZipStream($file, [IO.Compression.CompressionMode]::Decompress)\n  $utf8 = New-Object Text.UTF8Encoding($false)\n  $header = New-Object byte[] 512\n  $chunk = New-Object byte[] 65536\n  function Fill([byte[]]$b, [int]$n) {\n    $got = 0\n    while ($got -lt $n) {\n      $r = $in.Read($b, $got, $n - $got)\n      if ($r -le 0) { throw \"$archive ends early\" }\n      $got += $r\n    }\n  }\n  function Field([int]$at, [int]$len) {\n    $end = [Array]::IndexOf($header, [byte]0, $at, $len)\n    if ($end -lt 0) { $end = $at + $len }\n    $utf8.GetString($header, $at, $end - $at)\n  }\n  # Copies $size bytes to $out (or skips them, with no $out), then the padding after them.\n  function Body([long]$size, $out) {\n    $left = $size\n    while ($left -gt 0) {\n      $n = [int][Math]::Min([long]$chunk.Length, $left)\n      Fill $chunk $n\n      if ($out) { $out.Write($chunk, 0, $n) }\n      $left -= $n\n    }\n    $pad = [int]((512 - $size % 512) % 512)\n    if ($pad) { Fill $chunk $pad }\n  }\n  $pax = @{}\n  $links = 0\n  $files = 0\n  while ($true) {\n    Fill $header 512\n    if ($header[148] -eq 0) { break } # the end: zero blocks have no checksum\n    $type = [char]$header[156]\n    $sizeText = (Field 124 12).Trim()\n    $size = [long]0\n    if ($sizeText) { $size = [Convert]::ToInt64($sizeText, 8) }\n    if ($pax['size']) { $size = [long]$pax['size'] }\n    if ($type -eq 'x') {\n      # pax records (\"<length> key=value\\n\"): a long path, a large size, for the next entry.\n      $ms = New-Object IO.MemoryStream\n      Body $size $ms\n      $b = $ms.ToArray()\n      $i = 0\n      while ($i -lt $b.Length) {\n        $sp = [Array]::IndexOf($b, [byte]32, $i)\n        $len = [int]$utf8.GetString($b, $i, $sp - $i)\n        $eq = [Array]::IndexOf($b, [byte]61, $sp)\n        $pax[$utf8.GetString($b, $sp + 1, $eq - $sp - 1)] = $utf8.GetString($b, $eq + 1, $i + $len - $eq - 2)\n        $i += $len\n      }\n      continue\n    }\n    if ($type -eq 'L' -or $type -eq 'K') {\n      # GNU tar's long name (or link target) for the next entry.\n      $ms = New-Object IO.MemoryStream\n      Body $size $ms\n      if ($type -eq 'L') { $pax['path'] = $utf8.GetString($ms.ToArray()).TrimEnd([char]0) }\n      continue\n    }\n    $name = Field 0 100\n    $prefix = Field 345 155\n    if ($prefix) { $name = \"$prefix/$name\" }\n    if ($pax['path']) { $name = $pax['path'] }\n    $pax = @{}\n    $parts = @($name.Split('/') | Where-Object { $_ -ne '' -and $_ -ne '.' })\n    if ($parts.Count -le $strip) { Body $size $null; continue }\n    $path = Join-Path $new ([string]::Join([string]$sep, [string[]]($parts[$strip..($parts.Count - 1)])))\n    if ($type -eq '5' -or $type -eq '0' -or $type -eq [char]0) {\n      # A name Windows can't take (`:`, `*`, too long...) is left out, with a warning.\n      $out = $null\n      try {\n        if ($type -eq '5') {\n          [void][IO.Directory]::CreateDirectory($path)\n        } else {\n          [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path))\n          $out = [IO.File]::Create($path)\n        }\n      } catch {\n        Write-Warning \"Not copied: $name ($($_.Exception.Message))\"\n        Body $size $null\n        continue\n      }\n      if ($out) {\n        try { Body $size $out } finally { $out.Close() }\n        $files++\n      } else {\n        Body $size $null\n      }\n    } else {\n      if ($type -eq '2') { $links++ }\n      Body $size $null\n    }\n  }\n  $in.Close()\n  if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }\n  Move-Item $new $dest\n  Remove-Item $archive -Force\n  $note = ''\n  if ($links) { $note = \" ($links symbolic links left out)\" }\n  \"$files files in $dest$note\"\n}\nSet-Location C:\\isoloom\n& powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\isoloom\\provision\\iis.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }\nNew-Item -ItemType Directory -Force C:\\ProgramData\\isoloom | Out-Null; Set-Content C:\\ProgramData\\isoloom\\ready 'ready'\n"
+    content     = "$ErrorActionPreference = 'Stop'\nif ($env:COMPUTERNAME -ne 'WEB01') { throw \"still named $env:COMPUTERNAME: the rename hasn't taken effect\" }\nnetsh interface portproxy add v4tov4 listenport=8082 listenaddress=0.0.0.0 connectport=80 connectaddress=127.0.0.1 | Out-Null\nNew-NetFirewallRule -DisplayName 'isoloom 80' -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow | Out-Null\nNew-NetFirewallRule -DisplayName 'isoloom 8082' -Direction Inbound -Protocol TCP -LocalPort 8082 -Action Allow | Out-Null\n$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n# The project into a Windows machine: unpacks the tar.gz $archive into $dest (replacing an older\n# copy), leaving out the archive's first $strip folders. Plain .NET (GZipStream), so it runs on\n# every Windows Isoloom supports: PowerShell 2.0 and later, and no tar.exe before Windows Server\n# 2019. Symbolic links are left out (counted).\n& {\n  $ErrorActionPreference = 'Stop'\n  $sep = [IO.Path]::DirectorySeparatorChar\n  $new = \"$dest.new\"\n  if (Test-Path $new) { Remove-Item $new -Recurse -Force }\n  [void][IO.Directory]::CreateDirectory($new)\n  $file = New-Object IO.FileStream($archive, [IO.FileMode]::Open, [IO.FileAccess]::Read)\n  $in = New-Object IO.Compression.GZipStream($file, [IO.Compression.CompressionMode]::Decompress)\n  $utf8 = New-Object Text.UTF8Encoding($false)\n  $header = New-Object byte[] 512\n  $chunk = New-Object byte[] 65536\n  function Fill([byte[]]$b, [int]$n) {\n    $got = 0\n    while ($got -lt $n) {\n      $r = $in.Read($b, $got, $n - $got)\n      if ($r -le 0) { throw \"$archive ends early\" }\n      $got += $r\n    }\n  }\n  function Field([int]$at, [int]$len) {\n    $end = [Array]::IndexOf($header, [byte]0, $at, $len)\n    if ($end -lt 0) { $end = $at + $len }\n    $utf8.GetString($header, $at, $end - $at)\n  }\n  # Copies $size bytes to $out (or skips them, with no $out), then the padding after them.\n  function Body([long]$size, $out) {\n    $left = $size\n    while ($left -gt 0) {\n      $n = [int][Math]::Min([long]$chunk.Length, $left)\n      Fill $chunk $n\n      if ($out) { $out.Write($chunk, 0, $n) }\n      $left -= $n\n    }\n    $pad = [int]((512 - $size % 512) % 512)\n    if ($pad) { Fill $chunk $pad }\n  }\n  $pax = @{}\n  $links = 0\n  $files = 0\n  while ($true) {\n    Fill $header 512\n    if ($header[148] -eq 0) { break } # the end: zero blocks have no checksum\n    $type = [char]$header[156]\n    $sizeText = (Field 124 12).Trim()\n    $size = [long]0\n    if ($sizeText) { $size = [Convert]::ToInt64($sizeText, 8) }\n    if ($pax['size']) { $size = [long]$pax['size'] }\n    if ($type -eq 'x') {\n      # pax records (\"<length> key=value\\n\"): a long path, a large size, for the next entry.\n      $ms = New-Object IO.MemoryStream\n      Body $size $ms\n      $b = $ms.ToArray()\n      $i = 0\n      while ($i -lt $b.Length) {\n        $sp = [Array]::IndexOf($b, [byte]32, $i)\n        $len = [int]$utf8.GetString($b, $i, $sp - $i)\n        $eq = [Array]::IndexOf($b, [byte]61, $sp)\n        $pax[$utf8.GetString($b, $sp + 1, $eq - $sp - 1)] = $utf8.GetString($b, $eq + 1, $i + $len - $eq - 2)\n        $i += $len\n      }\n      continue\n    }\n    if ($type -eq 'L' -or $type -eq 'K') {\n      # GNU tar's long name (or link target) for the next entry.\n      $ms = New-Object IO.MemoryStream\n      Body $size $ms\n      if ($type -eq 'L') { $pax['path'] = $utf8.GetString($ms.ToArray()).TrimEnd([char]0) }\n      continue\n    }\n    $name = Field 0 100\n    $prefix = Field 345 155\n    if ($prefix) { $name = \"$prefix/$name\" }\n    if ($pax['path']) { $name = $pax['path'] }\n    $pax = @{}\n    $parts = @($name.Split('/') | Where-Object { $_ -ne '' -and $_ -ne '.' })\n    if ($parts.Count -le $strip) { Body $size $null; continue }\n    $path = Join-Path $new ([string]::Join([string]$sep, [string[]]($parts[$strip..($parts.Count - 1)])))\n    if ($type -eq '5' -or $type -eq '0' -or $type -eq [char]0) {\n      # A name Windows can't take (`:`, `*`, too long...) is left out, with a warning.\n      $out = $null\n      try {\n        if ($type -eq '5') {\n          [void][IO.Directory]::CreateDirectory($path)\n        } else {\n          [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path))\n          $out = [IO.File]::Create($path)\n        }\n      } catch {\n        Write-Warning \"Not copied: $name ($($_.Exception.Message))\"\n        Body $size $null\n        continue\n      }\n      if ($out) {\n        try { Body $size $out } finally { $out.Close() }\n        $files++\n      } else {\n        Body $size $null\n      }\n    } else {\n      if ($type -eq '2') { $links++ }\n      Body $size $null\n    }\n  }\n  $in.Close()\n  if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }\n  Move-Item $new $dest\n  Remove-Item $archive -Force\n  $note = ''\n  if ($links) { $note = \" ($links symbolic links left out)\" }\n  \"$files files in $dest$note\"\n}\nSet-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'provision/iis.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }\nNew-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready\n"
     destination = "C:/ProgramData/isoloom/setup.ps1"
   }
   provisioner "remote-exec" {
@@ -304,9 +302,6 @@ resource "terraform_data" "isoloom_controller" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-controller.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -318,33 +313,32 @@ resource "terraform_data" "isoloom_controller" {
     content     = tls_private_key.controller.private_key_openssh
     destination = "/tmp/isoloom-controller-key"
   }
+  provisioner "file" {
+    content     = "[linux]\n\n[windows]\nweb01 ansible_host=192.168.57.10\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n"
+    destination = "/tmp/isoloom-inventory.ini"
+  }
   provisioner "remote-exec" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '192.168.57.10 web01' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo mkdir -p /etc/isoloom && sudo install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && rm -f /tmp/isoloom-controller-key",
-      "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null",
-      "[ -x /opt/ansible/bin/ansible-playbook ] || { sudo python3 -m venv /opt/ansible && sudo /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }",
-      "printf '%s' '[linux]\n\n[windows]\nweb01 ansible_host=192.168.57.10\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n' | sudo tee /etc/isoloom/inventory.ini >/dev/null",
-      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}\n'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.57.10 web01'\\'' >> /etc/hosts'",
+      "sudo sh -c 'mkdir -p /etc/isoloom && install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && install -m 0644 /tmp/isoloom-inventory.ini /etc/isoloom/inventory.ini && rm -f /tmp/isoloom-controller-key /tmp/isoloom-inventory.ini'",
+      "sudo sh -c 'DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null'",
+      "sudo sh -c '[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q '\\''ansible-core>=2.15,<2.17'\\'' pywinrm; }'",
+      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n_isoloom_transient='\\''winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'\\''\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nrun_play() {\n  _isoloom_n=1\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    if [ \"$_isoloom_rc\" -eq 0 ]; then\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return 0\n    fi\n    if [ \"$_isoloom_n\" -lt 4 ] && grep -qE \"$_isoloom_transient\" \"$_isoloom_log\"; then\n      echo \"isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)\"\n      sleep $((2 * _isoloom_pause))\n      _isoloom_n=$((_isoloom_n + 1))\n    else\n      rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n      return \"$_isoloom_rc\"\n    fi\n  done\n}'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [terraform_data.web01]
 }
 
 output "machines" {
-  value = {
-    web01 = aws_instance.web01.public_ip
-  }
+  value = { web01 = aws_instance.web01.public_ip }
 }
 
 output "ssh_users" {
-  value = {
-    web01 = "isoloom"
-  }
+  value = { web01 = "isoloom" }
 }
 
 output "ip" {
@@ -358,14 +352,18 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "networks", machine = "controller", host = aws_eip.isoloom_controller.public_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh" }
+    {
+      position = "networks"
+      machine  = "controller"
+      host     = aws_eip.isoloom_controller.public_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"
+    }
   ]
 }
 
 output "published" {
-  value = {
-    "web01/80" = "${aws_instance.web01.public_ip}:8082"
-  }
+  value = { "web01/80" = "${aws_instance.web01.public_ip}:8082" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

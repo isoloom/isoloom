@@ -15,5 +15,8 @@ isoloom-compose.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
 
+[dev-dependencies]
+insta.workspace = true
+
 [lints]
 workspace = true

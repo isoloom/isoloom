@@ -272,7 +272,7 @@ resource "azurerm_virtual_network" "env" {{
 
         // Its set-up, over SSH: the MAC of each extra interface comes from its Azure NIC
         // (uppercase, dash-separated), lowered and colon-joined to match `ip link`.
-        let cmds = linux_setup_cmds(spec, name, m, vm, &lab, &redirects, &|nid| {
+        let cmds = linux_setup_cmds(spec, name, &lab, &redirects, &|nid| {
             tf_expr(&format!("lower(replace(azurerm_network_interface.{id}_{nid}.mac_address, \"-\", \":\"))"))
         });
         tf.push_str(&provision(spec, &id, &pip, USER, m, &cmds));
