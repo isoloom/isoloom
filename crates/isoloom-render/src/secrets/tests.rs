@@ -1,4 +1,6 @@
-use super::{DELIVERED, KEPT_DIR, host_environment, place, receive, step, wait};
+#[cfg(unix)]
+use super::{DELIVERED, KEPT_DIR, host_environment, wait};
+use super::{place, receive, step};
 use isoloom_plan::SecretFile;
 
 fn file(name: &str, path: &str, uid: Option<u32>, mode: Option<u32>) -> SecretFile {
@@ -11,6 +13,8 @@ fn file(name: &str, path: &str, uid: Option<u32>, mode: Option<u32>) -> SecretFi
     }
 }
 
+// The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
+#[cfg(unix)]
 /// `script` run by `sh` with the kept folder moved to a temporary one, `input` on its standard
 /// input; what it did, and the folder.
 fn run(script: &str, input: &str, tag: &str) -> (std::process::Output, std::path::PathBuf) {
@@ -30,6 +34,8 @@ fn run(script: &str, input: &str, tag: &str) -> (std::process::Output, std::path
     (child.wait_with_output().unwrap(), dir)
 }
 
+// The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
+#[cfg(unix)]
 fn b64(s: &str) -> String {
     let out = std::process::Command::new("sh")
         .arg("-c")
@@ -40,6 +46,8 @@ fn b64(s: &str) -> String {
     String::from_utf8(out.stdout).unwrap()
 }
 
+// The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
+#[cfg(unix)]
 #[test]
 fn delivery_keeps_each_value_as_sent_then_marks_it() {
     let names = vec!["db-password".to_string(), "api-key".to_string(), "empty".to_string()];
@@ -60,6 +68,8 @@ fn delivery_keeps_each_value_as_sent_then_marks_it() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+// The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
+#[cfg(unix)]
 #[test]
 fn a_missing_value_fails_the_delivery_without_the_mark() {
     let names = vec!["a".to_string(), "b".to_string()];
@@ -90,6 +100,8 @@ fn the_step_waits_then_places_at_every_boot() {
     assert!(check.success());
 }
 
+// The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
+#[cfg(unix)]
 #[test]
 fn the_wait_passes_once_delivered() {
     let (out, dir) = run(&format!("mkdir -p {KEPT_DIR} && touch {DELIVERED} && {}", wait("web")), "", "wait");
@@ -98,6 +110,8 @@ fn the_wait_passes_once_delivered() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+// The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
+#[cfg(unix)]
 #[test]
 fn a_docker_host_reads_each_kept_value_into_its_variable() {
     assert_eq!(host_environment(&[]), "");
