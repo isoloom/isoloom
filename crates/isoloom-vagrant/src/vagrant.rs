@@ -17,9 +17,13 @@
 //!   when the host's is another (x86 Windows on an Apple Silicon Mac: slow, so longer timeouts).
 //!   Without root, QEMU links exactly two VMs per network (a socket listen/connect pair), each
 //!   on one network; [`qemu_refusal`] says when a spec doesn't fit.
+//! - On Hyper-V, Vagrant puts a VM's adapters on one switch and sets no address: each network
+//!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
+//!   guest ([`hyperv`]); [`hyperv_refusal`] says when a machine has no Hyper-V box.
 
 mod checks;
 mod helpers;
+pub mod hyperv;
 mod limits;
 mod machine;
 mod providers;
@@ -176,6 +180,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.comment("This host's CPU as QEMU names it: a machine built for another one runs emulated there.");
     r.assign("HOST_ARCH", Value::raw(format!("{ARM_HOST} ? \"aarch64\" : \"x86_64\"")));
     r.text(PROJECT_RB);
+    r.text(hyperv::HYPERV_RB);
     r.blank();
     vagrantfile::inputs(r, &env.spec().inputs);
     esxi(r, env);
@@ -224,4 +229,11 @@ pub fn qemu_refusal(spec: &Spec) -> Option<String> {
     let checks = checks::Checks::of(&env, &in_their_place);
     let with_controller = env.controller.is_some() || !checks.controller.is_empty();
     qemu::refusal(qemu::links(&env, with_controller))
+}
+
+/// Why this environment's VMs can't all boot under Vagrant's Hyper-V provider, if they can't:
+/// a machine whose OS has no known Hyper-V box and whose spec gives none (`vm.image.hyperv`).
+/// `refusal_on` asks it for `hyperv`.
+pub fn hyperv_refusal(spec: &Spec) -> Option<String> {
+    hyperv::refusal(&Environment::build(spec, Target::Vagrant, None))
 }

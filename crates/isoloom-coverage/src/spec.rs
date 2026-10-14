@@ -238,6 +238,7 @@ pub const PROXMOX: &[(&str, Status)] = &[
     ("machines.*.vm.image.vagrant", PROXMOX_IMAGE),
     ("machines.*.vm.image.vagrant_version", PROXMOX_IMAGE),
     ("machines.*.vm.image.qemu", PROXMOX_IMAGE),
+    ("machines.*.vm.image.hyperv", PROXMOX_IMAGE),
     (
         "provision[].ansible",
         done("run from a controller VM on every network, once every machine is up", "ansible-pair"),
@@ -475,6 +476,30 @@ fn base_table() -> Vec<Row> {
             }),
         },
         Row {
+            path: "cloud.before",
+            outputs: all(Status::Descriptive {
+                note: "host steps before the apply (up.sh)",
+            }),
+        },
+        Row {
+            path: "cloud.env",
+            outputs: all(Status::Descriptive {
+                note: "Terraform's environment (the cloud-services scripts)",
+            }),
+        },
+        Row {
+            path: "cloud.apply_retries",
+            outputs: all(Status::Descriptive {
+                note: "applies again after a failed apply (up.sh)",
+            }),
+        },
+        Row {
+            path: "cloud.requires",
+            outputs: all(Status::Descriptive {
+                note: "host tools `doctor` and `run` check",
+            }),
+        },
+        Row {
             path: "machines.*.services[].name",
             outputs: all(Status::Descriptive {
                 note: "names the service for people and runners",
@@ -558,7 +583,10 @@ fn base_table() -> Vec<Row> {
         common(
             "machines.*.privileged",
             done("the container runs privileged (and a Kubernetes securityContext)", "arm-lab"),
-            na("a VM already has kernel access: its workload runs as root"),
+            done(
+                "nested virtualization on Hyper-V (`enable_virtualization_extensions`); elsewhere a VM already has kernel access",
+                "existing-hosts",
+            ),
         ),
         common(
             "machines.*.read_only",
@@ -709,6 +737,13 @@ fn base_table() -> Vec<Row> {
             "machines.*.vm.image.qemu",
             done(
                 "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
+                "windows-hello",
+            ),
+        ),
+        vm_field(
+            "machines.*.vm.image.hyperv",
+            done(
+                "the box Vagrant's Hyper-V provider boots instead (its latest version with a Hyper-V build)",
                 "windows-hello",
             ),
         ),
@@ -954,6 +989,7 @@ const NAMED: &[&str] = &[
     "volumes",
     "cloud.vars",
     "cloud.outputs",
+    "cloud.env",
     "checks[].headers",
     "machines.*.docker.args",
     "provision[].groups",

@@ -344,13 +344,20 @@ fn host_address(spec: &Spec, h: &checks::Host) -> String {
 /// what they expose and cost). Not the variables, which may take a user's input.
 fn add_cloud(spec: &Spec, map: &mut Map<String, Value>) {
     if let Some(c) = &spec.cloud {
+        // Every input the variables take, at any depth, once each.
+        let mut inputs: Vec<String> = Vec::new();
+        for n in c.vars.values().flat_map(crate::model::CloudServices::inputs_in) {
+            if !inputs.contains(&n) {
+                inputs.push(n);
+            }
+        }
         map.insert(
             "cloud".into(),
             json!({
                 "provider": c.provider.id(),
                 "terraform": c.terraform,
                 "outputs": c.outputs.keys().collect::<Vec<_>>(),
-                "inputs": c.vars.values().filter_map(crate::model::CloudServices::input_of).collect::<Vec<_>>(),
+                "inputs": inputs,
                 "hourly_usd": c.hourly_usd,
             }),
         );

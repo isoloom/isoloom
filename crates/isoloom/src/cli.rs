@@ -30,7 +30,7 @@ pub enum Command {
     /// List the targets the spec can run on, and why the others can't.
     Targets(targets::Args),
     /// What this machine can run: for every target, the tools and credentials found and the ones
-    /// missing. No spec needed.
+    /// missing. No spec needed; with one in DIR, also what its cloud services require.
     Doctor(doctor::Args),
     /// Add up the machines, CPUs, memory and disk the spec needs.
     Resources(resources::Args),

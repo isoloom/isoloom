@@ -1,11 +1,17 @@
 //! Host readiness: whether *this machine* can run a target. `isoloom targets` says where a spec
 //! can run; this says which of those the host is equipped for, and what is missing: Docker and
 //! Compose v2, Vagrant and a provider, a reachable Kubernetes context, Terraform and a cloud's
-//! credentials, Proxmox's endpoint and token. Nothing here touches the spec; tools embedding
-//! Isoloom call [`check`] for their runtime pickers.
+//! credentials, Proxmox's endpoint and token. Nothing here touches the spec but
+//! [`requirements`], what a cloud-services module asks of the host (`cloud.requires`); tools
+//! embedding Isoloom call [`check`] for their runtime pickers.
+
+mod hyperv;
+mod requirements;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+pub use requirements::{requirements, requirements_with};
 
 use crate::model::Target;
 
@@ -258,17 +264,30 @@ fn vagrant(target: Target, h: &Host, notes: &mut Notes) {
         (h.run)("vagrant", &["--version"]),
         "vagrant isn't installed (https://developer.hashicorp.com/vagrant/install)",
     );
-    let (providers, unusable) = vagrant_providers(h);
+    let (mut providers, mut unusable) = vagrant_providers(h);
+    // Hyper-V comes with Windows: on when its service runs, usable from an elevated shell.
+    let mut not_elevated = None;
+    match hyperv::probe(h, cfg!(windows)) {
+        Some(Ok(p)) => providers.push(p),
+        Some(Err(why)) if why == hyperv::NOT_ELEVATED => not_elevated = Some(why),
+        Some(Err(why)) => unusable = unusable.or(Some(why)),
+        None => {}
+    }
     if target == Target::Hybrid {
         notes.need(
             providers.iter().find(|p| p.starts_with("VirtualBox")).cloned(),
             "hybrid needs VirtualBox (promiscuous interfaces are set per provider; VirtualBox only for now)",
         );
-    } else {
-        notes.need(
-            (!providers.is_empty()).then(|| format!("providers: {}", providers.join(", "))),
-            &unusable.unwrap_or_else(|| "no Vagrant provider found (VirtualBox, VMware, Parallels, libvirt, UTM, QEMU or ESXi)".to_string()),
-        );
+        return;
+    }
+    let none = || "no Vagrant provider found (VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU or ESXi)".to_string();
+    notes.need(
+        (!providers.is_empty()).then(|| format!("providers: {}", providers.join(", "))),
+        &not_elevated.clone().or(unusable).unwrap_or_else(none),
+    );
+    // Another provider will do, but say why Hyper-V won't from here.
+    if let Some(why) = not_elevated.filter(|_| !providers.is_empty()) {
+        notes.lines.push(why);
     }
 }
 
@@ -411,7 +430,9 @@ mod tests {
     #[test]
     fn vagrant_needs_a_provider_and_hybrid_virtualbox() {
         let r = check_on(Target::Vagrant, None, &["vagrant"], &[]);
-        assert!(!r.ready && r.summary().contains("no Vagrant provider"));
+        // On Windows the Hyper-V probe runs too, and finds no Hyper-V here: that's the reason given.
+        let none = if cfg!(windows) { "Hyper-V isn't turned on" } else { "no Vagrant provider" };
+        assert!(!r.ready && r.summary().contains(none), "{}", r.summary());
         let r = check_on(Target::Vagrant, None, &["vagrant", "prlctl"], &[]);
         assert!(r.ready && r.summary().contains("Parallels"));
         let r = check_on(Target::Hybrid, None, &["vagrant", "prlctl"], &[]);

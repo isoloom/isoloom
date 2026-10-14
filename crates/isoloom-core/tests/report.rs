@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use isoloom_core::report::{REPORTS, graph_d2, graph_dot, report};
+use isoloom_core::report::{REPORTS, graph_d2, graph_dot, hyperv_ports_note, report};
 use isoloom_core::{load, resolved::resolve};
 
 fn snapshot(name: &str) -> serde_json::Value {
@@ -54,4 +54,12 @@ fn reports_cover_addresses_services_wiring_and_resources() {
     assert!(resources.lines().last().unwrap().starts_with("total"), "{resources}");
     assert!(report("nope", &r, false).unwrap_err().to_string().contains("addressing"));
     assert_eq!(REPORTS.len(), 4);
+}
+
+#[test]
+fn on_hyperv_published_ports_are_said_not_to_be_forwarded() {
+    let note = hyperv_ports_note(&snapshot("windows-hello")).expect("windows-hello publishes a port");
+    assert!(note.contains("127.0.0.1:8082 (web01:80) is not there"), "{note}");
+    // Nothing published, nothing to say.
+    assert_eq!(hyperv_ports_note(&snapshot("existing-hosts")), None);
 }

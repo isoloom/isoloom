@@ -258,6 +258,19 @@ impl Ruby {
     /// closing tag. The quoted tag keeps Ruby from expanding anything in the script.
     pub fn heredoc(&mut self, call: Call, key: &str, tag: &str, script: &str) -> &mut Ruby {
         self.call(call.kw(key, Value::raw(format!("<<~'{tag}'"))));
+        self.heredoc_body(tag, script)
+    }
+
+    /// `head`, a line of code that opens the heredoc `<<~'TAG'` (as a method's argument:
+    /// `IsoloomHyperV.address(machine, <<~'SH')`), then `script` one level deeper and the
+    /// closing tag.
+    pub fn heredoc_line(&mut self, head: impl fmt::Display, tag: &str, script: &str) -> &mut Ruby {
+        self.line(head);
+        self.heredoc_body(tag, script)
+    }
+
+    /// A heredoc's lines one level deeper, then its closing tag.
+    fn heredoc_body(&mut self, tag: &str, script: &str) -> &mut Ruby {
         self.depth += 1;
         for l in script.lines() {
             if l.is_empty() {

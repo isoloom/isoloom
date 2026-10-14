@@ -30,7 +30,13 @@ fn examples_with_outputs() -> Vec<String> {
 
 /// Files a run leaves next to the generated ones (all git-ignored): not outputs.
 fn is_run_artifact(rel: &str) -> bool {
-    rel.split('/').any(|c| c == ".terraform" || c == ".vagrant") || rel.ends_with(".terraform.lock.hcl") || rel.contains(".tfstate")
+    rel.split('/').any(|c| c == ".terraform" || c == ".vagrant")
+        || rel.ends_with(".terraform.lock.hcl")
+        || rel.contains(".tfstate")
+        // cloud-services: the module's copy, the launch-time inputs, the apply's marker, the
+        // deployment's name.
+        || rel.contains("/cloud-services/module/")
+        || ["inputs.tfvars.json", "deploying", "isoloom-instance"].iter().any(|f| rel.ends_with(&format!("/cloud-services/{f}")))
 }
 
 /// Every file under `dir`, as paths relative to `base` with `/` separators.
@@ -454,6 +460,7 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
                 vagrant: Some("spec/box".into()),
                 vagrant_version: None,
                 qemu: None,
+                hyperv: None,
                 winrm: None,
             });
         }
@@ -1104,4 +1111,91 @@ fn qemu_refuses_more_than_two_vms_on_a_network() {
     let vf = &generate(&three, Target::Vagrant).unwrap()[0].contents;
     // Still generated (for every other provider); the QEMU block says why it has no network.
     assert!(provider_block(vf, "a", "qemu").contains("# No private network on QEMU: network `lab` has 3 VMs"));
+}
+
+/// The block `config.vm.define "<name>"` of a Vagrantfile, up to its `end`.
+fn define_block<'a>(vf: &'a str, name: &str) -> &'a str {
+    let start = &vf[vf.find(&format!("config.vm.define \"{name}\"")).unwrap()..];
+    &start[..start.find("\n  end\n").unwrap()]
+}
+
+#[test]
+fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_guest() {
+    let (_, spec) = example("segmented");
+    let v = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    // The first adapter's switch from ISOLOOM_HYPERV_SWITCH, the helper module once.
+    assert_eq!(v.matches("HYPERV_SWITCH = ENV.fetch(\"ISOLOOM_HYPERV_SWITCH\", \"Default Switch\")").count(), 1);
+    let web = define_block(&v, "web");
+    // bento has no Hyper-V build: the roboxes box, pinned; the VM named after the environment.
+    assert!(
+        web.contains(
+            "m.vm.provider \"hyperv\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      o.vm.box_version = \"4.3.12\"\n      v.vmname = \"segmented-web\""
+        ),
+        "{web}"
+    );
+    assert!(web.contains("o.vm.network \"private_network\", bridge: HYPERV_SWITCH"), "{web}");
+    assert!(!web.contains("enable_virtualization_extensions"), "{web}");
+    // Its network is a private switch, its adapter attached before every start (by a fixed MAC),
+    // its address set in the guest once it answers, the switch gone with the last VM.
+    assert!(web.contains("IsoloomHyperV.switches([\"isoloom-segmented-front\"])"), "{web}");
+    assert!(web.contains("before :\"VagrantPlugins::HyperV::Action::StartInstance\""), "{web}");
+    assert!(web.contains("IsoloomHyperV.attach(machine, [[\"isoloom-segmented-front\", \"0215"), "{web}");
+    // The address step hangs on a Hyper-V action: other providers run (and print) no trigger.
+    assert!(web.contains("m.trigger.after :\"VagrantPlugins::HyperV::Action::WaitForIPAddress\""), "{web}");
+    assert!(!v.contains("Vagrant::Action::Builtin"), "a trigger fires on every provider");
+    // Every network is tried, and a missing adapter fails the step.
+    assert!(
+        web.contains("rc=0\n") && web.contains(" 10.61.10.10/24 || rc=1\n") && web.contains("exit $rc\n"),
+        "{web}"
+    );
+    assert!(
+        web.contains("systemctl enable -q isoloom-lab-net.service") && web.contains("rc-update add local default"),
+        "{web}"
+    );
+    assert!(web.contains("IsoloomHyperV.prune([\"isoloom-segmented-front\"])"), "{web}");
+    // The router is on every network, with an adapter on each; every adapter has its own MAC.
+    let router = define_block(&v, "isoloom-router");
+    assert_eq!(router.matches("\", \"0215").count(), spec.networks.len(), "{router}");
+    let macs: Vec<&str> = v.match_indices("\"0215").map(|(i, _)| &v[i..i + 14]).collect();
+    let mut unique = macs.clone();
+    unique.sort_unstable();
+    unique.dedup();
+    assert!(macs.len() > spec.networks.len() && macs.len() == unique.len(), "{macs:?}");
+
+    // Windows: the box's Hyper-V build from `vm.image.hyperv`, a static address through WMI.
+    let (_, win) = example("windows-hello");
+    let v = contents(&generate(&win, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(
+        v.contains("      o.vm.box = \"StefanScherer/windows_2019\"\n      o.vm.box_version = \">= 0\"\n      v.vmname = \"windows-hello-web01\""),
+        "{v}"
+    );
+    assert!(
+        v.contains("IsoloomHyperV.address(machine, <<~'PS1')") && v.contains("EnableStatic(@($n.ip), @($n.mask))"),
+        "{v}"
+    );
+    // Its published port isn't forwarded on Hyper-V: a warning says where it is.
+    assert!(v.contains("IsoloomHyperV.ports(machine, [[80, 8082]])"), "{v}");
+    assert!(v.contains("mac = '02:15:") && v.contains("ip = '192.168.57.10'; mask = '255.255.255.0'"), "{v}");
+
+    // A privileged machine runs VMs of its own: nested virtualization.
+    let (_, hosts) = example("existing-hosts");
+    let v = contents(&generate(&hosts, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(define_block(&v, "cache").contains("v.enable_virtualization_extensions = true"));
+}
+
+#[test]
+fn an_os_without_a_hyperv_box_is_refused_on_hyperv_until_the_spec_gives_one() {
+    let yaml = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    networks: { lab: 10 }\n    vm: { os: debian-13, provision: [setup.sh] }\n";
+    let spec = parse(yaml).unwrap();
+    // Still generated for every other provider; the Hyper-V block says what is missing.
+    let v = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(v.contains("# No Hyper-V build of this box is known: give one with `vm.image.hyperv`."), "{v}");
+    assert_eq!(isoloom_core::refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
+    let why = isoloom_core::refusal_on(&spec, Target::Vagrant, Some("hyperv")).expect("refused on Hyper-V");
+    assert!(why.contains("machine `box`") && why.contains("vm.image.hyperv"), "{why}");
+    // The spec's own box: its latest version with a Hyper-V build.
+    let own = parse(&yaml.replace("os: debian-13", "os: debian-13, image: { hyperv: my/debian13 }")).unwrap();
+    assert_eq!(isoloom_core::refusal_on(&own, Target::Vagrant, Some("hyperv")), None);
+    let v = contents(&generate(&own, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(v.contains("o.vm.box = \"my/debian13\"\n      o.vm.box_version = \">= 0\""), "{v}");
 }

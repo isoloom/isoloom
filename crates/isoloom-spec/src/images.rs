@@ -87,15 +87,35 @@ impl Table {
     }
 }
 
-/// A Vagrant box: its name, a pinned version when known-good, and the libvirt and QEMU boxes
-/// when the main one has no build for them.
+/// A Vagrant box: its name, a pinned version when known-good, and the libvirt, QEMU and Hyper-V
+/// boxes when the main one has no build for them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VagrantBox {
     pub name: String,
     pub version: Option<String>,
     pub libvirt: Option<String>,
     pub qemu: Option<String>,
+    pub hyperv: HyperVBox,
 }
+
+/// The box Vagrant's Hyper-V provider boots for a machine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HyperVBox {
+    /// The main box (it has a Hyper-V build at its version).
+    Main,
+    /// Another box, or another version of the main one (`None`: its latest).
+    Other { name: String, version: Option<String> },
+    /// No Hyper-V build known for this OS: give one with `vm.image.hyperv`.
+    Missing,
+}
+
+/// Debian 12 on Hyper-V (bento's boxes no longer have Hyper-V builds; the roboxes `generic/*`
+/// boxes do, their last version 4.3.12): Isoloom's own Debian VMs (router, tool shell) use it
+/// there too.
+pub const HYPERV_DEBIAN_12: (&str, &str) = ("generic/debian12", ROBOXES);
+
+/// The last version of the roboxes `generic/*` boxes, which have Hyper-V builds.
+const ROBOXES: &str = "4.3.12";
 
 /// Debian 12 for QEMU: the official Debian cloud image as a box (amd64 and arm64), with the
 /// cloud-init vagrant-qemu sets a private network's address through. Isoloom's own Debian VMs
@@ -107,48 +127,94 @@ pub fn is_windows(os: &str) -> bool {
     os.starts_with("windows")
 }
 
-/// The built-in Vagrant boxes, by OS name.
-fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
-    let b = |name: &str, version: Option<&str>, libvirt: Option<&str>| VagrantBox {
+/// A box, its version when pinned, and its libvirt build when the main one has none.
+fn boxed(name: &str, version: Option<&str>, libvirt: Option<&str>) -> VagrantBox {
+    VagrantBox {
         name: name.into(),
         version: version.map(Into::into),
         libvirt: libvirt.map(Into::into),
         qemu: None,
+        hyperv: HyperVBox::Main,
+    }
+}
+
+/// `b` with its QEMU box (vagrant-qemu boots libvirt-format boxes), where the main one has none.
+fn with_qemu(mut b: VagrantBox, qemu: &str) -> VagrantBox {
+    b.qemu = Some(qemu.into());
+    b
+}
+
+/// `b` with its Hyper-V box, where the main one has no Hyper-V build (bento's current boxes
+/// have none).
+fn with_hyperv(mut b: VagrantBox, name: &str, version: &str) -> VagrantBox {
+    b.hyperv = HyperVBox::Other {
+        name: name.into(),
+        version: Some(version.into()),
     };
-    // The QEMU box (vagrant-qemu boots libvirt-format boxes), where the main one has none.
-    let q = |mut v: VagrantBox, qemu: &str| {
-        v.qemu = Some(qemu.into());
-        v
-    };
+    b
+}
+
+/// `b`, with no Hyper-V build known anywhere.
+fn no_hyperv(mut b: VagrantBox) -> VagrantBox {
+    b.hyperv = HyperVBox::Missing;
+    b
+}
+
+/// The built-in Vagrant boxes, by OS name.
+fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
+    if is_windows(os) {
+        return builtin_windows(os);
+    }
+    let (b, h) = (boxed, with_hyperv);
     Some(match os {
-        "debian-11" => b("bento/debian-11", None, Some("generic/debian11")),
-        "debian-12" => q(b("bento/debian-12", None, Some("generic/debian12")), QEMU_DEBIAN_12),
-        "debian-13" => b("bento/debian-13", None, None),
+        "debian-11" => h(b("bento/debian-11", None, Some("generic/debian11")), "generic/debian11", ROBOXES),
+        "debian-12" => h(
+            with_qemu(b("bento/debian-12", None, Some("generic/debian12")), QEMU_DEBIAN_12),
+            HYPERV_DEBIAN_12.0,
+            HYPERV_DEBIAN_12.1,
+        ),
+        "debian-13" => no_hyperv(b("bento/debian-13", None, None)),
         // End of life: for labs about older systems (Metasploitable 3 runs on 14.04). No cloud
         // or Proxmox image is mapped for these, so those targets decline them.
-        "ubuntu-14.04" => b("ubuntu/trusty64", None, None),
-        "ubuntu-16.04" => b("bento/ubuntu-16.04", None, Some("generic/ubuntu1604")),
-        "ubuntu-18.04" => b("bento/ubuntu-18.04", None, Some("generic/ubuntu1804")),
-        "ubuntu-20.04" => b("bento/ubuntu-20.04", None, Some("generic/ubuntu2004")),
-        "ubuntu-22.04" => b("bento/ubuntu-22.04", None, Some("generic/ubuntu2204")),
-        "ubuntu-24.04" => b("bento/ubuntu-24.04", None, None),
-        "rocky-9" => b("bento/rockylinux-9", None, Some("generic/rocky9")),
-        "almalinux-9" => b("bento/almalinux-9", None, Some("generic/alma9")),
+        "ubuntu-14.04" => no_hyperv(b("ubuntu/trusty64", None, None)),
+        "ubuntu-16.04" => h(b("bento/ubuntu-16.04", None, Some("generic/ubuntu1604")), "generic/ubuntu1604", ROBOXES),
+        "ubuntu-18.04" => h(b("bento/ubuntu-18.04", None, Some("generic/ubuntu1804")), "generic/ubuntu1804", ROBOXES),
+        "ubuntu-20.04" => h(b("bento/ubuntu-20.04", None, Some("generic/ubuntu2004")), "generic/ubuntu2004", ROBOXES),
+        "ubuntu-22.04" => h(b("bento/ubuntu-22.04", None, Some("generic/ubuntu2204")), "generic/ubuntu2204", ROBOXES),
+        // No roboxes build of 24.04: gusztavvargadr's, its last version with a Hyper-V build.
+        "ubuntu-24.04" => h(b("bento/ubuntu-24.04", None, None), "gusztavvargadr/ubuntu-server-2404-lts", "2607.0.0"),
+        "rocky-9" => h(b("bento/rockylinux-9", None, Some("generic/rocky9")), "generic/rocky9", ROBOXES),
+        "almalinux-9" => h(b("bento/almalinux-9", None, Some("generic/alma9")), "generic/alma9", ROBOXES),
         // End of life (2024): for labs about older systems.
-        "centos-7" => b("bento/centos-7", None, Some("generic/centos7")),
-        "fedora-42" => b("bento/fedora-42", None, None),
+        "centos-7" => h(b("bento/centos-7", None, Some("generic/centos7")), "generic/centos7", ROBOXES),
+        "fedora-42" => no_hyperv(b("bento/fedora-42", None, None)),
+        // Kali's own box has a Hyper-V build.
         "kali" => b("kalilinux/rolling", None, None),
+        _ => return None,
+    })
+}
+
+/// The built-in Windows boxes: each has a Hyper-V build at its pinned version, but
+/// windows-server-2019's.
+fn builtin_windows(os: &str) -> Option<VagrantBox> {
+    let b = boxed;
+    Some(match os {
         "windows-10" => b("gusztavvargadr/windows-10", Some("2511.0.0"), None),
         // End of life, evaluation boxes (Ansible's own test boxes), pinned: for labs about
         // older Windows. No cloud or Proxmox image is mapped for these.
         "windows-server-2008r2" => b("jborean93/WindowsServer2008R2", Some("0.7.0"), None),
         "windows-server-2012r2" => b("jborean93/WindowsServer2012R2", Some("1.2.0"), None),
         "windows-server-2016" => b("StefanScherer/windows_2016", Some("2019.02.14"), None),
-        // The box GOAD uses (VirtualBox, VMware, Hyper-V), pinned to its known-good version.
-        // On QEMU (an Apple Silicon Mac emulating x86), an evaluation box built for libvirt.
-        "windows-server-2019" => q(
-            b("StefanScherer/windows_2019", Some("2021.05.15"), None),
-            "peru/windows-server-2019-standard-x64-eval",
+        // The box GOAD uses (VirtualBox, VMware), pinned to its known-good version. On QEMU (an
+        // Apple Silicon Mac emulating x86), an evaluation box built for libvirt. On Hyper-V, its
+        // last version with a Hyper-V build.
+        "windows-server-2019" => with_hyperv(
+            with_qemu(
+                b("StefanScherer/windows_2019", Some("2021.05.15"), None),
+                "peru/windows-server-2019-standard-x64-eval",
+            ),
+            "StefanScherer/windows_2019",
+            "2020.02.12",
         ),
         // Pinned so a rebuilt box can't change an environment under it.
         "windows-server-2022" => b("gusztavvargadr/windows-server-2022-standard", Some("2607.0.0"), None),
@@ -164,17 +230,24 @@ pub fn winrm(vm: &VmImpl) -> crate::model::Winrm {
     vm.image.as_ref().and_then(|i| i.winrm).unwrap_or_default()
 }
 
-/// The Vagrant box for a machine: the spec's `vm.image.vagrant` when set, else the built-in one.
+/// The Vagrant box for a machine: the spec's `vm.image.vagrant` when set, else the built-in one;
+/// on Hyper-V, the spec's `vm.image.hyperv` when set (its latest version with a Hyper-V build).
 pub fn vagrant(vm: &VmImpl) -> Option<VagrantBox> {
-    match vm.image.as_ref().and_then(|i| i.vagrant.clone()) {
-        Some(name) => Some(VagrantBox {
+    let image = vm.image.as_ref();
+    let mut b = match image.and_then(|i| i.vagrant.clone()) {
+        Some(name) => VagrantBox {
             name,
-            version: vm.image.as_ref().and_then(|i| i.vagrant_version.clone()),
+            version: image.and_then(|i| i.vagrant_version.clone()),
             libvirt: None,
-            qemu: vm.image.as_ref().and_then(|i| i.qemu.clone()),
-        }),
-        None => builtin_vagrant(&vm.os),
+            qemu: image.and_then(|i| i.qemu.clone()),
+            hyperv: HyperVBox::Main,
+        },
+        None => builtin_vagrant(&vm.os)?,
+    };
+    if let Some(name) = image.and_then(|i| i.hyperv.clone()) {
+        b.hyperv = HyperVBox::Other { name, version: None };
     }
+    Some(b)
 }
 
 #[cfg(test)]
@@ -187,5 +260,35 @@ mod tests {
         for os in KNOWN_OS {
             assert!(builtin_vagrant(os).is_some(), "no built-in Vagrant box for `{os}`");
         }
+    }
+
+    #[test]
+    fn hyperv_boxes_where_the_main_one_has_no_build() {
+        let other = |os: &str| match builtin_vagrant(os).map(|b| b.hyperv) {
+            Some(HyperVBox::Other { name, version }) => Some((name, version)),
+            _ => None,
+        };
+        let pinned = |n: &str, v: &str| Some((n.to_string(), Some(v.to_string())));
+        assert_eq!(other("debian-12"), pinned("generic/debian12", "4.3.12"));
+        assert_eq!(other("ubuntu-24.04"), pinned("gusztavvargadr/ubuntu-server-2404-lts", "2607.0.0"));
+        assert_eq!(other("windows-server-2019"), pinned("StefanScherer/windows_2019", "2020.02.12"));
+        for os in ["kali", "windows-11", "windows-server-2022"] {
+            assert_eq!(builtin_vagrant(os).map(|b| b.hyperv), Some(HyperVBox::Main), "{os}");
+        }
+        for os in ["debian-13", "ubuntu-14.04", "fedora-42"] {
+            assert_eq!(builtin_vagrant(os).map(|b| b.hyperv), Some(HyperVBox::Missing), "{os}");
+        }
+    }
+
+    #[test]
+    fn the_specs_hyperv_box_wins() {
+        let vm: VmImpl = serde_yaml_ng::from_str("os: debian-13\nimage: { hyperv: my/debian13 }\n").unwrap();
+        let b = vagrant(&vm).unwrap();
+        assert_eq!(b.name, "bento/debian-13");
+        let mine = HyperVBox::Other {
+            name: "my/debian13".into(),
+            version: None,
+        };
+        assert_eq!(b.hyperv, mine);
     }
 }
