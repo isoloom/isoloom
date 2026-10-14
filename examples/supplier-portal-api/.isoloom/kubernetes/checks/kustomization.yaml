@@ -4,12 +4,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: isoloom-supplier-portal-api
 resources:
-  - job.yaml
+- job.yaml
 generatorOptions:
   disableNameSuffixHash: true
 configMapGenerator:
-  - name: isoloom-check-runners
-    files:
-      - networks.sh
-      - database.sh
-      - web.sh
+- name: isoloom-check-runners
+  files:
+  - networks.sh
+  - database.sh
+  - web.sh

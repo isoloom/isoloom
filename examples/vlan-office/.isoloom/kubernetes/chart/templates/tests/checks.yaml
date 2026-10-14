@@ -6,11 +6,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-check-runners
-data:
-  staff.sh: {{ .Files.Get "files/checks/staff.sh" | quote }}
-  intranet.sh: {{ .Files.Get "files/checks/intranet.sh" | quote }}
-  guest.sh: {{ .Files.Get "files/checks/guest.sh" | quote }}
-  admin.sh: {{ .Files.Get "files/checks/admin.sh" | quote }}
+binaryData:
+  staff.sh: '{{ .Files.Get "files/checks/staff.sh" | b64enc }}'
+  intranet.sh: '{{ .Files.Get "files/checks/intranet.sh" | b64enc }}'
+  guest.sh: '{{ .Files.Get "files/checks/guest.sh" | b64enc }}'
+  admin.sh: '{{ .Files.Get "files/checks/admin.sh" | b64enc }}'
 ---
 apiVersion: v1
 kind: Pod

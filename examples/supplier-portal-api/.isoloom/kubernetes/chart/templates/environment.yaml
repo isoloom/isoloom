@@ -30,7 +30,7 @@ spec:
           mountPath: /probe
       containers:
       - name: database
-        image: {{ index .Values.images "database" | quote }}
+        image: '{{ index .Values.images "database" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3207
@@ -65,7 +65,7 @@ spec:
           mountPath: /.isoloom-probe
           readOnly: true
       - name: init
-        image: {{ index .Values.images "database" | quote }}
+        image: '{{ index .Values.images "database" }}'
         imagePullPolicy: IfNotPresent
         command:
         - sh
@@ -148,7 +148,7 @@ spec:
         - until nc -z database 3207; do sleep 2; done
       containers:
       - name: web
-        image: {{ index .Values.images "web" | quote }}
+        image: '{{ index .Values.images "web" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3206

@@ -29,7 +29,7 @@ spec:
         - name: isoloom-probe
           mountPath: /probe
       - name: seed-shared
-        image: {{ index .Values.images "writer" | quote }}
+        image: '{{ index .Values.images "writer" }}'
         imagePullPolicy: IfNotPresent
         command:
         - /.isoloom-probe/busybox
@@ -47,7 +47,7 @@ spec:
           readOnly: true
       containers:
       - name: writer
-        image: {{ index .Values.images "writer" | quote }}
+        image: '{{ index .Values.images "writer" }}'
         imagePullPolicy: IfNotPresent
         command:
         - sleep
@@ -56,7 +56,7 @@ spec:
         - name: vol-shared
           mountPath: /srv/shared
       - name: init
-        image: {{ index .Values.images "writer" | quote }}
+        image: '{{ index .Values.images "writer" }}'
         imagePullPolicy: IfNotPresent
         command:
         - sh
@@ -128,7 +128,7 @@ spec:
           mountPath: /probe
       containers:
       - name: reader
-        image: {{ index .Values.images "reader" | quote }}
+        image: '{{ index .Values.images "reader" }}'
         imagePullPolicy: IfNotPresent
         command:
         - sleep
