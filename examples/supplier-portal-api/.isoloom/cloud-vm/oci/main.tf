@@ -10,10 +10,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    oci = {
-      source  = "oracle/oci"
-      version = "~> 6.0"
-    }
+    oci = { source = "oracle/oci", version = "~> 6.0" }
   }
 }
 
@@ -21,22 +18,27 @@ variable "compartment_id" {
   type        = string
   description = "The compartment the environment goes in"
 }
+
 variable "region" {
   type        = string
   default     = "eu-paris-1"
   description = "The OCI region to launch in"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -48,6 +50,7 @@ variable "expires_at" {
   default     = ""
   description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
+
 variable "inputs" {
   type        = map(string)
   default     = {}
@@ -189,9 +192,6 @@ resource "terraform_data" "database" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown ubuntu /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-database.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -200,17 +200,20 @@ resource "terraform_data" "database" {
     destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "file" {
-    content     = join("\n", ["API_URL=${jsonencode(lookup(var.inputs, "API_URL", ""))}", "LAUNCH_TOKEN=${jsonencode(lookup(var.inputs, "LAUNCH_TOKEN", ""))}"])
+    content = join("\n", [
+      "API_URL='${replace(lookup(var.inputs, "API_URL", ""), "'", "'\\''")}'",
+      "LAUNCH_TOKEN='${replace(lookup(var.inputs, "LAUNCH_TOKEN", ""), "'", "'\\''")}'"
+    ])
     destination = "/tmp/isoloom-inputs.env"
   }
   provisioner "remote-exec" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.20.0.31 web' | sudo tee -a /etc/hosts >/dev/null",
-      "cd /opt/isoloom && sudo -E sh -c 'set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' >> /etc/hosts'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -251,9 +254,6 @@ resource "terraform_data" "web" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown ubuntu /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -265,28 +265,22 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.20.0.32 database' | sudo tee -a /etc/hosts >/dev/null",
-      "sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.32 database'\\'' >> /etc/hosts'",
+      "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [terraform_data.database]
 }
 
 output "machines" {
-  value = {
-    database = oci_core_instance.database.public_ip
-    web      = oci_core_instance.web.public_ip
-  }
+  value = { database = oci_core_instance.database.public_ip, web = oci_core_instance.web.public_ip }
 }
 
 output "ssh_users" {
-  value = {
-    database = "ubuntu"
-    web      = "ubuntu"
-  }
+  value = { database = "ubuntu", web = "ubuntu" }
 }
 
 output "ip" {
@@ -300,15 +294,25 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "database", machine = "database", host = oci_core_instance.database.public_ip, user = "ubuntu", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/database.sh" },
-    { position = "web", machine = "web", host = oci_core_instance.web.public_ip, user = "ubuntu", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" }
+    {
+      position = "database"
+      machine  = "database"
+      host     = oci_core_instance.database.public_ip
+      user     = "ubuntu"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/database.sh"
+    },
+    {
+      position = "web"
+      machine  = "web"
+      host     = oci_core_instance.web.public_ip
+      user     = "ubuntu"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh"
+    }
   ]
 }
 
 output "published" {
-  value = {
-    "web/portal" = "${oci_core_instance.web.public_ip}:3206"
-  }
+  value = { "web/portal" = "${oci_core_instance.web.public_ip}:3206" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what
