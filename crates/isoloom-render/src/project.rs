@@ -54,8 +54,15 @@ pub fn terraform(tf: &mut String) {
     if !archive && !tf.contains("local.project_paths") {
         return;
     }
-    tf.push_str(&LISTS.replace("SKIP", SKIP));
+    tf.push_str(&lists(archive));
+}
+
+/// The lists as a fixed HCL fragment, for a module that copies the project: with `archive`,
+/// also `tar`'s exclusion file (the cloud modules), else the lists only (Proxmox).
+pub fn lists(archive: bool) -> String {
+    let mut out = LISTS.replace("SKIP", SKIP);
     if archive {
-        tf.push_str(EXCLUSIONS);
+        out.push_str(EXCLUSIONS);
     }
+    out
 }

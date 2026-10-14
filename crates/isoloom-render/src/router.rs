@@ -27,6 +27,12 @@ pub fn route_commands(spec: &Spec, name: &str, m: &Machine, with_default: bool) 
 /// The nftables ruleset: forwarding between networks is dropped, except what `reach` allows
 /// (and replies to it).
 pub fn nftables(spec: &Spec) -> String {
+    let body = forward_rules(spec).iter().map(|r| format!("    {r}")).collect::<Vec<_>>().join("\n");
+    format!("table inet isoloom {{\n  chain forward {{\n    type filter hook forward priority 0; policy drop;\n{body}\n  }}\n}}\n")
+}
+
+/// The rules of the router's forward chain: replies, then what each `reach` rule opens.
+pub fn forward_rules(spec: &Spec) -> Vec<String> {
     let mut rules = vec!["ct state established,related accept".to_string()];
     for r in spec.reach.iter().filter(|r| plain(spec, &r.from) && plain(spec, &r.to)) {
         let from = &spec.networks[&r.from].cidr;
@@ -41,8 +47,7 @@ pub fn nftables(spec: &Spec) -> String {
             rules.push(format!("ip saddr {from} ip daddr {to} icmp type echo-request accept"));
         }
     }
-    let body = rules.iter().map(|r| format!("    {r}")).collect::<Vec<_>>().join("\n");
-    format!("table inet isoloom {{\n  chain forward {{\n    type filter hook forward priority 0; policy drop;\n{body}\n  }}\n}}\n")
+    rules
 }
 
 /// Shell that applies each network's `tc` on the router's interface into it (found by the
