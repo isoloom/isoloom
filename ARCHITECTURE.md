@@ -82,8 +82,10 @@ CLI see everything.
 
 1. **Spec:** add the field to `isoloom-spec/src/model.rs` with a doc comment (it becomes the
    schema description). Default it so existing specs still parse.
-2. **Validate:** reject what can't work in `isoloom-spec/src/validate.rs`, with the field path
-   and a reason that says how to fix it.
+2. **Validate:** reject what can't work in the section's validator under
+   `isoloom-spec/src/validate/` (`networks.rs`, `machines.rs`, `checks.rs`...), with the field
+   path and a reason that says how to fix it. `validate` runs the sections in a fixed order:
+   the order of the problems is part of the output.
 3. **Plan:** when the feature is target-neutral (a check, a lifecycle step), put it in the
    plan, not in a backend.
 4. **Each backend:** produce it, or refuse the spec for that target with a reason (see the
