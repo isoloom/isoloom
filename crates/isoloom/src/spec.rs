@@ -6,7 +6,10 @@ use std::sync::OnceLock;
 
 use isoloom_core as core;
 
+use isoloom_core::events::ErrorCode;
+
 use crate::Res;
+use crate::failure::Failure;
 
 /// The profile asked for (`--profile`, else `ISOLOOM_PROFILE`), set once at start.
 static PROFILE: OnceLock<Option<String>> = OnceLock::new();
@@ -22,28 +25,37 @@ pub fn profile_name() -> Option<String> {
     PROFILE.get().cloned().flatten()
 }
 
-/// The profile asked for, read from `dir`. The first time, its inputs become environment
-/// variables (those not already set), so every target's tool sees them as it sees the user's.
-// The workspace's only `unsafe`: `set_var` before any thread starts (see SAFETY below). Tracked:
-// pass the inputs to each child process with `Command::env` instead (Wave 2, #106).
-#[allow(unsafe_code)]
+/// The profile's inputs every tool started from here gets, recorded when the profile is first
+/// read: those not already set in this process's environment (the user's own value wins).
+static INPUTS: OnceLock<Vec<(String, String)>> = OnceLock::new();
+
+/// The profile asked for, read from `dir`. Its inputs become [`child_env`] the first time.
 pub fn profile_for(dir: &Path) -> Res<Option<core::profile::Profile>> {
-    static INPUTS: std::sync::Once = std::sync::Once::new();
     let Some(name) = PROFILE.get().and_then(Option::as_deref) else {
         return Ok(None);
     };
-    let p = core::profile::load(dir, name)?;
-    INPUTS.call_once(|| {
-        for (k, v) in &p.inputs {
-            if std::env::var_os(k).is_none() {
-                // SAFETY: called while loading the spec, before the command line starts any
-                // thread of its own (the check runners and log readers start later); the main
-                // thread only waits for this one.
-                unsafe { std::env::set_var(k, v) };
-            }
-        }
+    let p = core::profile::load(dir, name).map_err(|e| Failure::new(ErrorCode::Profile, e))?;
+    INPUTS.get_or_init(|| {
+        p.inputs
+            .iter()
+            .filter(|(k, _)| std::env::var_os(k).is_none())
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     });
     Ok(Some(p))
+}
+
+/// The variables added to every tool's environment (`Command::envs`): the profile's inputs, so
+/// each target's tool sees them as it sees the user's own. Empty without a profile.
+pub fn child_env() -> &'static [(String, String)] {
+    INPUTS.get().map_or(&[], Vec::as_slice)
+}
+
+/// An input's value as the tools see it: this process's environment, else the profile's.
+pub fn input(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .or_else(|| child_env().iter().find(|(k, _)| k == name).map(|(_, v)| v.clone()))
 }
 
 /// The spec in `dir`, with the profile asked for.
@@ -88,10 +100,12 @@ pub fn report_invalid(spec: &core::Spec) -> bool {
 pub fn require_valid(spec: &core::Spec) -> Res<()> {
     let problems = core::validate(spec);
     if !problems.is_empty() {
-        for p in &problems {
-            eprintln!("✗ {p}");
+        if !crate::output::json() {
+            for p in &problems {
+                eprintln!("✗ {p}");
+            }
         }
-        return Err("fix the spec first (`isoloom validate`)".into());
+        return Err(Failure::invalid(&problems).into());
     }
     Ok(())
 }
@@ -124,5 +138,5 @@ pub fn snapshot_of(dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<ser
 
 /// A project folder as an absolute path (the registry and the tools' working directories need one).
 pub fn abs(dir: &Path) -> Res<PathBuf> {
-    std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()).into())
+    std::fs::canonicalize(dir).map_err(|e| Failure::new(ErrorCode::Io, format!("{}: {e}", dir.display())).into())
 }

@@ -16,9 +16,11 @@ use isoloom_core as core;
 use isoloom_core::Target;
 use isoloom_core::checks::{self, Position};
 
-use crate::Res;
+use isoloom_core::events::Scope;
+
 use crate::prepare::prepare;
 use crate::tools::vagrant::wake_controller;
+use crate::{Res, output};
 use runner::Runner;
 
 #[derive(clap::Args)]
@@ -36,9 +38,10 @@ pub struct Args {
     /// Only the spec's own checks; skip the derived ones.
     #[arg(long)]
     no_derived: bool,
-    /// Machine-readable results.
+    /// Machine-readable output: JSON events, one per line (a `check` event per result), then
+    /// the outcome or the error (see docs/json.md).
     #[arg(long)]
-    json: bool,
+    pub json: bool,
     /// The SSH private key for the cloud targets (default: your SSH agent and config).
     #[arg(long)]
     ssh_key: Option<PathBuf>,
@@ -91,14 +94,20 @@ impl Ctx<'_> {
 }
 
 pub fn run(a: &Args) -> Res<ExitCode> {
+    let prep = Scope::step(a.target.as_deref(), "prepare");
+    output::begin(&prep, None);
     let p = prepare(&a.dir, a.target.as_deref(), a.images.as_deref(), a.instance, &a.sets)?;
     let t = p.target;
+    output::done(&prep, Some(t.id().to_string()));
     if t == Target::CloudServices {
-        return cloud::test(&p.spec, &p.dir, a.instance, a.json);
+        return cloud::test(&p.spec, &p.dir, a.instance);
     }
-    let plan = checks::plan(&p.spec);
+    // The checks as the plan resolved them for the target.
+    let plan = &p.plan.checks;
     if plan.iter().all(|c| a.no_derived && c.derived) {
-        if !a.json {
+        if output::json() {
+            nothing_to_check(t);
+        } else {
             println!("nothing to check: no `checks:` in the spec, and no derived checks (no services other machines could reach)");
         }
         return Ok(ExitCode::SUCCESS);
@@ -107,7 +116,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         spec: &p.spec,
         dir: &p.dir,
         out: p.dir.join(core::instance::output_dir(a.instance)),
-        positions: checks::by_position(&p.spec, &plan).into_iter().map(|(pos, _)| pos).collect(),
+        positions: checks::by_position(&p.spec, plan).into_iter().map(|(pos, _)| pos).collect(),
         default_pos: checks::default_position(&p.spec),
         cloud: a.cloud.as_deref(),
         ssh_key: a.ssh_key.as_deref(),
@@ -118,14 +127,23 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     let (runners, temp) = runners(&ctx, t)?;
     // A controller halted after provisioning runs checks again: booted for them, halted after.
     let _rehalt = match t {
-        Target::Vagrant | Target::DockerVm | Target::Hybrid => wake_controller(&ctx.out, t, a.json)?,
+        Target::Vagrant | Target::DockerVm | Target::Hybrid => wake_controller(&ctx.out, t, output::json())?,
         _ => None,
     };
-    let tally = execute::run_all(&runners, t, a.json)?;
+    let tally = execute::run_all(&runners, t)?;
     if let Some(d) = temp {
         let _ = std::fs::remove_dir_all(d);
     }
-    execute::summarize(t, &tally, a.json)
+    Ok(execute::summarize(t, &tally))
+}
+
+/// The `result` event of a test with nothing to check: success, no results.
+fn nothing_to_check(t: Target) {
+    output::result(
+        "test",
+        true,
+        serde_json::json!({ "target": t.id(), "passed": 0, "failed": 0, "unfinished": [], "results": [] }),
+    );
 }
 
 /// The check runners of the target, and a folder written for them to remove at the end.

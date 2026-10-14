@@ -16,6 +16,7 @@ mod cli;
 mod cloud_services;
 mod commands;
 mod external;
+mod failure;
 mod generated;
 mod machine;
 mod output;
@@ -24,7 +25,8 @@ mod spec;
 mod target;
 mod tools;
 
-/// What a command returns: its exit code, or the error printed as `error: ...` (exit code 2).
+/// What a command returns: its exit code, or the error printed as `error: ...` (exit code 2;
+/// with `--json`, the error document `failure` describes).
 type Res<T> = Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> ExitCode {
@@ -37,7 +39,10 @@ fn main() -> ExitCode {
         .spawn(|| match run(cli::Cli::parse()) {
             Ok(code) => code,
             Err(e) => {
-                eprintln!("error: {e}");
+                // With `--json`, the error document on stdout; otherwise the message on stderr.
+                if !output::print_error(e.as_ref()) {
+                    eprintln!("error: {e}");
+                }
                 ExitCode::from(2)
             }
         });

@@ -1,12 +1,16 @@
 //! `isoloom provision`: the environment's provisioning again, in place, on local VMs.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, Stdio};
+use std::process::ExitCode;
 
 use isoloom_core as core;
 use isoloom_core::Target;
 
+use isoloom_core::events::{ErrorCode, Scope};
+
+use crate::failure::{Failure, fail};
 use crate::prepare::prepare;
+use crate::tools::process;
 use crate::tools::vagrant::{CONTROLLER, wake_controller};
 use crate::{Res, output};
 
@@ -26,6 +30,10 @@ pub struct Args {
     /// Override a value for this command (as for `run`). Repeatable.
     #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
     sets: Vec<String>,
+    /// Machine-readable output: JSON events, one per line, then the outcome or the error (see
+    /// docs/json.md).
+    #[arg(long)]
+    pub json: bool,
 }
 
 pub fn run(a: &Args) -> Res<ExitCode> {
@@ -34,67 +42,81 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 
 /// `isoloom provision`: the environment's provisioning again, in place (see the command's help).
 fn provision_cmd(dir: &Path, target: Option<&str>, machines: &[String], instance: Option<u8>, sets: &[String]) -> Res<ExitCode> {
+    let prep = Scope::step(target, "prepare");
+    output::begin(&prep, None);
     let p = prepare(dir, target, None, instance, sets)?;
     if let Some(m) = machines.iter().find(|m| !p.spec.machines.contains_key(*m)) {
-        return Err(format!("no machine named `{m}` in the spec").into());
+        return Err(Failure::new(ErrorCode::MachineUnknown, format!("no machine named `{m}` in the spec"))
+            .machine(m)
+            .into());
     }
     let sub = match p.target {
         Target::Vagrant => "vagrant",
         Target::DockerVm => "docker-vm",
         Target::Hybrid => "hybrid",
         other => {
-            return Err(format!(
+            let message = format!(
                 "`isoloom provision` runs on local VMs (vagrant, docker-vm, hybrid) for now, not `{}`",
                 other.id()
-            )
-            .into());
+            );
+            return Err(fail(ErrorCode::Unsupported, message));
         }
     };
     let out = p.dir.join(core::instance::output_dir(instance));
     let wd = out.join(sub);
     if !wd.join(".vagrant").is_dir() {
-        return Err(format!("nothing runs here yet: `isoloom run {}` first", p.target.id()).into());
+        return Err(fail(
+            ErrorCode::NotRunning,
+            format!("nothing runs here yet: `isoloom run {}` first", p.target.id()),
+        ));
     }
-    if p.spec.provision.is_empty() {
+    output::done(&prep, Some(p.target.id().to_string()));
+    let at = Scope::step(Some(p.target.id()), "provision");
+    let ok = if p.spec.provision.is_empty() {
         // No controller steps: each machine's own, again.
         let mut args = vec!["provision"];
         args.extend(machines.iter().map(String::as_str));
-        return Ok(output::exit_code(vagrant(&wd, &args)?));
+        output::begin(&at, None);
+        vagrant(&wd, &args, &at)?
+    } else {
+        let _rehalt = wake_controller(&out, p.target, output::json())?;
+        from_controller(&p.spec, &wd, machines, &at)?
+    };
+    if ok {
+        output::done(&at, None);
+    } else {
+        output::failed(&at, "a provisioning step failed (see the log events)", None);
     }
-    let _rehalt = wake_controller(&out, p.target, false)?;
-    from_controller(&p.spec, &wd, machines)
+    output::result("provision", ok, serde_json::json!({ "target": p.target.id(), "machines": machines }));
+    Ok(output::exit_code(ok))
 }
 
-fn vagrant(wd: &Path, args: &[&str]) -> Res<bool> {
-    Ok(Command::new("vagrant").args(args).current_dir(wd).status()?.success())
+fn vagrant(wd: &Path, args: &[&str], at: &Scope) -> Res<bool> {
+    let mut c = process::command("vagrant");
+    c.args(args).current_dir(wd);
+    Ok(process::run_step(&mut c, at)?.success())
 }
 
 /// The environment's `provision:` steps run again by the controller, limited to `machines`.
-fn from_controller(spec: &core::Spec, wd: &Path, machines: &[String]) -> Res<ExitCode> {
+fn from_controller(spec: &core::Spec, wd: &Path, machines: &[String], at: &Scope) -> Res<bool> {
+    let which = if machines.is_empty() {
+        "every machine".to_string()
+    } else {
+        machines.join(", ")
+    };
+    output::begin(at, Some(format!("{which} from the controller")));
     // The project's current files (playbooks edited since), then the playbooks.
-    if !vagrant(wd, &["provision", CONTROLLER, "--provision-with", "file,project"])? {
-        return Err("couldn't copy the project to the controller".into());
+    if !vagrant(wd, &["provision", CONTROLLER, "--provision-with", "file,project"], at)? {
+        return Err(fail(ErrorCode::ToolFailed, "couldn't copy the project to the controller"));
     }
-    println!(
-        "provisioning {} from the controller",
-        if machines.is_empty() {
-            "every machine".to_string()
-        } else {
-            machines.join(", ")
-        }
-    );
+    if !output::json() {
+        println!("provisioning {which} from the controller");
+    }
     // The script on stdin: no quoting through the host's shell, whatever the host.
-    let mut child = Command::new("vagrant")
-        .args(["ssh", CONTROLLER, "-c", "sudo sh -s"])
-        .current_dir(wd)
-        .stdin(Stdio::piped())
-        .spawn()?;
-    {
-        use std::io::Write;
-        let mut stdin = child.stdin.take().ok_or("vagrant ssh: no stdin")?;
-        stdin.write_all(core::generate::provision_script(spec, machines).as_bytes())?;
-    }
-    Ok(output::exit_code(child.wait()?.success()))
+    let script = core::generate::provision_script(spec, machines);
+    let mut c = process::command("vagrant");
+    c.args(["ssh", CONTROLLER, "-c", "sudo sh -s"]).current_dir(wd);
+    Ok(process::run_step_input(&mut c, Some(script.as_bytes()), at)?.success())
 }
 
 #[cfg(test)]

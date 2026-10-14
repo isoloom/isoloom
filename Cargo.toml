@@ -38,8 +38,8 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 # base doesn't pass yet is listed as "allow" under "Tracked" with the plan to deny it: CI runs
 # clippy with `-D warnings`, so a lint at "warn" would fail it the same as "deny".
 [workspace.lints.rust]
-# The command line has the only exception: one `#[allow]` on its `set_var` (crates/isoloom/src/spec.rs).
-unsafe_code = "deny"
+# No exception: a profile's inputs reach the tools through `Command::envs`, not `set_var`.
+unsafe_code = "forbid"
 # Tracked: denied for library crates once every public item is documented (Wave 2, #106).
 missing_docs = "allow"
 

@@ -8,6 +8,17 @@
 - A machine with `external:` is planned as what it is (a VM, a container) on every target but `external`; it was planned as an existing host everywhere.
 - Breaking (library): `isoloom_external::generate` is replaced by `isoloom_external::render(&Environment)` and `ExternalBackend`. `MachinePlan` gains `os`, `winrm`, `external` and `host_vars`, `Environment` gains `inventory_groups`.
 
+### JSON events on every lifecycle command (#146)
+- `--json` on `run`, `down`, `reset`, `provision`, `test`, `capture`, `status`, `connect`, `exec`, `tc` and `gc`. The long commands print newline-delimited events: `step` (`target`, `machine`, `step`, `state`: running, done or failed, `detail`, `time`), the tools' output as `log` events, `check` results, and a final `result`. The one-shot commands print one document (`connect --json`: the command that opens the shell, not run). A failed command's last line is `{ "error": { "code", "message", "machine", "step", "hint", "problems" } }` with a stable code. Described in docs/json.md; the JSON Schema is docs/events.schema.json and `isoloom schema --events`. Without `--json` every command prints what it printed before.
+- Breaking: `test --json` prints events (a `check` per result, the summary as the `result` event's data) instead of one pretty document.
+- Library: `isoloom_core::events` (the events, `ErrorCode`, `Emitter` with a callback or a channel) and `isoloom_core::tool::run_logged`, for tools embedding Isoloom; `host::check_in` and `host::run_limited_in` take extra environment variables.
+
+### No `unsafe`
+- A profile's inputs reach every tool through `Command::envs` (and the readiness checks see them) instead of the command line setting its own environment. `unsafe_code` is `forbid` workspace-wide.
+
+### Validation in sections
+- The spec's validation is one validator per section (`isoloom-spec/src/validate/`), each function at most 60 lines, with the same problems in the same order. `Problem::new` and `Problem::section`.
+
 ### Quality gates
 - Workspace lints (clippy pedantic with a short allow-list, no `unsafe`, no `unwrap`, `panic`, `dbg!` or `todo!`, at most 5 parameters), `clippy.toml` shape limits, and new CI jobs: per-crate line coverage floors (cargo-llvm-cov), API docs without warnings, unused dependencies (cargo-machete), `cargo deny check` (advisories, licenses, bans, sources), spelling (typos) and determinism (every example rendered twice). Lints not passing yet are listed in ARCHITECTURE.md, to deny by the end of Wave 2.
 - Property tests for IPv4 blocks and the shell, HCL, Ruby and PowerShell quoting; snapshot tests of every example's normalized spec. Ruby strings now escape `#$` and `#@` (interpolations) as well as `#{`; PowerShell strings double the typographic single quotes, which PowerShell also reads as quotes. One `rb` helper in isoloom-render replaces the Vagrant crate's three copies.

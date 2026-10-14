@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::Res;
-use crate::commands::run::{Ask, up_or_down};
+use crate::commands::run::{Ask, finish, up_or_down};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -21,6 +21,10 @@ pub struct Args {
     /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
     #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
     sets: Vec<String>,
+    /// Machine-readable output: JSON events, one per line, then the outcome or the error (see
+    /// docs/json.md).
+    #[arg(long)]
+    pub json: bool,
 }
 
 pub fn run(a: &Args) -> Res<ExitCode> {
@@ -32,5 +36,6 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         instance: a.instance,
         sets: &a.sets,
     };
-    up_or_down(&ask, true)
+    let down = up_or_down(&ask, true)?;
+    Ok(finish("down", &ask, &down))
 }

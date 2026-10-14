@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Isoloom JSON events and errors",
+  "description": "One line of an Isoloom lifecycle command's --json output (newline-delimited JSON): an event, or the error document that ends a failed command.",
+  "anyOf": [
+    {
+      "description": "Something the command did.",
+      "$ref": "#/$defs/Event"
+    },
+    {
+      "description": "Why it failed.",
+      "$ref": "#/$defs/ErrorDocument"
+    }
+  ],
+  "$defs": {
+    "Event": {
+      "description": "One thing a lifecycle command reports while it runs. Every event carries the time it was\nemitted (`YYYY-MM-DDTHH:MM:SSZ`, UTC).",
+      "oneOf": [
+        {
+          "description": "A step of the command started (`running`), finished (`done`) or failed (`failed`).",
+          "type": "object",
+          "properties": {
+            "target": {
+              "description": "The target the environment runs on (`docker`, `vagrant`...), when known.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "machine": {
+              "description": "The machine the step is about; null for the whole environment.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "step": {
+              "description": "The step: see the list in `docs/json.md` (`prepare`, `up`, `checks`...).",
+              "type": "string"
+            },
+            "state": {
+              "description": "Where it stands.",
+              "$ref": "#/$defs/State"
+            },
+            "detail": {
+              "description": "A short human-readable detail (a folder, a count, a reason).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "time": {
+              "description": "When.",
+              "type": "string"
+            },
+            "event": {
+              "type": "string",
+              "const": "step"
+            }
+          },
+          "required": [
+            "event",
+            "step",
+            "state",
+            "time"
+          ]
+        },
+        {
+          "description": "A line the underlying tool (docker compose, vagrant, terraform, kubectl, ssh) printed\nduring a step.",
+          "type": "object",
+          "properties": {
+            "target": {
+              "description": "The target, when known.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "machine": {
+              "description": "The machine the tool works on, when it is one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "step": {
+              "description": "The step the tool runs for.",
+              "type": "string"
+            },
+            "stream": {
+              "description": "Which of the tool's outputs.",
+              "$ref": "#/$defs/Stream"
+            },
+            "line": {
+              "description": "The line, without its newline.",
+              "type": "string"
+            },
+            "time": {
+              "description": "When.",
+              "type": "string"
+            },
+            "event": {
+              "type": "string",
+              "const": "log"
+            }
+          },
+          "required": [
+            "event",
+            "step",
+            "stream",
+            "line",
+            "time"
+          ]
+        },
+        {
+          "description": "One check's result (`isoloom test`).",
+          "type": "object",
+          "properties": {
+            "target": {
+              "description": "The target.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "position": {
+              "description": "Where the check ran from: a machine, or the environment's networks.",
+              "type": "string"
+            },
+            "name": {
+              "description": "The check's name.",
+              "type": "string"
+            },
+            "ok": {
+              "description": "Whether it passed.",
+              "type": "boolean"
+            },
+            "detail": {
+              "description": "Why it failed (empty when it passed).",
+              "type": "string"
+            },
+            "time": {
+              "description": "When.",
+              "type": "string"
+            },
+            "event": {
+              "type": "string",
+              "const": "check"
+            }
+          },
+          "required": [
+            "event",
+            "position",
+            "name",
+            "ok",
+            "detail",
+            "time"
+          ]
+        },
+        {
+          "description": "The command's outcome: the last event of a command that succeeded.",
+          "type": "object",
+          "properties": {
+            "command": {
+              "description": "The subcommand (`run`, `test`...).",
+              "type": "string"
+            },
+            "ok": {
+              "description": "Whether it reached its goal (false: checks failed, a machine's command failed).",
+              "type": "boolean"
+            },
+            "data": {
+              "description": "What the command found or produced: see `docs/json.md` for each command."
+            },
+            "time": {
+              "description": "When.",
+              "type": "string"
+            },
+            "event": {
+              "type": "string",
+              "const": "result"
+            }
+          },
+          "required": [
+            "event",
+            "command",
+            "ok",
+            "data",
+            "time"
+          ]
+        }
+      ]
+    },
+    "State": {
+      "description": "Where a step stands.",
+      "oneOf": [
+        {
+          "description": "Started, not finished yet.",
+          "type": "string",
+          "const": "running"
+        },
+        {
+          "description": "Finished and succeeded.",
+          "type": "string",
+          "const": "done"
+        },
+        {
+          "description": "Finished and failed; an error document usually follows.",
+          "type": "string",
+          "const": "failed"
+        }
+      ]
+    },
+    "Stream": {
+      "description": "Which output of the underlying tool a log line came from.",
+      "oneOf": [
+        {
+          "description": "Its standard output.",
+          "type": "string",
+          "const": "stdout"
+        },
+        {
+          "description": "Its standard error (where most tools print their progress).",
+          "type": "string",
+          "const": "stderr"
+        }
+      ]
+    },
+    "ErrorDocument": {
+      "description": "The last line a failed command prints with `--json`: `{ \"error\": { ... } }`.",
+      "type": "object",
+      "properties": {
+        "error": {
+          "description": "Why the command failed.",
+          "$ref": "#/$defs/ErrorBody"
+        }
+      },
+      "required": [
+        "error"
+      ]
+    },
+    "ErrorBody": {
+      "description": "Why a command failed.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "What kind of failure: stable, see [`ErrorCode`].",
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "message": {
+          "description": "The message the command line prints after `error:`.",
+          "type": "string"
+        },
+        "machine": {
+          "description": "The machine it is about, when it is one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "step": {
+          "description": "The step that failed, when one was running (see the `step` events).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hint": {
+          "description": "What to do about it, when there is something to say beyond the message.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "problems": {
+          "description": "The spec's problems, for `spec_invalid` (empty otherwise).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FieldProblem"
+          }
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "problems"
+      ]
+    },
+    "ErrorCode": {
+      "description": "The stable codes of errors: what kind of failure, for a program to react to without reading\nthe message.",
+      "oneOf": [
+        {
+          "description": "The command line's arguments don't make sense together (an unknown action, a missing\ncommand after `--`).",
+          "type": "string",
+          "const": "usage"
+        },
+        {
+          "description": "No spec in the folder, or it can't be read or parsed.",
+          "type": "string",
+          "const": "spec_load"
+        },
+        {
+          "description": "The spec parses but has problems (listed in `problems`).",
+          "type": "string",
+          "const": "spec_invalid"
+        },
+        {
+          "description": "The profile asked for can't be read or doesn't fit the spec.",
+          "type": "string",
+          "const": "profile"
+        },
+        {
+          "description": "A launch-time input the environment needs isn't set (in the shell or the profile's\n`inputs`).",
+          "type": "string",
+          "const": "input_missing"
+        },
+        {
+          "description": "No target by that name.",
+          "type": "string",
+          "const": "target_unknown"
+        },
+        {
+          "description": "The spec can't run on the target, or several targets are possible and none was named.",
+          "type": "string",
+          "const": "target_unavailable"
+        },
+        {
+          "description": "The target's files couldn't be generated.",
+          "type": "string",
+          "const": "generate_failed"
+        },
+        {
+          "description": "This host lacks what the target needs (a tool, a credential): see `isoloom doctor`.",
+          "type": "string",
+          "const": "host_not_ready"
+        },
+        {
+          "description": "A tool the target runs with isn't installed.",
+          "type": "string",
+          "const": "tool_missing"
+        },
+        {
+          "description": "The tool ran and failed (its output came as `log` events).",
+          "type": "string",
+          "const": "tool_failed"
+        },
+        {
+          "description": "Nothing is running there: run the environment first.",
+          "type": "string",
+          "const": "not_running"
+        },
+        {
+          "description": "No machine (or tool, or group) by that name in the environment.",
+          "type": "string",
+          "const": "machine_unknown"
+        },
+        {
+          "description": "No network by that name, or the machine isn't on it.",
+          "type": "string",
+          "const": "network_unknown"
+        },
+        {
+          "description": "The command doesn't do that on this target yet.",
+          "type": "string",
+          "const": "unsupported"
+        },
+        {
+          "description": "Reading or writing a file failed.",
+          "type": "string",
+          "const": "io"
+        },
+        {
+          "description": "Anything else.",
+          "type": "string",
+          "const": "internal"
+        }
+      ]
+    },
+    "FieldProblem": {
+      "description": "One problem of an invalid spec: the field's path and the reason.",
+      "type": "object",
+      "properties": {
+        "at": {
+          "description": "The field, e.g. `machines.web.depends_on[0]`.",
+          "type": "string"
+        },
+        "message": {
+          "description": "What is wrong, and the fix when there is one.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "message"
+      ]
+    }
+  },
+  "$id": "https://www.isoloom.com/schema/events-v1.json"
+}

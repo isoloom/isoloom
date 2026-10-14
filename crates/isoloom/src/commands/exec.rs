@@ -2,11 +2,13 @@
 //! that can be reached, each line prefixed with the machine's name.
 
 use std::path::PathBuf;
-use std::process::{ExitCode, Stdio};
+use std::process::{Command, ExitCode, Stdio};
 
 use isoloom_core as core;
+use isoloom_core::events::ErrorCode;
 use isoloom_core::shell;
 
+use crate::failure::fail;
 use crate::machine::{Env, Running, on_machine};
 use crate::tools::process;
 use crate::{Res, output, spec};
@@ -27,6 +29,9 @@ pub struct Args {
     /// ports, files under .isoloom-N/. For several copies on one host.
     #[arg(long, value_name = "N")]
     instance: Option<u8>,
+    /// Machine-readable output: one JSON document, or the error as JSON (see docs/json.md).
+    #[arg(long)]
+    pub json: bool,
     /// The command, after `--`.
     #[arg(last = true)]
     command: Vec<String>,
@@ -35,7 +40,7 @@ pub struct Args {
 pub fn run(a: &Args) -> Res<ExitCode> {
     let dir = spec::abs(&a.dir)?;
     if a.command.is_empty() {
-        return Err("give the command after `--`, e.g. `isoloom exec web -- uname -a`".into());
+        return Err(fail(ErrorCode::Usage, "give the command after `--`, e.g. `isoloom exec web -- uname -a`"));
     }
     let running = Running::find(&dir, a.target.as_deref(), a.instance)?;
     let cmd = quoted(&a.command);
@@ -43,6 +48,12 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     let (spec, machine) = (&running.spec, a.machine.as_str());
     if machine != "all" && !spec.groups.contains_key(machine) && !spec.clones.contains_key(machine) {
         let mut c = on_machine(&env, machine, Some(&cmd), false, false)?;
+        if a.json {
+            let result = captured(machine, &mut c)?;
+            let ok = result["ok"] == true;
+            output::print_json(&serde_json::json!({ "target": running.target.id(), "results": [result] }))?;
+            return Ok(output::exit_code(ok));
+        }
         return process::run_attached(&mut c);
     }
     let names: Vec<String> = if machine == "all" {
@@ -52,7 +63,36 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     } else {
         core::groups::members(spec, machine)
     };
+    if a.json {
+        return each_json(&env, &names, &cmd);
+    }
     on_each(&env, &names, &cmd)
+}
+
+/// The command run on one machine, its output captured: `{ machine, ok, exit_code, stdout, stderr }`.
+fn captured(name: &str, c: &mut Command) -> Res<serde_json::Value> {
+    c.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let o = c.output().map_err(|e| process::tool_error(c, &e))?;
+    Ok(serde_json::json!({
+        "machine": name,
+        "ok": o.status.success(),
+        "exit_code": o.status.code(),
+        "stdout": String::from_utf8_lossy(&o.stdout),
+        "stderr": String::from_utf8_lossy(&o.stderr),
+    }))
+}
+
+/// `exec --json` on several machines: one document with each machine's result (or why it was
+/// skipped).
+fn each_json(env: &Env, names: &[String], cmd: &str) -> Res<ExitCode> {
+    let mut results = Vec::new();
+    for name in names {
+        let result = on_machine(env, name, Some(cmd), false, false).and_then(|mut c| captured(name, &mut c));
+        results.push(result.unwrap_or_else(|why| serde_json::json!({ "machine": name, "skipped": why.to_string() })));
+    }
+    let ok = results.iter().all(|r| r["ok"] != false);
+    output::print_json(&serde_json::json!({ "target": env.target.id(), "results": results }))?;
+    Ok(output::exit_code(ok))
 }
 
 /// Each word quoted again for the machine's shell, so `exec web -- sh -c 'a; b'` arrives intact.

@@ -3,11 +3,14 @@
 //! each machine's own interface on it.
 
 use std::path::PathBuf;
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
 use isoloom_core as core;
 use isoloom_core::{Target, shell};
 
+use isoloom_core::events::ErrorCode;
+
+use crate::failure::{Failure, fail};
 use crate::machine::find_interface;
 use crate::tools::compose;
 use crate::tools::process::tool_error;
@@ -39,6 +42,9 @@ pub struct Args {
     /// For `set`: rate cap, e.g. 10mbit.
     #[arg(long)]
     rate: Option<String>,
+    /// Machine-readable output: one JSON document, or the error as JSON (see docs/json.md).
+    #[arg(long)]
+    pub json: bool,
 }
 
 /// Where impairment applies: who it is, the address its interface on the network has, and
@@ -54,17 +60,24 @@ pub fn run(a: Args) -> Res<ExitCode> {
     let spec = spec::load_as(&dir, a.instance)?;
     let (t, _) = target::pick(&dir, a.target.as_deref(), a.instance, &spec)?;
     let network = a.network.as_str();
-    let net = spec.networks.get(network).ok_or_else(|| format!("no network named `{network}`"))?;
+    let net = spec
+        .networks
+        .get(network)
+        .ok_or_else(|| fail(ErrorCode::NetworkUnknown, format!("no network named `{network}`")))?;
     if let Some(gw) = &net.gateway {
-        return Err(format!("`{network}` is routed by its gateway machine `{gw}`, not by Isoloom's router").into());
+        let message = format!("`{network}` is routed by its gateway machine `{gw}`, not by Isoloom's router");
+        return Err(Failure::new(ErrorCode::Unsupported, message).machine(gw).into());
     }
     let docker = matches!(t, Target::Docker | Target::Hosted);
     if !docker && !matches!(t, Target::Vagrant | Target::Hybrid) {
-        return Err(format!("`tc` on {} comes next (Docker and local VMs today)", t.id()).into());
+        return Err(fail(
+            ErrorCode::Unsupported,
+            format!("`tc` on {} comes next (Docker and local VMs today)", t.id()),
+        ));
     }
     let places = places(&spec, a.instance, network, docker);
     if places.is_empty() {
-        return Err(format!("nothing on `{network}` to impair").into());
+        return Err(fail(ErrorCode::NetworkUnknown, format!("nothing on `{network}` to impair")));
     }
     let wanted = core::Tc {
         delay: a.delay,
@@ -73,6 +86,7 @@ pub fn run(a: Args) -> Res<ExitCode> {
         rate: a.rate,
     };
     let mut ok = true;
+    let mut results = Vec::new();
     for p in places {
         let command = tc_command(&a.action, &p, network, &wanted, net.tc.as_ref())?;
         let mut c = if docker {
@@ -80,12 +94,21 @@ pub fn run(a: Args) -> Res<ExitCode> {
             c.args(["exec", "-T", &p.host, "sh", "-c", &command]);
             c
         } else {
-            let mut c = Command::new("vagrant");
+            let mut c = crate::tools::process::command("vagrant");
             c.current_dir(dir.join(core::instance::output_dir(a.instance)).join(target::vm_folder(t)));
             c.args(["ssh", &p.host, "-c", &format!("sudo sh -c {}", shell::quote(&command))]);
             c
         };
-        ok &= c.status().map_err(|e| tool_error(&c, &e))?.success();
+        if a.json {
+            let o = c.output().map_err(|e| tool_error(&c, &e))?;
+            ok &= o.status.success();
+            results.push(serde_json::json!({ "who": p.who, "ok": o.status.success(), "output": String::from_utf8_lossy(&o.stdout).trim_end() }));
+        } else {
+            ok &= c.status().map_err(|e| tool_error(&c, &e))?.success();
+        }
+    }
+    if a.json {
+        output::print_json(&serde_json::json!({ "target": t.id(), "network": network, "action": a.action, "ok": ok, "places": results }))?;
     }
     Ok(output::exit_code(ok))
 }
@@ -135,7 +158,7 @@ fn tc_command(action: &str, p: &Place, network: &str, wanted: &core::Tc, spec_tc
         "set" => {
             let netem = wanted.netem();
             if netem.is_empty() {
-                return Err("`set` takes --delay, --jitter, --loss and/or --rate".into());
+                return Err(fail(ErrorCode::Usage, "`set` takes --delay, --jitter, --loss and/or --rate"));
             }
             format!("{find}; tc qdisc replace dev \"$IF\" root netem {netem} && echo \"{who} on {network}: {netem}\"")
         }
@@ -146,6 +169,6 @@ fn tc_command(action: &str, p: &Place, network: &str, wanted: &core::Tc, spec_tc
             ),
             None => format!("{find}; tc qdisc del dev \"$IF\" root 2>/dev/null; echo \"{who} on {network}: the spec sets no impairment; off\""),
         },
-        other => return Err(format!("unknown action `{other}`: show, set, disable or reset").into()),
+        other => return Err(fail(ErrorCode::Usage, format!("unknown action `{other}`: show, set, disable or reset"))),
     })
 }

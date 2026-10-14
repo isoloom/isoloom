@@ -57,7 +57,7 @@ fn render(format: &str, out: &Path, ext: &str, text: &str) -> Res<ExitCode> {
             vec![format!("-T{ext}"), "-o".into(), out.display().to_string(), src.display().to_string()],
         ),
     };
-    match std::process::Command::new(program).args(&args).status() {
+    match crate::tools::process::command(program).args(&args).status() {
         Ok(st) if st.success() => {
             println!("✓ {} (source: {})", out.display(), src.display());
             Ok(ExitCode::SUCCESS)

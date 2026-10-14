@@ -2,12 +2,16 @@
 //! the provisioning and is halted after it, the baseline snapshot, and libvirt's quirks.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
-use isoloom_core as core;
 use isoloom_core::Target;
+use isoloom_plan::Environment;
 
-use crate::{Res, target};
+use isoloom_core::events::{ErrorCode, Scope};
+
+use crate::failure::fail;
+use crate::tools::process;
+use crate::{Res, output, target};
 
 /// The controller VM, which runs the environment's `provision:` playbooks and the checks.
 pub const CONTROLLER: &str = "isoloom-controller";
@@ -20,7 +24,7 @@ pub struct Rehalt(PathBuf);
 
 impl Drop for Rehalt {
     fn drop(&mut self) {
-        let _ = Command::new("vagrant")
+        let _ = crate::tools::process::command("vagrant")
             .args(["halt", CONTROLLER])
             .current_dir(&self.0)
             .stdout(Stdio::null())
@@ -49,24 +53,26 @@ pub fn wake_controller(out: &Path, t: Target, quiet: bool) -> Res<Option<Rehalt>
             }
         }
     }
+    let at = Scope::step(Some(t.id()), "controller");
     if !quiet {
         println!("booting the controller for the checks (it halts after provisioning)");
     }
-    let ok = Command::new("vagrant")
-        .args(["up", CONTROLLER, "--no-provision"])
-        .current_dir(&wd)
-        .stdout(if quiet { Stdio::null() } else { Stdio::inherit() })
-        .status()?
-        .success();
-    if !ok {
-        return Err("couldn't boot the controller (vagrant up isoloom-controller)".into());
+    output::begin(&at, Some("booting the controller (it halts after provisioning)".into()));
+    let mut c = crate::tools::process::command("vagrant");
+    c.args(["up", CONTROLLER, "--no-provision"]).current_dir(&wd);
+    if quiet && !output::json() {
+        c.stdout(Stdio::null());
     }
+    if !process::run_step(&mut c, &at)?.success() {
+        return Err(fail(ErrorCode::ToolFailed, "couldn't boot the controller (vagrant up isoloom-controller)"));
+    }
+    output::done(&at, None);
     Ok(Some(Rehalt(wd)))
 }
 
 /// Whether Vagrant says the controller of the folder runs.
 fn is_running(wd: &Path) -> Res<bool> {
-    let out = Command::new("vagrant")
+    let out = crate::tools::process::command("vagrant")
         .args(["status", CONTROLLER, "--machine-readable"])
         .current_dir(wd)
         .output()?;
@@ -75,7 +81,7 @@ fn is_running(wd: &Path) -> Res<bool> {
 
 /// Whether the controller is about to halt itself (its provisioning just ended).
 fn is_halting(wd: &Path) -> bool {
-    Command::new("vagrant")
+    crate::tools::process::command("vagrant")
         .args(["ssh", CONTROLLER, "-c", "test -e /run/isoloom-halting"])
         .current_dir(wd)
         .stdout(Stdio::null())
@@ -102,15 +108,15 @@ pub fn vagrant_uses_libvirt(wd: &Path) -> bool {
         .any(|m| m.path().join("libvirt/id").is_file())
 }
 
-/// The spec's published UDP services, as `<machine>:<port>/udp (published as <host>)`.
-pub fn udp_forwards(spec: &core::Spec) -> Vec<String> {
-    spec.machines
+/// The plan's published UDP ports, as `<machine>:<port>/udp (published as <host>)`.
+pub fn udp_forwards(plan: &Environment) -> Vec<String> {
+    plan.machines
         .iter()
         .flat_map(|(name, m)| {
-            m.services
+            m.ports
                 .iter()
-                .filter(|s| !s.protocol.is_tcp())
-                .filter_map(move |s| s.publish.map(|h| format!("{name}:{}/udp (published as {h})", s.port)))
+                .filter(|p| !p.protocol.is_tcp())
+                .map(move |p| format!("{name}:{}/udp (published as {})", p.port, p.publish))
         })
         .collect()
 }
@@ -133,7 +139,8 @@ mod tests {
             "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53, publish: 1053 }], vm: { os: debian-12 } }\n",
         )
         .unwrap();
-        assert_eq!(udp_forwards(&spec), ["dns:53/udp (published as 10053)"]);
+        let plan = isoloom_plan::Environment::build(&spec, isoloom_core::Target::Vagrant, None);
+        assert_eq!(udp_forwards(&plan), ["dns:53/udp (published as 10053)"]);
     }
 
     #[test]

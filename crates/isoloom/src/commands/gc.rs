@@ -1,11 +1,11 @@
 //! `isoloom gc`: Docker leftovers of environments, listed, and removed with `--yes`.
 
 use std::collections::BTreeSet;
-use std::process::{Command, ExitCode, Stdio};
+use std::process::{ExitCode, Stdio};
 
 use isoloom_core as core;
 
-use crate::Res;
+use crate::{Res, output};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -15,6 +15,9 @@ pub struct Args {
     /// Also built images that no container uses (they are rebuilt or pulled on the next run).
     #[arg(long)]
     images: bool,
+    /// Machine-readable output: one JSON document, or the error as JSON (see docs/json.md).
+    #[arg(long)]
+    pub json: bool,
 }
 
 /// What can go: (name or id, what to show) for each kind.
@@ -30,7 +33,6 @@ impl Leftovers {
     }
 }
 
-#[allow(clippy::unnecessary_wraps)] // every command returns `Res`: the dispatch in main treats them alike.
 pub fn run(a: &Args) -> Res<ExitCode> {
     let managed = format!("label={}=true", core::generate::MANAGED_LABEL);
     let alive = live_projects();
@@ -39,6 +41,9 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         volumes: orphans("volume", &managed, &alive),
         images: if a.images { unused_images(&managed) } else { Vec::new() },
     };
+    if a.json {
+        return json(&left, a.yes);
+    }
     if left.count() == 0 {
         println!("nothing to collect");
         return Ok(ExitCode::SUCCESS);
@@ -62,9 +67,26 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     Ok(remove(&left))
 }
 
+/// `gc --json`: what is left over, as one document, and whether removing it (`--yes`) worked.
+fn json(left: &Leftovers, yes: bool) -> Res<ExitCode> {
+    let named = |list: &[(String, String)]| -> Vec<serde_json::Value> {
+        list.iter().map(|(name, env)| serde_json::json!({ "name": name, "environment": env })).collect()
+    };
+    let failed = if yes && left.count() > 0 { removal_failures(left) } else { 0 };
+    let images: Vec<serde_json::Value> = left.images.iter().map(|(id, name)| serde_json::json!({ "id": id, "name": name })).collect();
+    output::print_json(&serde_json::json!({
+        "networks": named(&left.networks),
+        "volumes": named(&left.volumes),
+        "images": images,
+        "removed": yes && failed == 0,
+        "failed": failed,
+    }))?;
+    Ok(output::exit_code(failed == 0))
+}
+
 /// `docker <args>`, its stdout lines (empty when Docker isn't there or fails).
 fn docker_lines(args: &[&str]) -> Vec<String> {
-    Command::new("docker")
+    crate::tools::process::command("docker")
         .args(args)
         .stderr(Stdio::null())
         .output()
@@ -133,9 +155,25 @@ fn unused_images(managed: &str) -> Vec<(String, String)> {
 }
 
 fn remove(left: &Leftovers) -> ExitCode {
+    let failed = removal_failures(left);
+    if failed > 0 {
+        eprintln!("✗ {failed} could not be removed (in use?)");
+        return ExitCode::from(1);
+    }
+    println!("removed");
+    ExitCode::SUCCESS
+}
+
+/// Removes every leftover; how many could not be removed.
+fn removal_failures(left: &Leftovers) -> usize {
     let mut failed = 0;
     let mut rm = |args: &[&str]| {
-        if !Command::new("docker").args(args).stdout(Stdio::null()).status().is_ok_and(|s| s.success()) {
+        if !crate::tools::process::command("docker")
+            .args(args)
+            .stdout(Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+        {
             failed += 1;
         }
     };
@@ -148,10 +186,5 @@ fn remove(left: &Leftovers) -> ExitCode {
     for (id, _) in &left.images {
         rm(&["image", "rm", id]);
     }
-    if failed > 0 {
-        eprintln!("✗ {failed} could not be removed (in use?)");
-        return ExitCode::from(1);
-    }
-    println!("removed");
-    ExitCode::SUCCESS
+    failed
 }

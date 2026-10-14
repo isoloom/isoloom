@@ -48,8 +48,15 @@ pub struct Host<'a> {
 /// Runs a tool and returns its stdout when it succeeds, giving up (and killing it) after
 /// `secs`: a wedged hypervisor service must not hang `status` or `doctor`.
 pub fn run_limited(program: &str, args: &[&str], secs: u64) -> Result<Option<String>, crate::HostError> {
+    run_limited_in(program, args, secs, &[])
+}
+
+/// [`run_limited`] with `env` added to the tool's environment (a profile's inputs, which the
+/// command line passes to every tool it starts).
+pub fn run_limited_in(program: &str, args: &[&str], secs: u64, env: &[(String, String)]) -> Result<Option<String>, crate::HostError> {
     use std::process::Stdio;
     let mut cmd = Command::new(program);
+    cmd.envs(env.iter().map(|(k, v)| (k, v)));
     cmd.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
     // On Windows a console program started by a windowed app (a desktop app, an IDE) opens a
     // console window of its own: every probe would flash one on screen. Output is piped anyway.
@@ -116,12 +123,19 @@ pub fn real_host() -> (
 
 /// Checks a target against the real host.
 pub fn check(target: Target, cloud: Option<&str>) -> Readiness {
-    with_real_host(|host| check_with(target, cloud, host))
+    check_in(target, cloud, &[])
+}
+
+/// Checks a target against the real host, as the tools will see it with `env` added to their
+/// environment where a variable isn't already set (it keeps its value): a profile's inputs
+/// can carry a cloud's credentials.
+pub fn check_in(target: Target, cloud: Option<&str>, env: &[(String, String)]) -> Readiness {
+    with_real_host(env, |host| check_with(target, cloud, host))
 }
 
 /// Every target (each cloud for the cloud targets) against the real host.
 pub fn all() -> Vec<Readiness> {
-    with_real_host(|host| {
+    with_real_host(&[], |host| {
         let mut out = Vec::new();
         for t in Target::ALL {
             match t {
@@ -143,9 +157,12 @@ pub fn all() -> Vec<Readiness> {
     })
 }
 
-/// Runs `f` with the real host.
-fn with_real_host<R>(f: impl FnOnce(&Host) -> R) -> R {
-    let (run, env, exists, opens, home) = real_host();
+/// Runs `f` with the real host, `extra` added to the environment where a variable isn't set.
+fn with_real_host<R>(extra: &[(String, String)], f: impl FnOnce(&Host) -> R) -> R {
+    let (_, real_env, exists, opens, home) = real_host();
+    let extra: Vec<(String, String)> = extra.iter().filter(|(k, _)| std::env::var_os(k).is_none()).cloned().collect();
+    let run = |program: &str, args: &[&str]| -> Option<String> { run_limited_in(program, args, 20, &extra).ok().flatten() };
+    let env = |k: &str| real_env(k).or_else(|| extra.iter().find(|(name, v)| name == k && !v.is_empty()).map(|(_, v)| v.clone()));
     f(&Host {
         run: &run,
         env: &env,

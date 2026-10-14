@@ -5,7 +5,10 @@ use std::path::{Path, PathBuf};
 
 use isoloom_core as core;
 use isoloom_core::Target;
+use isoloom_core::events::ErrorCode;
+use isoloom_plan::Environment;
 
+use crate::failure::{Failure, fail};
 use crate::{Res, generated, spec, target};
 
 /// A project ready to run on a target.
@@ -16,6 +19,9 @@ pub struct Prepared {
     pub dir: PathBuf,
     pub target: Target,
     pub defaults: core::defaults::Defaults,
+    /// What the target runs, planned from the spec: the runtime reads it rather than working
+    /// things out again (the machines' published ports, the checks, the start order).
+    pub plan: Environment,
 }
 
 /// Loads and validates the spec, applies the image table, picks the target (the one named, the
@@ -32,10 +38,12 @@ pub fn prepare(dir: &Path, target: Option<&str>, images: Option<&Path>, instance
         Some(n) => core::generate_instance(&spec, t, n),
         None => core::generate(&spec, t),
     }
-    .map_err(|e| format!("can't generate `{}`: {e}", t.id()))?;
+    .map_err(|e| Failure::new(ErrorCode::GenerateFailed, format!("can't generate `{}`: {e}", t.id())))?;
     generated::write_all(&dir, &generated::finish(files, &settings.defaults, &dir)?)?;
+    let spec = spec::as_instance(spec, instance)?;
     Ok(Prepared {
-        spec: spec::as_instance(spec, instance)?,
+        plan: Environment::build(&spec, t, instance),
+        spec,
         dir,
         target: t,
         defaults: settings.defaults,
@@ -49,15 +57,19 @@ fn choose(asked: Option<&str>, spec: &core::Spec) -> Res<Target> {
         Some(id) => target::by_id(id)?,
         None => match possible.as_slice() {
             [one] => *one,
-            [] => return Err("this spec has no runnable target; see `isoloom targets`".into()),
+            [] => return Err(fail(ErrorCode::TargetUnavailable, "this spec has no runnable target; see `isoloom targets`")),
             many => {
                 let ids: Vec<&str> = many.iter().map(|t| t.id()).collect();
-                return Err(format!("several targets are possible ({}); pass one, e.g. `isoloom run {}`", ids.join(", "), ids[0]).into());
+                let message = format!("several targets are possible ({}); pass one, e.g. `isoloom run {}`", ids.join(", "), ids[0]);
+                return Err(fail(ErrorCode::TargetUnavailable, message));
             }
         },
     };
     if !possible.contains(&t) {
-        return Err(format!("this spec can't run on `{}`; see `isoloom targets`", t.id()).into());
+        return Err(fail(
+            ErrorCode::TargetUnavailable,
+            format!("this spec can't run on `{}`; see `isoloom targets`", t.id()),
+        ));
     }
     Ok(t)
 }
