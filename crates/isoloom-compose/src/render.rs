@@ -2,6 +2,7 @@
 //! `init:` jobs and network sidecar), Isoloom's router, VLAN switches, probes, check runners and
 //! tools, then the networks and volumes; every resource labelled as the environment's.
 
+mod files;
 mod machine;
 mod secrets;
 
@@ -120,6 +121,7 @@ pub fn compose_file(target: Target, env: &Environment) -> Result<Rendered, Rende
         networks: networks(env, &ts),
         volumes: volumes(env, &out.probe_archs),
         secrets: secrets::of_file(env),
+        configs: files::configs(env),
         ..ComposeFile::default()
     };
     probes(env, &out.probe_archs, &mut out.services);

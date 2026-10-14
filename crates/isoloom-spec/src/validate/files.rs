@@ -55,7 +55,7 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     paths.problems
 }
 
-/// The machines' build contexts, Dockerfiles, appliance files and provisioning scripts.
+/// The machines' build contexts, Dockerfiles, appliance files, files and provisioning scripts.
 fn machines(spec: &Spec, paths: &mut Paths) {
     for (name, m) in &spec.machines {
         if let Some(d) = &m.docker {
@@ -72,6 +72,17 @@ fn machines(spec: &Spec, paths: &mut Paths) {
             }
             for (i, s) in d.init.iter().enumerate() {
                 paths.check(format!("machines.{name}.docker.init[{i}]"), s);
+            }
+        }
+        for (i, f) in m.files.iter().enumerate() {
+            if let Some(s) = &f.source {
+                paths.check(format!("machines.{name}.files[{i}].source"), s);
+                if paths.lab_dir.join(s).is_dir() {
+                    paths.problems.push(Problem::new(
+                        format!("machines.{name}.files[{i}].source"),
+                        format!("`{s}` is a folder: name a file"),
+                    ));
+                }
             }
         }
         if let Some(v) = &m.vm {

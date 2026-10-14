@@ -47,6 +47,10 @@ pub enum Feature {
     ExternalNetworks,
     /// Bridging a network to an interface of the host (`bridged`).
     BridgedNetworks,
+    /// A container's file from the project with its own owner or mode (see [`crate::machine_files`]).
+    OwnedProjectFiles,
+    /// Files written on a host that already exists.
+    ExistingHostFiles,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -130,6 +134,18 @@ pub enum Requirement {
         /// The network.
         network: String,
     },
+    /// A container's file comes from the project with a `uid`, `gid` or `mode`.
+    OwnedProjectFile {
+        /// The machine.
+        machine: String,
+        /// Where the file goes in it.
+        path: String,
+    },
+    /// An existing host has `files`.
+    ExistingHostFiles {
+        /// The machine.
+        machine: String,
+    },
 }
 
 impl Requirement {
@@ -153,6 +169,8 @@ impl Requirement {
             Requirement::SecretOwner { .. } => Feature::SecretOwners,
             Requirement::ExternalNetwork { .. } => Feature::ExternalNetworks,
             Requirement::BridgedNetwork { .. } => Feature::BridgedNetworks,
+            Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
+            Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
         }
     }
 }
@@ -211,6 +229,14 @@ impl fmt::Display for Requirement {
             Requirement::BridgedNetwork { network } => write!(
                 f,
                 "network `{network}` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)"
+            ),
+            Requirement::OwnedProjectFile { machine, path } => write!(
+                f,
+                "machine `{machine}`'s file `{path}` comes from the project with a `uid`, `gid` or `mode`: Compose mounts a project file as it is, so write it as `content` instead"
+            ),
+            Requirement::ExistingHostFiles { machine } => write!(
+                f,
+                "machine `{machine}` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook"
             ),
         }
     }

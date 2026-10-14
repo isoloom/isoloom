@@ -16,6 +16,7 @@ mod dns;
 mod files;
 mod groups;
 mod ipv6;
+mod machine_files;
 mod machines;
 mod networks;
 mod outside;
@@ -112,6 +113,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     machines::each(spec, &blocks, &mut p);
     dns::options(spec, &mut p);
     outside::first_networks(spec, &mut p);
+    machine_files::check(spec, &mut p);
     machines::cycle(spec, &mut p);
     provision::controller(spec, &mut p);
     provision::steps(spec, &mut p);

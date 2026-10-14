@@ -53,8 +53,8 @@ fn data(definition: &str, field: &str) -> Option<Support> {
         ("ConfigMap", "binaryData") => Emitted {
             from: "(the project's scripts, read from the chart's files)",
         },
-        ("ConfigMap", "data") => Equivalent {
-            via: "`binaryData`, which keeps a script byte for byte",
+        ("ConfigMap", "data") => Emitted {
+            from: "machines.*.files[].content (the project's scripts are `binaryData`, byte for byte)",
         },
         ("Secret", "data") => Emitted { from: "inputs (in the chart)" },
         ("Secret", "type") => Emitted { from: "(Opaque)" },

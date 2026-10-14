@@ -7,4 +7,10 @@ mod machines;
 use crate::spec::status::Status;
 
 /// The cloud VM output's cells, section by section.
-pub const PARTS: &[&[(&str, Status)]] = &[environment::CELLS, machines::CELLS, super::ipv6::CLOUD_VM, super::outside::CLOUD_VM];
+pub const PARTS: &[&[(&str, Status)]] = &[
+    environment::CELLS,
+    machines::CELLS,
+    super::ipv6::CLOUD_VM,
+    super::outside::CLOUD_VM,
+    super::machine_files::VM,
+];

@@ -63,9 +63,9 @@ pub fn blocks(env: &Environment, name: &str, m: &mut Module) {
     m.block(vm.block(env));
 }
 
-/// Whether the machine gets the project: it has steps, or a check runner runs a script there.
+/// Whether the machine gets the project: its steps read it, or a check runner runs a script there.
 fn needs_project(env: &Environment, name: &str) -> bool {
-    let runs = env.machines[name].lifecycle.iter().any(|s| matches!(s, isoloom_plan::Step::Run { .. }));
+    let runs = isoloom_plan::machine_files::reads_project(&env.machines[name].lifecycle);
     let scripts = by_position(env.spec(), &env.checks)
         .into_iter()
         .any(|(p, g)| p == Position::Machine(name.to_string()) && g.iter().any(|c| matches!(c.probe, Probe::Script { .. })));

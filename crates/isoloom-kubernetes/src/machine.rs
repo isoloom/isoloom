@@ -107,6 +107,7 @@ impl<'a> Machine<'a> {
 pub(crate) fn objects(m: &Machine) -> Vec<Manifest> {
     let mut out = vec![deployment(m)];
     out.extend(claims(m));
+    out.extend(crate::files::config_map(m));
     out.extend(service(m));
     out.extend(published(m));
     if m.plan.offline {

@@ -43,6 +43,7 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
         ports: mp.ports.iter().copied().map(port).collect(),
         volumes: mp.volumes.iter().map(|v| format!("{}:{}", v.key, v.path)).collect(),
         secrets: super::secrets::of_machine(mp),
+        configs: super::files::mounts(name, mp),
         restart: Some("unless-stopped".into()),
         ..Service::default()
     };

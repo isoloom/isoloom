@@ -152,9 +152,24 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
             note: "Compose scopes names to the environment",
         },
     ),
-    ("configs.*.content", FILES),
-    ("configs.*.environment", FILES),
-    ("configs.*.file", FILES),
+    (
+        "configs.*.content",
+        Emitted {
+            from: "machines.*.files[].content",
+        },
+    ),
+    (
+        "configs.*.environment",
+        Equivalent {
+            via: "machines.*.files[].content (the text in the spec; a value given at run time is an input)",
+        },
+    ),
+    (
+        "configs.*.file",
+        Emitted {
+            from: "machines.*.files[].source",
+        },
+    ),
     (
         "configs.*.external",
         Tooling {

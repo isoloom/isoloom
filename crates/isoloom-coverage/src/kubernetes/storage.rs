@@ -1,6 +1,6 @@
 //! Volumes: what a pod mounts, and the claims Isoloom's volumes are.
 
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
 
 const PLUGIN: Support = NotPortable {
     why: "one storage system's plugin: no other target has it",
@@ -89,9 +89,8 @@ fn mount(field: &str) -> Option<Support> {
         "readOnly" => Emitted {
             from: "(Isoloom's probe, mounted read-only)",
         },
-        "subPath" => Partial {
-            from: "machines.*.secrets (each secret's key at its path)",
-            gap: "a machine's `files`, each mounted at its own path",
+        "subPath" => Emitted {
+            from: "machines.*.files and machines.*.secrets (each file mounted at its path)",
         },
         "recursiveReadOnly" => Equivalent { via: "`readOnly`" },
         "subPathExpr" | "mountPropagation" | "bindMountOptions" => MOUNT_DETAIL,

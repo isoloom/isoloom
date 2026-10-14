@@ -1,6 +1,6 @@
 //! Service keys from `annotations` to `cpuset`, `build` included.
 
-use super::{BUILD, CLOUD_SIZES, FILES, NO_CONTAINER_ON_VMS, TOOLING, WINDOWS_CONTAINERS};
+use super::{BUILD, CLOUD_SIZES, FILE_OWNER, FILES, NO_CONTAINER_ON_VMS, TOOLING, WINDOWS_CONTAINERS};
 use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Tooling};
 
 /// Service keys from `annotations` to `cpuset`.
@@ -115,10 +115,15 @@ pub(super) const SERVICES_A_C: &[(&str, Support)] = &[
     ),
     ("services.*.configs", FILES),
     ("services.*.configs[].source", FILES),
-    ("services.*.configs[].target", FILES),
-    ("services.*.configs[].uid", FILES),
-    ("services.*.configs[].gid", FILES),
-    ("services.*.configs[].mode", FILES),
+    (
+        "services.*.configs[].target",
+        Emitted {
+            from: "machines.*.files[].path",
+        },
+    ),
+    ("services.*.configs[].uid", FILE_OWNER),
+    ("services.*.configs[].gid", FILE_OWNER),
+    ("services.*.configs[].mode", FILE_OWNER),
     ("services.*.container_name", Equivalent { via: "the machine's name" }),
     ("services.*.cpu_count", CLOUD_SIZES),
     ("services.*.cpu_percent", CLOUD_SIZES),

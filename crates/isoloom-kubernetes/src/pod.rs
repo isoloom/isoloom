@@ -9,6 +9,7 @@
 use isoloom_render::constraints;
 use isoloom_spec::shell;
 
+use crate::files;
 use crate::kustomize::{SCRIPTS, key};
 use crate::machine::{Machine, udp};
 use crate::network::MACHINE_LABEL;
@@ -159,6 +160,7 @@ fn mounts(m: &Machine) -> Vec<VolumeMount> {
         out.push(VolumeMount::read_only(PROBE_VOLUME, PROBE_DIR));
     }
     out.extend(crate::secrets::mounts(m));
+    out.extend(files::mounts(m));
     out
 }
 
@@ -195,6 +197,7 @@ fn init_containers(m: &Machine) -> Vec<Container> {
         c.volume_mounts = vec![VolumeMount::at(PROBE_VOLUME, "/probe")];
         out.push(c);
     }
+    out.extend(files::init_container(m, "scripts"));
     let held = m.plan.volumes.iter().filter(|v| m.holds(&v.kind));
     out.extend(held.map(|v| seed_container(m, &v.name, &v.path)));
     out.extend(m.plan.depends_on.iter().filter_map(|dep| wait_for(m, dep)));
@@ -278,9 +281,10 @@ fn volumes(m: &Machine) -> Vec<Volume> {
         .iter()
         .map(|v| volume(format!("vol-{}", v.name), VolumeSource::PersistentVolumeClaim { claim_name: v.key.clone() }))
         .collect();
-    if !m.init().is_empty() {
+    if !m.init().is_empty() || files::reads_project(m) {
         out.push(volume("scripts".into(), scripts_volume()));
     }
+    out.extend(files::volumes(m));
     if needs_probe(m) {
         out.push(volume(PROBE_VOLUME.into(), VolumeSource::EmptyDir(EmptyDir::default())));
     }

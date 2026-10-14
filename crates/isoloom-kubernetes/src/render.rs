@@ -84,6 +84,7 @@ fn objects(env: &Environment) -> Rendered {
     let checks = checks::plan(env);
     objects.extend(checks.policies.iter().cloned());
     let mut scripts: Vec<String> = machines.iter().flat_map(|m| m.init().iter().cloned()).collect();
+    scripts.extend(machines.iter().flat_map(crate::files::sources));
     scripts.extend(checks.scripts.iter().cloned());
     scripts.sort();
     scripts.dedup();

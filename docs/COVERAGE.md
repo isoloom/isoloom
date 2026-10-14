@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 78% | 150 | 116 | 3 | 31 |
+| [Docker Compose](#docker-compose) | 84% | 150 | 123 | 6 | 21 |
 | [Vagrant](#vagrant) | 92% | 42 | 39 | 0 | 3 |
 | [Vagrant: networks](#vagrant-networks) | 92% | 38 | 35 | 0 | 3 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
@@ -37,7 +37,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 95% | 31 | 28 | 3 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 91% | 201 | 183 | 3 | 15 |
+| [Kubernetes](#kubernetes) | 92% | 201 | 184 | 2 | 15 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
 | [Helm](#helm) | 100% | 19 | 19 | 0 | 0 |
 
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-78% of 150 portable features (116 done, 3 partly, 31 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+84% of 150 portable features (123 done, 6 partly, 21 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -67,7 +67,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `networks` | Yes | Yes | From `networks` |
 | `volumes` | Yes | Yes | From `machines.*.volumes` |
 | `secrets` | Yes | Yes | From `secrets` |
-| `configs` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `configs` | Yes | Yes | From `machines.*.files` |
 | `jobs` | Yes | Another way | Via docker.init (one-shot jobs) |
 
 ### Services
@@ -131,12 +131,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `cgroup` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `cgroup_parent` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `command` | Yes | Partly | Isoloom's tools: tools.*.command; not yet: a machine's own command |
-| `configs` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
-| `configs[].source` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
-| `configs[].target` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
-| `configs[].uid` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
-| `configs[].gid` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
-| `configs[].mode` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `configs` | Yes | Yes | From `machines.*.files` |
+| `configs[].source` | Yes | Yes | From `machines.*.files` |
+| `configs[].target` | Yes | Yes | From `machines.*.files[].path` |
+| `configs[].uid` | Yes | Partly | From `machines.*.files[].uid, gid and mode` (a file's `content`); not yet: a project file (`source`) is mounted as it is: an owner or mode for it is refused |
+| `configs[].gid` | Yes | Partly | From `machines.*.files[].uid, gid and mode` (a file's `content`); not yet: a project file (`source`) is mounted as it is: an owner or mode for it is refused |
+| `configs[].mode` | Yes | Partly | From `machines.*.files[].uid, gid and mode` (a file's `content`); not yet: a project file (`source`) is mounted as it is: an owner or mode for it is refused |
 | `container_name` | Yes | Another way | Via the machine's name |
 | `cpu_count` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `cpu_percent` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
@@ -403,9 +403,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `name` | n/a | No | Compose scopes names to the environment |
-| `content` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
-| `environment` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
-| `file` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `content` | Yes | Yes | From `machines.*.files[].content` |
+| `environment` | Yes | Another way | Via machines.*.files[].content (the text in the spec; a value given at run time is an input) |
+| `file` | Yes | Yes | From `machines.*.files[].source` |
 | `external` | n/a | No | A config created outside Compose |
 | `external.name` | n/a | No | Legacy spelling of `name` |
 | `labels` | n/a | No | Compose tooling, not the environment's behavior |
@@ -6748,7 +6748,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-91% of 201 portable features (183 done, 3 partly, 15 to do; 369 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+92% of 201 portable features (184 done, 2 partly, 15 to do; 369 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -6988,7 +6988,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `VolumeMount: name` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
 | `VolumeMount: readOnly` | Yes | Yes | Isoloom's probe, mounted read-only |
 | `VolumeMount: recursiveReadOnly` | Yes | Another way | Via `readOnly` |
-| `VolumeMount: subPath` | Yes | Partly | From `machines.*.secrets` (each secret's key at its path); not yet: a machine's `files`, each mounted at its own path |
+| `VolumeMount: subPath` | Yes | Yes | From `machines.*.files and machines.*.secrets` (each file mounted at its path) |
 | `VolumeMount: subPathExpr` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
 | `PersistentVolumeClaimVolumeSource: claimName` | Yes | Yes | From `volumes` |
 | `PersistentVolumeClaimVolumeSource: readOnly` | Yes | Another way | Via the mount's `readOnly` |
@@ -7097,7 +7097,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `JobSpec: ttlSecondsAfterFinished` | n/a | No | How Kubernetes rolls out and retries: a machine is one pod, replaced when it changes |
 | `ConfigMap: apiVersion` | Yes | Yes | Every object Isoloom writes |
 | `ConfigMap: binaryData` | Yes | Yes | The project's scripts, read from the chart's files |
-| `ConfigMap: data` | Yes | Another way | Via `binaryData`, which keeps a script byte for byte |
+| `ConfigMap: data` | Yes | Yes | From `machines.*.files[].content` (the project's scripts are `binaryData`, byte for byte) |
 | `ConfigMap: immutable` | n/a | No | An API safeguard: Isoloom replaces the object when the spec changes |
 | `ConfigMap: kind` | Yes | Yes | Every object Isoloom writes |
 | `ConfigMap: metadata` | Yes | Yes | Every object Isoloom writes |
@@ -7318,6 +7318,12 @@ is marked ✗, with its reason below.
 | `machines.*.depends_on` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
 | `volumes.*.owner` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | planned |
 | `machines.*.volumes` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
+| `machines.*.files[].path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.files[].source` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.files[].content` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.files[].uid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
+| `machines.*.files[].gid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
+| `machines.*.files[].mode` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
 | `machines.*.access` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.docker.image` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.build` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
@@ -7371,24 +7377,24 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 87% of 85 | 74 | 0 | 0 | 11 |
-| hosted | 87% of 85 | 74 | 0 | 0 | 11 |
-| kubernetes | 70% of 77 | 49 | 11 | 1 | 16 |
-| helm | 70% of 77 | 49 | 11 | 1 | 16 |
-| kustomize | 70% of 77 | 49 | 11 | 1 | 16 |
-| vagrant | 90% of 75 | 66 | 3 | 0 | 6 |
-| docker-vm | 83% of 85 | 71 | 0 | 0 | 14 |
-| hybrid | 73% of 94 | 68 | 3 | 7 | 16 |
-| proxmox | 86% of 73 | 63 | 1 | 3 | 6 |
-| aws | 62% of 73 | 40 | 11 | 6 | 16 |
-| azure | 62% of 73 | 40 | 11 | 7 | 15 |
-| gcp | 62% of 73 | 40 | 11 | 6 | 16 |
-| digitalocean | 44% of 73 | 29 | 7 | 6 | 31 |
-| linode | 47% of 73 | 31 | 8 | 6 | 28 |
-| oci | 47% of 73 | 31 | 8 | 6 | 28 |
-| cloud-docker | 82% of 85 | 70 | 0 | 0 | 15 |
+| docker | 86% of 91 | 77 | 3 | 0 | 11 |
+| hosted | 86% of 91 | 77 | 3 | 0 | 11 |
+| kubernetes | 72% of 83 | 55 | 11 | 1 | 16 |
+| helm | 72% of 83 | 55 | 11 | 1 | 16 |
+| kustomize | 72% of 83 | 55 | 11 | 1 | 16 |
+| vagrant | 90% of 81 | 72 | 3 | 0 | 6 |
+| docker-vm | 82% of 91 | 74 | 3 | 0 | 14 |
+| hybrid | 74% of 100 | 71 | 6 | 7 | 16 |
+| proxmox | 87% of 79 | 69 | 1 | 3 | 6 |
+| aws | 65% of 79 | 46 | 11 | 6 | 16 |
+| azure | 65% of 79 | 46 | 11 | 7 | 15 |
+| gcp | 65% of 79 | 46 | 11 | 6 | 16 |
+| digitalocean | 48% of 79 | 35 | 7 | 6 | 31 |
+| linode | 51% of 79 | 37 | 8 | 6 | 28 |
+| oci | 51% of 79 | 37 | 8 | 6 | 28 |
+| cloud-docker | 81% of 91 | 73 | 3 | 0 | 15 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 62% of 58 | 32 | 9 | 14 | 3 |
+| external | 57% of 64 | 32 | 9 | 14 | 9 |
 
 ### Refusals
 
@@ -7428,6 +7434,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **cloud-docker**: Machine `a`: arm64 on a cloud VM comes later (Graviton instances and arm64 images) (`machines.*.arch`)
 - **digitalocean**: DigitalOcean cloud-vm takes single-machine labs so far (it can't pin private addresses) (`machines.*.depends_on`, `volumes.*.owner`, `machines.*.access`)
 - **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`)
+- **external**: Machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook (`machines.*.files[].path`, `machines.*.files[].source`, `machines.*.files[].content`, `machines.*.files[].uid`, `machines.*.files[].gid`, `machines.*.files[].mode`)
 - **hybrid**: Machine `r` is a network appliance (`docker.appliance`), which runs on the Docker targets (`machines.*.docker.appliance`, `machines.*.docker.firmware`, `machines.*.docker.config`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, cloud-docker**: Environment-level provisioning (`provision:`) runs on VM targets for now (`provision[].ansible`, `provision[].inventory`, `provision[].groups`, `provision[].vars`, `provision[].host_vars`, `controller`, `provision[].requirements`)
 - **digitalocean**: DigitalOcean cloud-vm has no Ansible controller yet (`provision[].ansible`, `provision[].inventory`, `provision[].groups`, `provision[].vars`, `provision[].host_vars`, `controller`, `provision[].requirements`)

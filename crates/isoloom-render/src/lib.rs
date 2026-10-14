@@ -9,6 +9,7 @@ pub mod hcl_builder;
 pub mod ignore;
 pub mod inventory;
 pub mod ipv6;
+pub mod machine_files;
 pub mod machine_setup;
 pub mod playbooks;
 pub mod project;

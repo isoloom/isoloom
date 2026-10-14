@@ -9,6 +9,7 @@ pub mod environment;
 pub mod images;
 pub mod ipv6;
 pub mod lifecycle;
+pub mod machine_files;
 pub mod outside;
 pub mod requirements;
 pub mod routing;

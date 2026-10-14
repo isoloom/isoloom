@@ -15,7 +15,7 @@ mod top;
 
 use super::{
     Format, Support,
-    Support::{Equivalent, InImage, NotPortable, Planned, Tooling},
+    Support::{Emitted, Equivalent, InImage, NotPortable, Partial, Planned, Tooling},
 };
 
 /// Keys listed as one row, without the keys below them: a job and a `pre_start` hook are whole
@@ -52,8 +52,11 @@ const SWARM: Support = Tooling {
 const BUILD: Support = Tooling {
     note: "how the image is built, not the machine it produces",
 };
-const FILES: Support = Planned {
-    note: "machine files: content placed at a path on the machine, on every target",
+const FILES: Support = Emitted { from: "machines.*.files" };
+/// A file's owner and mode: given to a text, refused for a project file Compose mounts as it is.
+const FILE_OWNER: Support = Partial {
+    from: "machines.*.files[].uid, gid and mode (a file's `content`)",
+    gap: "a project file (`source`) is mounted as it is: an owner or mode for it is refused",
 };
 const GPUS: Support = Planned {
     note: "GPU passthrough where the target has a GPU, refused where it has none",

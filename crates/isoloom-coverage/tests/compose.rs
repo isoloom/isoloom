@@ -202,6 +202,19 @@ networks: { lan: { cidr: 10.9.0.0/24 }, corp: { cidr: 10.77.0.0/24, external: co
 machines:
   web: { networks: { lan: 10, corp: 10 }, docker: { image: nginx:alpine } }
 ",
+    // A machine's files: `configs`, as text with an owner and mode, and as a project file.
+    r#"
+version: 1
+name: machine-files
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    docker: { image: nginx:alpine }
+    files:
+      - { path: /etc/app/app.ini, content: "mode=lab\n", uid: 101, gid: 101, mode: "0640" }
+      - { path: /etc/nginx/conf.d/site.conf, source: conf/site.conf }
+"#,
 ];
 
 /// Every Compose file Isoloom writes for `spec`, on every target that writes one.
