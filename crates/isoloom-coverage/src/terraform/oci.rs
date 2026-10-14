@@ -3,9 +3,15 @@
 
 use super::support::{
     ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, DISKS, EGRESS_RULES, ENVIRONMENT, ICMP, IMAGES, LOCATION,
-    MANAGED, NESTED, OCI_IPV6, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, SOURCE_PORTS, TAGS, TPM, VLANS, VM_AGENT,
+    MANAGED, NAT, NESTED, OCI_IPV6, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, PUBLIC_IP, ROUTER, SOURCE_PORTS, TAGS, TPM, VLANS, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
+use crate::Support::{self, Equivalent};
+
+/// A resource that wires up what Isoloom writes inline.
+const WIRED: Support = Equivalent {
+    via: "`route_table_id` of oci_core_subnet",
+};
 
 /// Oracle Cloud: every resource type, and what the generators write.
 pub const TABLE: Table = Table {
@@ -30,11 +36,16 @@ pub const TABLE: Table = Table {
 
 /// Every resource type by family (names without the provider's prefix).
 const TYPES: Rules = &[
-    (
-        ENVIRONMENT,
-        "core_nat_gateway core_route_table_attachment core_network_security_group core_network_security_group_security_rule core_public_ip
-        core_private_ip core_vnic_attachment core_volume core_volume_attachment core_dhcp_options core_ipv6 core_vlan core_boot_volume",
-    ),
+    (ENVIRONMENT, "core_vnic_attachment"),
+    (WIRED, "core_route_table_attachment"),
+    (NAT, "core_nat_gateway"),
+    (PUBLIC_IP, "core_public_ip"),
+    (ADDRESSES, "core_private_ip"),
+    (OCI_IPV6, "core_ipv6"),
+    (VLANS, "core_vlan"),
+    (BACKUP, "core_boot_volume"),
+    (DISKS, "core_volume core_volume_attachment"),
+    (PRIVATE_DNS, "core_dhcp_options"),
     (IMAGES, "core_image core_compute_image_capability_schema core_shape_management"),
     (PRIVATE_DNS, "dns_zone dns_rrset dns_record dns_view dns_resolver dns_resolver_endpoint"),
     (
@@ -86,8 +97,9 @@ const TYPES: Rules = &[
 const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
-        "data.oci_core_images data.oci_identity_availability_domains oci_core_instance oci_core_internet_gateway oci_core_route_table
-        oci_core_security_list oci_core_subnet oci_core_vcn",
+        "data.oci_core_images data.oci_identity_availability_domains oci_core_instance oci_core_internet_gateway
+        oci_core_network_security_group oci_core_network_security_group_security_rule oci_core_route_table oci_core_security_list
+        oci_core_subnet oci_core_vcn",
     ),
     ("provider", "region"),
     (
@@ -98,12 +110,19 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "oci_core_instance",
         "availability_domain compartment_id create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.hostname_label
-        create_vnic_details.private_ip create_vnic_details.subnet_id display_name metadata shape shape_config shape_config.memory_in_gbs
+        create_vnic_details.nsg_ids create_vnic_details.private_ip create_vnic_details.subnet_id display_name metadata shape shape_config shape_config.memory_in_gbs
         platform_config platform_config.is_measured_boot_enabled platform_config.is_secure_boot_enabled
         platform_config.is_trusted_platform_module_enabled platform_config.type shape_config.ocpus source_details
         source_details.boot_volume_size_in_gbs source_details.source_id source_details.source_type",
     ),
     ("oci_core_internet_gateway", "compartment_id display_name vcn_id"),
+    ("oci_core_network_security_group", "compartment_id display_name vcn_id"),
+    (
+        "oci_core_network_security_group_security_rule",
+        "description direction network_security_group_id protocol source source_type tcp_options tcp_options.destination_port_range
+        tcp_options.destination_port_range.max tcp_options.destination_port_range.min udp_options udp_options.destination_port_range
+        udp_options.destination_port_range.max udp_options.destination_port_range.min",
+    ),
     (
         "oci_core_route_table",
         "compartment_id display_name route_rules route_rules.destination route_rules.network_entity_id vcn_id",
@@ -164,8 +183,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (
                 ALIAS,
                 "hostname_label image subnet_id shape_config.vcpus source_details.instance_source_image_filter_details
-                source_details.instance_source_image_filter_details.* create_vnic_details.private_ip_id create_vnic_details.subnet_cidr
-                create_vnic_details.nsg_ids",
+                source_details.instance_source_image_filter_details.* create_vnic_details.private_ip_id create_vnic_details.subnet_cidr",
             ),
             (
                 OCI_IPV6,
@@ -178,6 +196,18 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         ],
     ),
     ("oci_core_internet_gateway", &[(PROTECT, "enabled"), (CLOUD_NETWORK, "route_table_id")]),
+    (
+        "oci_core_network_security_group_security_rule",
+        &[
+            (CLOUD, "stateless"),
+            (EGRESS_RULES, "destination destination_type"),
+            (ICMP, "icmp_options icmp_options.*"),
+            (
+                SOURCE_PORTS,
+                "tcp_options.source_port_range tcp_options.source_port_range.* udp_options.source_port_range udp_options.source_port_range.*",
+            ),
+        ],
+    ),
     (
         "oci_core_route_table",
         &[

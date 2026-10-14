@@ -106,8 +106,8 @@ resource "oci_core_route_table" "env" {
   }
 }
 
-# What may reach the machines: everything inside the VCN, SSH and the published ports from
-# allowed_cidr; egress open.
+# What may reach every machine: everything inside the VCN, and SSH from allowed_cidr; egress
+# open. A machine's published ports are its own security group's.
 resource "oci_core_security_list" "env" {
   compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.env.id
@@ -130,15 +130,6 @@ resource "oci_core_security_list" "env" {
       max = 22
     }
   }
-  ingress_security_rules {
-    description = "published"
-    source      = var.allowed_cidr
-    protocol    = "6"
-    tcp_options {
-      min = 8080
-      max = 8080
-    }
-  }
 }
 
 resource "oci_core_subnet" "env" {
@@ -148,6 +139,28 @@ resource "oci_core_subnet" "env" {
   display_name      = local.name
   route_table_id    = oci_core_route_table.env.id
   security_list_ids = [oci_core_security_list.env.id]
+}
+
+# The ports `web` publishes, from allowed_cidr: on its VNIC only.
+resource "oci_core_network_security_group" "web" {
+  compartment_id = var.compartment_id
+  vcn_id         = oci_core_vcn.env.id
+  display_name   = "${local.name}-web"
+}
+
+resource "oci_core_network_security_group_security_rule" "web_tcp_8080" {
+  network_security_group_id = oci_core_network_security_group.web.id
+  description               = "published"
+  direction                 = "INGRESS"
+  protocol                  = "6"
+  source                    = var.allowed_cidr
+  source_type               = "CIDR_BLOCK"
+  tcp_options {
+    destination_port_range {
+      min = 8080
+      max = 8080
+    }
+  }
 }
 
 # Machine `web`, at its fixed address 10.80.0.10.
@@ -170,6 +183,7 @@ resource "oci_core_instance" "web" {
     private_ip       = "10.80.0.10"
     assign_public_ip = true
     hostname_label   = "web"
+    nsg_ids          = [oci_core_network_security_group.web.id]
   }
   metadata = {
     ssh_authorized_keys = var.ssh_public_key

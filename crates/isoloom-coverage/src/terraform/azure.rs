@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, ENVIRONMENT, IMAGES, MANAGED, OFFLINE, PLACEMENT, PRIVATE_DNS, PROTECT,
-    PUBLIC_DNS, PUBLIC_IPV6, SOURCE_PORTS, TAGS, TPM, VM_AGENT,
+    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DISKS, IMAGES, MANAGED, NAT, OFFLINE, PLACEMENT, PRIVATE_DNS, PROTECT,
+    PUBLIC_DNS, PUBLIC_IPV6, ROUTER, SOURCE_PORTS, TAGS, TPM, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -11,6 +11,11 @@ use crate::Support::{self, Equivalent};
 /// Rule resources whose effect the security groups' inline rules give.
 const INLINE: Support = Equivalent {
     via: "the `security_rule` blocks of azurerm_network_security_group, which carry the reach rules",
+};
+
+/// Resources that wire up what Isoloom writes inline.
+const WIRED: Support = Equivalent {
+    via: "the `admin_ssh_key` block of the virtual machine, and each NIC's azurerm_network_interface_security_group_association, which puts the same rules on every interface of the subnet",
 };
 
 /// Azure: every resource type, and what the generators write.
@@ -36,12 +41,11 @@ pub const TABLE: Table = Table {
 
 /// Every resource type by family (names without the provider's prefix).
 const TYPES: Rules = &[
-    (
-        ENVIRONMENT,
-        "nat_gateway nat_gateway_public_ip_association subnet_nat_gateway_association route_table subnet_route_table_association
-        managed_disk virtual_machine_data_disk_attachment ssh_public_key subnet_network_security_group_association
-        virtual_network_dns_servers route",
-    ),
+    (WIRED, "ssh_public_key subnet_network_security_group_association"),
+    (NAT, "nat_gateway nat_gateway_public_ip_association subnet_nat_gateway_association"),
+    (ROUTER, "route_table route subnet_route_table_association"),
+    (DISKS, "managed_disk virtual_machine_data_disk_attachment"),
+    (PRIVATE_DNS, "virtual_network_dns_servers"),
     (
         INLINE,
         "network_security_rule application_security_group network_interface_application_security_group_association",

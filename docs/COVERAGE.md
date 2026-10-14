@@ -27,12 +27,12 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
 | [Terraform: Proxmox](#terraform-proxmox) | 76% | 119 | 91 | 0 | 28 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
-| [Terraform: AWS](#terraform-aws) | 73% | 132 | 97 | 0 | 35 |
-| [Terraform: Azure](#terraform-azure) | 82% | 135 | 111 | 0 | 24 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 72% | 97 | 69 | 2 | 26 |
-| [Terraform: DigitalOcean](#terraform-digitalocean) | 77% | 36 | 28 | 0 | 8 |
-| [Terraform: Linode](#terraform-linode) | 66% | 59 | 39 | 0 | 20 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 50% | 152 | 77 | 0 | 75 |
+| [Terraform: AWS](#terraform-aws) | 78% | 130 | 102 | 0 | 28 |
+| [Terraform: Azure](#terraform-azure) | 83% | 135 | 113 | 0 | 22 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 73% | 97 | 70 | 2 | 25 |
+| [Terraform: DigitalOcean](#terraform-digitalocean) | 87% | 32 | 28 | 0 | 4 |
+| [Terraform: Linode](#terraform-linode) | 82% | 52 | 43 | 0 | 9 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 56% | 173 | 98 | 0 | 75 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
@@ -1972,7 +1972,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: AWS
 
-73% of 132 portable features (97 done, 0 partly, 35 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
+78% of 130 portable features (102 done, 0 partly, 28 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -2112,7 +2112,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_ebs_snapshot_block_public_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_ebs_snapshot_copy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `aws_ebs_snapshot_import` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
-| `aws_ebs_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_ebs_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `aws_ebs_volume_copy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `aws_ec2_allowed_images_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_ec2_availability_zone_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -2127,9 +2127,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_ec2_serial_console_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_ec2_subnet_cidr_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `aws_ec2_tag` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_egress_only_internet_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `aws_eip` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_eip_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_eip_association` | Yes | Another way | Via the arguments that wire the same things inline: `vpc_id` of aws_internet_gateway, `network_interface` of aws_eip, an aws_route_table_association for every subnet (the main route table serves none), `security_groups` of aws_network_interface and the `route` blocks of aws_route_table |
 | `aws_flow_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_fms_admin_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_fms_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -2183,7 +2182,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_imagebuilder_workflow` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
 | `aws_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_internet_gateway` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_internet_gateway_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_internet_gateway_attachment` | Yes | Another way | Via the arguments that wire the same things inline: `vpc_id` of aws_internet_gateway, `network_interface` of aws_eip, an aws_route_table_association for every subnet (the main route table serves none), `security_groups` of aws_network_interface and the `route` blocks of aws_route_table |
 | `aws_internetmonitor_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_invoicing_invoice_unit` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_key_pair` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
@@ -2193,15 +2192,15 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_licensemanager_grant` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_licensemanager_grant_accepter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_licensemanager_license_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_main_route_table_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `aws_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `aws_nat_gateway_eip_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_main_route_table_association` | Yes | Another way | Via the arguments that wire the same things inline: `vpc_id` of aws_internet_gateway, `network_interface` of aws_eip, an aws_route_table_association for every subnet (the main route table serves none), `security_groups` of aws_network_interface and the `route` blocks of aws_route_table |
+| `aws_nat_gateway` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `aws_nat_gateway_eip_association` | Yes | Not yet | Private networks reaching the internet through NAT |
 | `aws_network_acl` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
 | `aws_network_acl_association` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
 | `aws_network_acl_rule` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
 | `aws_network_interface` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_network_interface_attachment` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_network_interface_sg_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_network_interface_sg_attachment` | Yes | Another way | Via the arguments that wire the same things inline: `vpc_id` of aws_internet_gateway, `network_interface` of aws_eip, an aws_route_table_association for every subnet (the main route table serves none), `security_groups` of aws_network_interface and the `route` blocks of aws_route_table |
 | `aws_networkflowmonitor_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_networkflowmonitor_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_networkmonitor_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -2258,7 +2257,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_resourcegroups_resource` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_rolesanywhere_profile` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_rolesanywhere_trust_anchor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_route` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_route` | Yes | Another way | Via the arguments that wire the same things inline: `vpc_id` of aws_internet_gateway, `network_interface` of aws_eip, an aws_route_table_association for every subnet (the main route table serves none), `security_groups` of aws_network_interface and the `route` blocks of aws_route_table |
 | `aws_route53_query_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_route53_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `aws_route53_records_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -2311,12 +2310,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_ssoadmin_trusted_token_issuer` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_uxc_account_customizations` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_volume_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `aws_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_vpc_block_public_access_exclusion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_block_public_access_options` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_vpc_dhcp_options` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `aws_vpc_dhcp_options_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_vpc_dhcp_options` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `aws_vpc_dhcp_options_association` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `aws_vpc_encryption_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_ipam` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_ipam_organization_admin_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -2328,7 +2327,6 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_vpc_ipam_resource_discovery_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_ipam_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_ipv4_cidr_block_association` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_vpc_ipv6_cidr_block_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `aws_vpc_network_performance_metric_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_security_group_egress_rule` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
 | `aws_vpc_security_group_ingress_rule` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
@@ -3124,11 +3122,11 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
 
-And 1373 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 1375 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Azure
 
-82% of 135 portable features (111 done, 0 partly, 24 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+83% of 135 portable features (113 done, 0 partly, 22 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3208,7 +3206,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `azurerm_maintenance_assignment_virtual_machine` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_maintenance_assignment_virtual_machine_scale_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_maintenance_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_managed_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_managed_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `azurerm_managed_disk_sas_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_management_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_management_group_policy_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3239,8 +3237,8 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `azurerm_monitor_scheduled_query_rules_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_monitor_smart_detector_alert_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_monitor_workspace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `azurerm_nat_gateway_public_ip_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_nat_gateway` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `azurerm_nat_gateway_public_ip_association` | Yes | Not yet | Private networks reaching the internet through NAT |
 | `azurerm_network_connection_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_network_interface` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_network_interface_application_security_group_association` | Yes | Another way | Via the `security_rule` blocks of azurerm_network_security_group, which carry the reach rules |
@@ -3287,8 +3285,8 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `azurerm_role_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_role_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_role_management_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_route` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `azurerm_route_table` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_route` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `azurerm_route_table` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
 | `azurerm_security_center_assessment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_security_center_assessment_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_security_center_automation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3317,11 +3315,11 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `azurerm_site_recovery_vmware_replication_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `azurerm_site_recovery_vmware_replication_policy_association` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `azurerm_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
-| `azurerm_ssh_public_key` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_ssh_public_key` | Yes | Another way | Via the `admin_ssh_key` block of the virtual machine, and each NIC's azurerm_network_interface_security_group_association, which puts the same rules on every interface of the subnet |
 | `azurerm_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_subnet_nat_gateway_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `azurerm_subnet_network_security_group_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `azurerm_subnet_route_table_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_subnet_nat_gateway_association` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `azurerm_subnet_network_security_group_association` | Yes | Another way | Via the `admin_ssh_key` block of the virtual machine, and each NIC's azurerm_network_interface_security_group_association, which puts the same rules on every interface of the subnet |
+| `azurerm_subnet_route_table_association` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
 | `azurerm_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_subscription_cost_management_export` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_subscription_cost_management_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3333,7 +3331,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `azurerm_user_assigned_identity` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_virtual_machine` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_virtual_machine_automanage_configuration_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_virtual_machine_data_disk_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_virtual_machine_data_disk_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `azurerm_virtual_machine_implicit_data_disk_from_source` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `azurerm_virtual_machine_packet_capture` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_virtual_machine_restore_point` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -3343,7 +3341,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `azurerm_virtual_machine_scale_set_packet_capture` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_virtual_machine_scale_set_standby_pool` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_virtual_network` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_virtual_network_dns_servers` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_virtual_network_dns_servers` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `azurerm_windows_virtual_machine` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_windows_virtual_machine_scale_set` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 
@@ -3854,7 +3852,7 @@ And 894 other resource types that only this cloud has: its managed services, net
 
 ## Terraform: Google Cloud
 
-72% of 97 portable features (69 done, 2 partly, 26 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+73% of 97 portable features (70 done, 2 partly, 25 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3904,11 +3902,11 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `google_cloud_security_compliance_framework` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_cloud_security_compliance_framework_deployment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_cloud_support_support_event_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `google_compute_address` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `google_compute_attached_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_address` | Yes | Another way | Via `network_interface.network_ip` of google_compute_instance, which fixes each machine's spec address (its public one is Isoloom's way in, as on every cloud) |
+| `google_compute_attached_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `google_compute_autoscaler` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_bulk_per_instance_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `google_compute_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `google_compute_disk_async_replication` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `google_compute_disk_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_disk_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3990,10 +3988,10 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `google_compute_resource_policy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_resource_policy_attachment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_rollout_plan` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `google_compute_route` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `google_compute_router` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `google_compute_router_nat` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `google_compute_router_nat_address` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_route` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `google_compute_router` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `google_compute_router_nat` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `google_compute_router_nat_address` | Yes | Not yet | Private networks reaching the internet through NAT |
 | `google_compute_shared_vpc_host_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_shared_vpc_service_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -4663,7 +4661,7 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: DigitalOcean
 
-77% of 36 portable features (28 done, 0 partly, 8 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
+87% of 32 portable features (28 done, 0 partly, 4 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4680,19 +4678,15 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 | `digitalocean_nfs_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `digitalocean_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `digitalocean_project_resources` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `digitalocean_reserved_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `digitalocean_reserved_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `digitalocean_reserved_ipv6` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `digitalocean_reserved_ipv6_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `digitalocean_ssh_key` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `digitalocean_tag` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `digitalocean_uptime_alert` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `digitalocean_uptime_check` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `digitalocean_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `digitalocean_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `digitalocean_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `digitalocean_volume_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `digitalocean_volume_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `digitalocean_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `digitalocean_vpc_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `digitalocean_vpc_nat_gateway` | Yes | Not yet | Private networks reaching the internet through NAT |
 
 ### Settings
 
@@ -4790,11 +4784,11 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
 
-And 55 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 59 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Linode
 
-66% of 59 portable features (39 done, 0 partly, 20 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
+82% of 52 portable features (43 done, 0 partly, 9 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4803,33 +4797,26 @@ And 55 other resource types that only this cloud has: its managed services, netw
 | `linode_account_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_consumer_image_share_group_token` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `linode_firewall` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `linode_firewall_device` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_firewall_device` | Yes | Another way | Via what linode_instance and linode_firewall write inline: `linodes` of the firewall, the instance's `interface` blocks (its configuration profile) and the boot disk it makes from `image` |
 | `linode_firewall_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_iam_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `linode_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `linode_instance_config` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `linode_instance_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `linode_instance_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `linode_instance_shared_ips` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `linode_interface` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `linode_ipv6_range` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_instance_config` | Yes | Another way | Via what linode_instance and linode_firewall write inline: `linodes` of the firewall, the instance's `interface` blocks (its configuration profile) and the boot disk it makes from `image` |
+| `linode_instance_disk` | Yes | Another way | Via what linode_instance and linode_firewall write inline: `linodes` of the firewall, the instance's `interface` blocks (its configuration profile) and the boot disk it makes from `image` |
+| `linode_interface` | Yes | Another way | Via what linode_instance and linode_firewall write inline: `linodes` of the firewall, the instance's `interface` blocks (its configuration profile) and the boot disk it makes from `image` |
 | `linode_lock` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_monitor_alert_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_monitor_logs_destination` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_monitor_logs_stream` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `linode_networking_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `linode_networking_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `linode_placement_group_assignment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `linode_producer_image_share_group` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `linode_producer_image_share_group_member` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
-| `linode_reserved_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `linode_reserved_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_sshkey` | Yes | Another way | Via each instance's own `authorized_keys`, which installs the environment's key without storing it in the account |
 | `linode_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `linode_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `linode_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `linode_vpc_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 
@@ -5308,11 +5295,11 @@ And 55 other resource types that only this cloud has: its managed services, netw
 | `label` | Yes | Yes | Written by the generator |
 | `vpc_id` | Yes | Yes | Written by the generator |
 
-And 15 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 22 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Oracle Cloud
 
-50% of 152 portable features (77 done, 0 partly, 75 to do; 1320 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
+56% of 173 portable features (98 done, 0 partly, 75 to do; 1361 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5378,7 +5365,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `oci_compute_cloud_at_customer_ccc_upgrade_schedule` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_app_catalog_listing_resource_version_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `oci_core_app_catalog_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `oci_core_boot_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_boot_volume` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `oci_core_boot_volume_backup` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `oci_core_cluster_network` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_compute_capacity_report` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -5395,7 +5382,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `oci_core_default_drg_route_table` | n/a | No | The account's default network: Isoloom builds its own |
 | `oci_core_default_route_table` | n/a | No | The account's default network: Isoloom builds its own |
 | `oci_core_default_security_list` | n/a | No | The account's default network: Isoloom builds its own |
-| `oci_core_dhcp_options` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_dhcp_options` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `oci_core_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `oci_core_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_instance_configuration` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -5403,23 +5390,22 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `oci_core_instance_pool` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_instance_pool_instance` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_internet_gateway` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_ipv6` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_ipv6` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `oci_core_listing_resource_version_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `oci_core_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `oci_core_network_security_group` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `oci_core_network_security_group_security_rule` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `oci_core_private_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `oci_core_public_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_nat_gateway` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `oci_core_network_security_group` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_core_network_security_group_security_rule` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_core_private_ip` | Yes | Not yet | With several addresses on one network |
 | `oci_core_route_table` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_route_table_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_route_table_attachment` | Yes | Another way | Via `route_table_id` of oci_core_subnet |
 | `oci_core_security_list` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_shape_management` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `oci_core_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_vcn` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_vlan` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_vlan` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
 | `oci_core_vnic_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `oci_core_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `oci_core_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `oci_core_volume_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
 | `oci_core_volume_backup` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `oci_core_volume_backup_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `oci_core_volume_backup_policy_assignment` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -5694,7 +5680,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `create_vnic_details.display_name` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `create_vnic_details.freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `create_vnic_details.hostname_label` | Yes | Yes | Written by the generator |
-| `create_vnic_details.nsg_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.nsg_ids` | Yes | Yes | Written by the generator |
 | `create_vnic_details.private_ip` | Yes | Yes | Written by the generator |
 | `create_vnic_details.private_ip_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `create_vnic_details.security_attributes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -5798,6 +5784,57 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_core_network_security_group
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `display_name` | Yes | Yes | Written by the generator |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `vcn_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_core_network_security_group_security_rule
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `description` | Yes | Yes | Written by the generator |
+| `destination` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `destination_type` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `direction` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `network_security_group_id` | Yes | Yes | Written by the generator |
+| `protocol` | Yes | Yes | Written by the generator |
+| `source` | Yes | Yes | Written by the generator |
+| `source_type` | Yes | Yes | Written by the generator |
+| `stateless` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `icmp_options` | Yes | Not yet | ICMP in reach rules |
+| `icmp_options.code` | Yes | Not yet | ICMP in reach rules |
+| `icmp_options.type` | Yes | Not yet | ICMP in reach rules |
+| `tcp_options` | Yes | Yes | Written by the generator |
+| `tcp_options.destination_port_range` | Yes | Yes | Written by the generator |
+| `tcp_options.destination_port_range.max` | Yes | Yes | Written by the generator |
+| `tcp_options.destination_port_range.min` | Yes | Yes | Written by the generator |
+| `tcp_options.source_port_range` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `tcp_options.source_port_range.max` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `tcp_options.source_port_range.min` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+| `udp_options` | Yes | Yes | Written by the generator |
+| `udp_options.destination_port_range` | Yes | Yes | Written by the generator |
+| `udp_options.destination_port_range.max` | Yes | Yes | Written by the generator |
+| `udp_options.destination_port_range.min` | Yes | Yes | Written by the generator |
+| `udp_options.source_port_range` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `udp_options.source_port_range.max` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `udp_options.source_port_range.min` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
 
 ### oci_core_route_table
 
@@ -5957,7 +5994,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `filter.regex` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 | `filter.values` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 
-And 732 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 733 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: utility providers
 

@@ -106,8 +106,8 @@ resource "oci_core_route_table" "env" {
   }
 }
 
-# What may reach the machines: everything inside the VCN, SSH and the published ports from
-# allowed_cidr; egress open.
+# What may reach every machine: everything inside the VCN, and SSH from allowed_cidr; egress
+# open. A machine's published ports are its own security group's.
 resource "oci_core_security_list" "env" {
   compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.env.id
