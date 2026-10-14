@@ -53,13 +53,13 @@ pub struct Rules {
 
 /// The features every cloud lacks for now, `arm64`, `ipv6` and `gateways` (`None`: it has them)
 /// the cloud's own.
-pub const fn limits(arm64: &'static str, ipv6: &'static str, gateways: Option<&'static str>) -> Limits {
+pub const fn limits(arm64: &'static str, ipv6: Option<&'static str>, gateways: Option<&'static str>) -> Limits {
     Limits {
         arm64: Some(arm64),
         gateways,
         playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
         tc: Some("link impairment (`tc`) needs a router in the path; the cloud's firewalls have none"),
-        ipv6: Some(ipv6),
+        ipv6,
     }
 }
 

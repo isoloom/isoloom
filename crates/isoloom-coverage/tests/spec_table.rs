@@ -66,21 +66,39 @@ fn any_example_shows(path: &str, output: Output) -> bool {
         .any(|name| example_shows(&name, path, output).is_ok())
 }
 
+/// The outputs that can prove a primary output's claim: the output itself, or for the cloud VM
+/// modules any cloud, since one cloud's claim (IPv6 on Azure and Oracle Cloud) may be one the
+/// reference cloud refuses with its own reason.
+fn provers(o: Output) -> Vec<Output> {
+    match o {
+        Output::CloudVm(_) => Output::all().into_iter().filter(|c| matches!(c, Output::CloudVm(_))).collect(),
+        other => vec![other],
+    }
+}
+
+/// Whether `proof` (an example, or the field's probe) generates `path` on `o`.
+fn proven(path: &str, proof: &str, o: Output) -> Result<(), String> {
+    if proof == PROBE {
+        match run::outcome(path, o) {
+            Outcome::Renders => Ok(()),
+            other => Err(format!("its probe: {other:?}")),
+        }
+    } else {
+        example_shows(proof, path, o)
+    }
+}
+
 #[test]
 fn every_claim_rests_on_an_example_or_its_probe() {
     let mut wrong = Vec::new();
     for o in Output::all().into_iter().filter(|o| o.is_primary()) {
         for path in FIELDS {
             let Some(proof) = claim(path, o).and_then(Status::proof) else { continue };
-            let result = if proof == PROBE {
-                match run::outcome(path, o) {
-                    Outcome::Renders => Ok(()),
-                    other => Err(format!("its probe: {other:?}")),
-                }
-            } else {
-                example_shows(proof, path, o)
-            };
-            if let Err(e) = result {
+            let results: Vec<Result<(), String>> = provers(o).into_iter().map(|p| proven(path, proof, p)).collect();
+            if results.iter().any(Result::is_ok) {
+                continue;
+            }
+            if let Some(Err(e)) = results.first() {
                 wrong.push(format!("{path} on {}: {e}", o.label()));
             }
         }

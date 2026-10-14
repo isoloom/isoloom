@@ -364,19 +364,21 @@ When AWS refuses and several clouds accept, the command stops and names them
 module's `checks` output and runs each runner over SSH; `down` runs `terraform destroy`.
 
 **Limits.** Refused by every cloud: `tc`, a machine's own `vm.boot`, `devices`, `bridged` and
-`external` networks, `mtu`, `rate_limit`, arm64, `ipv6.addresses: auto`, `ipv6.only`, and
-`gpus.ids` (give a count). `dns.private` uses the cloud's own private zone (Route 53, Azure
+`external` networks, `mtu`, `rate_limit`, arm64, `ipv6.only`, and `gpus.ids` (give a count). `dns.private` uses the cloud's own private zone (Route 53, Azure
 private DNS, Cloud DNS, an Oracle Cloud private view), or the hosts file where the cloud has
 none. Then each cloud:
 
 - **AWS:** a network with a `gateway` machine routes through it, though the network's
   machines still reach the internet at their own public addresses. AWS assigns a VPC's IPv6
   block itself, so the spec's can't be kept, and keeps a subnet's first addresses (.1 to .3).
-- **Azure:** no networks with a `gateway` machine and no nested virtualization yet.
+- **Azure:** no networks with a `gateway` machine and no nested virtualization yet; IPv6
+  addresses are the derived ones (`ipv6.addresses: auto` is refused).
 - **Google Cloud:** no networks with a `gateway` machine (a route can't go between subnetworks
   of one VPC through a machine), no Windows yet, and the VPC's IPv6 block is Google's.
-- **Oracle Cloud:** several networks with a VNIC on each, `gateway` machines as on AWS; Linux
-  machines only, no Ansible controller, no IPv6 and no GPUs yet.
+- **Oracle Cloud:** several networks with a VNIC on each, `gateway` machines as on AWS;
+  dual-stack networks keep the spec's IPv6 block as a private prefix of the VCN, and with
+  `ipv6.addresses: auto` Oracle Cloud picks each VNIC's address. It keeps a prefix's first four
+  addresses (`::0` to `::3`). Linux machines only, no Ansible controller and no GPUs yet.
 - **Linode:** several networks, but a machine on one of them only (a Linode has one VPC
   interface); Linux machines only, no Ansible controller, no TPM, no nested virtualization.
 - **DigitalOcean:** a single Linux machine on a single network (a droplet's private address is

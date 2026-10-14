@@ -10,9 +10,15 @@
 //!   moves to its own table once the gateway exists: Oracle Cloud's routes name the gateway's
 //!   private IP, which exists only with its VNIC. Every other network's table sends the routed
 //!   network through the gateway too, so traffic crosses it both ways.
+//! - A dual-stack network's IPv6 block is one of the VCN's private prefixes and its subnet's
+//!   prefix, with Oracle's public prefix left out: the spec's block is the network's only one.
+//!   Its security list mirrors the IPv4 rules on the IPv6 blocks (its own, the `reach` rules
+//!   between dual-stack networks, ICMPv6's "packet too big"). The VCN routes between its
+//!   prefixes itself; no IPv6 route leaves it, since Oracle Cloud routes no private prefix to
+//!   the internet (machines go out over IPv4).
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, index, list, number, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, index, list, number, reference, string};
 
 use super::{named, resource};
 use crate::vm::gateways::routed;
@@ -47,7 +53,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     };
     m.commented(
         "The environment's networks: a VCN holding each one's block, routed to the internet.",
-        vcn.build(),
+        ipv6_vcn(env, vcn).build(),
     );
     m.block(in_vcn(resource("oci_core_internet_gateway", "env"), reference("local.name")).build());
     m.block(
@@ -63,6 +69,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         let mut subnet = named(resource("oci_core_subnet", &res(net)))
             .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
             .add_attribute(("cidr_block", string(p.cidr.as_str())))
+            .add_attributes(p.ipv6.as_ref().map(|v| ("ipv6cidr_block", string(v.cidr.as_str()))))
             .add_attribute(("display_name", display(net)))
             .add_attribute(("route_table_id", reference("oci_core_route_table.env.id")))
             .add_attribute(("security_list_ids", list([reference(&format!("oci_core_security_list.{}.id", res(net)))])));
@@ -76,6 +83,18 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         }
         m.block(subnet.build());
     }
+}
+
+/// With dual-stack networks: IPv6 on, their blocks as the VCN's private prefixes, and no
+/// Oracle-allocated public prefix beside them.
+fn ipv6_vcn(env: &Environment, vcn: BlockBuilder) -> BlockBuilder {
+    let blocks: Vec<Expression> = env.networks.values().filter_map(|n| n.ipv6.as_ref()).map(|v| string(v.cidr.as_str())).collect();
+    if blocks.is_empty() {
+        return vcn;
+    }
+    vcn.add_attribute(("is_ipv6enabled", boolean(true)))
+        .add_attribute(("is_oracle_gua_allocation_enabled", boolean(false)))
+        .add_attribute(("ipv6private_cidr_blocks", list(blocks)))
 }
 
 fn internet() -> Block {
@@ -107,17 +126,19 @@ fn rule(kind: &str, description: &str, peer: Expression, protocol: &str, p: Opti
     b.build()
 }
 
-/// ICMP's "fragmentation needed" (type 3, code 4), from or to anywhere.
-fn fragmentation(kind: &str) -> Block {
+/// ICMP's "fragmentation needed" (type 3, code 4), from or to anywhere; with `v6`, ICMPv6's
+/// "packet too big" (protocol 58, type 2, code 0), its IPv6 counterpart.
+fn fragmentation(kind: &str, v6: bool) -> Block {
     let key = if kind.starts_with("ingress") { "source" } else { "destination" };
+    let (anywhere, protocol, icmp, code) = if v6 { ("::/0", "58", 2, 0) } else { ("0.0.0.0/0", "1", 3, 4) };
     Block::builder(kind)
         .add_attribute(("description", string("path MTU discovery")))
-        .add_attribute((key, string("0.0.0.0/0")))
-        .add_attribute(("protocol", string("1")))
+        .add_attribute((key, string(anywhere)))
+        .add_attribute(("protocol", string(protocol)))
         .add_block(
             Block::builder("icmp_options")
-                .add_attribute(("type", number(3)))
-                .add_attribute(("code", number(4)))
+                .add_attribute(("type", number(icmp)))
+                .add_attribute(("code", number(code)))
                 .build(),
         )
         .build()
@@ -140,7 +161,7 @@ fn reach_rules(kind: &str, rules: &[Rule<'_>], what: &str) -> Vec<Block> {
     out
 }
 
-/// A network's security list.
+/// A network's security list: the IPv4 rules, then their IPv6 mirror on a dual-stack network.
 fn security_list(env: &Environment, net: &str, cidr: &str) -> Block {
     let (inbound, outbound) = ("ingress_security_rules", "egress_security_rules");
     let allowed = || reference("var.allowed_cidr");
@@ -148,13 +169,34 @@ fn security_list(env: &Environment, net: &str, cidr: &str) -> Block {
         .add_block(rule(inbound, "its own network", string(cidr), "all", None))
         .add_blocks(reach_rules(inbound, &reach::into(env, net), "from"))
         .add_block(rule(inbound, "SSH from allowed_cidr", allowed(), "6", Some(22)))
-        .add_block(fragmentation(inbound))
+        .add_block(fragmentation(inbound, false))
         .add_block(rule(outbound, "its own network", string(cidr), "all", None))
         .add_blocks(reach_rules(outbound, &reach::out_of(env, net), "to"));
     for block in reach::public_blocks() {
         b = b.add_block(rule(outbound, "the internet", string(block), "all", None));
     }
-    b.add_block(fragmentation(outbound)).build()
+    b = b.add_block(fragmentation(outbound, false));
+    if let Some(v6) = env.networks[net].ipv6.as_ref().map(|v| v.cidr.as_str()) {
+        b = b
+            .add_block(rule(inbound, "its own network (IPv6)", string(v6), "all", None))
+            .add_blocks(reach_rules(inbound, &ipv6(env, reach::into(env, net)), "from"))
+            .add_block(fragmentation(inbound, true))
+            .add_block(rule(outbound, "its own network (IPv6)", string(v6), "all", None))
+            .add_blocks(reach_rules(outbound, &ipv6(env, reach::out_of(env, net)), "to"))
+            .add_block(fragmentation(outbound, true));
+    }
+    b.build()
+}
+
+/// The `reach` rules whose other network is dual-stack too, on its IPv6 block.
+fn ipv6<'a>(env: &'a Environment, rules: Vec<Rule<'a>>) -> Vec<Rule<'a>> {
+    rules
+        .into_iter()
+        .filter_map(|r| {
+            let v6 = env.networks[r.network].ipv6.as_ref()?;
+            Some(Rule { cidr: &v6.cidr, ..r })
+        })
+        .collect()
 }
 
 /// The private IP of machine `gateway`'s VNIC toward `net` (on it, else its first), looked up

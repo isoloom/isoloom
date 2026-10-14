@@ -13,7 +13,7 @@ pub struct Ipv6 {
     pub cidr: String,
     /// How machines get their IPv6 address: `static` (default), the one derived from their
     /// octet, or `auto`, the one the target hands out (Docker's address management, the
-    /// cluster's). Isoloom's own addresses stay fixed either way.
+    /// cluster's, Oracle Cloud's). Isoloom's own addresses stay fixed either way.
     #[serde(default, skip_serializing_if = "Ipv6Addresses::is_static")]
     pub addresses: Ipv6Addresses,
     /// IPv6 only: the network carries no IPv4. Its `cidr` still numbers the machines (their

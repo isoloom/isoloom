@@ -32,7 +32,7 @@ const RULES: Rules = Rules {
     networks: Networks::OnePerMachine,
     limits: shared::limits(
         "arm64 on Linode comes later (it has no arm64 plans)",
-        "a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept",
+        Some("a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept"),
         Some("a Linode VPC has no route tables, so no traffic can be sent through a machine"),
     ),
     has_image: |os| image(os).is_some(),

@@ -28,7 +28,7 @@ const RULES: Rules = Rules {
     networks: Networks::OneVm,
     limits: shared::limits(
         "arm64 on DigitalOcean comes later (it has no arm64 droplets)",
-        "DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one)",
+        Some("DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one)"),
         Some("a DigitalOcean VPC has no route tables, so no traffic can be sent through a machine"),
     ),
     has_image: |os| image(os).is_some(),
