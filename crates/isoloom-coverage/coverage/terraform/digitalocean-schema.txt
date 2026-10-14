@@ -66,6 +66,17 @@ resource digitalocean_ssh_key name
 resource digitalocean_ssh_key public_key
 resource digitalocean_ssh_key timeouts
 resource digitalocean_ssh_key timeouts.create
+resource digitalocean_volume
+resource digitalocean_volume description
+resource digitalocean_volume filesystem_type
+resource digitalocean_volume id
+resource digitalocean_volume initial_filesystem_label
+resource digitalocean_volume initial_filesystem_type
+resource digitalocean_volume name
+resource digitalocean_volume region
+resource digitalocean_volume size
+resource digitalocean_volume snapshot_id
+resource digitalocean_volume tags
 resource digitalocean_vpc
 resource digitalocean_vpc description
 resource digitalocean_vpc id

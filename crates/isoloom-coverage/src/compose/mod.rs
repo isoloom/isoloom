@@ -83,6 +83,14 @@ const SHORT_PORTS: Support = Equivalent {
 const SHORT_VOLUMES: Support = Equivalent {
     via: "the short form Isoloom writes (`source:target[:ro]`)",
 };
+/// A mount Isoloom writes in the long form: one with options.
+const LONG_VOLUMES: Support = Emitted {
+    from: "(the long form, for a mount with options: a folder of a shared volume, a sized tmpfs)",
+};
+/// Another image's files, mounted.
+const IMAGE_MOUNT: Support = NotPortable {
+    why: "mounts another container image's files: VMs have no images to mount",
+};
 const STAY_UP: Support = Equivalent {
     via: "restart (always unless-stopped: machines stay up like VMs)",
 };

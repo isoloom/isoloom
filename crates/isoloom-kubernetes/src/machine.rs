@@ -11,8 +11,7 @@ use isoloom_spec::shell;
 
 use crate::network::{self, MACHINE_LABEL};
 use crate::objects::{
-    ClaimResources, ClaimSpec, DeploymentSpec, Image, Labels, Manifest, Metadata, NetworkPolicySpec, Peer, PodTemplate, PolicyPort, Rule, Selector,
-    ServicePort, ServiceSpec, Strategy,
+    DeploymentSpec, Image, Labels, Manifest, Metadata, NetworkPolicySpec, Peer, PodTemplate, PolicyPort, Rule, Selector, ServicePort, ServiceSpec, Strategy,
 };
 use crate::pod;
 
@@ -107,7 +106,7 @@ impl<'a> Machine<'a> {
 /// policies.
 pub(crate) fn objects(m: &Machine) -> Vec<Manifest> {
     let mut out = vec![deployment(m)];
-    out.extend(claims(m));
+    out.extend(crate::storage::claims(m));
     out.extend(crate::files::config_map(m));
     out.extend(service(m));
     out.extend(published(m));
@@ -129,22 +128,6 @@ fn deployment(m: &Machine) -> Manifest {
         },
     };
     Manifest::deployment(m.name, spec)
-}
-
-/// The claims of the volumes it holds (a shared one is its owner's).
-fn claims(m: &Machine) -> Vec<Manifest> {
-    let claim = || ClaimSpec {
-        access_modes: vec!["ReadWriteOnce"],
-        resources: ClaimResources {
-            requests: [("storage", "1Gi".to_string())].into_iter().collect(),
-        },
-    };
-    m.plan
-        .volumes
-        .iter()
-        .filter(|v| m.holds(&v.kind))
-        .map(|v| Manifest::claim(&v.key, claim()))
-        .collect()
 }
 
 /// `UDP` for a UDP port; TCP, the default, left out.

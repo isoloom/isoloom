@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Arch, Dns, Resources, ScalarSchema, VmImage};
+use super::{Arch, Dns, Mount, Resources, ScalarSchema, Tmpfs, VmImage};
 #[cfg(doc)]
 use super::{Machine, Spec};
 
@@ -25,7 +25,7 @@ pub struct Shared {
     pub read_only: Option<bool>,
     /// Memory-backed mount paths, as `tmpfs` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tmpfs: Option<Vec<String>>,
+    pub tmpfs: Option<Vec<Tmpfs>>,
     /// The size of `/dev/shm`, as `shm_size` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shm_size: Option<String>,
@@ -54,7 +54,7 @@ pub struct Shared {
     pub depends_on: Option<Vec<String>>,
     /// Data that survives restarts, as `volumes` on a machine (merged key by key).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub volumes: Option<IndexMap<String, String>>,
+    pub volumes: Option<IndexMap<String, Mount>>,
     /// Completes the `docker:` of machines that have one (image, build, init, idle).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub docker: Option<SharedDocker>,
@@ -150,9 +150,11 @@ pub struct External {
     pub key: Option<String>,
 }
 
-/// A volume several machines mount (see [`Spec::volumes`]): one named volume on Docker, one
-/// claim on Kubernetes (its users on its owner's node), and on VMs the owner's directory
-/// served over NFS to the others, mounted at their own paths.
+/// A volume of the environment, mounted by one machine or several (see [`Spec::volumes`]): one
+/// named volume on Docker, one claim on Kubernetes (its users on its owner's node), and on VMs
+/// the owner's directory served over NFS to the others, mounted at their own paths. Declared
+/// here, a volume can also outlive the environment (`persistent`) or be one that exists already
+/// (`external`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SharedVolume {
@@ -160,6 +162,15 @@ pub struct SharedVolume {
     /// first machine that mounts it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
+    /// Keep its data when the environment is torn down: `isoloom down` leaves it, and the next
+    /// `run` finds it again; `isoloom down --volumes` removes it. Docker and Kubernetes; a VM's
+    /// storage goes with the VM.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub persistent: bool,
+    /// An existing volume, by its name on the platform (a Docker volume, a Kubernetes claim in
+    /// the environment's namespace): Isoloom mounts it and never creates or removes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external: Option<String>,
 }
 
 /// A process limit (see [`Machine::ulimits`]): one value for the soft and hard limits, or both.

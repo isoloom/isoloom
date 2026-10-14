@@ -84,7 +84,9 @@ pub fn reason(refusal: &Refusal) -> String {
 fn objects(env: &Environment) -> Rendered {
     let namespace = format!("isoloom-{}", env.name);
     let machines = Machine::all(env);
-    let mut objects = vec![Manifest::namespace(&namespace)];
+    let mut ns = Manifest::namespace(&namespace);
+    ns.metadata.labels = crate::storage::namespace_labels(&machines);
+    let mut objects = vec![ns];
     objects.extend(machines.iter().flat_map(machine::objects));
     objects.extend(network::policies(env));
     let checks = checks::plan(env);

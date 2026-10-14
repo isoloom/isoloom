@@ -80,13 +80,17 @@ fn owner(at: &str, f: &MachineFile, windows: bool, p: &mut Problems) {
 /// written into its data on others: it goes elsewhere.
 fn under_volume(name: &str, m: &Machine, p: &mut Problems) {
     for (i, f) in m.files.iter().enumerate() {
-        let inside = m.volumes.iter().find(|(_, v)| f.path.starts_with(&format!("{}/", v.trim_end_matches('/'))));
+        let inside = m
+            .volumes
+            .iter()
+            .find(|(_, v)| f.path.starts_with(&format!("{}/", v.path().trim_end_matches('/'))));
         if let Some((v, dir)) = inside {
             p.add(
                 format!("machines.{name}.files[{i}].path"),
                 format!(
-                    "`{}` is inside volume `{v}` ({dir}): a volume keeps its own data, place the file outside it",
-                    f.path
+                    "`{}` is inside volume `{v}` ({}): a volume keeps its own data, place the file outside it",
+                    f.path,
+                    dir.path()
                 ),
             );
         }

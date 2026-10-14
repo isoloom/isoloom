@@ -64,6 +64,8 @@ spec:
         volumeMounts:
         - name: vol-shared
           mountPath: /srv/shared
+        - name: disk-data
+          mountPath: /srv/data
       - name: init
         image: alpine:3.20
         imagePullPolicy: IfNotPresent
@@ -74,6 +76,8 @@ spec:
         volumeMounts:
         - name: vol-shared
           mountPath: /srv/shared
+        - name: disk-data
+          mountPath: /srv/data
         - name: scripts
           mountPath: /isoloom/scripts
       nodeSelector:
@@ -82,6 +86,9 @@ spec:
       - name: vol-shared
         persistentVolumeClaim:
           claimName: shared
+      - name: disk-data
+        persistentVolumeClaim:
+          claimName: writer-data
       - name: scripts
         configMap:
           name: isoloom-scripts
@@ -99,6 +106,18 @@ spec:
   resources:
     requests:
       storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: writer-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 50Gi
 ---
 apiVersion: apps/v1
 kind: Deployment

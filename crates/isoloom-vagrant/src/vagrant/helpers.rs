@@ -58,6 +58,7 @@ fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ip
         tpm: None,
         esxi_guestos: None,
         nested: false,
+        disks: Vec::new(),
     }
 }
 

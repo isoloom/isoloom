@@ -94,9 +94,13 @@ pub(crate) const LINKED_CLONE_ON: Support = Emitted {
 pub(crate) const DISK: Support = Emitted {
     from: "machines.*.resources.disk_gb (the root filesystem grown into it)",
 };
-/// More disks: a machine's data lives on its one disk, sized by `disk_gb`, at its volumes' paths.
+/// More disks, another way than the one Isoloom writes them.
 pub(crate) const MORE_DISKS: Support = Equivalent {
-    via: "machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths)",
+    via: "machines.*.disks (Vagrant's `config.vm.disk`, libvirt's `storage`, ESXi's `guest_storage`)",
+};
+/// A machine's data disks, each attached empty; its set-up formats and mounts them.
+pub(crate) const DATA_DISKS: Support = Emitted {
+    from: "machines.*.disks (formatted and mounted by the machine's set-up)",
 };
 pub(crate) const ARCH: Support = Emitted { from: "machines.*.arch" };
 pub(crate) const RESOURCES: Support = Emitted { from: "machines.*.resources" };

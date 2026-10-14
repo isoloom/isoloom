@@ -55,6 +55,7 @@ pub const TABLED: &[&str] = &[
     "LabelSelector",
     "Volume",
     "VolumeMount",
+    "VolumeDevice",
     "PersistentVolumeClaimVolumeSource",
     "ConfigMapVolumeSource",
     "EmptyDirVolumeSource",

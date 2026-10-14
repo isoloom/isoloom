@@ -36,13 +36,13 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
         sysctls: mp.settings.sysctls.clone(),
         ulimits: mp.settings.ulimits.iter().map(|(k, u)| (k.clone(), ulimit(u.soft(), u.hard()))).collect(),
         shm_size: m.shm_size.clone(),
-        tmpfs: m.tmpfs.clone(),
+        tmpfs: crate::storage::tmpfs(m).0,
         hostname: Some(name.to_string()),
         networks: sidecars::attachments(env, name, mp),
         extra_hosts: sidecars::extra_hosts(env, name),
         environment: environment(env, mp),
         ports: mp.ports.iter().copied().map(port).collect(),
-        volumes: mp.volumes.iter().map(|v| format!("{}:{}", v.key, v.path)).collect(),
+        volumes: crate::storage::volume_mounts(mp).into_iter().chain(crate::storage::tmpfs(m).1).collect(),
         secrets: super::secrets::of_machine(mp),
         configs: super::files::mounts(name, mp),
         restart: Some("unless-stopped".into()),
@@ -151,13 +151,13 @@ fn appliance(env: &Environment, name: &str, m: &Machine, svc: &mut Service, file
             path: format!("{OUTPUT_DIR}/{DIR}/appliances/{name}/{file}"),
             contents,
         });
-        svc.volumes.push(format!("./appliances/{name}/{file}:{inside}:ro"));
+        svc.volumes.push(format!("./appliances/{name}/{file}:{inside}:ro").into());
     }
     if let Some(own) = &d.config {
-        svc.volumes.push(format!("{ROOT}/{own}:{}:ro", w.own_config));
+        svc.volumes.push(format!("{ROOT}/{own}:{}:ro", w.own_config).into());
     }
     if let (Some(fw), Some(inside)) = (&d.firmware, w.firmware) {
-        svc.volumes.push(format!("{ROOT}/{fw}:{inside}:ro"));
+        svc.volumes.push(format!("{ROOT}/{fw}:{inside}:ro").into());
     }
     // An emulator Isoloom builds itself (its Dockerfile next to the Compose file).
     if let Some(dockerfile) = w.build {
@@ -226,7 +226,7 @@ fn readiness(env: &Environment, mp: &MachinePlan, m: &Machine, svc: &mut Service
         svc.healthcheck = Some(healthcheck);
         // Isoloom's own probe, copied into a volume before the machine starts.
         let probe_svc = probe_service(mp.arch);
-        svc.volumes.push(format!("{probe_svc}:{PROBE_DIR}:ro"));
+        svc.volumes.push(format!("{probe_svc}:{PROBE_DIR}:ro").into());
         svc.after(probe_svc, "service_completed_successfully");
         if !archs.contains(&mp.arch) {
             archs.push(mp.arch);
@@ -284,8 +284,8 @@ fn init_jobs(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, servi
             restart: Some("no".into()),
             ..Service::default()
         };
-        j.volumes.push(format!("{ROOT}/{script}:{mounted}:ro"));
-        j.volumes.extend(mp.volumes.iter().map(|v| format!("{}:{}", v.key, v.path)));
+        j.volumes.push(format!("{ROOT}/{script}:{mounted}:ro").into());
+        j.volumes.extend(crate::storage::volume_mounts(mp));
         j.after(name, ready_condition(m));
         if sidecars::needs_routes(env, name) {
             j.after(format!("{name}-routes"), "service_healthy");

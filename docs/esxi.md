@@ -71,7 +71,7 @@ router), `ssh_user` (`isoloom`) and `checks` (which runner runs where).
 
 The target refuses these, with the reason: Windows machines, arm64, IPv6 networks, networks
 with a `gateway` machine, secrets, external and bridged networks, a machine's own image or boot,
-TPM, GPUs, nested virtualization, a network's `mtu`, a machine's `rate_limit`, and more than nine networks (an ESXi VM has at most ten
+TPM, GPUs, nested virtualization, data disks (`disks`), a network's `mtu`, a machine's `rate_limit`, and more than nine networks (an ESXi VM has at most ten
 network interfaces, and the router needs one per network plus its uplink).
 
 ## The `esxi` target or Vagrant's ESXi provider?

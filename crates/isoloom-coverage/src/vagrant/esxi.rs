@@ -1,6 +1,6 @@
 //! The settings of vagrant-vmware-esxi, for standalone ESXi hosts.
 
-use super::{DISK, HOST_TUNING, LINKED_CLONE, MAC, MORE_DISKS, TOOLING, USER_SETUP};
+use super::{DATA_DISKS, DISK, HOST_TUNING, LINKED_CLONE, MAC, TOOLING, USER_SETUP};
 use crate::{
     Support,
     Support::{Emitted, Equivalent, Tooling},
@@ -25,7 +25,7 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         "guest_custom_vmx_settings" => Emitted {
             from: "machines.*.nested_virtualization (`vhv.enable`); no spec field writes raw settings",
         },
-        "guest_storage" => MORE_DISKS,
+        "guest_storage" => DATA_DISKS,
         "guest_guestos" => Emitted {
             from: "machines.*.vm.os (a Windows VM's guest OS; a Linux box keeps its own)",
         },

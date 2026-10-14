@@ -129,7 +129,8 @@ fn owner<'a>(tables: &'a [Format], key: &str) -> Option<&'a Format> {
 /// a cloud image's URL on Proxmox, a Windows machine's own Azure image, a Proxmox template
 /// booted through UEFI in an order of its own), GPUs (passed through on Proxmox by PCI address
 /// and by resource mapping; a cloud's GPU instance type), VMs running VMs of their own, and a
-/// port published over UDP on a cloud VM (Oracle Cloud's per-machine security group rule).
+/// port published over UDP on a cloud VM (Oracle Cloud's per-machine security group rule), and a
+/// data disk on every cloud (DigitalOcean's examples have none).
 const OWN_IMAGES: &[(&str, Target)] = &[
     (
         "web: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh], image: { proxmox: 'https://images.example/d.qcow2', aws: ami-0abc, azure: /subscriptions/s/resourceGroups/g/providers/Microsoft.Compute/images/d, gcp: projects/p/global/images/d, digitalocean: '4242', linode: private/42, oci: ocid1.image.oc1..d } } }",
@@ -157,6 +158,10 @@ const OWN_IMAGES: &[(&str, Target)] = &[
     ),
     (
         "dns: { networks: { lan: 53 }, services: [{ port: 53, protocol: udp, publish: 10053 }], vm: { os: ubuntu-24.04, provision: [s.sh] } }",
+        Target::CloudVm,
+    ),
+    (
+        "db: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh] }, disks: { data: { size_gb: 50, mount: /data } } }",
         Target::CloudVm,
     ),
 ];

@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CREDENTIALS, DISKS, IMAGES, MANAGED, NAT,
-    OTHER_RECORDS, PLACEMENT, PRIVATE_DNS_IPV6, PROTECT, PUBLIC_DNS, PUBLIC_IPV6, REVERSE_DNS, ROUTER, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
+    ACCOUNT, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CREDENTIALS, IMAGES, MANAGED, NAT, OTHER_RECORDS,
+    PLACEMENT, PRIVATE_DNS_IPV6, PROTECT, PUBLIC_DNS, PUBLIC_IPV6, REVERSE_DNS, ROUTER, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -44,7 +44,6 @@ const TYPES: Rules = &[
     (WIRED, "ssh_public_key subnet_network_security_group_association"),
     (NAT, "nat_gateway nat_gateway_public_ip_association subnet_nat_gateway_association"),
     (ROUTER, "route_table route subnet_route_table_association"),
-    (DISKS, "managed_disk virtual_machine_data_disk_attachment"),
     (CLOUD_RESOLVER, "virtual_network_dns_servers"),
     (
         INLINE,
@@ -110,7 +109,7 @@ const TYPES: Rules = &[
 const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
-        "azurerm_linux_virtual_machine azurerm_network_interface azurerm_network_interface_security_group_association
+        "azurerm_managed_disk azurerm_virtual_machine_data_disk_attachment azurerm_linux_virtual_machine azurerm_network_interface azurerm_network_interface_security_group_association
         azurerm_network_security_group azurerm_private_dns_a_record azurerm_private_dns_zone
         azurerm_private_dns_zone_virtual_network_link azurerm_public_ip azurerm_resource_group azurerm_subnet azurerm_virtual_network
         azurerm_windows_virtual_machine",
@@ -159,6 +158,8 @@ const WRITTEN: &[(&str, &str)] = &[
         source_image_reference.offer source_image_reference.publisher source_image_reference.sku source_image_reference.version
         tags vtpm_enabled winrm_listener winrm_listener.protocol",
     ),
+    ("azurerm_managed_disk", "create_option disk_size_gb location name resource_group_name storage_account_type tags"),
+    ("azurerm_virtual_machine_data_disk_attachment", "caching lun managed_disk_id virtual_machine_id"),
 ];
 
 /// The provider block's settings.
@@ -177,6 +178,24 @@ const ARGUMENTS: &[(&str, Rules)] = &[
     (
         "azurerm_private_dns_zone_virtual_network_link",
         &[(CLOUD_NAMES, "registration_enabled"), (ZONE_SETTINGS, "resolution_policy")],
+    ),
+    (
+        "azurerm_virtual_machine_data_disk_attachment",
+        &[(CLOUD, "create_option write_accelerator_enabled")],
+    ),
+    (
+        "azurerm_managed_disk",
+        &[
+            (PLACEMENT, "edge_zone zone"),
+            (
+                BACKUP,
+                "source_resource_id source_uri storage_account_id upload_size_bytes image_reference_id gallery_image_reference_id hyper_v_generation os_type",
+            ),
+            (
+                CLOUD,
+                "disk_access_id disk_encryption_set_id disk_iops_read_only disk_iops_read_write disk_mbps_read_only disk_mbps_read_write logical_sector_size max_shares network_access_policy on_demand_bursting_enabled optimized_frequent_attach_enabled performance_plus_enabled public_network_access_enabled secure_vm_disk_encryption_set_id security_type tier trusted_launch_enabled encryption_settings encryption_settings.*",
+            ),
+        ],
     ),
     (
         "azurerm_linux_virtual_machine",

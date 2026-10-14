@@ -33,6 +33,9 @@ use isoloom_spec::model::Target;
 #[path = "support/vagrantfile.rs"]
 mod vagrantfile;
 
+#[path = "support/storage.rs"]
+mod storage;
+
 /// Checks a format's rows against what the generator really writes: every key written has a
 /// row marked as written, and every row marked as written is written by some example.
 fn written_matches(rows: &[(String, Support)], written: &BTreeSet<String>, format: &str) {
@@ -138,6 +141,15 @@ fn vagrantfiles() -> Vec<String> {
     assert_eq!(isoloom_spec::validate(&fixture), vec![], "the own-boot fixture");
     let files = generate(&fixture, Target::Vagrant).unwrap();
     found.extend(files.into_iter().filter(|f| f.path.ends_with("/Vagrantfile")).map(|f| f.contents));
+    // Data disks, which no example has.
+    let disks = isoloom_spec::parse(storage::DISKS).unwrap();
+    found.extend(
+        generate(&disks, Target::Vagrant)
+            .unwrap()
+            .into_iter()
+            .filter(|f| f.path.ends_with("/Vagrantfile"))
+            .map(|f| f.contents),
+    );
     found
 }
 

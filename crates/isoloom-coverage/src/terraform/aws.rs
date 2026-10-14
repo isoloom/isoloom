@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, DISKS,
-    IMAGE_BUILD, IMAGES, LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ZONE_BINDING, ZONE_SETTINGS,
+    ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, IMAGE_BUILD,
+    IMAGES, LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ZONE_BINDING, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -11,6 +11,11 @@ use crate::Support::{self, Equivalent};
 /// Rule resources whose effect the security groups' inline rules give.
 const INLINE: Support = Equivalent {
     via: "the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules",
+};
+
+/// Volumes of their own, which the instance's `ebs_block_device` blocks give.
+const INSTANCE_VOLUMES: Support = Equivalent {
+    via: "machines.*.disks: the `ebs_block_device` blocks of aws_instance, each volume created and attached with it",
 };
 
 /// Resources that wire up what Isoloom writes inline.
@@ -47,7 +52,7 @@ const TYPES: Rules = &[
     ),
     (NAT, "nat_gateway nat_gateway_eip_association"),
     (AWS_IPV6, "vpc_ipv6_cidr_block_association egress_only_internet_gateway"),
-    (DISKS, "ebs_volume volume_attachment"),
+    (INSTANCE_VOLUMES, "ebs_volume volume_attachment"),
     (CLOUD_RESOLVER, "vpc_dhcp_options vpc_dhcp_options_association"),
     (
         INLINE,
@@ -128,7 +133,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ("aws_eip", "network_interface"),
     (
         "aws_instance",
-        "ami associate_public_ip_address instance_initiated_shutdown_behavior instance_type key_name metadata_options
+        "ebs_block_device ebs_block_device.delete_on_termination ebs_block_device.device_name ebs_block_device.volume_size ebs_block_device.volume_type ami associate_public_ip_address instance_initiated_shutdown_behavior instance_type key_name metadata_options
         metadata_options.http_tokens primary_network_interface primary_network_interface.network_interface_id private_ip root_block_device
         root_block_device.encrypted root_block_device.volume_size root_block_device.volume_type subnet_id tags user_data
         vpc_security_group_ids",
@@ -219,11 +224,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (CPUS, "cpu_options.core_count cpu_options.threads_per_core"),
             (NESTED, "cpu_options cpu_options.nested_virtualization"),
-            (
-                DISKS,
-                "ebs_block_device ebs_block_device.delete_on_termination ebs_block_device.device_name ebs_block_device.volume_size
-                ebs_block_device.volume_type",
-            ),
         ],
     ),
     (

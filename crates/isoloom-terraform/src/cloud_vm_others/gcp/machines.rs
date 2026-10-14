@@ -25,7 +25,8 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
     }
     let os = os(mp).unwrap_or_default();
     let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
-    m.block(instance(&Instance {
+    m.blocks(crate::vm::disks::gcp(name, &mp.disks));
+    let mut vm = instance(&Instance {
         env,
         id: &id,
         who: name,
@@ -37,7 +38,9 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         disk: Some(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)),
         on: (net, *address),
         tpm: mp.tpm.is_some(),
-    }));
+    });
+    vm.body.extend(crate::vm::disks::gcp_attached(name, &mp.disks));
+    m.block(vm);
     let hooks = Hooks {
         at_boot: Vec::new(),
         after_reboot: vec![cloud::reschedule_auto_stop()],

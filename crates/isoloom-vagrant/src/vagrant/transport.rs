@@ -101,6 +101,7 @@ fn label(step: &Step) -> String {
     match step {
         Step::Prelude => "constraints".into(),
         Step::DiskGrow => "disk".into(),
+        Step::Disks { .. } => "data disks".into(),
         Step::Settings => "settings".into(),
         Step::Hosts { .. } => "hosts".into(),
         Step::Routes { .. } => "routes".into(),

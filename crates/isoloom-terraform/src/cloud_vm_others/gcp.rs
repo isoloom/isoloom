@@ -117,6 +117,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
         .or_else(|| gpus::refusal(env, &GPUS))
         .or_else(|| crate::vm::nested::refusal(env, "Google Cloud", true))
         .or_else(|| mtu_refusal(env))
+        .or_else(|| crate::vm::disks::too_small(env, "Google Cloud", 10, 15))
     {
         return Some(why);
     }

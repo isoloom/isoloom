@@ -5,6 +5,7 @@
 # the checks read the same three values from inside the machine on every target. As a VM it
 # also has a virtual TPM 2.0 (measured boot, sealed secrets), where the target gives one: the
 # targets that can't (DigitalOcean, Linode) refuse it rather than drop it.
+# Its cache has a data disk of its own, formatted XFS on the VM targets.
 version: 1
 name: tuned-web
 
@@ -18,6 +19,7 @@ machines:
     environment: { APP_MODE: production }
     sysctls: { net.core.somaxconn: 4096 }
     ulimits: { nofile: { soft: 8192, hard: 16384 } }
+    disks: { cache: { size_gb: 50, fs: xfs, mount: /var/cache/web } }
     docker: { image: "nginx:1.27-alpine" }
     vm:
       os: debian-12
@@ -37,3 +39,7 @@ checks:
     from: web
     exec: "sh -c 'echo $(ulimit -Sn)/$(ulimit -Hn)'"
     expect: 8192/16384
+  - name: the cache disk is mounted
+    from: web
+    exec: "grep -q ' /var/cache/web ' /proc/mounts && echo mounted"
+    expect: mounted

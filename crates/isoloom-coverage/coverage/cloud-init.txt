@@ -148,3 +148,14 @@ power_state.delay
 power_state.message
 power_state.mode
 power_state.timeout
+disk_setup.*.layout
+disk_setup.*.overwrite
+disk_setup.*.table_type
+fs_setup.*.cmd
+fs_setup.*.device
+fs_setup.*.extra_opts
+fs_setup.*.filesystem
+fs_setup.*.label
+fs_setup.*.overwrite
+fs_setup.*.partition
+fs_setup.*.replace_fs

@@ -28,6 +28,7 @@ use crate::process::Process;
 use crate::requirements::{self, Requirement};
 use crate::routing;
 use crate::secrets::SecretFile;
+use crate::storage::{self, DataDisk, Lifetime};
 
 /// One environment, planned for one target.
 #[derive(Debug, Clone, PartialEq)]
@@ -132,6 +133,8 @@ pub struct MachinePlan {
     pub volumes: Vec<Volume>,
     /// The files placed on it, in spec order.
     pub files: Vec<MachineFile>,
+    /// Its data disks, in spec order.
+    pub disks: Vec<DataDisk>,
     /// The settings a container gets from its runtime and a VM from its set-up.
     pub settings: Settings,
     /// The inputs it reads (environment variables given at run time).
@@ -212,8 +215,12 @@ pub struct Volume {
     pub name: String,
     /// Where the machine mounts it.
     pub path: String,
+    /// The folder of a shared volume it takes, if not all of it.
+    pub subpath: Option<String>,
     /// The name the runtime knows it by (a Compose named volume).
     pub key: String,
+    /// How long its storage lives.
+    pub lifetime: Lifetime,
     /// Whether the machine keeps it to itself or shares it.
     pub kind: VolumeKind,
 }
@@ -438,6 +445,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         ports: published(m),
         volumes: volumes(spec, name, m),
         files: m.files.clone(),
+        disks: storage::disks(name, m),
         settings: Settings {
             environment: m.environment.clone(),
             sysctls: m.sysctls.clone(),
@@ -497,10 +505,12 @@ fn published(m: &Machine) -> Vec<PublishedPort> {
 fn volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Volume> {
     m.volumes
         .iter()
-        .map(|(v, path)| Volume {
+        .map(|(v, mount)| Volume {
             name: v.clone(),
-            path: path.clone(),
+            path: mount.path().to_string(),
+            subpath: mount.subpath().map(String::from),
             key: spec.volume_key(name, v),
+            lifetime: storage::lifetime(spec, v),
             kind: match spec.volume_owner(v) {
                 Some(owner) if spec.volumes.contains_key(v) => VolumeKind::Shared {
                     owner: owner.to_string(),

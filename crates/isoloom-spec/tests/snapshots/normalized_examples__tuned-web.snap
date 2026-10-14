@@ -40,6 +40,11 @@ machines:
     resources: ~
     depends_on: []
     volumes: {}
+    disks:
+      cache:
+        size_gb: 50
+        fs: xfs
+        mount: /var/cache/web
     access: false
     docker:
       image: "nginx:1.27-alpine"
@@ -79,5 +84,13 @@ checks:
     exec: "sh -c 'echo $(ulimit -Sn)/$(ulimit -Hn)'"
     script: ~
     expect: 8192/16384
+    wait: ~
+  - name: the cache disk is mounted
+    from: web
+    http: ~
+    tcp: ~
+    exec: "grep -q ' /var/cache/web ' /proc/mounts && echo mounted"
+    script: ~
+    expect: mounted
     wait: ~
 targets: ~

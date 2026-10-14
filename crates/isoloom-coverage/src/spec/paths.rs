@@ -26,6 +26,7 @@ const NAMED: &[&str] = &[
     "machines",
     "machines.*.networks",
     "machines.*.volumes",
+    "machines.*.disks",
     "volumes",
     "cloud.vars",
     "cloud.outputs",

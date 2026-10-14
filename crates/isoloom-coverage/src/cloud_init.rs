@@ -5,12 +5,12 @@
 //! script as user data instead (the auto-stop timer), so they write no cloud-config key: their
 //! set-up runs over SSH.
 //!
-//! The nested keys listed are those of the items Isoloom writes (`users`, `write_files` and
-//! `power_state`), so a field it leaves out of an item is a row too.
+//! The nested keys listed are those of the items Isoloom writes (`users`, `write_files`,
+//! `power_state`, `disk_setup` and `fs_setup`), so a field it leaves out of an item is a row too.
 
 use super::{
     Format, Support,
-    Support::{Emitted, Equivalent, InImage, NotPortable, Planned, Tooling},
+    Support::{Emitted, Equivalent, InImage, NotPortable, Tooling},
 };
 
 const TOOLING: Support = Tooling {
@@ -31,8 +31,11 @@ const SSH_ACCESS: Support = Tooling {
 const MIRRORS: Support = Equivalent {
     via: "constraints (the prelude points apt and dnf at the proxy and the mirrors)",
 };
-const DATA_DISKS: Support = Planned {
-    note: "data disks, partitioned and formatted (Wave 3: persistent volumes and data disks)",
+const DATA_DISKS: Support = Emitted {
+    from: "machines.*.disks (each found by its serial, partitioned, formatted with its name as the label)",
+};
+const DISK_FIELD: Support = Tooling {
+    note: "how cloud-init partitions and formats a disk: Isoloom sets the device, label and filesystem it needs",
 };
 const USER_FIELD: Support = Tooling {
     note: "Isoloom's own user: it needs a name, sudo, a shell and the key, nothing more",
@@ -154,8 +157,8 @@ const ROWS: &[(&str, Support)] = &[
     ("mount_default_fields", TOOLING),
     (
         "mounts",
-        Equivalent {
-            via: "volumes (a shared volume is mounted from /etc/fstab)",
+        Emitted {
+            from: "machines.*.disks.*.mount (a data disk mounted by its label; a shared volume is mounted from /etc/fstab by its step)",
         },
     ),
     ("no_ssh_fingerprints", SSH_ACCESS),
@@ -346,4 +349,30 @@ const ROWS: &[(&str, Support)] = &[
     ("power_state.message", Emitted { from: "(the reboot step)" }),
     ("power_state.mode", Emitted { from: "(reboot)" }),
     ("power_state.timeout", POWER_FIELD),
+    (
+        "disk_setup.*.layout",
+        Emitted {
+            from: "(one partition, the whole disk)",
+        },
+    ),
+    (
+        "disk_setup.*.overwrite",
+        Emitted {
+            from: "(false: a disk with data is left as it is)",
+        },
+    ),
+    ("disk_setup.*.table_type", Emitted { from: "(gpt)" }),
+    ("fs_setup.*.cmd", DISK_FIELD),
+    (
+        "fs_setup.*.device",
+        Emitted {
+            from: "(the disk's first partition)",
+        },
+    ),
+    ("fs_setup.*.extra_opts", DISK_FIELD),
+    ("fs_setup.*.filesystem", Emitted { from: "machines.*.disks.*.fs" }),
+    ("fs_setup.*.label", Emitted { from: "(the disk's name)" }),
+    ("fs_setup.*.overwrite", DISK_FIELD),
+    ("fs_setup.*.partition", DISK_FIELD),
+    ("fs_setup.*.replace_fs", DISK_FIELD),
 ];

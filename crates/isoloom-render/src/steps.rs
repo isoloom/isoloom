@@ -36,6 +36,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
     match step {
         Step::Prelude => constraints::linux_prelude(env.spec()),
         Step::DiskGrow => Some(disk_grow()),
+        Step::Disks { disks } => crate::disks::linux(disks),
         Step::Settings => settings(env, machine),
         Step::Hosts { entries } => hosts(entries),
         Step::Routes { routes, default } => {
@@ -113,6 +114,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             process::windows_healthy(env, machine).unwrap_or_default()
         )),
         Step::DiskGrow => Some(GROW_ROOT_PS1.into()),
+        Step::Disks { disks } => crate::disks::windows(disks),
         Step::WaitFor { machine: dep, ports } if !ports.is_empty() => Some(windows_wait_for(dep, ports)),
         _ => None,
     }
@@ -170,12 +172,9 @@ fn windows_wait_for(machine: &str, ports: &[u16]) -> String {
     )
 }
 
-/// The machine's environment, sysctls and ulimits: `machine_setup`'s script without the shared
-/// volumes, which are steps of their own.
+/// The machine's environment, sysctls and ulimits: `machine_setup`'s script.
 fn settings(env: &Environment, machine: &str) -> Option<String> {
-    let mut m = env.spec().machines.get(machine)?.clone();
-    m.volumes.clear();
-    machine_setup::linux(env.spec(), machine, &m)
+    machine_setup::linux(env.spec().machines.get(machine)?)
 }
 
 /// The other machines by name, appended to `/etc/hosts`.
@@ -206,7 +205,10 @@ fn trunk_commands(env: &Environment, machine: &str) -> Option<String> {
 fn shared_volume(volume: &str, path: &str, role: &SharedRole) -> String {
     let mut sh = format!("{}\nmkdir -p {}\n", machine_setup::PKG, quote(path));
     match role {
-        SharedRole::Serve { clients } => {
+        SharedRole::Serve { clients, folders } => {
+            for f in folders {
+                let _ = writeln!(sh, "mkdir -p {}", quote(&format!("{}/{f}", path.trim_end_matches('/'))));
+            }
             let clients = clients
                 .iter()
                 .map(|c| format!("{c}(rw,sync,no_subtree_check,no_root_squash)"))

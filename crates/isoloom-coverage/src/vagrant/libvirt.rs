@@ -1,6 +1,6 @@
 //! The settings of vagrant-libvirt.
 
-use super::{ARCH, DEVICES, DISK, HOST_TUNING, MORE_DISKS, RESOURCES, TOOLING, USER_SETUP};
+use super::{ARCH, DATA_DISKS, DEVICES, DISK, HOST_TUNING, MORE_DISKS, RESOURCES, TOOLING, USER_SETUP};
 use crate::{
     Support,
     Support::{Emitted, Equivalent, Tooling},
@@ -11,7 +11,8 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         "cpus" | "memory" => RESOURCES,
         "machine_arch" => ARCH,
         "machine_virtual_size" => DISK,
-        "storage" | "disks" => MORE_DISKS,
+        "storage" => DATA_DISKS,
+        "disks" => MORE_DISKS,
         "nested" => Emitted {
             from: "machines.*.nested_virtualization",
         },

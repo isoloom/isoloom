@@ -114,15 +114,16 @@ extract azure hashicorp/azurerm 5.8.0 \
   resource:azurerm_public_ip resource:azurerm_network_security_group resource:azurerm_network_interface \
   resource:azurerm_network_interface_security_group_association resource:azurerm_linux_virtual_machine \
   resource:azurerm_windows_virtual_machine resource:azurerm_private_dns_zone \
-  resource:azurerm_private_dns_zone_virtual_network_link resource:azurerm_private_dns_a_record
+  resource:azurerm_private_dns_zone_virtual_network_link resource:azurerm_private_dns_a_record \
+  resource:azurerm_managed_disk resource:azurerm_virtual_machine_data_disk_attachment
 extract google hashicorp/google 8.5.0 \
   resource:google_project resource:google_project_service resource:google_compute_network \
   resource:google_compute_subnetwork resource:google_compute_firewall resource:google_compute_instance \
-  resource:google_dns_managed_zone resource:google_dns_record_set
+  resource:google_dns_managed_zone resource:google_dns_record_set resource:google_compute_disk
 extract digitalocean digitalocean/digitalocean 2.103.0 \
-  resource:digitalocean_vpc resource:digitalocean_ssh_key resource:digitalocean_droplet resource:digitalocean_firewall
+  resource:digitalocean_vpc resource:digitalocean_ssh_key resource:digitalocean_droplet resource:digitalocean_firewall resource:digitalocean_volume
 extract linode linode/linode 4.7.0 \
-  resource:linode_instance resource:linode_firewall resource:linode_vpc resource:linode_vpc_subnet
+  resource:linode_instance resource:linode_firewall resource:linode_vpc resource:linode_vpc_subnet resource:linode_volume
 extract oci oracle/oci 9.8.0 \
   resource:oci_core_vcn resource:oci_core_internet_gateway resource:oci_core_route_table \
   resource:oci_core_security_list resource:oci_core_subnet resource:oci_core_instance \

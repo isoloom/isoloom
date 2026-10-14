@@ -27,13 +27,21 @@ fn compose_mounts_one_volume_in_both() {
     assert!(compose.contains("- shared:/srv/shared") && compose.contains("- shared:/data/shared"));
     let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&compose).unwrap();
     let volumes: Vec<&str> = doc["volumes"].as_mapping().unwrap().keys().filter_map(|k| k.as_str()).collect();
-    assert_eq!(volumes, ["shared"], "one volume, not one per machine");
+    assert_eq!(
+        volumes,
+        ["shared", "writer-data"],
+        "one volume, not one per machine (and the writer's data disk)"
+    );
 }
 
 #[test]
 fn kubernetes_has_one_claim_and_the_reader_beside_the_owner() {
     let k = all(&shared(), Target::Kubernetes);
-    assert_eq!(k.matches("kind: PersistentVolumeClaim").count(), 2, "plain manifests and the chart, one each");
+    assert_eq!(
+        k.matches("kind: PersistentVolumeClaim").count(),
+        4,
+        "plain manifests and the chart, one each, and the writer's data disk"
+    );
     assert!(k.contains("claimName: shared"));
     assert!(k.contains("podAffinity") && k.contains("isoloom.com/machine: writer") && k.contains("topologyKey: kubernetes.io/hostname"));
 }

@@ -19,7 +19,7 @@ pub struct ComposeFile {
     pub networks: IndexMap<String, Network>,
     /// Its named volumes.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    pub volumes: IndexMap<String, Labelled>,
+    pub volumes: IndexMap<String, Volume>,
     /// Its secrets, each read from a variable of Compose's own environment.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
     pub secrets: IndexMap<String, Secret>,
@@ -114,9 +114,10 @@ pub struct Service {
     /// Ports published on the host (`address:host:container`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub ports: Vec<String>,
-    /// Mounts: bind mounts and named volumes (`source:target[:ro]`).
+    /// Mounts: bind mounts and named volumes (`source:target[:ro]`), and the mounts with
+    /// options in the long form.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub volumes: Vec<String>,
+    pub volumes: Vec<Mount>,
     /// The secrets it gets, as files.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub secrets: Vec<ServiceSecret>,
@@ -359,10 +360,16 @@ pub struct ServiceSecret {
     pub mode: Option<String>,
 }
 
-/// A named volume: only Isoloom's labels.
+/// A named volume: Isoloom's labels, or an existing volume's name.
 #[derive(Debug, Clone, Default, Serialize)]
-pub struct Labelled {
-    /// The volume's labels (Isoloom's own, to find what it created).
+pub struct Volume {
+    /// Created outside this file (by `name`), not by Compose: never removed by it either.
+    #[serde(skip_serializing_if = "no")]
+    pub external: bool,
+    /// Its name on the Docker host, when not `<project>_<key>`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The volume's labels (Isoloom's own, to find what it created and what `down` keeps).
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
     pub labels: IndexMap<String, String>,
 }
@@ -395,4 +402,58 @@ pub struct ConfigMount {
     /// The mode, in octal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
+}
+
+/// One of a service's mounts: the short form (`source:target[:ro]`), or the long one for a
+/// mount with options.
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub enum Mount {
+    /// `source:target[:ro]`.
+    Short(String),
+    /// A mount with its options.
+    Long(LongMount),
+}
+
+impl From<String> for Mount {
+    fn from(short: String) -> Mount {
+        Mount::Short(short)
+    }
+}
+
+/// A mount in the long form.
+#[derive(Debug, Clone, Serialize)]
+pub struct LongMount {
+    /// `volume` or `tmpfs`.
+    #[serde(rename = "type")]
+    pub kind: &'static str,
+    /// The named volume, for a volume.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// The path in the container.
+    pub target: String,
+    /// A volume's options.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub volume: Option<VolumeOptions>,
+    /// A tmpfs mount's options.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tmpfs: Option<TmpfsOptions>,
+}
+
+/// `volumes[].volume`.
+#[derive(Debug, Clone, Serialize)]
+pub struct VolumeOptions {
+    /// The folder of the volume mounted instead of all of it.
+    pub subpath: String,
+}
+
+/// `volumes[].tmpfs`.
+#[derive(Debug, Clone, Serialize)]
+pub struct TmpfsOptions {
+    /// Its most memory (`64m`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
+    /// Its permissions, as a number (Compose reads the octal mode's value).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<u32>,
 }

@@ -11,6 +11,7 @@ use crate::addressing::address_for;
 use crate::environment::Route;
 use crate::ipv6::{self, Route6};
 use crate::routing;
+use crate::storage::DataDisk;
 
 /// A machine's set-up steps, in order.
 pub type MachineLifecycle = Vec<Step>;
@@ -22,6 +23,11 @@ pub enum Step {
     Prelude,
     /// Grows the root file system to the disk the machine was given.
     DiskGrow,
+    /// Formats its data disks (once, when blank) and mounts them, at every boot.
+    Disks {
+        /// The disks, in spec order (a raw one is left as it is).
+        disks: Vec<DataDisk>,
+    },
     /// The machine's environment, sysctls and ulimits.
     Settings,
     /// The other machines by name, at the address this one reaches each at.
@@ -115,10 +121,12 @@ pub enum SharedRole {
     Serve {
         /// The addresses of the machines mounting it.
         clients: Vec<Ipv4Addr>,
+        /// The folders other machines take of it (`subpath`), created when missing.
+        folders: Vec<String>,
     },
     /// It mounts the owner's export.
     Mount {
-        /// `<owner address>:<owner path>`.
+        /// `<owner address>:<owner path>`, then `/<subpath>` when it takes one folder.
         source: String,
         /// The owner, named in errors.
         owner: String,
@@ -142,6 +150,11 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
     if m.resources.and_then(|r| r.disk_gb).is_some() {
         steps.push(Step::DiskGrow);
     }
+    if !m.disks.is_empty() {
+        steps.push(Step::Disks {
+            disks: crate::storage::disks(name, m),
+        });
+    }
     steps.push(Step::Project);
     steps.push(hosts(spec, name));
     steps.push(Step::Settings);
@@ -156,7 +169,7 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
         .volumes
         .iter()
         .filter(|(v, _)| !spec.volumes.contains_key(*v))
-        .map(|(_, p)| p.clone())
+        .map(|(_, p)| p.path().to_string())
         .collect();
     if !own.is_empty() {
         steps.push(Step::Volumes { paths: own });
@@ -218,25 +231,27 @@ fn shared_volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Step> {
     m.volumes
         .iter()
         .filter(|(v, _)| spec.volumes.contains_key(*v))
-        .filter_map(|(v, path)| {
+        .filter_map(|(v, mount)| {
             let owner = spec.volume_owner(v)?;
             let role = if owner == name {
-                let clients = spec
-                    .volume_users(v)
-                    .into_iter()
-                    .filter(|u| *u != name)
-                    .map(|u| address_for(spec, name, u))
-                    .collect();
-                SharedRole::Serve { clients }
+                let others: Vec<&str> = spec.volume_users(v).into_iter().filter(|u| *u != name).collect();
+                let mut folders: Vec<String> = others.iter().filter_map(|u| spec.machines[*u].volumes[v].subpath().map(String::from)).collect();
+                folders.dedup();
+                SharedRole::Serve {
+                    clients: others.iter().map(|u| address_for(spec, name, u)).collect(),
+                    folders,
+                }
             } else {
+                let at = spec.machines[owner].volumes[v].path().trim_end_matches('/');
+                let folder = mount.subpath().map(|f| format!("/{f}")).unwrap_or_default();
                 SharedRole::Mount {
-                    source: format!("{}:{}", address_for(spec, name, owner), spec.machines[owner].volumes[v]),
+                    source: format!("{}:{at}{folder}", address_for(spec, name, owner)),
                     owner: owner.to_string(),
                 }
             };
             Some(Step::SharedVolume {
                 volume: v.clone(),
-                path: path.clone(),
+                path: mount.path().to_string(),
                 role,
             })
         })

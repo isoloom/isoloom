@@ -144,6 +144,9 @@ impl Backend for ProxmoxBackend {
             // The SDN zone's DNS needs a PowerDNS server outside the environment: each VM's
             // hosts file carries the names, and the zone's domain is its search domain.
             Feature::PrivateDns,
+            Feature::DataDisks,
+            Feature::RawDisks,
+            Feature::TmpfsModes,
         ])
     }
 

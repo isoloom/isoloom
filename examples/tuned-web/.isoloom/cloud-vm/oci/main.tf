@@ -342,6 +342,16 @@ resource "oci_core_instance" "web" {
     hostname_label         = "web"
     skip_source_dest_check = false
   }
+  launch_volume_attachments {
+    type         = "paravirtualized"
+    display_name = "cache"
+    launch_create_volume_details {
+      volume_creation_type = "ATTRIBUTES"
+      compartment_id       = var.compartment_id
+      display_name         = "${local.name}-web-cache"
+      size_in_gbs          = 50
+    }
+  }
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
     user_data           = base64encode(var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : "#!/bin/sh\n")
@@ -368,6 +378,7 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
+      "sudo sh -c 'set -e\npkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ndisk() {\n  label=$1; fs=$2; at=$3; bytes=$4\n  mkdir -p \"$at\"\n  if ! blkid -L \"$label\" >/dev/null 2>&1; then\n    i=0; dev=\n    while [ -z \"$dev\" ]; do\n      for d in $(lsblk -dnbo NAME,SIZE,TYPE | awk -v b=\"$bytes\" '\\''$3 == \"disk\" && $2 >= b && $2 < b + 1073741824 { print $1 }'\\''); do\n        if [ \"$(lsblk -n \"/dev/$d\" | wc -l)\" -eq 1 ] && ! blkid -p \"/dev/$d\" >/dev/null 2>&1; then dev=/dev/$d; break; fi\n      done\n      if [ -z \"$dev\" ]; then\n        i=$((i+1)); if [ \"$i\" -ge 60 ]; then echo \"disk $label: no blank disk of $bytes bytes is attached\" >&2; exit 1; fi\n        sleep 5\n      fi\n    done\n    if [ \"$fs\" = xfs ]; then command -v mkfs.xfs >/dev/null || pkg xfsprogs; mkfs.xfs -q -L \"$label\" \"$dev\"; else mkfs.ext4 -q -L \"$label\" \"$dev\"; fi\n    udevadm settle 2>/dev/null || true\n  fi\n  grep -q \"^LABEL=$label \" /etc/fstab || printf '\\''LABEL=%s %s %s defaults,nofail 0 2\\n'\\'' \"$label\" \"$at\" \"$fs\" >> /etc/fstab\n  mountpoint -q \"$at\" || mount \"$at\"\n}\ndisk '\\''cache'\\'' xfs '\\''/var/cache/web'\\'' 53687091200'",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(APP_MODE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''APP_MODE=production\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"APP_MODE=production\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nprintf %s '\\''net.core.somaxconn = 4096\n'\\'' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\nmkdir -p /etc/security/limits.d && printf %s '\\''* soft nofile 8192\n* hard nofile 16384\nroot soft nofile 8192\nroot hard nofile 16384\n'\\'' > /etc/security/limits.d/90-isoloom.conf\nprintf %s '\\''[Manager]\nDefaultLimitNOFILE=8192:16384\n'\\'' > /etc/systemd/system.conf.d/90-isoloom-limits.conf\nsystemctl daemon-reexec 2>/dev/null || true'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",

@@ -39,6 +39,8 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         images: None,
         instance: a.instance,
         sets: &a.sets,
+        // The data kept past `down` stays through a reset too.
+        volumes: false,
     };
     let p = prepare(ask.dir, ask.target, None, ask.instance, ask.sets)?;
     if p.target == Target::Vagrant && restored(&p.dir.join(isoloom_spec::instance::output_dir(ask.instance)).join("vagrant")) {

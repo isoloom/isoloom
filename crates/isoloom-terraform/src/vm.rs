@@ -37,6 +37,7 @@ pub mod checks;
 pub mod cloud;
 pub mod cloud_init;
 pub mod controller;
+pub mod disks;
 pub mod gateways;
 pub mod gpus;
 pub mod limits;

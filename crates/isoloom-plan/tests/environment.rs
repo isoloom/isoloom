@@ -87,7 +87,7 @@ fn shared_volumes_name_their_owner_and_users() {
         .iter()
         .find(|s| matches!(s, Step::SharedVolume { .. }))
         .expect("a shared volume step");
-    assert!(matches!(serve, Step::SharedVolume { role: SharedRole::Serve { clients }, .. } if clients == &[Ipv4Addr::new(10, 30, 0, 10)]));
+    assert!(matches!(serve, Step::SharedVolume { role: SharedRole::Serve { clients, .. }, .. } if clients == &[Ipv4Addr::new(10, 30, 0, 10)]));
     let mount = env.machines["web"]
         .lifecycle
         .iter()

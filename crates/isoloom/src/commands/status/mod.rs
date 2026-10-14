@@ -10,7 +10,7 @@ use isoloom_runtime::registry::{self, Entry};
 
 use isoloom_runtime::events::{ErrorCode, Scope};
 
-use crate::commands::run::bring_up;
+use crate::commands::run::{Way, bring_up};
 use crate::failure::fail;
 use crate::tools::process;
 use crate::{Res, output};
@@ -117,7 +117,7 @@ fn cleanup(reg: &registry::Registry, name: &str) -> Res<ExitCode> {
 
 /// One environment torn down with its target's tool (the `down` step); whether it went well.
 fn tear_down(e: &Entry) -> Res<bool> {
-    let tool = bring_up(&e.dir, e.target, e.cloud.as_deref(), e.instance, true)?;
+    let tool = bring_up(&e.dir, e.target, e.cloud.as_deref(), e.instance, Way::Down)?;
     let at = Scope::step(Some(e.target.id()), "down");
     let line = format!("Tearing down {} on {} ({})", e.name, e.target.id(), tool.wd.display());
     output::announce(&at, Some(format!("{} ({})", e.name, tool.wd.display())), &line);

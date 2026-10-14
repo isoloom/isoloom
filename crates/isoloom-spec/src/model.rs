@@ -17,6 +17,7 @@ mod private_dns;
 mod process;
 mod secrets;
 mod shared;
+mod storage;
 mod target;
 
 pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
@@ -34,6 +35,7 @@ pub use private_dns::EnvironmentDns;
 pub use process::{CommandLine, Healthcheck, HttpCheck, seconds};
 pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, is_drive_path, secret_variable};
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, TOOL_RECIPES, Tool, ULIMITS, Ulimit};
+pub use storage::{Disk, Filesystem, Mount, MountPart, Tmpfs, TmpfsMount};
 pub use target::{Shape, Target};
 
 use indexmap::IndexMap;
