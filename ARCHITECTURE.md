@@ -42,7 +42,8 @@ requirements), a `MachineLifecycle` made of `Step`s with one Linux and one Windo
 each, and a `Backend` trait (`capabilities()` plus `render(&Environment)`). Refusal then becomes
 "requirements minus capabilities" instead of each generator deciding on its own. Until every
 backend moves to the plan (Wave 2), `LegacyBackend` keeps the other generators running
-unchanged; Compose and external are on the plan.
+unchanged; Compose, external, docker-vm and hybrid are on the plan, docker-vm and hybrid
+with the one Ruby builder (`isoloom_vagrant::ruby`) every Vagrantfile is meant to be written with.
 
 ### The Ansible inventory
 
@@ -64,7 +65,7 @@ windows_password)`, `Access::external()`. A backend never writes inventory lines
 | `isoloom-render` | The `Backend` trait and shared rendering pieces: addresses, header, Ansible runs, the Ansible inventory, HCL, Ruby and PowerShell quoting, step scripts, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
 | `isoloom-compose` | The Docker Compose backend (`docker`, `hosted`, and the Compose file Docker-on-a-VM targets carry), with the network appliances |
 | `isoloom-kubernetes` | The Kubernetes backend: manifests, Kustomize, the Helm chart |
-| `isoloom-vagrant` | The Vagrant backends: `vagrant` (every provider), `docker-vm`, `hybrid` |
+| `isoloom-vagrant` | The Vagrant backends: `vagrant` (every provider), `docker-vm`, `hybrid`; the Ruby builder (`ruby`) and the Vagrantfile pieces they share (`vagrantfile`) |
 | `isoloom-terraform` | The Terraform backends: Proxmox, one cloud VM per machine (AWS, Azure, GCP, DigitalOcean, Linode, OCI), Docker on one cloud VM, cloud services |
 | `isoloom-external` | The `external` backend: hosts that already exist |
 | `isoloom-targets` | Dispatch to every backend, refusals, `generate_all`, the resolved snapshot |

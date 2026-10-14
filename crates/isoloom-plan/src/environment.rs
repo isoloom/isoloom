@@ -260,6 +260,9 @@ impl Environment {
         let laid_out = lay_out(spec, target);
         let spec = &laid_out;
         let router = routing::needed(spec).then(|| routing::networks(spec).map(|n| (n.clone(), routing::address(spec, n))).collect());
+        let machines: IndexMap<String, MachinePlan> = spec.machines.iter().map(|(n, m)| (n.clone(), machine(spec, target, n, m))).collect();
+        let mut requirements = requirements::of(spec);
+        requirements.extend(requirements::mixed_shapes(spec, |n| machines.get(n).map(|m| m.shape)));
         Environment {
             name: spec.name.clone(),
             target,
@@ -270,12 +273,12 @@ impl Environment {
                 .map(|n| (n.clone(), network(spec, &original.networks[n].cidr, n)))
                 .collect(),
             router,
-            machines: spec.machines.iter().map(|(n, m)| (n.clone(), machine(spec, target, n, m))).collect(),
+            machines,
             start_order: start_order(spec).into_iter().map(String::from).collect(),
             checks: checks::plan(spec),
             controller: controller(spec),
             constraints: spec.constraints.clone(),
-            requirements: requirements::of(spec),
+            requirements,
             images: Images::of(spec),
             inventory_groups: ansible::groups(spec),
             spec: laid_out.clone(),

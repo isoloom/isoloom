@@ -592,12 +592,12 @@ name = "isoloom-vagrant"
 version = "0.10.1"
 dependencies = [
  "indexmap",
+ "insta",
  "isoloom-compose",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
  "isoloom-terraform",
- "serde_yaml_ng",
 ]
 
 [[package]]

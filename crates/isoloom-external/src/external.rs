@@ -31,10 +31,16 @@ impl Backend for ExternalBackend {
     }
 
     /// Provisioning runs from here with the inventory; checks are probes from each machine (a
-    /// playbook or script check is left out of the runners, not refused). Appliances need
-    /// Docker's networks, which existing hosts don't have.
+    /// playbook or script check is left out of the runners, not refused). A gateway machine is
+    /// one of the existing hosts, routing as it already does. Appliances need Docker's networks,
+    /// which existing hosts don't have.
     fn capabilities(&self) -> Capabilities {
-        Capabilities::of([Feature::EnvironmentProvisioning, Feature::PlaybookChecks, Feature::ExecWithoutContainer])
+        Capabilities::of([
+            Feature::EnvironmentProvisioning,
+            Feature::PlaybookChecks,
+            Feature::ExecWithoutContainer,
+            Feature::Gateways,
+        ])
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {

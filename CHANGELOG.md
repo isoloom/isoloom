@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### docker-vm and hybrid rendered from the plan
+- `docker-vm` and `hybrid` are backends of their own (`DockerVmBackend`, `HybridBackend`), registered in isoloom-targets: they render the planned `Environment`, and their Vagrantfiles are written with one Ruby builder (`isoloom_vagrant::ruby`: values quoted by `rb`, calls, blocks, heredocs) and shared Vagrantfile pieces (`isoloom_vagrant::vagrantfile`). Hybrid no longer edits generated text: the `vagrant` generator writes into `.isoloom/hybrid/` with the Docker host's block (`vagrant::generate_in`), and the containers' Compose file is the Compose backend's typed file (`isoloom_compose::compose_file`), adapted before it is written.
+- Refusals from the plan: a network's `gateway`, a volume shared by a container and a VM, and a VM that depends on a container are requirements (`Requirement::Gateway`, `VolumeAcrossShapes`, `VmDependsOnContainer`) that hybrid lacks the capability for; docker-vm has Compose's capabilities, so `isoloom targets` reports its refusal as `docker-vm: ...` rather than `docker: ...`.
+- Output: every docker-vm file is unchanged. In hybrid's `compose.yml`, `extra_hosts` moves to its place among the service's keys, and the publishing bridge is written `isoloom-publish: {}` (an empty network) instead of `null`; Compose reads both the same. A container publishing a fixed port (`fixed: true`) now gets a valid `host:port` mapping and forward in hybrid.
+- Breaking (library): `isoloom_vagrant::docker_vm::generate` and `hybrid::generate` are gone (use the backends, or `isoloom_targets::generate`); `Feature` and `Requirement` gain variants; the Compose structs gain `Network::external`, `Network::name` and `Attachment::gw_priority`.
+
 ### One Ansible inventory, and the external target on the plan
 - One inventory renderer (`isoloom_render::inventory`) from the plan, with each target's way of reaching its hosts as an `Access` (Vagrant, Proxmox, a cloud, external). The external target and Proxmox use it; Vagrant and the clouds switch as they move onto the plan. Proxmox's controller inventory now has the spec's `groups:` (it only had the `provision:` steps' groups), so a playbook can target `pair` in ansible-pair there too.
 - The external target renders from the plan (`ExternalBackend`): the same inventory, `machines.json` and check runners as before, byte for byte, and its refusals come from its capabilities.

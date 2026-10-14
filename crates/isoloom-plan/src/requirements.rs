@@ -8,6 +8,7 @@ use std::fmt;
 use isoloom_spec::model::Spec;
 
 use crate::checks::{self, Position, Probe};
+use crate::environment::MachineShape;
 
 /// A capability a backend may have: the kind of a [`Requirement`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -20,6 +21,12 @@ pub enum Feature {
     ExecWithoutContainer,
     /// Network appliances (`docker.appliance`), wired the way Docker attaches networks.
     NetworkAppliances,
+    /// Networks routed by a machine of the environment (a network's `gateway`).
+    Gateways,
+    /// One shared volume mounted by containers and VMs alike.
+    VolumesAcrossShapes,
+    /// A VM that waits for a container (`depends_on`).
+    VmAfterContainer,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -40,6 +47,23 @@ pub enum Requirement {
         /// The machine.
         machine: String,
     },
+    /// A network is routed by one of the environment's machines.
+    Gateway {
+        /// The network.
+        network: String,
+    },
+    /// A shared volume is mounted by a container and by a VM.
+    VolumeAcrossShapes {
+        /// The volume.
+        volume: String,
+    },
+    /// A VM waits for a container.
+    VmDependsOnContainer {
+        /// The VM.
+        vm: String,
+        /// The container it waits for.
+        container: String,
+    },
 }
 
 impl Requirement {
@@ -50,6 +74,9 @@ impl Requirement {
             Requirement::PlaybookChecks => Feature::PlaybookChecks,
             Requirement::ExecWithoutContainer { .. } => Feature::ExecWithoutContainer,
             Requirement::NetworkAppliance { .. } => Feature::NetworkAppliances,
+            Requirement::Gateway { .. } => Feature::Gateways,
+            Requirement::VolumeAcrossShapes { .. } => Feature::VolumesAcrossShapes,
+            Requirement::VmDependsOnContainer { .. } => Feature::VmAfterContainer,
         }
     }
 }
@@ -67,6 +94,17 @@ impl fmt::Display for Requirement {
                 f,
                 "machine `{machine}` is a network appliance (`docker.appliance`), which runs on the Docker targets"
             ),
+            Requirement::Gateway { .. } => f.write_str("networks with a `gateway` machine in hybrid environments come later"),
+            Requirement::VolumeAcrossShapes { volume } => write!(
+                f,
+                "volume `{volume}` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now"
+            ),
+            Requirement::VmDependsOnContainer { vm, container } => {
+                write!(
+                    f,
+                    "VM `{vm}` depends on container `{container}`: VMs start first in a hybrid environment, for now"
+                )
+            }
         }
     }
 }
@@ -122,6 +160,34 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
             .filter(|(_, m)| m.docker.as_ref().is_some_and(|d| d.appliance.is_some()))
             .map(|(name, _)| Requirement::NetworkAppliance { machine: name.clone() }),
     );
+    out.extend(
+        spec.networks
+            .iter()
+            .filter(|(_, n)| n.gateway.is_some())
+            .map(|(name, _)| Requirement::Gateway { network: name.clone() }),
+    );
+    out
+}
+
+/// What mixing containers and VMs in one environment asks for: a shared volume mounted by both,
+/// a VM waiting for a container. `shape` is each machine's shape on the target; only containers
+/// and VMs count (an external or supplied machine is neither), so nothing comes out unless the
+/// target runs both.
+pub fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+    let is = |name: &str, s: MachineShape| shape(name) == Some(s);
+    let volumes = spec.volumes.keys().filter(|v| {
+        let users = spec.volume_users(v);
+        users.iter().any(|u| is(u, MachineShape::Container)) && users.iter().any(|u| is(u, MachineShape::Vm))
+    });
+    let mut out: Vec<Requirement> = volumes.map(|v| Requirement::VolumeAcrossShapes { volume: v.clone() }).collect();
+    for (name, m) in spec.machines.iter().filter(|(n, _)| is(n, MachineShape::Vm)) {
+        if let Some(dep) = m.depends_on.iter().find(|d| is(d, MachineShape::Container)) {
+            out.push(Requirement::VmDependsOnContainer {
+                vm: name.clone(),
+                container: dep.clone(),
+            });
+        }
+    }
     out
 }
 

@@ -134,6 +134,9 @@ pub struct Attachment {
     pub interface_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<u32>,
+    /// Which attachment gives the default route (the highest wins).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gw_priority: Option<u32>,
 }
 
 impl Attachment {
@@ -201,6 +204,12 @@ pub struct Limits {
 /// A network.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Network {
+    /// Created outside this file (by `name`), not by Compose.
+    #[serde(skip_serializing_if = "no")]
+    pub external: bool,
+    /// Its name on the Docker host, when not `<project>_<key>`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipam: Option<Ipam>,
     #[serde(skip_serializing_if = "no")]
