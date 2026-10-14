@@ -63,16 +63,18 @@ fn mac(nic: &str) -> Expression {
 /// An interface per network (the first carries the public IP; forwarding on for a machine on
 /// several, and for a gateway), each with its association to the machine's security group.
 fn nics(id: &str, who: &str, mp: &MachinePlan) -> Vec<Block> {
-    controller_nics(id, who, (&mp.addresses, &mp.addresses6), mp.is_gateway)
+    controller_nics(id, who, (&mp.addresses, &mp.addresses6, &mp.more_addresses), mp.is_gateway)
 }
 
+/// A machine's addresses by network: its IPv4 ones, its IPv6 ones, its further IPv4 ones.
+type Addresses<'a> = (
+    &'a indexmap::IndexMap<String, std::net::Ipv4Addr>,
+    &'a indexmap::IndexMap<String, std::net::Ipv6Addr>,
+    &'a indexmap::IndexMap<String, Vec<std::net::Ipv4Addr>>,
+);
+
 /// The same from the addresses themselves (each IPv6 one beside its network's IPv4 one).
-fn controller_nics(
-    id: &str,
-    who: &str,
-    (addresses, addresses6): (&indexmap::IndexMap<String, std::net::Ipv4Addr>, &indexmap::IndexMap<String, std::net::Ipv6Addr>),
-    gateway: bool,
-) -> Vec<Block> {
+fn controller_nics(id: &str, who: &str, (addresses, addresses6, more): Addresses<'_>, gateway: bool) -> Vec<Block> {
     let forwarding = gateway || addresses.len() > 1;
     addresses
         .iter()
@@ -84,6 +86,7 @@ fn controller_nics(
                 net,
                 address: *address,
                 address6: addresses6.get(net).copied(),
+                more: more.get(net).map_or(&[], Vec::as_slice),
                 primary: i == 0,
                 forwarding,
             })
@@ -278,7 +281,12 @@ pub fn controller(env: &Environment, m: &mut Module) {
         .iter()
         .map(|(n, p)| (n.clone(), Cidr::parse(&p.cidr).map_or(std::net::Ipv4Addr::UNSPECIFIED, Cidr::controller)))
         .collect();
-    m.blocks(controller_nics(id, "controller", (&addresses, &indexmap::IndexMap::new()), false));
+    m.blocks(controller_nics(
+        id,
+        "controller",
+        (&addresses, &indexmap::IndexMap::new(), &indexmap::IndexMap::new()),
+        false,
+    ));
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, memory, disk) = controller::size(env);
     let disk = disk.unwrap_or(30).max(30);

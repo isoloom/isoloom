@@ -69,17 +69,15 @@ fn service_from(spec: &Spec, position: &Position, (a, ma): (&str, &Machine), (b,
     if paths.iter().all(|(_, ok)| !ok) {
         return paths
             .iter()
-            .map(|(n, _)| {
+            .flat_map(|(n, _)| hosts(spec, b, mb, n))
+            .map(|(host, at)| {
                 let probe = Probe::Tcp {
-                    host: Host::Machine {
-                        name: b.to_string(),
-                        network: (*n).clone(),
-                    },
+                    host,
                     port: svc.port,
                     expect: TcpExpect::Blocked,
                     exchange: TcpExchange::default(),
                 };
-                derived_check(format!("{b}:{}{} blocked from {a}", svc.port, on_network(mb, n)), position.clone(), probe, 0)
+                derived_check(format!("{b}:{}{at} blocked from {a}", svc.port), position.clone(), probe, 0)
             })
             .collect();
     }
@@ -91,14 +89,21 @@ fn service_from(spec: &Spec, position: &Position, (a, ma): (&str, &Machine), (b,
     paths
         .iter()
         .filter(|(_, ok)| *ok)
-        .map(|(n, _)| {
-            derived_check(
-                format!("{b}:{}{} from {a}", svc.port, on_network(mb, n)),
-                position.clone(),
-                answers(b, n, svc),
-                30,
-            )
-        })
+        .flat_map(|(n, _)| hosts(spec, b, mb, n))
+        .map(|(host, at)| derived_check(format!("{b}:{}{at} from {a}", svc.port), position.clone(), answers(host, svc), 30))
+        .collect()
+}
+
+/// Where machine `b` answers on network `n`, each with how a check's name says it: its address
+/// there, then each of its further addresses (`lan: [10, 11]`) as written.
+fn hosts(spec: &Spec, b: &str, mb: &Machine, n: &str) -> Vec<(Host, String)> {
+    let primary = Host::Machine {
+        name: b.to_string(),
+        network: n.to_string(),
+    };
+    let more = crate::more_addresses::of(spec, mb).swap_remove(n).unwrap_or_default();
+    std::iter::once((primary, on_network(mb, n)))
+        .chain(more.into_iter().map(|a| (Host::Literal(a.to_string()), format!(" at {a}"))))
         .collect()
 }
 
@@ -129,21 +134,17 @@ pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
     for (b, mb) in &spec.machines {
         // A dormant service answers only once woken, a UDP one isn't probed, as above.
         for svc in mb.services.iter().filter(|s| !s.dormant && s.protocol.is_tcp()) {
-            for n in mb.networks.keys() {
-                let name = format!("{b}:{}{} from the networks", svc.port, on_network(mb, n));
-                out.push(derived_check(name, Position::Networks, answers(b, n, svc), 30));
+            for (host, at) in mb.networks.keys().flat_map(|n| hosts(spec, b, mb, n)) {
+                let name = format!("{b}:{}{at} from the networks", svc.port);
+                out.push(derived_check(name, Position::Networks, answers(host, svc), 30));
             }
         }
     }
     out
 }
 
-/// The probe that machine `b`'s service answers at its address on network `n`.
-fn answers(b: &str, n: &str, svc: &Service) -> Probe {
-    let host = Host::Machine {
-        name: b.to_string(),
-        network: n.to_string(),
-    };
+/// The probe that a machine's service answers at `host`.
+fn answers(host: Host, svc: &Service) -> Probe {
     if svc.http {
         Probe::Http {
             url: Url {

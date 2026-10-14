@@ -79,8 +79,9 @@ them. A Docker host VM (`docker-vm`, `cloud-docker`, hybrid's) fills them from t
 unpacked. Such a file must be text (UTF-8), and Compose skips an empty one.
 
 **Limits.** Refused: a network's `mtu` or `bridged`, a machine's `rate_limit` or
-`nested_virtualization`, and environment-level `provision:` (it runs on the VM targets). A
-Windows machine has no `docker:`, so an environment with one never gets this target.
+`nested_virtualization`, several addresses on one network (`lan: [10, 11]`: Docker gives a
+container one address per network), and environment-level `provision:` (it runs on the VM
+targets). A Windows machine has no `docker:`, so an environment with one never gets this target.
 
 **Storage.** Volumes are named volumes; `persistent` ones survive `down` (`down --volumes`
 removes them) and `external` ones are existing volumes. A data disk becomes a named volume at
@@ -126,7 +127,7 @@ chart.
 
 **Limits.** Refused: link impairment (`tc`) and networks with a `gateway` machine (Kubernetes
 has no router in the path), a network's `mtu`, `bridged` or `external`, a machine's
-`rate_limit`, `nested_virtualization` or `devices`, `gpus.ids` (give a count) and
+`rate_limit`, `nested_virtualization`, `devices` or several addresses on one network, `gpus.ids` (give a count) and
 `gpus.options`, environment-level `provision:`, and `dns.private` (a cluster names Services
 under its own domain). A network's `cidr` and a machine's address
 on it are kept as intent only: Kubernetes picks pod addresses. The manifests, the chart and the
@@ -388,7 +389,9 @@ module's `checks` output and runs each runner over SSH; `down` runs `terraform d
 **Limits.** Refused by every cloud: `tc`, a machine's own `vm.boot`, `devices`, `bridged` and
 `external` networks, `mtu`, `rate_limit`, arm64, `ipv6.only`, and `gpus.ids` (give a count). `dns.private` uses the cloud's own private zone (Route 53, Azure
 private DNS, Cloud DNS, an Oracle Cloud private view), or the hosts file where the cloud has
-none. Then each cloud:
+none. Several addresses on one network (`lan: [10, 11]`) are told to the cloud and added by
+the machine's set-up ([cloud modules](cloud-modules.md#several-addresses-on-one-network));
+DigitalOcean refuses them. Then each cloud:
 
 - **AWS:** a network with a `gateway` machine routes through it, though the network's
   machines still reach the internet at their own public addresses. AWS assigns a VPC's IPv6
@@ -480,8 +483,8 @@ key }`, an SSH endpoint that already exists.
 - `down`: forgets the environment; the hosts stay as they are.
 
 **Limits.** Refused: a machine's own process (`command`, `working_dir`, `before`,
-`healthcheck`), `files` (place them with a `provision:` playbook), `ipv6.only`, `mtu` and
-`rate_limit`. `reach` is checked, not enforced: the hosts' own firewall decides.
+`healthcheck`), `files` (place them with a `provision:` playbook), `ipv6.only`, `mtu`,
+`rate_limit` and several addresses on one network (a host keeps the addresses it has). `reach` is checked, not enforced: the hosts' own firewall decides.
 Data disks are refused: Isoloom creates no machine to attach one to.
 
 **Not run on a real host.**

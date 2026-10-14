@@ -126,7 +126,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     (
         "azurerm_network_interface",
-        "ip_configuration ip_configuration.name ip_configuration.private_ip_address ip_configuration.private_ip_address_allocation
+        "ip_configuration ip_configuration.name ip_configuration.primary ip_configuration.private_ip_address ip_configuration.private_ip_address_allocation
         ip_configuration.private_ip_address_version ip_configuration.public_ip_address_id ip_configuration.subnet_id
         ip_forwarding_enabled location name resource_group_name tags",
     ),
@@ -284,7 +284,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (CLOUD_RESOLVER, "dns_servers"),
             (CLOUD_NAMES, "internal_dns_name_label"),
-            (ALIAS, "ip_configuration.primary"),
         ],
     ),
     (

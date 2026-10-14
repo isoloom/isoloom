@@ -62,6 +62,7 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         nested: nested::wanted(mp),
         disk: Some(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)),
         on: (&mp.addresses, mp.is_gateway || mp.addresses.len() > 1),
+        more: &mp.more_addresses,
         tpm: mp.tpm.is_some(),
     });
     vm.body.extend(crate::vm::disks::gcp_attached(name, &mp.disks));
@@ -174,8 +175,19 @@ struct Instance<'a> {
     /// address); and whether IP forwarding is on: it routes a network, or is on several (replies
     /// leave from the right interface).
     on: (&'a IndexMap<String, Ipv4Addr>, bool),
+    /// Its further addresses on each network (`lan: [10, 11]`).
+    more: &'a IndexMap<String, Vec<Ipv4Addr>>,
     /// A shielded VM with a virtual TPM and secure boot (`vm.tpm`).
     tpm: bool,
+}
+
+/// A further address of the instance on its network: an alias range of one address, from the
+/// subnet's own range (the network's block, which a secondary range may not overlap), which the
+/// VPC then delivers to the instance.
+fn alias(address: Ipv4Addr) -> Block {
+    Block::builder("alias_ip_range")
+        .add_attribute(("ip_cidr_range", string(format!("{address}/32"))))
+        .build()
 }
 
 /// An instance at its address with a public one; its user from the `ssh-keys` metadata; the
@@ -190,7 +202,8 @@ fn instance(i: &Instance) -> Block {
     let nics = i.on.0.iter().enumerate().map(|(n, (net, address))| {
         let nic = Block::builder("network_interface")
             .add_attribute(("subnetwork", reference(&format!("google_compute_subnetwork.{}.id", res(net)))))
-            .add_attribute(("network_ip", string(address.to_string())));
+            .add_attribute(("network_ip", string(address.to_string())))
+            .add_blocks(i.more.get(net).into_iter().flatten().copied().map(alias));
         if n == 0 {
             nic.add_block(Block::builder("access_config").build())
         } else {
@@ -269,6 +282,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
         nested: false,
         disk,
         on: (&addresses, addresses.len() > 1),
+        more: &IndexMap::new(),
         tpm: false,
     }));
     let ssh = controller::Ssh {

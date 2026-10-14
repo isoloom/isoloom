@@ -14,6 +14,7 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     machines::CELLS,
     super::ipv6::PROXMOX,
     super::private_dns::PROXMOX,
+    super::more_addresses::PROXMOX,
     super::outside::PROXMOX,
     super::machine_files::VM,
     super::process::VM,

@@ -2,11 +2,16 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, IMAGE_BUILD,
-    IMAGES, LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ZONE_BINDING, ZONE_SETTINGS,
+    ACCOUNT, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, IMAGE_BUILD, IMAGES,
+    LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ZONE_BINDING, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
+
+/// A count of addresses AWS picks, where Isoloom writes the spec's own.
+const COUNTED: Support = Equivalent {
+    via: "machines.*.networks as a list (`lan: [10, 11]`): the spec's own addresses, as `secondary_private_ips` of aws_instance, or the `private_ip_list` and `ipv4_prefixes` (a whole aligned /28) of aws_network_interface, instead of a count AWS fills with addresses of its choosing",
+};
 
 /// Rule resources whose effect the security groups' inline rules give.
 const INLINE: Support = Equivalent {
@@ -135,12 +140,15 @@ const WRITTEN: &[(&str, &str)] = &[
         "aws_instance",
         "ebs_block_device ebs_block_device.delete_on_termination ebs_block_device.device_name ebs_block_device.volume_size ebs_block_device.volume_type ami associate_public_ip_address instance_initiated_shutdown_behavior instance_type key_name metadata_options
         metadata_options.http_tokens primary_network_interface primary_network_interface.network_interface_id private_ip root_block_device
-        root_block_device.encrypted root_block_device.volume_size root_block_device.volume_type subnet_id tags user_data
-        vpc_security_group_ids",
+        root_block_device.encrypted root_block_device.volume_size root_block_device.volume_type secondary_private_ips subnet_id tags
+        user_data vpc_security_group_ids",
     ),
     ("aws_internet_gateway", "tags vpc_id"),
     ("aws_key_pair", "key_name public_key"),
-    ("aws_network_interface", "private_ips security_groups source_dest_check subnet_id tags"),
+    (
+        "aws_network_interface",
+        "ipv4_prefixes private_ip_list private_ip_list_enabled private_ips security_groups source_dest_check subnet_id tags",
+    ),
     ("aws_network_interface_attachment", "device_index instance_id network_interface_id"),
     ("aws_route53_record", "name records ttl type zone_id"),
     ("aws_route53_zone", "name vpc vpc.vpc_id"),
@@ -216,7 +224,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 launch_template launch_template.*",
             ),
             (AWS_IPV6, "enable_primary_ipv6 ipv6_address_count ipv6_addresses"),
-            (ADDRESSES, "secondary_private_ips"),
             (
                 ALIAS,
                 "security_groups source_dest_check user_data_base64 user_data_replace_on_change volume_tags root_block_device.delete_on_termination network_interface
@@ -244,11 +251,8 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 AWS_IPV6,
                 "enable_primary_ipv6 ipv6_address_count ipv6_address_list ipv6_address_list_enabled ipv6_addresses ipv6_prefix_count ipv6_prefixes",
             ),
-            (
-                ADDRESSES,
-                "private_ips_count ipv4_prefix_count ipv4_prefixes",
-            ),
-            (ALIAS, "private_ip private_ip_list private_ip_list_enabled attachment attachment.*"),
+            (COUNTED, "private_ips_count ipv4_prefix_count"),
+            (ALIAS, "private_ip attachment attachment.*"),
             (CLOUD, "interface_type ena_srd_specification ena_srd_specification.*"),
         ],
     ),

@@ -13,6 +13,8 @@ pub enum Stage {
     Clones,
     /// `common:` and `groups:` folded into the machines.
     Groups,
+    /// A machine's several addresses on one network (`lan: [10, 11]`), split from its first.
+    Addresses,
     /// VLANs written under their LAN, made networks of their own.
     Vlans,
 }

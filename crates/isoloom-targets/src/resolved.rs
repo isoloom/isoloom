@@ -158,6 +158,15 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Value {
     if !v6.is_empty() {
         out["ipv6_addresses"] = v6.iter().map(|(n, a)| (n.clone(), json!(a.to_string()))).collect::<Map<_, _>>().into();
     }
+    // Its further addresses on a network (`lan: [10, 11]`), after the primary one in `addresses`.
+    let more = isoloom_plan::more_addresses::of(spec, m);
+    if !more.is_empty() {
+        out["more_addresses"] = more
+            .iter()
+            .map(|(n, a)| (n.clone(), json!(a.iter().map(ToString::to_string).collect::<Vec<_>>())))
+            .collect::<Map<_, _>>()
+            .into();
+    }
     out
 }
 

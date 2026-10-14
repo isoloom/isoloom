@@ -52,6 +52,12 @@ pub enum Step {
     },
     /// 802.1Q interfaces for the VLANs it reaches through a trunk.
     Trunks,
+    /// Its further addresses on a network (`lan: [10, 11]`), each on the interface holding its
+    /// primary address there.
+    MoreAddresses {
+        /// One entry per network where it has several.
+        addresses: Vec<crate::more_addresses::MoreAddresses>,
+    },
     /// The directories of its own volumes.
     Volumes {
         /// The mount paths.
@@ -170,6 +176,7 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
     steps.push(Step::Settings);
     steps.extend(shared_volumes(spec, name, m));
     steps.push(Step::Trunks);
+    steps.extend(crate::more_addresses::step(spec, m));
     steps.push(Step::Routes {
         routes: routing::routes(spec, name, m).into_iter().map(|(cidr, via)| Route { cidr, via }).collect(),
         default: routing::default_gateway(spec, name, m),
@@ -234,7 +241,23 @@ fn hosts(spec: &Spec, name: &str) -> Step {
             (address_for(spec, name, o), crate::private_dns::with_domain(spec, names))
         })
         .collect();
-    Step::Hosts { entries }
+    Step::Hosts {
+        entries: [entries, more_addresses(spec, name, linux)].concat(),
+    }
+}
+
+/// The other machines' further addresses (`lan: [10, 11]`), after every primary one, under
+/// their machine's own name: a reverse lookup names the machine, and a lookup by name still
+/// finds its primary address first.
+fn more_addresses(spec: &Spec, name: &str, linux: bool) -> Vec<(Ipv4Addr, Vec<String>)> {
+    spec.machines
+        .iter()
+        .filter(|(o, om)| o.as_str() != name && !(linux && windows(om)))
+        .flat_map(|(o, om)| {
+            let names = crate::private_dns::with_domain(spec, vec![o.clone()]);
+            crate::more_addresses::of(spec, om).into_values().flatten().map(move |a| (a, names.clone()))
+        })
+        .collect()
 }
 
 fn shared_volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Step> {

@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Several addresses on one network: a machine written `office: [10, 11, 12]` has .10 (its
+# primary address, the one its name resolves to) and .11 and .12 besides, on the same interface.
+# A web server with a site per address, and a decoy that answers on a whole /28 for a scan to
+# find. Each VM's set-up adds the further addresses; a cloud learns them too (AWS secondary
+# private addresses and an IPv4 prefix for the /28, Azure IP configurations, Google Cloud alias
+# ranges, Oracle Cloud secondary private IPs, Linode routed ranges). Every hosts file names them
+# after their machine, and the derived checks probe each one.
+version: 1
+name: several-addresses
+
+networks:
+  office: { cidr: 10.86.0.0/24 }
+
+machines:
+  # A site per address: nginx answers on all three.
+  web:
+    networks: { office: [10, 11, 12] }
+    services: [{ port: 80, http: true }]
+    vm:
+      os: debian-12
+      provision: [provision/web.sh]
+  # A decoy at .40 that also answers on the whole of 10.86.0.48/28.
+  decoy:
+    networks: { office: [40, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63] }
+    vm:
+      os: debian-12
+      provision: [provision/decoy.sh]
+  client:
+    networks: { office: 20 }
+    vm:
+      os: debian-12
+      provision: [provision/client.sh]
+
+checks:
+  - name: the second site answers at its own address
+    from: client
+    http: http://10.86.0.12/
+  - name: the hosts file names the web server's further address
+    from: client
+    exec: getent hosts 10.86.0.11
+    expect: web
+  - name: the decoy answers on its /28
+    from: client
+    exec: ping -c 1 -W 2 10.86.0.57

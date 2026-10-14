@@ -167,6 +167,8 @@ impl Backend for EsxiBackend {
             Feature::DataDisks,
             Feature::RawDisks,
             Feature::TmpfsModes,
+            // Each VM's set-up adds them on the interface of its primary address.
+            Feature::VmMoreAddresses,
         ])
     }
 

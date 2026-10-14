@@ -142,6 +142,23 @@ disks, and on a single-network environment the VPC network itself, from `google_
 to `google_compute_network.<network>`), but the instances of a machine on several networks are
 rebuilt either way.
 
+### Several addresses on one network
+
+A machine written `networks: { lan: [10, 11, 12] }` has `.10`, its primary address (the one its
+name resolves to), and `.11` and `.12` on the same interface. The cloud drops traffic for an
+address it doesn't know, so the module tells it, and the machine's set-up puts each address on
+the interface of its primary one. Every hosts file names the further addresses after their
+machine, and the derived checks probe each one.
+
+| Cloud | What the module writes |
+| --- | --- |
+| AWS | `secondary_private_ips` on `aws_instance`; on a machine with a network interface of its own (several networks, or a whole aligned /28 of addresses), its ordered `private_ip_list`, and `ipv4_prefixes` for each whole /28. An instance type takes a number of addresses per interface: a machine that needs more gets a larger type (15 at most, a /28 counting once) |
+| Azure | An `ip_configuration` per further address on the interface (the first one `primary`) |
+| Google Cloud | An `alias_ip_range` per further address (`/32`), from the subnetwork's own range |
+| Oracle Cloud | An `oci_core_private_ip` per further address on the machine's VNIC |
+| Linode | `ip_ranges` (`/32` each) on the VPC interface |
+| DigitalOcean | Refused: a Droplet has one address on its VPC |
+
 ### Data disks (`disks`)
 
 A machine's data disks are block volumes of their size, attached to its VM. The machine's set-up

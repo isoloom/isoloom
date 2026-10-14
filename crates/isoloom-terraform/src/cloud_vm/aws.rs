@@ -15,6 +15,7 @@
 //!   WinRM at first boot, then the core's WinRM set-up.
 //! - Environment-level `provision:`: the core's controller, a Debian instance on every network.
 
+mod addresses;
 mod machines;
 mod network;
 mod outputs;
@@ -60,7 +61,9 @@ const NESTING: &[(u32, &str)] = &[(8192, "m8i.large"), (16384, "m8i.xlarge"), (3
 
 /// A machine's instance type: its GPUs', a nesting one, else by its memory.
 pub fn machine_type(mp: &isoloom_plan::MachinePlan, memory_mb: u32) -> &'static str {
-    GPUS.of(mp).or_else(|| nested::size(mp, memory_mb, NESTING)).unwrap_or(instance_type(memory_mb))
+    GPUS.of(mp)
+        .or_else(|| nested::size(mp, memory_mb, NESTING))
+        .unwrap_or_else(|| addresses::sized(instance_type(memory_mb), mp))
 }
 
 /// The instance's nested virtualization switch, when the machine runs VMs of its own.
@@ -153,6 +156,9 @@ fn machines_refusal(env: &Environment) -> Option<String> {
             return Some(format!(
                 "machine `{name}`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later"
             ));
+        }
+        if let Some(why) = env.machines.get(name).and_then(|mp| addresses::refusal(name, mp)) {
+            return Some(why);
         }
         // A gateway machine's gateway address moves to the router's (`vm::gateways`).
         if let Some((net, _)) = m.networks.iter().find(|(n, o)| **o <= 3 && !gateways::is_gateway_address(env, name, n)) {

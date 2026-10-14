@@ -1,6 +1,7 @@
 //! The Isoloom spec: the model, parsing and loading, the schema, normalization (groups,
 //! clones, VLANs, profiles, instances, defaults, the image table) and validation.
 
+pub mod addresses;
 pub mod appliance;
 pub mod clones;
 pub mod defaults;
@@ -41,6 +42,7 @@ pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
     // finished ones.
     let clones = clones::expand(&mut doc).map_err(LoadError::at(Stage::Clones))?;
     groups::expand(&mut doc).map_err(LoadError::at(Stage::Groups))?;
+    addresses::split(&mut doc).map_err(LoadError::at(Stage::Addresses))?;
     let mut spec: Spec = serde_yaml_ng::from_value(doc)?;
     spec.clones = clones;
     vlans::flatten(spec).map_err(LoadError::at(Stage::Vlans))

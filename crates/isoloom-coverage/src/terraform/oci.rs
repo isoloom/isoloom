@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS,
-    IMAGES, LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
+    ACCOUNT, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, IMAGES,
+    LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent, NotPortable};
@@ -59,7 +59,6 @@ pub const TABLE: Table = Table {
 const TYPES: Rules = &[
     (NAT, "core_nat_gateway"),
     (PUBLIC_IP, "core_public_ip"),
-    (ADDRESSES, "core_private_ip"),
     (IPV6_WITH_VNIC, "core_ipv6"),
     (CLOUD_VLANS, "core_vlan"),
     (BACKUP, "core_boot_volume"),
@@ -119,7 +118,7 @@ const WRITTEN: &[(&str, &str)] = &[
         "types",
         "data.oci_core_images data.oci_core_private_ips data.oci_core_vcn_dns_resolver_association data.oci_core_vnic
         data.oci_identity_availability_domains oci_core_instance oci_core_internet_gateway oci_core_network_security_group
-        oci_core_network_security_group_security_rule oci_core_route_table oci_core_route_table_attachment oci_core_security_list
+        oci_core_network_security_group_security_rule oci_core_private_ip oci_core_route_table oci_core_route_table_attachment oci_core_security_list
         oci_core_subnet oci_core_vcn oci_core_vnic_attachment oci_dns_resolver oci_dns_rrset oci_dns_view oci_dns_zone",
     ),
     ("provider", "region"),
@@ -130,6 +129,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ("data.oci_core_private_ips", "ip_address subnet_id"),
     ("data.oci_core_vcn_dns_resolver_association", "vcn_id"),
     ("data.oci_core_vnic", "vnic_id"),
+    ("oci_core_private_ip", "display_name ip_address vnic_id"),
     ("data.oci_identity_availability_domains", "compartment_id"),
     ("oci_dns_resolver", "attached_views attached_views.view_id resolver_id scope"),
     (
@@ -320,6 +320,14 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (CLOUD_NAMES, "create_vnic_details.assign_private_dns_record"),
             (CLOUD_VLANS, "create_vnic_details.vlan_id"),
             (RESERVED_IPV6, "create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id"),
+        ],
+    ),
+    (
+        "oci_core_private_ip",
+        &[
+            (CLOUD_NAMES, "hostname_label"),
+            (CLOUD_VLANS, "vlan_id"),
+            (ALIAS, "id subnet_id lifetime route_table_id ipv4subnet_cidr_at_creation cidr_prefix_length"),
         ],
     ),
     ("data.oci_core_private_ips", &[(ALIAS, "ip_state lifetime vlan_id vnic_id filter filter.*")]),

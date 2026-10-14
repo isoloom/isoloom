@@ -1,0 +1,291 @@
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 1,
+  "name": "several-addresses",
+  "instance": null,
+  "inputs": [],
+  "networks": {
+    "office": {
+      "cidr": "10.86.0.0/24",
+      "docker_cidr": "10.86.0.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "10.86.0.1",
+      "router": null,
+      "controller": "10.86.0.253"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "web": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "role": "target",
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "office": "10.86.0.10"
+      },
+      "docker_addresses": {
+        "office": "10.86.0.10"
+      },
+      "services": [
+        {
+          "port": 80,
+          "name": null,
+          "http": true,
+          "publish": null
+        }
+      ],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false,
+      "more_addresses": {
+        "office": [
+          "10.86.0.11",
+          "10.86.0.12"
+        ]
+      }
+    },
+    "decoy": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "role": "target",
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "office": "10.86.0.40"
+      },
+      "docker_addresses": {
+        "office": "10.86.0.40"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false,
+      "more_addresses": {
+        "office": [
+          "10.86.0.48",
+          "10.86.0.49",
+          "10.86.0.50",
+          "10.86.0.51",
+          "10.86.0.52",
+          "10.86.0.53",
+          "10.86.0.54",
+          "10.86.0.55",
+          "10.86.0.56",
+          "10.86.0.57",
+          "10.86.0.58",
+          "10.86.0.59",
+          "10.86.0.60",
+          "10.86.0.61",
+          "10.86.0.62",
+          "10.86.0.63"
+        ]
+      }
+    },
+    "client": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "role": "target",
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "office": "10.86.0.20"
+      },
+      "docker_addresses": {
+        "office": "10.86.0.20"
+      },
+      "services": [],
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false
+    }
+  },
+  "start_order": [
+    "web",
+    "decoy",
+    "client"
+  ],
+  "clones": {},
+  "tools": {},
+  "groups": {},
+  "router": null,
+  "controller": {
+    "role": "infra",
+    "keep_running": false,
+    "addresses": {
+      "office": "10.86.0.253"
+    }
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "vagrant",
+      "proxmox",
+      "esxi",
+      "cloud-vm"
+    ],
+    "generated": [
+      "vagrant",
+      "proxmox",
+      "esxi",
+      "cloud-vm"
+    ],
+    "refused": {},
+    "not_possible": {
+      "docker": "needs `docker:` on web, decoy, client",
+      "hosted": "needs `docker:` on web, decoy, client",
+      "docker-vm": "needs `docker:` on web, decoy, client",
+      "cloud-docker": "needs `docker:` on web, decoy, client",
+      "kubernetes": "needs `docker:` on web, decoy, client",
+      "hybrid": "only when some machines are containers and others are VMs",
+      "external": "needs `external:` on web, decoy, client",
+      "cloud-services": "left out by `targets:`"
+    },
+    "clouds": {
+      "cloud-vm": {
+        "generated": [
+          "aws",
+          "azure",
+          "gcp",
+          "linode",
+          "oci"
+        ],
+        "refused": {
+          "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address"
+        }
+      }
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "decoy",
+        "machine": "decoy",
+        "runner": "isoloom-check-decoy",
+        "checks": [
+          {
+            "name": "web:80 from decoy",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.86.0.10:80/",
+            "expect": "any",
+            "wait": 30
+          },
+          {
+            "name": "web:80 at 10.86.0.11 from decoy",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.86.0.11:80/",
+            "expect": "any",
+            "wait": 30
+          },
+          {
+            "name": "web:80 at 10.86.0.12 from decoy",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.86.0.12:80/",
+            "expect": "any",
+            "wait": 30
+          }
+        ]
+      },
+      {
+        "position": "client",
+        "machine": "client",
+        "runner": "isoloom-check-client",
+        "checks": [
+          {
+            "name": "the second site answers at its own address",
+            "derived": false,
+            "kind": "http",
+            "target": "http://10.86.0.12/",
+            "expect": "200",
+            "wait": 30
+          },
+          {
+            "name": "the hosts file names the web server's further address",
+            "derived": false,
+            "kind": "exec",
+            "target": "getent hosts 10.86.0.11",
+            "expect": "web",
+            "wait": 0
+          },
+          {
+            "name": "the decoy answers on its /28",
+            "derived": false,
+            "kind": "exec",
+            "target": "ping -c 1 -W 2 10.86.0.57",
+            "expect": "",
+            "wait": 0
+          },
+          {
+            "name": "web:80 from client",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.86.0.10:80/",
+            "expect": "any",
+            "wait": 30
+          },
+          {
+            "name": "web:80 at 10.86.0.11 from client",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.86.0.11:80/",
+            "expect": "any",
+            "wait": 30
+          },
+          {
+            "name": "web:80 at 10.86.0.12 from client",
+            "derived": true,
+            "kind": "http",
+            "target": "http://10.86.0.12:80/",
+            "expect": "any",
+            "wait": 30
+          }
+        ]
+      }
+    ]
+  }
+}

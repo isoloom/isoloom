@@ -212,7 +212,7 @@ machines:
     external: { address: 192.168.1.2, user: admin, port: 2222, key: ~/.ssh/lab }
   h:
     count: 2
-    networks: { out: 10 }
+    networks: { out: [10, 20] }
     docker: { build: h, dockerfile: h.Dockerfile, target: lab, args: { A: b } }
     files: [{ path: /etc/a, content: x, uid: 1, gid: 1, mode: "0600" }, { path: /etc/b, source: b }]
     command: [serve]

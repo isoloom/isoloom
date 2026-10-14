@@ -8,6 +8,7 @@ use isoloom_render::hcl_builder::{
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
+use super::addresses;
 use super::network::{controller_group, name_with, resource, security_group};
 use super::{image_user, instance_type, linux_user_data, r, vpc_does};
 use crate::vm::linux::{self, Hooks};
@@ -17,7 +18,8 @@ use crate::vm::{cloud, controller, gateways, os, own_image, res, windows};
 /// network, its Elastic IP on several (AWS doesn't auto-assign one then).
 pub fn public_ip(env: &Environment, name: &str) -> Expression {
     let id = res(name);
-    if env.machines[name].addresses.len() > 1 {
+    let mp = &env.machines[name];
+    if !mp.is_windows() && addresses::needs_interfaces(mp) {
         r(&format!("aws_eip.{id}.public_ip"))
     } else {
         r(&format!("aws_instance.{id}.public_ip"))
@@ -44,7 +46,7 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         instance = instance.add_block(nitro_tpm(&res(os(mp).unwrap_or_default())));
     }
     let instance = super::nesting(instance, mp);
-    if mp.addresses.len() > 1 {
+    if addresses::needs_interfaces(mp) {
         m.blocks(several_networks(env, name, instance));
     } else {
         m.block(one_network(env, name, instance));
@@ -93,6 +95,7 @@ fn one_network(env: &Environment, name: &str, instance: BlockBuilder) -> Block {
     } else {
         instance
     };
+    let instance = addresses::on_instance(instance, mp, net);
     instance
         .add_attribute(("subnet_id", r(&format!("aws_subnet.{}.id", res(net)))))
         .add_attribute(("private_ip", string(addr.to_string())))
@@ -116,7 +119,7 @@ fn several_networks(env: &Environment, name: &str, instance: BlockBuilder) -> Ve
         .addresses
         .iter()
         .map(|(n, a)| {
-            interface(&format!("{id}_{}", res(n)), n, &a.to_string(), group.clone())
+            interface(&format!("{id}_{}", res(n)), n, &a.to_string(), group.clone(), Some(mp))
                 .add_attribute(("tags", object([("Name", name_with(&format!("-{name}-{n}")))])))
                 .build()
         })
@@ -136,11 +139,11 @@ fn several_networks(env: &Environment, name: &str, instance: BlockBuilder) -> Ve
     out
 }
 
-/// A network interface, started: on its network's subnet, at `address`.
-fn interface(id: &str, net: &str, address: &str, group: Expression) -> BlockBuilder {
-    resource("aws_network_interface", id)
-        .add_attribute(("subnet_id", r(&format!("aws_subnet.{}.id", res(net)))))
-        .add_attribute(("private_ips", list([string(address)])))
+/// A network interface, started: on its network's subnet, at `address` (then the machine's
+/// further addresses there).
+fn interface(id: &str, net: &str, address: &str, group: Expression, mp: Option<&isoloom_plan::MachinePlan>) -> BlockBuilder {
+    let nic = resource("aws_network_interface", id).add_attribute(("subnet_id", r(&format!("aws_subnet.{}.id", res(net)))));
+    addresses::on_interface(nic, mp, net, address)
         .add_attribute(("security_groups", list([group])))
         .add_attribute(("source_dest_check", boolean(false)))
 }
@@ -204,7 +207,7 @@ pub fn windows(env: &Environment, name: &str, m: &mut Module) {
         .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50)))
         .add_blocks(crate::vm::disks::aws(&mp.disks))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])));
-    let instance = super::nesting(instance, mp).build();
+    let instance = super::nesting(addresses::on_instance(instance, mp, net), mp).build();
     m.commented(
         "No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.",
         instance,
@@ -244,7 +247,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
     let nic = |n: &str| format!("isoloom_controller_{}", res(n));
     for (n, p) in &env.networks {
         let at = Cidr::parse(&p.cidr).map(|c| c.controller().to_string()).unwrap_or_default();
-        m.block(interface(&nic(n), n, &at, r("aws_security_group.isoloom_controller.id")).build());
+        m.block(interface(&nic(n), n, &at, r("aws_security_group.isoloom_controller.id"), None).build());
     }
     let first = env.networks.keys().next().map(|n| nic(n)).unwrap_or_default();
     let (_, mem, _) = controller::size(env);

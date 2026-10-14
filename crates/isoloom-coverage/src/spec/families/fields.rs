@@ -32,6 +32,7 @@ pub const FIELDS: &[&str] = &[
     "inputs",
     "secrets",
     "machines.*.networks",
+    "machines.*.networks[]",
     "machines.*.services[].port",
     "cloud.provider",
     "cloud.terraform",

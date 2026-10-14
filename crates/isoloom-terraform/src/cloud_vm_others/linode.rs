@@ -162,11 +162,16 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
             .build(),
     );
     let user_data = call("base64encode", [auto_stop(shutdown_script(), string(""))]);
-    let vpc = Block::builder("interface")
+    let mut vpc = Block::builder("interface")
         .add_attribute(("purpose", string("vpc")))
         .add_attribute(("subnet_id", reference(&format!("linode_vpc_subnet.{}.id", res(&net)))))
-        .add_block(Block::builder("ipv4").add_attribute(("vpc", string(address))).build())
-        .build();
+        .add_block(Block::builder("ipv4").add_attribute(("vpc", string(address))).build());
+    // Its further addresses (`lan: [10, 11]`): ranges of the subnet the VPC routes to this
+    // interface, one address each; its set-up puts them on the interface.
+    if let Some(more) = mp.more_addresses.get(&net) {
+        vpc = vpc.add_attribute(("ip_ranges", list(more.iter().map(|a| string(format!("{a}/32"))))));
+    }
+    let vpc = vpc.build();
     m.block(
         resource("linode_instance", &id)
             .add_attribute(("label", name_with(&format!("-{name}"))))

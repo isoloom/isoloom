@@ -120,6 +120,8 @@ pub struct Nic<'a> {
     pub address: Ipv4Addr,
     /// Its IPv6 address there, on a dual-stack network.
     pub address6: Option<Ipv6Addr>,
+    /// Its further addresses there (`lan: [10, 11]`), each an IP configuration of its own.
+    pub more: &'a [Ipv4Addr],
     /// The first interface carries the public IP.
     pub primary: bool,
     /// Forwarding on: the machine is on several networks.
@@ -143,11 +145,25 @@ pub fn nic(n: &Nic) -> [Block; 2] {
     if n.primary {
         config = config.add_attribute(("public_ip_address_id", reference(&format!("azurerm_public_ip.{}.id", n.id))));
     }
+    // With several, Azure wants the first named the primary one.
+    if !n.more.is_empty() {
+        config = config.add_attribute(("primary", boolean(true)));
+    }
     let mut b = placed("azurerm_network_interface", &nid, name_with(&format!("-{}-{}", n.who, n.net)));
     if n.forwarding {
         b = b.add_attribute(("ip_forwarding_enabled", boolean(true)));
     }
     b = b.add_block(config.build());
+    for (i, more) in n.more.iter().enumerate() {
+        b = b.add_block(
+            Block::builder("ip_configuration")
+                .add_attribute(("name", string(format!("more-{}", i + 1))))
+                .add_attribute(("subnet_id", reference(&format!("azurerm_subnet.{}.id", res(n.net)))))
+                .add_attribute(("private_ip_address_allocation", string("Static")))
+                .add_attribute(("private_ip_address", string(more.to_string())))
+                .build(),
+        );
+    }
     if let Some(v6) = n.address6 {
         b = b.add_block(
             Block::builder("ip_configuration")

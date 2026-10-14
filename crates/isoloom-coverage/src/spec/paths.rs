@@ -50,6 +50,10 @@ pub fn paths(doc: &Value) -> Vec<String> {
             Value::Mapping(m) if NAMED.contains(&at) => {
                 if m.values().all(|c| !matches!(c, Value::Mapping(_))) {
                     out.push(at.to_string());
+                    // A list of addresses on a network (`lan: [10, 11]`) is a feature of its own.
+                    if at == "machines.*.networks" && m.values().any(|c| matches!(c, Value::Sequence(_))) {
+                        out.push(format!("{at}[]"));
+                    }
                 } else {
                     for c in m.values() {
                         walk(c, &format!("{at}.*"), out);
