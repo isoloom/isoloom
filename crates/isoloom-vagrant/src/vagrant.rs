@@ -91,6 +91,9 @@ pub fn capabilities() -> Capabilities {
         Feature::NestedVirtualization,
         // No DNS of its own: each VM's hosts file carries the names under the zone's domain.
         Feature::PrivateDns,
+        Feature::DataDisks,
+        Feature::RawDisks,
+        Feature::TmpfsModes,
     ])
 }
 
@@ -286,6 +289,18 @@ pub fn utm_refusal(spec: &Spec) -> Option<String> {
     let (name, _) = qemu::links(&env, with_controller).into_iter().find(|(_, l)| *l != qemu::Link::None)?;
     Some(format!(
         "`{name}` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
+    ))
+}
+
+/// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's,
+/// Parallels' and UTM's plugins attach none. `refusal_on` asks it for them.
+pub fn disk_refusal(spec: &Spec, provider: &str) -> Option<String> {
+    if !matches!(provider, "qemu" | "parallels" | "utm") {
+        return None;
+    }
+    let (name, _) = spec.machines.iter().find(|(_, m)| m.vm.is_some() && !m.disks.is_empty())?;
+    Some(format!(
+        "machine `{name}` has data disks (`disks`), which the `{provider}` provider doesn't attach"
     ))
 }
 

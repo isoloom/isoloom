@@ -69,6 +69,11 @@ pub fn probe(path: &str) -> Option<String> {
         "volumes.*.owner" => {
             format!("{{ volumes: {{ data: {{ owner: a }} }}, machines: {{ a: {{ volumes: {{ data: /data }} }}, {B}, volumes: {{ data: /data }} }} }} }}")
         }
+        "volumes.*.persistent" => "{ volumes: { data: { persistent: true } }, machines: { a: { volumes: { data: /data } } } }".to_string(),
+        "volumes.*.external" => "{ volumes: { data: { external: lab-data } }, machines: { a: { volumes: { data: /data } } } }".to_string(),
+        "machines.*.volumes.*.path" | "machines.*.volumes.*.subpath" => format!(
+            "{{ volumes: {{ data: {{ owner: a }} }}, machines: {{ a: {{ volumes: {{ data: /data }} }}, {B}, volumes: {{ data: {{ path: /srv, subpath: www }} }} }} }} }}"
+        ),
         "provision[].ansible"
         | "provision[].inventory"
         | "provision[].groups"
@@ -154,6 +159,12 @@ fn machine(path: &str) -> Option<&'static str> {
         "files[].uid" => "{ files: [{ path: /etc/app.ini, content: x, uid: 1000 }] }",
         "files[].gid" => "{ files: [{ path: /etc/app.ini, content: x, gid: 1000 }] }",
         "files[].mode" => "{ files: [{ path: /etc/app.ini, content: x, mode: '0600' }] }",
+        "tmpfs[].path" => "{ tmpfs: [{ path: /run }] }",
+        "tmpfs[].size" => "{ tmpfs: [{ path: /run, size: 64m }] }",
+        "tmpfs[].mode" => "{ tmpfs: [{ path: /run, mode: '1777' }] }",
+        // 50 GB: every cloud's smallest volume.
+        "disks.*.size_gb" | "disks.*.mount" => "{ disks: { data: { size_gb: 50, mount: /data } } }",
+        "disks.*.fs" => "{ disks: { data: { size_gb: 50, fs: xfs, mount: /data } } }",
         "shm_size" => "{ shm_size: 256m }",
         "dns.servers" => "{ dns: { servers: [10.20.0.53] } }",
         "dns.search" => "{ dns: { servers: [10.20.0.53], search: [probe.test] } }",

@@ -45,6 +45,9 @@ pub struct Container {
     /// Where it sees the pod's volumes.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub volume_mounts: Vec<VolumeMount>,
+    /// Where it sees the pod's block devices (raw data disks).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub volume_devices: Vec<VolumeDevice>,
 }
 
 impl Container {
@@ -64,6 +67,7 @@ impl Container {
             env: Vec::new(),
             resources: None,
             volume_mounts: Vec::new(),
+            volume_devices: Vec::new(),
         }
     }
 }
@@ -208,6 +212,16 @@ pub struct VolumeMount {
     /// The one file or folder of the volume it sees there, instead of the whole volume.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_path: Option<String>,
+}
+
+/// Where a container sees a block device (a claim of `volumeMode: Block`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeDevice {
+    /// The pod's volume.
+    pub name: String,
+    /// The device's path in the container.
+    pub device_path: String,
 }
 
 impl VolumeMount {

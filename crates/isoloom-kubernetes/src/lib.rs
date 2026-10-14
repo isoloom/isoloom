@@ -54,6 +54,7 @@ pub mod pod;
 mod process;
 mod render;
 pub mod secrets;
+pub mod storage;
 mod values_schema;
 
 use isoloom_plan::{Capabilities, Environment, Feature};
@@ -78,7 +79,8 @@ pub const CHART_PROJECT_FILES: &str = "files/project";
 /// network, containers have no ulimits, with no router in the path there is nothing to impair
 /// links with, a Secret volume's files belong to root, and no host devices (a pod reaches a
 /// node's devices only through a device plugin). GPUs are the device plugin's resource
-/// (`nvidia.com/gpu`).
+/// (`nvidia.com/gpu`). Volumes can be kept past `down` or exist already (claims), and data disks
+/// are claims (raw ones block devices); a tmpfs has no mode (a memory emptyDir has none).
 pub fn capabilities() -> Capabilities {
     Capabilities::of([
         Feature::Ipv6,
@@ -88,6 +90,10 @@ pub fn capabilities() -> Capabilities {
         Feature::OwnedProjectFiles,
         Feature::MachineProcess,
         Feature::ContainerGpus,
+        Feature::PersistentVolumes,
+        Feature::ExternalVolumes,
+        Feature::DataDisks,
+        Feature::RawDisks,
     ])
 }
 

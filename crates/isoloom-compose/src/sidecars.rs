@@ -348,11 +348,11 @@ fn check_runner(env: &Environment, pos: &Position, scripts: bool, services: &mut
         image: Some(env.images.pull(CHECK_IMAGE)),
         profiles: vec!["check".into()],
         entrypoint: vec!["/bin/sh".into(), "/isoloom/run.sh".into()],
-        volumes: vec![format!("./checks/{}.sh:/isoloom/run.sh:ro", pos.id())],
+        volumes: vec![format!("./checks/{}.sh:/isoloom/run.sh:ro", pos.id()).into()],
         ..Service::default()
     };
     if scripts {
-        c.volumes.push(format!("{ROOT}:/isoloom/project:ro"));
+        c.volumes.push(format!("{ROOT}:/isoloom/project:ro").into());
     }
     for (name, m) in spec.machines.iter().filter(|(_, m)| m.docker.is_some()) {
         if m.has_readiness() {

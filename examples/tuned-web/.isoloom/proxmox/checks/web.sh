@@ -78,5 +78,7 @@ if _retry 0 _exec 'cat /proc/sys/net/core/somaxconn' '4096'; then pass 'the acce
 
 if _retry 0 _exec 'sh -c '\''echo $(ulimit -Sn)/$(ulimit -Hn)'\''' '8192/16384'; then pass 'a process may open 8192 files (16384 at most)'; else fail 'a process may open 8192 files (16384 at most)' "$(printf '%s' "$out" | tail -n 1)"; fi
 
+if _retry 0 _exec 'grep -q '\'' /var/cache/web '\'' /proc/mounts && echo mounted' 'mounted'; then pass 'the cache disk is mounted'; else fail 'the cache disk is mounted' "$(printf '%s' "$out" | tail -n 1)"; fi
+
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

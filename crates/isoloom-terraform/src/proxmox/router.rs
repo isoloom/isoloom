@@ -62,6 +62,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         dns: None,
         ips: vec![ip_config("dhcp", None)],
         depends_on: vec![reference("proxmox_sdn_applier.env")],
+        data_disks: Vec::new(),
     };
     m.commented("The guest agent reports its uplink address (DHCP), for the published ports.", vm.block(env));
 }

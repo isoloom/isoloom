@@ -4,6 +4,7 @@
 mod environment;
 mod hardware;
 mod machines;
+mod storage;
 
 use crate::spec::status::Status;
 
@@ -20,4 +21,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::own_image::CONTAINER_BOOT,
     hardware::CELLS,
     super::links::COMPOSE,
+    storage::CELLS,
 ];

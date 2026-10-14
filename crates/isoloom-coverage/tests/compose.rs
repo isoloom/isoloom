@@ -147,6 +147,9 @@ fn written_paths(defs: &Json, node: &Json, value: &Yaml, prefix: &str, out: &mut
 }
 
 /// Every target whose output holds a Compose file.
+#[path = "support/storage.rs"]
+mod storage;
+
 const COMPOSE_TARGETS: &[Target] = &[Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker, Target::Hybrid];
 
 /// Specs that exercise what no committed example does, so every row marked as written is
@@ -243,6 +246,8 @@ machines:
   pinned: { networks: { lan: 11 }, docker: { image: nginx:alpine }, gpus: { ids: ["0"], driver: nvidia } }
   fuse: { networks: { lan: 12 }, docker: { image: nginx:alpine }, devices: [{ host: /dev/fuse, guest: /dev/fuse, permissions: rw }] }
 "#,
+    // Volumes kept past `down` or existing, a folder of a shared volume, a sized tmpfs, a disk.
+    storage::CONTAINERS,
 ];
 
 /// Every Compose file Isoloom writes for `spec`, on every target that writes one.

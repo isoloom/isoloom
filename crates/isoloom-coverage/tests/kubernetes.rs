@@ -15,6 +15,9 @@ use isoloom_spec::{load, parse};
 use isoloom_targets::generate;
 use serde_yaml_ng::Value;
 
+#[path = "support/storage.rs"]
+mod storage;
+
 const CHART: &str = ".isoloom/kubernetes/chart/";
 
 /// What no example sets but the generator writes: a machine's environment, sysctls, resolver
@@ -66,8 +69,10 @@ fn generated() -> Vec<(String, String)> {
         }
     }
     assert!(out.iter().any(|(p, _)| p.ends_with("environment.yaml")), "no example generates for Kubernetes");
-    let fixture = generate(&parse(FIXTURE).unwrap(), Target::Kubernetes).unwrap();
-    out.extend(fixture.into_iter().map(|f| (f.path, f.contents)));
+    for text in [FIXTURE, storage::KUBERNETES] {
+        let fixture = generate(&parse(text).unwrap(), Target::Kubernetes).unwrap();
+        out.extend(fixture.into_iter().map(|f| (f.path, f.contents)));
+    }
     out
 }
 

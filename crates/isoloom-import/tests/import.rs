@@ -47,7 +47,7 @@ fn what_the_format_expresses_is_carried_over() {
     assert_eq!(web.depends_on, ["cache"]);
     assert_eq!(web.docker.as_ref().unwrap().image.as_deref(), Some("nginx:1.27-alpine"));
     assert_eq!(spec.machines["cache"].services[0].port, 6379, "expose becomes a service");
-    assert_eq!(spec.machines["cache"].volumes["cache-data"], "/data", "a named volume carries over");
+    assert_eq!(spec.machines["cache"].volumes["cache-data"].path(), "/data", "a named volume carries over");
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn volumes_shared_between_services_are_noted() {
     let spec = parse(&d.yaml).unwrap();
     assert_eq!(validate(&spec), vec![]);
     assert_eq!(
-        spec.machines["a"].volumes.get("cache").map(String::as_str),
+        spec.machines["a"].volumes.get("cache").map(isoloom_spec::model::Mount::path),
         Some("/cache"),
         "anonymous volume kept"
     );

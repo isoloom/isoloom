@@ -3,7 +3,7 @@
 
 use super::support::{
     ACCOUNT, ADDRESSES, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS,
-    DISKS, IMAGES, LOCATION, MANAGED, NAT, NESTED, OCI_IPV6, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
+    IMAGES, LOCATION, MANAGED, NAT, NESTED, OCI_IPV6, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -12,6 +12,11 @@ use crate::Support::{self, Equivalent};
 /// with it.
 const IN_LIST: Support = Equivalent {
     via: "the network's security list, which carries its egress and ICMP rules (oci_core_security_list)",
+};
+
+/// Volumes the instance's `launch_volume_attachments` blocks create and attach.
+const CREATED_WITH_INSTANCE: crate::Support = crate::Support::Equivalent {
+    via: "machines.*.disks: the `launch_volume_attachments` blocks of oci_core_instance, each volume created and attached with it",
 };
 
 /// Oracle Cloud: every resource type, and what the generators write.
@@ -43,7 +48,7 @@ const TYPES: Rules = &[
     (OCI_IPV6, "core_ipv6"),
     (CLOUD_VLANS, "core_vlan"),
     (BACKUP, "core_boot_volume"),
-    (DISKS, "core_volume core_volume_attachment"),
+    (CREATED_WITH_INSTANCE, "core_volume core_volume_attachment"),
     (CLOUD_RESOLVER, "core_dhcp_options"),
     (IMAGES, "core_image core_compute_image_capability_schema core_shape_management"),
     (ALIAS_RECORDS, "dns_record"),
@@ -120,7 +125,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ("oci_dns_zone", "compartment_id name scope view_id zone_type"),
     (
         "oci_core_instance",
-        "availability_domain compartment_id create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.hostname_label
+        "launch_volume_attachments launch_volume_attachments.display_name launch_volume_attachments.type launch_volume_attachments.launch_create_volume_details launch_volume_attachments.launch_create_volume_details.compartment_id launch_volume_attachments.launch_create_volume_details.display_name launch_volume_attachments.launch_create_volume_details.size_in_gbs launch_volume_attachments.launch_create_volume_details.volume_creation_type availability_domain compartment_id create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.hostname_label
         create_vnic_details.nsg_ids create_vnic_details.private_ip create_vnic_details.skip_source_dest_check create_vnic_details.subnet_id
         display_name metadata shape shape_config shape_config.memory_in_gbs
         platform_config platform_config.is_measured_boot_enabled platform_config.is_secure_boot_enabled
@@ -222,7 +227,10 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (CLOUD_NAMES, "create_vnic_details.assign_private_dns_record"),
             (CLOUD_VLANS, "create_vnic_details.vlan_id"),
-            (DISKS, "launch_volume_attachments launch_volume_attachments.*"),
+            (
+                CLOUD,
+                "launch_volume_attachments.device launch_volume_attachments.encryption_in_transit_type launch_volume_attachments.is_agent_auto_iscsi_login_enabled launch_volume_attachments.is_pv_encryption_in_transit_enabled launch_volume_attachments.is_read_only launch_volume_attachments.is_shareable launch_volume_attachments.use_chap launch_volume_attachments.volume_id launch_volume_attachments.launch_create_volume_details.kms_key_id launch_volume_attachments.launch_create_volume_details.vpus_per_gb",
+            ),
         ],
     ),
     ("oci_core_internet_gateway", &[(PROTECT, "enabled"), (CLOUD_NETWORK, "route_table_id")]),

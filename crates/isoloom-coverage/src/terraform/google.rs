@@ -2,7 +2,7 @@
 //! the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CPUS, CREDENTIALS, DISKS, GCP_IPV6,
+    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CPUS, CREDENTIALS, GCP_IPV6,
     GPU_SCHEDULING, IMAGES, LOCATION, MANAGED, MONITORING, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
@@ -16,6 +16,11 @@ const INLINE: Support = Equivalent {
 /// A reserved address.
 const ADDRESS: Support = Equivalent {
     via: "`network_interface.network_ip` of google_compute_instance, which fixes each machine's spec address (its public one is Isoloom's way in, as on every cloud)",
+};
+
+/// An attachment the instance's `attached_disk` blocks make.
+const ATTACHED_INLINE: crate::Support = crate::Support::Equivalent {
+    via: "machines.*.disks: the `attached_disk` blocks of google_compute_instance",
 };
 
 /// Google Cloud: every resource type, and what the generators write.
@@ -44,7 +49,7 @@ const TYPES: Rules = &[
     (ADDRESS, "compute_address"),
     (NAT, "compute_router compute_router_nat compute_router_nat_address"),
     (ROUTER, "compute_route"),
-    (DISKS, "compute_disk compute_attached_disk"),
+    (ATTACHED_INLINE, "compute_attached_disk"),
     (
         INLINE,
         "compute_network_firewall_policy* compute_region_network_firewall_policy* os_login_ssh_public_key",
@@ -110,7 +115,7 @@ const TYPES: Rules = &[
 const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
-        "google_compute_firewall google_compute_instance google_compute_network google_compute_subnetwork google_dns_managed_zone
+        "google_compute_disk google_compute_firewall google_compute_instance google_compute_network google_compute_subnetwork google_dns_managed_zone
         google_dns_record_set google_project google_project_service",
     ),
     ("provider", "region"),
@@ -120,7 +125,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     (
         "google_compute_instance",
-        "boot_disk boot_disk.initialize_params boot_disk.initialize_params.image boot_disk.initialize_params.size labels machine_type
+        "attached_disk attached_disk.device_name attached_disk.source boot_disk boot_disk.initialize_params boot_disk.initialize_params.image boot_disk.initialize_params.size labels machine_type
         metadata metadata_startup_script name network_interface network_interface.access_config network_interface.network_ip
         network_interface.subnetwork project shielded_instance_config shielded_instance_config.enable_secure_boot
         shielded_instance_config.enable_vtpm tags zone",
@@ -135,6 +140,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ("google_dns_record_set", "managed_zone name project rrdatas ttl type"),
     ("google_project", "auto_create_network billing_account deletion_policy name org_id project_id"),
     ("google_project_service", "disable_on_destroy project service"),
+    ("google_compute_disk", "name project size type zone"),
 ];
 
 /// The provider block's settings.
@@ -163,6 +169,24 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         ],
     ),
     ("google_dns_record_set", &[(PROTECT, "deletion_policy"), (ZONE_SETTINGS, "routing_policy.*")]),
+    (
+        "google_compute_disk",
+        &[
+            (
+                BACKUP,
+                "create_snapshot_before_destroy create_snapshot_before_destroy_prefix snapshot source_disk source_instant_snapshot source_storage_object async_primary_disk async_primary_disk.* source_snapshot_encryption_key source_snapshot_encryption_key.*",
+            ),
+            (
+                IMAGES,
+                "image source_image_encryption_key source_image_encryption_key.* guest_os_features guest_os_features.* architecture licenses",
+            ),
+            (
+                CLOUD,
+                "access_mode deletion_policy enable_confidential_compute physical_block_size_bytes provisioned_iops provisioned_throughput storage_pool disk_encryption_key disk_encryption_key.* params params.*",
+            ),
+            (ALIAS, "description labels"),
+        ],
+    ),
     (
         "google_compute_firewall",
         &[
@@ -210,11 +234,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (CPUS, "advanced_machine_features.threads_per_core advanced_machine_features.visible_core_count"),
             (NESTED, "advanced_machine_features advanced_machine_features.enable_nested_virtualization"),
-            (
-                DISKS,
-                "attached_disk attached_disk.device_name attached_disk.force_attach attached_disk.mode attached_disk.source scratch_disk
-                scratch_disk.*",
-            ),
+            (CLOUD, "attached_disk.force_attach attached_disk.mode scratch_disk scratch_disk.*"),
             (ACCELERATORS, "guest_accelerator guest_accelerator.*"),
             (GPU_SCHEDULING, "scheduling scheduling.on_host_maintenance"),
             (

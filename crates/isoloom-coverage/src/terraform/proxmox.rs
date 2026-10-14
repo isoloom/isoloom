@@ -167,7 +167,7 @@ const WRITTEN: &[(&str, &str)] = &[
         initialization.ip_config.ipv4.gateway initialization.interface initialization.type initialization.user_data_file_id machine memory memory.dedicated name
         network_device network_device.bridge network_device.firewall network_device.mac_address network_device.mtu
         network_device.rate_limit network_device.vlan_id node_name on_boot operating_system operating_system.type pool_id
-        serial_device tags vga vga.type tpm_state tpm_state.datastore_id tpm_state.version",
+        serial_device tags vga vga.type tpm_state tpm_state.datastore_id tpm_state.version disk.file_format disk.serial",
     ),
 ];
 
@@ -258,13 +258,13 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 ALIAS,
                 "vm_id mac_addresses clone clone.* cdrom cdrom.* initialization.file_format initialization.type
                 initialization.upgrade initialization.meta_data_file_id initialization.network_data_file_id initialization.vendor_data_file_id
-                initialization.user_account initialization.user_account.* disk.file_format disk.import_from disk.path_in_datastore agent.type
+                initialization.user_account initialization.user_account.* disk.import_from disk.path_in_datastore agent.type
                 scsi_hardware keyboard_layout tablet_device serial_device.device vga.clipboard vga.memory",
             ),
             (
                 SERVER,
                 "hook_script_file_id kvm_arguments cpu.affinity cpu.limit cpu.units cpu.hotplugged hotplug disk.aio disk.backup disk.cache
-                disk.discard disk.iothread disk.queues disk.replicate disk.serial disk.ssd disk.speed disk.speed.* memory.floating
+                disk.discard disk.iothread disk.queues disk.replicate disk.ssd disk.speed disk.speed.* memory.floating
                 memory.hugepages memory.keep_hugepages memory.shared numa numa.* cpu.numa cpu.sockets agent.trim smbios smbios.* rng rng.*
                 watchdog watchdog.* amd_sev amd_sev.* audio_device audio_device.*",
             ),

@@ -79,6 +79,16 @@ pub enum Feature {
     RateLimit,
     /// Names served under the environment's private DNS zone (`dns.private`).
     PrivateDns,
+    /// Volumes kept past `down` (`persistent`).
+    PersistentVolumes,
+    /// Volumes that exist already (`external`), mounted by name.
+    ExternalVolumes,
+    /// Data disks beside a machine's own (`disks`).
+    DataDisks,
+    /// Data disks left unformatted, as block devices (`fs: raw`).
+    RawDisks,
+    /// A mode on a memory-backed mount (`tmpfs[].mode`).
+    TmpfsModes,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -211,6 +221,31 @@ pub enum Requirement {
         /// The zone's domain.
         domain: String,
     },
+    /// A volume is `persistent`.
+    PersistentVolume {
+        /// The first such volume.
+        volume: String,
+    },
+    /// A volume is `external`.
+    ExternalVolume {
+        /// The first such volume.
+        volume: String,
+    },
+    /// A machine has `disks`.
+    DataDisks {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine has a disk with `fs: raw`.
+    RawDisks {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine's tmpfs mount has a `mode`.
+    TmpfsModes {
+        /// The first machine that does.
+        machine: String,
+    },
 }
 
 impl Requirement {
@@ -243,6 +278,11 @@ impl Requirement {
             Requirement::NetworkMtu { .. } => Feature::NetworkMtu,
             Requirement::RateLimit { .. } => Feature::RateLimit,
             Requirement::PrivateDns { .. } => Feature::PrivateDns,
+            Requirement::PersistentVolume { .. } => Feature::PersistentVolumes,
+            Requirement::ExternalVolume { .. } => Feature::ExternalVolumes,
+            Requirement::DataDisks { .. } => Feature::DataDisks,
+            Requirement::RawDisks { .. } => Feature::RawDisks,
+            Requirement::TmpfsModes { .. } => Feature::TmpfsModes,
         }
     }
 }
@@ -317,6 +357,7 @@ impl fmt::Display for Requirement {
                 f,
                 "the names are served under a private zone (`dns.private`, `{domain}`), and this target has no DNS or hosts file Isoloom sets: a cluster names Services under its own domain, an existing host keeps its own resolver"
             ),
+            storage => crate::storage::why(storage, f),
         }
     }
 }
@@ -408,6 +449,7 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
     out.extend(crate::ipv6::requirements(spec));
     out.extend(crate::links::requirements(spec));
     out.extend(crate::private_dns::requirements(spec));
+    out.extend(crate::storage::requirements(spec));
     out
 }
 

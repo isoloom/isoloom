@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Refreshes crates/isoloom-coverage/coverage/cloud-init.txt: every key of the cloud-config
 format, from cloud-init's own schema (`schema-cloud-config-v1.json`) at the pinned release. The
-top-level keys, then the keys of the items Isoloom writes (`users`, `write_files`, `power_state`),
-one a line.
+top-level keys, then the keys of the items Isoloom writes (`users`, `write_files`, `power_state`,
+`disk_setup`, `fs_setup`), one a line.
 
 Usage: python3 scripts/refresh-cloud-init.py   (then `cargo test`: keys with no row fail)
 ISOLOOM_REFRESH=latest reads the newest release instead of the pin.
@@ -15,7 +15,13 @@ import urllib.request
 PIN = "26.2"
 OUT = pathlib.Path(__file__).resolve().parent.parent / "crates/isoloom-coverage/coverage/cloud-init.txt"
 # The nested keys listed: the items Isoloom writes, under their prefix.
-NESTED = [("users.*.", "users"), ("write_files.*.", "write_files"), ("power_state.", "power_state")]
+NESTED = [
+    ("users.*.", "users"),
+    ("write_files.*.", "write_files"),
+    ("power_state.", "power_state"),
+    ("disk_setup.*.", "disk_setup"),
+    ("fs_setup.*.", "fs_setup"),
+]
 
 
 def version() -> str:
@@ -36,6 +42,9 @@ def keys(defs: dict, node: dict, seen: frozenset = frozenset()) -> dict:
             out.update(keys(defs, sub, seen))
     if isinstance(node.get("items"), dict):
         out.update(keys(defs, node["items"], seen))
+    # A map of names the author picks (`disk_setup`'s devices): the keys of each entry.
+    for sub in node.get("patternProperties", {}).values():
+        out.update(keys(defs, sub, seen))
     # The schema's own top-level `properties` only mark the keys as allowed (`{}`): the
     # definitions above say what each holds.
     for k, v in node.get("properties", {}).items():

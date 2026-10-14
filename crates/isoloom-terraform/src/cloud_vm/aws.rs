@@ -120,6 +120,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
         .or_else(|| machines_refusal(env))
         .or_else(|| gpus::refusal(env, &GPUS))
         .or_else(|| nested::refusal(env, "AWS", true))
+        .or_else(|| crate::vm::disks::too_small(env, "AWS", 1, crate::vm::disks::AWS_MAX_DISKS))
 }
 
 fn networks_refusal(env: &Environment) -> Option<String> {

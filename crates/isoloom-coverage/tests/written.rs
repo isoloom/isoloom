@@ -16,6 +16,9 @@ use isoloom_spec::model::Target;
 use isoloom_spec::{Spec, load, parse, validate};
 use isoloom_targets::{GENERATED_TARGETS, GeneratedFile, generate};
 
+#[path = "support/storage.rs"]
+mod storage;
+
 /// Fixtures for what no example exercises: a network's constraints (the cloud-init prelude), an
 /// existing Windows host (reached over SSH with PowerShell) and a VM with a domain (its full
 /// name).
@@ -58,7 +61,8 @@ fn specs() -> Vec<(String, Spec)> {
     out.push(("segmented with constraints".into(), parse(&format!("{segmented}{CONSTRAINTS}")).unwrap()));
     out.push(("windows-external".into(), parse(WINDOWS_EXTERNAL).unwrap()));
     out.push(("domain".into(), parse(DOMAIN).unwrap()));
-    for (name, spec) in &out[out.len() - 3..] {
+    out.push(("data disks".into(), parse(storage::DISKS).unwrap()));
+    for (name, spec) in &out[out.len() - 4..] {
         assert_eq!(validate(spec), vec![], "fixture {name}");
     }
     out
@@ -122,6 +126,10 @@ fn the_rows_are_exactly_the_pinned_lists() {
 /// call makes a value of its own (a file's content), not cloud-config keys.
 const PASSTHROUGH: &[&str] = &["concat", "compact", "flatten", "tolist"];
 
+/// Maps whose keys the document picks (a disk's alias): their entries are `*`, and a scalar entry
+/// is no key of its own.
+const NAMED: &[&str] = &["device_aliases.", "disk_setup."];
+
 struct Walk<'a> {
     locals: &'a HashMap<String, Expression>,
     keys: BTreeSet<String>,
@@ -131,6 +139,9 @@ impl Walk<'_> {
     /// The keys of `e`, a value at `prefix` (`""`, `users.*.`).
     fn value(&mut self, e: &Expression, prefix: &str) {
         match e {
+            Expression::Object(o) if NAMED.contains(&prefix) => {
+                o.values().for_each(|v| self.value(v, &format!("{prefix}*.")));
+            }
             Expression::Object(o) => {
                 for (k, v) in o {
                     let name = match k {

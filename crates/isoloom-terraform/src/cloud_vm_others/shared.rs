@@ -47,6 +47,8 @@ pub struct Rules {
     pub gpus: GpuSizes,
     /// Whether its VMs can run VMs of their own (`nested_virtualization`).
     pub nests: bool,
+    /// Its smallest volume in GB, and the most a VM takes: a machine's data disks must fit.
+    pub disks: (u32, usize),
 }
 
 /// The features every cloud lacks for now, `arm64`, `ipv6` and `gateways` (`None`: it has them)
@@ -100,6 +102,7 @@ pub fn refusal(env: &Environment, rules: &Rules) -> Option<String> {
         .or_else(|| gpus::refusal(env, &rules.gpus))
         .or_else(|| crate::vm::nested::refusal(env, rules.cloud, rules.nests))
         .or_else(|| crate::vm::limits::fixed_mtu(env, rules.cloud))
+        .or_else(|| crate::vm::disks::too_small(env, rules.cloud, rules.disks.0, rules.disks.1))
     {
         return Some(why);
     }

@@ -28,6 +28,10 @@ machines:
     depends_on: []
     volumes:
       shared: /srv/shared
+    disks:
+      data:
+        size_gb: 50
+        mount: /srv/data
     access: false
     docker:
       image: "alpine:3.20"
@@ -80,5 +84,13 @@ checks:
     exec: cat /data/shared/greeting
     script: ~
     expect: written by the writer
+    wait: ~
+  - name: "the writer's data disk is mounted"
+    from: writer
+    http: ~
+    tcp: ~
+    exec: "grep -q ' /srv/data ' /proc/mounts && echo mounted"
+    script: ~
+    expect: mounted
     wait: ~
 targets: ~

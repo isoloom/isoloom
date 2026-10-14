@@ -269,10 +269,14 @@ resource "proxmox_virtual_environment_file" "writer" {
   source_raw {
     file_name = "iso${var.slot}-writer.yaml"
     data = format("#cloud-config\n%s", yamlencode({
-      hostname    = "writer"
-      users       = local.users
-      packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = local.project_files
+      hostname       = "writer"
+      users          = local.users
+      packages       = ["nftables", "curl", "netcat-openbsd"]
+      device_aliases = { data = "/dev/disk/by-id/virtio-data" }
+      disk_setup     = { data = { table_type = "gpt", layout = true, overwrite = false } }
+      fs_setup       = [{ label = "data", filesystem = "ext4", device = "data.1" }]
+      mounts         = [["LABEL=data", "/srv/data", "ext4", "defaults,nofail", "0", "2"]]
+      write_files    = local.project_files
       runcmd = [
         "sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
         "sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
@@ -301,6 +305,13 @@ resource "proxmox_virtual_environment_vm" "writer" {
     file_id      = proxmox_download_file.debian_12.id
     interface    = "virtio0"
     size         = 20
+  }
+  disk {
+    datastore_id = var.datastore
+    interface    = "virtio1"
+    size         = 50
+    serial       = "data"
+    file_format  = "raw"
   }
   network_device {
     bridge   = proxmox_sdn_vnet.app.id
@@ -451,6 +462,13 @@ output "ssh_user" {
 # The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
 output "checks" {
   value = [
+    {
+      position = "writer"
+      machine  = "writer"
+      host     = "10.84.0.10"
+      user     = "isoloom"
+      script   = ".isoloom/proxmox/checks/writer.sh"
+    },
     {
       position = "reader"
       machine  = "reader"

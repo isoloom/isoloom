@@ -10,7 +10,7 @@ use std::process::ExitCode;
 
 use isoloom_spec::Target;
 
-pub use bring_up::{Invocation, bring_up};
+pub use bring_up::{Invocation, Way, bring_up};
 
 use isoloom_runtime::events::{ErrorCode, Scope};
 
@@ -56,6 +56,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         images: a.images.as_deref(),
         instance: a.instance,
         sets: &a.sets,
+        volumes: false,
     };
     let up = up_or_down(&ask, false)?;
     Ok(finish("run", &ask, &up))
@@ -70,6 +71,8 @@ pub struct Ask<'a> {
     pub images: Option<&'a Path>,
     pub instance: Option<u8>,
     pub sets: &'a [String],
+    /// Down removes the volumes kept past it too (`down --volumes`).
+    pub volumes: bool,
 }
 
 /// An environment brought up or torn down.
@@ -155,7 +158,12 @@ fn cloud_for(p: &Prepared, ask: &Ask, down: bool) -> Res<Option<String>> {
 /// with the secrets handed to it.
 fn launch(p: &Prepared, ask: &Ask, down: bool, values: &secrets::Values) -> Res<Invocation> {
     let t = p.target;
-    let mut tool = bring_up(&p.dir, t, ask.cloud, ask.instance, down)?;
+    let way = match (down, ask.volumes) {
+        (false, _) => Way::Up,
+        (true, false) => Way::Down,
+        (true, true) => Way::DownWithVolumes,
+    };
+    let mut tool = bring_up(&p.dir, t, ask.cloud, ask.instance, way)?;
     // The preferred Vagrant provider, from the defaults.
     if !down
         && tool.program == "vagrant"

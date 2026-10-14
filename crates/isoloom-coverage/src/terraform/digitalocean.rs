@@ -2,10 +2,15 @@
 //! what the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DIGITALOCEAN_IPV6, DISKS, IMAGES, MANAGED, NAT, OLDER_NAME, PLACEMENT, PROTECT,
+    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DIGITALOCEAN_IPV6, IMAGES, MANAGED, NAT, OLDER_NAME, PLACEMENT, PROTECT,
     PUBLIC_DNS, PUBLIC_IP, PUBLIC_IPV6,
 };
 use super::table::{Provider, Rules, Table};
+
+/// An attachment the droplet's `volume_ids` makes.
+const ATTACHED_BY_ID: crate::Support = crate::Support::Equivalent {
+    via: "machines.*.disks: the `volume_ids` of digitalocean_droplet, each volume attached at creation",
+};
 
 /// DigitalOcean: every resource type, and what the generators write.
 pub const TABLE: Table = Table {
@@ -33,7 +38,7 @@ const TYPES: Rules = &[
     (PUBLIC_IP, "reserved_ip reserved_ip_assignment"),
     (PUBLIC_IPV6, "reserved_ipv6 reserved_ipv6_assignment"),
     (NAT, "vpc_nat_gateway"),
-    (DISKS, "volume volume_attachment"),
+    (ATTACHED_BY_ID, "volume_attachment"),
     (OLDER_NAME, "floating_ip floating_ip_assignment"),
     (IMAGES, "custom_image"),
     (PUBLIC_DNS, "domain record"),
@@ -50,8 +55,11 @@ const TYPES: Rules = &[
 
 /// What the generators write, from the committed examples' modules.
 const WRITTEN: &[(&str, &str)] = &[
-    ("types", "digitalocean_droplet digitalocean_firewall digitalocean_ssh_key digitalocean_vpc"),
-    ("digitalocean_droplet", "image name region size ssh_keys tags user_data vpc_uuid"),
+    (
+        "types",
+        "digitalocean_volume digitalocean_droplet digitalocean_firewall digitalocean_ssh_key digitalocean_vpc",
+    ),
+    ("digitalocean_droplet", "volume_ids image name region size ssh_keys tags user_data vpc_uuid"),
     (
         "digitalocean_firewall",
         "droplet_ids inbound_rule inbound_rule.port_range inbound_rule.protocol inbound_rule.source_addresses name outbound_rule
@@ -59,6 +67,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     ("digitalocean_ssh_key", "name public_key"),
     ("digitalocean_vpc", "ip_range name region"),
+    ("digitalocean_volume", "name region size"),
 ];
 
 /// The provider block's settings.
@@ -71,13 +80,20 @@ const SETTINGS: Rules = &[(
 /// The arguments Isoloom leaves out, per resource type or data source.
 const ARGUMENTS: &[(&str, Rules)] = &[
     (
+        "digitalocean_volume",
+        &[
+            (BACKUP, "snapshot_id"),
+            (CLOUD, "filesystem_type initial_filesystem_label initial_filesystem_type"),
+            (ALIAS, "description tags"),
+        ],
+    ),
+    (
         "digitalocean_droplet",
         &[
             (CLOUD, "backups backup_policy backup_policy.* droplet_agent monitoring gpu_partition_mode"),
             (PROTECT, "graceful_shutdown resize_disk"),
             (DIGITALOCEAN_IPV6, "ipv6 ipv6_address"),
             (ALIAS, "private_networking public_networking"),
-            (DISKS, "volume_ids"),
         ],
     ),
     (

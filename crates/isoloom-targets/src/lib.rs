@@ -9,7 +9,7 @@ pub use backends::{BACKENDS, backend};
 pub use isoloom_plan::Environment;
 pub use isoloom_render::backend::{Backend, Files, RenderError};
 
-pub use isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
+pub use isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, removable_volumes, start_commands, start_plan};
 pub use isoloom_kubernetes::{project_copies, secrets::SECRETS as KUBERNETES_SECRETS};
 pub use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, constraints, machine_setup, provision_script, router_name};
 pub use isoloom_spec::validate::docker_cidrs;
@@ -163,7 +163,7 @@ pub fn cloud_refusals(spec: &Spec, target: Target) -> Option<(Vec<&'static str>,
 /// it does.
 pub fn refusal_on(spec: &Spec, target: Target, provider: Option<&str>) -> Option<String> {
     refusal(spec, target).or_else(|| match (target, provider) {
-        (Target::Vagrant, Some(p)) => vagrant::provider_refusal(spec, p),
+        (Target::Vagrant, Some(p)) => vagrant::provider_refusal(spec, p).or_else(|| vagrant::disk_refusal(spec, p)),
         _ => None,
     })
 }

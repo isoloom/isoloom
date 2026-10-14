@@ -32,7 +32,7 @@ pub(super) fn apply(mp: &MachinePlan, svc: &mut Service) {
     for (i, script) in p.before.iter().enumerate() {
         let inside = format!("{BEFORE_DIR}/{}-{}", i + 1, file_name(script));
         steps.push(format!("sh {inside}"));
-        svc.volumes.push(format!("{ROOT}/{script}:{inside}:ro"));
+        svc.volumes.push(format!("{ROOT}/{script}:{inside}:ro").into());
     }
     steps.push("exec \"$$@\"".into());
     svc.entrypoint = vec!["/bin/sh".into(), "-c".into(), steps.join("; "), "isoloom-before".into()];

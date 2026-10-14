@@ -37,7 +37,8 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
     let mut instance = resource("aws_instance", &id)
         .add_attribute(("ami", ami(mp)))
-        .add_attribute(("instance_type", string(super::machine_type(mp, mem))));
+        .add_attribute(("instance_type", string(super::machine_type(mp, mem))))
+        .add_blocks(crate::vm::disks::aws(&mp.disks));
     // A looked-up AMI says whether it has NitroTPM; an own AMI is the author's to choose.
     if mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none() {
         instance = instance.add_block(nitro_tpm(&res(os(mp).unwrap_or_default())));
@@ -201,6 +202,7 @@ pub fn windows(env: &Environment, name: &str, m: &mut Module) {
         .add_attribute(("vpc_security_group_ids", list([r(&format!("aws_security_group.{id}.id"))])))
         .add_attribute(("user_data", windows_user_data()))
         .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50)))
+        .add_blocks(crate::vm::disks::aws(&mp.disks))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])));
     let instance = super::nesting(instance, mp).build();
     m.commented(

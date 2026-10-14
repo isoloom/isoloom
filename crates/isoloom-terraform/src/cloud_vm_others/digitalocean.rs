@@ -32,6 +32,7 @@ const RULES: Rules = Rules {
         Some("a DigitalOcean VPC has no route tables, so no traffic can be sent through a machine"),
     ),
     has_image: |os| image(os).is_some(),
+    disks: (1, 7),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
     tpm: false,
     own: own_image::digitalocean,
@@ -153,21 +154,23 @@ fn droplet(env: &Environment, name: &str, m: &mut Module) {
     let mp = &env.machines[name];
     let id = res(name);
     let slug = own_image::of(mp, own_image::digitalocean).unwrap_or_else(|| image(os(mp).unwrap_or_default()).unwrap_or_default());
-    m.block(
-        resource("digitalocean_droplet", &id)
-            .add_attribute(("name", cloud::name_with(&format!("-{name}"))))
-            .add_attribute(("region", reference("var.region")))
-            .add_attribute((
-                "size",
-                string(RULES.gpus.of(mp).unwrap_or(size(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))),
-            ))
-            .add_attribute(("image", string(slug)))
-            .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
-            .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.fingerprint")])))
-            .add_attribute(("user_data", auto_stop(shutdown_script(), isoloom_render::hcl_builder::null())))
-            .add_attribute(("tags", tag_list(env)))
-            .build(),
-    );
+    m.blocks(crate::vm::disks::digitalocean(name, &mp.disks));
+    let mut droplet = resource("digitalocean_droplet", &id)
+        .add_attribute(("name", cloud::name_with(&format!("-{name}"))))
+        .add_attribute(("region", reference("var.region")))
+        .add_attribute((
+            "size",
+            string(RULES.gpus.of(mp).unwrap_or(size(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))),
+        ))
+        .add_attribute(("image", string(slug)))
+        .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
+        .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.fingerprint")])))
+        .add_attribute(("user_data", auto_stop(shutdown_script(), isoloom_render::hcl_builder::null())))
+        .add_attribute(("tags", tag_list(env)));
+    if !mp.disks.is_empty() {
+        droplet = droplet.add_attribute(("volume_ids", crate::vm::disks::digitalocean_ids(name, &mp.disks)));
+    }
+    m.block(droplet.build());
     m.commented(
         "What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.",
         firewall(mp, &id),

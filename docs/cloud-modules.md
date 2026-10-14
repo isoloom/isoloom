@@ -105,6 +105,22 @@ on Azure its subnet also has no default way out (`default_outbound_access_enable
 an interface without a public address. Google Cloud networks have Ethernet's MTU (1500), as on
 every other target.
 
+### Data disks (`disks`)
+
+A machine's data disks are block volumes of their size, attached to its VM. The machine's set-up
+waits for each blank disk of that size, formats it with the disk's name as its label and mounts
+it from `/etc/fstab`. A cloud refuses a disk below its smallest volume, or more disks than a VM
+takes.
+
+| Cloud | What the module writes | Smallest volume |
+| --- | --- | --- |
+| AWS | An `ebs_block_device` block on `aws_instance` per disk (`gp3`, created and deleted with it) | 1 GB |
+| Azure | `azurerm_managed_disk` and `azurerm_virtual_machine_data_disk_attachment` per disk (two at most) | 1 GB |
+| Google Cloud | `google_compute_disk` per disk (`pd-balanced`), attached by the instance's `attached_disk` | 10 GB |
+| DigitalOcean | `digitalocean_volume` per disk, attached by the droplet's `volume_ids` | 1 GB |
+| Linode | `linode_volume` per disk, attached to the instance | 10 GB |
+| Oracle Cloud | A `launch_volume_attachments` block on the instance per disk (paravirtualized) | 50 GB |
+
 ### Running a module by hand
 
 ```sh

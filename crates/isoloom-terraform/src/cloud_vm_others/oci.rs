@@ -57,6 +57,7 @@ const RULES: Rules = Rules {
     },
     // The AMD shape exposes its virtualization instructions when asked (`platform_config`).
     nests: true,
+    disks: (50, 15),
 };
 
 /// The `cloud-vm` module on Oracle Cloud.
@@ -240,6 +241,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
             .add_blocks(platform(mp))
             .add_block(source)
             .add_block(vnic)
+            .add_blocks(crate::vm::disks::oci(name, &mp.disks))
             .add_attribute(("metadata", metadata))
             .build(),
     );

@@ -92,6 +92,8 @@ pub struct Guest<'a> {
     pub esxi_guestos: Option<&'static str>,
     /// Whether it runs VMs of its own (`nested_virtualization`).
     pub nested: bool,
+    /// Its data disks, `(name, GB)`, in order.
+    pub disks: Vec<(&'a str, u32)>,
 }
 
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
@@ -103,6 +105,16 @@ pub fn blocks(r: &mut Ruby, g: &Guest) {
                 .arg(Value::sym("disk"))
                 .kw("size", Value::str(&format!("{d}GB")))
                 .kw("primary", true),
+        );
+    }
+    // Data disks: Vagrant's own setting for VirtualBox, VMware and Hyper-V; libvirt and ESXi
+    // in their blocks. QEMU, Parallels and UTM attach none (refused for them).
+    for (name, gb) in &g.disks {
+        r.call(
+            Call::new("m.vm.disk")
+                .arg(Value::sym("disk"))
+                .kw("name", Value::str(name))
+                .kw("size", Value::str(&format!("{gb}GB"))),
         );
     }
     desktop(r, "virtualbox", g, true, |r| {
@@ -190,6 +202,9 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
         g.boot.into_iter().for_each(|b| boot::libvirt(r, b));
         if g.nested {
             nested::switch(r, "libvirt");
+        }
+        for (_, gb) in &g.disks {
+            r.call(Call::new("v.storage").arg(Value::sym("file")).kw("size", Value::str(&format!("{gb}G"))));
         }
     });
 }
@@ -312,5 +327,8 @@ fn esxi(r: &mut Ruby, g: &Guest) {
     }
     if g.nested {
         nested::switch(r, "vmware_esxi");
+    }
+    if !g.disks.is_empty() {
+        r.assign("v.guest_storage", Value::array(g.disks.iter().map(|(_, gb)| Value::from(*gb))));
     }
 }

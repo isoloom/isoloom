@@ -1,6 +1,6 @@
 //! The options of `config.vm.disk` and `config.vm.synced_folder`.
 
-use super::{DEVICES, FOLDERS, HOST_TUNING, MORE_DISKS, pairs, table};
+use super::{DATA_DISKS, DEVICES, FOLDERS, HOST_TUNING, pairs, table};
 use crate::{
     Format, Support,
     Support::{Emitted, Equivalent, NotPortable, Tooling},
@@ -29,12 +29,12 @@ pub(super) fn format() -> Format {
 fn disk(o: &str) -> Option<Support> {
     Some(match o {
         "size" => Emitted {
-            from: "machines.*.resources.disk_gb",
+            from: "machines.*.resources.disk_gb and machines.*.disks.*.size_gb",
         },
         "type" | "primary" => Emitted {
             from: "(the VM's own disk, `:disk` and primary, grown to `disk_gb`)",
         },
-        "name" => MORE_DISKS,
+        "name" => DATA_DISKS,
         "file" => DEVICES,
         "disk_ext" | "provider_config" => HOST_TUNING,
         "id" => Tooling {

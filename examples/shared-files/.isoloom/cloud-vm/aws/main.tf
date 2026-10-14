@@ -147,8 +147,14 @@ resource "aws_security_group" "writer" {
 }
 
 resource "aws_instance" "writer" {
-  ami                         = data.aws_ami.debian_12.id
-  instance_type               = "t3.micro"
+  ami           = data.aws_ami.debian_12.id
+  instance_type = "t3.micro"
+  ebs_block_device {
+    device_name           = "/dev/sdf"
+    volume_size           = 50
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
   subnet_id                   = aws_subnet.app.id
   private_ip                  = "10.84.0.10"
   associate_public_ip_address = true
@@ -181,6 +187,7 @@ resource "terraform_data" "writer" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
+      "sudo sh -c 'set -e\npkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ndisk() {\n  label=$1; fs=$2; at=$3; bytes=$4\n  mkdir -p \"$at\"\n  if ! blkid -L \"$label\" >/dev/null 2>&1; then\n    i=0; dev=\n    while [ -z \"$dev\" ]; do\n      for d in $(lsblk -dnbo NAME,SIZE,TYPE | awk -v b=\"$bytes\" '\\''$3 == \"disk\" && $2 >= b && $2 < b + 1073741824 { print $1 }'\\''); do\n        if [ \"$(lsblk -n \"/dev/$d\" | wc -l)\" -eq 1 ] && ! blkid -p \"/dev/$d\" >/dev/null 2>&1; then dev=/dev/$d; break; fi\n      done\n      if [ -z \"$dev\" ]; then\n        i=$((i+1)); if [ \"$i\" -ge 60 ]; then echo \"disk $label: no blank disk of $bytes bytes is attached\" >&2; exit 1; fi\n        sleep 5\n      fi\n    done\n    if [ \"$fs\" = xfs ]; then command -v mkfs.xfs >/dev/null || pkg xfsprogs; mkfs.xfs -q -L \"$label\" \"$dev\"; else mkfs.ext4 -q -L \"$label\" \"$dev\"; fi\n    udevadm settle 2>/dev/null || true\n  fi\n  grep -q \"^LABEL=$label \" /etc/fstab || printf '\\''LABEL=%s %s %s defaults,nofail 0 2\\n'\\'' \"$label\" \"$at\" \"$fs\" >> /etc/fstab\n  mountpoint -q \"$at\" || mount \"$at\"\n}\ndisk '\\''data'\\'' ext4 '\\''/srv/data'\\'' 53687091200'",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
@@ -279,6 +286,13 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
+    {
+      position = "writer"
+      machine  = "writer"
+      host     = aws_instance.writer.public_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/writer.sh"
+    },
     {
       position = "reader"
       machine  = "reader"

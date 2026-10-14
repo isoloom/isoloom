@@ -120,10 +120,11 @@
       "kubernetes",
       "vagrant",
       "proxmox",
-      "esxi",
       "cloud-vm"
     ],
-    "refused": {},
+    "refused": {
+      "esxi": "machine `writer` has data disks (`disks`), which this target can't attach"
+    },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "needs `external:` on writer, reader",
@@ -147,6 +148,21 @@
   "checks": {
     "default_position": "networks",
     "positions": [
+      {
+        "position": "writer",
+        "machine": "writer",
+        "runner": "isoloom-check-writer",
+        "checks": [
+          {
+            "name": "the writer's data disk is mounted",
+            "derived": false,
+            "kind": "exec",
+            "target": "grep -q ' /srv/data ' /proc/mounts && echo mounted",
+            "expect": "mounted",
+            "wait": 0
+          }
+        ]
+      },
       {
         "position": "reader",
         "machine": "reader",

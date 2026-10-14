@@ -437,6 +437,18 @@ resource linode_instance timeouts
 resource linode_instance timeouts.create
 resource linode_instance timeouts.delete
 resource linode_instance timeouts.update
+resource linode_volume
+resource linode_volume encryption
+resource linode_volume label
+resource linode_volume linode_id
+resource linode_volume region
+resource linode_volume size
+resource linode_volume source_volume_id
+resource linode_volume tags
+resource linode_volume timeouts
+resource linode_volume timeouts.create
+resource linode_volume timeouts.delete
+resource linode_volume timeouts.update
 resource linode_vpc
 resource linode_vpc description
 resource linode_vpc ipv4

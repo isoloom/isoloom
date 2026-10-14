@@ -23,6 +23,10 @@ pub struct Args {
     /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
     #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
     sets: Vec<String>,
+    /// Also remove the volumes kept past `down` (`persistent: true`): their data is gone. An
+    /// existing volume (`external`) is never removed.
+    #[arg(long)]
+    volumes: bool,
     /// Machine-readable output: JSON events, one per line, then the outcome or the error (see
     /// docs/json.md).
     #[arg(long)]
@@ -37,6 +41,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         images: None,
         instance: a.instance,
         sets: &a.sets,
+        volumes: a.volumes,
     };
     let down = up_or_down(&ask, true)?;
     Ok(finish("down", &ask, &down))

@@ -178,9 +178,9 @@ pub const PUBLIC_IPV6: Support = NotPortable {
 pub const PROXMOX_IPV6: Support = Equivalent {
     via: "networks.*.ipv6: a set-up step gives each VM its IPv6 address, the same on every VM target (not run on a real host)",
 };
-/// Data disks.
+/// Data disks where the generator doesn't attach them yet (the `esxi` target refuses `disks`).
 pub const DISKS: Support = Planned {
-    note: "with data disks: persistent volumes on VMs",
+    note: "machines.*.disks on ESXi: an esxi_virtual_disk each, attached by slot (the target refuses data disks until then)",
 };
 /// Nested virtualization: the cloud's switch, or the block holding it.
 pub const NESTED: Support = Emitted {

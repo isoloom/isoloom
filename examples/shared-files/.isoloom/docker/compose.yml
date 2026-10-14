@@ -18,6 +18,7 @@ services:
         ipv4_address: 10.84.0.10
     volumes:
     - shared:/srv/shared
+    - writer-data:/srv/data
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
@@ -31,6 +32,7 @@ services:
     volumes:
     - ../../steps/write.sh:/isoloom/init/write.sh:ro
     - shared:/srv/shared
+    - writer-data:/srv/data
     depends_on:
       writer:
         condition: service_started
@@ -54,6 +56,24 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
     restart: unless-stopped
+  isoloom-check-writer:
+    image: curlimages/curl:8.11.1
+    profiles:
+    - check
+    entrypoint:
+    - /bin/sh
+    - /isoloom/run.sh
+    network_mode: service:writer
+    volumes:
+    - ./checks/writer.sh:/isoloom/run.sh:ro
+    depends_on:
+      writer-init-1:
+        condition: service_completed_successfully
+      writer:
+        condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: shared-files
   isoloom-check-reader:
     image: curlimages/curl:8.11.1
     profiles:
@@ -83,6 +103,10 @@ networks:
       isoloom.environment: shared-files
 volumes:
   shared:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: shared-files
+  writer-data:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shared-files

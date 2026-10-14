@@ -19,6 +19,7 @@ pub mod process;
 pub mod requirements;
 pub mod routing;
 pub mod secrets;
+pub mod storage;
 
 pub use environment::{Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Size, Volume, VolumeKind};
 pub use lifecycle::{MachineLifecycle, Step};
@@ -27,5 +28,6 @@ pub use private_dns::PrivateDns;
 pub use process::{Health, HealthTest, Process};
 pub use requirements::{Capabilities, Feature, Refusal, Requirement, refusal};
 pub use secrets::SecretFile;
+pub use storage::{DataDisk, Lifetime};
 
 use isoloom_spec::{model, shell};

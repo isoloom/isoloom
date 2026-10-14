@@ -20,6 +20,12 @@ pub(super) fn classify(definition: &str, field: &str) -> Option<Support> {
     match definition {
         "Volume" => volume(field),
         "VolumeMount" => mount(field),
+        "VolumeDevice" => match field {
+            "name" | "devicePath" => Some(Emitted {
+                from: "machines.*.disks with `fs: raw` (at /dev/isoloom-<disk>)",
+            }),
+            _ => None,
+        },
         "PersistentVolumeClaimVolumeSource" | "ConfigMapVolumeSource" | "EmptyDirVolumeSource" => source(definition, field),
         "SecretVolumeSource" | "KeyToPath" => secret(definition, field),
         "PersistentVolumeClaimSpec" | "VolumeResourceRequirements" => claim(definition, field),
@@ -32,7 +38,9 @@ fn volume(field: &str) -> Option<Support> {
         "name" => Emitted {
             from: "volumes (and Isoloom's own: the scripts, the probe)",
         },
-        "persistentVolumeClaim" => Emitted { from: "machines.*.volumes" },
+        "persistentVolumeClaim" => Emitted {
+            from: "machines.*.volumes and machines.*.disks",
+        },
         "configMap" => Emitted {
             from: "(the project's scripts the pods run: `init:` jobs, checks)",
         },
@@ -90,7 +98,7 @@ fn mount(field: &str) -> Option<Support> {
             from: "(Isoloom's probe, mounted read-only)",
         },
         "subPath" => Emitted {
-            from: "machines.*.files and machines.*.secrets (each file mounted at its path)",
+            from: "machines.*.files and machines.*.secrets (each file mounted at its path), machines.*.volumes.*.subpath (a folder of a shared volume)",
         },
         "recursiveReadOnly" => Equivalent { via: "`readOnly`" },
         "subPathExpr" | "mountPropagation" | "bindMountOptions" => MOUNT_DETAIL,
@@ -100,7 +108,9 @@ fn mount(field: &str) -> Option<Support> {
 
 fn source(definition: &str, field: &str) -> Option<Support> {
     Some(match (definition, field) {
-        ("PersistentVolumeClaimVolumeSource", "claimName") => Emitted { from: "volumes" },
+        ("PersistentVolumeClaimVolumeSource", "claimName") => Emitted {
+            from: "volumes (an existing claim by its name: volumes.*.external)",
+        },
         ("PersistentVolumeClaimVolumeSource", "readOnly") => Equivalent { via: "the mount's `readOnly`" },
         ("ConfigMapVolumeSource", "name" | "defaultMode") => Emitted {
             from: "(the project's scripts, executable)",
@@ -139,9 +149,11 @@ fn claim(definition: &str, field: &str) -> Option<Support> {
         ("PersistentVolumeClaimSpec", "accessModes") => Emitted {
             from: "volumes (ReadWriteOnce: a shared volume's machines run on one node)",
         },
-        ("PersistentVolumeClaimSpec", "resources") | ("VolumeResourceRequirements", "requests") => Emitted { from: "volumes (1Gi each)" },
-        ("PersistentVolumeClaimSpec", "volumeMode") => Planned {
-            note: "raw data disks, with persistent volumes and data disks",
+        ("PersistentVolumeClaimSpec", "resources") | ("VolumeResourceRequirements", "requests") => Emitted {
+            from: "volumes (1Gi each) and machines.*.disks.*.size_gb",
+        },
+        ("PersistentVolumeClaimSpec", "volumeMode") => Emitted {
+            from: "machines.*.disks.*.fs (Block for a raw disk, Filesystem otherwise)",
         },
         ("PersistentVolumeClaimSpec", "dataSource" | "dataSourceRef") => Tooling {
             note: "a claim cloned from a snapshot: snapshots are `isoloom snapshot`'s",

@@ -157,8 +157,8 @@ fn hook(name: &str) -> Option<Support> {
         "helm.sh/hook-weight" => Tooling {
             note: "orders hooks of one kind: Isoloom's checks are independent",
         },
-        "helm.sh/resource-policy" => Tooling {
-            note: "keeps an object when the release is deleted: `isoloom down` removes everything",
+        "helm.sh/resource-policy" => Emitted {
+            from: "volumes.*.persistent (its claim kept when the release is uninstalled)",
         },
         _ => return None,
     })

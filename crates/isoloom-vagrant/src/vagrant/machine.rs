@@ -135,5 +135,6 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
         tpm: mp.tpm,
         esxi_guestos: mp.os.as_deref().and_then(windows::esxi_guestos),
         nested: mp.hardware.nested_virtualization,
+        disks: mp.disks.iter().map(|d| (d.name.as_str(), d.size_gb)).collect(),
     }
 }

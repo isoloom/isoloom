@@ -159,7 +159,7 @@ reach: [{ from: out, to: dmz, ports: [80] }]
 dns: { private: true, domain: every.internal }
 inputs: [TOKEN]
 secrets: { token: { env: TOKEN } }
-volumes: { data: { owner: fw } }
+volumes: { data: { owner: fw, persistent: true, external: lab-data } }
 machines:
   fw:
     networks: { out: 2, dmz: 1 }
@@ -201,6 +201,9 @@ machines:
     working_dir: /srv
     before: [b.sh]
     healthcheck: { test: t, http: { port: 80, path: / }, interval: 1s, timeout: 1s, retries: 1, start_period: 1s }
+    volumes: { data: { path: /data, subpath: h } }
+    tmpfs: [{ path: /run, size: 64m, mode: "1777" }]
+    disks: { d: { size_gb: 1, fs: ext4, mount: /d } }
 provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, host_vars: { fw: { a: b } }, requirements: req.yml }]
 controller: { image: { vagrant: x/y }, resources: { cpus: 1, memory_mb: 512 } }
 common: { resources: { cpus: 1 } }

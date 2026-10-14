@@ -44,6 +44,7 @@ fn lacking(env: &Environment, name: &str, mp: &MachinePlan) -> Option<&'static s
     [
         (mp.arch != Arch::Amd64, "an arm64 image (a container runs the server's own architecture)"),
         (!mp.volumes.is_empty(), "`volumes` (a container's mount point goes with it)"),
+        (!mp.disks.is_empty(), "data disks (`disks`: nothing formats or mounts them in it)"),
         (
             !mp.files.is_empty() || !mp.secrets.is_empty(),
             "`files` or `secrets` (nothing delivers them into it)",

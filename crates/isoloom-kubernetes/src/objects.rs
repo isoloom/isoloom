@@ -9,7 +9,7 @@ mod pod;
 
 pub use container::{
     Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, HttpGet, KeyToPath, Limits, Probe, Resources, SecretKey, SecretSource, Volume,
-    VolumeMount, VolumeSource,
+    VolumeDevice, VolumeMount, VolumeSource,
 };
 pub use networking::{IpBlock, NetworkPolicySpec, Peer, PolicyPort, Rule, ServicePort, ServiceSpec};
 pub use pod::{Affinity, AffinityTerm, DnsConfig, DnsOption, NameValue, PodAffinity, PodSecurity, PodSpec, PodTemplate};
@@ -280,6 +280,9 @@ impl Selector {
 pub struct ClaimSpec {
     /// How nodes mount it.
     pub access_modes: Vec<&'static str>,
+    /// `Filesystem` (mounted) or `Block` (a raw device), when Isoloom says which.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub volume_mode: Option<&'static str>,
     /// Its size.
     pub resources: ClaimResources,
 }

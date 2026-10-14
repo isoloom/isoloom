@@ -1,7 +1,7 @@
 //! The top-level keys, then the networks, volumes, configs, secrets and models a file declares.
 
 use super::{FILES, LEGACY_NAME, MODEL_RUNNER, TOOLING};
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Tooling};
 
 /// The top-level keys, `include` items included.
 pub(super) const TOP: &[(&str, Support)] = &[
@@ -112,13 +112,13 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
     (
         "networks.*.labels",
         Emitted {
-            from: "(the environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc`)",
+            from: "(the environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc`; isoloom.persistent from volumes.*.persistent, for `down` to keep it)",
         },
     ),
     (
         "volumes.*.name",
-        Tooling {
-            note: "Compose scopes names to the environment",
+        Emitted {
+            from: "volumes.*.external (the existing volume's name)",
         },
     ),
     (
@@ -133,12 +133,7 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
             why: "Docker volume driver options",
         },
     ),
-    (
-        "volumes.*.external",
-        Planned {
-            note: "with volumes (data that outlives the environment)",
-        },
-    ),
+    ("volumes.*.external", Emitted { from: "volumes.*.external" }),
     ("volumes.*.external.name", LEGACY_NAME),
     (
         "volumes.*.labels",

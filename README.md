@@ -114,7 +114,7 @@ isoloom status            # what is up on this host, and whether it still runs
 isoloom connect MACHINE   # a shell on a machine (compose exec, vagrant ssh, kubectl exec, ssh)
 isoloom exec MACHINE -- … # a command on one machine, or `all`
 isoloom capture MACHINE NETWORK   # tcpdump on its interface there
-isoloom down TARGET [DIR] # tear it down
+isoloom down TARGET [DIR] # tear it down (--volumes: the persistent volumes too)
 ```
 
 Every command takes `--profile NAME` (or `ISOLOOM_PROFILE`): `profiles/<name>.yml`, what differs
@@ -169,6 +169,19 @@ its own way: `kernel` with `initrd`, `cmdline` and `dtb`, the `firmware` (`bios`
 on its first network. Vagrant's libvirt provider boots all of it, QEMU UEFI with its
 `firmware_format`, Proxmox the firmware (OVMF with an EFI disk) and the order; the other
 providers and targets refuse such a machine and say why.
+
+Data lives in volumes and data disks. A machine's `volumes` map a name to a path; a volume
+declared at the top level (`volumes:`) is shared between the machines that mount it, and one of
+them can take a single folder of it (`{ path: /srv/www, subpath: www }`). A top-level volume can
+be `persistent: true`, which `isoloom down` keeps and `isoloom down --volumes` removes (Docker
+and Kubernetes; a VM target refuses it, since its disks go with the VM), or `external: <name>`,
+an existing Docker volume or Kubernetes claim that Isoloom mounts and never removes. A `tmpfs`
+entry takes a `size` and a `mode` (`{ path: /run, size: 64m, mode: "1777" }`). `disks:` gives a
+machine data disks beside its own (`{ data: { size_gb: 50, fs: xfs, mount: /data } }`; `fs` is
+`ext4`, `xfs`, `ntfs` on Windows, or `raw`): an empty disk on Vagrant (VirtualBox, VMware,
+Hyper-V, libvirt, ESXi), Proxmox and every cloud, formatted with its name as the label and
+mounted at boot; a named volume on Docker; a claim on Kubernetes (a block device when raw). Each
+target's handling, and what it refuses: [docs/storage.md](docs/storage.md).
 
 Checks come in three kinds, and `isoloom test` runs them all from inside the environment:
 **derived** from the spec (every service answers from the machines `reach` lets through and from

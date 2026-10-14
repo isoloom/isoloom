@@ -125,4 +125,6 @@ fn lxc_is_opt_in_and_refuses_what_a_container_cannot_carry() {
     assert!(!isoloom_spec::effective(&spec).contains(&Target::Proxmox));
     let why = refusal(&LXC.replace("environment: { MODE: lab }", "volumes: { data: /data }"));
     assert!(why.contains("`volumes`"), "{why}");
+    let why = refusal(&LXC.replace("environment: { MODE: lab }", "disks: { data: { size_gb: 2, mount: /data } }"));
+    assert!(why.contains("`disks`"), "{why}");
 }

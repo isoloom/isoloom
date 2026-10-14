@@ -76,6 +76,7 @@ fn vm(env: &Environment, name: &str, boot: Boot) -> Vm {
         dns: Some(dns(env, name)),
         ips,
         depends_on: depends_on(env, mp),
+        data_disks: mp.disks.clone(),
     }
 }
 
@@ -184,6 +185,18 @@ pub enum Boot {
     },
 }
 
+/// A data disk: an empty one after the VM's own (`virtio1` on), its serial its name, which the
+/// machine's cloud-init finds it by.
+fn data_disk(i: usize, d: &isoloom_plan::DataDisk) -> Block {
+    Block::builder("disk")
+        .add_attribute(("datastore_id", reference("var.datastore")))
+        .add_attribute(("interface", string(format!("virtio{}", i + 1))))
+        .add_attribute(("size", number(d.size_gb.into())))
+        .add_attribute(("serial", string(d.name.as_str())))
+        .add_attribute(("file_format", string("raw")))
+        .build()
+}
+
 /// A VM of the environment: a machine, the router or the controller.
 #[derive(Debug, Clone)]
 pub struct Vm {
@@ -215,6 +228,8 @@ pub struct Vm {
     pub ips: Vec<Block>,
     /// What it waits for.
     pub depends_on: Vec<Expression>,
+    /// Its data disks, after its own.
+    pub data_disks: Vec<isoloom_plan::DataDisk>,
 }
 
 impl Vm {
@@ -254,6 +269,7 @@ impl Vm {
             .add_block(super::arch::cpu(cores, self.arm))
             .add_block(Block::builder("memory").add_attribute(("dedicated", number(memory.into()))).build())
             .add_blocks(self.disks())
+            .add_blocks(self.data_disks.iter().enumerate().map(|(i, d)| data_disk(i, d)))
             .add_blocks(std::mem::take(&mut self.nics))
             .add_blocks(std::mem::take(&mut self.pci))
             .add_block(self.initialization());

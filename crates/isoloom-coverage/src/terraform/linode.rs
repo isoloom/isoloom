@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, DISKS, IMAGES, LINODE_IPV6, MANAGED, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP,
-    PUBLIC_IPV6, VM_AGENT,
+    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, IMAGES, LINODE_IPV6, MANAGED, PLACEMENT, PROTECT, PUBLIC_DNS,
+    PUBLIC_IP, PUBLIC_IPV6, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -47,7 +47,6 @@ const TYPES: Rules = &[
         "instance_ip instance_shared_ips networking_ip networking_ip_assignment reserved_ip reserved_ip_assignment",
     ),
     (PUBLIC_IPV6, "ipv6_range"),
-    (DISKS, "volume"),
     (
         IMAGES,
         "image consumer_image_share_group_token producer_image_share_group producer_image_share_group_member",
@@ -63,7 +62,7 @@ const TYPES: Rules = &[
 
 /// What the generators write, from the committed examples' modules.
 const WRITTEN: &[(&str, &str)] = &[
-    ("types", "linode_firewall linode_instance linode_vpc linode_vpc_subnet"),
+    ("types", "linode_volume linode_firewall linode_instance linode_vpc linode_vpc_subnet"),
     (
         "linode_firewall",
         "inbound inbound.action inbound.ipv4 inbound.label inbound.ports inbound.protocol inbound_policy label linodes outbound outbound.action
@@ -76,6 +75,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     ("linode_vpc", "label region"),
     ("linode_vpc_subnet", "ipv4 label vpc_id"),
+    ("linode_volume", "label linode_id region size"),
 ];
 
 /// The provider block's settings.
@@ -88,6 +88,7 @@ const SETTINGS: Rules = &[(
 
 /// The arguments Isoloom leaves out, per resource type or data source.
 const ARGUMENTS: &[(&str, Rules)] = &[
+    ("linode_volume", &[(BACKUP, "source_volume_id"), (CLOUD, "encryption"), (ALIAS, "tags")]),
     (
         "linode_firewall",
         &[

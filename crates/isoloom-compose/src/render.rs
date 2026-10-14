@@ -20,8 +20,9 @@ use isoloom_spec::model::{Arch, Target};
 
 use crate::appliances;
 use crate::docker::{DIR, ENVIRONMENT_LABEL, MANAGED_LABEL, PROBE_IMAGE, TOOLBOX_IMAGE, probe_service};
-use crate::file::{Attachment, ComposeFile, Ipam, Labelled, Network, Service, Subnet};
+use crate::file::{Attachment, ComposeFile, Ipam, Network, Service, Subnet, Volume};
 use crate::sidecars;
+use crate::storage;
 use machine::machine;
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,
@@ -30,7 +31,8 @@ use machine::machine;
 /// (the containers run on the user's own Docker host, which has them). No controller: no
 /// `provision:`, no Ansible checks; `exec` checks run inside a container. No bridged
 /// networks: a container reaches the host's LAN through a macvlan network made beforehand
-/// (`external`).
+/// (`external`). Data disks are named volumes, a tmpfs takes a mode, and a volume can be kept
+/// past `down` or exist already; no raw disk (a container gets no block device).
 pub fn capabilities() -> isoloom_plan::Capabilities {
     isoloom_plan::Capabilities::of([
         Feature::NetworkAppliances,
@@ -49,12 +51,17 @@ pub fn capabilities() -> isoloom_plan::Capabilities {
         Feature::ContainerDevices,
         // Docker's DNS answers the names under the private zone's domain (network aliases).
         Feature::PrivateDns,
+        Feature::DataDisks,
+        Feature::TmpfsModes,
+        Feature::PersistentVolumes,
+        Feature::ExternalVolumes,
     ])
 }
 
 /// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
 /// existing networks, which a fresh Docker host VM has none of, and the host's GPUs and
-/// devices, which a VM Isoloom creates doesn't have. Secrets reach the VM over its own
+/// devices, which a VM Isoloom creates doesn't have, and volumes kept past `down` or existing
+/// already (the storage goes with the VM). Secrets reach the VM over its own
 /// connection (`isoloom run`), and Compose takes them from there.
 pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
     isoloom_plan::Capabilities::of([
@@ -63,6 +70,8 @@ pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
         Feature::MachineAliases,
         Feature::Ulimits,
         Feature::TrafficControl,
+        Feature::DataDisks,
+        Feature::TmpfsModes,
         Feature::Ipv6,
         Feature::Ipv6Only,
         Feature::Ipv6Auto,
@@ -127,6 +136,7 @@ pub fn compose_file(target: Target, env: &Environment) -> Result<Rendered, Rende
             machine(env, name, mp, &ts, &mut out);
         }
     }
+    storage::folders(env, &mut out.services);
     let runners = sidecars::check_runners(env, &mut out.services);
     tools(env, &mut out.services);
     let mut file = ComposeFile {
@@ -222,7 +232,7 @@ fn probes(env: &Environment, archs: &[Arch], services: &mut IndexMap<String, Ser
             image: Some(env.images.pull(PROBE_IMAGE)),
             platform: Some(arch.docker_platform().to_string()),
             entrypoint: vec!["/bin/cp".into(), "/bin/busybox".into(), "/probe/busybox".into()],
-            volumes: vec![format!("{name}:/probe")],
+            volumes: vec![format!("{name}:/probe").into()],
             network_mode: Some("none".into()),
             restart: Some("no".into()),
             ..Service::default()
@@ -273,14 +283,11 @@ fn networks(env: &Environment, ts: &[trunks::Trunk]) -> IndexMap<String, Network
     out
 }
 
-/// The named volumes: the machines', then the probes'.
-fn volumes(env: &Environment, archs: &[Arch]) -> IndexMap<String, Labelled> {
-    let own = env
-        .machines
-        .values()
-        .filter(|m| m.shape == MachineShape::Container)
-        .flat_map(|m| m.volumes.iter().map(|v| v.key.clone()));
-    own.chain(archs.iter().map(|a| probe_service(*a))).map(|k| (k, Labelled::default())).collect()
+/// The named volumes: the machines' (and their disks'), then the probes'.
+fn volumes(env: &Environment, archs: &[Arch]) -> IndexMap<String, Volume> {
+    let mut out = storage::declared(env);
+    out.extend(archs.iter().map(|a| (probe_service(*a), Volume::default())));
+    out
 }
 
 /// Everything the environment creates says so (containers, built images, networks, volumes),
@@ -299,7 +306,8 @@ fn label(env: &Environment, file: &mut ComposeFile) {
     for n in file.networks.values_mut() {
         n.labels.extend(ours.clone());
     }
-    for v in file.volumes.values_mut() {
+    // An existing volume isn't the environment's: Compose takes only its name.
+    for v in file.volumes.values_mut().filter(|v| !v.external) {
         v.labels.extend(ours.clone());
     }
 }

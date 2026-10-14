@@ -33,6 +33,7 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         (machine_size(mp, memory), disk, mp.tpm.is_some()),
         list(ids),
     ));
+    m.blocks(crate::vm::disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
     let hooks = Hooks {
         at_boot: cloud::interfaces(env, &mp.addresses, &|n| mac(&nic_id(&id, n))),
         after_reboot: vec![cloud::reschedule_auto_stop()],
@@ -198,6 +199,7 @@ pub fn windows(env: &Environment, name: &str, m: &mut Module) {
     m.block(public_ip(&id, name));
     m.blocks(nics(&id, name, mp));
     m.block(windows_vm(env, name, mp));
+    m.blocks(crate::vm::disks::azure(name, "azurerm_windows_virtual_machine", &mp.disks));
     m.blocks(windows::blocks(windows::Machine {
         env,
         name,

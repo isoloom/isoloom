@@ -2,12 +2,14 @@
 //! VM its user data (Proxmox): the constraints' `Prelude` step as `bootcmd` (before packages
 //! install, at every boot: it is idempotent), the files as `write_files`, the other steps as
 //! `runcmd`, run as root. After a `reboot` step, cloud-init restarts the machine once it is done
-//! (`power_state`) and a unit runs the remaining steps at the next boot.
+//! (`power_state`) and a unit runs the remaining steps at the next boot. The data disks are
+//! cloud-init's own: each found by its serial (the disk's name, as the target attaches it),
+//! partitioned, formatted with its name as the label and mounted from `/etc/fstab`.
 
 use std::fmt::Write as _;
 
-use isoloom_plan::{Environment, Step};
-use isoloom_render::hcl_builder::{Expression, call, list, object, string};
+use isoloom_plan::{DataDisk, Environment, Step};
+use isoloom_render::hcl_builder::{Expression, boolean, call, list, object, string};
 use isoloom_render::steps;
 
 use super::{at_every_boot, module, step_command};
@@ -38,6 +40,8 @@ pub struct CloudConfig {
     pub runcmd: Vec<String>,
     /// Whether cloud-init restarts the machine once done (a `reboot` step left a part).
     pub restart: bool,
+    /// The data disks it formats and mounts (raw ones are left as they are).
+    pub disks: Vec<DataDisk>,
 }
 
 impl CloudConfig {
@@ -53,6 +57,7 @@ impl CloudConfig {
             files: Vec::new(),
             runcmd: Vec::new(),
             restart: false,
+            disks: Vec::new(),
         }
     }
 
@@ -64,6 +69,7 @@ impl CloudConfig {
         if !self.bootcmd.is_empty() {
             items.push(("bootcmd", list(self.bootcmd.into_iter().map(string))));
         }
+        items.extend(disks(&self.disks));
         items.push(("write_files", write_files(self.file_lists, self.files)));
         items.push(("runcmd", list(self.runcmd.into_iter().map(string))));
         if self.restart {
@@ -76,6 +82,50 @@ impl CloudConfig {
         }
         call("format", [string("#cloud-config\n%s"), call("yamlencode", [object(items)])])
     }
+}
+
+/// The prefix of a disk's device, whose serial is its name: what a virtio disk is under udev.
+pub const DISK_BY_ID: &str = "/dev/disk/by-id/virtio-";
+
+/// The keys formatting and mounting the formatted disks: each one's alias (its device, by its
+/// serial), one partition on a GPT table, its filesystem labelled with its name, its fstab line.
+/// Nothing on a disk that has a partition table or a filesystem already (`overwrite: false`).
+fn disks(disks: &[DataDisk]) -> Vec<(&'static str, Expression)> {
+    let formatted: Vec<(&DataDisk, &str)> = disks.iter().filter_map(|d| Some((d, d.mount.as_deref()?))).collect();
+    if formatted.is_empty() {
+        return Vec::new();
+    }
+    let aliases = formatted.iter().map(|(d, _)| (d.name.as_str(), string(format!("{DISK_BY_ID}{}", d.name))));
+    let setup = formatted.iter().map(|(d, _)| {
+        let table = object([("table_type", string("gpt")), ("layout", boolean(true)), ("overwrite", boolean(false))]);
+        (d.name.as_str(), table)
+    });
+    let fs = formatted.iter().map(|(d, _)| {
+        object([
+            ("label", string(d.name.as_str())),
+            ("filesystem", string(d.fs.id())),
+            ("device", string(format!("{}.1", d.name))),
+        ])
+    });
+    let mounts = formatted.iter().map(|(d, at)| {
+        list(
+            [
+                format!("LABEL={}", d.name),
+                (*at).to_string(),
+                d.fs.id().into(),
+                "defaults,nofail".into(),
+                "0".into(),
+                "2".into(),
+            ]
+            .map(string),
+        )
+    });
+    vec![
+        ("device_aliases", object(aliases)),
+        ("disk_setup", object(setup)),
+        ("fs_setup", list(fs)),
+        ("mounts", list(mounts)),
+    ]
 }
 
 /// The files: the lists, then the single files.
@@ -119,6 +169,7 @@ pub fn machine(env: &Environment, machine: &str, config: &mut CloudConfig) {
     for step in &mp.lifecycle {
         match step {
             Step::Prelude | Step::Project => {}
+            Step::Disks { disks } => config.disks.clone_from(disks),
             Step::Reboot => parts.push(again.clone()),
             _ => {
                 let Some(c) = step_command(env, machine, step, false) else { continue };

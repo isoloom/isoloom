@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{CommandLine, Dns, DockerImpl, External, Healthcheck, MachineFile, MachineSecret, Ulimit, VmImpl};
+use super::{CommandLine, Disk, Dns, DockerImpl, External, Healthcheck, MachineFile, MachineSecret, Mount, Tmpfs, Ulimit, VmImpl};
 
 /// A machine's CPU architecture. Every target has one: a container platform, a box
 /// architecture, a cloud instance family. Defaults to x86-64.
@@ -91,10 +91,11 @@ pub struct Machine {
     /// its declared `volumes`. Applies to containers; a VM's root stays writable.
     #[serde(default)]
     pub read_only: bool,
-    /// Memory-backed (tmpfs) mount paths inside the machine, for scratch space that never
-    /// touches disk (e.g. `/tmp`, `/run`). A VM sets these up in its own provisioning (fstab).
+    /// Memory-backed (tmpfs) mounts inside the machine, for scratch space that never touches
+    /// disk: a path (`/tmp`), or a path with a size and a mode (`{ path: /run, size: 64m, mode:
+    /// "1777" }`). A VM sets these up in its own provisioning (fstab).
     #[serde(default)]
-    pub tmpfs: Vec<String>,
+    pub tmpfs: Vec<Tmpfs>,
     /// The size of `/dev/shm` (shared memory), e.g. `256m` or `1g`, for workloads that need more
     /// than the small default (browsers, some databases). A VM sizes it in its own provisioning.
     #[serde(default)]
@@ -161,13 +162,20 @@ pub struct Machine {
     /// Data that survives restarts and re-creation of the machine, until the environment is
     /// destroyed: a name -> an absolute path in the machine. On the container targets a volume
     /// starts with the image's files at that path (Docker's named volumes; Kubernetes seeds
-    /// its claim from the image while it is empty), so init jobs can add to them.
+    /// its claim from the image while it is empty), so init jobs can add to them. A shared
+    /// volume's user may take one folder of it: `{ path: /srv/www, subpath: www }`.
     #[serde(default)]
-    pub volumes: IndexMap<String, String>,
+    pub volumes: IndexMap<String, Mount>,
     /// Files placed at a path on the machine (a configuration the image doesn't carry), from
     /// the project or written inline, with their owner and mode: on every target.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub files: Vec<MachineFile>,
+    /// Data disks beside the machine's own, by name (kebab-case, at most 12 characters: the
+    /// filesystem's label): `{ size_gb: 50, fs: xfs, mount: /data }`. A VM gets an empty disk
+    /// of that size, formatted and mounted at boot; a container gets a volume at the mount. The
+    /// disks go with the machine.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub disks: IndexMap<String, Disk>,
     /// The machine the user lands on. It may have no implementation: the runner supplies it.
     #[serde(default)]
     pub access: bool,

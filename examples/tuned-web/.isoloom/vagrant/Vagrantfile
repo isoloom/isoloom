@@ -496,6 +496,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.83.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-tuned-web-app", libvirt__network_name: "isoloom-tuned-web-app", libvirt__dhcp_enabled: false
+    m.vm.disk :disk, name: "cache", size: "50GB"
     m.vm.provider "virtualbox" do |v|
       v.name = "tuned-web · web"
       v.linked_clone = true
@@ -552,6 +553,7 @@ Vagrant.configure("2") do |config|
       v.guest_name = "tuned-web-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
+      v.guest_storage = [50]
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
@@ -561,6 +563,7 @@ Vagrant.configure("2") do |config|
       v.tpm_type = "emulator"
       v.tpm_model = "tpm-crb"
       v.tpm_version = "2.0"
+      v.storage :file, size: "50G"
     end
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
@@ -635,6 +638,31 @@ Vagrant.configure("2") do |config|
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-tuned-web-app"]) }
     end
+    m.vm.provision "shell", name: "data disks", inline: <<~'SH'
+      set -e
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      disk() {
+        label=$1; fs=$2; at=$3; bytes=$4
+        mkdir -p "$at"
+        if ! blkid -L "$label" >/dev/null 2>&1; then
+          i=0; dev=
+          while [ -z "$dev" ]; do
+            for d in $(lsblk -dnbo NAME,SIZE,TYPE | awk -v b="$bytes" '$3 == "disk" && $2 >= b && $2 < b + 1073741824 { print $1 }'); do
+              if [ "$(lsblk -n "/dev/$d" | wc -l)" -eq 1 ] && ! blkid -p "/dev/$d" >/dev/null 2>&1; then dev=/dev/$d; break; fi
+            done
+            if [ -z "$dev" ]; then
+              i=$((i+1)); if [ "$i" -ge 60 ]; then echo "disk $label: no blank disk of $bytes bytes is attached" >&2; exit 1; fi
+              sleep 5
+            fi
+          done
+          if [ "$fs" = xfs ]; then command -v mkfs.xfs >/dev/null || pkg xfsprogs; mkfs.xfs -q -L "$label" "$dev"; else mkfs.ext4 -q -L "$label" "$dev"; fi
+          udevadm settle 2>/dev/null || true
+        fi
+        grep -q "^LABEL=$label " /etc/fstab || printf 'LABEL=%s %s %s defaults,nofail 0 2\n' "$label" "$at" "$fs" >> /etc/fstab
+        mountpoint -q "$at" || mount "$at"
+      }
+      disk 'cache' xfs '/var/cache/web' 53687091200
+    SH
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "settings", inline: <<~'SH'
       set -e

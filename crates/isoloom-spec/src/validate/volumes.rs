@@ -1,5 +1,5 @@
-//! Volumes: a machine's own (names Kubernetes can carry, safe mount paths) and the ones shared
-//! between machines (`volumes:` at the top level).
+//! Volumes: a machine's own (names Kubernetes can carry, safe mount paths) and the ones declared
+//! at the top level (`volumes:`): shared between machines, kept past `down`, or existing ones.
 
 use std::collections::BTreeSet;
 
@@ -26,6 +26,7 @@ pub(super) fn shared(spec: &Spec, p: &mut Problems) {
             );
             continue;
         }
+        kept(spec, v, &at, p);
         let Some(owner) = spec.volume_owner(v) else { continue };
         for u in &users {
             let m = &spec.machines[*u];
@@ -42,25 +43,83 @@ pub(super) fn shared(spec: &Spec, p: &mut Problems) {
     }
 }
 
-/// A machine's volumes: kebab-case names that fit Kubernetes' labels, and distinct, safe
-/// absolute paths.
+/// A volume kept past `down` or existing already: one or the other (an existing volume is
+/// never removed), and an existing one named as Docker and Kubernetes name volumes.
+fn kept(spec: &Spec, v: &str, at: &str, p: &mut Problems) {
+    let vol = &spec.volumes[v];
+    let Some(name) = &vol.external else { return };
+    if vol.persistent {
+        p.add(format!("{at}.persistent"), "an external volume is never removed: leave `persistent` out");
+    }
+    let valid = name.len() <= 63
+        && name.starts_with(|c: char| c.is_ascii_alphanumeric())
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+    if !valid {
+        p.add(
+            format!("{at}.external"),
+            format!("`{name}` isn't a volume name: letters, digits, '-', '_' and '.', starting with a letter or digit, at most 63"),
+        );
+    }
+}
+
+/// A machine's volumes: kebab-case names that fit Kubernetes' labels, distinct, safe absolute
+/// paths, and a folder of a shared volume only where it can be one. Then its other storage.
 pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
     let mut paths = BTreeSet::new();
-    for (v, path) in &s.m.volumes {
+    for (v, mount) in &s.m.volumes {
         let vat = format!("{}.volumes.{v}", s.at);
         if let Some(why) = name_problem(s.name, v) {
             p.add(&vat, why);
         }
-        // No spaces or ':' : the Docker short mount syntax (`<vol>:<path>`) and the `mkdir -p`
-        // the VM/Proxmox provisioners run both split on those, so either would corrupt the mount.
-        if !path.starts_with('/') || path == "/" || path.split('/').any(|s| s == "..") || path.contains([':', ' ', '\t']) {
+        let path = mount.path();
+        if !safe_path(path) {
             p.add(
-                vat,
+                &vat,
                 format!("`{path}` isn't a safe absolute path inside the machine (no spaces or ':'), like /var/lib/postgresql/data"),
             );
         } else if !paths.insert(path.trim_end_matches('/')) {
-            p.add(vat, format!("`{path}` is already a volume of this machine"));
+            p.add(&vat, format!("`{path}` is already a volume of this machine"));
         }
+        if let Some(sub) = mount.subpath() {
+            subpath(s, v, sub, &format!("{vat}.subpath"), p);
+        }
+    }
+    super::storage::of_machine(s, &paths, p);
+}
+
+/// A safe absolute path for a mount. No spaces or ':' : the Docker short mount syntax
+/// (`<vol>:<path>`) and the `mkdir -p` the VM/Proxmox provisioners run both split on those, so
+/// either would corrupt the mount.
+pub(super) fn safe_path(path: &str) -> bool {
+    path.starts_with('/') && path != "/" && !path.split('/').any(|s| s == "..") && !path.contains([':', ' ', '\t'])
+}
+
+/// A folder of a shared volume: a relative path inside it, taken by a machine other than the
+/// owner (which holds the whole volume, and serves it on the VM targets).
+fn subpath(s: &Subject, v: &str, sub: &str, at: &str, p: &mut Problems) {
+    if !s.spec.volumes.contains_key(v) {
+        p.add(
+            at,
+            format!("only a shared volume has folders to take: declare `{v}` under the top-level `volumes`"),
+        );
+    } else if s.spec.volume_owner(v) == Some(s.name) {
+        p.add(
+            at,
+            format!(
+                "`{}` holds the whole volume `{v}`: give the subpath to another machine, or make another one the `owner`",
+                s.name
+            ),
+        );
+    }
+    let safe = !sub.is_empty()
+        && !sub.starts_with('/')
+        && sub.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
+        && sub.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'));
+    if !safe {
+        p.add(
+            at,
+            format!("`{sub}` isn't a folder inside the volume: a relative path like `www` or `logs/app`, no `..`"),
+        );
     }
 }
 

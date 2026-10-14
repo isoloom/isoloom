@@ -49,7 +49,8 @@ pub fn cloud_refusals(env: &Environment) -> Vec<(&'static str, Option<String>)> 
 /// playbook checks (refused by each cloud's own limit until the cloud runs them), `exec` checks
 /// (run on the machine), machine aliases and ulimits (the set-up steps), and gateway networks
 /// and link impairment (refused by each cloud's own limits, with their own reasons: the plan's
-/// requirements name other targets).
+/// requirements name other targets), data disks (a volume each, attached; raw ones left
+/// unformatted) and tmpfs modes (a VM sets its tmpfs up in its provisioning).
 pub fn capabilities() -> Capabilities {
     Capabilities::of([
         Feature::EnvironmentProvisioning,
@@ -77,6 +78,9 @@ pub fn capabilities() -> Capabilities {
         // A network's MTU: Google Cloud sets it on its VPC; the other clouds refuse it on their
         // own (they have no setting for it).
         Feature::NetworkMtu,
+        Feature::DataDisks,
+        Feature::RawDisks,
+        Feature::TmpfsModes,
     ])
 }
 

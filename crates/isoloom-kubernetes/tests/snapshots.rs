@@ -260,7 +260,11 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
             Feature::Secrets,
             Feature::OwnedProjectFiles,
             Feature::MachineProcess,
-            Feature::ContainerGpus
+            Feature::ContainerGpus,
+            Feature::PersistentVolumes,
+            Feature::ExternalVolumes,
+            Feature::DataDisks,
+            Feature::RawDisks,
         ])
     );
 }

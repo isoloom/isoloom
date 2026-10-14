@@ -269,10 +269,14 @@ resource "proxmox_virtual_environment_file" "web" {
   source_raw {
     file_name = "iso${var.slot}-web.yaml"
     data = format("#cloud-config\n%s", yamlencode({
-      hostname    = "web"
-      users       = local.users
-      packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = local.project_files
+      hostname       = "web"
+      users          = local.users
+      packages       = ["nftables", "curl", "netcat-openbsd"]
+      device_aliases = { cache = "/dev/disk/by-id/virtio-cache" }
+      disk_setup     = { cache = { table_type = "gpt", layout = true, overwrite = false } }
+      fs_setup       = [{ label = "cache", filesystem = "xfs", device = "cache.1" }]
+      mounts         = [["LABEL=cache", "/var/cache/web", "xfs", "defaults,nofail", "0", "2"]]
+      write_files    = local.project_files
       runcmd = [
         "sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(APP_MODE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''APP_MODE=production\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"APP_MODE=production\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nprintf %s '\\''net.core.somaxconn = 4096\n'\\'' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\nmkdir -p /etc/security/limits.d && printf %s '\\''* soft nofile 8192\n* hard nofile 16384\nroot soft nofile 8192\nroot hard nofile 16384\n'\\'' > /etc/security/limits.d/90-isoloom.conf\nprintf %s '\\''[Manager]\nDefaultLimitNOFILE=8192:16384\n'\\'' > /etc/systemd/system.conf.d/90-isoloom-limits.conf\nsystemctl daemon-reexec 2>/dev/null || true'",
         "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
@@ -304,6 +308,13 @@ resource "proxmox_virtual_environment_vm" "web" {
   tpm_state {
     datastore_id = var.datastore
     version      = "v2.0"
+  }
+  disk {
+    datastore_id = var.datastore
+    interface    = "virtio1"
+    size         = 50
+    serial       = "cache"
+    file_format  = "raw"
   }
   network_device {
     bridge   = proxmox_sdn_vnet.app.id

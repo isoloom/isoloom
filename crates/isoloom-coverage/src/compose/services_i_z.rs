@@ -1,7 +1,10 @@
 //! Service keys from `image` to `working_dir`, long-form `ports` and `volumes` included.
 
-use super::{CLOUD_SIZES, IMAGE, IPV6, LEGACY, MODEL_RUNNER, NO_CONTAINER_ON_VMS, SHARED_NAMESPACE, SHORT_PORTS, SHORT_VOLUMES, SWARM, TOOLING};
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
+use super::{
+    CLOUD_SIZES, IMAGE, IMAGE_MOUNT, IPV6, LEGACY, LONG_VOLUMES, MODEL_RUNNER, NO_CONTAINER_ON_VMS, SHARED_NAMESPACE, SHORT_PORTS, SHORT_VOLUMES, SWARM,
+    TOOLING,
+};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Tooling};
 
 /// Service keys from `image` to `working_dir`.
 pub(super) const SERVICES_I_Z: &[(&str, Support)] = &[
@@ -319,9 +322,9 @@ pub(super) const SERVICES_I_Z: &[(&str, Support)] = &[
             from: "machines.*.volumes and volumes (shared between machines; seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts)",
         },
     ),
-    ("services.*.volumes[].type", SHORT_VOLUMES),
-    ("services.*.volumes[].source", SHORT_VOLUMES),
-    ("services.*.volumes[].target", SHORT_VOLUMES),
+    ("services.*.volumes[].type", LONG_VOLUMES),
+    ("services.*.volumes[].source", LONG_VOLUMES),
+    ("services.*.volumes[].target", LONG_VOLUMES),
     ("services.*.volumes[].read_only", SHORT_VOLUMES),
     (
         "services.*.volumes[].consistency",
@@ -339,7 +342,7 @@ pub(super) const SERVICES_I_Z: &[(&str, Support)] = &[
     ),
     ("services.*.volumes[].bind.recursive", NO_CONTAINER_ON_VMS),
     ("services.*.volumes[].bind.selinux", NO_CONTAINER_ON_VMS),
-    ("services.*.volumes[].volume", SHORT_VOLUMES),
+    ("services.*.volumes[].volume", LONG_VOLUMES),
     (
         "services.*.volumes[].volume.labels",
         Tooling {
@@ -354,40 +357,30 @@ pub(super) const SERVICES_I_Z: &[(&str, Support)] = &[
     ),
     (
         "services.*.volumes[].volume.subpath",
-        Planned {
-            note: "mounting one folder of a shared volume",
+        Emitted {
+            from: "machines.*.volumes.*.subpath (created first by a one-shot job)",
         },
     ),
     (
         "services.*.volumes[].tmpfs",
-        Equivalent {
-            via: "tmpfs (from machines.*.tmpfs)",
+        Emitted {
+            from: "machines.*.tmpfs[] with a size or a mode",
         },
     ),
     (
         "services.*.volumes[].tmpfs.size",
-        Planned {
-            note: "a size for machines.*.tmpfs",
+        Emitted {
+            from: "machines.*.tmpfs[].size",
         },
     ),
     (
         "services.*.volumes[].tmpfs.mode",
-        Planned {
-            note: "a mode for machines.*.tmpfs",
+        Emitted {
+            from: "machines.*.tmpfs[].mode",
         },
     ),
-    (
-        "services.*.volumes[].image",
-        NotPortable {
-            why: "mounts another container image's files: VMs have no images to mount",
-        },
-    ),
-    (
-        "services.*.volumes[].image.subpath",
-        NotPortable {
-            why: "mounts another container image's files: VMs have no images to mount",
-        },
-    ),
+    ("services.*.volumes[].image", IMAGE_MOUNT),
+    ("services.*.volumes[].image.subpath", IMAGE_MOUNT),
     (
         "services.*.volumes_from",
         Equivalent {

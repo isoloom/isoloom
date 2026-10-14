@@ -1,6 +1,6 @@
 //! The pod and its containers: what a machine is on Kubernetes.
 
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Tooling};
 
 /// Kubernetes' own handling of pods: where they run, how they are restarted or stopped.
 const SCHEDULING: Support = Tooling {
@@ -161,8 +161,8 @@ fn container(field: &str) -> Option<Support> {
         "livenessProbe" => Tooling {
             note: "restarts a container Kubernetes finds unhealthy: the cluster's self-healing, not the machine's behavior",
         },
-        "volumeDevices" => Planned {
-            note: "raw data disks, with persistent volumes and data disks",
+        "volumeDevices" => Emitted {
+            from: "machines.*.disks with `fs: raw`",
         },
         "stdin" | "stdinOnce" | "tty" => ATTACH,
         "resizePolicy" | "restartPolicy" | "restartPolicyRules" | "terminationMessagePath" | "terminationMessagePolicy" => SCHEDULING,

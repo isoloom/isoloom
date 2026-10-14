@@ -18,6 +18,7 @@ use crate::objects::{
     Resources, SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
 };
 use crate::process::{self, SCRIPTS_DIR};
+use crate::storage;
 
 // Isoloom's static busybox (the probe needs nothing from the machine's image) and its utility
 // image, as on Compose.
@@ -106,6 +107,7 @@ fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
     if process::runs_scripts(m) {
         c.volume_mounts.push(VolumeMount::at("scripts", SCRIPTS_DIR));
     }
+    c.volume_devices = storage::devices(m);
     c
 }
 
@@ -144,8 +146,8 @@ fn env(m: &Machine) -> Vec<EnvVar> {
 /// Where the machine sees its volumes: its claims, its memory-backed mounts (tmpfs, a sized
 /// /dev/shm) and Isoloom's probe (read-only), which the readiness probe runs.
 fn mounts(m: &Machine) -> Vec<VolumeMount> {
-    let mut out: Vec<VolumeMount> = m.plan.volumes.iter().map(|v| VolumeMount::at(format!("vol-{}", v.name), &v.path)).collect();
-    out.extend(m.spec.tmpfs.iter().enumerate().map(|(i, path)| VolumeMount::at(format!("tmpfs-{i}"), path)));
+    let mut out = storage::mounts(m);
+    out.extend(storage::tmpfs(m).0);
     if m.spec.shm_size.is_some() {
         out.push(VolumeMount::at("dshm", "/dev/shm"));
     }
@@ -269,12 +271,7 @@ fn beside_owners(m: &Machine) -> Option<Affinity> {
 /// probe, then its memory-backed mounts.
 fn volumes(m: &Machine) -> Vec<Volume> {
     let volume = |name: String, source| Volume { name, source };
-    let mut out: Vec<Volume> = m
-        .plan
-        .volumes
-        .iter()
-        .map(|v| volume(format!("vol-{}", v.name), VolumeSource::PersistentVolumeClaim { claim_name: v.key.clone() }))
-        .collect();
+    let mut out = storage::pod_volumes(m);
     if !m.init().is_empty() || files::reads_project(m) || process::runs_scripts(m) {
         out.push(volume("scripts".into(), scripts_volume()));
     }
@@ -288,7 +285,7 @@ fn volumes(m: &Machine) -> Vec<Volume> {
             size_limit: size.cloned(),
         })
     };
-    out.extend((0..m.spec.tmpfs.len()).map(|i| volume(format!("tmpfs-{i}"), memory(None))));
+    out.extend(storage::tmpfs(m).1);
     if let Some(shm) = &m.spec.shm_size {
         out.push(volume("dshm".into(), memory(Some(shm))));
     }

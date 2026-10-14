@@ -30,6 +30,7 @@ mod reach;
 mod secrets;
 mod services;
 mod settings;
+mod storage;
 mod targets;
 mod tools;
 mod top;

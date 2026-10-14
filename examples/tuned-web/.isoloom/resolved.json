@@ -94,7 +94,7 @@
     ],
     "refused": {
       "kubernetes": "machine `web` sets `ulimits`: Kubernetes has no per-container process limits",
-      "esxi": "machine `web` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+      "esxi": "machine `web` has data disks (`disks`), which this target can't attach"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
@@ -146,6 +146,14 @@
             "kind": "exec",
             "target": "sh -c 'echo $(ulimit -Sn)/$(ulimit -Hn)'",
             "expect": "8192/16384",
+            "wait": 0
+          },
+          {
+            "name": "the cache disk is mounted",
+            "derived": false,
+            "kind": "exec",
+            "target": "grep -q ' /var/cache/web ' /proc/mounts && echo mounted",
+            "expect": "mounted",
             "wait": 0
           }
         ]

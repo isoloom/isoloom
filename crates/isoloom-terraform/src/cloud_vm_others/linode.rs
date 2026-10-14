@@ -36,6 +36,7 @@ const RULES: Rules = Rules {
         Some("a Linode VPC has no route tables, so no traffic can be sent through a machine"),
     ),
     has_image: |os| image(os).is_some(),
+    disks: (10, 6),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
     tpm: false,
     own: own_image::linode,
@@ -195,6 +196,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
         user: USER.into(),
         hooks: shared::hooks(mp, std::iter::once(Template::text(SUDO)).chain(network::routes(env, &net)).collect()),
     };
+    m.blocks(crate::vm::disks::linode(name, &mp.disks));
     let mut setup = linux::provisioner(machine);
     // The firewall first: the set-up's downloads go through it.
     setup.depends_on.insert(0, reference(&format!("linode_firewall.{id}")));
