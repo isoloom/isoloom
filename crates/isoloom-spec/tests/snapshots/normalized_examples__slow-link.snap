@@ -1,0 +1,96 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: slow-link
+networks:
+  branch:
+    cidr: 10.75.1.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+  far:
+    cidr: 10.75.2.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+    tc:
+      delay: 80ms
+      jitter: 10ms
+      loss: 1
+      rate: 10mbit
+reach:
+  - from: branch
+    to: far
+    ports:
+      - 80
+inputs: []
+machines:
+  web:
+    networks:
+      far: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 80
+        name: ~
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/web
+      dockerfile: build/web.Dockerfile
+      args:
+        NGINX_TAG: 1.27-alpine
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+  user:
+    networks:
+      branch: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: true
+    docker: ~
+    vm:
+      os: debian-12
+      provision: []
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: "the far site answers, slowly"
+    from: user
+    http: ~
+    tcp: ~
+    exec: ~
+    script: checks/slow-but-there.sh
+    expect: ~
+    wait: ~
+targets: ~
+tools:
+  shell: {}

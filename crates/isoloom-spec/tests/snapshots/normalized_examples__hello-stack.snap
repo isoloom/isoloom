@@ -1,0 +1,147 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: hello-stack
+networks:
+  app:
+    cidr: 10.60.0.0/24
+    internet: false
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  cache:
+    networks:
+      app: 20
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 6379
+        name: redis
+        http: false
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes:
+      data: /data
+    access: false
+    docker:
+      image: "redis:7-alpine"
+      build: ~
+      init:
+        - build/cache/seed.sh
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/cache.sh
+      image: ~
+  web:
+    networks:
+      app: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 80
+        name: ~
+        http: true
+        publish: 8080
+    inputs: []
+    resources: ~
+    depends_on:
+      - cache
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/web
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - checks/cache-seeded.sh
+  - name: the page greets
+    from: ~
+    http: "http://web/"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: 200
+    wait: ~
+  - name: "the cache holds the greeting, read inside it"
+    from: cache
+    http: ~
+    tcp: ~
+    exec: redis-cli get greeting
+    script: ~
+    expect: hello from isoloom
+    wait: ~
+  - name: the cache answers a PING
+    from: ~
+    http: ~
+    contains: +PONG
+    send: PING
+    tcp: "cache:6379"
+    exec: ~
+    script: ~
+    expect: ~
+    wait: ~
+  - name: the page says hello
+    from: ~
+    http: "http://web/"
+    headers:
+      Accept: text/html
+    contains: hello from isoloom
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: ~
+    wait: ~
+  - name: "the folder's address without its slash redirects"
+    from: ~
+    http: "http://web/hello"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: 301
+    wait: ~
+  - name: "the folder's page, past the redirect"
+    from: ~
+    http: "http://web/hello"
+    follow: true
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: ~
+    wait: ~
+  - name: the static page refuses a POST
+    from: ~
+    http: "http://web/"
+    method: POST
+    body: greeting=hi
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: 405
+    wait: ~
+targets: ~
+message: "The page answers at http://localhost:{{ machines.web.services.0.publish }}/ (and at\nhttp://web/ from inside). The cache at {{ machines.cache.addresses.app }}:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"

@@ -1,0 +1,152 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: pivot-dmz
+networks:
+  dmz:
+    cidr: 10.30.10.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+  internal:
+    cidr: 10.30.20.0/24
+    internet: false
+    gateway: ~
+    docker: ~
+  access:
+    cidr: 10.30.99.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach:
+  - from: access
+    to: dmz
+    ports: []
+  - from: dmz
+    to: internal
+    ports:
+      - 8080
+      - 5432
+inputs: []
+machines:
+  gateway:
+    networks:
+      dmz: 10
+      internal: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 80
+        name: ~
+        http: false
+        publish: ~
+      - port: 22
+        name: ~
+        http: false
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/gateway
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/gateway.yml
+      image: ~
+  app:
+    networks:
+      internal: 20
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 8080
+        name: ~
+        http: false
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/app
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/app.yml
+      image: ~
+  db:
+    networks:
+      internal: 30
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 5432
+        name: ~
+        http: false
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "postgres:16"
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/db.yml
+      image: ~
+  user:
+    networks:
+      access: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: true
+    docker: ~
+    vm:
+      os: kali
+      provision: []
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - checks/dmz-reachable.sh
+  - checks/internal-not-reachable-from-access.sh
+targets: ~

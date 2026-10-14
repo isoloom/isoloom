@@ -1,0 +1,132 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: cisco-qemu
+networks:
+  site-a:
+    cidr: 10.92.1.0/24
+    internet: true
+    gateway: vios
+    docker: ~
+  site-b:
+    cidr: 10.92.2.0/24
+    internet: true
+    gateway: csr
+    docker: ~
+  wan:
+    cidr: 10.92.0.0/29
+    internet: false
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  vios:
+    networks:
+      site-a: 1
+      wan: 2
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "vrnetlab/cisco_vios:15.9.3M6"
+      build: ~
+      init: []
+      idle: false
+      appliance: cisco-vios
+      config: configs/vios.cfg
+    vm: ~
+  csr:
+    networks:
+      site-b: 1
+      wan: 3
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "vrnetlab/cisco_csr1000v:17.03.08"
+      build: ~
+      init: []
+      idle: false
+      appliance: cisco-csr1000v
+      config: configs/csr.cfg
+    vm: ~
+  host-a:
+    networks:
+      site-a: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "alpine:3.20"
+      build: ~
+      init: []
+      idle: true
+    vm: ~
+  host-b:
+    networks:
+      site-b: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 80
+        name: ~
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "nginx:1.27-alpine"
+      build: ~
+      init: []
+      idle: false
+    vm: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: site A reaches site B through both routers
+    from: host-a
+    http: "http://host-b/"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: 200
+    wait: 900
+targets: ~

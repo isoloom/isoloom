@@ -1,0 +1,84 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: shared-files
+networks:
+  app:
+    cidr: 10.84.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  writer:
+    networks:
+      app: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes:
+      shared: /srv/shared
+    access: false
+    docker:
+      image: "alpine:3.20"
+      build: ~
+      init:
+        - steps/write.sh
+      idle: true
+    vm:
+      os: debian-12
+      provision:
+        - steps/write.sh
+      image: ~
+  reader:
+    networks:
+      app: 11
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes:
+      shared: /data/shared
+    access: false
+    docker:
+      image: "alpine:3.20"
+      build: ~
+      init: []
+      idle: true
+    vm:
+      os: debian-12
+      provision:
+        - steps/look.sh
+      image: ~
+volumes:
+  shared:
+    owner: writer
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the reader sees what the writer wrote
+    from: reader
+    http: ~
+    tcp: ~
+    exec: cat /data/shared/greeting
+    script: ~
+    expect: written by the writer
+    wait: ~
+targets: ~
