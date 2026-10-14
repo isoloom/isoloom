@@ -150,8 +150,8 @@ jobs:
   # next release must bump for), when the crate exists there. Reported in the job summary, with a
   # warning annotation; not enforced: the model's structs mirror the spec and are public with
   # public fields, so every new spec key reads as a breaking change, and only the supported
-  # modules are a promise. A reviewer decides whether a change needs a "Breaking (library)" line
-  # and a minor bump.
+  # modules are a promise. A reviewer decides whether a change needs a CHANGELOG line under
+  # "Breaking changes" and a major bump.
   api:
     runs-on: ubuntu-latest
     steps:
@@ -179,7 +179,7 @@ jobs:
             if cargo semver-checks check-release -p "$1" --baseline-rev "$2" --color never > "$RUNNER_TEMP/semver.txt" 2>&1; then
               echo "No breaking change." >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "::warning title=$1 API::breaking changes since $3; see the job summary. Supported surface changed? Add a \"Breaking (library)\" line to the CHANGELOG."
+              echo "::warning title=$1 API::breaking changes since $3; see the job summary. Supported surface changed? List it under \"Breaking changes\" in the CHANGELOG (a major bump)."
               { echo '```'; grep -vE '^ *(Building|Built|Parsing|Parsed|Checking|Checked|Finished|Compiling) ' "$RUNNER_TEMP/semver.txt" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
             fi
             cat "$RUNNER_TEMP/semver.txt"

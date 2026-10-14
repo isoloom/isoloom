@@ -242,7 +242,7 @@ certification records of #144 will replace it, and this page will say so then.
 {
   "format": "isoloom-real-target/1",
   "target": "cloud-docker", "cloud": "aws", "provider": null, "example": "solo-web",
-  "isoloom": { "commit": "9d0f22ff…", "version": "isoloom 0.10.1" },
+  "isoloom": { "commit": "9d0f22ff…", "version": "isoloom 1.0.0" },
   "runner": { "name": "GitHub Actions 12", "os": "Linux 6.8.0-1021-azure x86_64" },
   "workflow_run": "https://github.com/isoloom/isoloom/actions/runs/123",
   "versions": { "terraform": "Terraform v1.13.4", "terraform_providers": { "registry.terraform.io/hashicorp/aws": "6.17.0" } },

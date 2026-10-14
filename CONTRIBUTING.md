@@ -72,4 +72,5 @@ cd examples/hello-stack && isoloom run docker . && git diff --exit-code -- .isol
 - A pull request says what changed, links the issue (`Closes #N`), pastes how it was verified
   and lists what was deliberately left out.
 - Add a CHANGELOG line for anything a user or embedder notices; a breaking change to the
-  supported library surface gets a "Breaking (library)" line.
+  supported library surface gets a line under "Breaking changes" and makes the next release a
+  major one.

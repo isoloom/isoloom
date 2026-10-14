@@ -173,7 +173,7 @@ pub fn refusal_on(spec: &Spec, target: Target, provider: Option<&str>) -> Option
 /// they can't. Only the QEMU part of the answer: it doesn't say whether Vagrant can run the spec
 /// at all.
 #[deprecated(
-    since = "0.11.0",
+    since = "1.0.0",
     note = "use `refusal_on(spec, Target::Vagrant, Some(\"qemu\"))`, which also says why Vagrant can't run the spec at all"
 )]
 pub fn qemu_refusal(spec: &Spec) -> Option<String> {

@@ -56,13 +56,17 @@ isoloom run vagrant            # the same environment, one VM per machine
 
 ## Install
 
+Isoloom 1.0.0 is the current release. The installer downloads its binary for macOS or Linux
+(x86_64, arm64), checks its SHA-256 sum and puts it in `~/.local/bin`:
+
 ```sh
-curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/v1.0.0/install.sh | ISOLOOM_VERSION=v1.0.0 sh
 ```
 
-Release binaries for macOS, Linux and Windows are on the
-[releases page](https://github.com/isoloom/isoloom/releases); in GitHub Actions,
-`uses: isoloom/isoloom@v0.10.1`. Then follow [Getting started](docs/getting-started.md).
+Leave `ISOLOOM_VERSION` out for the latest release. The binaries for macOS, Linux and Windows,
+with their checksums, are on the [release page](https://github.com/isoloom/isoloom/releases/tag/v1.0.0);
+in GitHub Actions, `uses: isoloom/isoloom@v1.0.0`. Upgrading from 0.10:
+[docs/migration-1.0.md](docs/migration-1.0.md). Then follow [Getting started](docs/getting-started.md).
 
 ## Targets
 
@@ -106,12 +110,13 @@ one in [Targets](docs/targets.md).
 
 ## Using the library
 
-The crates aren't on crates.io: depend on the ones you use from git, pinned to a release tag.
+The crates aren't on crates.io: depend on the ones you use from git, pinned to a release tag;
+`version = "1"` makes Cargo check that the tag holds a 1.x crate.
 
 ```toml
-isoloom-spec = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
-isoloom-targets = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
-isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
+isoloom-spec = { git = "https://github.com/isoloom/isoloom", tag = "v1.0.0", version = "1" }
+isoloom-targets = { git = "https://github.com/isoloom/isoloom", tag = "v1.0.0", version = "1" }
+isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "v1.0.0", version = "1" }
 ```
 
 | Crate | Holds |
@@ -147,9 +152,9 @@ isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
   supported surface; it is gone, and each item is used from the crate that holds it
   (`isoloom_core::generate` is `isoloom_targets::generate`, `isoloom_core::registry` is
   `isoloom_runtime::registry`, `isoloom_core::checks` is `isoloom_plan::checks`).
-- **Versions**: while Isoloom is at 0.x, a breaking change to the supported surface bumps the
-  minor version (0.10 -> 0.11), never the patch, and the CHANGELOG lists it under a
-  "Breaking (library)" line. A new public field or enum variant isn't breaking (a new spec key
+- **Versions**: Isoloom follows semantic versioning from 1.0 on. A breaking change to the
+  supported surface bumps the major version (1.x -> 2.0), and the CHANGELOG lists it under
+  "Breaking changes"; a new feature bumps the minor version, a fix the patch. A new public field or enum variant isn't breaking (a new spec key
   is one): get the model's types by parsing a spec rather than writing struct literals. CI
   reports every pull request's API changes (`cargo semver-checks`, against the base and the
   last tag) in its summary.

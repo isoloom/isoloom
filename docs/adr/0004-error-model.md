@@ -42,4 +42,4 @@ own helpers) are tracked in issue #106 and converted as their crates are touched
 - Error text stays stable where users see it: converting a crate keeps its messages unless the
   pull request says why they changed.
 - Each crate's error type is part of its public API: a new variant needs `#[non_exhaustive]`
-  or a minor bump.
+  or a major bump (a minor one before 1.0).

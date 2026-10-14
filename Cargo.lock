@@ -424,7 +424,7 @@ checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
 name = "isoloom"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "clap",
  "indexmap",
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-compose"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "indexmap",
  "insta",
@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-coverage"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "hcl-rs",
  "isoloom-plan",
@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-external"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "isoloom-plan",
  "isoloom-render",
@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-import"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "hcl-rs",
  "indexmap",
@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-kubernetes"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "indexmap",
  "insta",
@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-plan"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "indexmap",
  "isoloom-spec",
@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-render"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "hcl-rs",
  "indexmap",
@@ -532,7 +532,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-runtime"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "isoloom-spec",
  "isoloom-targets",
@@ -545,7 +545,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-spec"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "indexmap",
  "insta",
@@ -560,7 +560,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-targets"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "indexmap",
  "isoloom-compose",
@@ -579,7 +579,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-terraform"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "indexmap",
  "insta",
@@ -592,7 +592,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-vagrant"
-version = "0.10.1"
+version = "1.0.0"
 dependencies = [
  "indexmap",
  "insta",

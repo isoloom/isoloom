@@ -7,15 +7,17 @@ go next.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/v1.0.0/install.sh | ISOLOOM_VERSION=v1.0.0 sh
 ```
 
-Release binaries for macOS, Linux (x86_64, arm64) and Windows are on the
-[releases page](https://github.com/isoloom/isoloom/releases). From source:
-`cargo install --git https://github.com/isoloom/isoloom isoloom`. In GitHub Actions:
+The installer checks the binary's SHA-256 sum and puts it in `~/.local/bin`; leave
+`ISOLOOM_VERSION` out for the latest release. The 1.0.0 binaries for macOS, Linux (x86_64,
+arm64) and Windows, with their checksums, are on the
+[release page](https://github.com/isoloom/isoloom/releases/tag/v1.0.0). From source:
+`cargo install --git https://github.com/isoloom/isoloom --tag v1.0.0 isoloom`. In GitHub Actions:
 
 ```yaml
-- uses: isoloom/isoloom@v0.10.1
+- uses: isoloom/isoloom@v1.0.0
 - run: isoloom check
 ```
 

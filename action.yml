@@ -5,7 +5,7 @@ branding:
   color: orange
 inputs:
   version:
-    description: A release tag (e.g. v0.6.0), or latest.
+    description: A release tag (e.g. v1.0.0), or latest.
     default: latest
 runs:
   using: composite
