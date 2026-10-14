@@ -131,3 +131,16 @@ pub const EXTERNAL: &[(&str, Status)] = &[
         },
     ),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::{PROXMOX, VAGRANT, vm};
+
+    /// The tables are built at compile time; building them again at run time proves the helper
+    /// gives the same rows (and lets line coverage see it run).
+    #[test]
+    fn the_vm_tables_are_the_helper_s_rows() {
+        assert_eq!(vm(VAGRANT[0].1).as_slice(), VAGRANT);
+        assert_eq!(vm(PROXMOX[0].1).as_slice(), PROXMOX);
+    }
+}

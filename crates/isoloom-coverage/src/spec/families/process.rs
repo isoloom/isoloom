@@ -99,3 +99,18 @@ const HOST: Status = Planned {
 const fn done(how: &'static str) -> Status {
     Done { how, proof: PROBE }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{COMPOSE, done};
+    use crate::spec::status::{PROBE, Status};
+
+    /// The cells are built at compile time; building one again at run time proves the helper
+    /// (and lets line coverage see it run).
+    #[test]
+    fn done_is_proven_by_the_field_s_probe() {
+        let how = "the service's `command` (the image's entrypoint runs it)";
+        assert_eq!(done(how), Status::Done { how, proof: PROBE });
+        assert_eq!(COMPOSE[0].1, done(how));
+    }
+}
