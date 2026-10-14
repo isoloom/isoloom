@@ -37,7 +37,8 @@
       "proxmox": "left out by `targets:`",
       "cloud-vm": "left out by `targets:`",
       "external": "left out by `targets:`"
-    }
+    },
+    "clouds": {}
   },
   "checks": {
     "default_position": "networks",

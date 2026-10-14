@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Per-cloud refusals surfaced
+- `resolved.json`'s `targets` gains `clouds`: for a generated `cloud-vm`, the clouds whose module is written (`generated`) and each refused cloud with its reason (`refused`), from `cloud_vm::cloud_refusals`. The snapshot stays at version 1 (a new field). Every example's `resolved.json` is regenerated.
+- `isoloom targets` lists the refused clouds under `cloud-vm` (`    ✗ gcp (machine `web01`: Windows on GCP comes later)`).
+- Library: `isoloom_targets::cloud_refusals(spec, target)` (and `CloudRefusal`).
+
 ### cloud-docker and cloud-services rendered from the plan; playbooks retried on unreachable hosts (#20)
 - `cloud-docker` is a backend of its own (`CloudDockerBackend`): the Compose file is the Compose backend's, and each cloud's module (AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle Cloud) and `docker-vm`'s Proxmox module are built with the HCL builder from the plan, with no text templates or post-passes left. Every module passes `terraform fmt -check`. Its refusals come from its capabilities (Compose's) and its own limit (arm64), without rendering.
 - The Docker host is set up through the VM core's `remote-exec` transport: one provisioner running the plan's `Prelude` (the constraints), `Project` and `Ready` steps around Docker and `docker compose up --wait`. The project is unpacked as root; the archive on the host is `.isoloom-project-environment.tgz`; inputs are written `KEY='value'` (they were `KEY=<jsonencode>`, which let `sh` expand `$`, backticks and `$(...)`). On Proxmox the constraints also run as `bootcmd`, before cloud-init installs the guest agent.

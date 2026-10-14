@@ -195,7 +195,8 @@
       "cloud-vm": "needs `vm:` on sw1, files, staff, guest",
       "external": "needs `external:` on sw1, files, staff, guest",
       "cloud-services": "left out by `targets:`"
-    }
+    },
+    "clouds": {}
   },
   "checks": {
     "default_position": "networks",

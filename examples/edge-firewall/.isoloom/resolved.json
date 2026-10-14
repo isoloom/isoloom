@@ -268,7 +268,8 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "needs `external:` on fw, web, cache",
       "cloud-services": "left out by `targets:`"
-    }
+    },
+    "clouds": {}
   },
   "checks": {
     "default_position": "user",

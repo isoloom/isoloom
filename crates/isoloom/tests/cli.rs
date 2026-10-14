@@ -67,6 +67,19 @@ fn an_example_validates() {
 }
 
 #[test]
+fn targets_lists_the_refused_clouds_under_cloud_vm() {
+    let home = scratch("targets-refused-clouds");
+    let o = isoloom(&home, &["targets", &example("windows-hello")]);
+    assert!(o.status.success(), "{}{}", stdout(&o), stderr(&o));
+    let out = stdout(&o);
+    let at = out.find("✓ cloud-vm\n").unwrap_or_else(|| panic!("cloud-vm not generated:\n{out}"));
+    let under: Vec<&str> = out[at..].lines().skip(1).take_while(|l| l.starts_with("    ")).collect();
+    assert_eq!(under.len(), 4, "{out}");
+    assert!(under[0].starts_with("    ✗ gcp (") && under[0].contains("Windows on GCP"), "{out}");
+    assert!(!out.contains("✗ aws") && !out.contains("✗ azure"), "{out}");
+}
+
+#[test]
 fn invalid_spec_fails_validate_with_its_problems() {
     let dir = project(
         "invalid-spec",

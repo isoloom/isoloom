@@ -138,6 +138,20 @@
       "kubernetes": "needs `docker:` on files01",
       "external": "needs `external:` on files01, intranet",
       "cloud-services": "left out by `targets:`"
+    },
+    "clouds": {
+      "cloud-vm": {
+        "generated": [
+          "aws",
+          "azure"
+        ],
+        "refused": {
+          "gcp": "machine `files01`: Windows on GCP comes later",
+          "digitalocean": "DigitalOcean cloud-vm is Linux only so far",
+          "linode": "Linode cloud-vm is Linux only so far",
+          "oci": "Oracle Cloud cloud-vm is Linux only so far"
+        }
+      }
     }
   },
   "checks": {

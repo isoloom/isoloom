@@ -1,13 +1,14 @@
 //! The resolved snapshot, `.isoloom/resolved.json`: the spec after Isoloom has worked
 //! everything out, for programs. Every address (machines on each network, and on Docker's
 //! blocks; the router, the controller, the gateways), routes, start order, published ports,
-//! the targets (possible, generated, refused with reasons), and the checks by position with
+//! the targets (possible, generated, refused with reasons, and on `cloud-vm` the clouds
+//! generated and refused), and the checks by position with
 //! their runners. The generators and this file use the same functions, and a test keeps them
 //! in agreement; tools embedding Isoloom read this instead of parsing a Vagrantfile.
 
 use serde_json::{Map, Value, json};
 
-use super::{GENERATED_TARGETS, GeneratedFile, address, docker_cidrs, on_docker, refusal, router, start_order};
+use super::{GENERATED_TARGETS, GeneratedFile, address, cloud_refusals, docker_cidrs, on_docker, refusal, router, start_order};
 use crate::checks::{self, HttpExpect, Position, Probe, Resolved, TcpExpect};
 use crate::images;
 use crate::model::{Machine, Protocol, Service, Spec, Target};
@@ -255,7 +256,21 @@ fn targets(spec: &Spec) -> Value {
         "generated": generated,
         "refused": refused,
         "not_possible": not_possible,
+        "clouds": clouds(spec),
     })
+}
+
+/// Per generated multi-cloud target (`cloud-vm`), the clouds whose module is written and each
+/// refused cloud with its reason: a cloud's refusal drops its module, not the target.
+fn clouds(spec: &Spec) -> Map<String, Value> {
+    Target::ALL
+        .into_iter()
+        .filter_map(|t| {
+            let (generated, refused) = cloud_refusals(spec, t)?;
+            let refused: Map<String, Value> = refused.into_iter().map(|(c, why)| (c.to_string(), json!(why))).collect();
+            Some((t.id().to_string(), json!({ "generated": generated, "refused": refused })))
+        })
+        .collect()
 }
 
 /// Why a target isn't possible for the spec.

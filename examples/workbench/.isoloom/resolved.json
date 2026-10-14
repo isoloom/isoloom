@@ -124,7 +124,8 @@
       "cloud-vm": "needs `vm:` on bench, web",
       "external": "needs `external:` on bench, web",
       "cloud-services": "left out by `targets:`"
-    }
+    },
+    "clouds": {}
   },
   "checks": {
     "default_position": "networks",

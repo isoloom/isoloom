@@ -83,6 +83,10 @@ fn print_text(spec: &core::Spec, host: bool) {
         match core::refusal(spec, t) {
             None => {
                 println!("✓ {}", t.id());
+                // A cloud whose model doesn't fit drops its module, not the target.
+                for (cloud, why) in core::generate::cloud_refusals(spec, t).map(|(_, r)| r).unwrap_or_default() {
+                    println!("    ✗ {cloud} ({why})");
+                }
                 for r in on_host(t, host) {
                     let label = r.cloud.as_deref().map(|c| format!(" {c}")).unwrap_or_default();
                     println!("    host{label}: {}", r.summary());

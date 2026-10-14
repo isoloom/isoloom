@@ -106,3 +106,38 @@ fn the_snapshot_is_a_generated_file_of_every_target() {
     assert!(lookup(&r, "checks.positions.0.machine").unwrap().is_null());
     assert!(lookup(&r, "nothing.here").is_none());
 }
+
+#[test]
+fn cloud_vm_lists_its_generated_and_refused_clouds() {
+    let spec = example("windows-hello");
+    let r = resolve(&spec);
+    let clouds = lookup(&r, "targets.clouds.cloud-vm").unwrap();
+    assert_eq!(clouds["generated"], serde_json::json!(["aws", "azure"]));
+    let refused = clouds["refused"].as_object().unwrap();
+    assert_eq!(refused.keys().collect::<Vec<_>>(), ["gcp", "digitalocean", "linode", "oci"]);
+    assert!(refused["gcp"].as_str().unwrap().contains("Windows on GCP"));
+    // What the snapshot says is what the generator writes: a module per generated cloud only.
+    let files = generate(&spec, Target::CloudVm).unwrap();
+    let written = |cloud: &str| files.iter().any(|f| f.path.starts_with(&format!(".isoloom/cloud-vm/{cloud}/")));
+    for cloud in clouds["generated"].as_array().unwrap() {
+        assert!(written(cloud.as_str().unwrap()), "{cloud}: no module");
+    }
+    for cloud in refused.keys() {
+        assert!(!written(cloud), "{cloud}: refused, yet its module is written");
+    }
+}
+
+#[test]
+fn only_a_generated_cloud_vm_lists_its_clouds() {
+    // pivot-dmz: cloud-vm is refused as a whole (AWS has no Kali image), so no clouds.
+    let p = resolve(&example("pivot-dmz"));
+    assert!(lookup(&p, "targets.refused.cloud-vm").is_some());
+    assert_eq!(lookup(&p, "targets.clouds").unwrap(), &serde_json::json!({}));
+    // segmented: every cloud-vm cloud is listed once, generated or refused; no other target is.
+    let s = resolve(&example("segmented"));
+    let clouds = lookup(&s, "targets.clouds").unwrap().as_object().unwrap();
+    assert_eq!(clouds.keys().collect::<Vec<_>>(), ["cloud-vm"]);
+    let generated = clouds["cloud-vm"]["generated"].as_array().unwrap().len();
+    let refused = clouds["cloud-vm"]["refused"].as_object().unwrap().len();
+    assert_eq!(generated + refused, 6);
+}

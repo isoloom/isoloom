@@ -225,7 +225,8 @@
       "cloud-vm": "needs `vm:` on r1, r2, host-a, host-b",
       "external": "needs `external:` on r1, r2, host-a, host-b",
       "cloud-services": "left out by `targets:`"
-    }
+    },
+    "clouds": {}
   },
   "checks": {
     "default_position": "networks",
