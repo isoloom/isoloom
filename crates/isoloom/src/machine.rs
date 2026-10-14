@@ -5,10 +5,9 @@
 use std::path::Path;
 use std::process::Command;
 
-use isoloom_core as core;
-use isoloom_core::{Target, shell};
+use isoloom_spec::{Target, shell};
 
-use isoloom_core::events::ErrorCode;
+use isoloom_runtime::events::ErrorCode;
 
 use crate::failure::{Failure, fail};
 use crate::tools::{compose, kubectl, terraform};
@@ -17,7 +16,7 @@ use crate::{Res, spec, target};
 /// A running environment to talk to.
 pub struct Env<'a> {
     pub dir: &'a Path,
-    pub spec: &'a core::Spec,
+    pub spec: &'a isoloom_spec::Spec,
     pub target: Target,
     pub cloud: Option<&'a str>,
     pub instance: Option<u8>,
@@ -27,7 +26,7 @@ pub struct Env<'a> {
 /// The environment `connect`, `exec` and `capture` reach: the spec as the instance and the
 /// target it runs on (named, or what `run` recorded).
 pub struct Running {
-    pub spec: core::Spec,
+    pub spec: isoloom_spec::Spec,
     pub target: Target,
     pub cloud: Option<String>,
 }
@@ -68,7 +67,7 @@ struct Call<'a> {
 impl Call<'_> {
     /// The output folder of the environment.
     fn out(&self) -> std::path::PathBuf {
-        self.env.dir.join(core::instance::output_dir(self.env.instance))
+        self.env.dir.join(isoloom_spec::instance::output_dir(self.env.instance))
     }
 
     /// `sudo ` when the command runs as root.
@@ -159,7 +158,7 @@ fn tool(call: &Call) -> Res<Command> {
 }
 
 /// A machine without `docker:` is supplied by the runner on the container targets.
-fn container_only(call: &Call, m: &core::Machine, what: &str) -> Res<()> {
+fn container_only(call: &Call, m: &isoloom_spec::Machine, what: &str) -> Res<()> {
     if m.docker.is_none() {
         let message = format!(
             "`{}` has no `docker:`: on {what} it is supplied by the runner, so there is nothing of it to reach",
@@ -171,11 +170,11 @@ fn container_only(call: &Call, m: &core::Machine, what: &str) -> Res<()> {
 }
 
 /// Whether the machine runs Windows, which has no shell to drop into.
-fn is_windows(m: &core::Machine) -> bool {
-    m.vm.as_ref().is_some_and(|v| core::images::is_windows(&v.os))
+fn is_windows(m: &isoloom_spec::Machine) -> bool {
+    m.vm.as_ref().is_some_and(|v| isoloom_spec::images::is_windows(&v.os))
 }
 
-fn docker(call: &Call, m: &core::Machine) -> Res<Command> {
+fn docker(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
     container_only(call, m, "Docker")?;
     let mut c = compose::quiet(call.env.dir, call.env.instance);
     c.arg("exec").arg(call.compose_flags());
@@ -183,7 +182,7 @@ fn docker(call: &Call, m: &core::Machine) -> Res<Command> {
     Ok(c)
 }
 
-fn local_vm(call: &Call, m: &core::Machine) -> Res<Command> {
+fn local_vm(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
     let Env { spec, target, .. } = *call.env;
     let machine = call.machine;
     let mut c = crate::tools::process::command("vagrant");
@@ -216,14 +215,14 @@ fn local_vm(call: &Call, m: &core::Machine) -> Res<Command> {
 fn compose_on_host(call: &Call) -> String {
     format!(
         "cd /opt/isoloom && sudo docker compose -f {}/docker/compose.yml exec {} {} sh -c {}",
-        core::instance::output_dir(call.env.instance),
+        isoloom_spec::instance::output_dir(call.env.instance),
         call.compose_flags(),
         call.machine,
         shell::quote(&call.inner)
     )
 }
 
-fn docker_vm(call: &Call, m: &core::Machine) -> Res<Command> {
+fn docker_vm(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
     container_only(call, m, "Docker")?;
     let mut c = crate::tools::process::command("vagrant");
     c.current_dir(call.out().join("docker-vm"));
@@ -231,7 +230,7 @@ fn docker_vm(call: &Call, m: &core::Machine) -> Res<Command> {
     Ok(c)
 }
 
-fn kubernetes(call: &Call, m: &core::Machine) -> Res<Command> {
+fn kubernetes(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
     container_only(call, m, "Kubernetes")?;
     let mut c = crate::tools::process::command("kubectl");
     c.args(["-n", &kubectl::namespace(&call.env.spec.name), "exec"]);
@@ -257,7 +256,7 @@ fn address_in(outputs: &serde_json::Value, machine: &str) -> Res<String> {
         .to_string())
 }
 
-fn cloud_vm(call: &Call, m: &core::Machine) -> Res<Command> {
+fn cloud_vm(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
     if is_windows(m) {
         return Err(Failure::new(ErrorCode::Unsupported, windows_hint(call.env.spec, call.machine))
             .machine(call.machine)
@@ -272,7 +271,7 @@ fn cloud_vm(call: &Call, m: &core::Machine) -> Res<Command> {
     Ok(c)
 }
 
-fn cloud_docker(call: &Call, m: &core::Machine) -> Res<Command> {
+fn cloud_docker(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
     container_only(call, m, "Docker")?;
     let cloud = target::docker_cloud(call.env.cloud)?;
     let outputs = terraform::output(&call.out().join("cloud-docker").join(cloud))?;
@@ -283,7 +282,7 @@ fn cloud_docker(call: &Call, m: &core::Machine) -> Res<Command> {
     Ok(c)
 }
 
-fn external(call: &Call, m: &core::Machine) -> Res<Command> {
+fn external(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
     let e = m.external.as_ref().ok_or_else(|| format!("`{}` has no `external:` address", call.machine))?;
     let key = call.env.ssh_key.or(e.key.as_deref().map(Path::new));
     let mut c = ssh(key, e.user.as_deref().unwrap_or("root"), &e.address, call.tty, None);
@@ -333,9 +332,9 @@ pub fn find_interface(addr: &str, missing: &str) -> String {
 }
 
 /// How to reach a Windows machine, which has no shell to drop into.
-fn windows_hint(spec: &core::Spec, machine: &str) -> String {
-    let r = core::resolved::resolve(spec);
-    let addr = core::resolved::lookup(&r, &format!("machines.{machine}.addresses"))
+fn windows_hint(spec: &isoloom_spec::Spec, machine: &str) -> String {
+    let r = isoloom_targets::resolved::resolve(spec);
+    let addr = isoloom_targets::resolved::lookup(&r, &format!("machines.{machine}.addresses"))
         .and_then(|a| a.as_object())
         .and_then(|a| a.values().next())
         .and_then(|v| v.as_str())

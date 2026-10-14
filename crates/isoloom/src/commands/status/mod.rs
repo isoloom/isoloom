@@ -5,10 +5,9 @@ mod probe;
 
 use std::process::ExitCode;
 
-use isoloom_core as core;
-use isoloom_core::registry::{self, Entry};
+use isoloom_runtime::registry::{self, Entry};
 
-use isoloom_core::events::{ErrorCode, Scope};
+use isoloom_runtime::events::{ErrorCode, Scope};
 
 use crate::commands::run::bring_up;
 use crate::failure::fail;
@@ -98,7 +97,7 @@ fn cleanup(reg: &registry::Registry, name: &str) -> Res<ExitCode> {
     }
     let mut torn = Vec::new();
     for e in &targets {
-        if e.dir.join(core::instance::output_dir(e.instance)).is_dir() {
+        if e.dir.join(isoloom_spec::instance::output_dir(e.instance)).is_dir() {
             torn.push(serde_json::json!({ "name": e.name, "target": e.target.id(), "dir": e.dir, "ok": tear_down(e)? }));
         } else if !output::json() {
             eprintln!("{}: folder gone, removing the entry", e.name);

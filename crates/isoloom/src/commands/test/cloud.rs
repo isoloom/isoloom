@@ -6,17 +6,16 @@ use std::path::Path;
 use std::process::{ExitCode, Output};
 
 use indexmap::IndexMap;
-use isoloom_core as core;
-use isoloom_core::checks::{self, Host, Line, Position};
+use isoloom_plan::checks::{self, Host, Line, Position};
 
-use isoloom_core::Target;
-use isoloom_core::events::{ErrorCode, Event, Scope};
+use isoloom_runtime::events::{ErrorCode, Event, Scope};
+use isoloom_spec::Target;
 
 use crate::failure::fail;
 use crate::tools::terraform;
 use crate::{Res, cloud_services, output};
 
-pub fn test(spec: &core::Spec, dir: &Path, instance: Option<u8>) -> Res<ExitCode> {
+pub fn test(spec: &isoloom_spec::Spec, dir: &Path, instance: Option<u8>) -> Res<ExitCode> {
     let outputs = cloud_services::outputs(dir, instance);
     if outputs.is_empty() && spec.cloud.as_ref().is_some_and(|c| !c.outputs.is_empty()) {
         return Err(fail(
@@ -94,7 +93,7 @@ fn report(out: &Output, at: &Scope) -> ExitCode {
                 name,
                 ok,
                 detail,
-                time: core::registry::now(),
+                time: isoloom_runtime::registry::now(),
             });
         } else if ok {
             println!("  ✓ {name}");

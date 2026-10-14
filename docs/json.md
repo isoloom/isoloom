@@ -110,11 +110,10 @@ Codes are stable: one never changes meaning. New codes can appear; treat an unkn
 
 ## Embedding
 
-A Rust program embedding Isoloom gets the same events from `isoloom_core::events::Emitter`
-(re-exported from `isoloom-runtime`):
+A Rust program embedding Isoloom gets the same events from `isoloom_runtime::events::Emitter`:
 
 ```rust
-use isoloom_core::events::{Emitter, Event};
+use isoloom_runtime::events::{Emitter, Event};
 
 // A callback, called on the thread that emits (the tools' output is read on threads of its own)...
 let emitter = Emitter::new(|e: &Event| println!("{e:?}"));
@@ -122,6 +121,6 @@ let emitter = Emitter::new(|e: &Event| println!("{e:?}"));
 let (emitter, events) = Emitter::channel();
 ```
 
-`isoloom_core::tool::run_logged(&mut command, &emitter, &scope)` runs a tool with its output as
+`isoloom_runtime::tool::run_logged(&mut command, &emitter, &scope)` runs a tool with its output as
 `log` events, as the command line does with `--json`; `Emitter::json_lines(writer)` writes them
 as the command line prints them.

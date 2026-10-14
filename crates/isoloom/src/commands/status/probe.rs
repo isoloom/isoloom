@@ -3,9 +3,8 @@
 
 use std::path::Path;
 
-use isoloom_core as core;
-use isoloom_core::Target;
-use isoloom_core::registry::Entry;
+use isoloom_runtime::registry::Entry;
+use isoloom_spec::Target;
 
 use crate::external::external_machines;
 use crate::target;
@@ -13,7 +12,7 @@ use crate::tools::{compose, kubectl};
 
 /// The live state of a recorded environment.
 pub fn probe(e: &Entry) -> String {
-    let out = e.dir.join(core::instance::output_dir(e.instance));
+    let out = e.dir.join(isoloom_spec::instance::output_dir(e.instance));
     if !out.is_dir() {
         return "stale (folder gone)".into();
     }
@@ -32,7 +31,7 @@ pub fn probe(e: &Entry) -> String {
 fn run(program: &str, args: &[&str], wd: &Path) -> Result<String, String> {
     let cwd = std::env::current_dir().ok();
     let _ = std::env::set_current_dir(wd);
-    let out = core::host::run_limited_in(program, args, 30, crate::spec::child_env());
+    let out = isoloom_runtime::host::run_limited_in(program, args, 30, crate::spec::child_env());
     if let Some(c) = cwd {
         let _ = std::env::set_current_dir(c);
     }
@@ -144,7 +143,10 @@ fn external(out: &Path) -> String {
             args.extend(m.ssh_args());
             args.push("true".into());
             let refs: Vec<&str> = args.iter().map(String::as_str).collect();
-            core::host::run_limited_in("ssh", &refs, 10, crate::spec::child_env()).ok().flatten().is_some()
+            isoloom_runtime::host::run_limited_in("ssh", &refs, 10, crate::spec::child_env())
+                .ok()
+                .flatten()
+                .is_some()
         })
         .count();
     counted(up, machines.len())

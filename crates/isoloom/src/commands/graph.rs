@@ -4,8 +4,6 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::{Res, spec};
 
 #[derive(clap::Args)]
@@ -29,8 +27,8 @@ pub struct Args {
 pub fn run(a: &Args) -> Res<ExitCode> {
     let snapshot = spec::snapshot_of(&a.dir, a.instance, &a.sets)?;
     let text = match a.format.as_str() {
-        "d2" => core::report::graph_d2(&snapshot),
-        "dot" => core::report::graph_dot(&snapshot),
+        "d2" => isoloom_runtime::report::graph_d2(&snapshot),
+        "dot" => isoloom_runtime::report::graph_dot(&snapshot),
         other => return Err(format!("unknown format `{other}`; `d2` or `dot`").into()),
     };
     let Some(out) = &a.out else {

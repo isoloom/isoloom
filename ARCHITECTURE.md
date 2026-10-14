@@ -109,12 +109,11 @@ failed on its own stops the setup at once.
 | `isoloom-import` | Drafting a spec from Compose, Vagrant and Terraform files, with notes for what the draft leaves out |
 | `isoloom-coverage` | The coverage map: what each output format can do and what Isoloom produces |
 | `isoloom-runtime` | Runtime state: the registry of running environments (`~/.isoloom/status.yml`), host readiness, the environment report; the lifecycle's JSON events and errors (`events`, with an `Emitter` for embedders) and a tool run with its output as events (`tool`): see [docs/json.md](docs/json.md) |
-| `isoloom-core` | The facade other tools embed: re-exports the supported surface of the crates above |
 | `isoloom` | The command line: clap definitions in `cli.rs`, one module per subcommand in `commands/`, tool runners in `tools/` (every tool started by `tools::process::command`), `--json` output in `output.rs` and the error codes in `failure.rs` |
 
 Dependencies point down the pipeline: `spec` depends on nothing of ours, `plan` on `spec`,
-`render` on both, backends on `render`, `targets` on the backends. Only `isoloom-core` and the
-CLI see everything.
+`render` on both, backends on `render`, `targets` on the backends. Only the CLI sees everything.
+Tools embedding Isoloom depend on the crates they use (README, "Using the library").
 
 ## How to add a feature
 
@@ -161,7 +160,7 @@ what Isoloom does with the feature: `Emitted`, `Partial`, `Equivalent`, `InImage
 2. Write the module (see `compose.rs`, `vagrant.rs`, `terraform.rs`): a `format()` returning
    the `Format`, with every feature of the definition classified.
 3. Register it in `formats()`.
-4. Extend `crates/isoloom-core/tests/coverage.rs`: the rows are exactly the definition's
+4. Extend `crates/isoloom-coverage/tests/coverage.rs`: the rows are exactly the definition's
    features, and the features marked as written match what the generators write for the
    committed examples.
 5. Regenerate `docs/COVERAGE.md`. [ADR 0005](docs/adr/0005-coverage-methodology.md) has the rules.
@@ -193,8 +192,12 @@ are already in `clippy.toml`; and the pedantic lints still hit by code moving on
 
 ### Tests
 
-Unit tests live beside the code; cross-crate behavior is tested in `crates/isoloom-core/tests`
-and the CLI in `crates/isoloom/tests`. Snapshots use `insta`
+Unit tests live beside the code; integration tests in the `tests/` folder of the crate they test:
+the generators over the examples (and every target's behavior through `generate`) in
+`crates/isoloom-targets/tests`, parsing, validation, the schema and profiles in
+`crates/isoloom-spec/tests`, the importers in `crates/isoloom-import/tests` (with their
+fixtures), the coverage tables in `crates/isoloom-coverage/tests`, the reports in
+`crates/isoloom-runtime/tests`, and the CLI in `crates/isoloom/tests`. Snapshots use `insta`
 (`crates/isoloom-spec/tests/snapshots`): a change to output shows up as a reviewed diff
 (`cargo insta review`). `proptest` suites cover CIDR parsing and addressing, and the quoting
 helpers for shell, HCL, Ruby and PowerShell (round trip and injection safety). A determinism

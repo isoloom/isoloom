@@ -5,10 +5,9 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use isoloom_core as core;
-use isoloom_core::{Target, shell};
+use isoloom_spec::{Target, shell};
 
-use isoloom_core::events::ErrorCode;
+use isoloom_runtime::events::ErrorCode;
 
 use crate::failure::{Failure, fail};
 use crate::machine::find_interface;
@@ -79,7 +78,7 @@ pub fn run(a: Args) -> Res<ExitCode> {
     if places.is_empty() {
         return Err(fail(ErrorCode::NetworkUnknown, format!("nothing on `{network}` to impair")));
     }
-    let wanted = core::Tc {
+    let wanted = isoloom_spec::Tc {
         delay: a.delay,
         jitter: a.jitter,
         loss: a.loss,
@@ -95,7 +94,7 @@ pub fn run(a: Args) -> Res<ExitCode> {
             c
         } else {
             let mut c = crate::tools::process::command("vagrant");
-            c.current_dir(dir.join(core::instance::output_dir(a.instance)).join(target::vm_folder(t)));
+            c.current_dir(dir.join(isoloom_spec::instance::output_dir(a.instance)).join(target::vm_folder(t)));
             c.args(["ssh", &p.host, "-c", &format!("sudo sh -c {}", shell::quote(&command))]);
             c
         };
@@ -114,11 +113,11 @@ pub fn run(a: Args) -> Res<ExitCode> {
 }
 
 /// The router's interface into the network, and each machine's own on it.
-fn places(spec: &core::Spec, instance: Option<u8>, network: &str, docker: bool) -> Vec<Place> {
-    let r = core::resolved::resolve_with(spec, instance);
+fn places(spec: &isoloom_spec::Spec, instance: Option<u8>, network: &str, docker: bool) -> Vec<Place> {
+    let r = isoloom_targets::resolved::resolve_with(spec, instance);
     let mut at = Vec::new();
-    if let Some(a) = core::resolved::lookup(&r, &format!("networks.{network}.router")).and_then(|v| v.as_str()) {
-        let router = core::generate::router_name().to_string();
+    if let Some(a) = isoloom_targets::resolved::lookup(&r, &format!("networks.{network}.router")).and_then(|v| v.as_str()) {
+        let router = isoloom_targets::router_name().to_string();
         at.push(Place {
             who: router.clone(),
             addr: a.to_string(),
@@ -131,7 +130,7 @@ fn places(spec: &core::Spec, instance: Option<u8>, network: &str, docker: bool) 
             continue;
         }
         let key = if docker { "docker_addresses" } else { "addresses" };
-        let Some(a) = core::resolved::lookup(&r, &format!("machines.{name}.{key}.{network}")).and_then(|v| v.as_str()) else {
+        let Some(a) = isoloom_targets::resolved::lookup(&r, &format!("machines.{name}.{key}.{network}")).and_then(|v| v.as_str()) else {
             continue;
         };
         // On Docker, the machine's network sidecar has `tc` and the right to use it.
@@ -149,7 +148,7 @@ fn places(spec: &core::Spec, instance: Option<u8>, network: &str, docker: bool) 
 }
 
 /// The shell command the action runs at one place.
-fn tc_command(action: &str, p: &Place, network: &str, wanted: &core::Tc, spec_tc: Option<&core::Tc>) -> Res<String> {
+fn tc_command(action: &str, p: &Place, network: &str, wanted: &isoloom_spec::Tc, spec_tc: Option<&isoloom_spec::Tc>) -> Res<String> {
     let find = find_interface(&p.addr, &format!("no interface on {network}"));
     let who = &p.who;
     Ok(match action {

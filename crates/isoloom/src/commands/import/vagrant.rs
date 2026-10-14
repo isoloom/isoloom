@@ -3,8 +3,6 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use super::draft::{Dest, source_of, write_draft};
 use crate::Res;
 use crate::tools::process;
@@ -16,7 +14,7 @@ pub fn run(file: Option<PathBuf>, dest: &Dest) -> Res<ExitCode> {
     }
     let recorded = record_vagrantfile(&file)?;
     let (folder, fallback, source) = source_of(&file)?;
-    let draft = core::import::vagrant::draft(&recorded, &fallback, &source)?;
+    let draft = isoloom_import::vagrant::draft(&recorded, &fallback, &source)?;
     write_draft(&draft, folder, dest)
 }
 

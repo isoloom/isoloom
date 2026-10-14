@@ -4,10 +4,10 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
-use isoloom_core::Target;
 use isoloom_plan::Environment;
+use isoloom_spec::Target;
 
-use isoloom_core::events::{ErrorCode, Scope};
+use isoloom_runtime::events::{ErrorCode, Scope};
 
 use crate::failure::fail;
 use crate::tools::process;
@@ -144,11 +144,11 @@ mod tests {
         std::fs::write(dir.join(".vagrant/machines/web/libvirt/id"), "x").unwrap();
         assert!(vagrant_uses_libvirt(&dir));
         std::fs::remove_dir_all(&dir).ok();
-        let spec = isoloom_core::parse(
+        let spec = isoloom_spec::parse(
             "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53, publish: 1053 }], vm: { os: debian-12 } }\n",
         )
         .unwrap();
-        let plan = isoloom_plan::Environment::build(&spec, isoloom_core::Target::Vagrant, None);
+        let plan = isoloom_plan::Environment::build(&spec, isoloom_spec::Target::Vagrant, None);
         assert_eq!(udp_forwards(&plan), ["dns:53/udp (published as 10053)"]);
     }
 

@@ -147,14 +147,14 @@ answers from the controller), **declared** (`http`, `tcp`, `exec`, with `from`,
 
 ## Layout
 
-- `crates/isoloom-core`: the format as a library (parse, validate, derive targets, generators).
-  Other Rust tools can embed it directly (see [Using the library](#using-the-library)). It
-  re-exports the crates the work is split into, by layer and backend:
-  - `isoloom-spec` (model, parsing, normalization, validation), `isoloom-plan` (checks),
-    `isoloom-render` (pieces shared by the backends);
+- `crates/`: the format as libraries, split by layer and backend (other Rust tools can embed
+  them: see [Using the library](#using-the-library)):
+  - `isoloom-spec` (model, parsing, normalization, validation), `isoloom-plan` (the plan and the
+    checks), `isoloom-render` (pieces shared by the backends);
   - the backends `isoloom-compose`, `isoloom-kubernetes`, `isoloom-terraform`, `isoloom-vagrant`
     and `isoloom-external`, wired together by `isoloom-targets` (with the resolved snapshot);
-  - `isoloom-import`, `isoloom-coverage` and `isoloom-runtime` (registry, host readiness, report).
+  - `isoloom-import`, `isoloom-coverage` and `isoloom-runtime` (registry, host readiness, events,
+    report).
 - `crates/isoloom`: the command line.
 - `examples/`: environments used as tests, from a two-machine app and a segmented network to an
   Active Directory domain, Cisco routers and cloud services. Those with a committed `.isoloom/`
@@ -162,18 +162,32 @@ answers from the controller), **declared** (`http`, `tcp`, `exec`, with `from`,
 
 ## Using the library
 
-`isoloom-core` isn't on crates.io: depend on it from git, pinned to a release tag.
+The crates aren't on crates.io: depend on the ones you use from git, pinned to a release tag
+(up to 0.10.1, a single `isoloom-core` crate: see below).
 
 ```toml
-isoloom-core = { git = "https://github.com/isoloom/isoloom", tag = "v0.10.1" }
+isoloom-spec = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
+isoloom-targets = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
+isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
 ```
 
-- **Supported surface**: the crate root (`load`, `parse`, `validate`, `validate_files`,
-  `derive`, `generate`, `refusal`, `refusal_on`, `totals`, the model types) and the modules `model`,
-  `validate`, `targets`, `generate` (with `resolved`, the snapshot), `checks`, `instance`,
-  `defaults`, `profile`, `registry` and `host`. Every other public module (`clones`, `groups`, `vlans`,
-  `ignore`, `images`, `import`, `coverage`, `report`, `schema`, `shell`) is internal: public for
-  the command line, and may change in any release.
+- **Supported surface**:
+  - `isoloom-spec`: the crate root (`load`, `load_with`, `load_profiled`, `parse`, `find`,
+    `validate`, `validate_files`, `derive`, `effective`, `totals`, the model types) and the
+    modules `model`, `validate`, `targets`, `instance`, `defaults` and `profile`;
+  - `isoloom-plan`: `checks` (the check plan and the runner's output lines);
+  - `isoloom-targets`: `generate`, `generate_all`, `generate_instance`, `refusal`, `refusal_on`,
+    `cloud_refusals`, `GeneratedFile`, `GenerateError`, and `resolved` (the snapshot);
+  - `isoloom-runtime`: `registry` (`~/.isoloom/status.yml`), `host`, `events` (the lifecycle's
+    JSON events and errors, with an `Emitter`) and `tool`.
+
+  Every other public item (the spec's `clones`, `groups`, `vlans`, `images`, `schema`, `shell`;
+  `isoloom-render`, the backends, `isoloom-import`, `isoloom-coverage`, `isoloom_runtime::report`)
+  is internal: public for the command line, and may change in any release. Up to 0.10 the
+  `isoloom-core` crate re-exported the supported surface; it is gone, and each item is used from
+  the crate that holds it (`isoloom_core::generate` is `isoloom_targets::generate`,
+  `isoloom_core::registry` is `isoloom_runtime::registry`, `isoloom_core::checks` is
+  `isoloom_plan::checks`).
 - **Versions**: while Isoloom is at 0.x, a breaking change to the supported surface bumps the
   minor version (0.10 -> 0.11), never the patch, and the CHANGELOG lists it under a
   "Breaking (library)" line. A new public field or enum variant isn't breaking (a new spec key

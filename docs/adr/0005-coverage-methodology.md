@@ -27,7 +27,7 @@ output does with it.
 **The number:** portable features count (not `Tooling`, not `NotPortable`); done ones count
 fully, partial ones half. 100% means every portable feature is produced.
 
-**Truth is tested** (`crates/isoloom-core/tests/coverage.rs`): the rows are exactly the
+**Truth is tested** (`crates/isoloom-coverage/tests/coverage.rs`): the rows are exactly the
 source's features; every feature a generator writes for a committed example is marked as
 written, and every row marked as written is written by some example; every spec field has a
 row; `docs/COVERAGE.md` is exactly what `isoloom coverage --markdown` prints.

@@ -3,8 +3,6 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::{Res, output, spec};
 
 #[derive(clap::Args)]
@@ -34,7 +32,9 @@ pub fn run(a: Args) -> Res<ExitCode> {
     };
     let all = spec::snapshot_of(&dir, a.instance, &a.sets)?;
     let value = match &what {
-        Some(path) => core::resolved::lookup(&all, path).ok_or_else(|| format!("nothing at `{path}` in the snapshot; try `isoloom inspect` to see it all"))?,
+        Some(path) => {
+            isoloom_targets::resolved::lookup(&all, path).ok_or_else(|| format!("nothing at `{path}` in the snapshot; try `isoloom inspect` to see it all"))?
+        }
         None => &all,
     };
     if a.yaml {

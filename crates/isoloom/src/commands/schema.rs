@@ -3,8 +3,6 @@
 
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::{Res, output};
 
 #[derive(clap::Args)]
@@ -16,9 +14,9 @@ pub struct Args {
 
 pub fn run(a: &Args) -> Res<ExitCode> {
     if a.events {
-        output::print_json(&core::events::schema())?;
+        output::print_json(&isoloom_runtime::events::schema())?;
     } else {
-        output::print_json(&core::schema::schema())?;
+        output::print_json(&isoloom_spec::schema::schema())?;
     }
     Ok(ExitCode::SUCCESS)
 }

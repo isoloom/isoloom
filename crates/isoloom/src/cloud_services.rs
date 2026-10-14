@@ -7,9 +7,7 @@ mod leftovers;
 use std::path::Path;
 use std::process::Stdio;
 
-use isoloom_core as core;
-
-use isoloom_core::events::ErrorCode;
+use isoloom_runtime::events::ErrorCode;
 
 use crate::failure::Failure;
 use crate::tools::terraform;
@@ -20,7 +18,7 @@ pub use leftovers::{leftovers, name_deployment};
 /// A cloud-services environment's outputs, by the spec's names: `outputs.sh` read (empty when
 /// it isn't deployed or Terraform can't say).
 pub fn outputs(dir: &Path, instance: Option<u8>) -> indexmap::IndexMap<String, String> {
-    let script = dir.join(core::instance::output_dir(instance)).join("cloud-services/outputs.sh");
+    let script = dir.join(isoloom_spec::instance::output_dir(instance)).join("cloud-services/outputs.sh");
     let Ok(out) = crate::tools::process::command("sh")
         .arg(&script)
         .envs(terraform::aws_session_env())
@@ -47,7 +45,7 @@ pub fn outputs(dir: &Path, instance: Option<u8>) -> indexmap::IndexMap<String, S
 
 /// Cloud services taking launch-time inputs: from the environment at `run`, written next to
 /// the state so `down` destroys with the same values.
-pub fn write_inputs(cloud: &core::CloudServices, wd: &Path) -> Res<()> {
+pub fn write_inputs(cloud: &isoloom_spec::CloudServices, wd: &Path) -> Res<()> {
     if let Some(h) = cloud.hourly_usd
         && !crate::output::json()
     {
@@ -56,11 +54,11 @@ pub fn write_inputs(cloud: &core::CloudServices, wd: &Path) -> Res<()> {
     let mut values = serde_json::Map::new();
     let mut missing: Vec<String> = Vec::new();
     for (k, v) in &cloud.vars {
-        if core::CloudServices::inputs_in(v).is_empty() {
+        if isoloom_spec::CloudServices::inputs_in(v).is_empty() {
             continue;
         }
         // Each `{{ inputs.NAME }}` in the value, at any depth, filled from the environment.
-        let filled = core::CloudServices::fill_inputs(v, &mut |i| match spec::input(i) {
+        let filled = isoloom_spec::CloudServices::fill_inputs(v, &mut |i| match spec::input(i) {
             Some(val) if !val.is_empty() => Some(val),
             _ => {
                 if !missing.iter().any(|m| m == i) {

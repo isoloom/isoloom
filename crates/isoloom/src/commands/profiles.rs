@@ -3,8 +3,6 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::{Res, output};
 
 #[derive(clap::Args)]
@@ -25,7 +23,7 @@ struct Checked {
 
 pub fn run(a: &Args) -> Res<ExitCode> {
     let dir = &a.dir;
-    let out: Vec<Checked> = core::profile::list(dir).iter().map(|name| check(dir, name)).collect();
+    let out: Vec<Checked> = isoloom_spec::profile::list(dir).iter().map(|name| check(dir, name)).collect();
     let failed = out.iter().any(|c| !c.problems.is_empty());
     if a.json {
         let items: Vec<serde_json::Value> = out
@@ -36,7 +34,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     } else if out.is_empty() {
         println!(
             "no profiles in {} (one file per customer or site: profiles/<name>.yml)",
-            dir.join(core::profile::DIR).display()
+            dir.join(isoloom_spec::profile::DIR).display()
         );
     } else {
         let width = out.iter().map(|c| c.name.len()).max().unwrap_or(0);
@@ -58,9 +56,9 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 
 /// A profile loaded, the spec it makes validated, and its target checked against that spec.
 fn check(dir: &Path, name: &str) -> Checked {
-    let profile = core::profile::load(dir, name);
+    let profile = isoloom_spec::profile::load(dir, name);
     let (target, description) = match &profile {
-        Ok(p) => (p.target.map(isoloom_core::Target::id), p.description.clone()),
+        Ok(p) => (p.target.map(isoloom_spec::Target::id), p.description.clone()),
         Err(_) => (None, None),
     };
     let problems = match profile {
@@ -75,21 +73,21 @@ fn check(dir: &Path, name: &str) -> Checked {
     }
 }
 
-fn problems_of(dir: &Path, p: &core::profile::Profile) -> Vec<String> {
-    let spec = match core::load_profiled(dir, Some(p), &[]) {
+fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile) -> Vec<String> {
+    let spec = match isoloom_spec::load_profiled(dir, Some(p), &[]) {
         Err(e) => return e.to_string().lines().map(str::to_string).collect(),
         Ok(spec) => spec,
     };
-    let spec = match core::defaults::load_profiled(dir, None, Some(p), &[]).map(|r| r.defaults.images.apply(&spec)) {
+    let spec = match isoloom_spec::defaults::load_profiled(dir, None, Some(p), &[]).map(|r| r.defaults.images.apply(&spec)) {
         Err(e) => return vec![e],
         Ok(spec) => spec,
     };
-    let mut problems: Vec<String> = core::validate(&spec).iter().map(|e| format!("the spec it makes: {e}")).collect();
+    let mut problems: Vec<String> = isoloom_spec::validate(&spec).iter().map(|e| format!("the spec it makes: {e}")).collect();
     if let Some(t) = p.target
         && problems.is_empty()
-        && !core::effective(&spec).contains(&t)
+        && !isoloom_spec::effective(&spec).contains(&t)
     {
-        let why = core::refusal(&spec, t).unwrap_or_else(|| "not one of its targets".into());
+        let why = isoloom_targets::refusal(&spec, t).unwrap_or_else(|| "not one of its targets".into());
         problems.push(format!("can't run on `{}`: {why}", t.id()));
     }
     problems

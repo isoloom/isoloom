@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
-use isoloom_core::events::ErrorCode;
+use isoloom_runtime::events::ErrorCode;
 
 use crate::failure::Failure;
 use crate::machine::{Running, on_machine};

@@ -3,11 +3,11 @@
 
 use std::path::Path;
 
-use isoloom_core::checks::Position;
+use isoloom_plan::checks::Position;
 
 use super::Ctx;
 use super::runner::{Runner, piped, ssh_runner};
-use isoloom_core::events::ErrorCode;
+use isoloom_runtime::events::ErrorCode;
 
 use crate::external::external_machines;
 use crate::failure::fail;

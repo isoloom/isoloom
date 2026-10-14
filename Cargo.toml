@@ -10,7 +10,6 @@ repository = "https://github.com/isoloom/isoloom"
 publish = false
 
 [workspace.dependencies]
-isoloom-core = { path = "crates/isoloom-core" }
 isoloom-spec = { path = "crates/isoloom-spec" }
 isoloom-plan = { path = "crates/isoloom-plan" }
 isoloom-render = { path = "crates/isoloom-render" }

@@ -5,10 +5,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-use isoloom_core as core;
-use isoloom_core::{Target, shell};
+use isoloom_spec::{Target, shell};
 
-use isoloom_core::events::{ErrorCode, Scope};
+use isoloom_runtime::events::{ErrorCode, Scope};
 
 use crate::failure::{Failure, fail};
 use crate::machine::{Running, find_interface, on_machine};
@@ -110,11 +109,11 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 }
 
 /// The machine's address on the network, where the target puts it.
-fn address(spec: &core::Spec, t: Target, machine: &str, network: &str) -> Res<String> {
-    let r = core::resolved::resolve(spec);
+fn address(spec: &isoloom_spec::Spec, t: Target, machine: &str, network: &str) -> Res<String> {
+    let r = isoloom_targets::resolved::resolve(spec);
     let on_docker = matches!(t, Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes);
     let key = if on_docker { "docker_addresses" } else { "addresses" };
-    Ok(core::resolved::lookup(&r, &format!("machines.{machine}.{key}.{network}"))
+    Ok(isoloom_targets::resolved::lookup(&r, &format!("machines.{machine}.{key}.{network}"))
         .and_then(|v| v.as_str())
         .ok_or_else(|| fail(ErrorCode::NetworkUnknown, "no address"))?
         .to_string())

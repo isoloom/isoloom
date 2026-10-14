@@ -4,9 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use isoloom_core as core;
-
-use isoloom_core::events::ErrorCode;
+use isoloom_runtime::events::ErrorCode;
 
 use crate::Res;
 use crate::failure::Failure;
@@ -30,11 +28,11 @@ pub fn profile_name() -> Option<String> {
 static INPUTS: OnceLock<Vec<(String, String)>> = OnceLock::new();
 
 /// The profile asked for, read from `dir`. Its inputs become [`child_env`] the first time.
-pub fn profile_for(dir: &Path) -> Res<Option<core::profile::Profile>> {
+pub fn profile_for(dir: &Path) -> Res<Option<isoloom_spec::profile::Profile>> {
     let Some(name) = PROFILE.get().and_then(Option::as_deref) else {
         return Ok(None);
     };
-    let p = core::profile::load(dir, name).map_err(|e| Failure::new(ErrorCode::Profile, e))?;
+    let p = isoloom_spec::profile::load(dir, name).map_err(|e| Failure::new(ErrorCode::Profile, e))?;
     INPUTS.get_or_init(|| {
         p.inputs
             .iter()
@@ -59,9 +57,9 @@ pub fn input(name: &str) -> Option<String> {
 }
 
 /// The spec in `dir`, with the profile asked for.
-pub fn load_spec(dir: &Path) -> Res<core::Spec> {
+pub fn load_spec(dir: &Path) -> Res<isoloom_spec::Spec> {
     let profile = profile_for(dir)?;
-    Ok(core::load_profiled(dir, profile.as_ref(), &[])?)
+    Ok(isoloom_spec::load_profiled(dir, profile.as_ref(), &[])?)
 }
 
 /// The target to use: the profile's when none is asked for.
@@ -73,10 +71,10 @@ pub fn pinned(dir: &Path, asked: Option<&str>) -> Res<Option<String>> {
 }
 
 /// The spec with `-s` overrides and the image table applied, and the defaults in effect.
-pub fn load_settings(dir: &Path, images: Option<&Path>, sets: &[String]) -> Res<(core::Spec, core::defaults::Resolved)> {
+pub fn load_settings(dir: &Path, images: Option<&Path>, sets: &[String]) -> Res<(isoloom_spec::Spec, isoloom_spec::defaults::Resolved)> {
     let profile = profile_for(dir)?;
-    let spec = core::load_profiled(dir, profile.as_ref(), sets)?;
-    let settings = core::defaults::load_profiled(dir, images, profile.as_ref(), sets)?;
+    let spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
+    let settings = isoloom_spec::defaults::load_profiled(dir, images, profile.as_ref(), sets)?;
     let spec = settings.defaults.images.apply(&spec);
     Ok((spec, settings))
 }
@@ -84,8 +82,8 @@ pub fn load_settings(dir: &Path, images: Option<&Path>, sets: &[String]) -> Res<
 /// Prints the spec's problems and returns true when it has any. Generators assume a validated
 /// spec (they `expect` valid CIDRs and declared networks): a spec that parses but is invalid
 /// must fail with the field and reason, not a panic.
-pub fn report_invalid(spec: &core::Spec) -> bool {
-    let problems = core::validate(spec);
+pub fn report_invalid(spec: &isoloom_spec::Spec) -> bool {
+    let problems = isoloom_spec::validate(spec);
     for p in &problems {
         eprintln!("✗ {p}");
     }
@@ -97,8 +95,8 @@ pub fn report_invalid(spec: &core::Spec) -> bool {
 
 /// Prints the spec's problems and fails when it has any: for the commands that need a valid
 /// spec to say anything at all.
-pub fn require_valid(spec: &core::Spec) -> Res<()> {
-    let problems = core::validate(spec);
+pub fn require_valid(spec: &isoloom_spec::Spec) -> Res<()> {
+    let problems = isoloom_spec::validate(spec);
     if !problems.is_empty() {
         if !crate::output::json() {
             for p in &problems {
@@ -111,20 +109,20 @@ pub fn require_valid(spec: &core::Spec) -> Res<()> {
 }
 
 /// The spec as instance `n` when one is named: its names, blocks and ports are the instance's.
-pub fn as_instance(spec: core::Spec, instance: Option<u8>) -> Res<core::Spec> {
+pub fn as_instance(spec: isoloom_spec::Spec, instance: Option<u8>) -> Res<isoloom_spec::Spec> {
     Ok(match instance {
-        Some(n) => core::instance::apply(&spec, n)?,
+        Some(n) => isoloom_spec::instance::apply(&spec, n)?,
         None => spec,
     })
 }
 
 /// The spec, as the instance when one is named (its names and ports are the instance's).
-pub fn load_as(dir: &Path, instance: Option<u8>) -> Res<core::Spec> {
+pub fn load_as(dir: &Path, instance: Option<u8>) -> Res<isoloom_spec::Spec> {
     as_instance(load_spec(dir)?, instance)
 }
 
 /// The spec with `-s` overrides, validated, as the instance when one is named.
-pub fn load_valid(dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<core::Spec> {
+pub fn load_valid(dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<isoloom_spec::Spec> {
     let (spec, _) = load_settings(dir, None, sets)?;
     require_valid(&spec)?;
     as_instance(spec, instance)
@@ -133,7 +131,7 @@ pub fn load_valid(dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<core
 /// The resolved snapshot of a project (as an instance when asked), after validation.
 pub fn snapshot_of(dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<serde_json::Value> {
     let spec = load_valid(dir, instance, sets)?;
-    Ok(core::resolved::resolve_with(&spec, instance))
+    Ok(isoloom_targets::resolved::resolve_with(&spec, instance))
 }
 
 /// A project folder as an absolute path (the registry and the tools' working directories need one).

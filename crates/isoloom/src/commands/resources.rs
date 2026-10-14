@@ -3,8 +3,6 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::{Res, output, spec};
 
 #[derive(clap::Args)]
@@ -17,7 +15,7 @@ pub struct Args {
 
 pub fn run(a: &Args) -> Res<ExitCode> {
     let spec = spec::load_spec(&a.dir)?;
-    let t = core::totals(&spec);
+    let t = isoloom_spec::totals(&spec);
     if a.json {
         output::print_json(&serde_json::json!({ "machines": t.machines, "cpus": t.cpus, "memoryMb": t.memory_mb, "diskGb": t.disk_gb }))?;
     } else {

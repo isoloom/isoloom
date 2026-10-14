@@ -4,11 +4,10 @@
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use isoloom_core as core;
-use isoloom_core::Target;
-use isoloom_core::model::Protocol;
-use isoloom_core::registry;
 use isoloom_plan::Environment;
+use isoloom_runtime::registry;
+use isoloom_spec::Target;
+use isoloom_spec::model::Protocol;
 
 use crate::tools::process;
 
@@ -28,7 +27,11 @@ pub fn compose_project(dir: &Path, instance: Option<u8>) -> Option<String> {
 /// `[-p <project>] -f <compose file>` for an environment's Compose file, under the project
 /// name it runs as (see [`compose_project`]).
 pub fn compose_files(dir: &Path, instance: Option<u8>) -> Vec<String> {
-    let f = dir.join(core::instance::output_dir(instance)).join("docker/compose.yml").display().to_string();
+    let f = dir
+        .join(isoloom_spec::instance::output_dir(instance))
+        .join("docker/compose.yml")
+        .display()
+        .to_string();
     match compose_project(dir, instance) {
         Some(p) => vec!["-p".into(), p, "-f".into(), f],
         None => vec!["-f".into(), f],
@@ -112,7 +115,7 @@ mod tests {
 
     #[test]
     fn published_ports_come_from_compose_ps() {
-        use isoloom_core::model::Protocol;
+        use isoloom_spec::model::Protocol;
         let items: Vec<serde_json::Value> = serde_json::from_str(
             r#"[{"Service":"web","Publishers":[{"URL":"127.0.0.1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"},{"URL":"::1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"}]},
                 {"Service":"dns","Publishers":[{"URL":"127.0.0.1","TargetPort":53,"PublishedPort":32780,"Protocol":"udp"},{"URL":"127.0.0.1","TargetPort":53,"PublishedPort":32781,"Protocol":"tcp"}]},

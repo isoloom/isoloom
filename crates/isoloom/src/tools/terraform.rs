@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::process::Stdio;
 
-use isoloom_core::events::ErrorCode;
+use isoloom_runtime::events::ErrorCode;
 
 use crate::failure::fail;
 use crate::tools::process;

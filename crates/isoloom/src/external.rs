@@ -5,11 +5,9 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Stdio;
 
-use isoloom_core as core;
-
-use isoloom_core::Target;
-use isoloom_core::events::{ErrorCode, Scope};
 use isoloom_plan::Environment;
+use isoloom_runtime::events::{ErrorCode, Scope};
+use isoloom_spec::Target;
 
 use crate::failure::Failure;
 use crate::tools::process;
@@ -49,12 +47,12 @@ pub fn external_machines(out: &Path) -> Res<BTreeMap<String, ExternalMachine>> {
 /// environment's `provision:` playbooks with the inventory.
 pub fn external_up(dir: &Path, plan: &Environment, instance: Option<u8>) -> Res<()> {
     let spec = plan.spec();
-    let out = dir.join(core::instance::output_dir(instance));
+    let out = dir.join(isoloom_spec::instance::output_dir(instance));
     let machines = external_machines(&out)?;
     for name in &plan.start_order {
         let Some(m) = machines.get(name) else { continue };
         let Some(vm) = &spec.machines[name].vm else { continue };
-        if core::images::is_windows(&vm.os) {
+        if isoloom_spec::images::is_windows(&vm.os) {
             note(&format!(
                 "{name}: Windows; provision it with the environment's playbooks (per-machine steps over SSH come later)"
             ));
@@ -99,7 +97,7 @@ fn run(program: &str, args: &[String], stdin: Option<Stdio>, at: &Scope) -> Res<
 fn copy_project(dir: &Path, m: &ExternalMachine, at: &Scope) -> Res<()> {
     // The entries tar takes, listed here: without version control, the tools' state and
     // what .isoloomignore lists; symbolic links as links.
-    let list: Vec<u8> = core::ignore::entries(dir, &core::ignore::Rules::read(dir))?
+    let list: Vec<u8> = isoloom_render::ignore::entries(dir, &isoloom_render::ignore::Rules::read(dir))?
         .into_iter()
         .flat_map(|e| e.into_bytes().into_iter().chain([0]))
         .collect();
@@ -125,7 +123,7 @@ fn copy_project(dir: &Path, m: &ExternalMachine, at: &Scope) -> Res<()> {
 
 /// One of a machine's own steps: a reboot, a shell script run there, or a playbook run from here.
 fn run_step(name: &str, m: &ExternalMachine, step: &str, at: &Scope) -> Res<()> {
-    if core::model::is_reboot(step) {
+    if isoloom_spec::model::is_reboot(step) {
         return reboot_external(name, &m.ssh_args(), at);
     }
     if step.ends_with(".sh") {
@@ -142,7 +140,7 @@ fn run_step(name: &str, m: &ExternalMachine, step: &str, at: &Scope) -> Res<()> 
 }
 
 /// The environment's `provision:` playbooks, with the generated inventory.
-fn environment_playbooks(dir: &Path, out: &Path, spec: &core::Spec) -> Res<()> {
+fn environment_playbooks(dir: &Path, out: &Path, spec: &isoloom_spec::Spec) -> Res<()> {
     let at = Scope::step(Some(Target::External.id()), "provision");
     for step in &spec.provision {
         note(&format!("environment: {}", step.ansible));

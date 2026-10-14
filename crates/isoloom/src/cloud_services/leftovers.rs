@@ -5,8 +5,7 @@
 use std::path::Path;
 use std::process::Stdio;
 
-use isoloom_core as core;
-use isoloom_core::model::CloudProvider;
+use isoloom_spec::model::CloudProvider;
 
 use crate::Res;
 use crate::tools::{process, terraform};
@@ -44,7 +43,7 @@ pub fn name_deployment(wd: &Path, name: &str, instance: Option<u8>) -> Res<()> {
 /// listed (never deleted). AWS only, through the Resource Groups Tagging API (`aws` CLI), in the
 /// region `cloud.env` or `cloud.vars.region` names. The name is forgotten once nothing is left
 /// in a known region.
-pub fn leftovers(spec: &core::Spec, wd: &Path) {
+pub fn leftovers(spec: &isoloom_spec::Spec, wd: &Path) {
     let file = wd.join(NAME_FILE);
     let Some(id) = std::fs::read_to_string(&file).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) else {
         return;
@@ -79,13 +78,13 @@ pub fn leftovers(spec: &core::Spec, wd: &Path) {
 /// all: `cloud.env`'s (the CLI reads it, so none to pass), else `cloud.vars.region` as applied
 /// (an input's value read back from `inputs.tfvars.json`), else the user's own environment.
 /// Unknown, the CLI's default is searched.
-fn region(c: &core::CloudServices, wd: &Path) -> (Option<String>, bool) {
+fn region(c: &isoloom_spec::CloudServices, wd: &Path) -> (Option<String>, bool) {
     if REGION_ENV.iter().any(|k| c.env.contains_key(*k)) {
         return (None, true);
     }
     let applied = || -> Option<String> {
         let v = c.vars.get("region")?;
-        if core::CloudServices::inputs_in(v).is_empty() {
+        if isoloom_spec::CloudServices::inputs_in(v).is_empty() {
             return v.as_str().map(String::from);
         }
         let inputs: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(wd.join("inputs.tfvars.json")).ok()?).ok()?;
@@ -99,7 +98,7 @@ fn region(c: &core::CloudServices, wd: &Path) -> (Option<String>, bool) {
 
 /// The ARNs tagged `isoloom-instance=<id>` (in `region` when given), or `None` when the `aws`
 /// CLI can't say (it says why).
-fn tagged(c: &core::CloudServices, id: &str, region: Option<&str>) -> Option<Vec<String>> {
+fn tagged(c: &isoloom_spec::CloudServices, id: &str, region: Option<&str>) -> Option<Vec<String>> {
     let mut cmd = process::command("aws");
     cmd.args(["resourcegroupstaggingapi", "get-resources", "--tag-filters"])
         .arg(format!("Key=isoloom-instance,Values={id}"))

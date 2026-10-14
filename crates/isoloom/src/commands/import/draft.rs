@@ -3,8 +3,6 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::Res;
 
 /// Where to put the draft: `--out`, `--force`, `--stdout`.
@@ -24,7 +22,7 @@ pub fn source_of(file: &Path) -> Res<(PathBuf, String, String)> {
 }
 
 /// Writes a draft (or prints it), then its notes by kind and whether it validates.
-pub fn write_draft(draft: &core::import::Draft, folder: PathBuf, dest: &Dest) -> Res<ExitCode> {
+pub fn write_draft(draft: &isoloom_import::Draft, folder: PathBuf, dest: &Dest) -> Res<ExitCode> {
     if dest.stdout {
         print!("{}", draft.yaml);
     } else {
@@ -46,9 +44,9 @@ pub fn write_draft(draft: &core::import::Draft, folder: PathBuf, dest: &Dest) ->
 }
 
 /// The draft's notes by kind, then whether it validates.
-fn report(draft: &core::import::Draft) -> Res<String> {
+fn report(draft: &isoloom_import::Draft) -> Res<String> {
     let mut report = String::new();
-    for kind in core::import::NoteKind::ALL {
+    for kind in isoloom_import::NoteKind::ALL {
         let notes: Vec<_> = draft.notes.iter().filter(|n| n.kind == kind).collect();
         if notes.is_empty() {
             continue;
@@ -58,7 +56,9 @@ fn report(draft: &core::import::Draft) -> Res<String> {
             report.push_str(&format!("  {}: {}\n", n.at, n.text));
         }
     }
-    let problems = core::parse(&draft.yaml).map(|s| core::validate(&s)).map_err(|e| e.to_string())?;
+    let problems = isoloom_spec::parse(&draft.yaml)
+        .map(|s| isoloom_spec::validate(&s))
+        .map_err(|e| e.to_string())?;
     if problems.is_empty() {
         report.push_str("\n✓ the draft is valid\n");
     } else {

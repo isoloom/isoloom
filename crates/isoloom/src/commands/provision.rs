@@ -3,10 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-use isoloom_core::Target;
+use isoloom_spec::Target;
 
-use isoloom_core::events::{ErrorCode, Scope};
+use isoloom_runtime::events::{ErrorCode, Scope};
 
 use crate::failure::{Failure, fail};
 use crate::prepare::prepare;
@@ -62,7 +61,7 @@ fn provision_cmd(dir: &Path, target: Option<&str>, machines: &[String], instance
             return Err(fail(ErrorCode::Unsupported, message));
         }
     };
-    let out = p.dir.join(core::instance::output_dir(instance));
+    let out = p.dir.join(isoloom_spec::instance::output_dir(instance));
     let wd = out.join(sub);
     if !wd.join(".vagrant").is_dir() {
         return Err(fail(
@@ -98,7 +97,7 @@ fn vagrant(wd: &Path, args: &[&str], at: &Scope) -> Res<bool> {
 }
 
 /// The environment's `provision:` steps run again by the controller, limited to `machines`.
-fn from_controller(spec: &core::Spec, wd: &Path, machines: &[String], at: &Scope) -> Res<bool> {
+fn from_controller(spec: &isoloom_spec::Spec, wd: &Path, machines: &[String], at: &Scope) -> Res<bool> {
     let which = if machines.is_empty() {
         "every machine".to_string()
     } else {
@@ -113,7 +112,7 @@ fn from_controller(spec: &core::Spec, wd: &Path, machines: &[String], at: &Scope
         println!("provisioning {which} from the controller");
     }
     // The script on stdin: no quoting through the host's shell, whatever the host.
-    let script = core::generate::provision_script(spec, machines);
+    let script = isoloom_targets::provision_script(spec, machines);
     let mut c = process::command("vagrant");
     c.args(["ssh", CONTROLLER, "-c", "sudo sh -s"]).current_dir(wd);
     Ok(process::run_step_input(&mut c, Some(script.as_bytes()), at)?.success())

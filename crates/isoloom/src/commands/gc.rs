@@ -3,8 +3,6 @@
 use std::collections::BTreeSet;
 use std::process::{ExitCode, Stdio};
 
-use isoloom_core as core;
-
 use crate::{Res, output};
 
 #[derive(clap::Args)]
@@ -34,7 +32,7 @@ impl Leftovers {
 }
 
 pub fn run(a: &Args) -> Res<ExitCode> {
-    let managed = format!("label={}=true", core::generate::MANAGED_LABEL);
+    let managed = format!("label={}=true", isoloom_targets::MANAGED_LABEL);
     let alive = live_projects();
     let left = Leftovers {
         networks: orphans("network", &managed, &alive),
@@ -114,7 +112,7 @@ fn live_projects() -> BTreeSet<String> {
 /// Isoloom's networks or volumes whose Compose project has no container left, with the
 /// environment each belongs to.
 fn orphans(kind: &str, managed: &str, alive: &BTreeSet<String>) -> Vec<(String, String)> {
-    let env_label = core::generate::ENVIRONMENT_LABEL;
+    let env_label = isoloom_targets::ENVIRONMENT_LABEL;
     docker_lines(&[
         kind,
         "ls",

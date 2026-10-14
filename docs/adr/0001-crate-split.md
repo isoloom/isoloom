@@ -39,3 +39,11 @@ identical.
 - `isoloom-core` stays the compatibility point for embedders; internal crates may change in
   any release.
 - Moving code between crates needs a facade re-export when it was part of the supported surface.
+
+## Update: the facade is gone (Wave 2)
+
+Once every backend rendered the plan, `isoloom-core` re-exported nothing of its own and hid
+which crate an item lives in. It was removed: the command line and embedders depend on the
+crates themselves (the supported surface is in `isoloom-spec`, `isoloom-plan`'s `checks`,
+`isoloom-targets` and `isoloom-runtime`; README, "Using the library"), and its integration tests
+moved into the crates they test (the generators over the examples in `isoloom-targets/tests`).
