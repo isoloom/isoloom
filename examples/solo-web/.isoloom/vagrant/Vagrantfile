@@ -391,7 +391,8 @@ Vagrant.configure("2") do |config|
       v.machine_arch = "x86_64"
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh provision/web.sh"
+    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/web.sh'"
+    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   end
 
   config.vm.define "isoloom-controller" do |m|
@@ -446,7 +447,7 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.80.0.10 web'; do grep -qxF \"$l\" /etc/hosts || echo \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "for l in '10.80.0.10 web'; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "controller", inline: <<~'SH'
       set -e
@@ -465,19 +466,10 @@ Vagrant.configure("2") do |config|
 
       [windows]
 
-
       [linux:vars]
       ansible_user=vagrant
       ansible_password=vagrant
       ansible_become=true
-
-      [windows:vars]
-      ansible_user=vagrant
-      ansible_password=vagrant
-      ansible_connection=winrm
-      ansible_winrm_server_cert_validation=ignore
-      ansible_winrm_operation_timeout_sec=400
-      ansible_winrm_read_timeout_sec=500
       INV
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"

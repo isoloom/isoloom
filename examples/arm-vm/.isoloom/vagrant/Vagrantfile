@@ -386,7 +386,8 @@ Vagrant.configure("2") do |config|
       v.machine_arch = "aarch64"
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "provision/setup.sh", inline: "cd /opt/isoloom && sh provision/setup.sh"
+    m.vm.provision "shell", name: "provision/setup.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/setup.sh'"
+    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/box.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
