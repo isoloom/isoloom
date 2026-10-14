@@ -86,11 +86,12 @@ and `Ready` steps around Docker and `docker compose up --wait`. `cloud-services`
 
 Every target that runs playbooks (Vagrant, Proxmox, the clouds) runs the same controller script,
 `isoloom_render::playbooks::script` (also `ansible_runs`): Ansible's settings, the helpers, then
-each `provision:` step through `run_play`. After a failed run, the hosts whose every failure
-was the connection (unreachable in the PLAY RECAP, or a `fatal:` message in
-`playbooks::TRANSIENT`: WinRM dropping during a reboot, an SSH reset) run it again, on those hosts
-only (`--limit @<playbook>.retry`, written by the script), after a logged pause, up to
-`playbooks::ATTEMPTS` attempts in all; a host where a task failed on its own is never retried.
+each `provision:` step through `run_play` (the playbook last). After a failed run with no task
+failed on its own, the hosts that failed only because of the connection (unreachable in the PLAY
+RECAP, or a `fatal:` message in `playbooks::TRANSIENT`: WinRM dropping during a reboot, an SSH
+reset) run it again, on those hosts only (`--limit @<playbook>.retry`, Ansible's retry file
+rewritten with them), after a logged pause, up to `playbooks::ATTEMPTS` runs in all. A task that
+failed on its own stops the setup at once.
 
 ## Crate map
 

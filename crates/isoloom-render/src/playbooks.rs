@@ -1,23 +1,27 @@
 //! The controller's script that runs the environment's playbooks (`provision:`): one script for
-//! every target that runs playbooks (Vagrant, Proxmox, the clouds), so they all retry the same
-//! way.
+//! every target that runs playbooks (Vagrant, Proxmox, the clouds, `isoloom provision`), so they
+//! all retry the same way.
 //!
-//! After a failed run, the hosts whose every failure was the connection (unreachable, or a task
-//! cut by a dropped connection: a Windows host rebooting during a play drops WinRM, an SSH
-//! session resets; see [`TRANSIENT`]) run the playbook again, on those hosts only
-//! (`--limit @<playbook>.retry`), after a pause, up to [`ATTEMPTS`] attempts in all. A host where
-//! a task failed on its own is never retried, and the setup stops on it once the retries are
-//! done. Every attempt and pause is logged, so the output explains what happened.
+//! After a failed run, when no task failed on its own, the hosts that failed only because of the
+//! connection run the playbook again, on those hosts only (`--limit @<playbook>.retry`), after a
+//! pause, up to [`ATTEMPTS`] runs in all:
+//! - unreachable hosts (a Windows host dropping WinRM for a minute after a domain join or an
+//!   update reboot);
+//! - hosts whose task was cut by a dropped connection: a failure whose message is in
+//!   [`TRANSIENT`] (WinRM's shell crashing mid-task, an SSH session reset).
+//!
+//! A task that failed on its own is real: the setup stops at once, nothing is retried. So does a
+//! run with no recap (a playbook that doesn't parse). Every wait and run is logged, so the output
+//! explains what happened.
 
 use isoloom_spec::model::Spec;
 use isoloom_spec::shell;
 
-/// Attempts at a playbook in all: the first run and up to two retries.
-pub const ATTEMPTS: u32 = 3;
+/// Runs of a playbook in all: the first and up to three again.
+pub const ATTEMPTS: u32 = 4;
 
-/// Where the controller writes the hosts a playbook runs again on (`<playbook>.retry`, the
-/// format of Ansible's own retry files, which can't be used: they mix in the hosts whose task
-/// failed for real).
+/// Where Ansible writes its retry files (`<playbook>.retry`), and where `run_play` writes the
+/// hosts a playbook runs again on, in the same file and format.
 pub const RETRY_DIR: &str = "/tmp/isoloom-retry";
 
 /// The script running the environment's playbooks, in order, with the inventory at
@@ -30,7 +34,10 @@ pub fn script(spec: &Spec, limit: &[String]) -> String {
     } else {
         format!(" --limit {}", shell::quote(&limit.join(",")))
     };
-    let mut script = format!("set -e\nmkdir -p /tmp/isoloom-facts\n{ENVIRONMENT}\n{}", helpers());
+    let mut script = format!(
+        "set -e\nmkdir -p /tmp/isoloom-facts\n{ENVIRONMENT}\nmkdir -p {RETRY_DIR}\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH={RETRY_DIR}\n{}",
+        helpers()
+    );
     for step in &spec.provision {
         let (dir, file) = step.ansible.rsplit_once('/').unwrap_or((".", &step.ansible));
         let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect();
@@ -39,8 +46,7 @@ pub fn script(spec: &Spec, limit: &[String]) -> String {
             None => "[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\n".into(),
         };
         script.push_str(&format!(
-            "cd /opt/isoloom/{dir}\n{requirements}run_play {} ansible-playbook -i /etc/isoloom/inventory.ini{extra}{}{limit}\n",
-            shell::quote(file),
+            "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i /etc/isoloom/inventory.ini{extra}{}{limit} {file}\n",
             vars(step)
         ));
     }
@@ -71,7 +77,7 @@ ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=
 /// regular expressions matched against a lowercased `fatal:` / `failed:` line. Ansible reports
 /// most of these as a failed task rather than an unreachable host: WinRM's shell crashing
 /// mid-task, a Windows host rebooting during a play (a domain join), an SSH session reset.
-/// Matched without regard to case; none may hold a `'` (the list is single-quoted in the script).
+/// Lowercase; none may hold a `'` (the list is single-quoted in the script).
 pub const TRANSIENT: &[&str] = &[
     // WinRM: the shell or its HTTP transport went away under a task.
     "send_input failed",
@@ -95,16 +101,15 @@ pub const TRANSIENT: &[&str] = &[
 /// The script's shell helpers (POSIX sh, safe under `set -e`):
 /// - `retry_download`: role downloads (Galaxy, from GitHub) fail now and then on the network;
 ///   tried 5 times, with a growing pause (`ISOLOOM_RETRY_PAUSE` seconds, 15 by default).
-/// - `play_hosts <log>`: the hosts of a run's PLAY RECAP that failed, one line each:
-///   `retry <host>` when every failure it had was the connection (unreachable, or a failed task
-///   whose message is [`TRANSIENT`]), `real <host>` when a task failed on its own (a failure
-///   Ansible ignored, `...ignoring`, doesn't count).
-/// - `run_play <playbook> <command...>`: the command with the playbook, then, while some hosts
-///   are `retry`, again on those hosts only (`--limit @<dir>/<playbook>.retry`, a file written
-///   here, in `ISOLOOM_RETRY_DIR`, [`RETRY_DIR`] by default) after a pause of
-///   4 × `ISOLOOM_RETRY_PAUSE` (60 s by default), up to [`ATTEMPTS`] attempts in all. A `real`
-///   host is never retried, and the play then fails whatever its retries do. Each attempt and
-///   pause is logged.
+/// - `play_hosts <log>`: the hosts of a run's PLAY RECAP that failed, one line each, sorted:
+///   `unreachable <host>`; `cut <host>` when every task that failed there was cut by the
+///   connection (its `fatal:` line matches [`TRANSIENT`]); `real <host>` otherwise. A failure
+///   Ansible ignored (`...ignoring`) doesn't count.
+/// - `run_play <command...> <playbook>`: the command (the playbook its last argument), then,
+///   while no host is `real` and some are `unreachable` or `cut`, again on those only
+///   (`--limit @<playbook>.retry`, in `ANSIBLE_RETRY_FILES_SAVE_PATH`, [`RETRY_DIR`] by default)
+///   after a pause of 4 × `ISOLOOM_RETRY_PAUSE` (60 s by default; 2 × when no host was
+///   unreachable, only cut), up to [`ATTEMPTS`] runs in all. Its exit code is the last run's.
 pub fn helpers() -> String {
     format!(
         "_isoloom_pause=${{ISOLOOM_RETRY_PAUSE:-15}}\n_isoloom_attempts={ATTEMPTS}\n_isoloom_transient='{}'\n{HELPER_FUNCTIONS}",
@@ -125,7 +130,7 @@ const HELPER_FUNCTIONS: &str = r#"retry_download() {
 play_hosts() {
   awk -v transient="$_isoloom_transient" '
     function commit() {
-      if (pending != "") { if (pending_real) real[pending] = 1; else seen[pending] = 1 }
+      if (pending != "") { if (pending_real) real[pending] = 1; else cut[pending] = 1 }
       pending = ""
     }
     { gsub(/\033\[[0-9;]*m/, "") }
@@ -149,50 +154,59 @@ play_hosts() {
     }
     END {
       commit()
-      for (h in failed) print ((h in real) ? "real " : "retry ") h
-      for (h in unreachable) if (!(h in failed)) print "retry " h
+      for (h in failed) print ((h in real || !(h in cut)) ? "real " : "cut ") h
+      for (h in unreachable) if (!(h in failed)) print "unreachable " h
     }
   ' "$1" | sort
 }
+_isoloom_kind() {
+  echo "$1" | awk -v k="$2" '$1 == k { printf "%s%s", s, $2; s = " " }'
+}
 run_play() {
-  _isoloom_book=$1
-  shift
-  _isoloom_limit="${ISOLOOM_RETRY_DIR:-/tmp/isoloom-retry}/${_isoloom_book%.*}.retry"
+  # The playbook is the last argument; Ansible names its retry file after it.
+  for _isoloom_book; do :; done
+  _isoloom_name=$(basename "$_isoloom_book")
+  _isoloom_retry=${ANSIBLE_RETRY_FILES_SAVE_PATH:-/tmp/isoloom-retry}/${_isoloom_name%.*}.retry
+  _isoloom_limit=
   _isoloom_log=$(mktemp)
   _isoloom_rcf=$(mktemp)
   _isoloom_n=1
-  _isoloom_real_rc=0
+  rm -f "$_isoloom_retry"
   while :; do
-    if [ "$_isoloom_n" -eq 1 ]; then
-      { "$@" "$_isoloom_book" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
-    else
-      { "$@" "$_isoloom_book" --limit "@$_isoloom_limit" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
-    fi
+    { "$@" $_isoloom_limit && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
     _isoloom_rc=$(cat "$_isoloom_rcf")
     [ "$_isoloom_rc" -ne 0 ] || break
     _isoloom_hosts=$(play_hosts "$_isoloom_log")
-    _isoloom_real=$(echo "$_isoloom_hosts" | awk '$1 == "real" { printf "%s%s", s, $2; s = " " }')
-    _isoloom_retry=$(echo "$_isoloom_hosts" | awk '$1 == "retry" { printf "%s%s", s, $2; s = " " }')
+    _isoloom_real=$(_isoloom_kind "$_isoloom_hosts" real)
+    _isoloom_gone=$(_isoloom_kind "$_isoloom_hosts" unreachable)
+    _isoloom_cut=$(_isoloom_kind "$_isoloom_hosts" cut)
+    _isoloom_again=$(echo $_isoloom_gone $_isoloom_cut)
     if [ -n "$_isoloom_real" ]; then
-      echo "isoloom: $_isoloom_book: a task failed on $_isoloom_real: not retried"
-      _isoloom_real_rc=$_isoloom_rc
+      echo "isoloom: $_isoloom_name: a task failed on $_isoloom_real: not retried"
+      break
     fi
-    if [ -z "$_isoloom_retry" ]; then
-      [ -n "$_isoloom_real" ] || echo "isoloom: $_isoloom_book failed (exit $_isoloom_rc) with no unreachable host or dropped connection: not retried"
+    if [ -z "$_isoloom_again" ]; then
+      echo "isoloom: $_isoloom_name failed (exit $_isoloom_rc) with no unreachable host or dropped connection: not retried"
       break
     fi
     if [ "$_isoloom_n" -ge "$_isoloom_attempts" ]; then
-      echo "isoloom: $_isoloom_book: still unreachable or disconnected after $_isoloom_n attempts: $_isoloom_retry"
+      echo "isoloom: $_isoloom_name: still unreachable after $_isoloom_n runs: $_isoloom_again; giving up"
       break
     fi
-    mkdir -p "$(dirname "$_isoloom_limit")"
-    printf '%s\n' $_isoloom_retry > "$_isoloom_limit"
+    printf '%s\n' $_isoloom_again > "$_isoloom_retry"
+    _isoloom_limit="--limit @$_isoloom_retry"
     _isoloom_n=$((_isoloom_n + 1))
-    echo "isoloom: $_isoloom_book: unreachable or disconnected: $_isoloom_retry; waiting $((4 * _isoloom_pause)) s, then attempt $_isoloom_n/$_isoloom_attempts on them (--limit @$_isoloom_limit)"
-    sleep $((4 * _isoloom_pause))
+    if [ -n "$_isoloom_gone" ]; then
+      _isoloom_wait=$((4 * _isoloom_pause))
+      echo "isoloom: $_isoloom_name: unreachable: $_isoloom_again; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)"
+    else
+      _isoloom_wait=$((2 * _isoloom_pause))
+      echo "isoloom: $_isoloom_name: the play was cut by a dropped connection on $_isoloom_cut; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)"
+    fi
+    sleep "$_isoloom_wait"
   done
   rm -f "$_isoloom_log" "$_isoloom_rcf"
-  [ "$_isoloom_real_rc" -eq 0 ] || [ "$_isoloom_rc" -ne 0 ] || _isoloom_rc=$_isoloom_real_rc
+  [ "$_isoloom_rc" -ne 0 ] || rm -f "$_isoloom_retry"
   return "$_isoloom_rc"
 }
 "#;
