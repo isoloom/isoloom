@@ -37,9 +37,6 @@ pub struct HubPort {
     pub net: String,
     /// The host port the VM connects to.
     pub port: u16,
-    /// Whether the VM is the network's first (destroyed last, by `vagrant destroy`): the hub
-    /// stops with it.
-    pub first: bool,
 }
 
 impl Link {
@@ -94,7 +91,6 @@ pub fn links(env: &Environment, with_controller: bool) -> IndexMap<String, Link>
                         Link::Hub(HubPort {
                             net: (*net).to_string(),
                             port: hub_port(&env.name, net, at),
-                            first: at == 0,
                         })
                     }
                 }
@@ -105,12 +101,13 @@ pub fn links(env: &Environment, with_controller: bool) -> IndexMap<String, Link>
         .collect()
 }
 
-/// Each network with a hub, and its ports (one a VM, in the order the VMs are defined).
-pub fn hubs(links: &IndexMap<String, Link>) -> IndexMap<String, Vec<u16>> {
-    let mut out: IndexMap<String, Vec<u16>> = IndexMap::new();
-    for link in links.values() {
+/// Each network with a hub, and its VMs with their ports, in the order the VMs are defined:
+/// the hub listens on every port, and stops once none of the VMs is left.
+pub fn hubs(links: &IndexMap<String, Link>) -> IndexMap<String, IndexMap<String, u16>> {
+    let mut out: IndexMap<String, IndexMap<String, u16>> = IndexMap::new();
+    for (vm, link) in links {
         if let Link::Hub(h) = link {
-            out.entry(h.net.clone()).or_default().push(h.port);
+            out.entry(h.net.clone()).or_default().insert(vm.clone(), h.port);
         }
     }
     out
@@ -167,5 +164,25 @@ mod tests {
             assert!((20000..40000).contains(&p), "{at}: {p}");
         }
         assert_ne!(super::hub_port("lab", "app", 1), base);
+    }
+
+    #[test]
+    fn hubs_name_every_vm_of_the_network_with_its_port() {
+        use super::{HubPort, Link};
+        let hub = |port| Link::Hub(HubPort { net: "app".into(), port });
+        let links: indexmap::IndexMap<String, Link> = [
+            ("r".to_string(), hub(30000)),
+            ("lone".to_string(), Link::None),
+            ("a".to_string(), hub(30001)),
+            ("pair".to_string(), Link::Socket("listen=127.0.0.1:1".into())),
+            ("b".to_string(), hub(30002)),
+        ]
+        .into_iter()
+        .collect();
+        let hubs = super::hubs(&links);
+        // Every VM is named, not only the first: the hub stops once none of them is left.
+        let app: Vec<(&str, u16)> = hubs["app"].iter().map(|(vm, p)| (vm.as_str(), *p)).collect();
+        assert_eq!(app, [("r", 30000), ("a", 30001), ("b", 30002)]);
+        assert_eq!(hubs.len(), 1);
     }
 }

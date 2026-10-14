@@ -213,11 +213,11 @@ fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu:
     r.text(qemu::QEMU_RB);
     let hubs = qemu::hubs(links);
     if !hubs.is_empty() {
-        r.comment("QEMU: each network's hub ports, one a VM, in the order they start.");
+        r.comment("QEMU: each network's hub port of each of its VMs, in the order they start.");
         r.hash(
             "QEMU_HUBS",
             hubs.iter()
-                .map(|(net, ports)| (Value::str(net), Value::array(ports.iter().map(|p| Value::from(*p))))),
+                .map(|(net, vms)| (Value::str(net), Value::hash(vms.iter().map(|(vm, p)| (Value::str(vm), Value::from(*p)))))),
         );
     }
     r.blank();

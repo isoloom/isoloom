@@ -41,20 +41,26 @@ fn qemu_links_three_vms_through_a_hub() {
     let ports: Vec<u16> = ["a", "b", "c"].iter().map(|vm| connects_to(provider_block(&vf, vm, "qemu"))).collect();
     assert_eq!(ports[1], ports[0] + 1, "{ports:?}");
     assert_eq!(ports[2], ports[0] + 2, "{ports:?}");
-    let hubs = format!("QEMU_HUBS = {{\n  \"lab\" => [{}, {}, {}],\n}}", ports[0], ports[1], ports[2]);
+    let hubs = format!(
+        "QEMU_HUBS = {{\n  \"lab\" => {{ \"a\" => {}, \"b\" => {}, \"c\" => {} }},\n}}",
+        ports[0], ports[1], ports[2]
+    );
     assert!(vf.contains(&hubs), "{vf}");
     assert!(vf.contains("module IsoloomQemu"));
+    // Every VM starts the hub before QEMU starts it, unless it runs (only QEMU runs this
+    // action), and every VM's destroy releases it: the hub stops once the network's last VM
+    // is destroyed, whichever that is, so `vagrant destroy <vm>` leaves it to the others.
+    let start = "m.trigger.before :\"VagrantPlugins::QEMU::Action::StartInstance\", type: :action do |t|\n      t.ruby { |_, _| IsoloomQemu.hub(\"lab\", QEMU_HUBS[\"lab\"].values) }";
+    let release = "m.trigger.after :\"VagrantPlugins::QEMU::Action::Destroy\", type: :action do |t|\n      t.ruby { |env, machine| IsoloomQemu.release(\"lab\", QEMU_HUBS[\"lab\"].keys, env, machine.name) }";
     for vm in ["a", "b", "c"] {
         let qemu = provider_block(&vf, vm, "qemu");
         assert!(qemu.contains("v.net_mode = :socket") && qemu.contains("v.advanced_network = true"), "{qemu}");
-        // The hub starts before QEMU starts the VM (only QEMU runs this action).
-        let start = "m.trigger.before :\"VagrantPlugins::QEMU::Action::StartInstance\", type: :action do |t|\n      t.ruby { |_, _| IsoloomQemu.hub(\"lab\", QEMU_HUBS[\"lab\"]) }";
         assert!(define(&vf, vm).contains(start), "{}", define(&vf, vm));
+        assert!(define(&vf, vm).contains(release), "{}", define(&vf, vm));
+        assert!(!define(&vf, vm).contains("IsoloomQemu.stop("), "{}", define(&vf, vm));
     }
-    // It stops with the first VM, which `vagrant destroy` destroys last.
-    let stop = "IsoloomQemu.stop(\"lab\")";
-    assert!(define(&vf, "a").contains(stop));
-    assert!(!define(&vf, "b").contains(stop) && !define(&vf, "c").contains(stop));
+    // The hub is left running while another of its VMs keeps a Vagrant id.
+    assert!(vf.contains("return if left.any? { |vm| env.local_data_path.join(\"machines\", vm, \"qemu\", \"id\").file? }"));
     // Other providers are untouched.
     assert!(!provider_block(&vf, "a", "virtualbox").contains("socket"));
 }
