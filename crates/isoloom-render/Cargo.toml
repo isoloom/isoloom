@@ -11,9 +11,11 @@ publish.workspace = true
 isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 serde_json.workspace = true
+indexmap.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+insta.workspace = true
 
 [lints]
 workspace = true
