@@ -8,7 +8,7 @@ interface.
 | Target | Module | One per |
 |---|---|---|
 | `cloud-docker` | `.isoloom/cloud-docker/<cloud>/main.tf` | cloud: `aws`, `azure`, `gcp`, `digitalocean`, `linode`, `oci` |
-| `cloud-vm` | `.isoloom/cloud-vm/<cloud>/main.tf` | cloud: `aws`, `azure`, `gcp`, `linode`, `oci` (a cloud that can't express a spec gets no module) |
+| `cloud-vm` | `.isoloom/cloud-vm/<cloud>/main.tf` | cloud: `aws`, `azure`, `gcp`, `digitalocean`, `linode`, `oci` (a cloud that can't express a spec gets no module; the others are still written) |
 | `cloud-services` | the project's own module, run by `.isoloom/cloud-services/*.sh` | environment |
 
 The cloud's credentials always come from the environment, as each Terraform provider expects

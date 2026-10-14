@@ -77,9 +77,9 @@ fn compose_up(dir: &Path, out: &Path, instance: Option<u8>, down: bool) -> Invoc
     invocation("sh", vec![s("-c"), script], dir)
 }
 
-/// The cloud-vm module of the cloud asked for. AWS is always generated; the others only for
-/// the specs they support, so --cloud picks the module and defaults to aws. A cloud with no
-/// module for this lab (its driver declined the spec) has no directory, and Terraform says so.
+/// The cloud-vm module of the cloud picked (`target::vm_cloud`; AWS for an entry recorded
+/// before the cloud was). Each cloud's module is written only when the cloud can run the
+/// environment, so a refused cloud has no directory.
 fn cloud_vm_module(out: &Path, cloud: Option<&str>) -> Res<PathBuf> {
     let cloud = cloud.unwrap_or("aws");
     let dir = out.join("cloud-vm").join(cloud);

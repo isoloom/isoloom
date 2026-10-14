@@ -28,7 +28,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Terraform: Proxmox](#terraform-proxmox) | 76% | 119 | 91 | 0 | 28 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 73% | 132 | 97 | 0 | 35 |
-| [Terraform: Azure](#terraform-azure) | 80% | 135 | 108 | 0 | 27 |
+| [Terraform: Azure](#terraform-azure) | 82% | 135 | 111 | 0 | 24 |
 | [Terraform: Google Cloud](#terraform-google-cloud) | 72% | 97 | 69 | 2 | 26 |
 | [Terraform: DigitalOcean](#terraform-digitalocean) | 77% | 36 | 28 | 0 | 8 |
 | [Terraform: Linode](#terraform-linode) | 66% | 59 | 39 | 0 | 20 |
@@ -3128,7 +3128,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: Azure
 
-80% of 135 portable features (108 done, 0 partly, 27 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+82% of 135 portable features (111 done, 0 partly, 24 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3568,7 +3568,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `ip_configuration.primary` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `ip_configuration.private_ip_address` | Yes | Yes | Written by the generator |
 | `ip_configuration.private_ip_address_allocation` | Yes | Yes | Written by the generator |
-| `ip_configuration.private_ip_address_version` | Yes | Not yet | The cloud takes the spec's unique local block (the Azure module writes it), but cloud-vm generates only when AWS takes the environment, which it refuses with IPv6 |
+| `ip_configuration.private_ip_address_version` | Yes | Yes | Written by the generator |
 | `ip_configuration.public_ip_address_id` | Yes | Yes | Written by the generator |
 | `ip_configuration.subnet_id` | Yes | Yes | Written by the generator |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
@@ -3783,14 +3783,14 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `proximity_placement_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `reboot_setting` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `resource_group_name` | Yes | Yes | Written by the generator |
-| `secure_boot_enabled` | Yes | Not yet | With a TPM on Windows in the cloud: AWS's NitroTPM Windows images (TPM-Windows_Server-*) first |
+| `secure_boot_enabled` | Yes | Yes | Written by the generator |
 | `size` | Yes | Yes | Written by the generator |
 | `source_image_id` | Yes | Yes | Written by the generator |
 | `tags` | Yes | Yes | Written by the generator |
 | `timezone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `user_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `virtual_machine_scale_set_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `vtpm_enabled` | Yes | Not yet | With a TPM on Windows in the cloud: AWS's NitroTPM Windows images (TPM-Windows_Server-*) first |
+| `vtpm_enabled` | Yes | Yes | Written by the generator |
 | `zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `additional_capabilities` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `additional_capabilities.hibernation_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |

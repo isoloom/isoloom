@@ -17,7 +17,7 @@ use isoloom_runtime::events::{ErrorCode, Scope};
 use crate::failure::Failure;
 use crate::prepare::{Prepared, prepare};
 use crate::tools::{compose, process, terraform};
-use crate::{Res, cloud_services, external, output, secrets, spec};
+use crate::{Res, cloud_services, external, output, secrets, spec, target};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -26,8 +26,9 @@ pub struct Args {
     target: Option<String>,
     #[arg(default_value = ".")]
     dir: PathBuf,
-    /// For `cloud-docker`, which cloud's module to apply (aws, azure, gcp, digitalocean,
-    /// linode, oci).
+    /// For `cloud-docker` and `cloud-vm`, which cloud's module to apply (aws, azure, gcp,
+    /// digitalocean, linode, oci). On `cloud-vm`, omitted: AWS when it can run the environment,
+    /// else the only cloud that can.
     #[arg(long)]
     cloud: Option<String>,
     /// Your own image table (YAML), as for `generate`.
@@ -61,6 +62,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 }
 
 /// What `run`, `down` and `reset` were asked for.
+#[derive(Clone, Copy)]
 pub struct Ask<'a> {
     pub dir: &'a Path,
     pub target: Option<&'a str>,
@@ -73,6 +75,8 @@ pub struct Ask<'a> {
 /// An environment brought up or torn down.
 pub struct Brought {
     pub target: Target,
+    /// The cloud it runs on (`--cloud`, or the one `cloud-vm` picked).
+    pub cloud: Option<String>,
     /// The project folder, absolute.
     pub dir: PathBuf,
     /// The spec's message, filled in (after a run).
@@ -86,7 +90,7 @@ pub fn finish(command: &str, ask: &Ask, b: &Brought) -> ExitCode {
         true,
         serde_json::json!({
             "target": b.target.id(),
-            "cloud": ask.cloud,
+            "cloud": b.cloud,
             "instance": ask.instance,
             "dir": b.dir,
             "message": b.message,
@@ -102,6 +106,11 @@ pub fn up_or_down(ask: &Ask, down: bool) -> Res<Brought> {
     let p = prepare(ask.dir, ask.target, ask.images, ask.instance, ask.sets)?;
     output::done(&prep, Some(p.target.id().to_string()));
     let (t, dir) = (p.target, &p.dir);
+    let cloud = cloud_for(&p, ask, down)?;
+    let ask = &Ask {
+        cloud: cloud.as_deref(),
+        ..*ask
+    };
     let mut values = Vec::new();
     if !down {
         let ready = Scope::step(Some(t.id()), "ready");
@@ -123,9 +132,23 @@ pub fn up_or_down(ask: &Ask, down: bool) -> Res<Brought> {
     let message = done::after(&p, ask, down, &tool, project);
     Ok(Brought {
         target: t,
+        cloud: cloud.clone(),
         dir: dir.clone(),
         message,
     })
+}
+
+/// The cloud a `cloud-vm` run or teardown works on (`target::vm_cloud`); a run stops on a cloud
+/// that can't run the environment, with its reason. Other targets keep `--cloud` as given.
+fn cloud_for(p: &Prepared, ask: &Ask, down: bool) -> Res<Option<String>> {
+    if p.target != Target::CloudVm {
+        return Ok(ask.cloud.map(str::to_string));
+    }
+    let cloud = target::vm_cloud(&p.dir, ask.instance, &p.spec, ask.cloud)?;
+    if !down && let Some(why) = target::vm_cloud_refusal(&p.spec, &cloud) {
+        return Err(Failure::new(ErrorCode::TargetUnavailable, why).into());
+    }
+    Ok(Some(cloud))
 }
 
 /// Runs the target's tool that brings the environment up (or down): the `up` (`down`) step,
@@ -173,7 +196,7 @@ fn launch(p: &Prepared, ask: &Ask, down: bool, values: &secrets::Values) -> Res<
 fn ready_here(p: &Prepared, cloud: Option<&str>) -> Res<()> {
     let t = p.target;
     let own = p.spec.cloud.as_ref().map(|c| c.provider.id());
-    let ready = isoloom_runtime::host::check_in(t, cloud.or(own).or((t == Target::CloudVm).then_some("aws")), spec::child_env());
+    let ready = isoloom_runtime::host::check_in(t, cloud.or(own), spec::child_env());
     if !ready.ready {
         let message = format!(
             "this machine can't run `{}` yet: {} (see `isoloom doctor`)",

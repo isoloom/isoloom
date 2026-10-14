@@ -2,6 +2,7 @@
 # A hybrid environment: a Windows file server (a VM, it has no container form) next to an
 # intranet web app (a container), on one network. The `hybrid` target runs each the light way;
 # `vagrant` and the other VM targets run both as VMs. The checks reach both from the inside.
+# The file server has a TPM: on `cloud-vm`, AWS refuses it and Azure runs it (trusted launch).
 version: 1
 name: mixed-office
 
@@ -16,6 +17,7 @@ machines:
     vm:
       os: windows-server-2019
       provision: [provision/share.ps1]
+      tpm: true   # a TPM 2.0 (for BitLocker): AWS has no Windows image for it yet, Azure does
 
   intranet:
     networks: { office: 20 }

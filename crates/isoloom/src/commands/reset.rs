@@ -44,6 +44,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     if p.target == Target::Vagrant && restored(&p.dir.join(isoloom_spec::instance::output_dir(ask.instance)).join("vagrant")) {
         let back = Brought {
             target: p.target,
+            cloud: ask.cloud.map(str::to_string),
             dir: p.dir,
             message: None,
         };

@@ -179,6 +179,8 @@ resource "azurerm_windows_virtual_machine" "files01" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
+  secure_boot_enabled   = true
+  vtpm_enabled          = true
   computer_name         = "files01"
   size                  = "Standard_B2s"
   admin_username        = "isoloom"

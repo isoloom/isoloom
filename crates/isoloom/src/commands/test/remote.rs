@@ -36,7 +36,8 @@ fn checks_output(outputs: &serde_json::Value, target: &str) -> Res<Vec<serde_jso
 
 /// Cloud VMs: each runner over SSH, on the host the module placed it.
 pub fn cloud_vm(ctx: &Ctx) -> Res<Vec<Runner>> {
-    let module = ctx.out.join("cloud-vm").join(ctx.cloud.unwrap_or("aws"));
+    let cloud = target::vm_cloud(ctx.dir, ctx.instance, ctx.spec, ctx.cloud)?;
+    let module = ctx.out.join("cloud-vm").join(cloud);
     let outputs = terraform::output(&module)?;
     let list = checks_output(&outputs, "cloud-vm")?;
     let runners = list

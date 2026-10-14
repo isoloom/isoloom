@@ -129,9 +129,9 @@ pub type CloudRefusal = (&'static str, String);
 
 /// The clouds of a target that writes one module per cloud (`cloud-vm`), when the target is
 /// generated: the clouds whose module is written, and each refused cloud with its reason. A
-/// cloud other than the reference one (AWS) refusing drops only its module, so the target can
-/// be generated while some clouds are left out. `None` for every other target, and for a
-/// `cloud-vm` that isn't generated (its refusal says why).
+/// cloud refusing drops only its module, so the target is generated as long as one cloud
+/// accepts the environment. `None` for every other target, and for a `cloud-vm` that isn't
+/// generated (its refusal says why).
 pub fn cloud_refusals(spec: &Spec, target: Target) -> Option<(Vec<&'static str>, Vec<CloudRefusal>)> {
     if target != Target::CloudVm || !effective(spec).contains(&target) || refusal(spec, target).is_some() {
         return None;

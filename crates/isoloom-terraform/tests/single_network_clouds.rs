@@ -116,5 +116,11 @@ fn an_os_without_an_image_is_refused() {
     let e = Environment::build(&spec, Target::CloudVm, None);
     let why = LinodeBackend.refusal(&e).expect("refused");
     assert_eq!(why, "machine `w`: no Linode image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04)");
-    assert!(OciBackend.refusal(&e).is_none(), "Oracle Cloud runs every Linux OS on Ubuntu");
+    // Oracle Cloud runs Debian on Ubuntu, but no other OS: it would no longer be the spec's.
+    let why = OciBackend.refusal(&e).expect("refused");
+    assert_eq!(
+        why,
+        "machine `w`: no Oracle Cloud image for `rocky-9` yet (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)"
+    );
+    assert_eq!(CloudVmBackend.refusal(&e).map(|r| r.starts_with("no cloud can run it (")), Some(true));
 }

@@ -28,7 +28,8 @@ const SUB: &str = "oci";
 /// The shape every instance has, sized by its memory.
 const SHAPE: &str = "VM.Standard.E4.Flex";
 
-/// What Oracle Cloud takes: every OS runs on an Ubuntu image.
+/// What Oracle Cloud takes: Ubuntu, and Debian on the newest Ubuntu LTS (it has no Debian image).
+/// Any other OS needs an image of its own (`vm.image.oci`) rather than running Ubuntu in its place.
 const RULES: Rules = Rules {
     cloud: "Oracle Cloud",
     single_machine: false,
@@ -36,8 +37,8 @@ const RULES: Rules = Rules {
         "arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images)",
         "dual-stack virtual cloud networks on Oracle Cloud come later",
     ),
-    has_image: |_| true,
-    images: "Ubuntu 22.04/24.04",
+    has_image: |os| matches!(os, "debian-12" | "debian-13" | "ubuntu-22.04" | "ubuntu-24.04"),
+    images: "Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04",
     tpm: true,
     own: own_image::oci,
     gpus: GpuSizes {
