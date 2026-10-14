@@ -285,7 +285,7 @@
       "vagrant"
     ],
     "refused": {
-      "proxmox": "machine `user`: no Proxmox image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7)",
+      "proxmox": "machine `user`: no Proxmox image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)",
       "cloud-vm": "machine `user`: no AWS image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)"
     },
     "not_possible": {

@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use isoloom_plan::Environment;
-use isoloom_render::inventory::{self, Access};
+use isoloom_render::inventory::{self, Access, WinrmAuth};
 use isoloom_spec::model::Target;
 
 fn env(example: &str, target: Target) -> Environment {
@@ -22,7 +22,7 @@ fn aws_user(os: &str) -> String {
 }
 
 fn aws() -> Access<'static> {
-    Access::cloud(aws_user, "${random_password.windows.result}")
+    Access::cloud(aws_user, "${random_password.windows.result}", WinrmAuth::Basic)
 }
 
 #[test]
@@ -37,7 +37,10 @@ fn vagrant_corp_ad_basics_windows() {
 
 #[test]
 fn proxmox_ansible_pair_keeps_the_groups() {
-    insta::assert_snapshot!(inventory::render(&env("ansible-pair", Target::Proxmox), &Access::proxmox()));
+    insta::assert_snapshot!(inventory::render(
+        &env("ansible-pair", Target::Proxmox),
+        &Access::proxmox("${random_password.windows.result}")
+    ));
 }
 
 #[test]
@@ -64,5 +67,25 @@ fn rendering_twice_gives_the_same_inventory() {
     ] {
         let once = inventory::render(&env(example, target), &aws());
         assert_eq!(once, inventory::render(&env(example, target), &aws()), "{example}");
+    }
+}
+
+#[test]
+fn azure_windows_hosts_authenticate_with_ntlm() {
+    let azure = Access::cloud(|_| "isoloom".to_string(), "${random_password.windows.result}", WinrmAuth::Ntlm);
+    let inv = inventory::render(&env("corp-ad-basics", Target::CloudVm), &azure);
+    assert!(inv.contains("ansible_winrm_transport=ntlm\n"), "{inv}");
+    assert!(!inv.contains("ansible_winrm_transport=basic"), "{inv}");
+}
+
+#[test]
+fn proxmox_windows_hosts_get_the_isoloom_account_over_winrm() {
+    let inv = inventory::render(&env("windows-hello", Target::Proxmox), &Access::proxmox("${random_password.windows.result}"));
+    for v in [
+        "ansible_user=isoloom",
+        "ansible_password=${random_password.windows.result}",
+        "ansible_connection=winrm",
+    ] {
+        assert!(inv.contains(&format!("{v}\n")), "{v}: {inv}");
     }
 }

@@ -2,7 +2,7 @@
 //! top-level blocks (`config.ssh`, `config.winrm`, `config.push`...). Their options have tables
 //! of their own.
 
-use super::{DISK, MORE_DISKS, NETWORKS, NO_SHARED_FOLDERS, PROVISIONERS, PUSH, TOOLING, USER_SETUP, VM, WINDOWS, kinds, names, pairs, table};
+use super::{DISK, MORE_DISKS, NETWORKS, NO_SHARED_FOLDERS, PROVISIONERS, PUSH, TOOLING, USER_SETUP, VM, kinds, names, pairs, table};
 use crate::{
     Format, Support,
     Support::{Emitted, Equivalent, NotPortable, Planned, Tooling},
@@ -44,11 +44,16 @@ const BLOCKS: [(&str, Support); 6] = [
             from: "vm.os (the Windows box's own account, over WinRM)",
         },
     ),
-    ("config.winssh", WINDOWS),
+    (
+        "config.winssh",
+        Emitted {
+            from: "machines.*.vm.image.winssh (a Windows box reached over OpenSSH)",
+        },
+    ),
     (
         "config.trigger",
         Emitted {
-            from: "(Hyper-V: each network's private switch made before a VM starts and removed after the last one, its adapters attached and addressed)",
+            from: "(Hyper-V: each network's private switch made before a VM starts and removed after the last one, its adapters attached and addressed, its virtual TPM enabled)",
         },
     ),
     ("config.vagrant", TOOLING),

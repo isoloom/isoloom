@@ -99,6 +99,14 @@ managed service; they are Planned. Azure `azurerm_windows_virtual_machine`, Goog
 `google_project` and `google_project_service`, and Linode `linode_vpc` and `linode_vpc_subnet`
 are written and now checked against every module that writes them.
 
+## Re-decided rows (Windows guests)
+
+| Row | Was | Now | Why |
+| --- | --- | --- | --- |
+| Kubernetes `PodSpec.os`, `SecurityContext.windowsOptions`, `PodSecurityContext.windowsOptions` | Planned | Not portable | Windows containers only: Isoloom's Windows machines are full VMs (WinRM, a domain controller), which no container image is. A Linux pod needs neither field. |
+| libvirt `tpm_path` | Planned | Tooling | The host's own TPM passed through: the emulated TPM (`tpm_type`) gives each VM one of its own. |
+| ESXi `guestos` | Planned | Equivalent | The plugin's older name for `guest_guestos`, which Isoloom writes. |
+
 ## The spec table's cells
 
 The spec table runs the other way: a row per field of an Isoloom spec, a column per output (each

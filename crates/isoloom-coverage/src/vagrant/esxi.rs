@@ -1,6 +1,6 @@
 //! The settings of vagrant-vmware-esxi, for standalone ESXi hosts.
 
-use super::{DISK, HOST_TUNING, LINKED_CLONE, MAC, MORE_DISKS, TOOLING, USER_SETUP, WINDOWS};
+use super::{DISK, HOST_TUNING, LINKED_CLONE, MAC, MORE_DISKS, TOOLING, USER_SETUP};
 use crate::{
     Support,
     Support::{Emitted, Equivalent, Tooling},
@@ -23,7 +23,12 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         },
         "guest_boot_disk_size" => DISK,
         "guest_storage" => MORE_DISKS,
-        "guest_guestos" | "guestos" => WINDOWS,
+        "guest_guestos" => Emitted {
+            from: "machines.*.vm.os (a Windows VM's guest OS; a Linux box keeps its own)",
+        },
+        "guestos" => Equivalent {
+            via: "guest_guestos, the plugin's newer name for it",
+        },
         "guest_mac_address" | "mac_address" => MAC,
         "guest_nic_type"
         | "nic_type"

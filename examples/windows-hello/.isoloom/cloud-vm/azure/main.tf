@@ -363,7 +363,7 @@ resource "terraform_data" "isoloom_controller" {
     destination = "/tmp/isoloom-controller-key"
   }
   provisioner "file" {
-    content     = "[linux]\n\n[windows]\nweb01 ansible_host=192.168.57.10\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n"
+    content     = "[linux]\n\n[windows]\nweb01 ansible_host=192.168.57.10\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=ntlm\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n"
     destination = "/tmp/isoloom-inventory.ini"
   }
   provisioner "remote-exec" {

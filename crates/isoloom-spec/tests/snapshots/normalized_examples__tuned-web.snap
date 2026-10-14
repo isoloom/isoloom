@@ -1,5 +1,6 @@
 ---
 source: crates/isoloom-spec/tests/normalized_examples.rs
+assertion_line: 23
 expression: spec
 ---
 version: 1
@@ -50,6 +51,7 @@ machines:
       provision:
         - provision/web.sh
       image: ~
+      tpm: true
 common: ~
 groups: {}
 provision: []

@@ -14,6 +14,7 @@ use indexmap::IndexMap;
 use isoloom_spec::images;
 use isoloom_spec::model::{Arch, Constraints, External, Machine, MachineFile, Protocol, Spec, Target, Tc, Ulimit, Winrm};
 use isoloom_spec::validate::docker_cidrs;
+use isoloom_spec::windows::{self, Tpm};
 
 use crate::addressing::{address, address_for, host_address, start_order};
 use crate::ansible;
@@ -143,8 +144,12 @@ pub struct MachinePlan {
     /// The OS of its VM implementation (`debian-12`, `windows-server-2022`...), whatever the
     /// target: an existing host keeps the OS its `vm:` names.
     pub os: Option<String>,
-    /// How its Windows VM answers WinRM (`None` off Windows).
+    /// How its Windows VM answers WinRM (`None` off Windows, and on a box reached over OpenSSH).
     pub winrm: Option<Winrm>,
+    /// Whether its Windows VM's box is reached over OpenSSH instead (`vm.image.winssh`).
+    pub winssh: bool,
+    /// Its virtual TPM 2.0, when it gets one (`vm.tpm`, or Windows 11's own).
+    pub tpm: Option<Tpm>,
     /// Its SSH endpoint as an existing host (`external:`), when the spec gives one.
     pub external: Option<External>,
     /// Its variables from the `provision:` steps' `host_vars`, merged in step order.
@@ -296,6 +301,7 @@ impl Environment {
         requirements.extend(outside::requirements(original));
         requirements.extend(requirements::mixed_shapes(spec, |n| machines.get(n).map(|m| m.shape)));
         requirements.extend(crate::machine_files::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
+        requirements.extend(requirements::tpm(&machines));
         Environment {
             name: spec.name.clone(),
             target,
@@ -433,7 +439,9 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
             Vec::new()
         },
         os: m.vm.as_ref().map(|v| v.os.clone()),
-        winrm: m.vm.as_ref().filter(|v| images::is_windows(&v.os)).map(images::winrm),
+        winrm: m.vm.as_ref().filter(|v| images::is_windows(&v.os) && !windows::winssh(v)).map(images::winrm),
+        winssh: m.vm.as_ref().is_some_and(windows::winssh),
+        tpm: m.vm.as_ref().and_then(windows::tpm),
         external: m.external.clone(),
         host_vars: ansible::host_vars(spec, name),
         outside: IndexMap::new(),

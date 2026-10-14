@@ -11,33 +11,33 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [Docker Compose](#docker-compose) | 84% | 150 | 123 | 6 | 21 |
-| [Vagrant](#vagrant) | 92% | 42 | 39 | 0 | 3 |
+| [Vagrant](#vagrant) | 95% | 42 | 40 | 0 | 2 |
 | [Vagrant: networks](#vagrant-networks) | 92% | 38 | 35 | 0 | 3 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
 | [Vagrant: provisioners](#vagrant-provisioners) | 94% | 57 | 54 | 0 | 3 |
-| [Vagrant: communicators](#vagrant-communicators) | 100% | 8 | 8 | 0 | 0 |
+| [Vagrant: communicators](#vagrant-communicators) | 100% | 11 | 11 | 0 | 0 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 7 | 7 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
-| [Vagrant: libvirt](#vagrant-libvirt) | 35% | 20 | 7 | 0 | 13 |
+| [Vagrant: libvirt](#vagrant-libvirt) | 52% | 19 | 10 | 0 | 9 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: UTM](#vagrant-utm) | 100% | 3 | 3 | 0 | 0 |
 | [Vagrant: QEMU](#vagrant-qemu) | 85% | 14 | 12 | 0 | 2 |
-| [Vagrant: ESXi](#vagrant-esxi) | 89% | 19 | 17 | 0 | 2 |
+| [Vagrant: ESXi](#vagrant-esxi) | 100% | 19 | 19 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 92% | 13 | 12 | 0 | 1 |
-| [Terraform: Proxmox](#terraform-proxmox) | 57% | 124 | 71 | 0 | 53 |
+| [Terraform: Proxmox](#terraform-proxmox) | 64% | 128 | 83 | 0 | 45 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 69% | 132 | 92 | 0 | 40 |
-| [Terraform: Azure](#terraform-azure) | 74% | 135 | 100 | 0 | 35 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 64% | 95 | 61 | 0 | 34 |
+| [Terraform: Azure](#terraform-azure) | 75% | 135 | 102 | 0 | 33 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 67% | 95 | 64 | 0 | 31 |
 | [Terraform: DigitalOcean](#terraform-digitalocean) | 75% | 36 | 27 | 0 | 9 |
 | [Terraform: Linode](#terraform-linode) | 59% | 59 | 35 | 0 | 24 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 45% | 150 | 68 | 0 | 82 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 48% | 152 | 73 | 0 | 79 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
-| [Ansible inventory](#ansible-inventory) | 95% | 31 | 28 | 3 | 0 |
+| [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 92% | 201 | 184 | 2 | 15 |
+| [Kubernetes](#kubernetes) | 93% | 198 | 184 | 2 | 12 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
 | [Helm](#helm) | 100% | 19 | 19 | 0 | 0 |
 
@@ -436,7 +436,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant
 
-92% of 42 portable features (39 done, 0 partly, 3 to do; 100 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners, communicators, pushes).
+95% of 42 portable features (40 done, 0 partly, 2 to do; 100 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners, communicators, pushes).
 
 ### Machine settings (config.vm)
 
@@ -520,8 +520,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | --- | --- | --- | --- |
 | `config.ssh` | Yes | Yes | A jump host from ISOLOOM_SSH_PROXY_COMMAND, when set; see the communicators' table |
 | `config.winrm` | Yes | Yes | From `vm.os` (the Windows box's own account, over WinRM) |
-| `config.winssh` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
-| `config.trigger` | Yes | Yes | Hyper-V: each network's private switch made before a VM starts and removed after the last one, its adapters attached and addressed |
+| `config.winssh` | Yes | Yes | From `machines.*.vm.image.winssh` (a Windows box reached over OpenSSH) |
+| `config.trigger` | Yes | Yes | Hyper-V: each network's private switch made before a VM starts and removed after the last one, its adapters attached and addressed, its virtual TPM enabled |
 | `config.vagrant` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `config.push` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
 
@@ -998,7 +998,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: communicators
 
-100% of 8 portable features (8 done, 0 partly, 0 to do; 76 features in all). From Vagrant 2.4.9 (the SSH, WinRM and Windows OpenSSH config classes).
+100% of 11 portable features (11 done, 0 partly, 0 to do; 76 features in all). From Vagrant 2.4.9 (the SSH, WinRM and Windows OpenSSH config classes).
 
 ### SSH (config.ssh)
 
@@ -1058,38 +1058,38 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `compression` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `config` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `connect_retries` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `connect_retry_delay` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `connect_timeout` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `default` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `disable_deprecated_algorithms` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `dsa_authentication` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `export_command_template` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `extra_args` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `forward_agent` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `forward_env` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `forward_x11` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `guest_port` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `host` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `insert_key` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `keep_alive` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `key_type` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `keys_only` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `paranoid` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `password` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `port` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `private_key_path` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `proxy_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `pty` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `remote_user` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `shell` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `ssh_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `sudo_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `upload_directory` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `username` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
-| `verify_host_key` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `compression` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `config` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `connect_retries` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `connect_retry_delay` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `connect_timeout` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `default` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `disable_deprecated_algorithms` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `dsa_authentication` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `export_command_template` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `extra_args` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `forward_agent` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `forward_env` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `forward_x11` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `guest_port` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `host` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `insert_key` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `keep_alive` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `key_type` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `keys_only` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `paranoid` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `password` | Yes | Yes | From `machines.*.vm.image.winssh` (the Windows box's own account) |
+| `port` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `private_key_path` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `proxy_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `pty` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `remote_user` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `shell` | Yes | Yes | From `machines.*.vm.image.winssh` (PowerShell runs the provisioners' scripts) |
+| `ssh_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `sudo_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `upload_directory` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
+| `username` | Yes | Yes | From `machines.*.vm.image.winssh` (the Windows box's own account) |
+| `verify_host_key` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior |
 
 ## Vagrant: VirtualBox
 
@@ -1103,7 +1103,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `check_guest_additions` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `cpus` | Yes | Yes | From `machines.*.resources` |
 | `customizations` | No | No | Raw commands for one hypervisor: no other target understands them |
-| `customize` | Yes | Yes | The hybrid target's Docker host only: its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks; no spec field writes raw commands |
+| `customize` | Yes | Yes | From `machines.*.vm.tpm` (a TPM 2.0, `--tpm-type`), and the hybrid target's Docker host (its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks); no spec field writes raw commands |
 | `default_nic_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `destroy_unused_network_interfaces` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `functional_vboxsf` | n/a | No | Shared folders are off: the project is copied into each VM |
@@ -1174,7 +1174,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: libvirt
 
-35% of 20 portable features (7 done, 0 partly, 13 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
+52% of 19 portable features (10 done, 0 partly, 9 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
 
 ### Settings
 
@@ -1309,10 +1309,10 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `sysinfo` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `system_uri` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `title` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `tpm_model` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
-| `tpm_path` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
-| `tpm_type` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
-| `tpm_version` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
+| `tpm_model` | Yes | Yes | From `machines.*.vm.tpm` (Windows 11's by default): an emulated TPM 2.0 |
+| `tpm_path` | n/a | No | The host's own TPM device, passed through: the emulated TPM gives each VM one of its own |
+| `tpm_type` | Yes | Yes | From `machines.*.vm.tpm` (Windows 11's by default): an emulated TPM 2.0 |
+| `tpm_version` | Yes | Yes | From `machines.*.vm.tpm` (Windows 11's by default): an emulated TPM 2.0 |
 | `uri` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `usb` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `usb_controller` | No | No | Display, input and host devices: containers and cloud VMs have none |
@@ -1418,7 +1418,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: ESXi
 
-89% of 19 portable features (17 done, 0 partly, 2 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
+100% of 19 portable features (19 done, 0 partly, 0 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
 
 ### Settings
 
@@ -1441,7 +1441,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `guest_boot_disk_size` | Yes | Yes | From `machines.*.resources.disk_gb` (the root filesystem grown into it) |
 | `guest_custom_vmx_settings` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_disk_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `guest_guestos` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
+| `guest_guestos` | Yes | Yes | From `machines.*.vm.os` (a Windows VM's guest OS; a Linux box keeps its own) |
 | `guest_mac_address` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `guest_memsize` | Yes | Yes | From `machines.*.resources` |
 | `guest_name` | Yes | Yes | From the environment and machine names |
@@ -1453,7 +1453,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `guest_storage` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
 | `guest_username` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_virtualhw_version` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `guestos` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
+| `guestos` | Yes | Another way | Via guest_guestos, the plugin's newer name for it |
 | `lax` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `local_allow_overwrite` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `local_failonwarning` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -1517,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-57% of 124 portable features (71 done, 0 partly, 53 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
+64% of 128 portable features (83 done, 0 partly, 45 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1751,7 +1751,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `acpi` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
-| `bios` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `bios` | Yes | Yes | Written by the generator |
 | `boot_order` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
 | `delete_unreferenced_disks_on_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -1761,7 +1761,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `keyboard_layout` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `kvm_arguments` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `mac_addresses` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `machine` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `machine` | Yes | Yes | Written by the generator |
 | `migrate` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `name` | Yes | Yes | Written by the generator |
 | `network_device` | Yes | Yes | Written by the generator |
@@ -1821,12 +1821,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `cdrom.enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `cdrom.file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `cdrom.interface` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `clone` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone` | Yes | Yes | Written by the generator |
 | `clone.datastore_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `clone.full` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.full` | Yes | Yes | Written by the generator |
 | `clone.node_name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `clone.retries` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `clone.vm_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.vm_id` | Yes | Yes | Written by the generator |
 | `cpu` | Yes | Yes | Written by the generator |
 | `cpu.affinity` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `cpu.architecture` | Yes | Not yet | With `machines.*.arch`: another CPU architecture |
@@ -1864,11 +1864,11 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `disk.speed.read_burstable` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `disk.speed.write` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `disk.speed.write_burstable` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `efi_disk` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
-| `efi_disk.datastore_id` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `efi_disk` | Yes | Yes | Written by the generator |
+| `efi_disk.datastore_id` | Yes | Yes | Written by the generator |
 | `efi_disk.file_format` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
 | `efi_disk.pre_enrolled_keys` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
-| `efi_disk.type` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `efi_disk.type` | Yes | Yes | Written by the generator |
 | `hostpci` | Yes | Not yet | With GPU and device passthrough |
 | `hostpci.device` | Yes | Not yet | With GPU and device passthrough |
 | `hostpci.id` | Yes | Not yet | With GPU and device passthrough |
@@ -1884,7 +1884,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `initialization.interface` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.meta_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.network_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `initialization.type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.type` | Yes | Yes | Written by the generator |
 | `initialization.upgrade` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.user_data_file_id` | Yes | Yes | Written by the generator |
 | `initialization.vendor_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -1934,9 +1934,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `startup.down_delay` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
 | `startup.order` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
 | `startup.up_delay` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
-| `tpm_state` | Yes | Not yet | With Windows 11's TPM and secure boot |
-| `tpm_state.datastore_id` | Yes | Not yet | With Windows 11's TPM and secure boot |
-| `tpm_state.version` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `tpm_state` | Yes | Yes | Written by the generator |
+| `tpm_state.datastore_id` | Yes | Yes | Written by the generator |
+| `tpm_state.version` | Yes | Yes | Written by the generator |
 | `usb` | Yes | Not yet | With GPU and device passthrough |
 | `usb.host` | Yes | Not yet | With GPU and device passthrough |
 | `usb.mapping` | Yes | Not yet | With GPU and device passthrough |
@@ -3128,7 +3128,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: Azure
 
-74% of 135 portable features (100 done, 0 partly, 35 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+75% of 135 portable features (102 done, 0 partly, 33 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3484,13 +3484,13 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `proximity_placement_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `reboot_setting` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `resource_group_name` | Yes | Yes | Written by the generator |
-| `secure_boot_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `secure_boot_enabled` | Yes | Yes | Written by the generator |
 | `size` | Yes | Yes | Written by the generator |
 | `source_image_id` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
 | `tags` | Yes | Yes | Written by the generator |
 | `user_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `virtual_machine_scale_set_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `vtpm_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `vtpm_enabled` | Yes | Yes | Written by the generator |
 | `zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `additional_capabilities` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `additional_capabilities.hibernation_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -3783,14 +3783,14 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `proximity_placement_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `reboot_setting` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `resource_group_name` | Yes | Yes | Written by the generator |
-| `secure_boot_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `secure_boot_enabled` | Yes | Not yet | With a TPM on Windows in the cloud: AWS's NitroTPM Windows images (TPM-Windows_Server-*) first |
 | `size` | Yes | Yes | Written by the generator |
 | `source_image_id` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
 | `tags` | Yes | Yes | Written by the generator |
 | `timezone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `user_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `virtual_machine_scale_set_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `vtpm_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `vtpm_enabled` | Yes | Not yet | With a TPM on Windows in the cloud: AWS's NitroTPM Windows images (TPM-Windows_Server-*) first |
 | `zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `additional_capabilities` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `additional_capabilities.hibernation_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -3854,7 +3854,7 @@ And 894 other resource types that only this cloud has: its managed services, net
 
 ## Terraform: Google Cloud
 
-64% of 95 portable features (61 done, 0 partly, 34 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+67% of 95 portable features (64 done, 0 partly, 31 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4541,10 +4541,10 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `service_account.email` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `service_account.scopes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `shielded_instance_config` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `shielded_instance_config` | Yes | Yes | Written by the generator |
 | `shielded_instance_config.enable_integrity_monitoring` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `shielded_instance_config.enable_secure_boot` | Yes | Not yet | With Windows 11's TPM and secure boot |
-| `shielded_instance_config.enable_vtpm` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `shielded_instance_config.enable_secure_boot` | Yes | Yes | Written by the generator |
+| `shielded_instance_config.enable_vtpm` | Yes | Yes | Written by the generator |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
@@ -5312,7 +5312,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Oracle Cloud
 
-45% of 150 portable features (68 done, 0 partly, 82 to do; 1320 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
+48% of 152 portable features (73 done, 0 partly, 79 to do; 1320 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5740,19 +5740,19 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `placement_constraint_details.compute_bare_metal_host_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `placement_constraint_details.compute_host_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `placement_constraint_details.type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `platform_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config` | Yes | Yes | Written by the generator |
 | `platform_config.are_virtual_instructions_enabled` | Yes | Not yet | With nested virtualization |
 | `platform_config.config_map` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `platform_config.is_access_control_service_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `platform_config.is_input_output_memory_management_unit_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `platform_config.is_measured_boot_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `platform_config.is_measured_boot_enabled` | Yes | Yes | Written by the generator |
 | `platform_config.is_memory_encryption_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `platform_config.is_secure_boot_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `platform_config.is_secure_boot_enabled` | Yes | Yes | Written by the generator |
 | `platform_config.is_symmetric_multi_threading_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `platform_config.is_trusted_platform_module_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `platform_config.is_trusted_platform_module_enabled` | Yes | Yes | Written by the generator |
 | `platform_config.numa_nodes_per_socket` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `platform_config.percentage_of_cores_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `platform_config.type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.type` | Yes | Yes | Written by the generator |
 | `preemptible_instance_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `preemptible_instance_config.preemption_action` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `preemptible_instance_config.preemption_action.preserve_boot_volume` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -6538,7 +6538,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Ansible inventory
 
-95% of 31 portable features (28 done, 3 partly, 0 to do; 143 features in all). From ansible-core v2.21.5's behavioral parameters, and pywinrm v0.5.0's for `ansible_winrm_*` (crates/isoloom-coverage/coverage/ansible-inventory.txt).
+100% of 31 portable features (31 done, 0 partly, 0 to do; 143 features in all). From ansible-core v2.21.5's behavioral parameters, and pywinrm v0.5.0's for `ansible_winrm_*` (crates/isoloom-coverage/coverage/ansible-inventory.txt).
 
 ### Parameters
 
@@ -6554,7 +6554,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `ansible_become_password` | Yes | Another way | Via (passwordless sudo as root: Isoloom's user needs no other method, user or password) |
 | `ansible_become_user` | Yes | Another way | Via (passwordless sudo as root: Isoloom's user needs no other method, user or password) |
 | `ansible_common_remote_group` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
-| `ansible_connection` | Yes | Partly | From `machines.*.vm.os` (WinRM for Windows; SSH with PowerShell on external); not yet: Proxmox's Windows VMs (no WinRM account yet) |
+| `ansible_connection` | Yes | Yes | From `machines.*.vm.os` (WinRM for Windows; SSH with PowerShell on external and for a box with `vm.image.winssh`) |
 | `ansible_connection_user` | n/a | No | Ansible's own behavior on the controller, not the machine's |
 | `ansible_control_path` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
 | `ansible_control_path_dir` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
@@ -6570,7 +6570,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `ansible_module_compression` | n/a | No | Ansible's own behavior on the controller, not the machine's |
 | `ansible_network_os` | n/a | No | Ansible's own behavior on the controller, not the machine's |
 | `ansible_no_target_syslog` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
-| `ansible_password` | Yes | Partly | The Vagrant boxes' account; the clouds' Windows password; not yet: Proxmox's Windows VMs (no WinRM account yet) |
+| `ansible_password` | Yes | Yes | The Vagrant boxes' account; the generated Windows password on Proxmox and the clouds |
 | `ansible_pipelining` | Yes | Another way | Via (the controller's ANSIBLE_PIPELINING=True) |
 | `ansible_port` | Yes | Yes | From `machines.*.external.port and machines.*.vm.image.winrm` |
 | `ansible_private_key` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
@@ -6656,7 +6656,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `ansible_system_tmpdirs` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
 | `ansible_target_log_info` | n/a | No | Ansible's own behavior on the controller, not the machine's |
 | `ansible_timeout` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
-| `ansible_user` | Yes | Partly | From `machines.*.external.user and machines.*.vm.os` (each image's own user; `isoloom` on Proxmox); not yet: Proxmox's Windows VMs (no WinRM account yet) |
+| `ansible_user` | Yes | Yes | From `machines.*.external.user and machines.*.vm.os` (each image's own user; `isoloom` on Proxmox and on the clouds' Windows) |
 | `ansible_win_async_startup_timeout` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
 | `ansible_winrm_ca_trust_path` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
 | `ansible_winrm_cert_key_pem` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
@@ -6748,7 +6748,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-92% of 201 portable features (184 done, 2 partly, 15 to do; 369 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+93% of 198 portable features (184 done, 2 partly, 12 to do; 369 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -6828,7 +6828,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `PodSpec: initContainers` | Yes | Yes | From `machines.*.depends_on` (waits for the dependencies' services), and Isoloom's probe and volume seeds |
 | `PodSpec: nodeName` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: nodeSelector` | Yes | Yes | From `machines.*.arch` (a node of the machine's architecture) |
-| `PodSpec: os` | Yes | Not yet | Windows machines in Windows containers (Windows makes an environment VM-only today) |
+| `PodSpec: os` | No | No | Windows containers only: Isoloom's Windows machines are VMs, which Kubernetes refuses (a Linux pod needs neither field) |
 | `PodSpec: overhead` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
 | `PodSpec: preemptionPolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: priority` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
@@ -6917,7 +6917,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `SecurityContext: runAsUser` | Yes | Yes | The volumes' seeds run as root, to copy any file |
 | `SecurityContext: seLinuxOptions` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
 | `SecurityContext: seccompProfile` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
-| `SecurityContext: windowsOptions` | Yes | Not yet | Windows machines in Windows containers (Windows makes an environment VM-only today) |
+| `SecurityContext: windowsOptions` | No | No | Windows containers only: Isoloom's Windows machines are VMs, which Kubernetes refuses (a Linux pod needs neither field) |
 | `PodSecurityContext: appArmorProfile` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
 | `PodSecurityContext: fsGroup` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
 | `PodSecurityContext: fsGroupChangePolicy` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
@@ -6930,7 +6930,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `PodSecurityContext: supplementalGroups` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
 | `PodSecurityContext: supplementalGroupsPolicy` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
 | `PodSecurityContext: sysctls` | Yes | Yes | From `machines.*.sysctls` |
-| `PodSecurityContext: windowsOptions` | Yes | Not yet | Windows machines in Windows containers (Windows makes an environment VM-only today) |
+| `PodSecurityContext: windowsOptions` | No | No | Windows containers only: Isoloom's Windows machines are VMs, which Kubernetes refuses (a Linux pod needs neither field) |
 | `Sysctl: name` | Yes | Yes | From `machines.*.sysctls` |
 | `Sysctl: value` | Yes | Yes | From `machines.*.sysctls` |
 | `PodDNSConfig: nameservers` | Yes | Yes | From `machines.*.dns.servers` |
@@ -7335,13 +7335,15 @@ is marked ✗, with its reason below.
 | `machines.*.docker.firmware` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.config` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.idle` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
-| `machines.*.vm.os` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | n/a | n/a | ◐ |
+| `machines.*.vm.os` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | n/a | n/a | ◐ |
 | `machines.*.vm.image.vagrant` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.image.vagrant_version` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.image.qemu` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.image.hyperv` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.image.winrm` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.winssh` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.provision` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ◐ |
+| `machines.*.vm.tpm` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ◐ | n/a | n/a | n/a |
 | `provision[].ansible` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
 | `provision[].inventory` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
 | `provision[].groups` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
@@ -7382,16 +7384,16 @@ is marked ✗, with its reason below.
 | kubernetes | 72% of 83 | 55 | 11 | 1 | 16 |
 | helm | 72% of 83 | 55 | 11 | 1 | 16 |
 | kustomize | 72% of 83 | 55 | 11 | 1 | 16 |
-| vagrant | 90% of 81 | 72 | 3 | 0 | 6 |
+| vagrant | 91% of 83 | 75 | 2 | 0 | 6 |
 | docker-vm | 82% of 91 | 74 | 3 | 0 | 14 |
-| hybrid | 74% of 100 | 71 | 6 | 7 | 16 |
-| proxmox | 87% of 79 | 69 | 1 | 3 | 6 |
-| aws | 65% of 79 | 46 | 11 | 6 | 16 |
-| azure | 65% of 79 | 46 | 11 | 7 | 15 |
-| gcp | 65% of 79 | 46 | 11 | 6 | 16 |
-| digitalocean | 48% of 79 | 35 | 7 | 6 | 31 |
-| linode | 51% of 79 | 37 | 8 | 6 | 28 |
-| oci | 51% of 79 | 37 | 8 | 6 | 28 |
+| hybrid | 75% of 102 | 74 | 5 | 7 | 16 |
+| proxmox | 88% of 80 | 70 | 1 | 3 | 6 |
+| aws | 65% of 80 | 46 | 12 | 6 | 16 |
+| azure | 65% of 80 | 46 | 12 | 7 | 15 |
+| gcp | 65% of 80 | 46 | 12 | 6 | 16 |
+| digitalocean | 48% of 80 | 35 | 7 | 6 | 32 |
+| linode | 51% of 80 | 37 | 8 | 6 | 29 |
+| oci | 51% of 80 | 37 | 9 | 6 | 28 |
 | cloud-docker | 81% of 91 | 73 | 3 | 0 | 15 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
 | external | 57% of 64 | 32 | 9 | 14 | 9 |
@@ -7436,6 +7438,8 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`)
 - **external**: Machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook (`machines.*.files[].path`, `machines.*.files[].source`, `machines.*.files[].content`, `machines.*.files[].uid`, `machines.*.files[].gid`, `machines.*.files[].mode`)
 - **hybrid**: Machine `r` is a network appliance (`docker.appliance`), which runs on the Docker targets (`machines.*.docker.appliance`, `machines.*.docker.firmware`, `machines.*.docker.config`)
+- **digitalocean**: Machine `a` asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none (`machines.*.vm.tpm`)
+- **linode**: Machine `a` asks for a virtual TPM (`vm.tpm: true`): Linode gives none (`machines.*.vm.tpm`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, cloud-docker**: Environment-level provisioning (`provision:`) runs on VM targets for now (`provision[].ansible`, `provision[].inventory`, `provision[].groups`, `provision[].vars`, `provision[].host_vars`, `controller`, `provision[].requirements`)
 - **digitalocean**: DigitalOcean cloud-vm has no Ansible controller yet (`provision[].ansible`, `provision[].inventory`, `provision[].groups`, `provision[].vars`, `provision[].host_vars`, `controller`, `provision[].requirements`)
 - **linode**: Linode cloud-vm has no Ansible controller yet (`provision[].ansible`, `provision[].inventory`, `provision[].groups`, `provision[].vars`, `provision[].host_vars`, `controller`, `provision[].requirements`)

@@ -141,11 +141,67 @@ fn refusals_come_from_the_plan_and_match_rendering() {
 }
 
 #[test]
-fn a_windows_machine_is_refused_by_proxmox_only() {
-    let e = |t| env("windows-hello", t);
-    assert!(CloudVmBackend.refusal(&e(Target::CloudVm)).is_none());
-    let why = ProxmoxBackend.refusal(&e(Target::Proxmox)).expect("refused");
-    assert!(why.contains("no Proxmox image for `windows-server-2019`"), "{why}");
+fn proxmox_windows_hello() {
+    // Not run on a real host: a clone of a Windows template, set up by cloudbase-init.
+    insta::assert_snapshot!(proxmox("windows-hello"));
+}
+
+/// A spec of one machine, its `vm:` as given.
+fn one_vm(vm: &str) -> isoloom_spec::Spec {
+    let spec = isoloom_spec::parse(&format!(
+        "version: 1\nname: t\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  w:\n    networks: {{ lab: 10 }}\n    vm: {vm}\n"
+    ))
+    .unwrap();
+    assert_eq!(isoloom_spec::validate(&spec), vec![]);
+    spec
+}
+
+#[test]
+fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() {
+    let spec = one_vm("{ os: debian-12, provision: [a.sh], tpm: true }");
+    let e = Environment::build(&spec, Target::Proxmox, None);
+    let files = ProxmoxBackend.render(&e).unwrap();
+    assert!(files[0].contents.contains("tpm_state {"), "{}", files[0].contents);
+    let cloud = Environment::build(&spec, Target::CloudVm, None);
+    let files = CloudVmBackend.render(&cloud).unwrap();
+    let module = |c: &str| {
+        files
+            .iter()
+            .find(|f| f.path.ends_with(&format!("cloud-vm/{c}/main.tf")))
+            .map(|f| f.contents.as_str())
+    };
+    assert!(module("aws").unwrap().contains("tpm_support == \"v2.0\""));
+    assert!(module("azure").unwrap().contains("vtpm_enabled"));
+    assert!(module("gcp").unwrap().contains("enable_vtpm"));
+    assert!(module("oci").unwrap().contains("is_trusted_platform_module_enabled"));
+    let refusals = isoloom_terraform::cloud_vm::cloud_refusals(&cloud);
+    let digitalocean = refusals
+        .iter()
+        .find(|(n, _)| *n == "digitalocean")
+        .and_then(|(_, w)| w.clone())
+        .expect("refused");
+    assert!(
+        digitalocean.contains("asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none"),
+        "{digitalocean}"
+    );
+    let windows = one_vm("{ os: windows-server-2022, provision: [a.ps1], tpm: true }");
+    let why = CloudVmBackend.refusal(&Environment::build(&windows, Target::CloudVm, None)).expect("refused");
+    assert!(why.contains("NitroTPM"), "{why}");
+    // Windows 11 merely expects one: the clouds leave it out instead of refusing.
+    let wanted = one_vm("{ os: windows-11, provision: [a.ps1] }");
+    let tpm = |e: &Environment| e.machines["w"].tpm;
+    assert_eq!(
+        tpm(&Environment::build(&wanted, Target::CloudVm, None)),
+        Some(isoloom_spec::windows::Tpm::Wanted)
+    );
+    assert!(isoloom_plan::refusal(&Environment::build(&wanted, Target::CloudVm, None).requirements, &CloudVmBackend.capabilities()).is_none());
+}
+
+#[test]
+fn proxmox_refuses_what_its_windows_machines_cant_have_yet() {
+    let e = Environment::build(&one_vm("{ os: windows-server-2022, provision: [a.yml] }"), Target::Proxmox, None);
+    let why = ProxmoxBackend.refusal(&e).expect("refused");
+    assert!(why.starts_with("machine `w`: Windows provisioning steps are PowerShell scripts"), "{why}");
 }
 
 #[test]

@@ -1,6 +1,6 @@
 //! The settings of vagrant-libvirt.
 
-use super::{ARCH, DEVICES, DISK, HOST_TUNING, IMAGE_BOOTS, MORE_DISKS, RESOURCES, TOOLING, USER_SETUP, WINDOWS};
+use super::{ARCH, DEVICES, DISK, HOST_TUNING, IMAGE_BOOTS, MORE_DISKS, RESOURCES, TOOLING, USER_SETUP};
 use crate::{
     Support,
     Support::{Emitted, Planned, Tooling},
@@ -15,7 +15,12 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         "nested" => Planned {
             note: "nested virtualization: running VMs inside (makes an environment VM-only)",
         },
-        "tpm_model" | "tpm_type" | "tpm_path" | "tpm_version" => WINDOWS,
+        "tpm_model" | "tpm_type" | "tpm_version" => Emitted {
+            from: "machines.*.vm.tpm (Windows 11's by default): an emulated TPM 2.0",
+        },
+        "tpm_path" => Tooling {
+            note: "the host's own TPM device, passed through: the emulated TPM gives each VM one of its own",
+        },
         "boot" | "boot_order" | "kernel" | "cmd_line" | "initrd" | "dtb" | "loader" | "nvram" => IMAGE_BOOTS,
         "uri" | "driver" | "host" | "port" | "connect_via_ssh" | "socket" | "username" | "password" | "id_ssh_key_file" | "proxy_command" | "system_uri"
         | "qemu_use_session" | "storage_pool_name" | "storage_pool_path" | "snapshot_pool_name" | "emulator_path" => USER_SETUP,

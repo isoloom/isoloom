@@ -7,14 +7,14 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::{GeneratedFile, netmask};
 use isoloom_spec::images::{self, VagrantBox};
-use isoloom_spec::model::{Arch, Winrm};
+use isoloom_spec::model::Arch;
 use isoloom_spec::validate::Cidr;
 
 use super::hyperv::{HyperV, Nic};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{self, Os};
-use super::{Ctx, checks};
+use super::{Ctx, checks, windows};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
 
@@ -31,7 +31,7 @@ pub fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     define(r, name, |r| {
         boxed(r, &image, mp.arch, name, os);
         if os == Os::Windows {
-            winrm(r, images::winrm(vm));
+            windows::communicator(r, mp.winrm);
         }
         for (net, ip) in &mp.addresses {
             private_network(r, env, net, *ip);
@@ -74,35 +74,6 @@ fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, name: &str, os: Os) {
     }
 }
 
-/// The box's own account over WinRM (Windows has no SSH by default). The box forwards RDP to
-/// every interface of the host: off (publish a service to reach one, on the loopback).
-fn winrm(r: &mut Ruby, transport: Winrm) {
-    r.call(
-        Call::new("m.vm.network")
-            .arg(Value::str("forwarded_port"))
-            .kw("guest", 3389u16)
-            .kw("host", 3389u16)
-            .kw("id", Value::str("rdp"))
-            .kw("disabled", true),
-    );
-    r.assign("m.vm.guest", Value::sym("windows"));
-    r.assign("m.vm.communicator", Value::str("winrm"));
-    r.assign("m.winrm.username", Value::str("vagrant"));
-    r.assign("m.winrm.password", Value::str("vagrant"));
-    match transport {
-        Winrm::Ssl => {
-            r.assign("m.winrm.transport", Value::sym("ssl"));
-            r.assign("m.winrm.ssl_peer_verification", false);
-        }
-        Winrm::Plaintext => {
-            r.assign("m.winrm.transport", Value::sym("plaintext"));
-            r.assign("m.winrm.basic_auth_only", true);
-        }
-    }
-    r.assign("m.winrm.max_tries", 30u32);
-    r.assign("m.winrm.retry_delay", 10u32);
-}
-
 /// The VM on network `net` at `ip`: a VirtualBox internal network (isolated from the host's
 /// LAN) or a libvirt network without DHCP, named after the environment. On an IPv6 network,
 /// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
@@ -141,6 +112,7 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
         windows: os == Os::Windows,
         nested: env.spec().machines.get(name).is_some_and(|m| m.privileged),
         published: mp.ports.iter().map(|p| (p.port, p.publish)).collect(),
+        tpm: mp.tpm,
     };
     Guest {
         label: format!("{} · {name}", env.name),
@@ -156,5 +128,7 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
             windows_address,
         },
         hyperv,
+        tpm: mp.tpm,
+        esxi_guestos: mp.os.as_deref().and_then(windows::esxi_guestos),
     }
 }

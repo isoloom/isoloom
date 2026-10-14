@@ -37,6 +37,7 @@ const RULES: Rules = Rules {
     ),
     has_image: |_| true,
     images: "Ubuntu 22.04/24.04",
+    tpm: true,
 };
 
 /// The `cloud-vm` module on Oracle Cloud.
@@ -277,6 +278,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
             .add_attribute(("display_name", name_with(&format!("-{name}"))))
             .add_attribute(("shape", string(SHAPE)))
             .add_block(shape)
+            .add_blocks(shielded(mp.tpm.is_some()))
             .add_block(source)
             .add_block(vnic)
             .add_attribute(("metadata", metadata))
@@ -291,6 +293,19 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
         hooks: single_network::hooks(mp, Vec::new()),
     };
     m.block(linux::provisioner(machine).block());
+}
+
+/// A shielded instance, when the machine has a TPM: its virtual TPM, secure and measured boot
+/// (the platform of the AMD shape; Canonical's images are shielded-instance images).
+fn shielded(tpm: bool) -> Option<Block> {
+    tpm.then(|| {
+        Block::builder("platform_config")
+            .add_attribute(("type", string("AMD_VM")))
+            .add_attribute(("is_secure_boot_enabled", boolean(true)))
+            .add_attribute(("is_measured_boot_enabled", boolean(true)))
+            .add_attribute(("is_trusted_platform_module_enabled", boolean(true)))
+            .build()
+    })
 }
 
 /// The first availability domain's name.

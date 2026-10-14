@@ -6,8 +6,11 @@ use std::net::Ipv4Addr;
 use isoloom_spec::images;
 use isoloom_spec::model::Arch;
 
+use isoloom_spec::windows::Tpm;
+
 use super::hyperv::{self, HyperV};
 use super::qemu::{HubPort, Link};
+use super::windows;
 use crate::ruby::{Call, Ruby, Value};
 
 /// A VM's size: CPUs, memory (MB), and the disk (GB) when set. The disk is a minimum: a box
@@ -78,6 +81,11 @@ pub struct Guest<'a> {
     pub qemu: Qemu<'a>,
     /// How Hyper-V runs it.
     pub hyperv: HyperV<'a>,
+    /// Its virtual TPM, where the provider gives one (VirtualBox, libvirt; Hyper-V's is in
+    /// `hyperv`).
+    pub tpm: Option<Tpm>,
+    /// The guest OS ESXi registers it as, when its box's own isn't enough (Windows).
+    pub esxi_guestos: Option<&'static str>,
 }
 
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
@@ -91,10 +99,14 @@ pub fn blocks(r: &mut Ruby, g: &Guest) {
                 .kw("primary", true),
         );
     }
-    desktop(r, "virtualbox", g, true);
+    desktop(r, "virtualbox", g, true, |r| {
+        if g.tpm.is_some() {
+            windows::virtualbox_tpm(r);
+        }
+    });
     vmware(r, g);
-    desktop(r, "parallels", g, true);
-    desktop(r, "utm", g, false);
+    desktop(r, "parallels", g, true, |_| {});
+    desktop(r, "utm", g, false, |_| {});
     r.block(provider("qemu"), "v, o", |r| qemu(r, g.size, &g.qemu));
     if let Link::Hub(h) = g.qemu.link {
         hub_triggers(r, h);
@@ -108,8 +120,9 @@ fn provider(name: &str) -> Call {
     Call::new("m.vm.provider").arg(Value::str(name))
 }
 
-/// VirtualBox, Parallels and UTM: a name, CPUs and memory (and linked clones where offered).
-fn desktop(r: &mut Ruby, name: &str, g: &Guest, linked_clone: bool) {
+/// VirtualBox, Parallels and UTM: a name, CPUs and memory (and linked clones where offered),
+/// then what only that provider sets (`more`).
+fn desktop(r: &mut Ruby, name: &str, g: &Guest, linked_clone: bool, more: impl FnOnce(&mut Ruby)) {
     r.block(provider(name), "v", |r| {
         r.assign("v.name", Value::str(&g.label));
         if linked_clone {
@@ -117,6 +130,7 @@ fn desktop(r: &mut Ruby, name: &str, g: &Guest, linked_clone: bool) {
         }
         r.assign("v.cpus", g.size.cpus);
         r.assign("v.memory", g.size.mem);
+        more(r);
     });
 }
 
@@ -155,6 +169,9 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
         }
         if let Some(d) = g.size.disk {
             r.assign("v.machine_virtual_size", d);
+        }
+        if g.tpm.is_some() {
+            windows::libvirt_tpm(r);
         }
     });
 }
@@ -266,6 +283,9 @@ fn esxi(r: &mut Ruby, g: &Guest) {
     r.assign_if("v.esxi_disk_store", Value::raw("ENV[\"ESXI_DATASTORE\"]"), "ENV[\"ESXI_DATASTORE\"]");
     r.assign("v.esxi_virtual_network", Value::raw(format!("esxi_networks({nets})")));
     r.assign("v.guest_name", Value::str(&g.vm_name));
+    if let Some(os) = g.esxi_guestos {
+        r.assign("v.guest_guestos", Value::str(os));
+    }
     r.assign("v.guest_numvcpus", g.size.cpus);
     r.assign("v.guest_memsize", g.size.mem);
     if let Some(d) = g.size.disk {

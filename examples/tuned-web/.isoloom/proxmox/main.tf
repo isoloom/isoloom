@@ -284,6 +284,10 @@ resource "proxmox_virtual_environment_vm" "web" {
     interface    = "virtio0"
     size         = 20
   }
+  tpm_state {
+    datastore_id = var.datastore
+    version      = "v2.0"
+  }
   network_device {
     bridge = proxmox_sdn_vnet.app.id
   }

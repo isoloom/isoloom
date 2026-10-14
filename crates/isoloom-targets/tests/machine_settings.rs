@@ -43,7 +43,8 @@ fn every_vm_target_runs_the_same_settings_before_the_steps() {
     }
     let pve = file(&spec, Target::Proxmox, "proxmox/main.tf");
     assert!(pve.contains("net.core.somaxconn = 4096"), "Proxmox runcmd");
-    for cloud in ["aws", "azure", "gcp", "linode", "oci"] {
+    // Linode gives no TPM, which the machine asks for: its module is left out.
+    for cloud in ["aws", "azure", "gcp", "oci"] {
         let tf = file(&spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"));
         assert!(tf.contains("sudo sh -c") && tf.contains("APP_MODE=production"), "{cloud}");
     }

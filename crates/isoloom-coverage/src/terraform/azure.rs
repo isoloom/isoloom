@@ -8,6 +8,12 @@ use super::support::{
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
 
+/// A Windows VM's TPM: written for one that has a TPM, which `cloud-vm` can't give a Windows
+/// machine until AWS (whose refusal is the target's) has Amazon's NitroTPM Windows images.
+const WINDOWS_TPM: Support = Support::Planned {
+    note: "with a TPM on Windows in the cloud: AWS's NitroTPM Windows images (TPM-Windows_Server-*) first",
+};
+
 /// Rule resources whose effect the security groups' inline rules give.
 const INLINE: Support = Equivalent {
     via: "the `security_rule` blocks of azurerm_network_security_group, which carry the reach rules",
@@ -116,7 +122,8 @@ const WRITTEN: &[(&str, &str)] = &[
         "azurerm_linux_virtual_machine",
         "admin_ssh_key admin_ssh_key.public_key admin_ssh_key.username admin_username custom_data location name network_interface_ids
         os_disk os_disk.caching os_disk.disk_size_gb os_disk.storage_account_type resource_group_name size source_image_reference
-        source_image_reference.offer source_image_reference.publisher source_image_reference.sku source_image_reference.version tags",
+        secure_boot_enabled source_image_reference.offer source_image_reference.publisher source_image_reference.sku
+        source_image_reference.version tags vtpm_enabled",
     ),
     (
         "azurerm_network_interface",
@@ -204,7 +211,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (ALIAS, "os_disk.name user_data os_managed_disk_id"),
             (IMAGES, "source_image_id"),
-            (TPM, "secure_boot_enabled vtpm_enabled"),
+            (WINDOWS_TPM, "secure_boot_enabled vtpm_enabled"),
             (
                 CLOUD,
                 "automatic_updates_enabled hotpatching_enabled timezone additional_unattend_content additional_unattend_content.*

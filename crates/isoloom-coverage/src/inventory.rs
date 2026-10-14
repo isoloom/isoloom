@@ -12,7 +12,7 @@
 
 use super::{
     Format, Support,
-    Support::{Emitted, Equivalent, Partial, Tooling},
+    Support::{Emitted, Equivalent, Tooling},
 };
 
 const ALIAS: Support = Tooling {
@@ -36,7 +36,6 @@ const HOST_VARS: Support = Equivalent {
 const SUDO: Support = Equivalent {
     via: "(passwordless sudo as root: Isoloom's user needs no other method, user or password)",
 };
-const WINDOWS_ACCOUNT: &str = "Proxmox's Windows VMs (no WinRM account yet)";
 
 /// The Ansible inventory table.
 pub fn format() -> Format {
@@ -68,9 +67,8 @@ const ROWS: &[(&str, Support)] = &[
     ("ansible_common_remote_group", HOST_VARS),
     (
         "ansible_connection",
-        Partial {
-            from: "machines.*.vm.os (WinRM for Windows; SSH with PowerShell on external)",
-            gap: WINDOWS_ACCOUNT,
+        Emitted {
+            from: "machines.*.vm.os (WinRM for Windows; SSH with PowerShell on external and for a box with `vm.image.winssh`)",
         },
     ),
     ("ansible_connection_user", ANSIBLE),
@@ -100,9 +98,8 @@ const ROWS: &[(&str, Support)] = &[
     ("ansible_no_target_syslog", HOST_VARS),
     (
         "ansible_password",
-        Partial {
-            from: "(the Vagrant boxes' account; the clouds' Windows password)",
-            gap: WINDOWS_ACCOUNT,
+        Emitted {
+            from: "(the Vagrant boxes' account; the generated Windows password on Proxmox and the clouds)",
         },
     ),
     (
@@ -212,9 +209,8 @@ const ROWS: &[(&str, Support)] = &[
     ("ansible_timeout", SSH_TUNING),
     (
         "ansible_user",
-        Partial {
-            from: "machines.*.external.user and machines.*.vm.os (each image's own user; `isoloom` on Proxmox)",
-            gap: WINDOWS_ACCOUNT,
+        Emitted {
+            from: "machines.*.external.user and machines.*.vm.os (each image's own user; `isoloom` on Proxmox and on the clouds' Windows)",
         },
     ),
     ("ansible_win_async_startup_timeout", WINRM_TUNING),

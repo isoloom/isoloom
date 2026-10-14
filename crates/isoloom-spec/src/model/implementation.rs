@@ -90,6 +90,12 @@ pub struct VmImpl {
     /// The image to use instead of the built-in one for `os`, per target.
     #[serde(default)]
     pub image: Option<VmImage>,
+    /// A virtual TPM 2.0 (BitLocker, Windows Hello, measured boot). Unset, a Windows 11 machine
+    /// gets one wherever the target can give one, and runs without where it can't (its
+    /// built-in images install without one). `true` requires one: a target that gives none
+    /// refuses the environment. `false` gives none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tpm: Option<bool>,
 }
 
 /// The `vm.provision` step that restarts a Linux machine; the steps after it run once the
@@ -155,6 +161,11 @@ pub struct VmImage {
     /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
     #[serde(default)]
     pub winrm: Option<Winrm>,
+    /// This Windows box answers OpenSSH (Windows' own `sshd`, PowerShell as its shell) instead
+    /// of WinRM: Vagrant connects with `config.winssh` and the playbooks over SSH, as the box's
+    /// `vagrant` account. Not with `winrm`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub winssh: bool,
 }
 
 /// The controller's settings (`controller:`), the fields a machine uses for the same things.

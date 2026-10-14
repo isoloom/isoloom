@@ -1,14 +1,14 @@
 //! The controller on Proxmox: the core's controller as a cloud-init VM. It sits on the uplink
 //! bridge (DHCP: internet, to install Ansible) and on every network at the controller address.
 //! Its cloud-init carries the project, its key and the inventory; it then waits for each
-//! machine's ready marker over SSH and runs the playbooks.
+//! machine's ready marker (over SSH, over WinRM on Windows) and runs the playbooks.
 
 use isoloom_plan::{Environment, Step};
 use isoloom_render::hcl_builder::{Module, reference, string};
 use isoloom_render::steps;
 use isoloom_spec::validate::Cidr;
 
-use super::machine::{Vm, ip_config, nic, snippet};
+use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::vm::cloud_init::{self, CloudConfig, file};
 use crate::vm::{as_root, controller, is_windows, res, vms};
 
@@ -18,7 +18,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     config.packages = ["python3-venv", "curl", "netcat-openbsd", "openssh-client"].map(String::from).to_vec();
     config.bootcmd.extend(cloud_init::prelude(env));
     config.file_lists.push(reference("local.project_files"));
-    let inventory = string(isoloom_render::inventory::render(env, &isoloom_render::inventory::Access::proxmox()));
+    let inventory = controller::inventory_template(env, isoloom_render::inventory::Access::proxmox).into_expression();
     config.files = vec![
         file(
             "/etc/isoloom/id_ed25519",
@@ -30,6 +30,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     config.runcmd.extend(controller::hosts(env).map(|s| as_root(&s, false)));
     config.runcmd.push(as_root(controller::ANSIBLE, false));
     config.runcmd.extend(waits(env));
+    config.runcmd.extend(super::windows::waits(env).iter().map(|w| as_root(w, false)));
     config.runcmd.push(as_root(&controller::playbooks(env), false));
     config.runcmd.extend(steps::linux(env, "", &Step::Ready).map(|s| as_root(&s, false)));
     m.commented(
@@ -52,7 +53,8 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         snippet: "controller".into(),
         name: "controller".into(),
         size: (cpus, memory, disk.unwrap_or(8)),
-        image: res(controller::OS),
+        boot: Boot::Image(res(controller::OS)),
+        tpm: false,
         agent: false,
         nics,
         dns: Some(

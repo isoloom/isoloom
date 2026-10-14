@@ -169,6 +169,8 @@ resource "azurerm_linux_virtual_machine" "web" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
+  secure_boot_enabled   = true
+  vtpm_enabled          = true
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.web_app.id]

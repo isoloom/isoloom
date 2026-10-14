@@ -105,10 +105,14 @@ fn an_example_without_outputs_is_refused_with_reasons() {
 #[test]
 fn refusal_reports_what_a_generator_would_refuse() {
     // A target can be possible by its machines' editions yet refused by its generator; `targets`
-    // used to show ✓ for those (Proxmox for a Windows lab, or one with environment provisioning).
+    // used to show ✓ for those (Proxmox for a Windows lab whose steps are playbooks, or one with
+    // environment provisioning).
+    let (_, ad) = example("corp-ad-basics");
+    let why = isoloom_targets::refusal(&ad, Target::Proxmox).expect("Windows steps are PowerShell on Proxmox");
+    assert!(why.contains("PowerShell scripts"), "{why}");
+    // A Windows lab of PowerShell steps clones a template on Proxmox.
     let (_, windows) = example("windows-hello");
-    let why = isoloom_targets::refusal(&windows, Target::Proxmox).expect("Windows has no Proxmox image yet");
-    assert!(why.contains("Proxmox image"), "{why}");
+    assert_eq!(isoloom_targets::refusal(&windows, Target::Proxmox), None);
     // Environment-level provisioning runs from a controller on Proxmox now, so it is not refused.
     let (_, ansible) = example("ansible-pair");
     assert_eq!(isoloom_targets::refusal(&ansible, Target::Proxmox), None);
@@ -290,8 +294,8 @@ fn unsupported_features_are_refused_with_the_reason() {
         "Windows has no local image yet"
     );
     assert!(
-        matches!(generate(&ad, Target::Proxmox), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("windows-server-2022")),
-        "no Windows image on Proxmox yet"
+        matches!(generate(&ad, Target::Proxmox), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("PowerShell scripts")),
+        "Windows steps on Proxmox are PowerShell scripts"
     );
     assert!(matches!(generate(&ad, Target::CloudVm), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("Windows steps are .ps1 scripts")));
 }
@@ -463,6 +467,7 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
                 qemu: None,
                 hyperv: None,
                 winrm: None,
+                winssh: false,
             });
         }
     }

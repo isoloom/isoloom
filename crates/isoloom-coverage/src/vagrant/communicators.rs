@@ -16,7 +16,7 @@ pub(super) fn format() -> Format {
             let s = match kind {
                 "ssh" => ssh(o),
                 "winrm" => winrm(o),
-                "winssh" => (o == "upload_directory" || ssh(o).is_some()).then_some(WINSSH),
+                "winssh" => winssh(o),
                 _ => None,
             };
             (format!("config.{kind}.{o}"), s)
@@ -29,9 +29,22 @@ pub(super) fn format() -> Format {
     )
 }
 
-const WINSSH: Support = Tooling {
-    note: "how Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned)",
-};
+/// The OpenSSH communicator of a Windows box (`vm.image.winssh`): its account and its shell are
+/// Isoloom's; the rest is how Vagrant connects.
+fn winssh(o: &str) -> Option<Support> {
+    match o {
+        "username" | "password" => Some(Emitted {
+            from: "machines.*.vm.image.winssh (the Windows box's own account)",
+        }),
+        "shell" => Some(Emitted {
+            from: "machines.*.vm.image.winssh (PowerShell runs the provisioners' scripts)",
+        }),
+        o if o == "upload_directory" || ssh(o).is_some() => Some(Tooling {
+            note: "how Vagrant reaches a Windows VM over OpenSSH: not the environment's behavior",
+        }),
+        _ => None,
+    }
+}
 
 /// Every SSH option, named so an upstream addition shows up unclassified.
 const SSH_TOOLING: [&str; 30] = [

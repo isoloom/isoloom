@@ -139,6 +139,10 @@ resource "google_compute_firewall" "web_ssh" {
 }
 
 resource "google_compute_instance" "web" {
+  shielded_instance_config {
+    enable_secure_boot = true
+    enable_vtpm        = true
+  }
   project      = local.project
   name         = "${local.name}-web"
   machine_type = "e2-small"

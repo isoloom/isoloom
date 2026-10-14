@@ -2,7 +2,9 @@
 # A web server tuned the way a production one is: an environment variable its process reads,
 # a deeper accept queue (a kernel parameter) and more open files (a process limit). A container
 # gets them from its runtime; a VM from its own configuration (systemd, sysctl.d, limits.d), so
-# the checks read the same three values from inside the machine on every target.
+# the checks read the same three values from inside the machine on every target. As a VM it
+# also has a virtual TPM 2.0 (measured boot, sealed secrets), where the target gives one: the
+# targets that can't (DigitalOcean, Linode) refuse it rather than drop it.
 version: 1
 name: tuned-web
 
@@ -20,6 +22,7 @@ machines:
     vm:
       os: debian-12
       provision: [provision/web.sh]
+      tpm: true
 
 checks:
   - name: the machine's environment has APP_MODE

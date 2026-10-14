@@ -59,6 +59,9 @@ pub fn capabilities() -> Capabilities {
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Ipv6,
+        // Given on AWS (NitroTPM), Azure, Google Cloud and Oracle Cloud; DigitalOcean and Linode
+        // refuse it on their own.
+        Feature::Tpm,
     ])
 }
 

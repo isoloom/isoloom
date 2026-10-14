@@ -105,11 +105,12 @@
           "aws",
           "azure",
           "gcp",
-          "digitalocean",
-          "linode",
           "oci"
         ],
-        "refused": {}
+        "refused": {
+          "digitalocean": "machine `web` asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none",
+          "linode": "machine `web` asks for a virtual TPM (`vm.tpm: true`): Linode gives none"
+        }
       }
     }
   },

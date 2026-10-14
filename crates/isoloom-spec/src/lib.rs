@@ -18,6 +18,7 @@ pub mod shell;
 pub mod targets;
 pub mod validate;
 pub mod vlans;
+pub mod windows;
 
 use std::path::{Path, PathBuf};
 

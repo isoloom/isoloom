@@ -110,11 +110,12 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     (
         "proxmox_virtual_environment_vm",
-        "agent agent.enabled cpu cpu.cores cpu.type disk disk.datastore_id disk.file_id disk.interface disk.size initialization
-        initialization.datastore_id initialization.dns initialization.dns.servers initialization.ip_config initialization.ip_config.ipv4
-        initialization.ip_config.ipv4.address initialization.ip_config.ipv4.gateway initialization.user_data_file_id memory
-        memory.dedicated name network_device network_device.bridge network_device.mac_address node_name on_boot operating_system
-        operating_system.type serial_device tags",
+        "agent agent.enabled bios clone clone.full clone.vm_id cpu cpu.cores cpu.type disk disk.datastore_id disk.file_id disk.interface
+        disk.size efi_disk efi_disk.datastore_id efi_disk.type initialization initialization.datastore_id initialization.dns
+        initialization.dns.servers initialization.ip_config initialization.ip_config.ipv4 initialization.ip_config.ipv4.address
+        initialization.ip_config.ipv4.gateway initialization.type initialization.user_data_file_id machine memory memory.dedicated name
+        network_device network_device.bridge network_device.mac_address node_name on_boot operating_system operating_system.type
+        serial_device tags tpm_state tpm_state.datastore_id tpm_state.version",
     ),
 ];
 

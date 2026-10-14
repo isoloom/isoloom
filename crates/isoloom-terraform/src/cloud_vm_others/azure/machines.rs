@@ -2,7 +2,7 @@
 //! core; the Windows machines' and the controller's.
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, call, list, number, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, reference, string};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
@@ -25,7 +25,7 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         .addresses
         .keys()
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
-    m.block(linux_vm(&id, name, os(mp).unwrap_or_default(), (memory, disk), list(ids)));
+    m.block(linux_vm(&id, name, os(mp).unwrap_or_default(), (memory, disk, mp.tpm.is_some()), list(ids)));
     let hooks = Hooks {
         at_boot: cloud::interfaces(env, &mp.addresses, &|n| mac(&nic_id(&id, n))),
         after_reboot: vec![cloud::reschedule_auto_stop()],
@@ -80,11 +80,11 @@ fn controller_nics(
         .collect()
 }
 
-/// A Linux VM (`size`: memory in MB and disk in GB), as `isoloom` with the operator's key; the
-/// auto-stop scheduled at first boot.
-fn linux_vm(id: &str, who: &str, os: &str, (memory, disk): (u32, u32), nics: Expression) -> Block {
+/// A Linux VM (memory in MB, disk in GB, and whether it has a virtual TPM), as `isoloom` with
+/// the operator's key; the auto-stop scheduled at first boot.
+fn linux_vm(id: &str, who: &str, os: &str, (memory, disk, tpm): (u32, u32, bool), nics: Expression) -> Block {
     let custom_data = cloud::auto_stop(call("base64encode", [cloud::shutdown_script()]), isoloom_render::hcl_builder::null());
-    placed("azurerm_linux_virtual_machine", id, name_with(&format!("-{who}")))
+    trusted_launch(placed("azurerm_linux_virtual_machine", id, name_with(&format!("-{who}"))), tpm)
         .add_attribute(("size", string(size(memory))))
         .add_attribute(("admin_username", string(USER)))
         .add_attribute(("network_interface_ids", nics))
@@ -96,8 +96,18 @@ fn linux_vm(id: &str, who: &str, os: &str, (memory, disk): (u32, u32), nics: Exp
                 .build(),
         )
         .add_block(os_disk(disk))
-        .add_block(source_image(os))
+        .add_block(source_image(os, tpm))
         .build()
+}
+
+/// Trusted launch, when the VM has a TPM: a virtual TPM and secure boot (on a generation 2 image).
+fn trusted_launch(b: BlockBuilder, tpm: bool) -> BlockBuilder {
+    if tpm {
+        b.add_attribute(("secure_boot_enabled", boolean(true)))
+            .add_attribute(("vtpm_enabled", boolean(true)))
+    } else {
+        b
+    }
 }
 
 fn os_disk(gb: u32) -> Block {
@@ -108,8 +118,10 @@ fn os_disk(gb: u32) -> Block {
         .build()
 }
 
-fn source_image(os: &str) -> Block {
+/// An OS's Marketplace image; with a TPM, its generation 2 build (trusted launch needs one).
+fn source_image(os: &str, tpm: bool) -> Block {
     let (publisher, offer, sku) = image(os).unwrap_or_default();
+    let sku = if tpm { sku.strip_suffix("-gen1").unwrap_or(sku) } else { sku };
     Block::builder("source_image_reference")
         .add_attribute(("publisher", string(publisher)))
         .add_attribute(("offer", string(offer)))
@@ -196,7 +208,7 @@ fn windows_vm(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
         .addresses
         .keys()
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
-    placed("azurerm_windows_virtual_machine", &id, name_with(&format!("-{name}")))
+    trusted_launch(placed("azurerm_windows_virtual_machine", &id, name_with(&format!("-{name}"))), mp.tpm.is_some())
         .add_attribute(("computer_name", string(name.chars().take(15).collect::<String>())))
         .add_attribute(("size", string(size(memory))))
         .add_attribute(("admin_username", string(USER)))
@@ -204,7 +216,7 @@ fn windows_vm(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
         .add_attribute(("network_interface_ids", list(ids)))
         .add_block(Block::builder("winrm_listener").add_attribute(("protocol", string("Http"))).build())
         .add_block(os_disk(disk))
-        .add_block(source_image(os(mp).unwrap_or_default()))
+        .add_block(source_image(os(mp).unwrap_or_default(), mp.tpm.is_some()))
         .build()
 }
 
@@ -252,14 +264,14 @@ pub fn controller(env: &Environment, m: &mut Module) {
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, memory, disk) = controller::size(env);
     let disk = disk.unwrap_or(30).max(30);
-    m.block(linux_vm(id, "controller", controller::OS, (memory, disk), list(ids)));
+    m.block(linux_vm(id, "controller", controller::OS, (memory, disk, false), list(ids)));
     let ssh = controller::Ssh {
         env,
         replace_on: reference(&format!("azurerm_linux_virtual_machine.{id}.id")),
         host: address_of(id),
         user: USER.to_string(),
         at_boot: cloud::interfaces(env, &addresses, &|n| mac(&nic_id(id, n))),
-        inventory: controller::cloud_inventory(env, |_| USER.to_string()),
+        inventory: controller::cloud_inventory(env, |_| USER.to_string(), isoloom_render::inventory::WinrmAuth::Ntlm),
     };
     m.block(controller::provisioner(ssh).block());
 }

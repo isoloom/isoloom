@@ -29,6 +29,7 @@ mod targets;
 mod tools;
 mod top;
 mod volumes;
+mod windows;
 
 #[cfg(test)]
 mod tests;
@@ -114,6 +115,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     dns::options(spec, &mut p);
     outside::first_networks(spec, &mut p);
     machine_files::check(spec, &mut p);
+    windows::check(spec, &mut p);
     machines::cycle(spec, &mut p);
     provision::controller(spec, &mut p);
     provision::steps(spec, &mut p);

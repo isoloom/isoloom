@@ -199,6 +199,12 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.vm.image.winssh",
+        NotApplicable {
+            why: "Windows hosts are reached over SSH",
+        },
+    ),
+    (
         "machines.*.vm.provision",
         Partial {
             how: "the project copied to /opt/isoloom over SSH; `.sh` steps run there with sudo, playbooks run from here, `reboot` restarts the host",
@@ -206,6 +212,7 @@ pub const CELLS: &[(&str, Status)] = &[
             proof: "existing-hosts",
         },
     ),
+    ("machines.*.vm.tpm", EXISTING_HOST),
     (
         "machines.*.external.address",
         Done {

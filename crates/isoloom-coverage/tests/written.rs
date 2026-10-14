@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use hcl::{Body, Expression, ObjectKey, Structure, Template, TraversalOperator, template::Element};
 use isoloom_coverage::{Format, cloud_init, dockerfile, inventory, written_problems};
 use isoloom_plan::Environment;
-use isoloom_render::inventory::{Access, render};
+use isoloom_render::inventory::{Access, WinrmAuth, render};
 use isoloom_spec::model::Target;
 use isoloom_spec::{Spec, load, parse, validate};
 use isoloom_targets::{GENERATED_TARGETS, GeneratedFile, generate};
@@ -260,11 +260,14 @@ type AccessMode = fn() -> Access<'static>;
 
 #[test]
 fn inventory_written_parameters_match_every_access_mode() {
-    let modes: [(&str, Target, AccessMode); 4] = [
+    let modes: [(&str, Target, AccessMode); 5] = [
         ("vagrant", Target::Vagrant, Access::vagrant),
-        ("proxmox", Target::Proxmox, Access::proxmox),
+        ("proxmox", Target::Proxmox, || Access::proxmox("${random_password.windows.result}")),
         ("cloud", Target::CloudVm, || {
-            Access::cloud(|_| "admin".to_string(), "${random_password.windows.result}")
+            Access::cloud(|_| "admin".to_string(), "${random_password.windows.result}", WinrmAuth::Basic)
+        }),
+        ("azure", Target::CloudVm, || {
+            Access::cloud(|_| "isoloom".to_string(), "${random_password.windows.result}", WinrmAuth::Ntlm)
         }),
         ("external", Target::External, Access::external),
     ];

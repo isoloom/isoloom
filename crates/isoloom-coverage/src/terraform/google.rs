@@ -117,7 +117,8 @@ const WRITTEN: &[(&str, &str)] = &[
         "google_compute_instance",
         "boot_disk boot_disk.initialize_params boot_disk.initialize_params.image boot_disk.initialize_params.size labels machine_type
         metadata metadata_startup_script name network_interface network_interface.access_config network_interface.network_ip
-        network_interface.subnetwork project tags zone",
+        network_interface.subnetwork project shielded_instance_config shielded_instance_config.enable_secure_boot
+        shielded_instance_config.enable_vtpm tags zone",
     ),
     ("google_compute_network", "auto_create_subnetworks name project"),
     ("google_compute_subnetwork", "ip_cidr_range name network project region"),

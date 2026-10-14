@@ -46,6 +46,15 @@ module IsoloomHyperV
     }).join("; "))
   end
 
+  # Before the VM starts: a virtual TPM 2.0, with a key protector of this host's own (Hyper-V
+  # enables none without one). A generation 1 VM has no TPM to give: an error when the spec
+  # requires one, else it starts without (Windows 11's boxes install without one).
+  def self.tpm(machine, required)
+    ps("$vm = Hyper-V\\Get-VM -Id #{q(machine.id)}; " \
+       "if ($vm.Generation -lt 2) { if (#{required ? '$true' : '$false'}) { throw ($vm.Name + ' is a generation 1 VM: it has no virtual TPM') } } " \
+       "elseif (-not (Hyper-V\\Get-VMSecurity -VM $vm).TpmEnabled) { Hyper-V\\Set-VMKeyProtector -VM $vm -NewLocalKeyProtector; Hyper-V\\Enable-VMTPM -VM $vm }")
+  end
+
   # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
   # answers, before its provisioning: its addresses on the networks.
   def self.address(machine, script)

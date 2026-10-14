@@ -22,6 +22,7 @@ mod outputs;
 use isoloom_plan::{Environment, Step};
 use isoloom_render::hcl_builder::{Block, Expression, Module, index, list, null, reference, string};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
+use isoloom_spec::images::is_windows as is_windows_os;
 use isoloom_spec::validate::Cidr;
 
 use crate::vm::cloud;
@@ -106,6 +107,11 @@ fn machines_refusal(env: &Environment) -> Option<String> {
         }
         if let Some(why) = cloud::windows_refusal(name, m) {
             return Some(why);
+        }
+        if is_windows_os(&vm.os) && vm.tpm == Some(true) {
+            return Some(format!(
+                "machine `{name}`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later"
+            ));
         }
         if let Some((net, _)) = m.networks.iter().find(|(_, o)| **o <= 3) {
             return Some(format!("machine `{name}`: AWS keeps the first addresses of a subnet (.1 to .3) on `{net}`"));
