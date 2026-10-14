@@ -86,7 +86,8 @@ fn files(dir: &Path, out: &mut Vec<(PathBuf, String)>) {
     }
 }
 
-/// Every file `isoloom generate` writes for `spec`, once checked that none holds a value.
+/// Every file `isoloom generate` writes for `spec`, once checked that none holds a value. Paths
+/// are relative to `.isoloom` and compared by component, so the checks hold on Windows too.
 fn generated(spec: &str, tag: &str) -> Vec<(PathBuf, String)> {
     let dir = project(spec, tag);
     let o = Command::new(env!("CARGO_BIN_EXE_isoloom"))
@@ -96,8 +97,12 @@ fn generated(spec: &str, tag: &str) -> Vec<(PathBuf, String)> {
         .output()
         .unwrap();
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let root = dir.join(".isoloom");
     let mut generated = Vec::new();
-    files(&dir.join(".isoloom"), &mut generated);
+    files(&root, &mut generated);
+    for (path, _) in &mut generated {
+        *path = path.strip_prefix(&root).unwrap().to_path_buf();
+    }
     for (path, text) in &generated {
         assert!(
             !text.contains(ENV_VALUE) && !text.contains(FILE_VALUE),
@@ -155,20 +160,15 @@ fn no_secret_value_reaches_a_windows_machines_file() {
     let generated = generated(WINDOWS, "windows");
     // Each VM target's Windows set-up waits for the delivery, then registers the startup task
     // that puts the files back at every boot.
-    for target in [
-        "/.isoloom/vagrant/",
-        "/.isoloom/proxmox/",
-        "/.isoloom/cloud-vm/aws/",
-        "/.isoloom/cloud-vm/azure/",
-    ] {
+    for target in ["vagrant", "proxmox", "cloud-vm/aws", "cloud-vm/azure"] {
         let set_up = generated
             .iter()
-            .filter(|(p, _)| p.display().to_string().contains(target))
+            .filter(|(p, _)| p.starts_with(target))
             .any(|(_, text)| text.contains("secrets\\\\.delivered") || text.contains("secrets\\.delivered"));
         assert!(set_up, "{target} doesn't wait for the secrets");
         let task = generated
             .iter()
-            .any(|(p, text)| p.display().to_string().contains(target) && text.contains("isoloom-apply-secrets"));
+            .any(|(p, text)| p.starts_with(target) && text.contains("isoloom-apply-secrets"));
         assert!(task, "{target} doesn't put them back at boot");
     }
     // A cloud's set-up says how to reach its Windows machine over WinRM, never its password.
