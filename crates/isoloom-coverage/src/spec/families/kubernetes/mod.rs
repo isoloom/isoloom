@@ -18,4 +18,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::own_image::CONTAINER_IMAGES,
     super::own_image::CONTAINER_BOOT,
     hardware::CELLS,
+    super::links::KUBERNETES,
 ];

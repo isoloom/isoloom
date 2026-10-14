@@ -21,6 +21,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     m.block(terraform(&providers));
     m.blocks(variables());
     m.blocks(super::windows::variables(env));
+    m.blocks(super::lxc::variables(env));
     if !env.spec().inputs.is_empty() {
         m.block(inputs_variable());
     }
@@ -30,14 +31,23 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         locals(env),
     );
     m.commented(
-        "The environment's networks: an SDN simple zone, a VNet per network.",
+        "The environment's VMs and containers, together in a pool of their own.",
         Block::builder("resource")
-            .add_label("proxmox_sdn_zone_simple")
+            .add_label("proxmox_virtual_environment_pool")
             .add_label("env")
-            .add_attribute(("id", reference("local.zone")))
-            .add_attribute(("nodes", list([reference("var.node")])))
+            .add_attribute(("pool_id", reference("local.zone")))
+            .add_attribute(("comment", string(format!("Isoloom: {}", env.name))))
             .build(),
     );
+    let mut zone = Block::builder("resource")
+        .add_label("proxmox_sdn_zone_simple")
+        .add_label("env")
+        .add_attribute(("id", reference("local.zone")))
+        .add_attribute(("nodes", list([reference("var.node")])));
+    if let Some(mtu) = super::links::zone_mtu(env) {
+        zone = zone.add_attribute(("mtu", number(mtu.into())));
+    }
+    m.commented("The environment's networks: an SDN simple zone, a VNet per network.", zone.build());
     if controller::needed(env) {
         m.commented("The controller's own key: it runs the playbooks over SSH on every machine.", controller::key());
     }
@@ -47,20 +57,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
             crate::vm::cloud::windows_password(),
         );
     }
-    let mut vnets = Vec::new();
-    for (i, (net, plan)) in env.networks.iter().enumerate() {
-        let id = Template::text("i").with_expr(reference("var.slot")).with_text(format!("n{i}"));
-        m.commented(
-            &format!("Network `{net}`: {}", plan.cidr),
-            Block::builder("resource")
-                .add_label("proxmox_sdn_vnet")
-                .add_label(res(net))
-                .add_attribute(("id", id.into_expression()))
-                .add_attribute(("zone", reference("proxmox_sdn_zone_simple.env.id")))
-                .build(),
-        );
-        vnets.push(reference(&format!("proxmox_sdn_vnet.{}", res(net))));
-    }
+    let vnets = super::links::vnets(env, m);
     m.block(
         Block::builder("resource")
             .add_label("proxmox_sdn_applier")
@@ -70,7 +67,11 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     );
     images(env, m);
     super::image::downloads(env, m);
+    super::firewall::ipsets(env, m);
 }
+
+/// The environment's pool, as a VM or a container names it.
+pub const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";
 
 fn variables() -> Vec<Block> {
     let s = |name: &str| Variable::new(name, "string");
@@ -211,15 +212,22 @@ fn locals(env: &Environment) -> Block {
 /// A cloud image per OS (the router's and the controller's Debian among them), per environment:
 /// a shared file would go with whichever environment is destroyed first.
 fn images(env: &Environment, m: &mut Module) {
-    let mut oses: Vec<&str> = vms(env).filter(|(_, mp)| !super::image::has_own(mp)).filter_map(|(_, mp)| os(mp)).collect();
-    oses.push(controller::OS);
+    let own = || vms(env).filter(|(_, mp)| !super::image::has_own(mp));
+    let mut oses: Vec<(&str, bool)> = own().filter_map(|(_, mp)| Some((os(mp)?, super::arch::is_arm(mp)))).collect();
+    oses.push((controller::OS, false));
     oses.sort_unstable();
     oses.dedup();
-    for o in oses {
-        let Some(url) = image_url(o) else { continue };
+    for (o, arm) in oses {
+        let url = if arm { super::arch::image_url(o) } else { image_url(o) };
+        let Some(url) = url else { continue };
+        let (id, file) = if arm {
+            (format!("{}_arm64", res(o)), format!("{o}-arm64"))
+        } else {
+            (res(o), o.to_string())
+        };
         let block = Block::builder("resource")
             .add_label("proxmox_download_file")
-            .add_label(res(o))
+            .add_label(id)
             .add_attribute(("node_name", reference("var.node")))
             .add_attribute(("datastore_id", reference("var.image_datastore")))
             .add_attribute(("content_type", string("iso")))
@@ -228,7 +236,7 @@ fn images(env: &Environment, m: &mut Module) {
                 "file_name",
                 Template::text("iso")
                     .with_expr(reference("var.slot"))
-                    .with_text(format!("-{o}.img"))
+                    .with_text(format!("-{file}.img"))
                     .into_expression(),
             ))
             .add_attribute(("overwrite_unmanaged", boolean(true)))

@@ -123,26 +123,17 @@ fn refusals_come_from_the_plan_and_match_rendering() {
         "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    vm: { os: debian-12 }\n",
     )
     .unwrap();
-    for (backend, why) in [
-        (
-            &CloudVmBackend as &dyn Backend,
-            "no cloud can run it (aws: machine `w`: arm64 on AWS comes later (Graviton instances and arm64 AMIs); \
-             azure: machine `w`: arm64 on Azure comes later (Arm-based sizes and arm64 images); \
-             gcp: machine `w`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images); \
-             digitalocean: machine `w`: arm64 on DigitalOcean comes later (it has no arm64 droplets); \
-             linode: machine `w`: arm64 on Linode comes later (it has no arm64 plans); \
-             oci: machine `w`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images))",
-        ),
-        (
-            &ProxmoxBackend,
-            "machine `w`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts)",
-        ),
-    ] {
-        let e = Environment::build(&spec, backend.target(), None);
-        assert_eq!(backend.refusal(&e).as_deref(), Some(why));
-        let err = backend.render(&e).expect_err("refused");
-        assert!(err.to_string().ends_with(why), "{err}");
-    }
+    // Proxmox runs it (an emulated aarch64 VM); every cloud refuses it, each with its reason.
+    let why = "no cloud can run it (aws: machine `w`: arm64 on AWS comes later (Graviton instances and arm64 AMIs); \
+         azure: machine `w`: arm64 on Azure comes later (Arm-based sizes and arm64 images); \
+         gcp: machine `w`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images); \
+         digitalocean: machine `w`: arm64 on DigitalOcean comes later (it has no arm64 droplets); \
+         linode: machine `w`: arm64 on Linode comes later (it has no arm64 plans); \
+         oci: machine `w`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images))";
+    let e = Environment::build(&spec, CloudVmBackend.target(), None);
+    assert_eq!(CloudVmBackend.refusal(&e).as_deref(), Some(why));
+    let err = CloudVmBackend.render(&e).expect_err("refused");
+    assert!(err.to_string().ends_with(why), "{err}");
 }
 
 #[test]

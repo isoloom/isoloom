@@ -14,6 +14,7 @@ pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
             Shape::Docker => m.docker.is_none(),
             Shape::Vm => m.vm.is_none(),
             Shape::Either => m.docker.is_none() && m.vm.is_none(),
+            Shape::VmOrLxc => m.vm.is_none() && !m.docker.as_ref().is_some_and(|d| d.lxc),
             Shape::External => m.external.is_none(),
             // Cloud services aren't machines: see `derive`.
             Shape::Cloud => false,

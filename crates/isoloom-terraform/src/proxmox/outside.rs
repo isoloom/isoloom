@@ -31,7 +31,8 @@ pub fn interfaces(env: &Environment, mp: &MachinePlan) -> Vec<(Block, Block)> {
                 OutsideAddress::Fixed(ip) => format!("{ip}/{}", Cidr::parse(&n.cidr).map_or(32, |c| c.len)),
                 OutsideAddress::Dhcp => "dhcp".to_string(),
             };
-            Some((device.build(), ip_config(&ip, None)))
+            // The machine's rate limit holds on every link; reach rules don't reach outside.
+            Some((super::links::limited(device, mp).build(), ip_config(&ip, None)))
         })
         .collect()
 }

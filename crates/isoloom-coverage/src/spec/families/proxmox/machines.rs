@@ -85,10 +85,9 @@ pub const CELLS: &[(&str, Status)] = &[
     ),
     (
         "machines.*.arch",
-        Partial {
-            how: "amd64 VMs",
-            gap: "arm64 (refused: uncommon on Proxmox hosts)",
-            proof: "segmented",
+        Done {
+            how: "amd64 VMs on the server's CPU; arm64 ones as aarch64 VMs QEMU emulates (UEFI, Debian's and Ubuntu's arm64 cloud images; `root@pam` sets the architecture; not run on a real host)",
+            proof: "arm-vm",
         },
     ),
     (

@@ -169,6 +169,8 @@ fn vlan_as_network(lan: &str, net: &Network, id: u16, vlan: &Vlan) -> Network {
         // A VLAN is the environment's own network, whatever its LAN joins.
         external: None,
         bridged: None,
+        // The LAN's segment carries its VLANs' frames: one MTU for all of them.
+        mtu: net.mtu,
     }
 }
 

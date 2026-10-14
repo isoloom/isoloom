@@ -42,7 +42,9 @@ checks:                          # plus the checks Isoloom derives from services
 
 - **Targets are derived, not declared.** Every machine has `docker:` → Docker targets; every
   machine has `vm:` → VM targets (Vagrant, Proxmox, cloud). A Windows machine has only `vm:`, so
-  that environment never gets a broken Docker file. `targets:` can only narrow the list.
+  that environment never gets a broken Docker file. On Proxmox, a machine with only `docker:` may
+  opt in to run as an LXC container (`docker.lxc: true`, Proxmox VE 9.1 or later): no Docker
+  runtime, so what a container can't carry (volumes, files, healthchecks...) is refused. `targets:` can only narrow the list.
 - **Behavior is the contract.** The same checks run on every target; a target whose checks fail
   isn't offered.
 - **Say it once.** `common:` and `groups:` hold what several machines share, and `count: 5` makes
@@ -230,7 +232,9 @@ See the [changelog](CHANGELOG.md) for the current version. Generators: **Docker 
 for a **hosting service**), **Kubernetes** (manifests, NetworkPolicies for networks and
 `reach`), **Vagrant** (VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, ESXi),
 **hybrid** (containers and VMs on the same networks), **Docker on one VM** (Vagrant, Proxmox),
-**Proxmox** (one VM per Linux machine, its own SDN network and router), **Docker on one cloud
+**Proxmox** (one VM per machine, or an LXC container with `docker.lxc`; its own SDN network,
+router and firewall, VLANs as tags, `networks.*.mtu` and `machines.*.rate_limit` on each device,
+arm64 VMs emulated, everything in a pool), **Docker on one cloud
 VM** and **one cloud VM per machine** (AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle),
 **existing hosts** reached over SSH, and **cloud services** (a Terraform module applied into
 your own cloud account). Routers enforce `reach` between networks; a network can name its own

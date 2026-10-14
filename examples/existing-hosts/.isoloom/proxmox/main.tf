@@ -128,6 +128,12 @@ locals {
   users         = var.ssh_public_key == "" ? [] : [{ name = "isoloom", sudo = "ALL=(ALL) NOPASSWD:ALL", shell = "/bin/bash", ssh_authorized_keys = [var.ssh_public_key] }]
 }
 
+# The environment's VMs and containers, together in a pool of their own.
+resource "proxmox_virtual_environment_pool" "env" {
+  pool_id = local.zone
+  comment = "Isoloom: existing-hosts"
+}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
   id    = local.zone
@@ -152,6 +158,15 @@ resource "proxmox_download_file" "debian_12" {
   url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+}
+
+# Network `lab`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "lab" {
+  name    = "iso${var.slot}n0"
+  comment = "existing-hosts: network lab"
+  cidr {
+    name = "192.168.1.0/24"
+  }
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
@@ -204,6 +219,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "existing-hosts"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   agent {
     enabled = true
@@ -270,6 +286,7 @@ resource "proxmox_virtual_environment_vm" "web" {
   name      = "iso${var.slot}-web"
   node_name = var.node
   tags      = ["isoloom", "existing-hosts"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -285,7 +302,8 @@ resource "proxmox_virtual_environment_vm" "web" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.lab.id
+    bridge   = proxmox_sdn_vnet.lab.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -305,6 +323,26 @@ resource "proxmox_virtual_environment_vm" "web" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `web`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "web" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.web.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "web" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.web.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network lab"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.lab.name}"
+  }
 }
 
 # Machine `cache`.
@@ -353,6 +391,7 @@ resource "proxmox_virtual_environment_vm" "cache" {
   name      = "iso${var.slot}-cache"
   node_name = var.node
   tags      = ["isoloom", "existing-hosts"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -368,7 +407,8 @@ resource "proxmox_virtual_environment_vm" "cache" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.lab.id
+    bridge   = proxmox_sdn_vnet.lab.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -388,6 +428,26 @@ resource "proxmox_virtual_environment_vm" "cache" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `cache`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "cache" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.cache.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "cache" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.cache.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network lab"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.lab.name}"
+  }
 }
 
 locals {

@@ -151,7 +151,7 @@ name: every-field
 networks:
   out: { cidr: 10.1.0.0/24, internet: true, docker: { cidr: 10.1.0.0/24 }, ipv6: { cidr: "fd00:1::/64", addresses: auto, only: false } }
   dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw, docker: { cidr: 10.1.1.0/24 } }
-  far: { cidr: 10.1.2.0/24, tc: { delay: 50ms, jitter: 5ms, loss: 0.5, rate: 10mbit } }
+  far: { cidr: 10.1.2.0/24, mtu: 1400, tc: { delay: 50ms, jitter: 5ms, loss: 0.5, rate: 10mbit } }
   office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, switch: fw, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
   corp: { cidr: 10.3.0.0/24, external: corp-net }
   home: { cidr: 10.4.0.0/24, bridged: { interface: en0, dhcp: true, default_route: true, vlan: 20 } }
@@ -166,6 +166,7 @@ machines:
     inputs: [TOKEN]
     secrets: [token, { source: token, target: /etc/app/token, uid: 0, gid: 0, mode: 0400 }]
     arch: amd64
+    rate_limit: 10mbit
     privileged: true
     nested_virtualization: true
     gpus: { count: 1, ids: [], driver: nvidia, capabilities: [compute], options: { a: b } }
@@ -182,7 +183,7 @@ machines:
     volumes: { data: /data }
     access: false
     aliases: [api.example.test]
-    docker: { image: a, init: [x.sh], idle: true, appliance: cisco-iol, config: r.cfg, firmware: f.bin }
+    docker: { image: a, init: [x.sh], idle: true, appliance: cisco-iol, config: r.cfg, firmware: f.bin, lxc: false }
     vm:
       os: debian-12
       provision: [x.sh]

@@ -18,4 +18,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::own_image::VAGRANT_IMAGES,
     super::own_image::VAGRANT_BOOT,
     hardware::CELLS,
+    super::links::VAGRANT,
 ];

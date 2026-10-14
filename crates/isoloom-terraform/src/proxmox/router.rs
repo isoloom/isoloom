@@ -30,6 +30,12 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     ]
     .map(String::from)
     .to_vec();
+    if let Some((files, start)) = super::lxc::router_dns(env) {
+        // The LXC containers' resolver: the environment's names.
+        config.packages.push("dnsmasq".into());
+        config.files.extend(files);
+        config.runcmd.push(start.into());
+    }
     m.commented(
         "The router: forwards between networks with the reach rules, and to the internet.",
         snippet("router", "router", config.document()),
@@ -39,7 +45,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         env.networks
             .keys()
             .enumerate()
-            .map(|(i, n)| nic(&format!("proxmox_sdn_vnet.{}.id", res(n)), Some(call("upper", [mac(Some(i))])))),
+            .map(|(i, n)| super::links::device(env, n, Some(call("upper", [mac(Some(i))])), None)),
     );
     let vm = Vm {
         id: "isoloom_router".into(),
@@ -49,6 +55,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         boot: Boot::Image(res(controller::OS)),
         tpm: false,
         own_boot: None,
+        arm: false,
         agent: true,
         nics,
         pci: Vec::new(),

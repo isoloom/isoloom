@@ -221,7 +221,7 @@
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
       "vagrant": "needs `vm:` on vios, csr, host-a, host-b",
-      "proxmox": "needs `vm:` on vios, csr, host-a, host-b",
+      "proxmox": "needs `docker.lxc` or `vm:` on vios, csr, host-a, host-b",
       "cloud-vm": "needs `vm:` on vios, csr, host-a, host-b",
       "external": "needs `external:` on vios, csr, host-a, host-b",
       "cloud-services": "left out by `targets:`"

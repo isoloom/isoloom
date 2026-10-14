@@ -128,6 +128,12 @@ locals {
   users         = var.ssh_public_key == "" ? [] : [{ name = "isoloom", sudo = "ALL=(ALL) NOPASSWD:ALL", shell = "/bin/bash", ssh_authorized_keys = [var.ssh_public_key] }]
 }
 
+# The environment's VMs and containers, together in a pool of their own.
+resource "proxmox_virtual_environment_pool" "env" {
+  pool_id = local.zone
+  comment = "Isoloom: shared-files"
+}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
   id    = local.zone
@@ -152,6 +158,15 @@ resource "proxmox_download_file" "debian_12" {
   url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+}
+
+# Network `app`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "app" {
+  name    = "iso${var.slot}n0"
+  comment = "shared-files: network app"
+  cidr {
+    name = "10.84.0.0/24"
+  }
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
@@ -204,6 +219,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "shared-files"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   agent {
     enabled = true
@@ -271,6 +287,7 @@ resource "proxmox_virtual_environment_vm" "writer" {
   name      = "iso${var.slot}-writer"
   node_name = var.node
   tags      = ["isoloom", "shared-files"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -286,7 +303,8 @@ resource "proxmox_virtual_environment_vm" "writer" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.app.id
+    bridge   = proxmox_sdn_vnet.app.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -306,6 +324,26 @@ resource "proxmox_virtual_environment_vm" "writer" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `writer`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "writer" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.writer.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "writer" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.writer.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network app"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.app.name}"
+  }
 }
 
 # Machine `reader`.
@@ -334,6 +372,7 @@ resource "proxmox_virtual_environment_vm" "reader" {
   name      = "iso${var.slot}-reader"
   node_name = var.node
   tags      = ["isoloom", "shared-files"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -349,7 +388,8 @@ resource "proxmox_virtual_environment_vm" "reader" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.app.id
+    bridge   = proxmox_sdn_vnet.app.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -369,6 +409,26 @@ resource "proxmox_virtual_environment_vm" "reader" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `reader`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "reader" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.reader.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "reader" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.reader.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network app"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.app.name}"
+  }
 }
 
 locals {

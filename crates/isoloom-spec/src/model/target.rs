@@ -54,7 +54,8 @@ impl Target {
     pub fn needs(self) -> Shape {
         match self {
             Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes => Shape::Docker,
-            Target::Vagrant | Target::Proxmox | Target::CloudVm => Shape::Vm,
+            Target::Vagrant | Target::CloudVm => Shape::Vm,
+            Target::Proxmox => Shape::VmOrLxc,
             Target::Hybrid => Shape::Either,
             Target::External => Shape::External,
             Target::CloudServices => Shape::Cloud,
@@ -88,6 +89,8 @@ pub enum Shape {
     Vm,
     /// Either implementation, machine by machine.
     Either,
+    /// A `vm:` block, or a `docker:` one that may run as an LXC container (`docker.lxc`).
+    VmOrLxc,
     /// An `external` block: the machine exists already.
     External,
     /// No machines: the spec's `cloud:` services.
@@ -101,6 +104,7 @@ impl Shape {
             Shape::Docker => "docker",
             Shape::Vm => "vm",
             Shape::Either => "docker` or `vm",
+            Shape::VmOrLxc => "docker.lxc` or `vm",
             Shape::External => "external",
             Shape::Cloud => "cloud",
         }

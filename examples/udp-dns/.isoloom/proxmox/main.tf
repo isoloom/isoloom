@@ -128,6 +128,12 @@ locals {
   users         = var.ssh_public_key == "" ? [] : [{ name = "isoloom", sudo = "ALL=(ALL) NOPASSWD:ALL", shell = "/bin/bash", ssh_authorized_keys = [var.ssh_public_key] }]
 }
 
+# The environment's VMs and containers, together in a pool of their own.
+resource "proxmox_virtual_environment_pool" "env" {
+  pool_id = local.zone
+  comment = "Isoloom: udp-dns"
+}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
   id    = local.zone
@@ -158,6 +164,24 @@ resource "proxmox_download_file" "debian_12" {
   url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+}
+
+# Network `servers`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "servers" {
+  name    = "iso${var.slot}n0"
+  comment = "udp-dns: network servers"
+  cidr {
+    name = "10.66.10.0/24"
+  }
+}
+
+# Network `users`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "users" {
+  name    = "iso${var.slot}n1"
+  comment = "udp-dns: network users"
+  cidr {
+    name = "10.66.20.0/24"
+  }
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
@@ -221,6 +245,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "udp-dns"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   agent {
     enabled = true
@@ -293,6 +318,7 @@ resource "proxmox_virtual_environment_vm" "dns" {
   name      = "iso${var.slot}-dns"
   node_name = var.node
   tags      = ["isoloom", "udp-dns"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -308,7 +334,8 @@ resource "proxmox_virtual_environment_vm" "dns" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.servers.id
+    bridge   = proxmox_sdn_vnet.servers.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -328,6 +355,59 @@ resource "proxmox_virtual_environment_vm" "dns" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `dns`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "dns" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.dns.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "dns" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.dns.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network servers"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.servers.name}"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach users to servers"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.users.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.servers.name}"
+    proto   = "tcp"
+    dport   = "53"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach users to servers"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.users.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.servers.name}"
+    proto   = "udp"
+    dport   = "53"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach users to servers"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.users.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.servers.name}"
+    macro   = "Ping"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "published"
+    proto   = "udp"
+    dport   = "53"
+  }
 }
 
 # Machine `client`.
@@ -358,6 +438,7 @@ resource "proxmox_virtual_environment_vm" "client" {
   name      = "iso${var.slot}-client"
   node_name = var.node
   tags      = ["isoloom", "udp-dns"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -373,7 +454,8 @@ resource "proxmox_virtual_environment_vm" "client" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.users.id
+    bridge   = proxmox_sdn_vnet.users.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -393,6 +475,26 @@ resource "proxmox_virtual_environment_vm" "client" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.dns]
+}
+
+# Machine `client`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "client" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.client.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "client" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.client.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network users"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.users.name}"
+  }
 }
 
 locals {

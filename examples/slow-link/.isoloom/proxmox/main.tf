@@ -128,6 +128,12 @@ locals {
   users         = var.ssh_public_key == "" ? [] : [{ name = "isoloom", sudo = "ALL=(ALL) NOPASSWD:ALL", shell = "/bin/bash", ssh_authorized_keys = [var.ssh_public_key] }]
 }
 
+# The environment's VMs and containers, together in a pool of their own.
+resource "proxmox_virtual_environment_pool" "env" {
+  pool_id = local.zone
+  comment = "Isoloom: slow-link"
+}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
   id    = local.zone
@@ -158,6 +164,24 @@ resource "proxmox_download_file" "debian_12" {
   url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+}
+
+# Network `branch`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "branch" {
+  name    = "iso${var.slot}n0"
+  comment = "slow-link: network branch"
+  cidr {
+    name = "10.75.1.0/24"
+  }
+}
+
+# Network `far`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "far" {
+  name    = "iso${var.slot}n1"
+  comment = "slow-link: network far"
+  cidr {
+    name = "10.75.2.0/24"
+  }
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
@@ -221,6 +245,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "slow-link"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   agent {
     enabled = true
@@ -293,6 +318,7 @@ resource "proxmox_virtual_environment_vm" "web" {
   name      = "iso${var.slot}-web"
   node_name = var.node
   tags      = ["isoloom", "slow-link"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -308,7 +334,8 @@ resource "proxmox_virtual_environment_vm" "web" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.far.id
+    bridge   = proxmox_sdn_vnet.far.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -328,6 +355,52 @@ resource "proxmox_virtual_environment_vm" "web" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `web`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "web" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.web.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "web" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.web.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network far"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.far.name}"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach branch to far"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.branch.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.far.name}"
+    proto   = "tcp"
+    dport   = "80"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach branch to far"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.branch.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.far.name}"
+    proto   = "udp"
+    dport   = "80"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach branch to far"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.branch.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.far.name}"
+    macro   = "Ping"
+  }
 }
 
 # Machine `user`.
@@ -355,6 +428,7 @@ resource "proxmox_virtual_environment_vm" "user" {
   name      = "iso${var.slot}-user"
   node_name = var.node
   tags      = ["isoloom", "slow-link"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -370,7 +444,8 @@ resource "proxmox_virtual_environment_vm" "user" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.branch.id
+    bridge   = proxmox_sdn_vnet.branch.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -390,6 +465,26 @@ resource "proxmox_virtual_environment_vm" "user" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `user`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "user" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.user.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "user" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.user.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network branch"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.branch.name}"
+  }
 }
 
 locals {

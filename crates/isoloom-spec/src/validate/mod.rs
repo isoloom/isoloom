@@ -19,6 +19,7 @@ mod files;
 mod groups;
 mod hardware;
 mod ipv6;
+mod links;
 mod machine_files;
 mod machines;
 mod networks;
@@ -129,6 +130,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     tools::each(spec, &mut p);
     machines::external(spec, &mut p);
     networks::tc(spec, &mut p);
+    links::check(spec, &mut p);
     ipv6::check(spec, &mut p);
     top::message(spec, &mut p);
     groups::check(spec, &mut p);

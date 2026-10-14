@@ -134,6 +134,12 @@ locals {
   users         = var.ssh_public_key == "" ? [] : [{ name = "isoloom", sudo = "ALL=(ALL) NOPASSWD:ALL", shell = "/bin/bash", ssh_authorized_keys = [var.ssh_public_key] }]
 }
 
+# The environment's VMs and containers, together in a pool of their own.
+resource "proxmox_virtual_environment_pool" "env" {
+  pool_id = local.zone
+  comment = "Isoloom: mixed-office"
+}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
   id    = local.zone
@@ -167,6 +173,15 @@ resource "proxmox_download_file" "debian_12" {
   url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+}
+
+# Network `office`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "office" {
+  name    = "iso${var.slot}n0"
+  comment = "mixed-office: network office"
+  cidr {
+    name = "192.168.58.0/24"
+  }
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
@@ -219,6 +234,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "mixed-office"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   agent {
     enabled = true
@@ -275,6 +291,7 @@ resource "proxmox_virtual_environment_vm" "files01" {
   name      = "iso${var.slot}-files01"
   node_name = var.node
   tags      = ["isoloom", "mixed-office"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   bios      = "ovmf"
   machine   = "q35"
@@ -298,7 +315,8 @@ resource "proxmox_virtual_environment_vm" "files01" {
     version      = "v2.0"
   }
   network_device {
-    bridge = proxmox_sdn_vnet.office.id
+    bridge   = proxmox_sdn_vnet.office.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -318,6 +336,26 @@ resource "proxmox_virtual_environment_vm" "files01" {
     type = "win10"
   }
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `files01`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "files01" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.files01.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "files01" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.files01.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network office"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office.name}"
+  }
 }
 
 # Machine `intranet`.
@@ -344,6 +382,7 @@ resource "proxmox_virtual_environment_vm" "intranet" {
   name      = "iso${var.slot}-intranet"
   node_name = var.node
   tags      = ["isoloom", "mixed-office"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -359,7 +398,8 @@ resource "proxmox_virtual_environment_vm" "intranet" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.office.id
+    bridge   = proxmox_sdn_vnet.office.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -379,6 +419,33 @@ resource "proxmox_virtual_environment_vm" "intranet" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `intranet`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "intranet" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.intranet.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "intranet" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.intranet.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network office"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office.name}"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "published"
+    proto   = "tcp"
+    dport   = "80"
+  }
 }
 
 locals {

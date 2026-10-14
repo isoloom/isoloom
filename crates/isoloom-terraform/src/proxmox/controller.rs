@@ -41,7 +41,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     let mut nics = vec![nic("var.uplink_bridge", None)];
     let mut ips = vec![ip_config("dhcp", None)];
     for (net, plan) in &env.networks {
-        nics.push(nic(&format!("proxmox_sdn_vnet.{}.id", res(net)), None));
+        nics.push(super::links::device(env, net, None, None));
         let c = Cidr::parse(&plan.cidr);
         ips.push(ip_config(&c.map(|c| format!("{}/{}", c.controller(), c.len)).unwrap_or_default(), None));
     }
@@ -56,6 +56,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         boot: Boot::Image(res(controller::OS)),
         tpm: false,
         own_boot: None,
+        arm: false,
         agent: false,
         nics,
         pci: Vec::new(),

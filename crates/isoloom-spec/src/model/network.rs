@@ -62,6 +62,11 @@ pub struct Network {
     /// addresses in `cidr`, or DHCP from the LAN).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bridged: Option<Bridged>,
+    /// The largest packet the network carries, in bytes (576 to 9216): smaller to mimic a
+    /// tunnel or a VPN link, jumbo frames (9000) for a storage network. A LAN's VLANs carry
+    /// the LAN's. Default: the target's own (1500 on most).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mtu: Option<u16>,
 }
 
 impl Network {
