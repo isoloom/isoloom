@@ -120,7 +120,9 @@ fn context(bodies: &[Body]) -> Context<'static> {
 
 /// The `for_each` instance with this key and value.
 fn each(key: String, value: Value) -> Expansion {
-    let each: hcl::Map<String, Value> = [("key".to_string(), Value::from(key.clone())), ("value".to_string(), value)].into_iter().collect();
+    let each: hcl::Map<String, Value> = [("key".to_string(), Value::from(key.clone())), ("value".to_string(), value)]
+        .into_iter()
+        .collect();
     (Some(key), Some(("each", Value::Object(each))))
 }
 
@@ -512,7 +514,15 @@ impl Placement {
                     .values()
                     .find(|(c, _)| c.contains(Cidr { base: ipn, len: 32 }))
                     .cloned()
-                    .unwrap_or_else(|| (Cidr { base: ipn & 0xffff_ff00, len: 24 }, String::new()));
+                    .unwrap_or_else(|| {
+                        (
+                            Cidr {
+                                base: ipn & 0xffff_ff00,
+                                len: 24,
+                            },
+                            String::new(),
+                        )
+                    });
                 let key = cidr_text(cidr);
                 used.entry(key.clone()).or_insert(named);
                 joins.push((key, ip.octets()[3]));

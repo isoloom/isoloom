@@ -164,7 +164,8 @@ impl<'a> Import<'a> {
         }
         let name = label(raw_name);
         if name != raw_name {
-            self.notes.add(at.clone(), NoteKind::Changed, format!("renamed `{name}` (machine names are DNS names)"));
+            self.notes
+                .add(at.clone(), NoteKind::Changed, format!("renamed `{name}` (machine names are DNS names)"));
         }
         let vm = &node["children"]["vm"];
         let (os, image) = self.os_and_image(&at, vm);
@@ -207,8 +208,7 @@ impl<'a> Import<'a> {
     /// The box: an OS name, plus the box itself when it isn't the one Isoloom would use.
     fn os_and_image(&mut self, at: &str, vm: &Value) -> (&'static str, Option<(String, Option<String>)>) {
         let boxname = text(self.pick(vm, "box")).unwrap_or_default();
-        let windows_hint =
-            text(self.pick(vm, "communicator")).as_deref() == Some("winrm") || text(self.pick(vm, "guest")).as_deref() == Some("windows");
+        let windows_hint = text(self.pick(vm, "communicator")).as_deref() == Some("winrm") || text(self.pick(vm, "guest")).as_deref() == Some("windows");
         let (mut os, builtin) = os_for_box(&boxname);
         if windows_hint && !os.starts_with("windows") {
             os = "windows-server-2019";
@@ -328,11 +328,9 @@ impl<'a> Import<'a> {
                     self.env_playbooks.push(p);
                 }
             }
-            "file" => self.notes.add(
-                at,
-                NoteKind::Equivalent,
-                "Isoloom copies the project into each Linux VM (/opt/isoloom)",
-            ),
+            "file" => self
+                .notes
+                .add(at, NoteKind::Equivalent, "Isoloom copies the project into each Linux VM (/opt/isoloom)"),
             other => self.notes.add(format!("{at} {other}"), NoteKind::Equivalent, "a `.sh` step can run any tool"),
         }
     }
@@ -340,16 +338,12 @@ impl<'a> Import<'a> {
     fn provision_shell(&mut self, at: &str, m: &mut Machine, c: &Call) {
         match (text(c.opt("path")), c.opt("inline")) {
             (Some(path), _) if path.ends_with(".sh") || path.ends_with(".ps1") => m.provision.push(path.trim_start_matches("./").into()),
-            (Some(path), _) => self.notes.add(
-                at,
-                NoteKind::Changed,
-                format!("`{path}`: steps are .sh (Linux) or .ps1 (Windows) files"),
-            ),
-            (None, Some(_)) => self.notes.add(
-                at,
-                NoteKind::InImage,
-                "an inline script: put it in a file and list it in `vm.provision`",
-            ),
+            (Some(path), _) => self
+                .notes
+                .add(at, NoteKind::Changed, format!("`{path}`: steps are .sh (Linux) or .ps1 (Windows) files")),
+            (None, Some(_)) => self
+                .notes
+                .add(at, NoteKind::InImage, "an inline script: put it in a file and list it in `vm.provision`"),
             _ => {}
         }
         // `reboot: true`: Vagrant restarts the guest after the script (if any).
