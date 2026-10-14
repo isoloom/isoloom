@@ -2,7 +2,29 @@
 
 Working document for the local rebuild. It is squashed away with the history at the first satisfying version.
 
-## 1. What 1.0 is
+## 0. Three products
+
+| Product | Role | Contains |
+|---|---|---|
+| **Isoloom** (this repo) | Converter: one spec to every IaC tool, and back | Spec, catalogue, plan, backends, import, `verify`, and the **run manifest** each target outputs. Apache-2.0. No runtime. |
+| **Isothrum** (`isoloom/isothrum`) | Runner: executes what Isoloom generates | One runner engine (crate and CLI) with: lifecycle (up, down, park, resume, re-provision); state and locks; a driver per target; secrets delivery; checks; readiness and recovery; reaper and budgets; snapshots, capture and consoles. Its lab editor (a drawing becomes a spec) stays an authoring tool. |
+| **Cyber CTF launcher** | UI wrapper for CTF labs | Lab catalogue, accounts, attack box and player UX. It uses Isoloom to read and convert labs, and Isothrum to run them. |
+
+**Contracts:**
+- **Isoloom to Isothrum:** the generated files plus a versioned run manifest, holding:
+  - native commands and their order;
+  - readiness criteria;
+  - outputs: addresses, host ports, URLs;
+  - how to run checks;
+  - secret slots: names and destinations, never values.
+- **Isothrum to UIs:** a Rust API plus a JSON event stream, used by the launcher and by Isothrum's desktop app.
+
+**Runner code comes from three runtimes, merged into one in Isothrum:**
+- **The launcher's** (about 16k lines, the most mature) is the core.
+- **Isoloom's run part** moves in rather than being deleted: secrets delivery including Windows, host readiness, the registry and WinRM retries.
+- **Isothrum desktop's** switches onto the result.
+
+## 1. What Isoloom 1.0 is
 
 **One spec, converted to every other infrastructure-as-code tool.**
 
@@ -58,8 +80,8 @@ Each phase ends with its exit check, run locally. One phase at a time. Within a 
 
 Make the codebase smaller before building on it.
 
-1. **Remove the runtime.**
-   - The CLI lifecycle commands, the registry, the events, host readiness, secret delivery, check execution and their tests.
+1. **Move the runtime out.**
+   - The CLI lifecycle commands, the registry, the events, host readiness, secret delivery, check execution and their tests go to the Isothrum repository as the runner's seed, rather than being deleted.
    - What generation needs from them, for example the check definitions, moves into the plan.
 2. **Remove the coverage crate.**
    - Its tables, refresh scripts and `docs/COVERAGE.md`, the coverage-floor tooling, and the drift workflow.
@@ -100,11 +122,12 @@ Make the codebase smaller before building on it.
 
    Each trade-off is stated.
 3. **Checks become native artefacts:** Compose healthchecks plus a test service, Helm test pods or a Kubernetes Job, Terraform `check` blocks or a script, an Ansible checks playbook for VMs, and a portable `checks/` bundle.
-4. **The capability matrix and tiers.**
+4. **The run manifest.** Each target also writes a versioned manifest, the contract with Isothrum: commands and order, readiness, outputs, check runners and secret slots. It is pure conversion: deterministic and snapshot-tested. An optional thin `isoloom up/down` may read it and call the native tools, with no state of its own.
+5. **The capability matrix and tiers.**
    - The spec-field × target matrix is generated from the backends' declared capabilities and refusals.
    - Tiers come from a single list in `isoloom-targets`.
    - `isoloom matrix` prints the matrix (text and JSON).
-5. **Windows on container targets** (dockur, opt-in, KVM). Salvage from `v1/windows-in-docker`.
+6. **Windows on container targets** (dockur, opt-in, KVM). Salvage from `v1/windows-in-docker`.
 
 **Exit:** every example generates on every target, or is refused with a reason, and the snapshots are reviewed.
 
@@ -163,14 +186,27 @@ Then the security review of secrets handling and of every place that writes cred
 3. **Squash the history into one commit.** This is a force-push, and needs the maintainer's confirmation at that moment. Then re-enable CI.
 4. Sign the release, with an SBOM, provenance and a pinned toolchain, and tag 1.0.0.
 
-### Phase 9: The launcher
+### Phase 9: The Isothrum runner
 
-Rework the Cyber CTF launcher onto the new crates.
-- **The launcher becomes the runtime:** it runs the native tools on Isoloom's output.
-- **Its labs move with `isoloom migrate`.**
-- **The rev it pins today stops resolving after the squash.** So this phase follows immediately after 1.0.
+1. **Create the runner engine** in `isoloom/isothrum` (a crate plus a CLI). It executes Isoloom run manifests.
+2. **Port into it:**
+   - the launcher's runtime: lifecycle, locks, deploy worker, drivers, recovery, reaper, budgets, remote servers;
+   - Isoloom's moved run part: secrets delivery, host readiness, registry, WinRM retries.
+3. **Tests:**
+   - a fake-tool harness for unit tests;
+   - one real-lab job per target family (Docker, kind, and Vagrant on a KVM runner), the Tier 1 proof.
+4. **Isothrum's desktop app** moves onto the engine.
+
+### Phase 10: The launcher as a UI
+
+1. **Replace the launcher's runtime module** with the Isothrum runner, and its spec handling with the Isoloom crates.
+2. **Keep only CTF-specific code:** lab catalogue, accounts, attack box UX, player flows.
+3. **Move the labs** with `isoloom migrate`.
+4. **Order matters:** the rev the launcher pins today stops resolving after the Isoloom squash, so this phase follows right after.
 
 ## 5. Open decisions
+
+0. **Isothrum's lab editor:** it stays in Isothrum next to the runner (a "studio": draw, run, inspect), or it becomes its own tool. Also decide whether the Isothrum runner is open source like Isoloom.
 
 1. **The tool list for 1.0.** "Every other IaC tool": confirm the current families, and whether to add Pulumi, Podman (Compose and Quadlet) or others for 1.0 or 1.x.
 2. **The Terraform provider:** reshape it into a files data source, or drop it.
