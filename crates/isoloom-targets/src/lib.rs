@@ -9,6 +9,7 @@ pub use backends::{BACKENDS, backend};
 pub use isoloom_plan::Environment;
 pub use isoloom_render::backend::{Backend, Files, RenderError};
 
+pub use isoloom_compose::render::files::project_variables as compose_project_variables;
 pub use isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, removable_volumes, start_commands, start_plan};
 pub use isoloom_kubernetes::{project_copies, secrets::SECRETS as KUBERNETES_SECRETS};
 pub use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, constraints, machine_setup, provision_script, router_name};

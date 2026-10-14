@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 98% | 152 | 148 | 4 | 0 |
+| [Docker Compose](#docker-compose) | 100% | 152 | 152 | 0 | 0 |
 | [Vagrant](#vagrant) | 100% | 42 | 42 | 0 | 0 |
 | [Vagrant: networks](#vagrant-networks) | 100% | 38 | 38 | 0 | 0 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
@@ -22,7 +22,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: libvirt](#vagrant-libvirt) | 100% | 19 | 19 | 0 | 0 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: UTM](#vagrant-utm) | 100% | 3 | 3 | 0 | 0 |
-| [Vagrant: QEMU](#vagrant-qemu) | 92% | 14 | 13 | 0 | 1 |
+| [Vagrant: QEMU](#vagrant-qemu) | 100% | 13 | 13 | 0 | 0 |
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 20 | 20 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
 | [Terraform: Proxmox](#terraform-proxmox) | 100% | 189 | 189 | 0 | 0 |
@@ -37,7 +37,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [cloud-init](#cloud-init) | 100% | 86 | 86 | 0 | 0 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 98% | 206 | 203 | 1 | 2 |
+| [Kubernetes](#kubernetes) | 100% | 204 | 204 | 0 | 0 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
 | [Helm](#helm) | 100% | 20 | 20 | 0 | 0 |
 
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-98% of 152 portable features (148 done, 4 partly, 0 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+100% of 152 portable features (152 done, 0 partly, 0 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -134,9 +134,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `configs` | Yes | Yes | From `machines.*.files` |
 | `configs[].source` | Yes | Yes | From `machines.*.files` |
 | `configs[].target` | Yes | Yes | From `machines.*.files[].path` |
-| `configs[].uid` | Yes | Partly | From `machines.*.files[].uid, gid and mode` (a file's `content`); not yet: a project file (`source`) is mounted as it is: an owner or mode for it is refused |
-| `configs[].gid` | Yes | Partly | From `machines.*.files[].uid, gid and mode` (a file's `content`); not yet: a project file (`source`) is mounted as it is: an owner or mode for it is refused |
-| `configs[].mode` | Yes | Partly | From `machines.*.files[].uid, gid and mode` (a file's `content`); not yet: a project file (`source`) is mounted as it is: an owner or mode for it is refused |
+| `configs[].uid` | Yes | Yes | From `machines.*.files[].uid, gid and mode` (a file's `content`, or its `source` read into Compose's environment) |
+| `configs[].gid` | Yes | Yes | From `machines.*.files[].uid, gid and mode` (a file's `content`, or its `source` read into Compose's environment) |
+| `configs[].mode` | Yes | Yes | From `machines.*.files[].uid, gid and mode` (a file's `content`, or its `source` read into Compose's environment) |
 | `container_name` | Yes | Another way | Via the machine's name |
 | `cpu_count` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `cpu_percent` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
@@ -179,7 +179,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `deploy.resources.limits.cpus` | Yes | Yes | From `machines.*.resources.cpus` |
 | `deploy.resources.limits.memory` | Yes | Yes | From `machines.*.resources.memory_mb` |
 | `deploy.resources.limits.pids` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `deploy.resources.reservations` | Yes | Partly | From `machines.*.gpus` (its devices); not yet: cpus and memory: a machine's size is its limit |
+| `deploy.resources.reservations` | Yes | Yes | From `machines.*.gpus` (its devices; `cpus` and `memory` are rows of their own, not portable) |
 | `deploy.resources.reservations.cpus` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `deploy.resources.reservations.memory` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `deploy.resources.reservations.generic_resources` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
@@ -404,7 +404,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | --- | --- | --- | --- |
 | `name` | n/a | No | Compose scopes names to the environment |
 | `content` | Yes | Yes | From `machines.*.files[].content` |
-| `environment` | Yes | Another way | Via machines.*.files[].content (the text in the spec; a value given at run time is an input) |
+| `environment` | Yes | Yes | From `machines.*.files[].source with an owner or mode` (`isoloom run` reads the project file into it) |
 | `file` | Yes | Yes | From `machines.*.files[].source` |
 | `external` | n/a | No | A config created outside Compose |
 | `external.name` | n/a | No | Legacy spelling of `name` |
@@ -1375,7 +1375,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: QEMU
 
-92% of 14 portable features (13 done, 0 partly, 1 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
+100% of 13 portable features (13 done, 0 partly, 0 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
 
 ### Settings
 
@@ -1414,7 +1414,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ssh_host` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `ssh_port` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `tap_device` | Yes | Another way | Via socket_opts to the network's hub: the same network between the VMs, without root (a TAP device and the socket_vmnet daemon need it) |
-| `vmnet_interface` | Yes | Not yet | With `public_network` (a network bridged to the outside); vmnet-bridged needs root on the Mac |
+| `vmnet_interface` | No | No | Vagrant-qemu 0.6.3 gives a VM one advanced NIC, for its first `private_network`, and vmnet_interface bridges only that one; a machine's first network is one of the environment's own (the spec requires it), so the NIC is the lab's and none is left for a bridged network (see ADR 0006) |
 
 ## Vagrant: ESXi
 
@@ -7759,7 +7759,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-98% of 206 portable features (203 done, 1 partly, 2 to do; 377 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+100% of 204 portable features (204 done, 0 partly, 0 to do; 377 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -7857,7 +7857,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `PodSpec: serviceAccountName` | n/a | No | Access to the Kubernetes API: machines don't call it |
 | `PodSpec: setHostnameAsFQDN` | Yes | Another way | Via `subdomain`: the pod's full name is in its hosts file (`hostname -f`), and its hostname stays the short name, as on every other target |
 | `PodSpec: shareProcessNamespace` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
-| `PodSpec: subdomain` | Yes | Partly | From `machines.*.dns.domain, as one label` (`corp.local` is `corp-local`); not yet: the pod's full name is `<machine>.<subdomain>.<namespace>.svc.<cluster domain>`: Kubernetes names pods under the cluster's domain, not `dns.domain` |
+| `PodSpec: subdomain` | Yes | Yes | From `machines.*.dns.domain, as one label` (`corp.local` is `corp-local`): the kubelet puts the pod under `<subdomain>.<namespace>.svc.<cluster domain>`, whatever the label (see ADR 0006) |
 | `PodSpec: terminationGracePeriodSeconds` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: tolerations` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: topologySpreadConstraints` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
@@ -8020,14 +8020,14 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `EmptyDirVolumeSource: mode` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
 | `EmptyDirVolumeSource: sizeLimit` | Yes | Yes | From `machines.*.tmpfs and machines.*.shm_size` (in memory) |
 | `SecretVolumeSource: defaultMode` | Yes | Another way | Via each key's `mode` |
-| `SecretVolumeSource: defaultUser` | Yes | Not yet | A secret's `uid` on Kubernetes, once the clusters Isoloom targets all have it |
+| `SecretVolumeSource: defaultUser` | No | No | Alpha in Kubernetes 1.37, behind the AtomicWriteVolumeUserFields feature gate that managed clusters don't open (an API server without it drops the field). A secret's `uid` and `gid` are copied into a memory emptyDir by an init container instead |
 | `SecretVolumeSource: items` | Yes | Yes | From `machines.*.secrets` (the machine's own secrets only) |
 | `SecretVolumeSource: optional` | n/a | No | `isoloom run` creates the Secret before the pods start: a missing secret stops the run instead |
 | `SecretVolumeSource: secretName` | Yes | Yes | From `secrets` (the `isoloom-secrets` Secret) |
 | `KeyToPath: key` | Yes | Yes | From `machines.*.secrets` (the machine's own secrets only) |
 | `KeyToPath: mode` | Yes | Yes | From `machines.*.secrets[].mode` (default 0444) |
 | `KeyToPath: path` | Yes | Yes | From `machines.*.secrets` (the machine's own secrets only) |
-| `KeyToPath: user` | Yes | Not yet | A secret's `uid` on Kubernetes, once the clusters Isoloom targets all have it |
+| `KeyToPath: user` | No | No | Alpha in Kubernetes 1.37, behind the AtomicWriteVolumeUserFields feature gate that managed clusters don't open (an API server without it drops the field). A secret's `uid` and `gid` are copied into a memory emptyDir by an init container instead |
 | `PersistentVolumeClaim: apiVersion` | Yes | Yes | Every object Isoloom writes |
 | `PersistentVolumeClaim: kind` | Yes | Yes | Every object Isoloom writes |
 | `PersistentVolumeClaim: metadata` | Yes | Yes | Every object Isoloom writes |
@@ -8320,7 +8320,7 @@ is marked ✗, with its reason below.
 | `machines.*.services[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.services[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
-| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
+| `machines.*.secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.environment` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
@@ -8373,9 +8373,9 @@ is marked ✗, with its reason below.
 | `machines.*.files[].path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.files[].source` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.files[].content` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
-| `machines.*.files[].uid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
-| `machines.*.files[].gid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
-| `machines.*.files[].mode` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
+| `machines.*.files[].uid` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.files[].gid` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.files[].mode` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.volumes.*.path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.volumes.*.subpath` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.disks.*.size_gb` | n/a | n/a | ✓ | ✓ | ✓ | ◐ | n/a | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ✗ |
@@ -8458,14 +8458,14 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 87% of 122 | 105 | 3 | 0 | 14 |
-| hosted | 87% of 122 | 105 | 3 | 0 | 14 |
-| kubernetes | 70% of 116 | 75 | 13 | 1 | 27 |
-| helm | 70% of 116 | 75 | 13 | 1 | 27 |
-| kustomize | 70% of 116 | 75 | 13 | 1 | 27 |
+| docker | 88% of 122 | 108 | 0 | 0 | 14 |
+| hosted | 88% of 122 | 108 | 0 | 0 | 14 |
+| kubernetes | 70% of 116 | 76 | 12 | 1 | 27 |
+| helm | 70% of 116 | 76 | 12 | 1 | 27 |
+| kustomize | 70% of 116 | 76 | 12 | 1 | 27 |
 | vagrant | 80% of 126 | 94 | 16 | 0 | 16 |
-| docker-vm | 78% of 122 | 94 | 3 | 0 | 25 |
-| hybrid | 65% of 149 | 95 | 6 | 7 | 41 |
+| docker-vm | 79% of 122 | 97 | 0 | 0 | 25 |
+| hybrid | 66% of 149 | 98 | 3 | 7 | 41 |
 | proxmox | 82% of 126 | 103 | 2 | 3 | 18 |
 | esxi | 76% of 120 | 91 | 1 | 3 | 25 |
 | aws | 62% of 126 | 71 | 16 | 6 | 33 |
@@ -8474,7 +8474,7 @@ is marked ✗, with its reason below.
 | digitalocean | 49% of 126 | 58 | 9 | 6 | 53 |
 | linode | 56% of 126 | 65 | 12 | 6 | 43 |
 | oci | 58% of 126 | 67 | 13 | 6 | 40 |
-| cloud-docker | 77% of 122 | 93 | 3 | 0 | 26 |
+| cloud-docker | 78% of 122 | 96 | 0 | 0 | 26 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
 | external | 45% of 85 | 34 | 9 | 16 | 26 |
 

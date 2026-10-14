@@ -52,6 +52,8 @@ impl Backend for HybridBackend {
             // Delivered by `isoloom run` over the machine's SSH, owners included.
             Feature::Secrets,
             Feature::SecretOwners,
+            // Read into Compose's environment by the containers' host before `up`.
+            Feature::OwnedProjectFiles,
             Feature::MachineProcess,
             Feature::NestedVirtualization,
             // Docker's DNS for the containers, each VM's hosts file for the VMs.

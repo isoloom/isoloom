@@ -191,12 +191,32 @@ fn launch(p: &Prepared, ask: &Ask, down: bool, values: &secrets::Values) -> Res<
         cmd.envs(terraform::aws_session_env());
     }
     secrets::deliver(p, values, &mut cmd)?;
+    if !down {
+        project_files(p, &mut cmd)?;
+    }
     let status = deliver::run_tool(p, ask, values, &mut cmd, &at)?;
     if !status.success() {
         return Err(Failure::new(ErrorCode::ToolFailed, format!("{} exited with {status}", tool.program)).into());
     }
     output::done(&at, None);
     Ok(tool)
+}
+
+/// The project files Compose copies in with their owner and mode (`docker`, `hosted`), read
+/// from the project into the variables the Compose file names: the generated file holds none
+/// of them. A Docker host VM reads them itself, from the project it unpacked.
+fn project_files(p: &Prepared, cmd: &mut std::process::Command) -> Res<()> {
+    if !matches!(p.target, Target::Docker | Target::Hosted) {
+        return Ok(());
+    }
+    for (var, path) in isoloom_targets::compose_project_variables(&p.plan) {
+        let text = std::fs::read_to_string(p.dir.join(&path)).map_err(|e| {
+            Failure::new(ErrorCode::Io, format!("can't read the project file `{path}` a machine's `files` copy: {e}"))
+                .hint("Compose copies a file with an owner or a mode from text: it must exist and be UTF-8")
+        })?;
+        cmd.env(var, text);
+    }
+    Ok(())
 }
 
 /// Whether this machine can run the target, and the Vagrant provider in the defaults can run

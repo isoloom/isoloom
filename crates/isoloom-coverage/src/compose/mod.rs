@@ -15,7 +15,7 @@ mod top;
 
 use super::{
     Format, Support,
-    Support::{Emitted, Equivalent, InImage, NotPortable, Partial, Tooling},
+    Support::{Emitted, Equivalent, InImage, NotPortable, Tooling},
 };
 
 /// Keys listed as one row, without the keys below them: a job and a `pre_start` hook are whole
@@ -53,10 +53,10 @@ const BUILD: Support = Tooling {
     note: "how the image is built, not the machine it produces",
 };
 const FILES: Support = Emitted { from: "machines.*.files" };
-/// A file's owner and mode: given to a text, refused for a project file Compose mounts as it is.
-const FILE_OWNER: Support = Partial {
-    from: "machines.*.files[].uid, gid and mode (a file's `content`)",
-    gap: "a project file (`source`) is mounted as it is: an owner or mode for it is refused",
+/// A file's owner and mode: Compose gives them to a config it copies in (text, or a project
+/// file read into its environment), never to one it mounts.
+const FILE_OWNER: Support = Emitted {
+    from: "machines.*.files[].uid, gid and mode (a file's `content`, or its `source` read into Compose's environment)",
 };
 /// A container's GPUs, as the device request Isoloom writes (refused where the containers run
 /// on a VM Isoloom creates, which has no GPU).
@@ -64,9 +64,8 @@ const GPUS: Support = Emitted { from: "machines.*.gpus" };
 const GPUS_KEY: Support = Equivalent {
     via: "machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads)",
 };
-const RESERVED: Support = Partial {
-    from: "machines.*.gpus (its devices)",
-    gap: "cpus and memory: a machine's size is its limit",
+const RESERVED: Support = Emitted {
+    from: "machines.*.gpus (its devices; `cpus` and `memory` are rows of their own, not portable)",
 };
 const IPV6: Support = Support::Emitted {
     from: "networks.*.ipv6 (each machine's address from its octet; none with `addresses: auto`)",

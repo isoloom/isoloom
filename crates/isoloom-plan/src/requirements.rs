@@ -339,7 +339,7 @@ impl fmt::Display for Requirement {
             ),
             Requirement::OwnedProjectFile { machine, path } => write!(
                 f,
-                "machine `{machine}`'s file `{path}` comes from the project with a `uid`, `gid` or `mode`: Compose mounts a project file as it is, so write it as `content` instead"
+                "machine `{machine}`'s file `{path}` comes from the project with a `uid`, `gid` or `mode`, and this target places a container's project file as it is: write it as `content` instead"
             ),
             Requirement::ExistingHostFiles { machine } => write!(
                 f,
@@ -371,7 +371,7 @@ fn refused_secrets(r: &Requirement, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         ),
         Requirement::SecretOwner { machine } => write!(
             f,
-            "a secret of machine `{machine}` sets `uid` or `gid`: a Kubernetes Secret volume's files belong to root"
+            "a secret of machine `{machine}` sets `uid` or `gid`, and this target places a secret's file as root's"
         ),
         _ => Ok(()),
     }

@@ -75,7 +75,8 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     );
     r.heredoc(shell("m", "networks"), "inline", "SH", &networks_script(nics));
     let secrets = isoloom_render::secrets::host_environment(&isoloom_render::secrets::of_containers(env));
-    let up = format!("{secrets}cd /opt/isoloom && docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900");
+    let files = isoloom_compose::render::files::host_environment(env);
+    let up = format!("{secrets}cd /opt/isoloom && {files}docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900");
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
     r.call(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", inputs));
 }
