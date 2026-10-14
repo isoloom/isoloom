@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ kubernetes (machine `web` sets `ulimits`: Kubernetes has no per-container process limits)
+
+# isoloom generate --target kubernetes (exit 1)
+· kubernetes: machine `web` sets `ulimits`: Kubernetes has no per-container process limits

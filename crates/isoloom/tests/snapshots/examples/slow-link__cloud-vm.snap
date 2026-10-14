@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ cloud-vm (no cloud can run it (aws, azure: link impairment (`tc`) needs a router in the path; the cloud's security groups have none; gcp: link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none; digitalocean: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode, oci: link impairment (`tc`) needs a router in the path; the cloud's firewalls have none))
+
+# isoloom generate --target cloud-vm (exit 1)
+· cloud-vm: no cloud can run it (aws, azure: link impairment (`tc`) needs a router in the path; the cloud's security groups have none; gcp: link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none; digitalocean: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode, oci: link impairment (`tc`) needs a router in the path; the cloud's firewalls have none)

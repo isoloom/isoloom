@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ external (needs `external:` on web, decoy, client)
+
+# isoloom generate --target external (exit 1)
+· external: not possible for this spec (see `isoloom targets`)

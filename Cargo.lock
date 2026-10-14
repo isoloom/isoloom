@@ -428,6 +428,7 @@ version = "0.10.1"
 dependencies = [
  "clap",
  "indexmap",
+ "insta",
  "isoloom-coverage",
  "isoloom-import",
  "isoloom-plan",

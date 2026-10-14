@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ hosted (needs `docker:` on web01)
+
+# isoloom generate --target hosted (exit 1)
+· hosted: not possible for this spec (see `isoloom targets`)

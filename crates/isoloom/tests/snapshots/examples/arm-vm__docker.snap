@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ docker (needs `docker:` on box)
+
+# isoloom generate --target docker (exit 1)
+· docker: not possible for this spec (see `isoloom targets`)

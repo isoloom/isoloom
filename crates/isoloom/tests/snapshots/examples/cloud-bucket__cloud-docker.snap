@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ cloud-docker (cloud services run on `cloud-services` only)
+
+# isoloom generate --target cloud-docker (exit 1)
+· cloud-docker: not possible for this spec (see `isoloom targets`)

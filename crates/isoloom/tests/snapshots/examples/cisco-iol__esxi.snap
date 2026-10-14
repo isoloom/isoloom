@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ esxi (needs `vm:` on r1, r2, host-a, host-b)
+
+# isoloom generate --target esxi (exit 1)
+· esxi: not possible for this spec (see `isoloom targets`)

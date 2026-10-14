@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ esxi (machine `dc01`: Windows provisioning steps are PowerShell scripts (.ps1); Ansible runs from the controller (`provision:`))
+
+# isoloom generate --target esxi (exit 1)
+· esxi: machine `dc01`: Windows provisioning steps are PowerShell scripts (.ps1); Ansible runs from the controller (`provision:`)

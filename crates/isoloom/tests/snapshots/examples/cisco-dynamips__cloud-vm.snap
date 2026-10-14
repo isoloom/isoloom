@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ cloud-vm (needs `vm:` on r1, r2, host-a, host-b)
+
+# isoloom generate --target cloud-vm (exit 1)
+· cloud-vm: not possible for this spec (see `isoloom targets`)

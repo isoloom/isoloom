@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ vagrant (needs `vm:` on vios, csr, host-a, host-b)
+
+# isoloom generate --target vagrant (exit 1)
+· vagrant: not possible for this spec (see `isoloom targets`)

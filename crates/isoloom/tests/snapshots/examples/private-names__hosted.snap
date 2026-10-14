@@ -1,0 +1,22 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✓ hosted
+
+# isoloom generate --target hosted (exit 0)
+✓ .isoloom/docker/compose.yml
+✓ .isoloom/docker/checks/exec-web.sh
+✓ .isoloom/docker/checks/web.sh
+✓ .isoloom/docker/checks/client.sh
+✓ .isoloom/resolved.json
+
+## .isoloom/docker/checks/client.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/exec-web.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/web.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/compose.yml: identical in the `docker` snapshot
+
+## .isoloom/resolved.json: identical in the `docker` snapshot

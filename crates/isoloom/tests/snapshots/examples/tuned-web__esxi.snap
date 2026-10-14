@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ esxi (machine `web` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do))
+
+# isoloom generate --target esxi (exit 1)
+· esxi: machine `web` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)

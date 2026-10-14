@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ vagrant (machine `dc01`: Windows provisioning steps are PowerShell scripts (.ps1); `provision/ad-domain.yml` isn't (Ansible runs from outside Windows: environment-level provisioning comes next))
+
+# isoloom generate --target vagrant (exit 1)
+· vagrant: machine `dc01`: Windows provisioning steps are PowerShell scripts (.ps1); `provision/ad-domain.yml` isn't (Ansible runs from outside Windows: environment-level provisioning comes next)

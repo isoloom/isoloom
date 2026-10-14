@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ vagrant (cloud services run on `cloud-services` only)
+
+# isoloom generate --target vagrant (exit 1)
+· vagrant: not possible for this spec (see `isoloom targets`)
