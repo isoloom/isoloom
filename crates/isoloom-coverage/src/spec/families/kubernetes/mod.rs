@@ -13,4 +13,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::ipv6::KUBERNETES,
     super::outside::KUBERNETES,
     super::machine_files::KUBERNETES,
+    super::process::KUBERNETES,
 ];

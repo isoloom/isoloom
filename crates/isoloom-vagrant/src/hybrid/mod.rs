@@ -49,6 +49,7 @@ impl Backend for HybridBackend {
             Feature::Ulimits,
             Feature::TrafficControl,
             Feature::Tpm,
+            Feature::MachineProcess,
         ])
     }
 

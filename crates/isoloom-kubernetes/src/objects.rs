@@ -8,8 +8,8 @@ mod networking;
 mod pod;
 
 pub use container::{
-    Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, KeyToPath, Limits, Probe, Resources, SecretKey, SecretSource, Volume, VolumeMount,
-    VolumeSource,
+    Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, HttpGet, KeyToPath, Limits, Probe, Resources, SecretKey, SecretSource, Volume,
+    VolumeMount, VolumeSource,
 };
 pub use networking::{IpBlock, NetworkPolicySpec, Peer, PolicyPort, Rule, ServicePort, ServiceSpec};
 pub use pod::{Affinity, AffinityTerm, DnsConfig, DnsOption, NameValue, PodAffinity, PodSecurity, PodSpec, PodTemplate};

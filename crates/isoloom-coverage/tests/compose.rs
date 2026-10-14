@@ -215,6 +215,24 @@ machines:
       - { path: /etc/app/app.ini, content: "mode=lab\n", uid: 101, gid: 101, mode: "0640" }
       - { path: /etc/nginx/conf.d/site.conf, source: conf/site.conf }
 "#,
+    // A machine's own process: `command`, `working_dir`, `healthcheck.test` (`before` in the
+    // entrypoint).
+    r#"
+version: 1
+name: machine-command
+inputs: [FLAG]
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    inputs: [FLAG]
+    services: [{ port: 8000 }]
+    docker: { image: python:3-alpine }
+    command: [python3, -m, http.server, "8000"]
+    working_dir: /srv
+    before: [flag.sh]
+    healthcheck: { test: "test -s /srv/flag", interval: 2s, retries: 30 }
+"#,
 ];
 
 /// Every Compose file Isoloom writes for `spec`, on every target that writes one.

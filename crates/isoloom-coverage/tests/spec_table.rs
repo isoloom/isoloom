@@ -187,6 +187,10 @@ machines:
     networks: { out: 10 }
     docker: { build: h, dockerfile: h.Dockerfile, target: lab, args: { A: b } }
     files: [{ path: /etc/a, content: x, uid: 1, gid: 1, mode: "0600" }, { path: /etc/b, source: b }]
+    command: [serve]
+    working_dir: /srv
+    before: [b.sh]
+    healthcheck: { test: t, http: { port: 80, path: / }, interval: 1s, timeout: 1s, retries: 1, start_period: 1s }
 provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, host_vars: { fw: { a: b } }, requirements: req.yml }]
 controller: { image: { vagrant: x/y }, resources: { cpus: 1, memory_mb: 512 } }
 common: { resources: { cpus: 1 } }

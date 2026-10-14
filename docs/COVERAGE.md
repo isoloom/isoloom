@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 84% | 150 | 123 | 6 | 21 |
+| [Docker Compose](#docker-compose) | 85% | 150 | 127 | 3 | 20 |
 | [Vagrant](#vagrant) | 95% | 42 | 40 | 0 | 2 |
 | [Vagrant: networks](#vagrant-networks) | 92% | 38 | 35 | 0 | 3 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
@@ -24,7 +24,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: UTM](#vagrant-utm) | 100% | 3 | 3 | 0 | 0 |
 | [Vagrant: QEMU](#vagrant-qemu) | 85% | 14 | 12 | 0 | 2 |
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 19 | 19 | 0 | 0 |
-| [Vagrant: Docker](#vagrant-docker) | 92% | 13 | 12 | 0 | 1 |
+| [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
 | [Terraform: Proxmox](#terraform-proxmox) | 64% | 128 | 83 | 0 | 45 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 69% | 132 | 92 | 0 | 40 |
@@ -37,7 +37,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 93% | 198 | 184 | 2 | 12 |
+| [Kubernetes](#kubernetes) | 96% | 204 | 197 | 1 | 6 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
 | [Helm](#helm) | 100% | 19 | 19 | 0 | 0 |
 
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-84% of 150 portable features (123 done, 6 partly, 21 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+85% of 150 portable features (127 done, 3 partly, 20 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -130,7 +130,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `cap_drop` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `cgroup` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `cgroup_parent` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `command` | Yes | Partly | Isoloom's tools: tools.*.command; not yet: a machine's own command |
+| `command` | Yes | Yes | From `machines.*.command` (and Isoloom's tools: tools.*.command) |
 | `configs` | Yes | Yes | From `machines.*.files` |
 | `configs[].source` | Yes | Yes | From `machines.*.files` |
 | `configs[].target` | Yes | Yes | From `machines.*.files[].path` |
@@ -225,7 +225,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `dns_opt` | Yes | Yes | From `machines.*.dns.options` (and the Kubernetes dnsConfig) |
 | `dns_search` | Yes | Yes | From `machines.*.dns.search` (and the Kubernetes dnsConfig) |
 | `domainname` | Yes | Yes | From `machines.*.dns.domain` |
-| `entrypoint` | Yes | Yes | Isoloom's own containers and init jobs; a machine's own is its image's |
+| `entrypoint` | Yes | Yes | From `machines.*.before` (a shell running the steps, then the command; Isoloom's own containers and init jobs) |
 | `env_file` | Yes | Another way | Via inputs |
 | `env_file[].path` | Yes | Another way | Via inputs |
 | `env_file[].format` | Yes | Another way | Via inputs |
@@ -244,13 +244,13 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `gpus[].driver` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
 | `gpus[].options` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
 | `group_add` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
-| `healthcheck` | Yes | Partly | From `machines.*.services` (a probe of every port); not yet: a custom healthcheck command |
+| `healthcheck` | Yes | Yes | From `machines.*.services and machines.*.healthcheck` (a probe of every port, and the machine's own check beside it) |
 | `healthcheck.disable` | n/a | No | Turns off the image's own check: Isoloom's readiness is its own probe |
-| `healthcheck.interval` | Yes | Yes | Isoloom's probe pace |
-| `healthcheck.retries` | Yes | Yes | Isoloom's probe pace |
-| `healthcheck.test` | Yes | Partly | From `machines.*.services` (a probe of every port); not yet: a custom healthcheck command |
-| `healthcheck.timeout` | Yes | Yes | Isoloom's probe pace |
-| `healthcheck.start_period` | Yes | Yes | A grace period for slow starters: appliances and built images |
+| `healthcheck.interval` | Yes | Yes | From `machines.*.healthcheck.interval` (else Isoloom's probe pace) |
+| `healthcheck.retries` | Yes | Yes | From `machines.*.healthcheck.retries` (else Isoloom's probe pace) |
+| `healthcheck.test` | Yes | Yes | From `machines.*.healthcheck.test and machines.*.healthcheck.http` (after the probe of every port) |
+| `healthcheck.timeout` | Yes | Yes | From `machines.*.healthcheck.timeout` (else Isoloom's probe pace) |
+| `healthcheck.start_period` | Yes | Yes | From `machines.*.healthcheck.start_period` (else a grace period for slow starters: appliances and built images) |
 | `healthcheck.start_interval` | Yes | Another way | Via interval (Isoloom probes at one pace) |
 | `hostname` | Yes | Yes | From the machine's name |
 | `image` | Yes | Yes | From `machines.*.docker.image` |
@@ -362,7 +362,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `volumes[].image` | No | No | Mounts another container image's files: VMs have no images to mount |
 | `volumes[].image.subpath` | No | No | Mounts another container image's files: VMs have no images to mount |
 | `volumes_from` | Yes | Another way | Via volumes (a volume shared between machines, each mounting it at its own path) |
-| `working_dir` | Yes | Not yet | A machine's working directory, with its command |
+| `working_dir` | Yes | Yes | From `machines.*.working_dir` |
 
 ### Networks
 
@@ -1480,7 +1480,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: Docker
 
-92% of 13 portable features (12 done, 0 partly, 1 to do; 28 features in all). From Vagrant 2.4.9 (the provider's config class).
+100% of 13 portable features (13 done, 0 partly, 0 to do; 28 features in all). From Vagrant 2.4.9 (the provider's config class).
 
 ### Settings
 
@@ -1489,7 +1489,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `auth_server` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `build_args` | Yes | Another way | Via machines.*.docker.args, in the Compose output |
 | `build_dir` | Yes | Another way | Via machines.*.docker.build, in the Compose output |
-| `cmd` | Yes | Not yet | A machine's own command, instead of its image's |
+| `cmd` | Yes | Another way | Via machines.*.command, in the Compose output |
 | `compose` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `compose_configuration` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `create_args` | No | No | Raw commands for one hypervisor: no other target understands them |
@@ -6748,7 +6748,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-93% of 198 portable features (184 done, 2 partly, 12 to do; 369 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+96% of 204 portable features (197 done, 1 partly, 6 to do; 375 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -6851,8 +6851,8 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `PodSpec: tolerations` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: topologySpreadConstraints` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: volumes` | Yes | Yes | From `volumes, machines.*.tmpfs and machines.*.shm_size` |
-| `Container: args` | Yes | Not yet | A machine's own `command` (the image's default runs today) |
-| `Container: command` | Yes | Yes | From `machines.*.docker.idle and machines.*.docker.init` (and Isoloom's own containers) |
+| `Container: args` | Yes | Yes | From `machines.*.command` |
+| `Container: command` | Yes | Yes | From `machines.*.before` (a shell running the steps, then the command), machines.*.docker.idle and machines.*.docker.init (and Isoloom's own containers) |
 | `Container: env` | Yes | Yes | From `machines.*.environment and machines.*.inputs` |
 | `Container: envFrom` | Yes | Another way | Via `env`, one variable at a time |
 | `Container: image` | Yes | Yes | From `machines.*.docker.image` (or the image the project builds; a value of its own in the chart) |
@@ -6861,13 +6861,13 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `Container: livenessProbe` | n/a | No | Restarts a container Kubernetes finds unhealthy: the cluster's self-healing, not the machine's behavior |
 | `Container: name` | Yes | Yes | The machine's name |
 | `Container: ports` | Yes | Yes | From `machines.*.services` |
-| `Container: readinessProbe` | Yes | Partly | From `machines.*.services` (ready when its services' ports answer; dormant ones aren't waited for); not yet: a custom healthcheck command |
+| `Container: readinessProbe` | Yes | Yes | From `machines.*.services and machines.*.healthcheck` (ready when its services' ports answer, dormant ones aside, and its own check passes) |
 | `Container: resizePolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Container: resources` | Yes | Yes | From `machines.*.resources` |
 | `Container: restartPolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Container: restartPolicyRules` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Container: securityContext` | Yes | Yes | From `machines.*.privileged and machines.*.read_only` |
-| `Container: startupProbe` | Yes | Another way | Via `readinessProbe`, which waits as long as the machine takes to start |
+| `Container: startupProbe` | Yes | Yes | From `machines.*.services, when machines.*.healthcheck.http is the readiness probe` (the ports answer first) |
 | `Container: stdin` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
 | `Container: stdinOnce` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
 | `Container: terminationMessagePath` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
@@ -6875,7 +6875,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `Container: tty` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
 | `Container: volumeDevices` | Yes | Not yet | Raw data disks, with persistent volumes and data disks |
 | `Container: volumeMounts` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
-| `Container: workingDir` | Yes | In the image | The image's WORKDIR |
+| `Container: workingDir` | Yes | Yes | From `machines.*.working_dir` |
 | `ContainerPort: containerPort` | Yes | Yes | From `machines.*.services[].port` |
 | `ContainerPort: hostIP` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
 | `ContainerPort: hostPort` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
@@ -6895,17 +6895,23 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `ResourceRequirements: claims` | Yes | Not yet | Device passthrough (GPUs), where the cluster offers it |
 | `ResourceRequirements: limits` | Yes | Yes | From `machines.*.resources` (cpus, memory_mb) |
 | `ResourceRequirements: requests` | n/a | No | What the scheduler reserves on a node: the limits are the machine's size |
-| `Probe: exec` | Yes | Yes | From `machines.*.services` (Isoloom's port probe, the same on every target) |
-| `Probe: failureThreshold` | Yes | Yes | Every 5 seconds, for up to 5 minutes |
-| `Probe: grpc` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
-| `Probe: httpGet` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
-| `Probe: initialDelaySeconds` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
-| `Probe: periodSeconds` | Yes | Yes | Every 5 seconds, for up to 5 minutes |
-| `Probe: successThreshold` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
+| `Probe: exec` | Yes | Yes | From `machines.*.services and machines.*.healthcheck.test` (Isoloom's port probe, the same on every target, and the machine's own command) |
+| `Probe: failureThreshold` | Yes | Yes | From `machines.*.healthcheck.retries` (else for up to 5 minutes) |
+| `Probe: grpc` | Yes | Another way | Via machines.*.healthcheck.test: a gRPC health client the image carries (`grpc_health_probe`) |
+| `Probe: httpGet` | Yes | Yes | From `machines.*.healthcheck.http` |
+| `Probe: initialDelaySeconds` | Yes | Yes | From `machines.*.healthcheck.start_period` |
+| `Probe: periodSeconds` | Yes | Yes | From `machines.*.healthcheck.interval` (else every 5 seconds) |
+| `Probe: successThreshold` | Yes | Yes | 1 with a healthcheck: one passing try makes the machine ready, as on Compose and the VMs |
 | `Probe: tcpSocket` | Yes | Another way | Via `exec`: Isoloom's port probe checks every service port, TCP and UDP |
 | `Probe: terminationGracePeriodSeconds` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
-| `Probe: timeoutSeconds` | Yes | Not yet | With a custom healthcheck command (the probe checks the services' ports today) |
-| `ExecAction: command` | Yes | Yes | From `machines.*.services` (Isoloom's port probe, the same on every target) |
+| `Probe: timeoutSeconds` | Yes | Yes | From `machines.*.healthcheck.timeout` |
+| `ExecAction: command` | Yes | Yes | From `machines.*.services and machines.*.healthcheck.test` (Isoloom's port probe, the same on every target, and the machine's own command) |
+| `HTTPGetAction: host` | Yes | Another way | Via the pod's own address, the default: the healthcheck requests the machine itself |
+| `HTTPGetAction: httpHeaders` | Yes | Another way | Via machines.*.healthcheck.test: a command that requests the page as it needs (headers, HTTPS) |
+| `HTTPGetAction: path` | Yes | Yes | From `machines.*.healthcheck.http` |
+| `HTTPGetAction: port` | Yes | Yes | From `machines.*.healthcheck.http` |
+| `HTTPGetAction: protocol` | Yes | Another way | Via machines.*.healthcheck.test: a command that requests the page as it needs (headers, HTTPS) |
+| `HTTPGetAction: scheme` | Yes | Another way | Via machines.*.healthcheck.test: a command that requests the page as it needs (headers, HTTPS) |
 | `SecurityContext: allowPrivilegeEscalation` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
 | `SecurityContext: appArmorProfile` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
 | `SecurityContext: capabilities` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
@@ -7315,6 +7321,16 @@ is marked ✗, with its reason below.
 | `machines.*.resources.cpus` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
 | `machines.*.resources.memory_mb` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
 | `machines.*.resources.disk_gb` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.command` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.working_dir` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.before` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.test` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.http.port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.http.path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.interval` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.timeout` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.retries` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
+| `machines.*.healthcheck.start_period` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.depends_on` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
 | `volumes.*.owner` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | planned |
 | `machines.*.volumes` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
@@ -7379,24 +7395,24 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 86% of 91 | 77 | 3 | 0 | 11 |
-| hosted | 86% of 91 | 77 | 3 | 0 | 11 |
-| kubernetes | 72% of 83 | 55 | 11 | 1 | 16 |
-| helm | 72% of 83 | 55 | 11 | 1 | 16 |
-| kustomize | 72% of 83 | 55 | 11 | 1 | 16 |
-| vagrant | 91% of 83 | 75 | 2 | 0 | 6 |
-| docker-vm | 82% of 91 | 74 | 3 | 0 | 14 |
-| hybrid | 75% of 102 | 74 | 5 | 7 | 16 |
-| proxmox | 88% of 80 | 70 | 1 | 3 | 6 |
-| aws | 65% of 80 | 46 | 12 | 6 | 16 |
-| azure | 65% of 80 | 46 | 12 | 7 | 15 |
-| gcp | 65% of 80 | 46 | 12 | 6 | 16 |
-| digitalocean | 48% of 80 | 35 | 7 | 6 | 32 |
-| linode | 51% of 80 | 37 | 8 | 6 | 29 |
-| oci | 51% of 80 | 37 | 9 | 6 | 28 |
-| cloud-docker | 81% of 91 | 73 | 3 | 0 | 15 |
+| docker | 87% of 101 | 87 | 3 | 0 | 11 |
+| hosted | 87% of 101 | 87 | 3 | 0 | 11 |
+| kubernetes | 75% of 93 | 65 | 11 | 1 | 16 |
+| helm | 75% of 93 | 65 | 11 | 1 | 16 |
+| kustomize | 75% of 93 | 65 | 11 | 1 | 16 |
+| vagrant | 92% of 93 | 85 | 2 | 0 | 6 |
+| docker-vm | 84% of 101 | 84 | 3 | 0 | 14 |
+| hybrid | 77% of 112 | 84 | 5 | 7 | 16 |
+| proxmox | 89% of 90 | 80 | 1 | 3 | 6 |
+| aws | 68% of 90 | 56 | 12 | 6 | 16 |
+| azure | 68% of 90 | 56 | 12 | 7 | 15 |
+| gcp | 68% of 90 | 56 | 12 | 6 | 16 |
+| digitalocean | 53% of 90 | 45 | 7 | 6 | 32 |
+| linode | 56% of 90 | 47 | 8 | 6 | 29 |
+| oci | 57% of 90 | 47 | 9 | 6 | 28 |
+| cloud-docker | 83% of 101 | 83 | 3 | 0 | 15 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 57% of 64 | 32 | 9 | 14 | 9 |
+| external | 49% of 74 | 32 | 9 | 14 | 19 |
 
 ### Refusals
 
@@ -7434,6 +7450,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **linode**: Machine `a`: arm64 on Linode comes later (it has no arm64 plans) (`machines.*.arch`)
 - **oci**: Machine `a`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images) (`machines.*.arch`)
 - **cloud-docker**: Machine `a`: arm64 on a cloud VM comes later (Graviton instances and arm64 images) (`machines.*.arch`)
+- **external**: Machine `a` sets its own process (`command`, `working_dir`, `before` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it (`machines.*.command`, `machines.*.working_dir`, `machines.*.before`, `machines.*.healthcheck.test`, `machines.*.healthcheck.http.port`, `machines.*.healthcheck.http.path`, `machines.*.healthcheck.interval`, `machines.*.healthcheck.timeout`, `machines.*.healthcheck.retries`, `machines.*.healthcheck.start_period`)
 - **digitalocean**: DigitalOcean cloud-vm takes single-machine labs so far (it can't pin private addresses) (`machines.*.depends_on`, `volumes.*.owner`, `machines.*.access`)
 - **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`)
 - **external**: Machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook (`machines.*.files[].path`, `machines.*.files[].source`, `machines.*.files[].content`, `machines.*.files[].uid`, `machines.*.files[].gid`, `machines.*.files[].mode`)

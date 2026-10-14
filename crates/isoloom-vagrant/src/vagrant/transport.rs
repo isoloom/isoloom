@@ -114,6 +114,8 @@ fn label(step: &Step) -> String {
         Step::WaitFor { machine, .. } => format!("wait for {machine}"),
         Step::Run { path, .. } => path.clone(),
         Step::Reboot => "reboot".into(),
+        Step::Before { .. } => "before".into(),
+        Step::Command => "command".into(),
         Step::Egress => "no internet".into(),
         Step::Tc => "tc".into(),
         Step::Ready => "ready".into(),

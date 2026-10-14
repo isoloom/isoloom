@@ -89,11 +89,18 @@ pub enum Step {
     },
     /// Restarts the machine; the steps after it run once it is back.
     Reboot,
+    /// Its `before` scripts, run now and at every boot before its command.
+    Before {
+        /// The scripts, from the project folder.
+        paths: Vec<String>,
+    },
+    /// Its own command, run as a service from now on (see [`crate::Process`]).
+    Command,
     /// Offline: no new connection leaves the environment.
     Egress,
     /// Link impairment on its own interfaces.
     Tc,
-    /// Marks the machine ready.
+    /// Marks the machine ready, once its healthcheck passes when it has one.
     Ready,
 }
 
@@ -156,6 +163,12 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
         (!ports.is_empty()).then(|| Step::WaitFor { machine: dep.clone(), ports })
     }));
     steps.extend(runs(m));
+    if !m.before.is_empty() {
+        steps.push(Step::Before { paths: m.before.clone() });
+    }
+    if m.command.is_some() {
+        steps.push(Step::Command);
+    }
     if routing::offline(spec, name, m) {
         steps.push(Step::Egress);
     }
@@ -225,10 +238,12 @@ fn shared_volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Step> {
 
 fn runs(m: &Machine) -> Vec<Step> {
     let Some(vm) = &m.vm else { return Vec::new() };
-    let reboots = vm.provision.iter().any(|s| is_reboot(s));
+    // Kept on disk when a reboot comes, and for the command and `before` steps, which read
+    // them again at every boot.
+    let persist = vm.provision.iter().any(|s| is_reboot(s)) || m.command.is_some() || !m.before.is_empty();
     let mut steps = Vec::new();
     if !m.inputs.is_empty() {
-        steps.push(Step::Inputs { persist: reboots });
+        steps.push(Step::Inputs { persist });
     }
     steps.extend(vm.provision.iter().map(|s| {
         if is_reboot(s) {

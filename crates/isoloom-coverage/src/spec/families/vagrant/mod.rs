@@ -13,4 +13,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::ipv6::VAGRANT,
     super::outside::VAGRANT,
     super::machine_files::VM,
+    super::process::VM,
 ];

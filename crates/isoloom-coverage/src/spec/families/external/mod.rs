@@ -13,4 +13,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::ipv6::EXTERNAL,
     super::outside::EXTERNAL,
     super::machine_files::EXTERNAL,
+    super::process::EXTERNAL,
 ];

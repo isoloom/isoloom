@@ -50,6 +50,7 @@ mod machine;
 mod network;
 pub mod objects;
 pub mod pod;
+mod process;
 mod render;
 pub mod secrets;
 mod values_schema;
@@ -68,7 +69,7 @@ pub const CHART: &str = "chart";
 /// Where the chart's copies of the project's scripts go, under the chart.
 pub const CHART_PROJECT_FILES: &str = "files/project";
 
-/// What Kubernetes can render: IPv6 networks of every kind (the cluster picks pod addresses,
+/// What Kubernetes can render: a machine's own process, IPv6 networks of every kind (the cluster picks pod addresses,
 /// so a network's IPv6 side sets the Services' IP families), secrets (a Secret `isoloom run`
 /// creates) and a project file with its own owner and mode (copied into place by an init
 /// container). No controller (no `provision:`, no Ansible checks), `exec` checks run inside a
@@ -82,6 +83,7 @@ pub fn capabilities() -> Capabilities {
         Feature::Ipv6Auto,
         Feature::Secrets,
         Feature::OwnedProjectFiles,
+        Feature::MachineProcess,
     ])
 }
 

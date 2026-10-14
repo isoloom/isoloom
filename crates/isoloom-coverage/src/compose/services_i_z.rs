@@ -396,8 +396,8 @@ pub(super) const SERVICES_I_Z: &[(&str, Support)] = &[
     ),
     (
         "services.*.working_dir",
-        Planned {
-            note: "a machine's working directory, with its command",
+        Emitted {
+            from: "machines.*.working_dir",
         },
     ),
 ];

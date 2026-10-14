@@ -14,9 +14,10 @@ use crate::kustomize::{SCRIPTS, key};
 use crate::machine::{Machine, udp};
 use crate::network::MACHINE_LABEL;
 use crate::objects::{
-    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, Image, Labels, Limits, NameValue, PodAffinity, PodSecurity,
-    PodSpec, Probe, Resources, SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
+    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Image, Labels, Limits, NameValue, PodAffinity, PodSecurity, PodSpec,
+    Resources, SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
 };
+use crate::process::{self, SCRIPTS_DIR};
 
 // Isoloom's static busybox (the probe needs nothing from the machine's image) and its utility
 // image, as on Compose.
@@ -30,8 +31,6 @@ pub const SEED_DIR: &str = "/isoloom-seed";
 pub const SEED_MARKER: &str = ".isoloom-seeding";
 /// The Secret the machines' inputs are read from.
 pub const INPUTS: &str = "isoloom-inputs";
-/// Where the project's scripts are, in a container running them.
-const SCRIPTS_DIR: &str = "/isoloom/scripts";
 /// A machine's image is only pulled when the node doesn't have it (a built one is only local).
 const IF_NOT_PRESENT: Option<&str> = Some("IfNotPresent");
 
@@ -80,6 +79,7 @@ fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
     if m.spec.supplied || m.spec.docker.as_ref().is_some_and(|d| d.idle) {
         c.command = vec!["sleep".into(), "infinity".into()];
     }
+    process::apply(m, &mut c);
     if m.spec.privileged || m.spec.read_only {
         c.security_context = Some(ContainerSecurity {
             privileged: m.spec.privileged,
@@ -96,25 +96,16 @@ fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
             protocol: udp(sv.protocol),
         })
         .collect();
-    // Ready when its services answer (dormant ones aren't waited for).
-    if m.probed() {
-        c.readiness_probe = Some(Probe {
-            exec: Exec {
-                command: vec![format!("{PROBE_DIR}/busybox"), "sh".into(), "-c".into(), probe(m)],
-            },
-            period_seconds: 5,
-            failure_threshold: 60,
-        });
-    }
+    // Ready when its services answer (dormant ones aren't waited for) and its own healthcheck
+    // passes.
+    process::probes(m, &mut c);
     c.env = env(m);
     c.resources = limits(m);
     c.volume_mounts = mounts.to_vec();
+    if process::runs_scripts(m) {
+        c.volume_mounts.push(VolumeMount::at("scripts", SCRIPTS_DIR));
+    }
     c
-}
-
-/// The probe of its services, run by Isoloom's busybox.
-fn probe(m: &Machine) -> String {
-    isoloom_compose::docker::probe(m.spec)
 }
 
 /// Its CPU and memory limits, if it has any.
@@ -170,7 +161,7 @@ fn jobs_container(m: &Machine, mounts: &[VolumeMount]) -> Option<Container> {
     if m.init().is_empty() {
         return None;
     }
-    let wait = m.probed().then(|| format!("until {}; do sleep 2; done", probe(m)));
+    let wait = m.probed().then(|| format!("until {}; do sleep 2; done", process::ready_test(m)));
     let run = m.init().iter().map(|script| format!("sh {SCRIPTS_DIR}/{}", key(script)));
     let steps: Vec<String> = wait.into_iter().chain(run).chain(["exec sleep infinity".to_string()]).collect();
     let mut c = Container::new("init", m.image());
@@ -271,7 +262,8 @@ fn beside_owners(m: &Machine) -> Option<Affinity> {
     })
 }
 
-/// The pod's volumes: its claims, the project's scripts (for its `init:` jobs), Isoloom's
+/// The pod's volumes: its claims, the project's scripts (for its `init:` jobs and `before`
+/// steps), Isoloom's
 /// probe, then its memory-backed mounts.
 fn volumes(m: &Machine) -> Vec<Volume> {
     let volume = |name: String, source| Volume { name, source };
@@ -281,7 +273,7 @@ fn volumes(m: &Machine) -> Vec<Volume> {
         .iter()
         .map(|v| volume(format!("vol-{}", v.name), VolumeSource::PersistentVolumeClaim { claim_name: v.key.clone() }))
         .collect();
-    if !m.init().is_empty() || files::reads_project(m) {
+    if !m.init().is_empty() || files::reads_project(m) || process::runs_scripts(m) {
         out.push(volume("scripts".into(), scripts_volume()));
     }
     out.extend(files::volumes(m));

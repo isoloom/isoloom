@@ -355,7 +355,7 @@ fn check_runner(env: &Environment, pos: &Position, scripts: bool, services: &mut
         c.volumes.push(format!("{ROOT}:/isoloom/project:ro"));
     }
     for (name, m) in spec.machines.iter().filter(|(_, m)| m.docker.is_some()) {
-        if !m.ready_ports().is_empty() {
+        if m.has_readiness() {
             c.after(name.clone(), "service_healthy");
         }
         for init in init_names(name, m) {
@@ -380,7 +380,7 @@ fn check_runner(env: &Environment, pos: &Position, scripts: bool, services: &mut
 fn machine_namespace(env: &Environment, name: &str, c: &mut Service, services: &mut IndexMap<String, Service>) -> String {
     let m = &env.spec().machines[name];
     if m.docker.is_some() {
-        if m.ready_ports().is_empty() {
+        if !m.has_readiness() {
             c.after(name, "service_started");
         }
         return name.to_string();

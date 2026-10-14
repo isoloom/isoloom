@@ -43,6 +43,7 @@ pub const TABLED: &[&str] = &[
     "ResourceRequirements",
     "Probe",
     "ExecAction",
+    "HTTPGetAction",
     "SecurityContext",
     "PodSecurityContext",
     "Sysctl",

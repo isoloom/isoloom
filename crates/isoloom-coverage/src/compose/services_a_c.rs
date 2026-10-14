@@ -1,7 +1,7 @@
 //! Service keys from `annotations` to `cpuset`, `build` included.
 
 use super::{BUILD, CLOUD_SIZES, FILE_OWNER, FILES, NO_CONTAINER_ON_VMS, TOOLING, WINDOWS_CONTAINERS};
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Tooling};
 
 /// Service keys from `annotations` to `cpuset`.
 pub(super) const SERVICES_A_C: &[(&str, Support)] = &[
@@ -108,9 +108,8 @@ pub(super) const SERVICES_A_C: &[(&str, Support)] = &[
     ("services.*.cgroup_parent", NO_CONTAINER_ON_VMS),
     (
         "services.*.command",
-        Partial {
-            from: "(Isoloom's tools: tools.*.command)",
-            gap: "a machine's own command",
+        Emitted {
+            from: "machines.*.command (and Isoloom's tools: tools.*.command)",
         },
     ),
     ("services.*.configs", FILES),

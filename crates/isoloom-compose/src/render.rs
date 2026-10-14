@@ -4,6 +4,7 @@
 
 mod files;
 mod machine;
+mod process;
 mod secrets;
 
 pub(crate) use machine::mac;
@@ -41,6 +42,7 @@ pub fn capabilities() -> isoloom_plan::Capabilities {
         Feature::Secrets,
         Feature::SecretOwners,
         Feature::ExternalNetworks,
+        Feature::MachineProcess,
     ])
 }
 
@@ -57,6 +59,7 @@ pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
         Feature::Ipv6,
         Feature::Ipv6Only,
         Feature::Ipv6Auto,
+        Feature::MachineProcess,
     ])
 }
 

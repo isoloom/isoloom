@@ -13,4 +13,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::ipv6::PROXMOX,
     super::outside::PROXMOX,
     super::machine_files::VM,
+    super::process::VM,
 ];

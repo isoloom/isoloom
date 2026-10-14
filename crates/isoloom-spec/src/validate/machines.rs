@@ -244,7 +244,7 @@ fn vm(s: &Subject, v: &VmImpl, p: &mut Problems) {
             }
         }
     }
-    if v.provision.is_empty() && !s.m.access && s.spec.provision.is_empty() {
+    if v.provision.is_empty() && s.m.command.is_none() && !s.m.access && s.spec.provision.is_empty() {
         p.add(
             format!("{at}.vm.provision"),
             "list the steps that install the machine's services (or provision the environment with `provision:`)",

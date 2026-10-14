@@ -62,9 +62,10 @@ impl<'a> Machine<'a> {
         }
     }
 
-    /// Whether it has a port to probe (its readiness, what the others wait for).
+    /// Whether it has a port to probe or a healthcheck of its own (its readiness, what its
+    /// `init:` jobs wait for).
     pub fn probed(&self) -> bool {
-        !self.spec.ready_ports().is_empty()
+        self.spec.has_readiness()
     }
 
     /// Its `init:` scripts, in order.
