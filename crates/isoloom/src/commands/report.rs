@@ -5,7 +5,7 @@ use std::process::ExitCode;
 
 use isoloom_core as core;
 
-use crate::{Res, spec};
+use crate::{Res, spec, tools};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -33,5 +33,12 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     }
     let snapshot = spec::snapshot_of(&a.dir, a.instance, &a.sets)?;
     print!("{}", core::report::report(&a.name, &snapshot, a.md)?);
+    // Published ports on Hyper-V (the provider the defaults or Vagrant pick): not forwarded.
+    if a.name == "services"
+        && tools::vagrant::provider(&a.dir).as_deref() == Some("hyperv")
+        && let Some(note) = core::report::hyperv_ports_note(&snapshot)
+    {
+        print!("\n{note}");
+    }
     Ok(ExitCode::SUCCESS)
 }

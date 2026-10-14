@@ -20,6 +20,8 @@ machines:
     external: { address: 192.168.1.20, user: florian, key: ~/.ssh/id_ed25519 }
   cache:
     networks: { lab: 21 }
+    # Kernel-level access (it changes a kernel boot option); on Hyper-V, nested virtualization too.
+    privileged: true
     services: [{ port: 6379, name: redis }]
     vm:
       os: debian-12

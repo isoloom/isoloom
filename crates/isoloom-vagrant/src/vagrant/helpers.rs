@@ -9,8 +9,10 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
 use isoloom_render::inventory::{self, Access};
 use isoloom_render::{CONTROLLER_BOX, GeneratedFile, ansible_runs, boot, controller_box, controller_size};
+use isoloom_spec::images::HyperVBox;
 use isoloom_spec::validate::Cidr;
 
+use super::hyperv::HyperV;
 use super::machine::{define, private_network};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
@@ -41,24 +43,32 @@ fn every_machine(env: &Environment) -> Step {
     Step::Hosts { entries }
 }
 
-/// One of Isoloom's own VMs, as its providers see it.
-fn helper<'a>(env: &Environment, what: &str, size: Size, nets: Vec<&'a str>, link: &'a Link) -> Guest<'a> {
+/// One of Isoloom's own VMs, as its providers see it: on each network of `at`, at its address
+/// there.
+fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ipv4Addr)>, link: &'a Link) -> Guest<'a> {
     Guest {
         label: format!("{} · {what}", env.name),
-        esxi_name: format!("{}-{}", env.name, what.replace(' ', "-")),
+        vm_name: format!("{}-{}", env.name, what.replace(' ', "-")),
         size,
-        nets,
+        nets: at.iter().map(|(net, _)| *net).collect(),
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
         qemu: Qemu::helper(link),
+        hyperv: HyperV::helper(env, at),
     }
+}
+
+/// Each network with the VM's address on it (`at`), in order.
+fn addresses(env: &Environment, at: impl Fn(Cidr) -> Ipv4Addr) -> Vec<(&str, Ipv4Addr)> {
+    env.networks
+        .iter()
+        .filter_map(|(net, n)| Cidr::parse(&n.cidr).map(|c| (net.as_str(), at(c))))
+        .collect()
 }
 
 /// Each network at the VM's address on it (`at`), as private networks.
 fn networks(r: &mut Ruby, env: &Environment, at: impl Fn(Cidr) -> Ipv4Addr) {
-    for (net, n) in &env.networks {
-        if let Some(c) = Cidr::parse(&n.cidr) {
-            private_network(r, env, net, at(c));
-        }
+    for (net, ip) in addresses(env, at) {
+        private_network(r, env, net, ip);
     }
 }
 
@@ -82,7 +92,8 @@ pub fn router_vm(r: &mut Ruby, ctx: &Ctx) {
         for (net, ip) in routed {
             private_network(r, env, net, *ip);
         }
-        providers::blocks(r, &helper(env, "router", Size::HELPER, routed.keys().map(String::as_str).collect(), link));
+        let at = routed.iter().map(|(net, ip)| (net.as_str(), *ip)).collect();
+        providers::blocks(r, &helper(env, "router", Size::HELPER, at, link));
         steps_of(r, env, router::NAME, &[Step::Prelude]);
         shell(r, "router", &script);
     });
@@ -113,8 +124,8 @@ fn tool_shell(r: &mut Ruby, ctx: &Ctx, index: usize) {
         r.assign("m.vm.box", Value::str(HELPER_BOX));
         r.assign("m.vm.hostname", Value::str("shell"));
         networks(r, env, |c| c.tool(index));
-        let all = env.networks.keys().map(String::as_str).collect();
-        providers::blocks(r, &helper(env, "tool shell", Size::HELPER, all, link));
+        let at = addresses(env, |c| c.tool(index));
+        providers::blocks(r, &helper(env, "tool shell", Size::HELPER, at, link));
         steps_of(r, env, TOOL_SHELL, &[Step::Prelude, every_machine(env)]);
         shell(
             r,
@@ -138,10 +149,12 @@ pub fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let (cpus, mem, disk) = controller_size(env.spec());
     let size = Size { cpus, mem, disk };
     let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
-    let mut guest = helper(env, "controller", size, env.networks.keys().map(String::as_str).collect(), link);
+    let mut guest = helper(env, "controller", size, addresses(env, Cidr::controller), link);
     // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other
     // providers gets Debian's instead.
     guest.libvirt_box = (bx == CONTROLLER_BOX).then_some(CONTROLLER_BOX);
+    // Its box (Alpine's, or the spec's own) boots on Hyper-V as it is.
+    guest.hyperv.boxed = HyperVBox::Main;
     let mut steps = vec![Step::Prelude];
     steps.extend(size.disk.map(|_| Step::DiskGrow));
     steps.extend([every_machine(env), Step::Project]);

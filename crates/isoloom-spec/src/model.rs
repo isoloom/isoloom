@@ -538,6 +538,10 @@ pub struct VmImage {
     /// (e.g. `peru/windows-server-2019-standard-x64-eval`).
     #[serde(default)]
     pub qemu: Option<String>,
+    /// The box Vagrant's Hyper-V provider boots instead, when `vagrant` has no Hyper-V build
+    /// (its latest version that has one).
+    #[serde(default)]
+    pub hyperv: Option<String>,
     /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
     #[serde(default)]
     pub winrm: Option<Winrm>,
@@ -1051,8 +1055,9 @@ pub struct CloudServices {
     /// A Terraform root module in the project (a folder holding `.tf` files), used as is.
     pub terraform: String,
     /// The module's variables: any value (a string, number, boolean, list or map). A string
-    /// that is exactly `{{ inputs.NAME }}` takes the launch-time input `NAME` (declared in
-    /// `inputs`), e.g. the user's IP for an allow-list: required at `run`, kept for `down`.
+    /// holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the
+    /// launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list:
+    /// required at `run`, kept for `down`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[schemars(with = "IndexMap<String, serde_json::Value>")]
     pub vars: IndexMap<String, serde_json::Value>,
@@ -1066,6 +1071,31 @@ pub struct CloudServices {
     /// budget. Isoloom doesn't bill or stop anything by it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hourly_usd: Option<f64>,
+    /// Steps run on this machine before Terraform applies the module (a key pair the module
+    /// reads, a build): scripts in the project, run in order from the module's copy, with the
+    /// spec's inputs and `env` in their environment. They run at every `run`: make them
+    /// idempotent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub before: Vec<String>,
+    /// Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`).
+    /// Not for credentials: those come from the user's own environment.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub env: IndexMap<String, String>,
+    /// How many times to apply again when an apply fails (a module that only converges on a
+    /// second apply), 0 to 5. 0 by default.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub apply_retries: u8,
+    /// What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)
+    /// that must be on the PATH, or a shell command that must succeed
+    /// (`python3 -c 'import boto3'`). `isoloom doctor` and `isoloom run` check them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<String>,
+}
+
+/// Whether a count is zero (left out when serialized).
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference.
+fn is_zero(n: &u8) -> bool {
+    *n == 0
 }
 
 /// A cloud an environment of cloud services deploys into.
@@ -1079,10 +1109,55 @@ pub enum CloudProvider {
 
 impl CloudServices {
     /// The launch-time input a variable takes, when its value is exactly `{{ inputs.NAME }}`.
+    /// A value can also hold inputs inside its strings, at any depth: see
+    /// [`inputs_in`](Self::inputs_in).
     pub fn input_of(value: &serde_json::Value) -> Option<&str> {
         let s = value.as_str()?.trim();
         s.strip_prefix("{{ inputs.")?.strip_suffix(" }}").map(str::trim)
     }
+
+    /// The launch-time inputs a variable's value takes: every `{{ inputs.NAME }}` in its strings,
+    /// at any depth, in order (repeats kept).
+    pub fn inputs_in(value: &serde_json::Value) -> Vec<String> {
+        let mut found = Vec::new();
+        Self::fill_inputs(value, &mut |name| {
+            found.push(name.to_string());
+            Some(String::new())
+        });
+        found
+    }
+
+    /// The value with each `{{ inputs.NAME }}` in its strings, at any depth, replaced by
+    /// `input(NAME)` (left as written when it gives nothing).
+    pub fn fill_inputs(value: &serde_json::Value, input: &mut dyn FnMut(&str) -> Option<String>) -> serde_json::Value {
+        use serde_json::Value;
+        match value {
+            Value::String(s) => Value::String(fill_string(s, input)),
+            Value::Array(a) => Value::Array(a.iter().map(|v| Self::fill_inputs(v, input)).collect()),
+            Value::Object(m) => Value::Object(m.iter().map(|(k, v)| (k.clone(), Self::fill_inputs(v, input))).collect()),
+            other => other.clone(),
+        }
+    }
+}
+
+/// `s` with each `{{ inputs.NAME }}` replaced by `input(NAME)`; any other `{{ ... }}`, and an
+/// input `input` gives nothing for, left as written.
+fn fill_string(s: &str, input: &mut dyn FnMut(&str) -> Option<String>) -> String {
+    let mut out = String::new();
+    let mut rest = s;
+    while let Some(start) = rest.find("{{") {
+        let Some(len) = rest[start..].find("}}") else { break };
+        let whole = &rest[start..start + len + 2];
+        out.push_str(&rest[..start]);
+        let inner = whole[2..whole.len() - 2].trim();
+        match inner.strip_prefix("inputs.").map(str::trim).and_then(&mut *input) {
+            Some(v) => out.push_str(&v),
+            None => out.push_str(whole),
+        }
+        rest = &rest[start + len + 2..];
+    }
+    out.push_str(rest);
+    out
 }
 
 impl CloudProvider {

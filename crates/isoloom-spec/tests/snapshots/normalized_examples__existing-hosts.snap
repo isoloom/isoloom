@@ -46,7 +46,7 @@ machines:
     networks:
       lab: 21
     arch: amd64
-    privileged: false
+    privileged: true
     read_only: false
     tmpfs: []
     shm_size: ~

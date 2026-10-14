@@ -28,6 +28,9 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     let mut paths = Paths { lab_dir, problems: Vec::new() };
     if let Some(c) = &spec.cloud {
         paths.check("cloud.terraform".into(), &c.terraform);
+        for (i, b) in c.before.iter().enumerate() {
+            paths.check(format!("cloud.before[{i}]"), b);
+        }
     }
     machines(spec, &mut paths);
     for (i, step) in spec.provision.iter().enumerate() {

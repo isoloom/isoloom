@@ -1,5 +1,8 @@
 //! The `cloud-services` target's two sides of a deployment: the launch-time inputs `run`
-//! hands the module, and the outputs `test` and the message read back from it.
+//! hands the module, and the outputs `test` and the message read back from it; the
+//! deployment's name and what is left with it after `down` ([`mod@leftovers`]).
+
+mod leftovers;
 
 use std::path::Path;
 use std::process::Stdio;
@@ -11,6 +14,8 @@ use isoloom_core::events::ErrorCode;
 use crate::failure::Failure;
 use crate::tools::terraform;
 use crate::{Res, spec};
+
+pub use leftovers::{leftovers, name_deployment};
 
 /// A cloud-services environment's outputs, by the spec's names: `outputs.sh` read (empty when
 /// it isn't deployed or Terraform can't say).
@@ -49,16 +54,22 @@ pub fn write_inputs(cloud: &core::CloudServices, wd: &Path) -> Res<()> {
         eprintln!("note: about ${h:.2} an hour while it exists (cloud.hourly_usd); `isoloom down` destroys it");
     }
     let mut values = serde_json::Map::new();
-    let mut missing = Vec::new();
+    let mut missing: Vec<String> = Vec::new();
     for (k, v) in &cloud.vars {
-        if let Some(i) = core::CloudServices::input_of(v) {
-            match spec::input(i) {
-                Some(val) if !val.is_empty() => {
-                    values.insert(k.clone(), serde_json::Value::String(val));
-                }
-                _ => missing.push(i.to_string()),
-            }
+        if core::CloudServices::inputs_in(v).is_empty() {
+            continue;
         }
+        // Each `{{ inputs.NAME }}` in the value, at any depth, filled from the environment.
+        let filled = core::CloudServices::fill_inputs(v, &mut |i| match spec::input(i) {
+            Some(val) if !val.is_empty() => Some(val),
+            _ => {
+                if !missing.iter().any(|m| m == i) {
+                    missing.push(i.to_string());
+                }
+                None
+            }
+        });
+        values.insert(k.clone(), filled);
     }
     if !missing.is_empty() {
         let message = format!("set {} in the environment (the services take them at launch)", missing.join(", "));

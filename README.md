@@ -127,6 +127,18 @@ kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | k
 helm install env .isoloom/kubernetes/chart -n env --create-namespace && helm test env -n env   # the same, as a chart
 ```
 
+On Windows with **Hyper-V** (`vagrant up --provider hyperv`, or `vagrant: { provider: hyperv }` in
+the defaults), run Vagrant from an elevated shell (an administrator, or a member of Hyper-V
+Administrators); `isoloom doctor` says whether Hyper-V is on and usable from yours. Each VM's
+first adapter is on `ISOLOOM_HYPERV_SWITCH` (default: the Default Switch, which Windows Server
+doesn't have); each network becomes a private switch `isoloom-<env>-<network>` (between the VMs
+only, removed with the last VM), and each machine's fixed address there is set inside the guest.
+Published ports aren't forwarded to the host's loopback on Hyper-V (Vagrant can't): `vagrant up`
+warns with the VM's address to use instead, and `isoloom report services` says so when Hyper-V is
+the provider (the defaults' `vagrant.provider`, or `VAGRANT_DEFAULT_PROVIDER`). OS names without
+a Hyper-V box (debian-13, ubuntu-14.04, fedora-42) need `vm.image.hyperv`; `isoloom run vagrant`
+refuses them on Hyper-V until they have one.
+
 Checks come in three kinds, and `isoloom test` runs them all from inside the environment:
 **derived** from the spec (every service answers from the machines `reach` lets through and from
 nowhere else; offline networks stay offline; without a Linux machine to run them, every service

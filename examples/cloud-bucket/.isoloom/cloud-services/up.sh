@@ -7,7 +7,14 @@ set -eu
 cd "$(dirname "$0")"
 here="$(pwd)"
 export TF_DATA_DIR="$here/.terraform"
-module='../../terraform'
+[ ! -f "$here/isoloom-instance" ] || export TF_VAR_isoloom_instance="$(cat "$here/isoloom-instance")"
+src='../../terraform'
+module="$here/module"
+echo $$ > "$here/deploying"
+trap 'rm -f "$here/deploying"' EXIT
+mkdir -p "$module"
+find "$module" -type f \( -name '*.tf' -o -name '*.tf.json' -o -name '*.tfvars' -o -name '*.tfvars.json' \) -exec rm -f {} +
+tar -C "$src" -cf - --exclude=.terraform --exclude='*.tfstate' --exclude='*.tfstate.*' . | tar -C "$module" -xf -
 terraform -chdir="$module" init -input=false >&2
 set -- -var-file="$here/terraform.tfvars.json"
 [ ! -f "$here/inputs.tfvars.json" ] || set -- "$@" -var-file="$here/inputs.tfvars.json"

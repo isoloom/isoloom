@@ -108,6 +108,15 @@ pub fn vagrant_uses_libvirt(wd: &Path) -> bool {
         .any(|m| m.path().join("libvirt/id").is_file())
 }
 
+/// The Vagrant provider `isoloom run vagrant` would use in `dir`: the defaults' `vagrant.provider`,
+/// else Vagrant's own `VAGRANT_DEFAULT_PROVIDER`.
+pub fn provider(dir: &Path) -> Option<String> {
+    crate::spec::load_settings(dir, None, &[])
+        .ok()
+        .and_then(|(_, r)| r.defaults.vagrant.provider)
+        .or_else(|| std::env::var("VAGRANT_DEFAULT_PROVIDER").ok().filter(|v| !v.is_empty()))
+}
+
 /// The plan's published UDP ports, as `<machine>:<port>/udp (published as <host>)`.
 pub fn udp_forwards(plan: &Environment) -> Vec<String> {
     plan.machines

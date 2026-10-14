@@ -6,6 +6,7 @@ use std::net::Ipv4Addr;
 use isoloom_spec::images;
 use isoloom_spec::model::Arch;
 
+use super::hyperv::{self, HyperV};
 use super::qemu::Link;
 use crate::ruby::{Call, Ruby, Value};
 
@@ -62,8 +63,8 @@ impl<'a> Qemu<'a> {
 pub struct Guest<'a> {
     /// Its display name.
     pub label: String,
-    /// Its name on ESXi.
-    pub esxi_name: String,
+    /// Its name on ESXi and Hyper-V (`<env>-<machine>`).
+    pub vm_name: String,
     /// Its size.
     pub size: Size,
     /// The networks it is on, in order.
@@ -72,6 +73,8 @@ pub struct Guest<'a> {
     pub libvirt_box: Option<&'a str>,
     /// How QEMU runs it.
     pub qemu: Qemu<'a>,
+    /// How Hyper-V runs it.
+    pub hyperv: HyperV<'a>,
 }
 
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
@@ -92,6 +95,7 @@ pub fn blocks(r: &mut Ruby, g: &Guest) {
     r.block(provider("qemu"), "v, o", |r| qemu(r, g.size, &g.qemu));
     r.block(provider("vmware_esxi"), "v", |r| esxi(r, g));
     libvirt(r, g);
+    hyperv::block(r, &g.vm_name, g.size, &g.hyperv);
 }
 
 fn provider(name: &str) -> Call {
@@ -226,7 +230,7 @@ fn esxi(r: &mut Ruby, g: &Guest) {
     r.assign("v.esxi_password", Value::str("env:ESXI_PASSWORD"));
     r.assign_if("v.esxi_disk_store", Value::raw("ENV[\"ESXI_DATASTORE\"]"), "ENV[\"ESXI_DATASTORE\"]");
     r.assign("v.esxi_virtual_network", Value::raw(format!("esxi_networks({nets})")));
-    r.assign("v.guest_name", Value::str(&g.esxi_name));
+    r.assign("v.guest_name", Value::str(&g.vm_name));
     r.assign("v.guest_numvcpus", g.size.cpus);
     r.assign("v.guest_memsize", g.size.mem);
     if let Some(d) = g.size.disk {

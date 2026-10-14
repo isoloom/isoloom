@@ -17,6 +17,11 @@ use crate::{cloud_services, output, spec};
 pub fn after(p: &Prepared, ask: &Ask, down: bool, tool: &Invocation, project: Option<String>) -> Option<String> {
     record(p, ask, down, project);
     if down {
+        // What the cloud still holds with this deployment's tag, once Terraform destroyed what
+        // it knew of (log groups, service-linked roles, secrets pending deletion).
+        if p.target == Target::CloudServices {
+            cloud_services::leftovers(&p.spec, &tool.wd);
+        }
         return None;
     }
     // VMs: a baseline snapshot of the environment as it came up, for `isoloom reset`.
@@ -37,7 +42,7 @@ pub fn after(p: &Prepared, ask: &Ask, down: bool, tool: &Invocation, project: Op
 }
 
 /// Remember what is up on this host, for status / connect / exec / capture.
-fn record(p: &Prepared, ask: &Ask, down: bool, project: Option<String>) {
+pub(super) fn record(p: &Prepared, ask: &Ask, down: bool, project: Option<String>) {
     let recorded = core::registry::update(|reg| {
         if down {
             reg.remove(&p.dir, p.target, ask.instance);

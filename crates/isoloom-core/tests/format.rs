@@ -244,6 +244,21 @@ fn cloud_vars_are_typed_and_can_take_inputs() {
     assert_eq!(vars["ips"], serde_json::json!(["10.0.0.1/32"]));
     assert_eq!(isoloom_core::CloudServices::input_of(&vars["cidr"]), Some("CLIENT_CIDR"));
     assert!(validate(&ok).is_empty(), "{:?}", validate(&ok));
+    // At any depth, inside a string too.
+    let nested = parse(&format!(
+        "{base}  vars: {{ allow: [\"{{{{ inputs.IP }}}}/32\", {{ v: \"{{{{inputs.NOPE}}}}\" }}] }}\ninputs: [IP]\n"
+    ))
+    .unwrap();
+    let allow = &nested.cloud.as_ref().unwrap().vars["allow"];
+    assert_eq!(isoloom_core::CloudServices::inputs_in(allow), ["IP", "NOPE"]);
+    let filled = isoloom_core::CloudServices::fill_inputs(allow, &mut |n| (n == "IP").then(|| "203.0.113.7".to_string()));
+    assert_eq!(filled, serde_json::json!(["203.0.113.7/32", { "v": "{{inputs.NOPE}}" }]));
+    assert!(validate(&nested).iter().any(|p| p.to_string().contains("`NOPE` isn't declared")));
+    // Other placeholders stay as written.
+    let other = serde_json::json!("{{ cloud.outputs.x }} and {{ inputs.IP }}");
+    assert_eq!(isoloom_core::CloudServices::inputs_in(&other), ["IP"]);
+    let filled = isoloom_core::CloudServices::fill_inputs(&other, &mut |_| Some("1".into()));
+    assert_eq!(filled, serde_json::json!("{{ cloud.outputs.x }} and 1"));
     let undeclared = parse(&format!("{base}  vars: {{ cidr: \"{{{{ inputs.NOPE }}}}\" }}\n")).unwrap();
     assert!(validate(&undeclared).iter().any(|p| p.to_string().contains("`NOPE` isn't declared")));
 }

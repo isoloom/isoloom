@@ -1,5 +1,5 @@
 //! What the target's tool says about an environment: `running (3/3)`, `partly (1/3)`,
-//! `stopped`, `applied (12 resources)`, or why it can't tell.
+//! `stopped`, `applied (12 resources)`, `deploying`, or why it can't tell.
 
 use std::path::Path;
 
@@ -101,7 +101,8 @@ fn kubernetes(e: &Entry) -> Result<String, String> {
     })
 }
 
-/// What the module's state holds: deployed resources, or nothing.
+/// What the module's state holds: deployed resources, or nothing; `deploying` while an apply
+/// runs (`up.sh` holds its process id in `deploying`).
 fn cloud_services(out: &Path) -> String {
     let state = out.join("cloud-services/terraform.tfstate");
     let n = std::fs::read_to_string(&state)
@@ -109,11 +110,28 @@ fn cloud_services(out: &Path) -> String {
         .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
         .and_then(|v| v["resources"].as_array().map(Vec::len))
         .unwrap_or(0);
-    if n > 0 {
-        format!("deployed ({n} resources)")
-    } else {
-        "not deployed".to_string()
+    let deploying = std::fs::read_to_string(out.join("cloud-services/deploying")).is_ok_and(|pid| alive(pid.trim()));
+    match (deploying, n) {
+        (true, 0) => "deploying".to_string(),
+        (true, n) => format!("deploying ({n} resources so far)"),
+        (false, 0) => "not deployed".to_string(),
+        (false, n) => format!("deployed ({n} resources)"),
     }
+}
+
+/// Whether the process `pid` still runs (on Windows, assumed: the shell's ids aren't Windows').
+fn alive(pid: &str) -> bool {
+    if pid.is_empty() || !pid.chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    if cfg!(windows) {
+        return true;
+    }
+    crate::tools::process::command("kill")
+        .args(["-0", pid])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
 }
 
 /// Each machine answers SSH, or not.

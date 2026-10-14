@@ -128,12 +128,14 @@ pub fn refusal(spec: &Spec, target: Target) -> Option<String> {
 /// as `defaults.yml` sets it: for Vagrant, `vagrant up --provider` (`virtualbox`, `libvirt`,
 /// `qemu`, ...). `None` is the target whatever the provider, which is [`refusal`].
 ///
-/// Today only `vagrant` on `qemu` refuses more: without root, QEMU links exactly two VMs per
-/// network, and each VM is on one network. `isoloom run vagrant` asks it for the provider in
+/// Today `vagrant` refuses more on two providers: on `qemu`, without root, QEMU links exactly
+/// two VMs per network, and each VM is on one network; on `hyperv`, a machine whose OS has no
+/// known Hyper-V box needs `vm.image.hyperv`. `isoloom run vagrant` asks it for the provider in
 /// the defaults before starting; a tool offering a provider can ask before it does.
 pub fn refusal_on(spec: &Spec, target: Target, provider: Option<&str>) -> Option<String> {
     refusal(spec, target).or_else(|| match (target, provider) {
         (Target::Vagrant, Some("qemu")) => vagrant::qemu_refusal(spec),
+        (Target::Vagrant, Some("hyperv")) => vagrant::hyperv_refusal(spec),
         _ => None,
     })
 }

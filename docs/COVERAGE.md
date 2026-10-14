@@ -16,7 +16,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: libvirt](#vagrant-libvirt) | 35% | 20 | 7 | 0 | 13 |
-| [Vagrant: Hyper-V](#vagrant-hyper-v) | 25% | 4 | 1 | 0 | 3 |
+| [Vagrant: Hyper-V](#vagrant-hyper-v) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
 | [Vagrant: QEMU](#vagrant-qemu) | 36% | 15 | 4 | 3 | 8 |
 | [Vagrant: ESXi](#vagrant-esxi) | 57% | 19 | 11 | 0 | 8 |
@@ -502,7 +502,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: Hyper-V
 
-25% of 4 portable features (1 done, 0 partly, 3 to do; 16 features in all). From Vagrant 2.4.9 (the provider's config class).
+100% of 6 portable features (6 done, 0 partly, 0 to do; 16 features in all). From Vagrant 2.4.9 (the provider's config class).
 
 ### Settings
 
@@ -510,20 +510,20 @@ Only what the examples generate is checked: a feature no example uses can still 
 | --- | --- | --- | --- |
 | `auto_start_action` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `auto_stop_action` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `cpus` | Yes | Not yet | With Hyper-V hosts |
+| `cpus` | Yes | Yes | From `machines.*.resources` |
 | `differencing_disk` | n/a | No | Faster starts from one image: no change in behavior |
 | `enable_automatic_checkpoints` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `enable_checkpoints` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `enable_enhanced_session_mode` | No | No | Display, input and host devices: containers and cloud VMs have none |
-| `enable_virtualization_extensions` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `enable_virtualization_extensions` | Yes | Yes | From `machines.*.privileged` (nested virtualization) |
 | `ip_address_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `linked_clone` | n/a | No | Faster starts from one image: no change in behavior |
+| `linked_clone` | Yes | Yes | A differencing disk, so a clone is instant instead of copying the whole box |
 | `mac` | No | No | Cloud VMs get their MAC address from the provider |
 | `maxmemory` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `memory` | Yes | Not yet | With Hyper-V hosts |
+| `memory` | Yes | Yes | From `machines.*.resources` |
 | `vlan_id` | Yes | Another way | Via `config.vm.network private_network`, the same on every provider |
 | `vm_integration_services` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `vmname` | Yes | Not yet | With Hyper-V hosts |
+| `vmname` | Yes | Yes | The environment and machine names, as the VM's name in Hyper-V |
 
 ## Vagrant: UTM
 

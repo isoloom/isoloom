@@ -143,6 +143,11 @@ fn launch(p: &Prepared, ask: &Ask, down: bool) -> Res<Invocation> {
         && let Some(c) = &p.spec.cloud
     {
         cloud_services::write_inputs(c, &tool.wd)?;
+        // The deployment's own name, for the module to tag what it creates (kept until `down`
+        // finds nothing left with it). Cloud services cost from the first resource: recorded
+        // before the apply, so `status` shows them deploying (and what a failed apply left).
+        cloud_services::name_deployment(&tool.wd, &p.spec.name, ask.instance)?;
+        done::record(p, ask, false, None);
     }
     let mut cmd = process::command(&tool.program);
     cmd.args(&tool.args).current_dir(&tool.wd);
@@ -171,7 +176,11 @@ fn ready_here(p: &Prepared, cloud: Option<&str>) -> Res<()> {
         );
         return Err(Failure::new(ErrorCode::HostNotReady, message).hint("isoloom doctor").into());
     }
-    // The provider in the defaults can refuse what the target alone runs (QEMU's two-VM links).
+    if t == Target::CloudServices {
+        module_requirements(p)?;
+    }
+    // The provider in the defaults can refuse what the target alone runs (QEMU's two-VM links,
+    // a machine with no Hyper-V box).
     if t == Target::Vagrant
         && let Some(provider) = &p.defaults.vagrant.provider
         && let Some(why) = core::refusal_on(&p.spec, t, Some(provider))
@@ -183,4 +192,19 @@ fn ready_here(p: &Prepared, cloud: Option<&str>) -> Res<()> {
         return Err(Failure::new(ErrorCode::TargetUnavailable, message).into());
     }
     Ok(())
+}
+
+/// What the cloud-services module needs here besides Terraform (`cloud.requires`): its shell
+/// commands run too, as the project's code is about to.
+fn module_requirements(p: &Prepared) -> Res<()> {
+    match core::host::requirements(&p.spec, true).filter(|r| !r.ready) {
+        Some(r) => {
+            let message = format!(
+                "this machine lacks what the module needs: {} (`cloud.requires`; see `isoloom doctor`)",
+                r.summary().trim_start_matches("not ready: ")
+            );
+            Err(Failure::new(ErrorCode::HostNotReady, message).hint("isoloom doctor").into())
+        }
+        None => Ok(()),
+    }
 }

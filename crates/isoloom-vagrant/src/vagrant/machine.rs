@@ -10,6 +10,7 @@ use isoloom_spec::images::{self, VagrantBox};
 use isoloom_spec::model::{Arch, Winrm};
 use isoloom_spec::validate::Cidr;
 
+use super::hyperv::{HyperV, Nic};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{self, Os};
@@ -125,9 +126,17 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
         .first()
         .filter(|_| os == Os::Windows)
         .map(|(net, ip)| (*ip, Cidr::parse(&env.networks[net].cidr).map_or(24, |c| c.len)));
+    let hyperv = HyperV {
+        env: &env.name,
+        boxed: image.hyperv.clone(),
+        nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
+        windows: os == Os::Windows,
+        nested: env.spec().machines.get(name).is_some_and(|m| m.privileged),
+        published: mp.ports.iter().map(|p| (p.port, p.publish)).collect(),
+    };
     Guest {
         label: format!("{} · {name}", env.name),
-        esxi_name: format!("{}-{name}", env.name),
+        vm_name: format!("{}-{name}", env.name),
         size: Size::of(mp.size, isoloom_spec::DEFAULT_CPUS, isoloom_spec::DEFAULT_MEMORY_MB),
         nets: mp.addresses.keys().map(String::as_str).collect(),
         libvirt_box: image.libvirt.as_deref(),
@@ -137,5 +146,6 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
             link,
             windows_address,
         },
+        hyperv,
     }
 }
