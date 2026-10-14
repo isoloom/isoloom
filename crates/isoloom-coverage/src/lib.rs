@@ -22,6 +22,7 @@ pub mod helm;
 pub mod inventory;
 pub mod kubernetes;
 pub mod kustomize;
+pub mod reference;
 pub mod spec;
 pub mod terraform;
 pub mod vagrant;

@@ -46,9 +46,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Spec {
-    /// The format's version: `1`.
+    /// The version of the `isoloom.yml` format the file is written in: `1`, the only one so far.
     pub version: u32,
-    /// Kebab-case id of the environment.
+    /// The environment's id, in kebab case (`supplier-portal`): it names its containers, VMs,
+    /// networks and cloud resources, and the environment in `isoloom status`.
     pub name: String,
     /// The environment's networks, by name: each an address block the machines on it share.
     #[serde(default)]
@@ -60,7 +61,9 @@ pub struct Spec {
     /// [`EnvironmentDns`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dns: Option<EnvironmentDns>,
-    /// Values a runner may provide at launch (e.g. tokens). Never baked into images.
+    /// Names of the values a runner provides at launch (a token, a licence key): from the
+    /// environment of `isoloom run`, or a profile's `inputs`. A machine receives the ones its own
+    /// `inputs` lists. Never baked into images.
     #[serde(default)]
     pub inputs: Vec<String>,
     /// Secrets, by kebab-case name: where `isoloom run` reads each value on the runner (`env`,
@@ -74,7 +77,7 @@ pub struct Spec {
     pub machines: IndexMap<String, Machine>,
     /// An environment of cloud services rather than machines (IAM users and roles, functions,
     /// buckets, queues...): a Terraform module in the project, applied into the user's own cloud
-    /// account. See [`CloudServices`]. A spec has either `cloud:` or machines.
+    /// account. A spec has either `cloud:` or machines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<CloudServices>,
     /// Volumes shared between machines: a machine volume with one of these names is this
@@ -83,7 +86,7 @@ pub struct Spec {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub volumes: IndexMap<String, SharedVolume>,
     /// What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time
-    /// servers. Usually set by a profile, one customer's network at a time. See [`Constraints`].
+    /// servers. Usually set by a profile, one customer's network at a time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub constraints: Option<Constraints>,
     /// Machine fields shared by every machine (a machine's own value wins). `docker:` and `vm:`
@@ -118,7 +121,7 @@ pub struct Spec {
     pub message: Option<String>,
     /// Observers beside the environment, on every network, that aren't machines of it (not
     /// in `reach`, `resources` or the derived checks): a toolbox to look from (`shell`), or any
-    /// container image. See [`Tool`].
+    /// container image.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub tools: IndexMap<String, Tool>,
     /// Base machine name -> its clones, for machines that had a `count`. Filled when parsing.

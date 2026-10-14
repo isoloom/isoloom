@@ -139,7 +139,7 @@ failed on its own stops the setup at once.
 | `isoloom-external` | The `external` backend: hosts that already exist |
 | `isoloom-targets` | Dispatch to every backend, refusals, `generate_all`, the resolved snapshot |
 | `isoloom-import` | Drafting a spec from Compose, Vagrant and Terraform files, with notes for what the draft leaves out |
-| `isoloom-coverage` | The coverage map: what each output format can do and what Isoloom produces |
+| `isoloom-coverage` | The coverage map: what each output format can do and what Isoloom produces; the spec reference (`reference`, docs/spec.md) from the schema and the spec table |
 | `isoloom-runtime` | Runtime state: the registry of running environments (`~/.isoloom/status.yml`), host readiness, the environment report; the lifecycle's JSON events and errors (`events`, with an `Emitter` for embedders) and a tool run with its output as events (`tool`): see [docs/json.md](docs/json.md) |
 | `isoloom` | The command line: clap definitions in `cli.rs`, one module per subcommand in `commands/`, tool runners in `tools/` (every tool started by `tools::process::command`), `--json` output in `output.rs` and the error codes in `failure.rs` |
 
@@ -161,7 +161,9 @@ Tools embedding Isoloom depend on the crates they use (README, "Using the librar
    refusals in `isoloom-targets`). A target that silently drops the field is a bug.
 5. **Coverage:** mark the rows the feature fills in each format's table (`Support::Emitted`
    with the spec field it comes from) and the spec-side row in `isoloom-coverage/src/spec.rs`.
-6. **Docs:** regenerate `docs/COVERAGE.md` (`cargo run -q -- coverage --markdown > docs/COVERAGE.md`).
+6. **Docs:** regenerate `docs/COVERAGE.md` (`cargo run -q -- coverage --markdown > docs/COVERAGE.md`)
+   and the spec reference (`cargo run -q -- docs --spec > docs/spec.md`), and say what a user
+   needs in the guide it belongs to ([docs/targets.md](docs/targets.md), [docs/secrets.md](docs/secrets.md)).
 7. **Example:** use the feature in an example and regenerate its `.isoloom/` folder. The
    coverage tests require every claimed row to be exercised by an example.
 

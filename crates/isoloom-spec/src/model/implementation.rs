@@ -14,7 +14,8 @@ pub struct DockerImpl {
     /// A published image (exactly one of `image` and `build`).
     #[serde(default)]
     pub image: Option<String>,
-    /// A build context in the project folder.
+    /// A folder of the project, built into the machine's image as its build context (exactly
+    /// one of `image` and `build`).
     #[serde(default)]
     pub build: Option<String>,
     /// The Dockerfile, a file anywhere in the project (default: `Dockerfile` in `build`): an
@@ -84,8 +85,8 @@ pub enum Appliance {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VmImpl {
-    /// An OS name from [`KNOWN_OS`]; each target maps it to an image. May come from `common:`
-    /// or a group (`vm: {}` in the machine).
+    /// The OS, one of the names Isoloom knows; each target maps it to an image. May come from
+    /// `common:` or a group (`vm: {}` in the machine).
     #[serde(default)]
     pub os: String,
     /// Steps run inside the VM, in order: `.sh` on Linux (and Ansible playbooks, `.yml`),

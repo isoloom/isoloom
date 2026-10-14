@@ -22,6 +22,7 @@ for e in examples/*/; do [ -d "$e.isoloom" ] && cargo run -q -p isoloom -- check
 
 # Regenerate every example and the coverage page: nothing may change unless the change is the point.
 cargo run -q -- coverage --markdown > docs/COVERAGE.md
+cargo run -q -- docs --spec > docs/spec.md
 git diff --exit-code examples docs
 ```
 

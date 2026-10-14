@@ -15,7 +15,7 @@ use super::machine::ScalarSchema;
 pub enum SecretSource {
     /// An environment variable of the runner (or the profile's `inputs`).
     Env {
-        /// The variable, e.g. `DB_PASSWORD`.
+        /// The name of the runner's environment variable holding the value, e.g. `DB_PASSWORD`.
         env: String,
     },
     /// A file on the runner. Keep it out of version control.
@@ -26,7 +26,8 @@ pub enum SecretSource {
     /// A HashiCorp Vault key/value secret, read with the `vault` command and its usual
     /// settings (`VAULT_ADDR`, `VAULT_TOKEN`).
     Vault {
-        /// `<path>#<field>`, e.g. `secret/app#db_password`.
+        /// The secret's path in Vault and the field holding the value, as `<path>#<field>`,
+        /// e.g. `secret/app#db_password`.
         vault: String,
     },
     /// A value in a SOPS-encrypted file, decrypted with the `sops` command.

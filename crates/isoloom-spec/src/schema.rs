@@ -95,8 +95,13 @@ fn machines(s: &mut Value) {
         s,
         &["$defs", "Machine", "properties", "volumes"],
         "additionalProperties",
-        json!({ "type": "string", "pattern": "^/" }),
+        // A path, or a path and the folder of a shared volume (`Mount`), both absolute.
+        json!({ "anyOf": [
+            { "type": "string", "pattern": "^/", "description": "The whole volume at this absolute path." },
+            { "$ref": "#/$defs/MountPart" },
+        ] }),
     );
+    set(s, &["$defs", "MountPart", "properties", "path"], "pattern", json!("^/"));
 }
 
 /// Replaces `anyOf: [X, {type: null}]` with X and `type: [T, "null"]` with T, everywhere.
