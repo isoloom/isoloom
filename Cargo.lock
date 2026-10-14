@@ -525,6 +525,7 @@ dependencies = [
 name = "isoloom-render"
 version = "0.10.1"
 dependencies = [
+ "hcl-rs",
  "indexmap",
  "insta",
  "isoloom-plan",
@@ -580,6 +581,7 @@ name = "isoloom-terraform"
 version = "0.10.1"
 dependencies = [
  "indexmap",
+ "insta",
  "isoloom-compose",
  "isoloom-plan",
  "isoloom-render",

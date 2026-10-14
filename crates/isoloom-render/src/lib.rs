@@ -4,6 +4,7 @@
 
 pub mod backend;
 pub mod constraints;
+pub mod hcl_builder;
 pub mod ignore;
 pub mod inventory;
 pub mod machine_setup;
