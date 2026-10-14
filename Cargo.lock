@@ -517,12 +517,15 @@ version = "0.10.1"
 dependencies = [
  "indexmap",
  "isoloom-spec",
+ "serde_json",
 ]
 
 [[package]]
 name = "isoloom-render"
 version = "0.10.1"
 dependencies = [
+ "indexmap",
+ "insta",
  "isoloom-plan",
  "isoloom-spec",
  "proptest",

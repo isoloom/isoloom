@@ -3,6 +3,7 @@
 //! positions and probes, and the requirements a backend must meet to render it.
 
 pub mod addressing;
+pub mod ansible;
 pub mod checks;
 pub mod environment;
 pub mod images;
