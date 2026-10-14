@@ -15,5 +15,8 @@ serde_json.workspace = true
 schemars.workspace = true
 serde_yaml_ng.workspace = true
 
+[dev-dependencies]
+isoloom-targets.workspace = true
+
 [lints]
 workspace = true

@@ -3,8 +3,6 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::{Res, generated, spec};
 
 #[derive(clap::Args)]
@@ -25,7 +23,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     if spec::report_invalid(&spec) {
         return Ok(ExitCode::FAILURE);
     }
-    let (files, _) = core::generate_all(&spec);
+    let (files, _) = isoloom_targets::generate_all(&spec);
     let files = generated::finish(files, &settings.defaults, &a.dir)?;
     let mut stale = 0;
     for f in &files {

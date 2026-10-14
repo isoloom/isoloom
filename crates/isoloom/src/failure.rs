@@ -2,7 +2,7 @@
 //! a hint) to the error document `--json` prints; other errors get their code from their type.
 //! The exit code is the same for every error (2, in `main`).
 
-use isoloom_core::events::{ErrorBody, ErrorCode, FieldProblem};
+use isoloom_runtime::events::{ErrorBody, ErrorCode, FieldProblem};
 
 /// An error with its stable code. Printed as its message alone, as every error is.
 #[derive(Debug)]
@@ -29,7 +29,7 @@ impl Failure {
     }
 
     /// An invalid spec, with its problems.
-    pub fn invalid(problems: &[isoloom_core::Problem]) -> Self {
+    pub fn invalid(problems: &[isoloom_spec::Problem]) -> Self {
         let mut f = Self::new(ErrorCode::SpecInvalid, "fix the spec first (`isoloom validate`)");
         f.0.problems = problems
             .iter()
@@ -61,14 +61,14 @@ pub fn body_of(e: &(dyn std::error::Error + 'static)) -> ErrorBody {
     if let Some(f) = e.downcast_ref::<Failure>() {
         return f.0.clone();
     }
-    let code = if let Some(l) = e.downcast_ref::<isoloom_core::LoadError>() {
+    let code = if let Some(l) = e.downcast_ref::<isoloom_spec::LoadError>() {
         match l {
-            isoloom_core::LoadError::Profile { .. } => ErrorCode::Profile,
+            isoloom_spec::LoadError::Profile { .. } => ErrorCode::Profile,
             _ => ErrorCode::SpecLoad,
         }
-    } else if e.downcast_ref::<isoloom_core::GenerateError>().is_some() {
+    } else if e.downcast_ref::<isoloom_targets::GenerateError>().is_some() {
         ErrorCode::GenerateFailed
-    } else if e.downcast_ref::<std::io::Error>().is_some() || e.downcast_ref::<isoloom_core::RegistryError>().is_some() {
+    } else if e.downcast_ref::<std::io::Error>().is_some() || e.downcast_ref::<isoloom_runtime::RegistryError>().is_some() {
         ErrorCode::Io
     } else {
         ErrorCode::Internal

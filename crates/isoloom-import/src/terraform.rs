@@ -403,8 +403,8 @@ fn proxmox_facts(i: &Instance) -> VmFacts {
     VmFacts {
         os_hint: if os.contains("win") { "windows".into() } else { os },
         size: None,
-        cpus: i.get(&["cpu", "cores"]).and_then(Json::as_u64).map(|n| n as u32),
-        memory_mb: i.get(&["memory", "dedicated"]).and_then(Json::as_u64).map(|n| n as u32),
+        cpus: i.get(&["cpu", "cores"]).and_then(Json::as_u64).and_then(|n| u32::try_from(n).ok()),
+        memory_mb: i.get(&["memory", "dedicated"]).and_then(Json::as_u64).and_then(|n| u32::try_from(n).ok()),
         ips: i.str(&["initialization", "ip_config", "ipv4", "address"]).into_iter().collect(),
     }
 }

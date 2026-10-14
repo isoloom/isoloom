@@ -7,12 +7,11 @@ mod done;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-use isoloom_core::Target;
+use isoloom_spec::Target;
 
 pub use bring_up::{Invocation, bring_up};
 
-use isoloom_core::events::{ErrorCode, Scope};
+use isoloom_runtime::events::{ErrorCode, Scope};
 
 use crate::failure::Failure;
 use crate::prepare::{Prepared, prepare};
@@ -167,7 +166,7 @@ fn launch(p: &Prepared, ask: &Ask, down: bool) -> Res<Invocation> {
 fn ready_here(p: &Prepared, cloud: Option<&str>) -> Res<()> {
     let t = p.target;
     let own = p.spec.cloud.as_ref().map(|c| c.provider.id());
-    let ready = core::host::check_in(t, cloud.or(own).or((t == Target::CloudVm).then_some("aws")), spec::child_env());
+    let ready = isoloom_runtime::host::check_in(t, cloud.or(own).or((t == Target::CloudVm).then_some("aws")), spec::child_env());
     if !ready.ready {
         let message = format!(
             "this machine can't run `{}` yet: {} (see `isoloom doctor`)",
@@ -183,7 +182,7 @@ fn ready_here(p: &Prepared, cloud: Option<&str>) -> Res<()> {
     // a machine with no Hyper-V box).
     if t == Target::Vagrant
         && let Some(provider) = &p.defaults.vagrant.provider
-        && let Some(why) = core::refusal_on(&p.spec, t, Some(provider))
+        && let Some(why) = isoloom_targets::refusal_on(&p.spec, t, Some(provider))
     {
         let message = format!(
             "`{}` can't run this environment on the `{provider}` provider (defaults: vagrant.provider): {why}",
@@ -197,7 +196,7 @@ fn ready_here(p: &Prepared, cloud: Option<&str>) -> Res<()> {
 /// What the cloud-services module needs here besides Terraform (`cloud.requires`): its shell
 /// commands run too, as the project's code is about to.
 fn module_requirements(p: &Prepared) -> Res<()> {
-    match core::host::requirements(&p.spec, true).filter(|r| !r.ready) {
+    match isoloom_runtime::host::requirements(&p.spec, true).filter(|r| !r.ready) {
         Some(r) => {
             let message = format!(
                 "this machine lacks what the module needs: {} (`cloud.requires`; see `isoloom doctor`)",

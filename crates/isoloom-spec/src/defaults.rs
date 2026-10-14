@@ -41,6 +41,7 @@ pub struct Defaults {
     /// The image table: OS images and the access machine the runner supplies.
     #[serde(default)]
     pub images: Table,
+    /// How `isoloom run vagrant` runs Vagrant.
     #[serde(default)]
     pub vagrant: Vagrant,
     /// Per cloud (`aws`, `azure`, `gcp`, `digitalocean`, `linode`, `oci`).
@@ -48,6 +49,7 @@ pub struct Defaults {
     pub cloud: IndexMap<String, Cloud>,
 }
 
+/// The defaults' `vagrant:` section.
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Vagrant {
@@ -57,6 +59,7 @@ pub struct Vagrant {
     pub provider: Option<String>,
 }
 
+/// One cloud's entry in the defaults' `cloud:` section.
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Cloud {
@@ -78,14 +81,19 @@ pub const BUILTIN_REGIONS: &[(&str, &str)] = &[
 /// One layer's contribution: where it came from, and what it set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Layer {
+    /// Where the layer comes from (a file, `--images`, an `ISOLOOM_*` variable, `-s`), as `isoloom
+    /// defaults` shows it.
     pub source: String,
+    /// What the layer sets, as YAML.
     pub value: Value,
 }
 
 /// The merged defaults with, for every leaf, the layer that set it last.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Resolved {
+    /// The merged defaults, typed.
     pub defaults: Defaults,
+    /// The merged defaults, as YAML (what `isoloom defaults` prints).
     pub merged: Value,
     /// Dotted key -> source, for `isoloom defaults`.
     pub sources: Vec<(String, String)>,
@@ -230,7 +238,7 @@ pub fn leaves(v: &Value, prefix: &str) -> Vec<String> {
         Value::Mapping(m) if !m.is_empty() => m
             .iter()
             .flat_map(|(k, c)| {
-                let key = k.as_str().map(str::to_string).unwrap_or_else(|| format!("{k:?}"));
+                let key = k.as_str().map_or_else(|| format!("{k:?}"), str::to_string);
                 leaves(c, &if prefix.is_empty() { key } else { format!("{prefix}.{key}") })
             })
             .collect(),

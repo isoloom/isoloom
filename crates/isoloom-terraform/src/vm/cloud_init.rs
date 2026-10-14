@@ -4,6 +4,8 @@
 //! `runcmd`, run as root. After a `reboot` step, cloud-init restarts the machine once it is done
 //! (`power_state`) and a unit runs the remaining steps at the next boot.
 
+use std::fmt::Write as _;
+
 use isoloom_plan::{Environment, Step};
 use isoloom_render::hcl_builder::{Expression, call, list, object, string};
 use isoloom_render::steps;
@@ -156,7 +158,7 @@ fn reboot_files(parts: &[Vec<String>]) -> Vec<Expression> {
             script.push('\n');
         }
         if n < parts.len() {
-            script.push_str(&format!("echo {} > {REBOOT_DIR}/next-boot\nsystemctl --no-block reboot\n", n + 1));
+            let _ = writeln!(script, "echo {} > {REBOOT_DIR}/next-boot\nsystemctl --no-block reboot", n + 1);
         } else {
             script.push_str("systemctl disable isoloom-steps.service\n");
         }

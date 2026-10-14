@@ -14,6 +14,8 @@
 //! `isoloom exec`. Expansion happens on the YAML before the spec is parsed (before `common:`
 //! and `groups:` fold in), so every reader sees finished machines.
 
+use std::fmt::Write as _;
+
 use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
 
@@ -165,7 +167,7 @@ fn expand_checks(top: &mut Mapping, clones: &Clones) {
                     let mut each = m.clone();
                     each.insert(key("from"), key(n));
                     if let Some(Value::String(name)) = each.get_mut(key("name")) {
-                        name.push_str(&format!(" ({n})"));
+                        let _ = write!(name, " ({n})");
                     }
                     out.push(Value::Mapping(each));
                 }

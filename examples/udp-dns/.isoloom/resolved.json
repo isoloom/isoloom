@@ -182,6 +182,20 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "needs `external:` on dns",
       "cloud-services": "left out by `targets:`"
+    },
+    "clouds": {
+      "cloud-vm": {
+        "generated": [
+          "aws",
+          "azure",
+          "gcp"
+        ],
+        "refused": {
+          "digitalocean": "DigitalOcean cloud-vm takes single-network labs so far",
+          "linode": "Linode cloud-vm takes single-network labs so far",
+          "oci": "Oracle Cloud cloud-vm takes single-network labs so far"
+        }
+      }
     }
   },
   "checks": {

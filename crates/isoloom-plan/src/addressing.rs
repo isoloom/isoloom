@@ -7,17 +7,22 @@ use std::net::Ipv4Addr;
 use isoloom_spec::model::Spec;
 use isoloom_spec::validate::{Cidr, starts_after};
 
-/// A network's block (validated specs only).
-pub(crate) fn cidr(spec: &Spec, network: &str) -> Cidr {
-    Cidr::parse(&spec.networks[network].cidr).expect("validated cidr")
+/// A block that stands in for one that doesn't parse: 0.0.0.0/24, whose reserved addresses
+/// (gateway, controller, router, tools) all exist, so nothing computed from it overflows.
+const UNPARSED: Cidr = Cidr { base: 0, len: 24 };
+
+/// A network's block: the one place the plan and the backends read a network's `cidr`.
+/// Validation rejects a block that doesn't parse, so a validated spec never meets
+/// `UNPARSED`; an unvalidated one gets 0.0.0.0 addresses in its output instead of a crash.
+pub fn cidr(spec: &Spec, network: &str) -> Cidr {
+    Cidr::parse(&spec.networks[network].cidr).unwrap_or(UNPARSED)
 }
 
-/// A machine's address on a network (validated specs only).
+/// A machine's address on a network (validated specs only): the block's last byte set to the
+/// machine's octet. Validation keeps the octet a host address of the block or its gateway's,
+/// and the block a /24 or smaller, so the address lies in the block.
 pub fn address(spec: &Spec, network: &str, octet: u8) -> Ipv4Addr {
-    let cidr = cidr(spec, network);
-    cidr.host(octet)
-        .or_else(|| (octet == cidr.gateway_octet()).then(|| cidr.gateway()))
-        .expect("validated address")
+    Ipv4Addr::from((cidr(spec, network).base & !0xff) | u32::from(octet))
 }
 
 /// Dotted netmask of a network.
@@ -38,17 +43,15 @@ pub fn host_address(spec: &Spec, network: &str) -> Ipv4Addr {
 }
 
 /// The address `from` should use to reach `to`: on a network they share if any, else
-/// `to`'s first address.
+/// `to`'s first address (`0.0.0.0` for a machine on no network, which has none).
 pub fn address_for(spec: &Spec, from: &str, to: &str) -> Ipv4Addr {
     let a = &spec.machines[from];
     let b = &spec.machines[to];
-    let (net, octet) = b
-        .networks
+    b.networks
         .iter()
         .find(|(n, _)| a.networks.contains_key(*n))
         .or_else(|| b.networks.first())
-        .expect("validated: machines have a network");
-    address(spec, net, *octet)
+        .map_or(Ipv4Addr::UNSPECIFIED, |(net, octet)| address(spec, net, *octet))
 }
 
 /// A machine's names for a hosts line: its own, then its `aliases`.

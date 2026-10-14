@@ -3,7 +3,7 @@
 
 use std::process::ExitCode;
 
-use isoloom_core::coverage::{self, Format, Support, anchor, capitalize, formats, section};
+use isoloom_coverage::{Format, Support, anchor, capitalize, formats, markdown, section};
 
 use crate::{Res, output};
 
@@ -22,7 +22,7 @@ pub struct Args {
 
 pub fn run(a: &Args) -> Res<ExitCode> {
     if a.markdown {
-        print!("{}", coverage::markdown());
+        print!("{}", markdown());
         return Ok(ExitCode::SUCCESS);
     }
     if a.json {

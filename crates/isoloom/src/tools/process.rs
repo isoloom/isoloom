@@ -4,7 +4,7 @@
 use std::ffi::OsStr;
 use std::process::{Command, ExitCode, ExitStatus};
 
-use isoloom_core::events::{ErrorCode, Scope};
+use isoloom_runtime::events::{ErrorCode, Scope};
 
 use crate::failure::Failure;
 use crate::{Res, output, spec};
@@ -46,10 +46,7 @@ pub fn spawn_error(program: &str, e: &std::io::Error) -> Failure {
 /// created exclusively (fails if it already exists), so a local attacker can't pre-place a
 /// symlink at a guessable path and have us clobber a victim file or run a swapped script.
 pub fn private_dir(prefix: &str) -> Res<std::path::PathBuf> {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+    let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     let dir = std::env::temp_dir().join(format!("{prefix}-{}-{nonce:x}", std::process::id()));
     std::fs::create_dir(&dir)?;
     Ok(dir)
@@ -70,11 +67,11 @@ pub fn run_step(c: &mut Command, at: &Scope) -> Res<ExitStatus> {
 /// [`run_step`] with `input` on the tool's standard input when given.
 pub fn run_step_input(c: &mut Command, input: Option<&[u8]>, at: &Scope) -> Res<ExitStatus> {
     let status = if output::json() {
-        isoloom_core::tool::run_logged_input(c, input, &output::events(), at)
+        isoloom_runtime::tool::run_logged_input(c, input, &output::events(), at)
     } else if input.is_some() {
         c.stdin(std::process::Stdio::piped());
         c.spawn().and_then(|mut child| {
-            let writer = isoloom_core::tool::feed(&mut child, input);
+            let writer = isoloom_runtime::tool::feed(&mut child, input);
             let status = child.wait();
             if let Some(w) = writer {
                 let _ = w.join();

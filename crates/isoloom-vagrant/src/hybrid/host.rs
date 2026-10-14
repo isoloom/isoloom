@@ -2,6 +2,8 @@
 //! promiscuous interfaces, where Docker creates a macvlan network per lab network and runs the
 //! containers' Compose file.
 
+use std::fmt::Write as _;
+
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::backend::RenderError;
 use isoloom_render::{GenerateError, router};
@@ -113,7 +115,8 @@ fn nic(env: &Environment, net: &str, index: usize) -> Result<Nic, RenderError> {
     };
     Ok(Nic {
         ip: c.controller().to_string(),
-        mac: format!("0A15{:06X}{:02X}", name_hash(&env.name) & 0xFF_FFFF, index as u8),
+        // The index's low byte: the MAC's last octet.
+        mac: format!("0A15{:06X}{:02X}", name_hash(&env.name) & 0xFF_FFFF, index % 0x100),
         cidr: plan.cidr.clone(),
         gateway: gateway.to_string(),
         name: docker_net(env, net),
@@ -131,13 +134,14 @@ fn networks_script(nics: &[Nic]) -> String {
             .chunks(2)
             .map(|p| String::from_utf8_lossy(p).into_owned())
             .collect();
-        sh.push_str(&format!(
-            "IF=$(ip -o link | grep -i '{mac}' | awk -F': ' '{{print $2}}')\nip link set \"$IF\" up promisc on\ndocker network inspect {dn} >/dev/null 2>&1 || docker network create -d macvlan --subnet {cidr} --gateway {gw} -o parent=\"$IF\" {dn}\n",
+        let _ = writeln!(
+            sh,
+            "IF=$(ip -o link | grep -i '{mac}' | awk -F': ' '{{print $2}}')\nip link set \"$IF\" up promisc on\ndocker network inspect {dn} >/dev/null 2>&1 || docker network create -d macvlan --subnet {cidr} --gateway {gw} -o parent=\"$IF\" {dn}",
             mac = mac.join(":"),
             dn = n.name,
             cidr = n.cidr,
             gw = n.gateway,
-        ));
+        );
     }
     sh
 }

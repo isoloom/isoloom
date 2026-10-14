@@ -10,9 +10,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Spec {
+    /// The format's version: `1`.
     pub version: u32,
     /// Kebab-case id of the environment.
     pub name: String,
+    /// The environment's networks, by name: each an address block the machines on it share.
     #[serde(default)]
     pub networks: IndexMap<String, Network>,
     /// Allowed traffic between networks; everything else between networks is blocked.
@@ -21,6 +23,8 @@ pub struct Spec {
     /// Values a runner may provide at launch (e.g. tokens). Never baked into images.
     #[serde(default)]
     pub inputs: Vec<String>,
+    /// The environment's machines, by name, started in the order written (after their
+    /// `depends_on`).
     #[serde(default)]
     pub machines: IndexMap<String, Machine>,
     /// An environment of cloud services rather than machines (IAM users and roles, functions,
@@ -77,6 +81,7 @@ pub struct Spec {
     pub clones: IndexMap<String, Vec<String>>,
 }
 
+/// A network: an address block, whether it reaches the internet, and what routes it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
@@ -181,10 +186,14 @@ fn yes() -> bool {
     true
 }
 
+/// Traffic allowed from one network to another (one way: answers come back), on some ports or
+/// all of them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Reach {
+    /// The network the connections start from.
     pub from: String,
+    /// The network they may reach.
     pub to: String,
     /// Empty = every port.
     #[serde(default)]
@@ -221,6 +230,8 @@ impl Arch {
     }
 }
 
+/// A machine of the environment: where it sits on the networks, what it serves, and how each
+/// kind of target produces it (`docker:`, `vm:`, `external:`).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
@@ -278,11 +289,15 @@ pub struct Machine {
     /// login's (`limits.d`). Kubernetes has none per container.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub ulimits: IndexMap<String, Ulimit>,
+    /// The ports the machine answers on: what is published, opened by `reach`, waited for and
+    /// checked.
     #[serde(default)]
     pub services: Vec<Service>,
     /// The spec inputs this machine receives (only these).
     #[serde(default)]
     pub inputs: Vec<String>,
+    /// CPUs, memory and disk for the machine (a VM's size, a container's limits). Default: 1
+    /// CPU, 1024 MB, 20 GB.
     #[serde(default)]
     pub resources: Option<Resources>,
     /// Machines that must be ready (their services answering) before this one starts.
@@ -314,13 +329,18 @@ pub struct Machine {
     pub supplied: bool,
 }
 
+/// A port a machine answers on.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
 pub struct Service {
+    /// The port, inside the machine.
     pub port: u16,
+    /// A name for the service (`web`, `api`): how outputs and messages refer to it. Default:
+    /// its port.
     #[serde(default)]
     pub name: Option<String>,
+    /// It speaks HTTP: derived checks request a page instead of only connecting.
     #[serde(default)]
     pub http: bool,
     /// It speaks TLS (HTTPS for an `http` service): probes and checks use TLS, certificates
@@ -369,6 +389,7 @@ impl Protocol {
         }
     }
 
+    /// Whether this is TCP, the default (a service without `protocol`).
     pub fn is_tcp(&self) -> bool {
         *self == Protocol::Tcp
     }
@@ -397,17 +418,22 @@ impl Machine {
     }
 }
 
+/// What a machine is given to run on; each left out takes its default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Resources {
+    /// CPUs (default 1).
     #[serde(default)]
     pub cpus: Option<u32>,
+    /// Memory in MB (default 1024).
     #[serde(default)]
     pub memory_mb: Option<u32>,
+    /// Disk in GB, for a VM (default 20).
     #[serde(default)]
     pub disk_gb: Option<u32>,
 }
 
+/// How a container produces a machine: an image, or one built from the project.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DockerImpl {
@@ -470,6 +496,7 @@ pub enum Appliance {
     CiscoDynamips,
 }
 
+/// How a VM produces a machine: its OS, and the steps that set it up.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VmImpl {
@@ -595,32 +622,45 @@ pub struct Provision {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Shared {
+    /// The machine's CPU architecture, as `arch` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arch: Option<Arch>,
+    /// Kernel-level access, as `privileged` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub privileged: Option<bool>,
+    /// A read-only root filesystem, as `read_only` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read_only: Option<bool>,
+    /// Memory-backed mount paths, as `tmpfs` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmpfs: Option<Vec<String>>,
+    /// The size of `/dev/shm`, as `shm_size` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shm_size: Option<String>,
+    /// Name resolution, as `dns` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dns: Option<Dns>,
+    /// Environment variables, as `environment` on a machine (merged key by key).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<IndexMap<String, ScalarSchema>>")]
     pub environment: Option<IndexMap<String, serde_json::Value>>,
+    /// Kernel parameters, as `sysctls` on a machine (merged key by key).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<IndexMap<String, ScalarSchema>>")]
     pub sysctls: Option<IndexMap<String, serde_json::Value>>,
+    /// Process limits, as `ulimits` on a machine (merged key by key).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ulimits: Option<IndexMap<String, Ulimit>>,
+    /// The spec inputs the machines receive, as `inputs` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inputs: Option<Vec<String>>,
+    /// CPUs, memory and disk, as `resources` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
+    /// Machines that must be ready first, as `depends_on` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depends_on: Option<Vec<String>>,
+    /// Data that survives restarts, as `volumes` on a machine (merged key by key).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<IndexMap<String, String>>,
     /// Completes the `docker:` of machines that have one (image, build, init, idle).
@@ -635,12 +675,16 @@ pub struct Shared {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SharedDocker {
+    /// A published image, as `docker.image` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image: Option<String>,
+    /// A build context in the project folder, as `docker.build` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build: Option<String>,
+    /// One-shot jobs run before the machine counts as ready, as `docker.init` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub init: Option<Vec<String>>,
+    /// Keep a container without a service of its own running, as `docker.idle` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idle: Option<bool>,
 }
@@ -649,10 +693,13 @@ pub struct SharedDocker {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SharedVm {
+    /// An OS name, as `vm.os` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub os: Option<String>,
+    /// Steps run inside the VM, as `vm.provision` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provision: Option<Vec<String>>,
+    /// Images per target instead of the OS name's, as `vm.image` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image: Option<VmImage>,
 }
@@ -663,6 +710,7 @@ pub struct SharedVm {
 pub struct Group {
     /// Machine names, globs (`ws*`), or other groups.
     pub members: Vec<String>,
+    /// The fields the members share (a member's own value wins).
     #[serde(flatten)]
     pub shared: Shared,
 }
@@ -729,8 +777,13 @@ impl Check {
 
     /// Whether this check is an Ansible playbook (`.yml` / `.yaml`).
     pub fn is_playbook(&self) -> bool {
-        self.path().is_some_and(|p| p.ends_with(".yml") || p.ends_with(".yaml"))
+        self.path().is_some_and(is_yaml_file)
     }
+}
+
+/// Whether `path` names a YAML file (an Ansible playbook): `.yml` or `.yaml`, as written.
+pub(crate) fn is_yaml_file(path: &str) -> bool {
+    std::path::Path::new(path).extension().is_some_and(|e| e == "yml" || e == "yaml")
 }
 
 // A string is a script; a map is a declared check. Written by hand (not `untagged`) so a typo in
@@ -818,7 +871,9 @@ pub struct Declared {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Expect {
+    /// An HTTP status code (`200`, `404`).
     Status(u16),
+    /// A word (`any`, `blocked`, `open`), or the text an `exec` output must contain.
     Text(String),
 }
 
@@ -926,16 +981,26 @@ pub struct SharedVolume {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Ulimit {
+    /// One value for both the soft and the hard limit.
     Both(u64),
-    Pair { soft: u64, hard: u64 },
+    /// The soft limit (what a process gets) and the hard one (how far it may raise it).
+    Pair {
+        /// The limit a process starts with.
+        soft: u64,
+        /// The ceiling a process may raise its soft limit to.
+        hard: u64,
+    },
 }
 
 impl Ulimit {
+    /// The limit a process starts with.
     pub fn soft(self) -> u64 {
         match self {
             Ulimit::Both(n) | Ulimit::Pair { soft: n, .. } => n,
         }
     }
+
+    /// The ceiling a process may raise its soft limit to.
     pub fn hard(self) -> u64 {
         match self {
             Ulimit::Both(n) | Ulimit::Pair { hard: n, .. } => n,
@@ -965,10 +1030,12 @@ pub const ULIMITS: &[&str] = &[
 /// A text, a number or a boolean, read as text (environment values, sysctl values).
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)]
 pub enum ScalarSchema {
+    /// A text.
     Text(String),
+    /// A number, read as its text.
     Number(f64),
+    /// A boolean, read as `true` or `false`.
     Bool(bool),
 }
 
@@ -1102,8 +1169,11 @@ fn is_zero(n: &u8) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum CloudProvider {
+    /// Amazon Web Services.
     Aws,
+    /// Microsoft Azure.
     Azure,
+    /// Google Cloud.
     Gcp,
 }
 
@@ -1161,6 +1231,7 @@ fn fill_string(s: &str, input: &mut dyn FnMut(&str) -> Option<String>) -> String
 }
 
 impl CloudProvider {
+    /// The name the spec writes it with (`aws`, `azure`, `gcp`).
     pub fn id(self) -> &'static str {
         match self {
             CloudProvider::Aws => "aws",
@@ -1202,6 +1273,7 @@ pub enum Target {
 }
 
 impl Target {
+    /// Every target, in the order they are listed (`isoloom targets`, the snapshot).
     pub const ALL: [Target; 11] = [
         Target::Docker,
         Target::Hosted,
@@ -1227,6 +1299,7 @@ impl Target {
         }
     }
 
+    /// The target's name on the command line and in its folder under `.isoloom/`.
     pub fn id(self) -> &'static str {
         match self {
             Target::Docker => "docker",
@@ -1247,7 +1320,9 @@ impl Target {
 /// The two ways a machine can be produced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
+    /// A `docker:` block: a container.
     Docker,
+    /// A `vm:` block: a virtual machine.
     Vm,
     /// Either implementation, machine by machine.
     Either,
@@ -1258,6 +1333,7 @@ pub enum Shape {
 }
 
 impl Shape {
+    /// The spec key that gives a machine this shape, as a refusal names it (`docker`, `vm`).
     pub fn key(self) -> &'static str {
         match self {
             Shape::Docker => "docker",

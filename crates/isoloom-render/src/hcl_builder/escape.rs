@@ -3,6 +3,8 @@
 //! reach Terraform as `${`. HCL's template scanner reads `$${` and `%%{` as the literal markers,
 //! left to right; every other character is itself, or a backslash escape.
 
+use std::fmt::Write as _;
+
 use hcl::expr::{Expression, Object, ObjectKey, Operation, TemplateExpr, TraversalOperator};
 
 /// The inside of a quoted string that reads as `s`: backslash escapes for quotes, backslashes
@@ -17,7 +19,9 @@ pub fn quoted_inside(s: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
-            c if c.is_control() => out.push_str(&format!("\\u{:04x}", u32::from(c))),
+            c if c.is_control() => {
+                let _ = write!(out, "\\u{:04x}", u32::from(c));
+            }
             '$' | '%' if chars.peek() == Some(&'{') => {
                 out.push(c);
                 out.push(c);

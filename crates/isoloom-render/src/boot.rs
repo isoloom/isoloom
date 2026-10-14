@@ -3,6 +3,8 @@
 //! (a `reboot` step, `vagrant reload`, a stopped cloud VM) wraps it with [`at_boot`] so it is
 //! applied now and again at every boot.
 
+use std::fmt::Write as _;
+
 /// `script` saved as `/etc/isoloom/<name>.sh` and run now and at every boot by a systemd
 /// service (`isoloom-<name>`), `what` saying what it does. With `on_link_up`, it also runs
 /// whenever an interface comes up (ifupdown, networkd-dispatcher): bringing an interface down
@@ -27,7 +29,10 @@ pub fn at_boot(name: &str, what: &str, script: &str, on_link_up: bool, after: &[
     } else {
         String::new()
     };
-    let after: String = after.iter().map(|a| format!(" isoloom-{a}.service")).collect();
+    let after = after.iter().fold(String::new(), |mut s, a| {
+        let _ = write!(s, " isoloom-{a}.service");
+        s
+    });
     format!(
         "mkdir -p /etc/isoloom\ncat > {path} <<'{marker}'\n#!/bin/sh\n# {what}\n{script}exit 0\n{marker}\nchmod +x {path}\n{hooks}\
          if command -v systemctl >/dev/null; then\n\

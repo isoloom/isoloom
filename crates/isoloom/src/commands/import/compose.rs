@@ -3,8 +3,6 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use super::draft::{Dest, source_of, write_draft};
 use crate::Res;
 
@@ -22,6 +20,6 @@ pub fn run(file: Option<PathBuf>, dest: &Dest) -> Res<ExitCode> {
     };
     let text = std::fs::read_to_string(&file).map_err(|e| format!("can't read {}: {e}", file.display()))?;
     let (folder, fallback, source) = source_of(&file)?;
-    let draft = core::import::compose::draft(&text, &fallback, &source)?;
+    let draft = isoloom_import::compose::draft(&text, &fallback, &source)?;
     write_draft(&draft, folder, dest)
 }

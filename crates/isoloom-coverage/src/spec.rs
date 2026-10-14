@@ -20,8 +20,10 @@ pub enum Output {
 }
 
 impl Output {
+    /// Every output, in the order of the table's columns.
     pub const ALL: [Output; 3] = [Output::Compose, Output::Vagrant, Output::Terraform];
 
+    /// The column's heading.
     pub fn label(self) -> &'static str {
         match self {
             Output::Compose => "Compose",
@@ -44,24 +46,45 @@ impl Output {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
     /// Produced; `proof` is an example that uses the field and generates for this output.
-    Done { how: &'static str, proof: &'static str },
+    Done {
+        /// What the output writes for it.
+        how: &'static str,
+        /// The example that shows it.
+        proof: &'static str,
+    },
     /// Produced, with a known gap.
     Partial {
+        /// What the output writes for it.
         how: &'static str,
+        /// What it doesn't cover yet.
         gap: &'static str,
+        /// The example that shows it.
         proof: &'static str,
     },
     /// Not produced yet.
-    Planned { note: &'static str },
+    Planned {
+        /// What it comes with.
+        note: &'static str,
+    },
     /// Means nothing for this output (e.g. `vm:` in a Compose file).
-    NotApplicable { why: &'static str },
+    NotApplicable {
+        /// Why the output has no use for it.
+        why: &'static str,
+    },
     /// Describes the environment for people and runners; no output uses it.
-    Descriptive { note: &'static str },
+    Descriptive {
+        /// Who reads it.
+        note: &'static str,
+    },
     /// Read by Isoloom itself (validation, target selection), not by an output.
-    Core { note: &'static str },
+    Core {
+        /// What Isoloom does with it.
+        note: &'static str,
+    },
 }
 
 impl Status {
+    /// The mark the table shows for it.
     pub fn symbol(self) -> &'static str {
         match self {
             Status::Done { .. } => "✓",
@@ -78,6 +101,7 @@ impl Status {
         matches!(self, Status::Done { .. } | Status::Partial { .. } | Status::Planned { .. })
     }
 
+    /// What the table says next to the mark: how it's produced, and the gap or the reason.
     pub fn note(self) -> String {
         match self {
             Status::Done { how, .. } => how.to_string(),
@@ -91,13 +115,21 @@ impl Status {
 /// status in each output, in [`Output::ALL`] order.
 #[derive(Debug, Clone, Copy)]
 pub struct Row {
+    /// The field's path (`machines.*.vm.os`).
     pub path: &'static str,
+    /// Its status in each output, in [`Output::ALL`] order.
     pub outputs: [Status; 3],
 }
 
 impl Row {
+    /// The field's status in output `o`.
     pub fn status(&self, o: Output) -> Status {
-        self.outputs[Output::ALL.iter().position(|x| *x == o).expect("every output has a column")]
+        // The columns are in `Output::ALL` order.
+        self.outputs[match o {
+            Output::Compose => 0,
+            Output::Vagrant => 1,
+            Output::Terraform => 2,
+        }]
     }
 }
 
@@ -116,13 +148,13 @@ const PROXMOX_IMAGE: Status = na("names a Vagrant box: Proxmox boots the OS's cl
 const NOT_A_CONTAINER: Status = na("VM outputs build machines from `vm:`");
 const NOT_A_VM: Status = na("container outputs build machines from `docker:`");
 
-fn all(s: Status) -> [Status; 3] {
+const fn all(s: Status) -> [Status; 3] {
     [s; 3]
 }
 
 /// The coverage table, in spec-reference order.
 pub fn table() -> Vec<Row> {
-    let mut rows = base_table();
+    let mut rows = BASE.to_vec();
     for (path, status) in PROXMOX {
         if let Some(r) = rows.iter_mut().find(|r| r.path == *path) {
             r.outputs[2] = *status;
@@ -308,663 +340,675 @@ pub const PROXMOX: &[(&str, Status)] = &[
     ("checks[].wait", done("retried every 2s until it passes or the time is up", "segmented")),
 ];
 
-fn base_table() -> Vec<Row> {
-    let row = |path, compose, vagrant, terraform| Row {
+/// A row with its status in each output.
+const fn row(path: &'static str, compose: Status, vagrant: Status, terraform: Status) -> Row {
+    Row {
         path,
         outputs: [compose, vagrant, terraform],
-    };
-    let vm_field = |path, vagrant| row(path, NOT_A_VM, vagrant, VM_PLANNED);
-    let common = |path, compose, vagrant| row(path, compose, vagrant, VM_PLANNED);
-    vec![
-        Row {
-            path: "version",
-            outputs: all(Status::Core {
-                note: "selects the format version",
-            }),
-        },
-        common(
-            "name",
-            done("the Compose project name", "hello-stack"),
-            done("VM labels and network names", "hello-stack"),
-        ),
-        common(
-            "networks.*.cidr",
-            done("a Compose network with that subnet", "hello-stack"),
-            done("a private network (VirtualBox internal network, libvirt network)", "hello-stack"),
-        ),
-        common(
-            "networks.*.tc.delay",
-            done(
-                "netem on the router's interface into the network and each machine's own (its network sidecar)",
-                "slow-link",
-            ),
-            done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
-        ),
-        common(
-            "networks.*.tc.jitter",
-            done(
-                "netem on the router's interface into the network and each machine's own (its network sidecar)",
-                "slow-link",
-            ),
-            done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
-        ),
-        common(
-            "networks.*.tc.loss",
-            done(
-                "netem on the router's interface into the network and each machine's own (its network sidecar)",
-                "slow-link",
-            ),
-            done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
-        ),
-        common(
-            "networks.*.tc.rate",
-            done(
-                "netem on the router's interface into the network and each machine's own (its network sidecar)",
-                "slow-link",
-            ),
-            done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
-        ),
-        row(
-            "networks.*.docker.cidr",
-            done(
-                "the network's block on Docker (others outside 10.0.0.0/8 move there automatically)",
-                "air-gapped",
-            ),
-            na("Docker only: VMs use `cidr` as written"),
-            na("Docker only: VMs use `cidr` as written"),
-        ),
-        row(
-            "networks.*.vlans.*.cidr",
-            done(
-                "a Compose network per VLAN (`<lan>-vlan<id>`); a machine on several VLANs of the LAN gets one 802.1Q trunk (`<lan>.<id>` subinterfaces) through a switch container",
-                "vlan-office",
-            ),
-            done(
-                "a private network per VLAN; a VM on several VLANs of the LAN gets an 802.1Q trunk inside it (`<lan>.<id>`)",
-                "vlan-office",
-            ),
-            done(
-                "an SDN VNet per VLAN; a VM on several VLANs of the LAN gets an 802.1Q trunk inside it (`<lan>.<id>`)",
-                "vlan-office",
-            ),
-        ),
-        row(
-            "networks.*.switch",
-            done(
-                "the LAN's switch appliance instead of the Linux switch container: an access port per VLAN network, a trunk port per trunk link, VLANs and port modes in its startup configuration",
-                "cisco-switch",
-            ),
-            na("switch appliances run on the Docker targets only"),
-            na("switch appliances run on the Docker targets only"),
-        ),
-        row(
-            "networks.*.vlans.*.internet",
-            done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
-            done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
-            done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
-        ),
-        common(
-            "networks.*.internet",
-            done(
-                "no default route for offline machines (Docker's internal network when nothing routes)",
-                "segmented",
-            ),
-            done("new connections out through the NAT interface blocked after provisioning", "segmented"),
-        ),
-        common(
-            "networks.*.gateway",
-            done(
-                "the gateway machine at .1 with forwarding; machines behind it route through it",
-                "edge-firewall",
-            ),
-            done("forwarding on the gateway; machines move behind it after provisioning", "edge-firewall"),
-        ),
-        common(
-            "reach[].from",
-            done("a router container filtering with nftables", "segmented"),
-            done("a router VM filtering with nftables", "segmented"),
-        ),
-        common("reach[].to", done("the router's rules", "segmented"), done("the router's rules", "segmented")),
-        common(
-            "reach[].ports",
-            done("the router's rules, per port", "segmented"),
-            done("the router's rules, per port", "segmented"),
-        ),
-        common(
-            "inputs",
-            done("variables read from the shell at start", "supplier-portal-api"),
-            done("values read from the environment at start", "supplier-portal-api"),
-        ),
-        common(
-            "machines.*.networks",
-            done("a fixed address on each network; names across networks", "hello-stack"),
-            done("a fixed address on each network; names in /etc/hosts", "hello-stack"),
-        ),
-        common(
-            "machines.*.services[].port",
-            done("a healthcheck, so `depends_on` and `up --wait` wait for it", "hello-stack"),
-            done("machines depending on it wait until it answers", "hello-stack"),
-        ),
-        Row {
-            path: "cloud.provider",
-            outputs: all(Status::Descriptive {
-                note: "the cloud of a cloud-services environment (the cloud-services target, not these outputs)",
-            }),
-        },
-        Row {
-            path: "cloud.terraform",
-            outputs: all(Status::Descriptive {
-                note: "the Terraform module the cloud-services target applies",
-            }),
-        },
-        Row {
-            path: "cloud.vars",
-            outputs: all(Status::Descriptive {
-                note: "the module's variables (terraform.tfvars.json)",
-            }),
-        },
-        Row {
-            path: "cloud.outputs",
-            outputs: all(Status::Descriptive {
-                note: "what checks and the message read once deployed",
-            }),
-        },
-        Row {
-            path: "cloud.hourly_usd",
-            outputs: all(Status::Descriptive {
-                note: "an estimate: `isoloom run` says it, the snapshot carries it",
-            }),
-        },
-        Row {
-            path: "cloud.before",
-            outputs: all(Status::Descriptive {
-                note: "host steps before the apply (up.sh)",
-            }),
-        },
-        Row {
-            path: "cloud.env",
-            outputs: all(Status::Descriptive {
-                note: "Terraform's environment (the cloud-services scripts)",
-            }),
-        },
-        Row {
-            path: "cloud.apply_retries",
-            outputs: all(Status::Descriptive {
-                note: "applies again after a failed apply (up.sh)",
-            }),
-        },
-        Row {
-            path: "cloud.requires",
-            outputs: all(Status::Descriptive {
-                note: "host tools `doctor` and `run` check",
-            }),
-        },
-        Row {
-            path: "machines.*.services[].name",
-            outputs: all(Status::Descriptive {
-                note: "names the service for people and runners",
-            }),
-        },
-        common(
-            "machines.*.services[].publish",
-            done("a published port, on the host's loopback", "supplier-portal-api"),
-            done("a forwarded port, on the host's loopback", "supplier-portal-api"),
-        ),
-        common(
-            "machines.*.services[].fixed",
-            done("the `publish` port itself on the host, not a free one", "supplier-portal-api"),
-            done("Vagrant forwards `publish` as is", "supplier-portal-api"),
-        ),
-        common(
-            "machines.*.services[].dormant",
-            done(
-                "left out of the healthcheck (so `depends_on` and `up --wait` don't wait for it) and of the derived checks that expect an answer; still published and opened by `reach`",
-                "segmented",
-            ),
-            done(
-                "left out of the dependency waits and of the derived checks that expect an answer; still forwarded and opened by `reach`",
-                "segmented",
-            ),
-        ),
-        common(
-            "machines.*.services[].protocol",
-            done(
-                "`udp`: published as `<port>/udp`; left out of the healthcheck and the derived checks (no handshake); opened by `reach` (TCP and UDP alike)",
-                "udp-dns",
-            ),
-            Status::Partial {
-                how: "`udp`: forwarded as UDP; left out of the dependency waits and the derived checks; opened by `reach`",
-                gap: "vagrant-libvirt skips UDP forwarded ports (`isoloom run` warns): reach the machine's address instead",
-                proof: "udp-dns",
-            },
-        ),
-        Row {
-            path: "machines.*.services[].tls",
-            outputs: all(Status::Descriptive {
-                note: "derived checks reach it over TLS (HTTPS for an `http` service)",
-            }),
-        },
-        Row {
-            path: "machines.*.services[].http",
-            outputs: all(Status::Descriptive {
-                note: "tells runners they can open it in a browser",
-            }),
-        },
-        common(
-            "machines.*.inputs",
-            done("environment of that machine and its init jobs only", "supplier-portal-api"),
-            done("environment of that machine's provisioning only", "supplier-portal-api"),
-        ),
-        common(
-            "machines.*.environment",
-            done("the container's environment (and its Kubernetes env)", "tuned-web"),
-            done("/etc/environment and systemd's default environment, before the steps", "tuned-web"),
-        ),
-        common(
-            "machines.*.sysctls",
-            done("the container's namespaced sysctls (and the Kubernetes pod's)", "tuned-web"),
-            done("/etc/sysctl.d, applied before the steps", "tuned-web"),
-        ),
-        common(
-            "machines.*.ulimits",
-            done("the container's ulimits (Kubernetes has none per container: refused)", "tuned-web"),
-            done("limits.d and systemd's default limits, before the steps", "tuned-web"),
-        ),
-        common(
-            "machines.*.aliases",
-            done("network aliases (and extra_hosts across the router)", "edge-firewall"),
-            done("in every Linux VM's /etc/hosts, after the machine's name", "edge-firewall"),
-        ),
-        common(
-            "machines.*.arch",
-            done("`platform` on the container and a node selector on Kubernetes (amd64/arm64)", "arm-lab"),
-            done("`box_architecture` on the VM", "segmented"),
-        ),
-        common(
-            "machines.*.privileged",
-            done("the container runs privileged (and a Kubernetes securityContext)", "arm-lab"),
-            done(
-                "nested virtualization on Hyper-V (`enable_virtualization_extensions`); elsewhere a VM already has kernel access",
-                "existing-hosts",
-            ),
-        ),
-        common(
-            "machines.*.read_only",
-            done("a read-only root filesystem on the container (and a Kubernetes securityContext)", "arm-lab"),
-            na("a VM's root filesystem stays writable; use `volumes` for data that must persist"),
-        ),
-        common(
-            "machines.*.tmpfs",
-            done("memory-backed mounts on the container (and Memory emptyDirs on Kubernetes)", "arm-lab"),
-            na("a VM mounts tmpfs in its own provisioning (fstab)"),
-        ),
-        common(
-            "machines.*.shm_size",
-            done("the size of /dev/shm on the container (and a Memory emptyDir on Kubernetes)", "arm-lab"),
-            na("a VM sizes /dev/shm in its own provisioning"),
-        ),
-        common(
-            "machines.*.dns.servers",
-            done("`dns` on the container (and the Kubernetes dnsConfig nameservers)", "arm-lab"),
-            na("a VM sets its resolver in its own provisioning (resolv.conf)"),
-        ),
-        common(
-            "machines.*.dns.search",
-            done("`dns_search` on the container (and the Kubernetes dnsConfig searches)", "arm-lab"),
-            na("a VM sets its search domains in its own provisioning"),
-        ),
-        common(
-            "machines.*.dns.domain",
-            done("`domainname` on the container", "arm-lab"),
-            na("a VM sets its domain in its own provisioning"),
-        ),
-        common(
-            "machines.*.resources.cpus",
-            done("a CPU limit", "supplier-portal-api"),
-            done("the VM's CPUs on every provider", "supplier-portal-api"),
-        ),
-        common(
-            "machines.*.resources.memory_mb",
-            done("a memory limit", "supplier-portal-api"),
-            done("the VM's memory on every provider", "supplier-portal-api"),
-        ),
-        common(
-            "machines.*.resources.disk_gb",
-            na("containers share the host's disk"),
-            done(
-                "the VM's disk on every provider (`vm.disk`, or the provider's own disk size), the root filesystem grown into it",
-                "segmented",
-            ),
-        ),
-        common(
-            "machines.*.depends_on",
-            done("starts after its dependencies answer (and their init jobs finish)", "hello-stack"),
-            done("boots after its dependencies, then waits until they answer", "hello-stack"),
-        ),
-        common(
-            "volumes.*.owner",
-            done("one named volume (one claim on Kubernetes, its users on the owner's node)", "shared-files"),
-            done(
-                "the owner's directory served over NFS, mounted by the others before their steps",
-                "shared-files",
-            ),
-        ),
-        common(
-            "machines.*.volumes",
-            done("a named volume per path", "hello-stack"),
-            done("the VM's own disk keeps the data; the path is created", "hello-stack"),
-        ),
-        common(
-            "machines.*.access",
-            done("checks run from its network namespace (a stand-in when the runner supplies it)", "segmented"),
-            Status::Partial {
-                how: "a VM like the others when it has `vm:`",
-                gap: "checks don't run from it",
-                proof: "segmented",
-            },
-        ),
-        row(
-            "machines.*.docker.image",
-            done("the service's image", "hello-stack"),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        row(
-            "machines.*.docker.build",
-            done("a build from the project folder", "segmented"),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        row(
-            "machines.*.docker.dockerfile",
-            done("the build's `dockerfile`, relative to its context", "slow-link"),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        row(
-            "machines.*.docker.args",
-            done("the build's `args`", "slow-link"),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        row(
-            "machines.*.docker.init",
-            done("one-shot jobs in its network namespace, after it answers", "hello-stack"),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        row(
-            "machines.*.docker.appliance",
-            done(
-                "Cisco IOL as vrnetlab packages it: the management port first, the networks as Ethernet0/1..., NETMAP and iouyap, a startup configuration with the addresses",
-                "cisco-iol",
-            ),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        row(
-            "machines.*.docker.firmware",
-            done("the IOS image a Dynamips 7200 boots, in a container Isoloom builds", "cisco-dynamips"),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        row(
-            "machines.*.docker.config",
-            done("added to the generated startup configuration when the container starts", "cisco-iol"),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        row(
-            "machines.*.docker.idle",
-            done("kept running idle (`entrypoint: [sleep, infinity]`), a machine to work from", "workbench"),
-            NOT_A_CONTAINER,
-            NOT_A_CONTAINER,
-        ),
-        vm_field(
-            "machines.*.vm.os",
-            Status::Partial {
-                how: "Vagrant boxes for debian-12, ubuntu-24.04 and kali",
-                gap: "Windows",
-                proof: "hello-stack",
-            },
-        ),
-        vm_field(
-            "machines.*.vm.image.vagrant",
-            done("the machine's own Vagrant box instead of the built-in one", "windows-hello"),
-        ),
-        vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
-        vm_field(
-            "machines.*.vm.image.qemu",
-            done(
-                "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
-                "windows-hello",
-            ),
-        ),
-        vm_field(
-            "machines.*.vm.image.hyperv",
-            done(
-                "the box Vagrant's Hyper-V provider boots instead (its latest version with a Hyper-V build)",
-                "windows-hello",
-            ),
-        ),
-        vm_field(
-            "machines.*.vm.image.winrm",
-            done(
-                "how the Windows box answers WinRM: `plaintext` (HTTP 5985, the default) or `ssl` (HTTPS 5986)",
-                "windows-hello",
-            ),
-        ),
-        vm_field(
-            "machines.*.vm.provision",
-            done(
-                "`.sh` steps, Ansible run inside the VM, and `reboot` (Vagrant restarts the VM)",
-                "existing-hosts",
-            ),
-        ),
-        common(
-            "provision[].ansible",
-            planned("environment-level provisioning on containers (a controller container)"),
-            done("run from a controller VM on every network, once every machine is up", "ansible-pair"),
-        ),
-        common(
-            "provision[].inventory",
-            planned("with environment-level provisioning on containers"),
-            done("more inventory files, next to the one Isoloom writes", "ansible-pair"),
-        ),
-        common(
-            "provision[].groups",
-            planned("with environment-level provisioning on containers"),
-            done("groups in the inventory Isoloom writes", "ansible-pair"),
-        ),
-        common(
-            "provision[].vars",
-            planned("with environment-level provisioning on containers"),
-            done("extra variables (`-e`)", "ansible-pair"),
-        ),
-        common(
-            "provision[].host_vars",
-            planned("with environment-level provisioning on containers"),
-            done("on each machine's line of the inventory Isoloom writes", "ansible-pair"),
-        ),
-        common(
-            "controller",
-            planned("with environment-level provisioning on containers"),
-            done("the controller's box (Vagrant) and resources", "ansible-pair"),
-        ),
-        common(
-            "provision[].requirements",
-            planned("with environment-level provisioning on containers"),
-            done("Galaxy collections and roles installed first", "ansible-pair"),
-        ),
-        common(
-            "checks[]",
-            done(
-                "a `check` profile: a runner per position (a sh script next to the Compose file), scripts from the project mounted read-only",
-                "hello-stack",
-            ),
-            done(
-                "on demand (`vagrant provision --provision-with checks`): a runner script per machine, the controller's for the rest and for Ansible checks",
-                "hello-stack",
-            ),
-        ),
-        common(
-            "checks[].name",
-            done("the runner's PASS/FAIL line", "hello-stack"),
-            done("the runner's PASS/FAIL line", "hello-stack"),
-        ),
-        common(
-            "checks[].from",
-            done(
-                "the runner in that machine's network namespace (a stand-in's when the runner supplies it)",
-                "segmented",
-            ),
-            done("the runner on that machine", "segmented"),
-        ),
-        common(
-            "checks[].http",
-            done("curl (else wget, else bash) from the position, retried for `wait`", "hello-stack"),
-            done("curl (else wget, else bash) from the machine, retried for `wait`", "hello-stack"),
-        ),
-        common(
-            "checks[].tcp",
-            done("nc (else bash) from the position", "segmented"),
-            done("nc (else bash) from the machine", "segmented"),
-        ),
-        common("checks[].method", done("curl -X", "hello-stack"), done("curl -X", "hello-stack")),
-        common("checks[].headers", done("curl -H", "hello-stack"), done("curl -H", "hello-stack")),
-        common(
-            "checks[].body",
-            done("curl --data-binary", "hello-stack"),
-            done("curl --data-binary", "hello-stack"),
-        ),
-        common(
-            "checks[].contains",
-            done(
-                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
-                "hello-stack",
-            ),
-            done(
-                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
-                "hello-stack",
-            ),
-        ),
-        common(
-            "checks[].follow",
-            done(
-                "redirects followed (curl -L --max-redirs 5; wget, which follows anyway, reads the last of at most 6 answers), the final status compared",
-                "hello-stack",
-            ),
-            done(
-                "redirects followed (curl -L --max-redirs 5; wget, which follows anyway, reads the last of at most 6 answers), the final status compared",
-                "hello-stack",
-            ),
-        ),
-        common(
-            "checks[].send",
-            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
-            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
-        ),
-        row(
-            "checks[].exec",
-            done(
-                "in the machine itself: its own runner piped to `docker compose exec -T <machine> sh -s`",
-                "hello-stack",
-            ),
-            done("the command in the machine's own shell", "arm-vm"),
-            VM_PLANNED,
-        ),
-        common(
-            "checks[].script",
-            done("sh, from the project mounted read-only", "edge-firewall"),
-            done("sh, from /opt/isoloom", "edge-firewall"),
-        ),
-        common(
-            "checks[].expect",
-            done(
-                "a status code, `any` or `blocked` (http); `open` or `blocked` (tcp); text (exec)",
-                "hello-stack",
-            ),
-            done(
-                "a status code, `any` or `blocked` (http); `open` or `blocked` (tcp); text (exec)",
-                "hello-stack",
-            ),
-        ),
-        common(
-            "checks[].wait",
-            done("retried every 2s until it passes or the time is up", "segmented"),
-            done("retried every 2s until it passes or the time is up", "segmented"),
-        ),
-        Row {
-            path: "targets",
-            outputs: all(Status::Core {
-                note: "narrows the targets Isoloom generates",
-            }),
-        },
-        common(
-            "tools",
-            done(
-                "a container per tool on every network at the reserved addresses (`shell`: netshoot)",
-                "slow-link",
-            ),
-            done(
-                "the `shell` tool as a Debian VM with the usual tools; image tools are container-only",
-                "slow-link",
-            ),
-        ),
-        Row {
-            path: "machines.*.external.address",
-            outputs: all(Status::Core {
-                note: "the `external` target's SSH endpoint (inventory, checks, connect)",
-            }),
-        },
-        Row {
-            path: "machines.*.external.user",
-            outputs: all(Status::Core {
-                note: "the `external` target's SSH user",
-            }),
-        },
-        Row {
-            path: "machines.*.external.port",
-            outputs: all(Status::Core {
-                note: "the `external` target's SSH port",
-            }),
-        },
-        Row {
-            path: "machines.*.external.key",
-            outputs: all(Status::Core {
-                note: "the `external` target's SSH key",
-            }),
-        },
-        Row {
-            path: "message",
-            outputs: all(Status::Descriptive {
-                note: "printed by `isoloom run` and `isoloom message`, placeholders filled from the snapshot",
-            }),
-        },
-        Row {
-            path: "machines.*.count",
-            outputs: all(Status::Core {
-                note: "expanded into clones before generation",
-            }),
-        },
-        Row {
-            path: "common",
-            outputs: all(Status::Core {
-                note: "folded into every machine before generation",
-            }),
-        },
-        Row {
-            path: "groups",
-            outputs: [
-                Status::Core {
-                    note: "folded into their members before generation",
-                },
-                done("folded into their members; Ansible inventory groups", "ansible-pair"),
-                done("folded into their members; Ansible inventory groups", "ansible-pair"),
-            ],
-        },
-    ]
+    }
 }
+
+/// A field of `vm:` only: nothing for Compose, the Terraform column from [`PROXMOX`].
+const fn vm_field(path: &'static str, vagrant: Status) -> Row {
+    row(path, NOT_A_VM, vagrant, VM_PLANNED)
+}
+
+/// A field every output reads, the Terraform column from [`PROXMOX`].
+const fn common(path: &'static str, compose: Status, vagrant: Status) -> Row {
+    row(path, compose, vagrant, VM_PLANNED)
+}
+
+/// Every field of the spec, in spec-reference order, before [`PROXMOX`] fills the Terraform
+/// column. Data, not code: one row a field.
+const BASE: &[Row] = &[
+    Row {
+        path: "version",
+        outputs: all(Status::Core {
+            note: "selects the format version",
+        }),
+    },
+    common(
+        "name",
+        done("the Compose project name", "hello-stack"),
+        done("VM labels and network names", "hello-stack"),
+    ),
+    common(
+        "networks.*.cidr",
+        done("a Compose network with that subnet", "hello-stack"),
+        done("a private network (VirtualBox internal network, libvirt network)", "hello-stack"),
+    ),
+    common(
+        "networks.*.tc.delay",
+        done(
+            "netem on the router's interface into the network and each machine's own (its network sidecar)",
+            "slow-link",
+        ),
+        done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
+    ),
+    common(
+        "networks.*.tc.jitter",
+        done(
+            "netem on the router's interface into the network and each machine's own (its network sidecar)",
+            "slow-link",
+        ),
+        done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
+    ),
+    common(
+        "networks.*.tc.loss",
+        done(
+            "netem on the router's interface into the network and each machine's own (its network sidecar)",
+            "slow-link",
+        ),
+        done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
+    ),
+    common(
+        "networks.*.tc.rate",
+        done(
+            "netem on the router's interface into the network and each machine's own (its network sidecar)",
+            "slow-link",
+        ),
+        done("netem on the router VM and each Linux VM's interface, re-applied at boot", "slow-link"),
+    ),
+    row(
+        "networks.*.docker.cidr",
+        done(
+            "the network's block on Docker (others outside 10.0.0.0/8 move there automatically)",
+            "air-gapped",
+        ),
+        na("Docker only: VMs use `cidr` as written"),
+        na("Docker only: VMs use `cidr` as written"),
+    ),
+    row(
+        "networks.*.vlans.*.cidr",
+        done(
+            "a Compose network per VLAN (`<lan>-vlan<id>`); a machine on several VLANs of the LAN gets one 802.1Q trunk (`<lan>.<id>` subinterfaces) through a switch container",
+            "vlan-office",
+        ),
+        done(
+            "a private network per VLAN; a VM on several VLANs of the LAN gets an 802.1Q trunk inside it (`<lan>.<id>`)",
+            "vlan-office",
+        ),
+        done(
+            "an SDN VNet per VLAN; a VM on several VLANs of the LAN gets an 802.1Q trunk inside it (`<lan>.<id>`)",
+            "vlan-office",
+        ),
+    ),
+    row(
+        "networks.*.switch",
+        done(
+            "the LAN's switch appliance instead of the Linux switch container: an access port per VLAN network, a trunk port per trunk link, VLANs and port modes in its startup configuration",
+            "cisco-switch",
+        ),
+        na("switch appliances run on the Docker targets only"),
+        na("switch appliances run on the Docker targets only"),
+    ),
+    row(
+        "networks.*.vlans.*.internet",
+        done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
+        done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
+        done("as `networks.*.internet`, per VLAN (the LAN's by default)", "vlan-office"),
+    ),
+    common(
+        "networks.*.internet",
+        done(
+            "no default route for offline machines (Docker's internal network when nothing routes)",
+            "segmented",
+        ),
+        done("new connections out through the NAT interface blocked after provisioning", "segmented"),
+    ),
+    common(
+        "networks.*.gateway",
+        done(
+            "the gateway machine at .1 with forwarding; machines behind it route through it",
+            "edge-firewall",
+        ),
+        done("forwarding on the gateway; machines move behind it after provisioning", "edge-firewall"),
+    ),
+    common(
+        "reach[].from",
+        done("a router container filtering with nftables", "segmented"),
+        done("a router VM filtering with nftables", "segmented"),
+    ),
+    common("reach[].to", done("the router's rules", "segmented"), done("the router's rules", "segmented")),
+    common(
+        "reach[].ports",
+        done("the router's rules, per port", "segmented"),
+        done("the router's rules, per port", "segmented"),
+    ),
+    common(
+        "inputs",
+        done("variables read from the shell at start", "supplier-portal-api"),
+        done("values read from the environment at start", "supplier-portal-api"),
+    ),
+    common(
+        "machines.*.networks",
+        done("a fixed address on each network; names across networks", "hello-stack"),
+        done("a fixed address on each network; names in /etc/hosts", "hello-stack"),
+    ),
+    common(
+        "machines.*.services[].port",
+        done("a healthcheck, so `depends_on` and `up --wait` wait for it", "hello-stack"),
+        done("machines depending on it wait until it answers", "hello-stack"),
+    ),
+    Row {
+        path: "cloud.provider",
+        outputs: all(Status::Descriptive {
+            note: "the cloud of a cloud-services environment (the cloud-services target, not these outputs)",
+        }),
+    },
+    Row {
+        path: "cloud.terraform",
+        outputs: all(Status::Descriptive {
+            note: "the Terraform module the cloud-services target applies",
+        }),
+    },
+    Row {
+        path: "cloud.vars",
+        outputs: all(Status::Descriptive {
+            note: "the module's variables (terraform.tfvars.json)",
+        }),
+    },
+    Row {
+        path: "cloud.outputs",
+        outputs: all(Status::Descriptive {
+            note: "what checks and the message read once deployed",
+        }),
+    },
+    Row {
+        path: "cloud.hourly_usd",
+        outputs: all(Status::Descriptive {
+            note: "an estimate: `isoloom run` says it, the snapshot carries it",
+        }),
+    },
+    Row {
+        path: "cloud.before",
+        outputs: all(Status::Descriptive {
+            note: "host steps before the apply (up.sh)",
+        }),
+    },
+    Row {
+        path: "cloud.env",
+        outputs: all(Status::Descriptive {
+            note: "Terraform's environment (the cloud-services scripts)",
+        }),
+    },
+    Row {
+        path: "cloud.apply_retries",
+        outputs: all(Status::Descriptive {
+            note: "applies again after a failed apply (up.sh)",
+        }),
+    },
+    Row {
+        path: "cloud.requires",
+        outputs: all(Status::Descriptive {
+            note: "host tools `doctor` and `run` check",
+        }),
+    },
+    Row {
+        path: "machines.*.services[].name",
+        outputs: all(Status::Descriptive {
+            note: "names the service for people and runners",
+        }),
+    },
+    common(
+        "machines.*.services[].publish",
+        done("a published port, on the host's loopback", "supplier-portal-api"),
+        done("a forwarded port, on the host's loopback", "supplier-portal-api"),
+    ),
+    common(
+        "machines.*.services[].fixed",
+        done("the `publish` port itself on the host, not a free one", "supplier-portal-api"),
+        done("Vagrant forwards `publish` as is", "supplier-portal-api"),
+    ),
+    common(
+        "machines.*.services[].dormant",
+        done(
+            "left out of the healthcheck (so `depends_on` and `up --wait` don't wait for it) and of the derived checks that expect an answer; still published and opened by `reach`",
+            "segmented",
+        ),
+        done(
+            "left out of the dependency waits and of the derived checks that expect an answer; still forwarded and opened by `reach`",
+            "segmented",
+        ),
+    ),
+    common(
+        "machines.*.services[].protocol",
+        done(
+            "`udp`: published as `<port>/udp`; left out of the healthcheck and the derived checks (no handshake); opened by `reach` (TCP and UDP alike)",
+            "udp-dns",
+        ),
+        Status::Partial {
+            how: "`udp`: forwarded as UDP; left out of the dependency waits and the derived checks; opened by `reach`",
+            gap: "vagrant-libvirt skips UDP forwarded ports (`isoloom run` warns): reach the machine's address instead",
+            proof: "udp-dns",
+        },
+    ),
+    Row {
+        path: "machines.*.services[].tls",
+        outputs: all(Status::Descriptive {
+            note: "derived checks reach it over TLS (HTTPS for an `http` service)",
+        }),
+    },
+    Row {
+        path: "machines.*.services[].http",
+        outputs: all(Status::Descriptive {
+            note: "tells runners they can open it in a browser",
+        }),
+    },
+    common(
+        "machines.*.inputs",
+        done("environment of that machine and its init jobs only", "supplier-portal-api"),
+        done("environment of that machine's provisioning only", "supplier-portal-api"),
+    ),
+    common(
+        "machines.*.environment",
+        done("the container's environment (and its Kubernetes env)", "tuned-web"),
+        done("/etc/environment and systemd's default environment, before the steps", "tuned-web"),
+    ),
+    common(
+        "machines.*.sysctls",
+        done("the container's namespaced sysctls (and the Kubernetes pod's)", "tuned-web"),
+        done("/etc/sysctl.d, applied before the steps", "tuned-web"),
+    ),
+    common(
+        "machines.*.ulimits",
+        done("the container's ulimits (Kubernetes has none per container: refused)", "tuned-web"),
+        done("limits.d and systemd's default limits, before the steps", "tuned-web"),
+    ),
+    common(
+        "machines.*.aliases",
+        done("network aliases (and extra_hosts across the router)", "edge-firewall"),
+        done("in every Linux VM's /etc/hosts, after the machine's name", "edge-firewall"),
+    ),
+    common(
+        "machines.*.arch",
+        done("`platform` on the container and a node selector on Kubernetes (amd64/arm64)", "arm-lab"),
+        done("`box_architecture` on the VM", "segmented"),
+    ),
+    common(
+        "machines.*.privileged",
+        done("the container runs privileged (and a Kubernetes securityContext)", "arm-lab"),
+        done(
+            "nested virtualization on Hyper-V (`enable_virtualization_extensions`); elsewhere a VM already has kernel access",
+            "existing-hosts",
+        ),
+    ),
+    common(
+        "machines.*.read_only",
+        done("a read-only root filesystem on the container (and a Kubernetes securityContext)", "arm-lab"),
+        na("a VM's root filesystem stays writable; use `volumes` for data that must persist"),
+    ),
+    common(
+        "machines.*.tmpfs",
+        done("memory-backed mounts on the container (and Memory emptyDirs on Kubernetes)", "arm-lab"),
+        na("a VM mounts tmpfs in its own provisioning (fstab)"),
+    ),
+    common(
+        "machines.*.shm_size",
+        done("the size of /dev/shm on the container (and a Memory emptyDir on Kubernetes)", "arm-lab"),
+        na("a VM sizes /dev/shm in its own provisioning"),
+    ),
+    common(
+        "machines.*.dns.servers",
+        done("`dns` on the container (and the Kubernetes dnsConfig nameservers)", "arm-lab"),
+        na("a VM sets its resolver in its own provisioning (resolv.conf)"),
+    ),
+    common(
+        "machines.*.dns.search",
+        done("`dns_search` on the container (and the Kubernetes dnsConfig searches)", "arm-lab"),
+        na("a VM sets its search domains in its own provisioning"),
+    ),
+    common(
+        "machines.*.dns.domain",
+        done("`domainname` on the container", "arm-lab"),
+        na("a VM sets its domain in its own provisioning"),
+    ),
+    common(
+        "machines.*.resources.cpus",
+        done("a CPU limit", "supplier-portal-api"),
+        done("the VM's CPUs on every provider", "supplier-portal-api"),
+    ),
+    common(
+        "machines.*.resources.memory_mb",
+        done("a memory limit", "supplier-portal-api"),
+        done("the VM's memory on every provider", "supplier-portal-api"),
+    ),
+    common(
+        "machines.*.resources.disk_gb",
+        na("containers share the host's disk"),
+        done(
+            "the VM's disk on every provider (`vm.disk`, or the provider's own disk size), the root filesystem grown into it",
+            "segmented",
+        ),
+    ),
+    common(
+        "machines.*.depends_on",
+        done("starts after its dependencies answer (and their init jobs finish)", "hello-stack"),
+        done("boots after its dependencies, then waits until they answer", "hello-stack"),
+    ),
+    common(
+        "volumes.*.owner",
+        done("one named volume (one claim on Kubernetes, its users on the owner's node)", "shared-files"),
+        done(
+            "the owner's directory served over NFS, mounted by the others before their steps",
+            "shared-files",
+        ),
+    ),
+    common(
+        "machines.*.volumes",
+        done("a named volume per path", "hello-stack"),
+        done("the VM's own disk keeps the data; the path is created", "hello-stack"),
+    ),
+    common(
+        "machines.*.access",
+        done("checks run from its network namespace (a stand-in when the runner supplies it)", "segmented"),
+        Status::Partial {
+            how: "a VM like the others when it has `vm:`",
+            gap: "checks don't run from it",
+            proof: "segmented",
+        },
+    ),
+    row(
+        "machines.*.docker.image",
+        done("the service's image", "hello-stack"),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    row(
+        "machines.*.docker.build",
+        done("a build from the project folder", "segmented"),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    row(
+        "machines.*.docker.dockerfile",
+        done("the build's `dockerfile`, relative to its context", "slow-link"),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    row(
+        "machines.*.docker.args",
+        done("the build's `args`", "slow-link"),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    row(
+        "machines.*.docker.init",
+        done("one-shot jobs in its network namespace, after it answers", "hello-stack"),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    row(
+        "machines.*.docker.appliance",
+        done(
+            "Cisco IOL as vrnetlab packages it: the management port first, the networks as Ethernet0/1..., NETMAP and iouyap, a startup configuration with the addresses",
+            "cisco-iol",
+        ),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    row(
+        "machines.*.docker.firmware",
+        done("the IOS image a Dynamips 7200 boots, in a container Isoloom builds", "cisco-dynamips"),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    row(
+        "machines.*.docker.config",
+        done("added to the generated startup configuration when the container starts", "cisco-iol"),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    row(
+        "machines.*.docker.idle",
+        done("kept running idle (`entrypoint: [sleep, infinity]`), a machine to work from", "workbench"),
+        NOT_A_CONTAINER,
+        NOT_A_CONTAINER,
+    ),
+    vm_field(
+        "machines.*.vm.os",
+        Status::Partial {
+            how: "Vagrant boxes for debian-12, ubuntu-24.04 and kali",
+            gap: "Windows",
+            proof: "hello-stack",
+        },
+    ),
+    vm_field(
+        "machines.*.vm.image.vagrant",
+        done("the machine's own Vagrant box instead of the built-in one", "windows-hello"),
+    ),
+    vm_field("machines.*.vm.image.vagrant_version", done("the box version, pinned", "windows-hello")),
+    vm_field(
+        "machines.*.vm.image.qemu",
+        done(
+            "the box Vagrant's QEMU provider boots instead (libvirt format), when the main one has none",
+            "windows-hello",
+        ),
+    ),
+    vm_field(
+        "machines.*.vm.image.hyperv",
+        done(
+            "the box Vagrant's Hyper-V provider boots instead (its latest version with a Hyper-V build)",
+            "windows-hello",
+        ),
+    ),
+    vm_field(
+        "machines.*.vm.image.winrm",
+        done(
+            "how the Windows box answers WinRM: `plaintext` (HTTP 5985, the default) or `ssl` (HTTPS 5986)",
+            "windows-hello",
+        ),
+    ),
+    vm_field(
+        "machines.*.vm.provision",
+        done(
+            "`.sh` steps, Ansible run inside the VM, and `reboot` (Vagrant restarts the VM)",
+            "existing-hosts",
+        ),
+    ),
+    common(
+        "provision[].ansible",
+        planned("environment-level provisioning on containers (a controller container)"),
+        done("run from a controller VM on every network, once every machine is up", "ansible-pair"),
+    ),
+    common(
+        "provision[].inventory",
+        planned("with environment-level provisioning on containers"),
+        done("more inventory files, next to the one Isoloom writes", "ansible-pair"),
+    ),
+    common(
+        "provision[].groups",
+        planned("with environment-level provisioning on containers"),
+        done("groups in the inventory Isoloom writes", "ansible-pair"),
+    ),
+    common(
+        "provision[].vars",
+        planned("with environment-level provisioning on containers"),
+        done("extra variables (`-e`)", "ansible-pair"),
+    ),
+    common(
+        "provision[].host_vars",
+        planned("with environment-level provisioning on containers"),
+        done("on each machine's line of the inventory Isoloom writes", "ansible-pair"),
+    ),
+    common(
+        "controller",
+        planned("with environment-level provisioning on containers"),
+        done("the controller's box (Vagrant) and resources", "ansible-pair"),
+    ),
+    common(
+        "provision[].requirements",
+        planned("with environment-level provisioning on containers"),
+        done("Galaxy collections and roles installed first", "ansible-pair"),
+    ),
+    common(
+        "checks[]",
+        done(
+            "a `check` profile: a runner per position (a sh script next to the Compose file), scripts from the project mounted read-only",
+            "hello-stack",
+        ),
+        done(
+            "on demand (`vagrant provision --provision-with checks`): a runner script per machine, the controller's for the rest and for Ansible checks",
+            "hello-stack",
+        ),
+    ),
+    common(
+        "checks[].name",
+        done("the runner's PASS/FAIL line", "hello-stack"),
+        done("the runner's PASS/FAIL line", "hello-stack"),
+    ),
+    common(
+        "checks[].from",
+        done(
+            "the runner in that machine's network namespace (a stand-in's when the runner supplies it)",
+            "segmented",
+        ),
+        done("the runner on that machine", "segmented"),
+    ),
+    common(
+        "checks[].http",
+        done("curl (else wget, else bash) from the position, retried for `wait`", "hello-stack"),
+        done("curl (else wget, else bash) from the machine, retried for `wait`", "hello-stack"),
+    ),
+    common(
+        "checks[].tcp",
+        done("nc (else bash) from the position", "segmented"),
+        done("nc (else bash) from the machine", "segmented"),
+    ),
+    common("checks[].method", done("curl -X", "hello-stack"), done("curl -X", "hello-stack")),
+    common("checks[].headers", done("curl -H", "hello-stack"), done("curl -H", "hello-stack")),
+    common(
+        "checks[].body",
+        done("curl --data-binary", "hello-stack"),
+        done("curl --data-binary", "hello-stack"),
+    ),
+    common(
+        "checks[].contains",
+        done(
+            "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+            "hello-stack",
+        ),
+        done(
+            "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+            "hello-stack",
+        ),
+    ),
+    common(
+        "checks[].follow",
+        done(
+            "redirects followed (curl -L --max-redirs 5; wget, which follows anyway, reads the last of at most 6 answers), the final status compared",
+            "hello-stack",
+        ),
+        done(
+            "redirects followed (curl -L --max-redirs 5; wget, which follows anyway, reads the last of at most 6 answers), the final status compared",
+            "hello-stack",
+        ),
+    ),
+    common(
+        "checks[].send",
+        done("a line written to the connection before reading (nc else bash)", "hello-stack"),
+        done("a line written to the connection before reading (nc else bash)", "hello-stack"),
+    ),
+    row(
+        "checks[].exec",
+        done(
+            "in the machine itself: its own runner piped to `docker compose exec -T <machine> sh -s`",
+            "hello-stack",
+        ),
+        done("the command in the machine's own shell", "arm-vm"),
+        VM_PLANNED,
+    ),
+    common(
+        "checks[].script",
+        done("sh, from the project mounted read-only", "edge-firewall"),
+        done("sh, from /opt/isoloom", "edge-firewall"),
+    ),
+    common(
+        "checks[].expect",
+        done(
+            "a status code, `any` or `blocked` (http); `open` or `blocked` (tcp); text (exec)",
+            "hello-stack",
+        ),
+        done(
+            "a status code, `any` or `blocked` (http); `open` or `blocked` (tcp); text (exec)",
+            "hello-stack",
+        ),
+    ),
+    common(
+        "checks[].wait",
+        done("retried every 2s until it passes or the time is up", "segmented"),
+        done("retried every 2s until it passes or the time is up", "segmented"),
+    ),
+    Row {
+        path: "targets",
+        outputs: all(Status::Core {
+            note: "narrows the targets Isoloom generates",
+        }),
+    },
+    common(
+        "tools",
+        done(
+            "a container per tool on every network at the reserved addresses (`shell`: netshoot)",
+            "slow-link",
+        ),
+        done(
+            "the `shell` tool as a Debian VM with the usual tools; image tools are container-only",
+            "slow-link",
+        ),
+    ),
+    Row {
+        path: "machines.*.external.address",
+        outputs: all(Status::Core {
+            note: "the `external` target's SSH endpoint (inventory, checks, connect)",
+        }),
+    },
+    Row {
+        path: "machines.*.external.user",
+        outputs: all(Status::Core {
+            note: "the `external` target's SSH user",
+        }),
+    },
+    Row {
+        path: "machines.*.external.port",
+        outputs: all(Status::Core {
+            note: "the `external` target's SSH port",
+        }),
+    },
+    Row {
+        path: "machines.*.external.key",
+        outputs: all(Status::Core {
+            note: "the `external` target's SSH key",
+        }),
+    },
+    Row {
+        path: "message",
+        outputs: all(Status::Descriptive {
+            note: "printed by `isoloom run` and `isoloom message`, placeholders filled from the snapshot",
+        }),
+    },
+    Row {
+        path: "machines.*.count",
+        outputs: all(Status::Core {
+            note: "expanded into clones before generation",
+        }),
+    },
+    Row {
+        path: "common",
+        outputs: all(Status::Core {
+            note: "folded into every machine before generation",
+        }),
+    },
+    Row {
+        path: "groups",
+        outputs: [
+            Status::Core {
+                note: "folded into their members before generation",
+            },
+            done("folded into their members; Ansible inventory groups", "ansible-pair"),
+            done("folded into their members; Ansible inventory groups", "ansible-pair"),
+        ],
+    },
+];
 
 /// Fields counted as one feature whatever they hold.
 const WHOLE: &[&str] = &[

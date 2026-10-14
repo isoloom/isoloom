@@ -15,12 +15,14 @@
 use std::fmt::Write;
 
 use crate::model::{Machine, Spec};
-use crate::validate::Cidr;
 
 /// A machine's trunk on a LAN: the VLAN networks it carries (network, VLAN id, last octet).
 pub struct Trunk {
+    /// The LAN the VLANs are tagged on.
     pub lan: String,
+    /// The machine carrying the trunk.
     pub machine: String,
+    /// Each VLAN network it carries: its name, its VLAN id and the machine's last octet there.
     pub vlans: Vec<(String, u16, u8)>,
 }
 
@@ -99,7 +101,7 @@ fn find_by_address(addr: std::net::Ipv4Addr) -> String {
 
 /// The switch's address on a VLAN network: the controller's, which Docker leaves free.
 pub fn switch_address(spec: &Spec, network: &str) -> std::net::Ipv4Addr {
-    Cidr::parse(&spec.networks[network].cidr).expect("validated cidr").controller()
+    crate::cidr(spec, network).controller()
 }
 
 /// The switch's start: a bridge per VLAN joining the VLAN network and every trunk's `.<id>`.
@@ -160,7 +162,7 @@ pub fn machine_commands(
         find_by_mac(&mac(t, 0))
     )];
     for (net, id, octet) in &t.vlans {
-        let len = Cidr::parse(&spec.networks[net].cidr).expect("validated cidr").len;
+        let len = crate::cidr(spec, net).len;
         cmds.push(format!(
             "ip link add link {name} name {name}.{id} type vlan id {id} && ip addr add {}/{len} dev {name}.{id} && ip link set {name}.{id} up",
             address(net, *octet)
@@ -229,7 +231,7 @@ pub fn vm_commands(spec: &Spec, t: &Trunk, address: impl Fn(&str, u8) -> std::ne
     ];
     for (net, id, octet) in &t.vlans {
         let addr = address(net, *octet);
-        let len = Cidr::parse(&spec.networks[net].cidr).expect("validated cidr").len;
+        let len = crate::cidr(spec, net).len;
         // The NIC keeps a local MAC; `<lan>.<id>` takes the one the hypervisor gave it.
         let local = format!("02:1f:{}", addr.octets().map(|o| format!("{o:02x}")).join(":"));
         steps.push(format!(

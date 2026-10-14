@@ -5,6 +5,8 @@
 //! run and ends the current one). Leaf expressions are written by `hcl-rs` in its compact form;
 //! lists, objects and calls are laid out here.
 
+use std::fmt::Write as _;
+
 use hcl::expr::{Expression, FuncCall, Object, ObjectKey};
 use hcl::format::{Format, Formatter};
 use hcl::{Block, BlockLabel, Body, Structure};
@@ -104,7 +106,9 @@ fn block(out: &mut String, b: &Block, indent: usize) -> Result<(), hcl::Error> {
         out.push(' ');
         match l {
             BlockLabel::Identifier(i) => out.push_str(i.as_str()),
-            BlockLabel::String(s) => out.push_str(&format!("\"{}\"", quoted_inside(s))),
+            BlockLabel::String(s) => {
+                let _ = write!(out, "\"{}\"", quoted_inside(s));
+            }
         }
     }
     if b.body().0.is_empty() {

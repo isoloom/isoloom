@@ -225,7 +225,8 @@
       "cloud-vm": "needs `vm:` on vios, csr, host-a, host-b",
       "external": "needs `external:` on vios, csr, host-a, host-b",
       "cloud-services": "left out by `targets:`"
-    }
+    },
+    "clouds": {}
   },
   "checks": {
     "default_position": "networks",

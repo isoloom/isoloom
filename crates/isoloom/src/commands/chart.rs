@@ -3,8 +3,6 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::{Res, generated, output, spec};
 
 #[derive(clap::Args)]
@@ -32,9 +30,9 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     if spec::report_invalid(&spec) {
         return Ok(ExitCode::FAILURE);
     }
-    let files = core::generate(&spec, core::Target::Kubernetes).map_err(|e| format!("no chart: {e}"))?;
+    let files = isoloom_targets::generate(&spec, isoloom_spec::Target::Kubernetes).map_err(|e| format!("no chart: {e}"))?;
     generated::write_all(dir, &generated::finish(files, &settings.defaults, dir)?)?;
-    let chart = dir.join(core::OUTPUT_DIR).join("kubernetes").join("chart");
+    let chart = dir.join(isoloom_targets::OUTPUT_DIR).join("kubernetes").join("chart");
     let dest = a.out.clone().unwrap_or_else(|| dir.clone());
     std::fs::create_dir_all(&dest)?;
     let status = crate::tools::process::command("helm")

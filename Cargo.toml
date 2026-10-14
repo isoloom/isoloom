@@ -10,7 +10,6 @@ repository = "https://github.com/isoloom/isoloom"
 publish = false
 
 [workspace.dependencies]
-isoloom-core = { path = "crates/isoloom-core" }
 isoloom-spec = { path = "crates/isoloom-spec" }
 isoloom-plan = { path = "crates/isoloom-plan" }
 isoloom-render = { path = "crates/isoloom-render" }
@@ -34,14 +33,12 @@ thiserror = "2"
 insta = { version = "1", features = ["yaml"] }
 proptest = { version = "1", default-features = false, features = ["std"] }
 
-# Every crate inherits these (`[lints] workspace = true`); see CONTRIBUTING.md. A lint the code
-# base doesn't pass yet is listed as "allow" under "Tracked" with the plan to deny it: CI runs
-# clippy with `-D warnings`, so a lint at "warn" would fail it the same as "deny".
+# Every crate inherits these (`[lints] workspace = true`); see CONTRIBUTING.md. Every lint is at
+# "deny": a new exception is a local `#[allow]` with a one-line reason, never an entry here.
 [workspace.lints.rust]
 # No exception: a profile's inputs reach the tools through `Command::envs`, not `set_var`.
 unsafe_code = "forbid"
-# Tracked: denied for library crates once every public item is documented (Wave 2, #106).
-missing_docs = "allow"
+missing_docs = "deny"
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
@@ -55,19 +52,11 @@ missing_errors_doc = "allow"         # errors are typed enums whose variants doc
 missing_panics_doc = "allow"         # panics are denied outside tests (`expect_used`, `panic`).
 doc_markdown = "allow"               # prose names products (Docker, VirtualBox, OpenTofu) and keys, not code.
 similar_names = "allow"              # `src`/`dst`, `cidr`/`cidrs` read fine.
-# Tracked: still hit in code being moved onto the plan IR (Wave 2), denied when it lands.
-case_sensitive_file_extension_comparisons = "allow"
-cast_possible_truncation = "allow"
-format_collect = "allow"
-format_push_string = "allow"
-map_unwrap_or = "allow"
-match_wildcard_for_single_variants = "allow"
-stable_sort_primitive = "allow"
-too_many_lines = "allow"             # threshold 60 in clippy.toml
-cognitive_complexity = "allow"       # threshold 15 in clippy.toml
-expect_used = "allow"
-# Restriction lints, denied now (tests may unwrap, expect and panic: see clippy.toml).
+too_many_lines = "deny"              # pedantic; threshold 60 in clippy.toml
+cognitive_complexity = "deny"        # nursery; threshold 15 in clippy.toml
+# Restriction lints (tests may unwrap, expect and panic: see clippy.toml).
 unwrap_used = "deny"
+expect_used = "deny"
 panic = "deny"
 dbg_macro = "deny"
 todo = "deny"

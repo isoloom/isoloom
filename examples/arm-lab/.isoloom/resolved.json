@@ -100,7 +100,8 @@
       "cloud-vm": "needs `vm:` on web",
       "external": "needs `external:` on web",
       "cloud-services": "left out by `targets:`"
-    }
+    },
+    "clouds": {}
   },
   "checks": {
     "default_position": "networks",

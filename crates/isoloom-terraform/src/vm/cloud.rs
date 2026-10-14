@@ -70,7 +70,7 @@ pub fn windows_refusal(name: &str, m: &Machine) -> Option<String> {
     }
     vm.provision
         .iter()
-        .any(|p| !p.ends_with(".ps1"))
+        .any(|p| !isoloom_plan::lifecycle::has_extension(p, "ps1"))
         .then(|| format!("machine `{name}`: Windows steps are .ps1 scripts"))
 }
 

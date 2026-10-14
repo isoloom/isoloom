@@ -102,7 +102,12 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
 
 /// The lines joined as a script, or `None` when there are none.
 fn lines_or_none(lines: &[String]) -> Option<String> {
-    (!lines.is_empty()).then(|| lines.iter().map(|l| format!("{l}\n")).collect())
+    (!lines.is_empty()).then(|| {
+        lines.iter().fold(String::new(), |mut s, l| {
+            let _ = writeln!(s, "{l}");
+            s
+        })
+    })
 }
 
 /// Grows the root file system into a disk made bigger than the image's: its partition when it

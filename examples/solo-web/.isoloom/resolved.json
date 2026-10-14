@@ -103,6 +103,19 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "needs `external:` on web",
       "cloud-services": "left out by `targets:`"
+    },
+    "clouds": {
+      "cloud-vm": {
+        "generated": [
+          "aws",
+          "azure",
+          "gcp",
+          "digitalocean",
+          "linode",
+          "oci"
+        ],
+        "refused": {}
+      }
     }
   },
   "checks": {

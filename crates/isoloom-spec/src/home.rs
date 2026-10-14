@@ -9,7 +9,6 @@ pub fn home() -> PathBuf {
     }
     let user_home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
+        .map_or_else(|| PathBuf::from("."), PathBuf::from);
     user_home.join(".isoloom")
 }

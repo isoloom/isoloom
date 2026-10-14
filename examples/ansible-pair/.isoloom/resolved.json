@@ -134,6 +134,20 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "needs `external:` on web, cache",
       "cloud-services": "left out by `targets:`"
+    },
+    "clouds": {
+      "cloud-vm": {
+        "generated": [
+          "aws",
+          "azure",
+          "gcp"
+        ],
+        "refused": {
+          "digitalocean": "DigitalOcean cloud-vm has no Ansible controller yet",
+          "linode": "Linode cloud-vm has no Ansible controller yet",
+          "oci": "Oracle Cloud cloud-vm has no Ansible controller yet"
+        }
+      }
     }
   },
   "checks": {

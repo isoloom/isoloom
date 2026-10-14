@@ -55,7 +55,8 @@ cd examples/hello-stack && isoloom run docker . && git diff --exit-code -- .isol
   parsing and quoting.
 - **Comment style:** plain sentences, colons to introduce detail, no em dashes.
 - **Lints** are set in the root `Cargo.toml` and inherited by every crate
-  (`[lints] workspace = true`). Don't silence one locally without a comment saying why.
+  (`[lints] workspace = true`), all at `deny`. Don't add an exception there; silence one locally
+  only where the fix reads worse, with a one-line comment saying why.
 
 ## Commits and pull requests
 

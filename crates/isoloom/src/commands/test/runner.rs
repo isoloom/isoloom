@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use isoloom_core::shell;
+use isoloom_spec::shell;
 
 /// One check runner to execute: where it stands, and the command that runs it and prints the
 /// `isoloom-check:` lines.

@@ -5,10 +5,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-use isoloom_core as core;
-use isoloom_core::{Target, shell};
+use isoloom_spec::{Target, shell};
 
-use isoloom_core::events::{ErrorCode, Scope};
+use isoloom_runtime::events::{ErrorCode, Scope};
 
 use crate::failure::{Failure, fail};
 use crate::machine::{Running, find_interface, on_machine};
@@ -47,18 +46,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     let dir = spec::abs(&a.dir)?;
     let running = Running::find(&dir, a.target.as_deref(), a.instance)?;
     let (machine, network, t) = (a.machine.as_str(), a.network.as_str(), running.target);
-    let m = running
-        .spec
-        .machines
-        .get(machine)
-        .ok_or_else(|| Failure::new(ErrorCode::MachineUnknown, format!("no machine named `{machine}`")).machine(machine))?;
-    if !m.networks.contains_key(network) {
-        let message = format!(
-            "`{machine}` isn't on `{network}` (its networks: {})",
-            m.networks.keys().cloned().collect::<Vec<_>>().join(", ")
-        );
-        return Err(Failure::new(ErrorCode::NetworkUnknown, message).machine(machine).into());
-    }
+    let m = machine_on(&running.spec, machine, network)?;
     let addr = address(&running.spec, t, machine, network)?;
     let extra = if a.args.is_empty() {
         "-l -v".to_string()
@@ -92,10 +80,30 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     if !a.json {
         return process::run_attached(&mut c);
     }
-    // With --json, each packet line a `log` event of the `capture` step, until tcpdump ends.
+    run_json(&mut c, t, machine, network, &addr)
+}
+
+/// The machine named, when it is on `network`.
+fn machine_on<'a>(spec: &'a isoloom_spec::Spec, machine: &str, network: &str) -> Res<&'a isoloom_spec::Machine> {
+    let m = spec
+        .machines
+        .get(machine)
+        .ok_or_else(|| Failure::new(ErrorCode::MachineUnknown, format!("no machine named `{machine}`")).machine(machine))?;
+    if !m.networks.contains_key(network) {
+        let message = format!(
+            "`{machine}` isn't on `{network}` (its networks: {})",
+            m.networks.keys().cloned().collect::<Vec<_>>().join(", ")
+        );
+        return Err(Failure::new(ErrorCode::NetworkUnknown, message).machine(machine).into());
+    }
+    Ok(m)
+}
+
+/// With --json: each packet line a `log` event of the `capture` step, until tcpdump ends.
+fn run_json(c: &mut Command, t: Target, machine: &str, network: &str, addr: &str) -> Res<ExitCode> {
     let at = Scope::step(Some(t.id()), "capture").on(machine);
     output::begin(&at, Some(format!("{network} ({addr})")));
-    let ok = process::run_step(&mut c, &at)?.success();
+    let ok = process::run_step(c, &at)?.success();
     if ok {
         output::done(&at, None);
     } else {
@@ -110,11 +118,11 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 }
 
 /// The machine's address on the network, where the target puts it.
-fn address(spec: &core::Spec, t: Target, machine: &str, network: &str) -> Res<String> {
-    let r = core::resolved::resolve(spec);
+fn address(spec: &isoloom_spec::Spec, t: Target, machine: &str, network: &str) -> Res<String> {
+    let r = isoloom_targets::resolved::resolve(spec);
     let on_docker = matches!(t, Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes);
     let key = if on_docker { "docker_addresses" } else { "addresses" };
-    Ok(core::resolved::lookup(&r, &format!("machines.{machine}.{key}.{network}"))
+    Ok(isoloom_targets::resolved::lookup(&r, &format!("machines.{machine}.{key}.{network}"))
         .and_then(|v| v.as_str())
         .ok_or_else(|| fail(ErrorCode::NetworkUnknown, "no address"))?
         .to_string())

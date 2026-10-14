@@ -1,14 +1,14 @@
 //! How commands print machine-readable output and turn a result into an exit code.
 //!
 //! A lifecycle command run with `--json` prints events, one JSON object per line on stdout
-//! (`isoloom_core::events`), and, when it fails, the error document as its last line. Its
+//! (`isoloom_runtime::events`), and, when it fails, the error document as its last line. Its
 //! human-readable lines are left out; the tools' own output comes as `log` events. Without
 //! `--json` nothing here prints.
 
 use std::process::ExitCode;
 use std::sync::{Mutex, OnceLock};
 
-use isoloom_core::events::{Emitter, ErrorDocument, Scope, State, write_line};
+use isoloom_runtime::events::{Emitter, ErrorDocument, Scope, State, write_line};
 
 use crate::Res;
 use crate::failure;

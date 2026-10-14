@@ -148,7 +148,10 @@ fn the_chart_templates_the_images_and_keeps_braces_as_they_are() {
     assert_eq!(values["images"]["web"].as_str(), Some("registry.corp/hub/library/nginx"));
     assert_eq!(values["images"]["db"].as_str(), Some("isoloom/shop-db"));
     // Every template is YAML before Helm renders it.
-    for f in files.iter().filter(|f| f.path.contains("/chart/templates/") && f.path.ends_with(".yaml")) {
+    for f in files
+        .iter()
+        .filter(|f| f.path.contains("/chart/templates/") && std::path::Path::new(&f.path).extension().is_some_and(|e| e == "yaml"))
+    {
         for doc in f.contents.split("---\n") {
             serde_yaml_ng::from_str::<serde_yaml_ng::Value>(doc).unwrap_or_else(|e| panic!("{}: {e}", f.path));
         }

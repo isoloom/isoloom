@@ -138,7 +138,7 @@ pub(super) fn management(spec: &Spec, p: &mut Problems) {
     if !any_appliance {
         return;
     }
-    let mgmt = Cidr::parse(crate::appliance::MGMT_CIDR).expect("constant");
+    let Some(mgmt) = Cidr::parse(crate::appliance::MGMT_CIDR) else { return };
     for (net, n) in &spec.networks {
         if Cidr::parse(&n.cidr).is_some_and(|c| c.overlaps(mgmt)) {
             p.add(

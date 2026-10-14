@@ -3,7 +3,7 @@
 The registry records which environments `isoloom run` brought up on this host, where they run
 and on which target. `status`, `connect`, `exec`, `capture` and `test` read it, so you don't have to
 repeat the target. Tools that embed Isoloom read and write it too, through
-`isoloom_core::registry`.
+`isoloom_runtime::registry`.
 
 ## Where it is
 
@@ -34,7 +34,7 @@ environments:
   started: 2026-10-10T11:30:00Z
 ```
 
-At the top, `version` is the format version (`isoloom_core::registry::VERSION`), written on
+At the top, `version` is the format version (`isoloom_runtime::registry::VERSION`), written on
 every save. A file without it (written before the field existed) is version 1. It changes only
 when a field is removed or changes meaning; a new optional field doesn't change it, so readers
 should ignore fields they don't know.
@@ -66,5 +66,5 @@ a tool and its background workers. To write it without losing anyone's change:
 - **Write atomically.** Write the whole file to a temporary file in the same folder, then rename
   it over `status.yml`. Readers never see a half-written file.
 
-`isoloom_core::registry::update` does both. Prefer it to `load` and then `save` whenever more
+`isoloom_runtime::registry::update` does both. Prefer it to `load` and then `save` whenever more
 than one writer may be running.

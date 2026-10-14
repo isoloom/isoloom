@@ -1,13 +1,12 @@
 //! What follows a successful `run` or `down`: the registry updated, and after a run the
 //! baseline snapshot, the warnings the tool's output loses, and the spec's message.
 
-use isoloom_core as core;
-use isoloom_core::Target;
+use isoloom_spec::Target;
 
 use super::Ask;
 use super::Invocation;
 use crate::prepare::Prepared;
-use isoloom_core::events::Scope;
+use isoloom_runtime::events::Scope;
 
 use crate::tools::vagrant::{self, BASELINE};
 use crate::tools::{compose, process};
@@ -43,11 +42,11 @@ pub fn after(p: &Prepared, ask: &Ask, down: bool, tool: &Invocation, project: Op
 
 /// Remember what is up on this host, for status / connect / exec / capture.
 pub(super) fn record(p: &Prepared, ask: &Ask, down: bool, project: Option<String>) {
-    let recorded = core::registry::update(|reg| {
+    let recorded = isoloom_runtime::registry::update(|reg| {
         if down {
             reg.remove(&p.dir, p.target, ask.instance);
         } else {
-            reg.upsert(core::registry::Entry {
+            reg.upsert(isoloom_runtime::registry::Entry {
                 name: p.spec.name.clone(),
                 dir: p.dir.clone(),
                 target: p.target,
@@ -55,12 +54,12 @@ pub(super) fn record(p: &Prepared, ask: &Ask, down: bool, project: Option<String
                 cloud: ask.cloud.map(str::to_string),
                 project,
                 profile: spec::profile_name(),
-                started: core::registry::now(),
+                started: isoloom_runtime::registry::now(),
             });
         }
     });
     if let Err(e) = recorded {
-        eprintln!("note: couldn't update {}: {e}", core::registry::path().display());
+        eprintln!("note: couldn't update {}: {e}", isoloom_runtime::registry::path().display());
     }
 }
 
@@ -90,7 +89,7 @@ fn message(p: &Prepared, instance: Option<u8>) -> Option<String> {
     let m = if p.target == Target::CloudServices {
         p.spec.cloud_message(&cloud_services::outputs(&p.dir, instance))
     } else {
-        core::resolved::render_message_at(
+        isoloom_targets::resolved::render_message_at(
             &p.spec,
             instance,
             p.target,

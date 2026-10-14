@@ -2,6 +2,8 @@
 //! `init:` jobs and network sidecar), Isoloom's router, VLAN switches, probes, check runners and
 //! tools, then the networks and volumes; every resource labelled as the environment's.
 
+use std::fmt::Write as _;
+
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, Feature, Image, MachinePlan, MachineShape, PublishedPort};
 use isoloom_render::backend::{self, Backend, Files, RenderError};
@@ -121,23 +123,22 @@ fn moved(env: &Environment) -> String {
     env.networks
         .iter()
         .filter(|(_, n)| n.declared_cidr != n.cidr)
-        .map(|(name, n)| {
-            format!(
-                "# On Docker, network `{name}` uses {} instead of {} (same last octets).\n",
+        .fold(String::new(), |mut out, (name, n)| {
+            let _ = writeln!(
+                out,
+                "# On Docker, network `{name}` uses {} instead of {} (same last octets).",
                 n.cidr, n.declared_cidr
-            )
+            );
+            out
         })
-        .collect()
 }
 
 /// A machine's service, then its sidecar and its `init:` jobs.
 fn machine(env: &Environment, name: &str, mp: &MachinePlan, ts: &[trunks::Trunk], out: &mut Out) {
     let m = &env.spec().machines[name];
     let mut svc = base(env, name, mp, m, ts);
-    if let Some(kind) = m.docker.as_ref().and_then(|d| d.appliance) {
-        appliance(env, name, m, kind, &mut svc, &mut out.files);
-    }
-    readiness(env, name, mp, m, &mut svc, &mut out.probe_archs);
+    appliance(env, name, m, &mut svc, &mut out.files);
+    readiness(env, mp, m, &mut svc, &mut out.probe_archs);
     out.services.insert(name.to_string(), svc);
     if sidecars::needs_routes(env, name) {
         out.services.insert(format!("{name}-routes"), sidecars::routes(env, name, name));
@@ -250,11 +251,13 @@ pub(crate) fn environment(env: &Environment, mp: &MachinePlan) -> Option<IndexMa
     Some(out)
 }
 
-/// A network appliance: its files, its start, its interfaces in the order it expects.
-#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct (Wave 2).
-fn appliance(env: &Environment, name: &str, m: &Machine, kind: isoloom_spec::model::Appliance, svc: &mut Service, files: &mut Vec<GeneratedFile>) {
+/// A network appliance's files, start and interfaces in the order it expects (nothing for a
+/// machine that isn't one).
+fn appliance(env: &Environment, name: &str, m: &Machine, svc: &mut Service, files: &mut Vec<GeneratedFile>) {
+    let Some((d, kind)) = m.docker.as_ref().and_then(|d| Some((d, d.appliance?))) else {
+        return;
+    };
     let spec = env.spec();
-    let d = m.docker.as_ref().expect("an appliance is a container");
     let w = appliances::wiring(spec, name, m, kind, |n, o| isoloom_render::address(spec, n, o));
     svc.volumes.clear();
     for (file, inside, contents) in w.files {
@@ -330,8 +333,7 @@ fn pull_from(env: &Environment, dockerfile: &str) -> String {
 }
 
 /// The probe healthcheck and what the machine waits for before it starts.
-#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct (Wave 2).
-fn readiness(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, svc: &mut Service, archs: &mut Vec<Arch>) {
+fn readiness(env: &Environment, mp: &MachinePlan, m: &Machine, svc: &mut Service, archs: &mut Vec<Arch>) {
     let spec = env.spec();
     if !m.ready_ports().is_empty() {
         svc.healthcheck = Some(Healthcheck {
@@ -376,7 +378,6 @@ fn readiness(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, svc: 
         svc.labels
             .insert(format!("isoloom.service.{}", m.service_label(sv)), format!("{kind}:{}", sv.port));
     }
-    let _ = name;
 }
 
 /// One-shot init jobs, in order, each after the previous one. They share the machine's network
@@ -431,9 +432,11 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
         if shell {
             t.cap_add = vec!["NET_ADMIN".into(), "NET_RAW".into()];
         }
-        for net in spec.networks.keys() {
-            let cidr = isoloom_spec::validate::Cidr::parse(&spec.networks[net].cidr).expect("validated cidr");
-            t.networks.insert(net.clone(), Attachment::at(cidr.tool(i)));
+        // The spec is validated: every block parses.
+        for (net, n) in &spec.networks {
+            if let Some(cidr) = isoloom_spec::validate::Cidr::parse(&n.cidr) {
+                t.networks.insert(net.clone(), Attachment::at(cidr.tool(i)));
+            }
         }
         if let (Some(port), Some(host)) = (tool.port, tool.publish) {
             t.ports = vec![format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{host}:{port}")];

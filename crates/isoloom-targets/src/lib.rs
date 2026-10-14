@@ -123,6 +123,30 @@ pub fn refusal(spec: &Spec, target: Target) -> Option<String> {
     backend(target)?.refusal(&Environment::build(spec, target, None))
 }
 
+/// A cloud refused by a multi-cloud target: the cloud's folder under the target's, and why it
+/// can't run the environment.
+pub type CloudRefusal = (&'static str, String);
+
+/// The clouds of a target that writes one module per cloud (`cloud-vm`), when the target is
+/// generated: the clouds whose module is written, and each refused cloud with its reason. A
+/// cloud other than the reference one (AWS) refusing drops only its module, so the target can
+/// be generated while some clouds are left out. `None` for every other target, and for a
+/// `cloud-vm` that isn't generated (its refusal says why).
+pub fn cloud_refusals(spec: &Spec, target: Target) -> Option<(Vec<&'static str>, Vec<CloudRefusal>)> {
+    if target != Target::CloudVm || !effective(spec).contains(&target) || refusal(spec, target).is_some() {
+        return None;
+    }
+    let env = Environment::build(spec, target, None);
+    let (mut generated, mut refused) = (Vec::new(), Vec::new());
+    for (cloud, why) in isoloom_terraform::cloud_vm::cloud_refusals(&env) {
+        match why {
+            None => generated.push(cloud),
+            Some(why) => refused.push((cloud, why)),
+        }
+    }
+    Some((generated, refused))
+}
+
 /// [`refusal`], for a target run with a given provider: why `target` can't run this spec when
 /// its tool uses `provider`, if it can't. `provider` is the name the target's tool knows it by,
 /// as `defaults.yml` sets it: for Vagrant, `vagrant up --provider` (`virtualbox`, `libvirt`,
@@ -160,8 +184,10 @@ fn first_problem(spec: &Spec) -> Option<String> {
 fn on_docker(spec: &Spec) -> Spec {
     let mut s = spec.clone();
     for (name, c) in docker_cidrs(spec) {
-        let n = s.networks.get_mut(&name).expect("same networks");
-        n.cidr = format!("{}/{}", Ipv4Addr::from(c.base), c.len);
+        // `docker_cidrs` names the spec's own networks.
+        if let Some(n) = s.networks.get_mut(&name) {
+            n.cidr = format!("{}/{}", Ipv4Addr::from(c.base), c.len);
+        }
     }
     s
 }

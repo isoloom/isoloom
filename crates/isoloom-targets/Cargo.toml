@@ -19,6 +19,11 @@ isoloom-external.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
 
+[dev-dependencies]
+isoloom-import.workspace = true
+isoloom-runtime.workspace = true
+serde_yaml_ng.workspace = true
+
 # Unused today; kept while this crate moves onto the plan IR (Wave 1, unit 6).
 [package.metadata.cargo-machete]
 ignored = ["indexmap"]

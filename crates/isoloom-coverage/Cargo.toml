@@ -11,5 +11,9 @@ publish.workspace = true
 isoloom-spec.workspace = true
 serde_yaml_ng.workspace = true
 
+[dev-dependencies]
+isoloom-targets.workspace = true
+serde_json.workspace = true
+
 [lints]
 workspace = true

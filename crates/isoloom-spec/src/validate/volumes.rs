@@ -26,7 +26,7 @@ pub(super) fn shared(spec: &Spec, p: &mut Problems) {
             );
             continue;
         }
-        let owner = spec.volume_owner(v).expect("a user");
+        let Some(owner) = spec.volume_owner(v) else { continue };
         for u in &users {
             let m = &spec.machines[*u];
             if m.vm.as_ref().is_some_and(|vm| crate::images::is_windows(&vm.os)) {

@@ -1,16 +1,16 @@
 //! The command (and its working directory) that brings each target up or tears it down.
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use isoloom_core as core;
-use isoloom_core::Target;
+use isoloom_spec::Target;
 
 use crate::tools::compose;
 use crate::{Res, target};
 
 /// The command (and its working directory) that brings a target up or tears it down.
 pub fn bring_up(dir: &Path, t: Target, cloud: Option<&str>, instance: Option<u8>, down: bool) -> Res<Invocation> {
-    let out = dir.join(core::instance::output_dir(instance));
+    let out = dir.join(isoloom_spec::instance::output_dir(instance));
     Ok(match t {
         Target::Docker | Target::Hosted => compose_up(dir, &out, instance, down),
         Target::Vagrant | Target::DockerVm | Target::Hybrid => {
@@ -58,21 +58,21 @@ fn compose_up(dir: &Path, out: &Path, instance: Option<u8>, down: bool) -> Invoc
         return invocation("docker", args, dir);
     }
     // One-shot jobs nothing running waits for fail `up --wait`: wait for the rest,
-    // then run them attached, in order (see core::generate::start_plan).
+    // then run them attached, in order (see isoloom_targets::start_plan).
     let yaml = std::fs::read_to_string(out.join("docker/compose.yml")).unwrap_or_default();
-    let plan = core::generate::start_plan(&yaml).unwrap_or_default();
+    let plan = isoloom_targets::start_plan(&yaml).unwrap_or_default();
     if plan.jobs.is_empty() {
         args.extend([s("up"), s("-d"), s("--build"), s("--wait")]);
         return invocation("docker", args, dir);
     }
-    let q = core::shell::quote;
+    let q = isoloom_spec::shell::quote;
     let prefix = std::iter::once("docker".to_string())
         .chain(args.iter().map(|a| q(a)))
         .collect::<Vec<_>>()
         .join(" ");
     let mut script = format!("{prefix} up -d --build --wait {}", plan.wait.iter().map(|w| q(w)).collect::<Vec<_>>().join(" "));
     for j in &plan.jobs {
-        script.push_str(&format!(" && {prefix} up --no-deps --exit-code-from {j} {j}", j = q(j)));
+        let _ = write!(script, " && {prefix} up --no-deps --exit-code-from {j} {j}", j = q(j));
     }
     invocation("sh", vec![s("-c"), script], dir)
 }

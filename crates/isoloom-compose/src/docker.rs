@@ -28,6 +28,8 @@
 //!
 //! Nothing is published on the host: the environment is reached from its own networks.
 
+use std::fmt::Write as _;
+
 use serde_yaml_ng::{Mapping, Value};
 
 use crate::model::{Arch, Machine, Spec};
@@ -155,10 +157,13 @@ pub fn start_commands(compose: &str, jobs: &[String], wait_timeout: Option<u32>)
     if jobs.is_empty() {
         return format!("{compose} up -d --build --wait{timeout}");
     }
-    let exclude: String = jobs.iter().map(|j| format!(" -e {j}")).collect();
+    let exclude = jobs.iter().fold(String::new(), |mut out, j| {
+        let _ = write!(out, " -e {j}");
+        out
+    });
     let mut cmd = format!("{compose} up -d --build --wait{timeout} $({compose} config --services | grep -vx{exclude})");
     for j in jobs {
-        cmd.push_str(&format!(" && {compose} up --no-deps --exit-code-from {j} {j}"));
+        let _ = write!(cmd, " && {compose} up --no-deps --exit-code-from {j} {j}");
     }
     cmd
 }
@@ -171,10 +176,11 @@ pub fn exec_runner(machine: &str) -> String {
 
 /// Init job service names for a machine.
 pub(crate) fn init_names(name: &str, m: &Machine) -> Vec<String> {
-    let n = m.docker.as_ref().map(|d| d.init.len()).unwrap_or(0);
+    let n = m.docker.as_ref().map_or(0, |d| d.init.len());
     (1..=n).map(|i| format!("{name}-init-{i}")).collect()
 }
 
+/// The last component of a `/`-separated path (a script's name in the container).
 pub fn file_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }

@@ -2,11 +2,10 @@
 
 use std::path::Path;
 
-use isoloom_core as core;
-use isoloom_core::Target;
-use isoloom_core::registry::{self, Entry};
+use isoloom_runtime::registry::{self, Entry};
+use isoloom_spec::Target;
 
-use isoloom_core::events::ErrorCode;
+use isoloom_runtime::events::ErrorCode;
 
 use crate::Res;
 use crate::failure::fail;
@@ -35,7 +34,7 @@ pub fn docker_cloud(cloud: Option<&str>) -> Res<&str> {
 
 /// The target of a project to talk to: the one named; else what `run` recorded for the
 /// project (when there is exactly one); else the spec's single possible target.
-pub fn pick(dir: &Path, target: Option<&str>, instance: Option<u8>, spec: &core::Spec) -> Res<(Target, Option<String>)> {
+pub fn pick(dir: &Path, target: Option<&str>, instance: Option<u8>, spec: &isoloom_spec::Spec) -> Res<(Target, Option<String>)> {
     let reg = registry::load().unwrap_or_default();
     let recorded: Vec<&Entry> = reg.for_dir(dir).into_iter().filter(|e| e.instance == instance).collect();
     if let Some(id) = target {
@@ -45,7 +44,7 @@ pub fn pick(dir: &Path, target: Option<&str>, instance: Option<u8>, spec: &core:
     }
     match recorded.as_slice() {
         [one] => Ok((one.target, one.cloud.clone())),
-        [] => match core::effective(spec).as_slice() {
+        [] => match isoloom_spec::effective(spec).as_slice() {
             [one] => Ok((*one, None)),
             many => Err(fail(
                 ErrorCode::NotRunning,

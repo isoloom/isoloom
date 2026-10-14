@@ -5,9 +5,9 @@
 use std::io::BufRead;
 use std::process::{ExitCode, Stdio};
 
-use isoloom_core::Target;
-use isoloom_core::checks::{self, Line};
-use isoloom_core::events::{Event, Scope, Stream};
+use isoloom_plan::checks::{self, Line};
+use isoloom_runtime::events::{Event, Scope, Stream};
+use isoloom_spec::Target;
 
 use super::runner::{Runner, STARTING_JOBS};
 use crate::tools::process;
@@ -103,7 +103,7 @@ fn report(at: &Scope, o: &Outcome) {
             name: o.name.clone(),
             ok: o.ok,
             detail: o.detail.clone(),
-            time: isoloom_core::registry::now(),
+            time: isoloom_runtime::registry::now(),
         });
     } else if o.ok {
         println!("  ✓ {}", o.name);

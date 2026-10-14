@@ -428,8 +428,13 @@ version = "0.10.1"
 dependencies = [
  "clap",
  "indexmap",
- "isoloom-core",
+ "isoloom-coverage",
+ "isoloom-import",
  "isoloom-plan",
+ "isoloom-render",
+ "isoloom-runtime",
+ "isoloom-spec",
+ "isoloom-targets",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -449,29 +454,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "isoloom-core"
-version = "0.10.1"
-dependencies = [
- "indexmap",
- "isoloom-coverage",
- "isoloom-import",
- "isoloom-plan",
- "isoloom-render",
- "isoloom-runtime",
- "isoloom-spec",
- "isoloom-targets",
- "jsonschema",
- "schemars",
- "serde",
- "serde_json",
- "serde_yaml_ng",
-]
-
-[[package]]
 name = "isoloom-coverage"
 version = "0.10.1"
 dependencies = [
  "isoloom-spec",
+ "isoloom-targets",
+ "serde_json",
  "serde_yaml_ng",
 ]
 
@@ -541,6 +529,7 @@ name = "isoloom-runtime"
 version = "0.10.1"
 dependencies = [
  "isoloom-spec",
+ "isoloom-targets",
  "schemars",
  "serde",
  "serde_json",
@@ -554,6 +543,7 @@ version = "0.10.1"
 dependencies = [
  "indexmap",
  "insta",
+ "jsonschema",
  "proptest",
  "schemars",
  "serde",
@@ -569,13 +559,16 @@ dependencies = [
  "indexmap",
  "isoloom-compose",
  "isoloom-external",
+ "isoloom-import",
  "isoloom-kubernetes",
  "isoloom-plan",
  "isoloom-render",
+ "isoloom-runtime",
  "isoloom-spec",
  "isoloom-terraform",
  "isoloom-vagrant",
  "serde_json",
+ "serde_yaml_ng",
 ]
 
 [[package]]

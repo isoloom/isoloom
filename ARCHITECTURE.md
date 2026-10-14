@@ -109,12 +109,11 @@ failed on its own stops the setup at once.
 | `isoloom-import` | Drafting a spec from Compose, Vagrant and Terraform files, with notes for what the draft leaves out |
 | `isoloom-coverage` | The coverage map: what each output format can do and what Isoloom produces |
 | `isoloom-runtime` | Runtime state: the registry of running environments (`~/.isoloom/status.yml`), host readiness, the environment report; the lifecycle's JSON events and errors (`events`, with an `Emitter` for embedders) and a tool run with its output as events (`tool`): see [docs/json.md](docs/json.md) |
-| `isoloom-core` | The facade other tools embed: re-exports the supported surface of the crates above |
 | `isoloom` | The command line: clap definitions in `cli.rs`, one module per subcommand in `commands/`, tool runners in `tools/` (every tool started by `tools::process::command`), `--json` output in `output.rs` and the error codes in `failure.rs` |
 
 Dependencies point down the pipeline: `spec` depends on nothing of ours, `plan` on `spec`,
-`render` on both, backends on `render`, `targets` on the backends. Only `isoloom-core` and the
-CLI see everything.
+`render` on both, backends on `render`, `targets` on the backends. Only the CLI sees everything.
+Tools embedding Isoloom depend on the crates they use (README, "Using the library").
 
 ## How to add a feature
 
@@ -161,7 +160,7 @@ what Isoloom does with the feature: `Emitted`, `Partial`, `Equivalent`, `InImage
 2. Write the module (see `compose.rs`, `vagrant.rs`, `terraform.rs`): a `format()` returning
    the `Format`, with every feature of the definition classified.
 3. Register it in `formats()`.
-4. Extend `crates/isoloom-core/tests/coverage.rs`: the rows are exactly the definition's
+4. Extend `crates/isoloom-coverage/tests/coverage.rs`: the rows are exactly the definition's
    features, and the features marked as written match what the generators write for the
    committed examples.
 5. Regenerate `docs/COVERAGE.md`. [ADR 0005](docs/adr/0005-coverage-methodology.md) has the rules.
@@ -172,29 +171,31 @@ The gates every change passes are listed in [CONTRIBUTING.md](CONTRIBUTING.md). 
 once in the root `Cargo.toml` (`[workspace.lints]`) and inherited by every crate with
 `[lints] workspace = true`; `clippy.toml` holds the shape limits.
 
-Enforced now (`deny`, so `cargo clippy --workspace --all-targets -- -D warnings` fails on them):
+Every lint is at `deny`, so `cargo clippy --workspace --all-targets -- -D warnings` fails on
+any of them, on every target (macOS, Linux, Windows):
 
 - rust: `unsafe_code` is `forbid`, with no exception (a profile's inputs reach every tool through
-  `Command::envs`, from `tools::process::command` in the command line); rustdoc:
-  `broken_intra_doc_links`, `bare_urls`.
+  `Command::envs`, from `tools::process::command` in the command line); `missing_docs` (every
+  public item of a library crate says what it is for); rustdoc: `broken_intra_doc_links`,
+  `bare_urls`.
 - clippy: `pedantic`, except the commented allow-list in `Cargo.toml` (`must_use_candidate`,
   `missing_errors_doc`, `missing_panics_doc`, `doc_markdown`, `similar_names`); `unwrap_used`,
-  `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic: `clippy.toml`);
-  `print_stdout` (the command line allows it at its root: printing is its interface);
-  `too_many_arguments` above 5 (two functions carry a targeted, commented `#[allow]`:
-  `appliance` and `readiness` in isoloom-compose's `render.rs`).
+  `expect_used`, `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic:
+  `clippy.toml`); `print_stdout` (the command line allows it at its root: printing is its
+  interface); the shape limits of `clippy.toml`: `too_many_lines` above 60, `too_many_arguments`
+  above 5, `cognitive_complexity` above 15.
 
-Tracked (`allow` today, denied by the end of Wave 2, issue #106): `missing_docs` for library
-crates; `expect_used`; `too_many_lines` (60) and `cognitive_complexity` (15), whose thresholds
-are already in `clippy.toml`; and the pedantic lints still hit by code moving onto the plan IR
-(`case_sensitive_file_extension_comparisons`, `cast_possible_truncation`, `format_collect`,
-`format_push_string`, `map_unwrap_or`, `match_wildcard_for_single_variants`,
-`stable_sort_primitive`).
+There is no blanket exception: a local `#[allow]` carries a one-line reason, only where
+splitting or restructuring would read worse (`git grep -n '#\[allow'` lists them).
 
 ### Tests
 
-Unit tests live beside the code; cross-crate behavior is tested in `crates/isoloom-core/tests`
-and the CLI in `crates/isoloom/tests`. Snapshots use `insta`
+Unit tests live beside the code; integration tests in the `tests/` folder of the crate they test:
+the generators over the examples (and every target's behavior through `generate`) in
+`crates/isoloom-targets/tests`, parsing, validation, the schema and profiles in
+`crates/isoloom-spec/tests`, the importers in `crates/isoloom-import/tests` (with their
+fixtures), the coverage tables in `crates/isoloom-coverage/tests`, the reports in
+`crates/isoloom-runtime/tests`, and the CLI in `crates/isoloom/tests`. Snapshots use `insta`
 (`crates/isoloom-spec/tests/snapshots`): a change to output shows up as a reviewed diff
 (`cargo insta review`). `proptest` suites cover CIDR parsing and addressing, and the quoting
 helpers for shell, HCL, Ruby and PowerShell (round trip and injection safety). A determinism

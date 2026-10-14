@@ -12,11 +12,10 @@ mod runner;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-use isoloom_core::Target;
-use isoloom_core::checks::{self, Position};
+use isoloom_plan::checks::{self, Position};
+use isoloom_spec::Target;
 
-use isoloom_core::events::Scope;
+use isoloom_runtime::events::Scope;
 
 use crate::prepare::prepare;
 use crate::tools::vagrant::wake_controller;
@@ -57,7 +56,7 @@ pub struct Args {
 
 /// What the runners of a test are built from.
 struct Ctx<'a> {
-    spec: &'a core::Spec,
+    spec: &'a isoloom_spec::Spec,
     /// The project folder, absolute.
     dir: &'a Path,
     /// The output folder (of the instance).
@@ -88,7 +87,7 @@ impl Ctx<'_> {
 
     /// The `exec` checks' runner of a machine, under `<out>/<sub>/checks`, when it has one.
     fn exec_runner(&self, sub: &str, machine: &str) -> Option<PathBuf> {
-        let file = self.out.join(sub).join("checks").join(core::generate::exec_runner(machine));
+        let file = self.out.join(sub).join("checks").join(isoloom_targets::exec_runner(machine));
         file.exists().then_some(file)
     }
 }
@@ -115,7 +114,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     let ctx = Ctx {
         spec: &p.spec,
         dir: &p.dir,
-        out: p.dir.join(core::instance::output_dir(a.instance)),
+        out: p.dir.join(isoloom_spec::instance::output_dir(a.instance)),
         positions: checks::by_position(&p.spec, plan).into_iter().map(|(pos, _)| pos).collect(),
         default_pos: checks::default_position(&p.spec),
         cloud: a.cloud.as_deref(),

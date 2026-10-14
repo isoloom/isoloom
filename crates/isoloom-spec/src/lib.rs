@@ -86,20 +86,29 @@ pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[Str
     parse(&text)
 }
 
-/// Defaults when a machine doesn't say: a VM needs more than a container.
+/// A machine's CPUs when its `resources` don't say (defaults sized for a VM, which needs more
+/// than a container).
 pub const DEFAULT_CPUS: u32 = 1;
+/// A machine's memory when its `resources` don't say, in MB.
 pub const DEFAULT_MEMORY_MB: u32 = 1024;
+/// A machine's disk when its `resources` don't say, in GB.
 pub const DEFAULT_DISK_GB: u32 = 20;
 
 /// What the whole spec needs when every machine is a VM (the access machine included).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Totals {
+    /// How many machines.
     pub machines: u32,
+    /// Their CPUs, added up.
     pub cpus: u32,
+    /// Their memory in MB, added up.
     pub memory_mb: u32,
+    /// Their disks in GB, added up.
     pub disk_gb: u32,
 }
 
+/// What the whole spec needs when every machine is a VM, each machine's `resources` or the
+/// defaults: what `isoloom resources` reports before a run.
 pub fn totals(spec: &Spec) -> Totals {
     spec.machines.values().fold(Totals::default(), |t, m| {
         let r = m.resources.unwrap_or(Resources {

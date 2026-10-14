@@ -14,6 +14,8 @@
 //!
 //! The Ruby doing the work is `IsoloomHyperV` ([`HYPERV_RB`]), in every Vagrantfile's preamble.
 
+use std::fmt::Write as _;
+
 use std::net::Ipv4Addr;
 
 use isoloom_plan::{Environment, MachineShape};
@@ -209,7 +211,10 @@ const LAB_NET_AT_BOOT: &str = "if [ -d /run/systemd/system ]; then\n  cat > /etc
 /// boot, and now.
 fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
     let macs: Vec<String> = nics.iter().map(|n| mac_text(mac(vm_name, n.net), ":", false)).collect();
-    let lines: String = nics.iter().zip(&macs).map(|(n, m)| format!("lab {m} {}/{} || rc=1\n", n.ip, n.len)).collect();
+    let lines = nics.iter().zip(&macs).fold(String::new(), |mut s, (n, m)| {
+        let _ = writeln!(s, "lab {m} {}/{} || rc=1", n.ip, n.len);
+        s
+    });
     let unmanaged = macs.iter().map(|m| format!("mac:{m}")).collect::<Vec<_>>().join(";");
     format!(
         "set -e\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/lab-net.sh <<'NET'\n{LAB_NET}{lines}exit $rc\nNET\nchmod +x /etc/isoloom/lab-net.sh\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf\nfi\n{LAB_NET_AT_BOOT}/etc/isoloom/lab-net.sh\n"

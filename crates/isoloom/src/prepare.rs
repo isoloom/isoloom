@@ -3,10 +3,9 @@
 
 use std::path::{Path, PathBuf};
 
-use isoloom_core as core;
-use isoloom_core::Target;
-use isoloom_core::events::ErrorCode;
 use isoloom_plan::Environment;
+use isoloom_runtime::events::ErrorCode;
+use isoloom_spec::Target;
 
 use crate::failure::{Failure, fail};
 use crate::{Res, generated, spec, target};
@@ -14,11 +13,11 @@ use crate::{Res, generated, spec, target};
 /// A project ready to run on a target.
 pub struct Prepared {
     /// The spec as the instance, so names and ports downstream are the instance's.
-    pub spec: core::Spec,
+    pub spec: isoloom_spec::Spec,
     /// The project folder, absolute.
     pub dir: PathBuf,
     pub target: Target,
-    pub defaults: core::defaults::Defaults,
+    pub defaults: isoloom_spec::defaults::Defaults,
     /// What the target runs, planned from the spec: the runtime reads it rather than working
     /// things out again (the machines' published ports, the checks, the start order).
     pub plan: Environment,
@@ -35,8 +34,8 @@ pub fn prepare(dir: &Path, target: Option<&str>, images: Option<&Path>, instance
     spec::require_valid(&spec)?;
     let t = choose(target.as_deref(), &spec)?;
     let files = match instance {
-        Some(n) => core::generate_instance(&spec, t, n),
-        None => core::generate(&spec, t),
+        Some(n) => isoloom_targets::generate_instance(&spec, t, n),
+        None => isoloom_targets::generate(&spec, t),
     }
     .map_err(|e| Failure::new(ErrorCode::GenerateFailed, format!("can't generate `{}`: {e}", t.id())))?;
     generated::write_all(&dir, &generated::finish(files, &settings.defaults, &dir)?)?;
@@ -51,8 +50,8 @@ pub fn prepare(dir: &Path, target: Option<&str>, images: Option<&Path>, instance
 }
 
 /// The target asked for, else the spec's only possible one; it must be one the spec can run on.
-fn choose(asked: Option<&str>, spec: &core::Spec) -> Res<Target> {
-    let possible = core::effective(spec);
+fn choose(asked: Option<&str>, spec: &isoloom_spec::Spec) -> Res<Target> {
+    let possible = isoloom_spec::effective(spec);
     let t = match asked {
         Some(id) => target::by_id(id)?,
         None => match possible.as_slice() {

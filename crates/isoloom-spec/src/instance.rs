@@ -40,9 +40,11 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec, String> {
             base: u32::from_be_bytes([10, b.wrapping_add(n), c, d]),
             len: block.len,
         };
-        s.networks.get_mut(&name).expect("same networks").docker = Some(NetworkDocker {
-            cidr: format!("{}/{}", std::net::Ipv4Addr::from(shifted.base), shifted.len),
-        });
+        if let Some(net) = s.networks.get_mut(&name) {
+            net.docker = Some(NetworkDocker {
+                cidr: format!("{}/{}", std::net::Ipv4Addr::from(shifted.base), shifted.len),
+            });
+        }
     }
     // Published host ports: 100 apart per instance (8080 -> 8180 for instance 1).
     for (mname, m) in &mut s.machines {

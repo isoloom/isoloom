@@ -2,6 +2,8 @@
 //! address (matched by MAC), forwarding between networks with the `reach` rules, forwarding the
 //! published ports from its uplink address, and giving every network the internet (NAT).
 
+use std::fmt::Write as _;
+
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Expression, Module, Template, call, list, number, reference, string};
 use isoloom_render::router;
@@ -105,11 +107,14 @@ fn ruleset(env: &Environment) -> String {
         for sv in m.services.iter().filter(|s| s.publish.is_some()) {
             let (proto, port, host) = (sv.protocol.id(), sv.port, sv.publish.unwrap_or_default());
             forward.push(format!("ip daddr {addr} {proto} dport {port} ct status dnat accept"));
-            dnat.push_str(&format!("    ip saddr != {lab} {proto} dport {host} dnat ip to {addr}:{port}\n"));
+            let _ = writeln!(dnat, "    ip saddr != {lab} {proto} dport {host} dnat ip to {addr}:{port}");
         }
     }
     forward.push(format!("ip saddr {lab} ip daddr != {lab} accept"));
-    let forward: String = forward.iter().map(|r| format!("    {r}\n")).collect();
+    let forward = forward.iter().fold(String::new(), |mut s, r| {
+        let _ = writeln!(s, "    {r}");
+        s
+    });
     format!(
         "flush ruleset\ntable inet isoloom {{\n  chain forward {{\n    type filter hook forward priority 0; policy drop;\n{forward}  }}\n  chain prerouting {{\n    type nat hook prerouting priority -100;\n{dnat}  }}\n  chain postrouting {{\n    type nat hook postrouting priority 100;\n    ip saddr {lab} ip daddr != {lab} masquerade\n  }}\n}}\n"
     )

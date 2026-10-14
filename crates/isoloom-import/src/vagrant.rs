@@ -42,7 +42,7 @@ fn text(v: Option<&Value>) -> Option<String> {
 
 fn number(v: Option<&Value>) -> Option<u32> {
     match v? {
-        Value::Number(n) => n.as_u64().map(|n| n as u32),
+        Value::Number(n) => n.as_u64().and_then(|n| u32::try_from(n).ok()),
         Value::String(s) => s.trim().parse().ok(),
         _ => None,
     }
@@ -67,13 +67,11 @@ fn os_for_box(b: &str) -> (&'static str, bool) {
 }
 
 /// Memory like `4096`, `"4G"`, `"2048M"` in MB.
-// A float-to-int cast saturates: a negative size becomes 0, never a wrapped value.
-#[allow(clippy::cast_sign_loss)]
 fn memory_mb(v: Option<&Value>) -> Option<u32> {
     let s = text(v)?;
     let s = s.trim().to_ascii_uppercase();
     match s.chars().last()? {
-        'G' => s[..s.len() - 1].parse::<f64>().ok().map(|g| (g * 1024.0) as u32),
+        'G' => s[..s.len() - 1].parse::<f64>().ok().and_then(|g| crate::whole_u32((g * 1024.0).trunc())),
         'M' => s[..s.len() - 1].parse().ok(),
         _ => s.parse().ok(),
     }
@@ -286,10 +284,11 @@ impl<'a> Import<'a> {
         if c.opt("disabled").and_then(Value::as_bool) == Some(true) {
             return;
         }
-        match (number(c.opt("guest")), number(c.opt("host"))) {
+        let port = |key| number(c.opt(key)).and_then(|n| u16::try_from(n).ok());
+        match (port("guest"), port("host")) {
             (Some(g), Some(h)) => {
                 let udp = text(c.opt("protocol")).is_some_and(|p| p.eq_ignore_ascii_case("udp"));
-                m.publish.push((g as u16, h as u16, udp));
+                m.publish.push((g, h, udp));
             }
             _ => self.notes.add(
                 format!("{at}.vm.network"),
@@ -339,7 +338,9 @@ impl<'a> Import<'a> {
 
     fn provision_shell(&mut self, at: &str, m: &mut Machine, c: &Call) {
         match (text(c.opt("path")), c.opt("inline")) {
-            (Some(path), _) if path.ends_with(".sh") || path.ends_with(".ps1") => m.provision.push(path.trim_start_matches("./").into()),
+            (Some(path), _) if std::path::Path::new(&path).extension().is_some_and(|e| e == "sh" || e == "ps1") => {
+                m.provision.push(path.trim_start_matches("./").into());
+            }
             (Some(path), _) => self
                 .notes
                 .add(at, NoteKind::Changed, format!("`{path}`: steps are .sh (Linux) or .ps1 (Windows) files")),

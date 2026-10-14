@@ -3,9 +3,9 @@
 
 use std::path::PathBuf;
 
-use isoloom_core::checks::Position;
-use isoloom_core::events::Scope;
-use isoloom_core::{Target, shell};
+use isoloom_plan::checks::Position;
+use isoloom_runtime::events::Scope;
+use isoloom_spec::{Target, shell};
 
 use super::Ctx;
 use super::runner::{Runner, STARTING_JOBS};
@@ -64,7 +64,7 @@ fn start_stand_ins(ctx: &Ctx) -> Res<()> {
     }
     let mut c = compose::quiet(ctx.dir, ctx.instance);
     c.args(["--profile", "check", "up", "-d", "--wait", "--no-deps"]).args(&stand_ins);
-    let status = process::run_step(&mut c, &Scope::step(Some(isoloom_core::Target::Docker.id()), "checks"))?;
+    let status = process::run_step(&mut c, &Scope::step(Some(isoloom_spec::Target::Docker.id()), "checks"))?;
     if !status.success() {
         return Err("couldn't start the access machine's stand-in".into());
     }

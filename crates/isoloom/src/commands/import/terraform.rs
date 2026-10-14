@@ -3,8 +3,6 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use super::draft::{Dest, write_draft};
 use crate::Res;
 
@@ -17,7 +15,7 @@ pub fn run(dir: Option<PathBuf>, dest: &Dest) -> Res<ExitCode> {
     let folder = dir.canonicalize()?;
     let fallback = folder.file_name().and_then(|n| n.to_str()).unwrap_or("env").to_string();
     let source = format!("{} (.tf files)", folder.file_name().and_then(|n| n.to_str()).unwrap_or("."));
-    let draft = core::import::terraform::draft(&files, &fallback, &source)?;
+    let draft = isoloom_import::terraform::draft(&files, &fallback, &source)?;
     write_draft(&draft, folder, dest)
 }
 

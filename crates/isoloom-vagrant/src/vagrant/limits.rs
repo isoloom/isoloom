@@ -2,6 +2,7 @@
 //! Vagrant box, a provisioning step Vagrant has no way to run, and what a Windows machine can't
 //! have yet (the set-up steps it has no PowerShell for). Found from the plan, without rendering.
 
+use isoloom_plan::lifecycle::has_extension;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::images;
 use isoloom_spec::model::{Machine, is_reboot};
@@ -28,7 +29,7 @@ fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
     }
     vm.provision
         .iter()
-        .find(|s| !(s.ends_with(".sh") || s.ends_with(".yml") || s.ends_with(".yaml") || is_reboot(s)))
+        .find(|s| !(["sh", "yml", "yaml"].iter().any(|e| has_extension(s, e)) || is_reboot(s)))
         .map(|step| format!("machine `{name}`: provisioning step `{step}` isn't a .sh, .yml or .yaml file (or `reboot`)"))
 }
 
@@ -38,7 +39,7 @@ fn windows(env: &Environment, name: &str, m: &Machine) -> Option<String> {
     if name.len() > 15 {
         return Some(format!("machine `{name}`: Windows computer names are at most 15 characters"));
     }
-    if let Some(step) = m.vm.as_ref()?.provision.iter().find(|s| !s.ends_with(".ps1")) {
+    if let Some(step) = m.vm.as_ref()?.provision.iter().find(|s| !has_extension(s, "ps1")) {
         return Some(format!(
             "machine `{name}`: Windows provisioning steps are PowerShell scripts (.ps1); `{step}` isn't (Ansible runs from outside Windows: environment-level provisioning comes next)"
         ));

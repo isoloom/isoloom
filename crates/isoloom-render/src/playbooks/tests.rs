@@ -8,6 +8,8 @@
 
 use std::path::{Path, PathBuf};
 
+use std::fmt::Write as _;
+
 use isoloom_spec::shell::quote;
 
 use super::{ATTEMPTS, RETRY_DIR, TRANSIENT, helpers, script};
@@ -25,9 +27,10 @@ type Host<'a> = (&'a str, u32, u32);
 fn recap(hosts: &[Host]) -> String {
     let mut out = String::from("\nPLAY RECAP *********************************************************************\n");
     for (h, u, f) in hosts {
-        out.push_str(&format!(
-            "{h:<27}: ok=3    changed=1    unreachable={u}    failed={f}    skipped=0    rescued=0    ignored=0\n"
-        ));
+        let _ = writeln!(
+            out,
+            "{h:<27}: ok=3    changed=1    unreachable={u}    failed={f}    skipped=0    rescued=0    ignored=0"
+        );
     }
     out
 }
@@ -74,7 +77,7 @@ fn play(runs: &[Run]) -> Outcome {
     std::fs::create_dir_all(&dir).unwrap();
     let mut cases = String::new();
     for (i, r) in runs.iter().enumerate() {
-        cases.push_str(&format!("    {}) printf '%s' {}; return {};;\n", i + 1, quote(&r.out), r.code));
+        let _ = writeln!(cases, "    {}) printf '%s' {}; return {};;", i + 1, quote(&r.out), r.code);
     }
     let body = format!(
         "set -e\nD={d}\n{helpers}fake() {{\n  echo \"$*\" >> \"$D/calls\"\n  case \"$*\" in *--limit*) echo $(cat \"$D/site.retry\") >> \"$D/limits\";; esac\n  case $(wc -l < \"$D/calls\" | tr -d ' ') in\n{cases}    *) return 0;;\n  esac\n}}\nrun_play fake -i inv site.yml\necho after\n",

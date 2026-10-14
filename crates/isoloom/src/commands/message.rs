@@ -3,8 +3,6 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::tools::compose;
 use crate::{Res, spec, target};
 
@@ -37,9 +35,9 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         Some(t) => {
             let publishes = spec.machines.values().any(|m| m.services.iter().any(|s| s.publish.is_some()));
             let ports = compose::real_ports(&spec::abs(&a.dir)?, t, a.instance, publishes);
-            core::resolved::render_message_at(&spec, a.instance, t, &ports)?
+            isoloom_targets::resolved::render_message_at(&spec, a.instance, t, &ports)?
         }
-        None => core::resolved::render_message(&spec, a.instance)?,
+        None => isoloom_targets::resolved::render_message(&spec, a.instance)?,
     };
     match message {
         Some(m) => println!("{}", m.trim_end()),

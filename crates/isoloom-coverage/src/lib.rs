@@ -30,19 +30,42 @@ pub use spec::{Output, Row, Status, paths, score, table};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Support {
     /// Isoloom writes it, from this spec field.
-    Emitted { from: &'static str },
+    Emitted {
+        /// The spec field it comes from (or how, in parentheses).
+        from: &'static str,
+    },
     /// Isoloom writes it, but not for every use.
-    Partial { from: &'static str, gap: &'static str },
+    Partial {
+        /// The spec field it comes from.
+        from: &'static str,
+        /// The uses it doesn't cover yet.
+        gap: &'static str,
+    },
     /// Not written, but the same effect comes from another field.
-    Equivalent { via: &'static str },
+    Equivalent {
+        /// The field that gives the same effect.
+        via: &'static str,
+    },
     /// Belongs in the machine itself: its image or its provisioning.
-    InImage { note: &'static str },
+    InImage {
+        /// Where to set it instead.
+        note: &'static str,
+    },
     /// Every target can do it: the format should gain it.
-    Planned { note: &'static str },
+    Planned {
+        /// What it comes with.
+        note: &'static str,
+    },
     /// Some VM targets can't do it (cloud VMs most often), so it stays out of the format.
-    NotPortable { why: &'static str },
+    NotPortable {
+        /// Which targets can't, and why.
+        why: &'static str,
+    },
     /// The format's own tooling: no effect on how the environment behaves.
-    Tooling { note: &'static str },
+    Tooling {
+        /// Why it has no effect on the environment.
+        note: &'static str,
+    },
     /// Not classified yet (the coverage tests reject it).
     Unclassified,
 }
@@ -126,10 +149,13 @@ fn origin(from: &str) -> String {
 
 /// One output format's features and what Isoloom does with each.
 pub struct Format {
+    /// The table's title (`Docker Compose`, `Terraform: AWS`).
     pub name: &'static str,
+    /// The generated file it describes, under the project.
     pub file: &'static str,
     /// Where the feature list comes from.
     pub source: &'static str,
+    /// Every feature of the source, and what Isoloom does with it.
     pub rows: Vec<(String, Support)>,
     /// On the page, list the features that aren't "not portable" and count the rest in one line
     /// (a cloud's hundreds of managed services).
@@ -139,9 +165,13 @@ pub struct Format {
 /// Toward 100%: the portable features, and how many are done, partly done, or to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Score {
+    /// The features every kind of target can do: the ones that count.
     pub portable: usize,
+    /// Of those, the ones Isoloom writes.
     pub done: usize,
+    /// Of those, the ones Isoloom writes for some uses.
     pub partly: usize,
+    /// Of those, the ones still planned or unclassified.
     pub to_do: usize,
 }
 
@@ -156,6 +186,7 @@ impl Score {
 }
 
 impl Format {
+    /// The format's progress toward 100%: its portable features, by status.
     pub fn score(&self) -> Score {
         let portable: Vec<Support> = self.rows.iter().map(|(_, s)| *s).filter(|s| s.counts()).collect();
         Score {
@@ -195,7 +226,7 @@ pub fn section(key: &str) -> (&'static str, &str) {
         return ("Resource types", rest);
     }
     if let Some(rest) = key.strip_prefix("provider ") {
-        return ("Settings", rest.split_once(": ").map(|(_, s)| s).unwrap_or(rest));
+        return ("Settings", rest.split_once(": ").map_or(rest, |(_, s)| s));
     }
     for (prefix, title) in [
         ("services.*.", "Services"),
@@ -279,6 +310,7 @@ pub fn anchor(title: &str) -> String {
     out
 }
 
+/// `s` with its first letter upper-case, for a heading.
 pub fn capitalize(s: &str) -> String {
     let mut c = s.chars();
     match c.next() {

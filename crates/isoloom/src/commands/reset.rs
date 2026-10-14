@@ -4,10 +4,9 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-use isoloom_core::Target;
+use isoloom_spec::Target;
 
-use isoloom_core::events::Scope;
+use isoloom_runtime::events::Scope;
 
 use crate::commands::run::{Ask, Brought, finish, up_or_down};
 use crate::prepare::prepare;
@@ -42,7 +41,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         sets: &a.sets,
     };
     let p = prepare(ask.dir, ask.target, None, ask.instance, ask.sets)?;
-    if p.target == Target::Vagrant && restored(&p.dir.join(core::instance::output_dir(ask.instance)).join("vagrant")) {
+    if p.target == Target::Vagrant && restored(&p.dir.join(isoloom_spec::instance::output_dir(ask.instance)).join("vagrant")) {
         let back = Brought {
             target: p.target,
             dir: p.dir,

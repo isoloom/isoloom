@@ -4,9 +4,8 @@
 use std::path::PathBuf;
 use std::process::{Command, ExitCode, Stdio};
 
-use isoloom_core as core;
-use isoloom_core::events::ErrorCode;
-use isoloom_core::shell;
+use isoloom_runtime::events::ErrorCode;
+use isoloom_spec::shell;
 
 use crate::failure::fail;
 use crate::machine::{Env, Running, on_machine};
@@ -61,7 +60,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     } else if let Some(clones) = spec.clones.get(machine) {
         clones.clone()
     } else {
-        core::groups::members(spec, machine)
+        isoloom_spec::groups::members(spec, machine)
     };
     if a.json {
         return each_json(&env, &names, &cmd);

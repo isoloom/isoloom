@@ -42,14 +42,20 @@ pub fn appliances(spec: &Spec) -> Vec<(&String, &Machine, Appliance)> {
     spec.machines.iter().filter_map(|(n, m)| Some((n, m, m.docker.as_ref()?.appliance?))).collect()
 }
 
+/// [`MGMT_CIDR`] as a block, written out so reading it can't fail (a test checks they agree).
+const MGMT: Cidr = Cidr {
+    base: u32::from_be_bytes([10, 255, 255, 0]),
+    len: 24,
+};
+
 /// An appliance's management address: .10 and up on the management network.
 pub fn mgmt_address(spec: &Spec, name: &str) -> Ipv4Addr {
-    let i = appliances(spec).iter().position(|(n, _, _)| n.as_str() == name).unwrap_or(0) as u32;
-    Ipv4Addr::from(Cidr::parse(MGMT_CIDR).expect("constant").base + 10 + i)
+    let i = appliances(spec).iter().position(|(n, _, _)| n.as_str() == name).unwrap_or(0);
+    Ipv4Addr::from(MGMT.base + 10 + u32::try_from(i).unwrap_or(0))
 }
 
 fn mgmt_gateway() -> Ipv4Addr {
-    Cidr::parse(MGMT_CIDR).expect("constant").gateway()
+    MGMT.gateway()
 }
 
 /// IOL's instance number: unique in the environment (1, 2...).
@@ -85,6 +91,7 @@ pub struct Port {
     pub network: String,
     /// The container's address there (none on a trunk's link, which has no addresses).
     pub address: Option<Ipv4Addr>,
+    /// What the port carries: the network itself, one VLAN, or a trunk.
     pub role: Role,
 }
 
@@ -139,7 +146,9 @@ pub struct Wiring {
     pub own_config: &'static str,
     /// Where the `firmware` file is mounted, for kinds that boot one.
     pub firmware: Option<&'static str>,
+    /// The container's environment variables, in order.
     pub environment: Vec<(String, String)>,
+    /// What the container runs: joins the startup configuration, then starts the OS.
     pub entrypoint: Vec<String>,
     /// QEMU needs /dev/kvm (and the image sets up its own taps).
     pub privileged: bool,
@@ -151,7 +160,7 @@ pub struct Wiring {
 fn base_config(spec: &Spec, name: &str, kind: Appliance, ports: &[Port]) -> String {
     let mut cfg = format!("hostname {name}\n!\nno ip domain lookup\nip domain name lab\n!\nusername admin privilege 15 secret admin\n!\n");
     if matches!(kind, Appliance::CiscoIol | Appliance::CiscoIolL2) {
-        let mgmt = Cidr::parse(MGMT_CIDR).expect("constant");
+        let mgmt = MGMT;
         let _ = write!(
             cfg,
             "no aaa new-model\nip cef\n!\nvrf definition isoloom-mgmt\n description Isoloom management\n address-family ipv4\n exit-address-family\n!\ninterface Ethernet0/0\n{}vrf forwarding isoloom-mgmt\n description Isoloom management\n ip address {} {}\n no shutdown\n!\n",
@@ -180,9 +189,10 @@ fn base_config(spec: &Spec, name: &str, kind: Appliance, ports: &[Port]) -> Stri
         match &port.role {
             Role::Network => {
                 let _ = writeln!(cfg, " description {}", port.network);
-                if let (false, Some(addr)) = (is_switch(kind), port.address) {
-                    let len = Cidr::parse(&spec.networks[&port.network].cidr).expect("validated cidr").len;
-                    let _ = writeln!(cfg, " ip address {addr} {}", mask(len));
+                // The spec is validated: its blocks parse.
+                let block = Cidr::parse(&spec.networks[&port.network].cidr);
+                if let (false, Some(addr), Some(block)) = (is_switch(kind), port.address, block) {
+                    let _ = writeln!(cfg, " ip address {addr} {}", mask(block.len));
                 }
             }
             Role::Access(id) => {
@@ -209,76 +219,84 @@ fn base_config(spec: &Spec, name: &str, kind: Appliance, ports: &[Port]) -> Stri
 pub fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: impl Fn(&str, u8) -> Ipv4Addr) -> Wiring {
     let ports = ports(spec, name, m, &address);
     let cfg = base_config(spec, name, kind, &ports);
-    let n = ports.len();
     match kind {
-        Appliance::CiscoIol | Appliance::CiscoIolL2 => {
-            let pid = iol_pid(spec, name);
-            let mut iouyap = "[default]\nbase_port = 49000\nnetmap = /iol/NETMAP\n[513:0/0]\neth_dev = eth0\n".to_string();
-            let mut netmap = format!("{pid}:0/0 513:0/0\n");
-            for k in 1..=n {
-                let (slot, port) = (k / 4, k % 4);
-                let _ = write!(iouyap, "[513:{slot}/{port}]\neth_dev = eth{k}\n");
-                let _ = writeln!(netmap, "{pid}:{slot}/{port} 513:{slot}/{port}");
-            }
-            Wiring {
-                ports,
-                files: vec![
-                    ("base.txt".into(), "/iol/base.txt".into(), cfg),
-                    ("NETMAP".into(), "/iol/NETMAP".into(), netmap),
-                    ("iouyap.ini".into(), "/iol/iouyap.ini".into(), iouyap),
-                ],
-                own_config: "/iol/own.txt",
-                firmware: None,
-                environment: vec![("IOL_PID".into(), pid.to_string())],
-                entrypoint: shell("cat /iol/base.txt /iol/own.txt > /iol/config.txt 2>/dev/null; echo end >> /iol/config.txt; exec /entrypoint.sh"),
-                privileged: false,
-                build: None,
-            }
-        }
-        Appliance::CiscoVios | Appliance::CiscoViosL2 | Appliance::CiscoCsr1000v | Appliance::CiscoC8000v => {
-            let mut environment = vec![("CLAB_INTFS".into(), n.to_string()), ("CONNECTION_MODE".into(), "tc".into())];
-            if matches!(kind, Appliance::CiscoVios | Appliance::CiscoViosL2) {
-                environment.push(("CLAB_MGMT_PASSTHROUGH".into(), "true".into()));
-            }
-            Wiring {
-                ports,
-                files: vec![("base.cfg".into(), "/config/base.cfg".into(), cfg)],
-                own_config: "/config/own.cfg",
-                firmware: None,
-                environment,
-                entrypoint: shell(&format!(
-                    "cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; exec uv run /launch.py --username admin --password admin --hostname {name} --connection-mode tc --trace"
-                )),
-                privileged: true,
-                build: None,
-            }
-        }
-        Appliance::CiscoDynamips => {
-            // PA-2FE-TX adapters in the slots the data interfaces reach past the I/O card's port.
-            let slots = (2..=n).map(|k| dynamips_port(k).0).max().unwrap_or(0);
-            let mut args = String::from("-P 7200 -r 512 -T 2000 -C /config/startup-config.cfg");
-            for slot in 1..=slots {
-                let _ = write!(args, " -p {slot}:PA-2FE-TX");
-            }
-            for k in 1..=n {
-                let (slot, port) = dynamips_port(k);
-                let _ = write!(args, " -s {slot}:{port}:linux_eth:eth{k}");
-            }
-            Wiring {
-                ports,
-                files: vec![("base.cfg".into(), "/config/base.cfg".into(), cfg)],
-                own_config: "/config/own.cfg",
-                firmware: Some("/firmware/ios.bin"),
-                environment: vec![("DYNAMIPS_ARGS".into(), args)],
-                entrypoint: shell(
-                    "cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; cd /tmp && exec dynamips $DYNAMIPS_ARGS /firmware/ios.bin",
-                ),
-                privileged: false,
-                build: Some(
-                    "# Dynamips, the Cisco 7200 emulator (Ubuntu's package, in its default sources); the IOS\n# image is the user's.\nFROM ubuntu:24.04\nRUN apt-get update && apt-get install -y --no-install-recommends dynamips iproute2 && rm -rf /var/lib/apt/lists/*\n".into(),
-                ),
-            }
-        }
+        Appliance::CiscoIol | Appliance::CiscoIolL2 => iol_wiring(iol_pid(spec, name), ports, cfg),
+        Appliance::CiscoVios | Appliance::CiscoViosL2 | Appliance::CiscoCsr1000v | Appliance::CiscoC8000v => vrnetlab_wiring(name, kind, ports, cfg),
+        Appliance::CiscoDynamips => dynamips_wiring(ports, cfg),
+    }
+}
+
+/// IOL: the interfaces mapped by `/iol/NETMAP` and `/iol/iouyap.ini`, the instance in `IOL_PID`.
+fn iol_wiring(pid: usize, ports: Vec<Port>, cfg: String) -> Wiring {
+    let mut iouyap = "[default]\nbase_port = 49000\nnetmap = /iol/NETMAP\n[513:0/0]\neth_dev = eth0\n".to_string();
+    let mut netmap = format!("{pid}:0/0 513:0/0\n");
+    for k in 1..=ports.len() {
+        let (slot, port) = (k / 4, k % 4);
+        let _ = write!(iouyap, "[513:{slot}/{port}]\neth_dev = eth{k}\n");
+        let _ = writeln!(netmap, "{pid}:{slot}/{port} 513:{slot}/{port}");
+    }
+    Wiring {
+        ports,
+        files: vec![
+            ("base.txt".into(), "/iol/base.txt".into(), cfg),
+            ("NETMAP".into(), "/iol/NETMAP".into(), netmap),
+            ("iouyap.ini".into(), "/iol/iouyap.ini".into(), iouyap),
+        ],
+        own_config: "/iol/own.txt",
+        firmware: None,
+        environment: vec![("IOL_PID".into(), pid.to_string())],
+        entrypoint: shell("cat /iol/base.txt /iol/own.txt > /iol/config.txt 2>/dev/null; echo end >> /iol/config.txt; exec /entrypoint.sh"),
+        privileged: false,
+        build: None,
+    }
+}
+
+/// vrnetlab's QEMU images: `launch.py` with containerlab's arguments, privileged for /dev/kvm.
+fn vrnetlab_wiring(name: &str, kind: Appliance, ports: Vec<Port>, cfg: String) -> Wiring {
+    let mut environment = vec![("CLAB_INTFS".into(), ports.len().to_string()), ("CONNECTION_MODE".into(), "tc".into())];
+    if matches!(kind, Appliance::CiscoVios | Appliance::CiscoViosL2) {
+        environment.push(("CLAB_MGMT_PASSTHROUGH".into(), "true".into()));
+    }
+    Wiring {
+        ports,
+        files: vec![("base.cfg".into(), "/config/base.cfg".into(), cfg)],
+        own_config: "/config/own.cfg",
+        firmware: None,
+        environment,
+        entrypoint: shell(&format!(
+            "cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; exec uv run /launch.py --username admin --password admin --hostname {name} --connection-mode tc --trace"
+        )),
+        privileged: true,
+        build: None,
+    }
+}
+
+/// Dynamips: each data interface bound to a router port, the IOS image booted from `firmware`.
+fn dynamips_wiring(ports: Vec<Port>, cfg: String) -> Wiring {
+    let n = ports.len();
+    // PA-2FE-TX adapters in the slots the data interfaces reach past the I/O card's port.
+    let slots = (2..=n).map(|k| dynamips_port(k).0).max().unwrap_or(0);
+    let mut args = String::from("-P 7200 -r 512 -T 2000 -C /config/startup-config.cfg");
+    for slot in 1..=slots {
+        let _ = write!(args, " -p {slot}:PA-2FE-TX");
+    }
+    for k in 1..=n {
+        let (slot, port) = dynamips_port(k);
+        let _ = write!(args, " -s {slot}:{port}:linux_eth:eth{k}");
+    }
+    Wiring {
+        ports,
+        files: vec![("base.cfg".into(), "/config/base.cfg".into(), cfg)],
+        own_config: "/config/own.cfg",
+        firmware: Some("/firmware/ios.bin"),
+        environment: vec![("DYNAMIPS_ARGS".into(), args)],
+        entrypoint: shell(
+            "cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; cd /tmp && exec dynamips $DYNAMIPS_ARGS /firmware/ios.bin",
+        ),
+        privileged: false,
+        build: Some(
+            "# Dynamips, the Cisco 7200 emulator (Ubuntu's package, in its default sources); the IOS\n# image is the user's.\nFROM ubuntu:24.04\nRUN apt-get update && apt-get install -y --no-install-recommends dynamips iproute2 && rm -rf /var/lib/apt/lists/*\n".into(),
+        ),
     }
 }
 
@@ -290,4 +308,14 @@ fn shell(script: &str) -> Vec<String> {
 /// data interfaces (IOS owns them).
 pub fn sidecar_commands(ports: usize) -> Vec<String> {
     (1..=ports).map(|k| format!("ip addr flush dev eth{k}")).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_management_block_is_the_shared_constant() {
+        assert_eq!(Cidr::parse(MGMT_CIDR), Some(MGMT));
+    }
 }

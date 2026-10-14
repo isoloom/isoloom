@@ -4,8 +4,6 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use isoloom_core as core;
-
 use crate::{Res, output, spec};
 
 #[derive(clap::Args)]
@@ -18,7 +16,7 @@ pub struct Args {
 }
 
 pub fn run(a: &Args) -> Res<ExitCode> {
-    let mut all = core::host::all();
+    let mut all = isoloom_runtime::host::all();
     let required_at = all.len();
     all.extend(required(&a.dir));
     if a.json {
@@ -49,8 +47,8 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 
 /// What the cloud-services module of the spec in `dir` needs on this machine (`cloud.requires`):
 /// command names only; its shell commands are the project's code, run by `run` alone.
-fn required(dir: &Path) -> Option<core::host::Readiness> {
-    core::find(dir).ok()?;
+fn required(dir: &Path) -> Option<isoloom_runtime::host::Readiness> {
+    isoloom_spec::find(dir).ok()?;
     let spec = spec::load_spec(dir).ok()?;
-    core::host::requirements(&spec, false)
+    isoloom_runtime::host::requirements(&spec, false)
 }

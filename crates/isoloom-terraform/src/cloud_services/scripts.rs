@@ -2,6 +2,8 @@
 //! variables: the environment (`env`, the deployment's name), the module's copy and the
 //! `before` steps, the apply's marker and its retries (`apply_retries`).
 
+use std::fmt::Write as _;
+
 use isoloom_spec::model::CloudServices;
 use isoloom_spec::shell;
 
@@ -27,9 +29,12 @@ pub const OUTPUTS_MODULE: &str = "[ -d \"$module\" ] || module=\"$src\"\n";
 /// What every script sets after `here`: `env`'s variables, the deployment's name, the module
 /// (`src`) and its copy (`module`). `src` is the module's folder, quoted, from the scripts'.
 pub fn environment(cloud: &CloudServices, src: &str) -> String {
-    let mut out: String = cloud.env.iter().map(|(k, v)| format!("export {k}={}\n", shell::quote(v))).collect();
+    let mut out = cloud.env.iter().fold(String::new(), |mut s, (k, v)| {
+        let _ = writeln!(s, "export {k}={}", shell::quote(v));
+        s
+    });
     out.push_str(TAG);
-    out.push_str(&format!("src={src}\nmodule=\"$here/module\"\n"));
+    let _ = writeln!(out, "src={src}\nmodule=\"$here/module\"");
     out
 }
 
@@ -39,7 +44,7 @@ pub fn copy(cloud: &CloudServices) -> String {
     if !cloud.before.is_empty() {
         out.push_str(STEP);
         for b in &cloud.before {
-            out.push_str(&format!("step {}\n", shell::quote(b)));
+            let _ = writeln!(out, "step {}", shell::quote(b));
         }
     }
     out
@@ -48,7 +53,10 @@ pub fn copy(cloud: &CloudServices) -> String {
 /// Destroying needs the module as it was applied (and what the steps wrote there): the copy,
 /// made again only when it is gone.
 pub fn copy_if_gone(cloud: &CloudServices) -> String {
-    let indented: String = copy(cloud).lines().map(|l| format!("  {l}\n")).collect();
+    let indented = copy(cloud).lines().fold(String::new(), |mut s, l| {
+        let _ = writeln!(s, "  {l}");
+        s
+    });
     format!("if [ ! -d \"$module\" ]; then\n{indented}fi\n")
 }
 
