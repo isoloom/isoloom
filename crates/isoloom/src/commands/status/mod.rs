@@ -3,6 +3,7 @@
 
 mod probe;
 
+use std::fmt::Write as _;
 use std::process::ExitCode;
 
 use isoloom_runtime::registry::{self, Entry};
@@ -78,10 +79,10 @@ fn target_label(e: &Entry) -> String {
         None => e.target.id().to_string(),
     };
     if let Some(n) = e.instance {
-        label.push_str(&format!(" #{n}"));
+        let _ = write!(label, " #{n}");
     }
     if let Some(p) = &e.profile {
-        label.push_str(&format!(" [{p}]"));
+        let _ = write!(label, " [{p}]");
     }
     label
 }

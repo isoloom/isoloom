@@ -115,6 +115,7 @@ impl Rules {
         self.0.iter().any(|r| r.keep)
     }
 
+    /// Whether there are no rules at all (no `.isoloomignore`, or an empty one).
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

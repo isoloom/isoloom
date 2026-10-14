@@ -65,9 +65,8 @@ fn print_sources(merged: &serde_yaml_ng::Value, sources: &[(String, String)]) {
         let value = leaf
             .split('.')
             .try_fold(merged, |v, k| v.get(k))
-            .map(|v| serde_yaml_ng::to_string(v).unwrap_or_default().trim().to_string())
-            .unwrap_or_default();
-        let source = sources.iter().find(|(k, _)| *k == leaf).map(|(_, s)| s.as_str()).unwrap_or("built in");
+            .map_or_else(String::new, |v| serde_yaml_ng::to_string(v).unwrap_or_default().trim().to_string());
+        let source = sources.iter().find(|(k, _)| *k == leaf).map_or("built in", |(_, s)| s.as_str());
         println!("{leaf:<width$}  {value:<24}  {source}");
     }
 }

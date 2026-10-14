@@ -3,6 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use isoloom_spec::{parse, validate, validate_files};
@@ -31,7 +32,10 @@ fn assert_problem(yaml: &str, at: &str, fragment: &str) {
 
 /// `NET` with these lines under `machines:` (each `  name: { … }`).
 fn with_machines(lines: &[&str]) -> String {
-    let body: String = lines.iter().map(|l| format!("  {l}\n")).collect();
+    let body = lines.iter().fold(String::new(), |mut body, l| {
+        let _ = writeln!(body, "  {l}");
+        body
+    });
     format!("{NET}machines:\n{body}")
 }
 

@@ -42,7 +42,10 @@ fn environment(m: &Machine, sh: &mut String) {
         return;
     }
     let keys = m.environment.keys().map(|k| regex_escape(k)).collect::<Vec<_>>().join("|");
-    let lines: String = m.environment.iter().map(|(k, v)| format!("{k}={v}\n")).collect();
+    let lines = m.environment.iter().fold(String::new(), |mut s, (k, v)| {
+        let _ = writeln!(s, "{k}={v}");
+        s
+    });
     let systemd = m
         .environment
         .iter()
@@ -61,7 +64,10 @@ fn sysctls(m: &Machine, sh: &mut String) {
     if m.sysctls.is_empty() {
         return;
     }
-    let lines: String = m.sysctls.iter().map(|(k, v)| format!("{k} = {v}\n")).collect();
+    let lines = m.sysctls.iter().fold(String::new(), |mut s, (k, v)| {
+        let _ = writeln!(s, "{k} = {v}");
+        s
+    });
     let _ = writeln!(
         sh,
         "printf %s {} > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf",
@@ -99,7 +105,8 @@ pub fn sudo_command(spec: &Spec, name: &str, m: &Machine) -> Option<String> {
 /// waiting for the owner as long as it takes to come up (15 minutes at most).
 fn shared_volume(spec: &Spec, name: &str, m: &Machine, v: &str, sh: &mut String) {
     let path = &m.volumes[v];
-    let owner = spec.volume_owner(v).expect("validated: a shared volume has an owner");
+    // Validation gives every shared volume an owner; without one there is nothing to serve.
+    let Some(owner) = spec.volume_owner(v) else { return };
     let _ = writeln!(sh, "{PKG}\nmkdir -p {}", quote(path));
     if owner == name {
         let clients = spec

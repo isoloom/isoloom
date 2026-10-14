@@ -18,6 +18,7 @@ pub struct Entry {
     pub name: String,
     /// The project folder (absolute).
     pub dir: PathBuf,
+    /// The target it runs on.
     pub target: Target,
     /// The instance number, when `run --instance` was used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -44,12 +45,14 @@ pub struct Entry {
 /// ignore fields they don't know).
 pub const VERSION: u32 = 1;
 
+/// The whole file: its format version and every environment `isoloom run` brought up.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Registry {
     /// The file's format version. A file written before the field existed reads as 1, the
     /// format it has; [`save`] always writes [`VERSION`].
     #[serde(default = "first_version")]
     pub version: u32,
+    /// The running environments, in the order they were brought up.
     #[serde(default)]
     pub environments: Vec<Entry>,
 }
@@ -200,10 +203,7 @@ impl Registry {
 
 /// Now, as RFC 3339 in UTC (seconds).
 pub fn now() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
     rfc3339(secs)
 }
 

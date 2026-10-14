@@ -28,11 +28,10 @@ pub fn file(spec: &Spec) -> GeneratedFile {
 
 /// The snapshot of an instance of the spec (the spec already as that instance).
 pub fn file_with(spec: &Spec, instance: Option<u8>) -> GeneratedFile {
-    let mut text = serde_json::to_string_pretty(&resolve_with(spec, instance)).expect("a JSON object serializes");
-    text.push('\n');
+    // `{:#}` is serde_json's pretty printer (two-space indent), and a `Value` always prints.
     GeneratedFile {
         path: PATH.to_string(),
-        contents: text,
+        contents: format!("{:#}\n", resolve_with(spec, instance)),
     }
 }
 
@@ -72,20 +71,19 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
     if let Some(m) = &spec.message {
         let filled = fill(m, &out).ok().or_else(|| spec.cloud.as_ref().map(|_| m.clone()));
         if let Value::Object(map) = &mut out {
-            map.insert("message".into(), filled.map(Value::String).unwrap_or(Value::Null));
+            map.insert("message".into(), filled.map_or(Value::Null, Value::String));
         }
     }
     out
 }
 
-/// A network's block (validated specs only).
-fn cidr(spec: &Spec, net: &str) -> Cidr {
-    Cidr::parse(&spec.networks[net].cidr).expect("validated cidr")
-}
-
-/// One address per network of the spec, from its block.
-fn per_network(spec: &Spec, at: impl Fn(&str) -> String) -> Map<String, Value> {
-    spec.networks.keys().map(|n| (n.clone(), json!(at(n)))).collect()
+/// One address per network of the spec, `at` its block. A network whose block doesn't parse
+/// (a spec that isn't valid) has no address.
+fn per_network(spec: &Spec, at: impl Fn(Cidr) -> String) -> Map<String, Value> {
+    spec.networks
+        .iter()
+        .filter_map(|(name, n)| Some((name.clone(), json!(at(Cidr::parse(&n.cidr)?)))))
+        .collect()
 }
 
 /// Each network with its blocks and the addresses Isoloom gives its infrastructure (`routed`:
@@ -97,7 +95,7 @@ fn networks(spec: &Spec, routed: bool) -> Map<String, Value> {
         .collect();
     let mut networks = Map::new();
     for (name, n) in &spec.networks {
-        let c = cidr(spec, name);
+        let Some(c) = Cidr::parse(&n.cidr) else { continue };
         networks.insert(
             name.clone(),
             json!({
@@ -193,8 +191,8 @@ fn tools(spec: &Spec, docker: &Spec) -> Map<String, Value> {
                     "image": t.image.clone().or_else(|| (n == "shell").then(|| "nicolaka/netshoot".to_string())),
                     "port": t.port,
                     "publish": t.publish,
-                    "addresses": per_network(spec, |net| cidr(spec, net).tool(i).to_string()),
-                    "docker_addresses": per_network(spec, |net| cidr(docker, net).tool(i).to_string()),
+                    "addresses": per_network(spec, |c| c.tool(i).to_string()),
+                    "docker_addresses": per_network(docker, |c| c.tool(i).to_string()),
                 }),
             )
         })
@@ -216,7 +214,7 @@ fn controller(spec: &Spec) -> Value {
     json!({
         "role": "infra",
         "keep_running": spec.controller.as_ref().is_some_and(|c| c.keep_running),
-        "addresses": per_network(spec, |n| cidr(spec, n).controller().to_string()),
+        "addresses": per_network(spec, |c| c.controller().to_string()),
     })
 }
 

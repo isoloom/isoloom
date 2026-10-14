@@ -192,8 +192,6 @@ pub(super) fn published_ports(v: &Value) -> (Vec<(PortKey, u16)>, Vec<String>) {
 }
 
 /// Memory like `512m`, `1g`, `1.5G`, `268435456` in MB.
-// The value is at least 1 here (checked before the cast), so no sign is lost.
-#[allow(clippy::cast_sign_loss)]
 pub(super) fn memory_mb(s: &str) -> Option<u32> {
     let s = s.trim().to_ascii_lowercase();
     let s = s.strip_suffix('b').unwrap_or(&s);
@@ -204,14 +202,12 @@ pub(super) fn memory_mb(s: &str) -> Option<u32> {
         _ => (s, 1.0 / (1024.0 * 1024.0)),
     };
     let mb = num.parse::<f64>().ok()? * factor;
-    (mb >= 1.0).then(|| mb.ceil() as u32)
+    if mb >= 1.0 { crate::whole_u32(mb.ceil()) } else { None }
 }
 
 /// CPUs as a whole number, at least 1 (`"1.5"` -> 2).
-// Clamped to at least 1 before the cast, so no sign is lost.
-#[allow(clippy::cast_sign_loss)]
 pub(super) fn cpus(v: &Value) -> Option<u32> {
-    str_of(v).and_then(|c| c.parse::<f64>().ok()).map(|c| c.ceil().max(1.0) as u32)
+    str_of(v).and_then(|c| c.parse::<f64>().ok()).and_then(|c| crate::whole_u32(c.ceil().max(1.0)))
 }
 
 pub(super) enum VolumeMount {

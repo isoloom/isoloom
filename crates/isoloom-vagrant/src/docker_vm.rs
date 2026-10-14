@@ -16,6 +16,8 @@
 //!
 //! It refuses what the Compose file can't run: its capabilities are Compose's.
 
+use std::fmt::Write as _;
+
 use isoloom_plan::checks::{Position, Probe};
 use isoloom_plan::{Capabilities, Environment, MachineShape};
 use isoloom_render::backend::{self, Backend, Files, RenderError};
@@ -210,15 +212,14 @@ fn exec_runs(env: &Environment) -> String {
             machines.push(m);
         }
     }
-    machines
-        .iter()
-        .map(|m| {
-            format!(
-                "docker compose -f {COMPOSE} exec -T {m} sh -s < .isoloom/docker/checks/{} || failed=1; ",
-                docker::exec_runner(m)
-            )
-        })
-        .collect()
+    machines.iter().fold(String::new(), |mut s, m| {
+        let _ = write!(
+            s,
+            "docker compose -f {COMPOSE} exec -T {m} sh -s < .isoloom/docker/checks/{} || failed=1; ",
+            docker::exec_runner(m)
+        );
+        s
+    })
 }
 
 /// The Proxmox module: the cloud-docker target's Docker host, on a Proxmox server.

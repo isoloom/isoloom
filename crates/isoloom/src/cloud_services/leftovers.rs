@@ -19,14 +19,12 @@ const REGION_ENV: [&str; 2] = ["AWS_REGION", "AWS_DEFAULT_REGION"];
 fn deployment_name(name: &str, instance: Option<u8>) -> String {
     use std::hash::{BuildHasher, Hasher};
     let mut h = std::collections::hash_map::RandomState::new().build_hasher();
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     h.write_u128(nanos);
     h.write_u32(std::process::id());
     let suffix = instance.map(|n| format!("-{n}")).unwrap_or_default();
-    format!("isoloom-{name}{suffix}-{:08x}", h.finish() as u32)
+    // The hash's high 32 bits: eight hex digits.
+    format!("isoloom-{name}{suffix}-{:08x}", h.finish() >> 32)
 }
 
 /// Names the deployment in `wd` (the cloud-services folder) before its first apply; a name

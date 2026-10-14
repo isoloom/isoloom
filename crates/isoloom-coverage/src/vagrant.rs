@@ -70,6 +70,7 @@ const VM_NAME: Support = Emitted {
     from: "(the environment and machine names, as the VM's display name)",
 };
 
+/// The Vagrant tables: `config.vm`, then one per provider.
 pub fn formats() -> Vec<Format> {
     vec![
         core(),
@@ -115,114 +116,117 @@ fn provider(name: &'static str, id: &'static str, list: &'static str, classify: 
     }
 }
 
+/// The settings Isoloom writes that aren't `config.vm` keys of their own: network types,
+/// provisioners and the like.
+const EXTRA: [(&str, Support); 20] = [
+    (
+        "config.vm.network private_network",
+        Emitted {
+            from: "networks and machines.*.networks",
+        },
+    ),
+    (
+        "config.vm.network forwarded_port",
+        Emitted {
+            from: "machines.*.services[].publish (on the host's loopback; `protocol: \"udp\"` with `protocol: udp`)",
+        },
+    ),
+    (
+        "config.vm.network public_network",
+        Planned {
+            note: "a network bridged to the outside (Compose `external`, a host bridge, a VPC)",
+        },
+    ),
+    (
+        "config.vm.provision shell",
+        Emitted {
+            from: "machines.*.vm.provision (.sh, .yml, .yaml, `reboot`), and Isoloom's own steps",
+        },
+    ),
+    (
+        "config.vm.provision file",
+        Equivalent {
+            via: "`isoloom_project` (below) copies the project; a file provisioner follows symlinks and lists files when the Vagrantfile loads",
+        },
+    ),
+    (
+        "config.vm.provision isoloom_project",
+        Emitted {
+            from: "(Isoloom's own provisioner, defined in the Vagrantfile: the project into each VM as a tar.gz built when the step runs, symlinks kept as links)",
+        },
+    ),
+    (
+        "config.vm.provision ansible_local",
+        Equivalent {
+            via: "a shell provisioner running the playbook with `ansible-playbook -c local` inside the VM, the machine as its inventory (as on every VM target)",
+        },
+    ),
+    (
+        "config.vm.provision ansible",
+        Equivalent {
+            via: "the same playbooks, run inside the VM by a shell provisioner",
+        },
+    ),
+    (
+        "config.vm.provision chef",
+        Equivalent {
+            via: "a `.sh` provisioning step can run any tool",
+        },
+    ),
+    (
+        "config.vm.provision puppet",
+        Equivalent {
+            via: "a `.sh` provisioning step can run any tool",
+        },
+    ),
+    (
+        "config.vm.provision salt",
+        Equivalent {
+            via: "a `.sh` provisioning step can run any tool",
+        },
+    ),
+    (
+        "config.vm.provision cfengine",
+        Equivalent {
+            via: "a `.sh` provisioning step can run any tool",
+        },
+    ),
+    (
+        "config.vm.provision docker",
+        Equivalent {
+            via: "`docker:` (containers come from the Compose output; VMs run services natively)",
+        },
+    ),
+    (
+        "config.vm.provision podman",
+        Equivalent {
+            via: "`docker:` (containers come from the Compose output; VMs run services natively)",
+        },
+    ),
+    (
+        "config.vm.provision container",
+        Equivalent {
+            via: "`docker:` (containers come from the Compose output; VMs run services natively)",
+        },
+    ),
+    ("config.ssh", TOOLING),
+    (
+        "config.winrm",
+        Emitted {
+            from: "vm.os (the Windows box's own account, over WinRM)",
+        },
+    ),
+    ("config.winssh", WINDOWS),
+    ("config.trigger", TOOLING),
+    ("config.vagrant", TOOLING),
+];
+
 fn core() -> Format {
     let mut rows: Vec<(String, Support)> = names(VM)
         .into_iter()
         .map(|s| (format!("config.vm.{s}"), machine(s).unwrap_or(Unclassified)))
         .collect();
-    let extra: [(&str, Support); 20] = [
-        (
-            "config.vm.network private_network",
-            Emitted {
-                from: "networks and machines.*.networks",
-            },
-        ),
-        (
-            "config.vm.network forwarded_port",
-            Emitted {
-                from: "machines.*.services[].publish (on the host's loopback; `protocol: \"udp\"` with `protocol: udp`)",
-            },
-        ),
-        (
-            "config.vm.network public_network",
-            Planned {
-                note: "a network bridged to the outside (Compose `external`, a host bridge, a VPC)",
-            },
-        ),
-        (
-            "config.vm.provision shell",
-            Emitted {
-                from: "machines.*.vm.provision (.sh, .yml, .yaml, `reboot`), and Isoloom's own steps",
-            },
-        ),
-        (
-            "config.vm.provision file",
-            Equivalent {
-                via: "`isoloom_project` (below) copies the project; a file provisioner follows symlinks and lists files when the Vagrantfile loads",
-            },
-        ),
-        (
-            "config.vm.provision isoloom_project",
-            Emitted {
-                from: "(Isoloom's own provisioner, defined in the Vagrantfile: the project into each VM as a tar.gz built when the step runs, symlinks kept as links)",
-            },
-        ),
-        (
-            "config.vm.provision ansible_local",
-            Equivalent {
-                via: "a shell provisioner running the playbook with `ansible-playbook -c local` inside the VM, the machine as its inventory (as on every VM target)",
-            },
-        ),
-        (
-            "config.vm.provision ansible",
-            Equivalent {
-                via: "the same playbooks, run inside the VM by a shell provisioner",
-            },
-        ),
-        (
-            "config.vm.provision chef",
-            Equivalent {
-                via: "a `.sh` provisioning step can run any tool",
-            },
-        ),
-        (
-            "config.vm.provision puppet",
-            Equivalent {
-                via: "a `.sh` provisioning step can run any tool",
-            },
-        ),
-        (
-            "config.vm.provision salt",
-            Equivalent {
-                via: "a `.sh` provisioning step can run any tool",
-            },
-        ),
-        (
-            "config.vm.provision cfengine",
-            Equivalent {
-                via: "a `.sh` provisioning step can run any tool",
-            },
-        ),
-        (
-            "config.vm.provision docker",
-            Equivalent {
-                via: "`docker:` (containers come from the Compose output; VMs run services natively)",
-            },
-        ),
-        (
-            "config.vm.provision podman",
-            Equivalent {
-                via: "`docker:` (containers come from the Compose output; VMs run services natively)",
-            },
-        ),
-        (
-            "config.vm.provision container",
-            Equivalent {
-                via: "`docker:` (containers come from the Compose output; VMs run services natively)",
-            },
-        ),
-        ("config.ssh", TOOLING),
-        (
-            "config.winrm",
-            Emitted {
-                from: "vm.os (the Windows box's own account, over WinRM)",
-            },
-        ),
-        ("config.winssh", WINDOWS),
-        ("config.trigger", TOOLING),
-        ("config.vagrant", TOOLING),
-    ];
-    rows.extend(extra.into_iter().map(|(k, s)| (k.to_string(), s)));
+    rows.extend(EXTRA.iter().map(|(k, s)| ((*k).to_string(), *s)));
     Format {
         name: "Vagrant",
         file: ".isoloom/vagrant/Vagrantfile",

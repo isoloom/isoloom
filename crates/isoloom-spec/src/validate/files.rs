@@ -86,9 +86,7 @@ fn machines(spec: &Spec, paths: &mut Paths) {
 fn cloud_module(spec: &Spec, lab_dir: &Path) -> Option<Problem> {
     let c = spec.cloud.as_ref()?;
     let dir = lab_dir.join(&c.terraform);
-    let tf = std::fs::read_dir(&dir)
-        .map(|d| d.flatten().any(|e| e.path().extension().is_some_and(|x| x == "tf")))
-        .unwrap_or(false);
+    let tf = std::fs::read_dir(&dir).is_ok_and(|d| d.flatten().any(|e| e.path().extension().is_some_and(|x| x == "tf")));
     (!tf && dir.is_dir()).then(|| {
         Problem::new(
             "cloud.terraform",

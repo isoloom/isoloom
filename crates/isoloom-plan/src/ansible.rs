@@ -39,7 +39,7 @@ pub fn host_vars(spec: &Spec, machine: &str) -> IndexMap<String, serde_json::Val
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)] // tests: a failing test is the report.
 
     use super::*;
 

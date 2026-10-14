@@ -193,76 +193,65 @@ fn declared_checks_resolve_to_positions_probes_and_defaults() {
     assert_eq!((own[2].name.as_str(), &own[2].position), ("sealed", &Position::Machine("web".into())));
     assert!(matches!(&own[3].probe, Probe::Exec { command, expect: Some(e) } if command == "id" && e == "root"));
     assert_eq!(own[3].wait, 9);
-    // Then the derived ones.
+}
+
+#[test]
+fn derived_checks_follow_the_declared_ones() {
+    let spec = parse(&format!("{BASE}checks:\n  - {{ http: http://web/ }}\n")).unwrap();
+    let plan = checks::plan(&spec);
+    let first_derived = plan.iter().position(|c| c.derived).unwrap();
+    assert!(plan[..first_derived].iter().all(|c| !c.derived) && plan[first_derived..].iter().all(|c| c.derived));
     assert!(plan.iter().any(|c| c.derived && c.name == "web:80 from user"));
 }
 
 #[test]
 fn a_check_that_is_off_names_its_field() {
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ name: x }}\n")),
-        ["checks[0]: say what to check with exactly one of `http`, `tcp`, `exec` or `script`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ http: web }}\n")),
-        ["checks[0].http: `web` isn't a URL like http://web:8080/path"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ tcp: web }}\n")),
-        ["checks[0].tcp: `web` isn't `host:port`, like cache:6379"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ from: nope, http: http://web/ }}\n")),
-        ["checks[0].from: no machine named `nope`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ exec: id }}\n")),
-        ["checks[0]: `exec` runs inside a machine: say which with `from`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, expect: 200 }}\n")),
-        ["checks[0].expect: for `tcp`: `open` or `blocked`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ http: http://web/, expect: open }}\n")),
-        ["checks[0].expect: for `http`: a status code (100-599), `any` or `blocked`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ exec: id, from: web, contains: x }}\n")),
-        ["checks[0]: `contains` goes with `http` or `tcp`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, send: PING }}\n")),
-        ["checks[0]: `send` goes with `tcp` and `contains` (the text the answer must contain)"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ http: http://web/, send: x, contains: y }}\n")),
-        ["checks[0]: `send` goes with `tcp` and `contains` (the text the answer must contain)"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, contains: x, expect: blocked }}\n")),
-        ["checks[0]: a `blocked` check sends nothing to look at: leave out `method`, `headers`, `body`, `send` and `contains`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, method: GET }}\n")),
-        ["checks[0]: `method`, `headers` and `body` go with `http`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, contains: \"\" }}\n")),
-        ["checks[0].contains: give the text to look for, or leave `contains` out"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, send: \"a\\nb\", contains: x }}\n")),
-        ["checks[0].send: one line: Isoloom adds the newline"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ tcp: web:80, follow: true }}\n")),
-        ["checks[0]: `follow` (redirects) goes with `http`"]
-    );
-    assert_eq!(
-        problems(&format!("{BASE}checks:\n  - {{ http: http://web/, follow: true, expect: blocked }}\n")),
-        ["checks[0]: a `blocked` check gets no answer, so no redirect to follow: leave out `follow`"]
-    );
+    // Each check (a YAML list item), and the problem it gets.
+    let cases = [
+        (
+            "{ name: x }",
+            "checks[0]: say what to check with exactly one of `http`, `tcp`, `exec` or `script`",
+        ),
+        ("{ http: web }", "checks[0].http: `web` isn't a URL like http://web:8080/path"),
+        ("{ tcp: web }", "checks[0].tcp: `web` isn't `host:port`, like cache:6379"),
+        ("{ from: nope, http: http://web/ }", "checks[0].from: no machine named `nope`"),
+        ("{ exec: id }", "checks[0]: `exec` runs inside a machine: say which with `from`"),
+        ("{ tcp: web:80, expect: 200 }", "checks[0].expect: for `tcp`: `open` or `blocked`"),
+        (
+            "{ http: http://web/, expect: open }",
+            "checks[0].expect: for `http`: a status code (100-599), `any` or `blocked`",
+        ),
+        ("{ exec: id, from: web, contains: x }", "checks[0]: `contains` goes with `http` or `tcp`"),
+        (
+            "{ tcp: web:80, send: PING }",
+            "checks[0]: `send` goes with `tcp` and `contains` (the text the answer must contain)",
+        ),
+        (
+            "{ http: http://web/, send: x, contains: y }",
+            "checks[0]: `send` goes with `tcp` and `contains` (the text the answer must contain)",
+        ),
+        (
+            "{ tcp: web:80, contains: x, expect: blocked }",
+            "checks[0]: a `blocked` check sends nothing to look at: leave out `method`, `headers`, `body`, `send` and `contains`",
+        ),
+        ("{ tcp: web:80, method: GET }", "checks[0]: `method`, `headers` and `body` go with `http`"),
+        (
+            "{ tcp: web:80, contains: \"\" }",
+            "checks[0].contains: give the text to look for, or leave `contains` out",
+        ),
+        (
+            "{ tcp: web:80, send: \"a\\nb\", contains: x }",
+            "checks[0].send: one line: Isoloom adds the newline",
+        ),
+        ("{ tcp: web:80, follow: true }", "checks[0]: `follow` (redirects) goes with `http`"),
+        (
+            "{ http: http://web/, follow: true, expect: blocked }",
+            "checks[0]: a `blocked` check gets no answer, so no redirect to follow: leave out `follow`",
+        ),
+    ];
+    for (check, problem) in cases {
+        assert_eq!(problems(&format!("{BASE}checks:\n  - {check}\n")), [problem], "{check}");
+    }
     // A typo in a declared check is reported as such, not as "no variant matched".
     let err = parse(&format!("{BASE}checks:\n  - {{ htp: http://web/ }}\n")).unwrap_err().to_string();
     assert!(err.contains("unknown field `htp`"), "{err}");
@@ -440,11 +429,11 @@ fn run_with_only(script: &str, tools: &[(&str, &str)]) -> String {
     String::from_utf8_lossy(&out.stdout).to_string()
 }
 
-#[test]
+/// A server for the redirect checks: /old redirects to /new (200); /loop redirects to itself
+/// for ever; /login answers a POST with a redirect to /home, which takes GET only.
 #[cfg(unix)]
-fn http_checks_follow_redirects_when_asked() {
-    // /old redirects to /new (200); /loop redirects to itself for ever.
-    let port = serve(true, 0, |l| {
+fn redirecting_server() -> u16 {
+    serve(true, 0, |l| {
         let path = l.split_whitespace().nth(1).unwrap_or("/");
         match path {
             "/old" => "HTTP/1.1 302 Found\r\nLocation: /new\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
@@ -454,8 +443,40 @@ fn http_checks_follow_redirects_when_asked() {
             "/home" if !l.starts_with("GET ") => "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
             _ => "HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nwelcome\n".into(),
         }
-    });
-    let u = format!("http://127.0.0.1:{port}");
+    })
+}
+
+/// The runner's lines for the redirect checks against `u`, as they must read (`with_body`: the
+/// checks that send a body or look for text ran too).
+#[cfg(unix)]
+fn expect_redirect_lines(text: &str, u: &str, with_body: bool) {
+    let lines: Vec<Line> = text.lines().filter_map(checks::parse_line).collect();
+    for ok in ["first", "followed"] {
+        assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
+    }
+    let unfollowed = Line::Fail("unfollowed".into(), format!("expected HTTP 200 from {u}/old, got 302"));
+    assert!(lines.contains(&unfollowed), "{text}");
+    let looping = Line::Fail("looping".into(), format!("expected HTTP 200 from {u}/loop (after redirects), got 302"));
+    assert!(lines.contains(&looping), "{text}");
+    if with_body {
+        // A POST answered with a redirect goes on as a GET, as in a browser.
+        for ok in ["followed body", "login", "empty post", "unfollowed post"] {
+            assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
+        }
+    }
+}
+
+/// Where a tool is on this host's PATH, if it is.
+#[cfg(unix)]
+fn which(tool: &str) -> Option<String> {
+    let out = std::process::Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output().unwrap();
+    Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|p| !p.is_empty())
+}
+
+#[test]
+#[cfg(unix)]
+fn http_checks_follow_redirects_when_asked() {
+    let u = format!("http://127.0.0.1:{}", redirecting_server());
     let spec = parse(&format!(
         "{BASE}checks:\n  \
          - {{ name: first, http: '{u}/old', expect: 302, wait: 0 }}\n  \
@@ -482,33 +503,7 @@ fn http_checks_follow_redirects_when_asked() {
     let script = checks::script(&position, &plan.iter().collect::<Vec<_>>(), &render);
     assert!(script.contains(&format!("_retry 0 _http_is '{u}/old' 200 follow;")), "{script}");
     assert!(script.contains(&format!("-L --max-redirs 5 '{u}/old'")), "{script}");
-    let expect = |text: &str, with_body: bool| {
-        let lines: Vec<Line> = text.lines().filter_map(checks::parse_line).collect();
-        for ok in ["first", "followed"] {
-            assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
-        }
-        assert!(
-            lines.contains(&Line::Fail("unfollowed".into(), format!("expected HTTP 200 from {u}/old, got 302"))),
-            "{text}"
-        );
-        assert!(
-            lines.contains(&Line::Fail(
-                "looping".into(),
-                format!("expected HTTP 200 from {u}/loop (after redirects), got 302")
-            )),
-            "{text}"
-        );
-        if with_body {
-            // A POST answered with a redirect goes on as a GET, as in a browser.
-            for ok in ["followed body", "login", "empty post", "unfollowed post"] {
-                assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
-            }
-        }
-    };
-    let which = |t: &str| {
-        let out = std::process::Command::new("sh").arg("-c").arg(format!("command -v {t}")).output().unwrap();
-        Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|p| !p.is_empty())
-    };
+    let expect = |text: &str, with_body: bool| expect_redirect_lines(text, &u, with_body);
     // curl, else GNU wget, else busybox's: the same answers (wget follows whatever it's told).
     if let Some(curl) = which("curl") {
         expect(&run_with_only(&script, &[("curl", &curl)]), true);

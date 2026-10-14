@@ -1,5 +1,6 @@
 //! Where a draft goes, and what is said about it: its notes by kind, and whether it validates.
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -51,9 +52,9 @@ fn report(draft: &isoloom_import::Draft) -> Res<String> {
         if notes.is_empty() {
             continue;
         }
-        report.push_str(&format!("\n{} ({})\n", kind.title(), notes.len()));
+        let _ = writeln!(report, "\n{} ({})", kind.title(), notes.len());
         for n in notes {
-            report.push_str(&format!("  {}: {}\n", n.at, n.text));
+            let _ = writeln!(report, "  {}: {}", n.at, n.text);
         }
     }
     let problems = isoloom_spec::parse(&draft.yaml)
@@ -64,7 +65,7 @@ fn report(draft: &isoloom_import::Draft) -> Res<String> {
     } else {
         report.push_str("\nThe draft needs fixing before it validates:\n");
         for p in &problems {
-            report.push_str(&format!("  {p}\n"));
+            let _ = writeln!(report, "  {p}");
         }
     }
     Ok(report)

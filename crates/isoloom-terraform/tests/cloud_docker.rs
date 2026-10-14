@@ -4,6 +4,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
+use std::fmt::Write as _;
+
 use std::path::Path;
 
 use isoloom_plan::Environment;
@@ -67,7 +69,10 @@ fn docker_vm_proxmox_hello_stack() {
 #[test]
 fn cloud_services_cloud_bucket() {
     let files = CloudServicesBackend.render(&env("cloud-bucket", Target::CloudServices)).expect("renders");
-    let all: String = files.iter().map(|f| format!("==> {}\n{}", f.path, f.contents)).collect();
+    let all = files.iter().fold(String::new(), |mut s, f| {
+        let _ = write!(s, "==> {}\n{}", f.path, f.contents);
+        s
+    });
     insta::assert_snapshot!(all);
 }
 

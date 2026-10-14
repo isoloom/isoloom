@@ -100,64 +100,7 @@ pub use isoloom_plan::images::rewrite_image;
 pub fn linux_prelude(spec: &Spec) -> Option<String> {
     let c = of(spec)?;
     let mut sh = String::from("set -e\n");
-    let env = proxy_env(spec, c);
-    if !env.is_empty() {
-        let lines: String = env.iter().map(|(k, v)| format!("{k}={v}\n")).collect();
-        let exports: String = env.iter().map(|(k, v)| format!("export {k}={}\n", quote(v))).collect();
-        let _ = write!(
-            sh,
-            "# The proxy, for every login shell, systemd's services and sudo.\n\
-             grep -v -i -E '^(http|https|no)_proxy=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\n\
-             printf %s {} >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\n\
-             printf %s {} > /etc/profile.d/isoloom-proxy.sh\n\
-             mkdir -p /etc/systemd/system.conf.d && printf '[Manager]\\nDefaultEnvironment=%s\\n' {} > /etc/systemd/system.conf.d/isoloom-proxy.conf\n\
-             if [ -d /etc/sudoers.d ]; then printf 'Defaults env_keep += \"http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY\"\\n' > /etc/sudoers.d/isoloom-proxy && chmod 0440 /etc/sudoers.d/isoloom-proxy; fi\n",
-            quote(&lines),
-            quote(&exports),
-            quote(
-                &env.iter()
-                    .filter(|(k, _)| k.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_'))
-                    .map(|(k, v)| format!("\"{k}={v}\""))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ),
-        );
-        let (http, https) = proxies(c).unwrap_or((None, None));
-        let mut apt = String::new();
-        if let Some(h) = http {
-            let _ = writeln!(apt, "Acquire::http::Proxy \"{h}\";");
-        }
-        if let Some(h) = https {
-            let _ = writeln!(apt, "Acquire::https::Proxy \"{h}\";");
-        }
-        let _ = writeln!(sh, "# apt, dnf/yum and Docker's daemon through it.");
-        let _ = writeln!(
-            sh,
-            "if [ -d /etc/apt/apt.conf.d ]; then printf %s {} > /etc/apt/apt.conf.d/95isoloom-proxy; fi",
-            quote(&apt)
-        );
-        if let Some(h) = http.or(https) {
-            let _ = writeln!(
-                sh,
-                "for f in /etc/dnf/dnf.conf /etc/yum.conf; do if [ -f \"$f\" ]; then sed -i '/^proxy=/d' \"$f\" && printf 'proxy=%s\\n' {} >> \"$f\"; fi; done",
-                quote(h)
-            );
-        }
-        let docker: String = env
-            .iter()
-            .filter(|(k, _)| k.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_'))
-            .map(|(k, v)| format!("Environment=\"{k}={v}\"\n"))
-            .collect();
-        let _ = writeln!(
-            sh,
-            "mkdir -p /etc/systemd/system/docker.service.d && printf '[Service]\\n%s' {} > /etc/systemd/system/docker.service.d/isoloom-proxy.conf",
-            quote(&docker)
-        );
-        let _ = writeln!(
-            sh,
-            "systemctl daemon-reload 2>/dev/null || true; if systemctl is-active --quiet docker 2>/dev/null; then systemctl restart docker; fi"
-        );
-    }
+    proxy(spec, c, &mut sh);
     if let Some(m) = &c.mirrors {
         let sources = "/etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources";
         if let Some(u) = &m.debian {
@@ -195,4 +138,81 @@ pub fn linux_prelude(spec: &Spec) -> Option<String> {
         );
     }
     Some(sh)
+}
+
+/// The proxy, when the constraints set one: for every login shell, systemd's services, sudo,
+/// apt, dnf/yum and Docker's daemon.
+fn proxy(spec: &Spec, c: &Constraints, sh: &mut String) {
+    let env = proxy_env(spec, c);
+    if env.is_empty() {
+        return;
+    }
+    let lines = env.iter().fold(String::new(), |mut s, (k, v)| {
+        let _ = writeln!(s, "{k}={v}");
+        s
+    });
+    let exports = env.iter().fold(String::new(), |mut s, (k, v)| {
+        let _ = writeln!(s, "export {k}={}", quote(v));
+        s
+    });
+    let _ = write!(
+        sh,
+        "# The proxy, for every login shell, systemd's services and sudo.\n\
+         grep -v -i -E '^(http|https|no)_proxy=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\n\
+         printf %s {} >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\n\
+         printf %s {} > /etc/profile.d/isoloom-proxy.sh\n\
+         mkdir -p /etc/systemd/system.conf.d && printf '[Manager]\\nDefaultEnvironment=%s\\n' {} > /etc/systemd/system.conf.d/isoloom-proxy.conf\n\
+         if [ -d /etc/sudoers.d ]; then printf 'Defaults env_keep += \"http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY\"\\n' > /etc/sudoers.d/isoloom-proxy && chmod 0440 /etc/sudoers.d/isoloom-proxy; fi\n",
+        quote(&lines),
+        quote(&exports),
+        quote(
+            &env.iter()
+                .filter(|(k, _)| k.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_'))
+                .map(|(k, v)| format!("\"{k}={v}\""))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ),
+    );
+    package_proxies(c, &env, sh);
+}
+
+/// The proxy for apt, dnf/yum and Docker's daemon (`env`: the proxy's variables).
+fn package_proxies(c: &Constraints, env: &[(String, String)], sh: &mut String) {
+    let (http, https) = proxies(c).unwrap_or((None, None));
+    let mut apt = String::new();
+    if let Some(h) = http {
+        let _ = writeln!(apt, "Acquire::http::Proxy \"{h}\";");
+    }
+    if let Some(h) = https {
+        let _ = writeln!(apt, "Acquire::https::Proxy \"{h}\";");
+    }
+    let _ = writeln!(sh, "# apt, dnf/yum and Docker's daemon through it.");
+    let _ = writeln!(
+        sh,
+        "if [ -d /etc/apt/apt.conf.d ]; then printf %s {} > /etc/apt/apt.conf.d/95isoloom-proxy; fi",
+        quote(&apt)
+    );
+    if let Some(h) = http.or(https) {
+        let _ = writeln!(
+            sh,
+            "for f in /etc/dnf/dnf.conf /etc/yum.conf; do if [ -f \"$f\" ]; then sed -i '/^proxy=/d' \"$f\" && printf 'proxy=%s\\n' {} >> \"$f\"; fi; done",
+            quote(h)
+        );
+    }
+    let docker = env
+        .iter()
+        .filter(|(k, _)| k.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_'))
+        .fold(String::new(), |mut s, (k, v)| {
+            let _ = writeln!(s, "Environment=\"{k}={v}\"");
+            s
+        });
+    let _ = writeln!(
+        sh,
+        "mkdir -p /etc/systemd/system/docker.service.d && printf '[Service]\\n%s' {} > /etc/systemd/system/docker.service.d/isoloom-proxy.conf",
+        quote(&docker)
+    );
+    let _ = writeln!(
+        sh,
+        "systemctl daemon-reload 2>/dev/null || true; if systemctl is-active --quiet docker 2>/dev/null; then systemctl restart docker; fi"
+    );
 }

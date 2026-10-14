@@ -126,7 +126,7 @@ fn run_step(name: &str, m: &ExternalMachine, step: &str, at: &Scope) -> Res<()> 
     if isoloom_spec::model::is_reboot(step) {
         return reboot_external(name, &m.ssh_args(), at);
     }
-    if step.ends_with(".sh") {
+    if isoloom_plan::lifecycle::has_extension(step, "sh") {
         let mut a = m.ssh_args();
         a.push(format!("cd /opt/isoloom && sudo sh {step}"));
         return run("ssh", &a, None, at);

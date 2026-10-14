@@ -24,10 +24,15 @@ const ESXI: &str = include_str!("../coverage/terraform/esxi.txt");
 /// networks), and its Windows VM types. Every other type is one of that cloud's managed
 /// services, which no other VM target has.
 pub struct Cloud {
+    /// The table's title (`Terraform: AWS`).
     pub name: &'static str,
+    /// Where the resource list comes from (the provider and its version).
     pub source: &'static str,
+    /// The provider's resource types, one a line (vendored under `coverage/terraform/`).
     pub list: &'static str,
+    /// The types an environment needs: the portable features.
     pub environment: &'static [&'static str],
+    /// Its Windows VM types (planned with Windows guests).
     pub windows: &'static [&'static str],
     /// What the cloud generators (cloud-vm and cloud-docker) write today.
     pub generated: &'static [&'static str],
@@ -35,6 +40,7 @@ pub struct Cloud {
     pub equivalent: &'static [(&'static str, &'static str)],
 }
 
+/// Every cloud with a coverage table.
 pub const CLOUDS: &[Cloud] = &[
     Cloud {
         name: "Terraform: AWS",
@@ -270,6 +276,7 @@ const FIREWALL: Support = Planned {
     note: "the Proxmox firewall: reach rules enforced outside the VMs, besides the router",
 };
 
+/// The Terraform tables: Proxmox, then one per cloud.
 pub fn formats() -> Vec<Format> {
     let all = names(PROXMOX);
     let rows = all

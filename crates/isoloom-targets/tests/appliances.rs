@@ -144,6 +144,12 @@ fn dynamips_builds_its_emulator_and_boots_the_firmware() {
 fn a_lans_switch_takes_an_access_port_per_vlan_then_a_trunk_port_per_trunk() {
     let (c, files) = compose_of("cisco-switch");
     assert!(!c.contains("isoloom-switch-office"), "no Linux switch when the LAN names its own: {c}");
+    switch_ports(&files);
+    switch_service(&c);
+}
+
+/// cisco-switch's switch configuration: an access port per VLAN, then a trunk port per trunk.
+fn switch_ports(files: &[isoloom_targets::GeneratedFile]) {
     let cfg = files.iter().find(|f| f.path.ends_with("appliances/sw1/base.txt")).unwrap().contents.clone();
     assert!(
         cfg.contains("vtp mode transparent\n!\nvlan 10\n name office-vlan10\n!\nvlan 20\n name office-vlan20\n"),
@@ -161,6 +167,10 @@ fn a_lans_switch_takes_an_access_port_per_vlan_then_a_trunk_port_per_trunk() {
     assert!(!cfg.contains(" ip address 10.92."), "a switch's ports take no address: {cfg}");
     let netmap = files.iter().find(|f| f.path.ends_with("appliances/sw1/NETMAP")).unwrap();
     assert!(netmap.contents.ends_with("1:0/3 513:0/3\n"), "{}", netmap.contents);
+}
+
+/// cisco-switch's Compose file: the switch's networks, and the machines around it.
+fn switch_service(c: &str) {
     // Compose: the VLAN networks at the controller address, then the trunk link, in order.
     let sw = &c[c.find("\n  sw1:\n").unwrap()..c.find("\n  sw1-routes:\n").unwrap()];
     assert!(

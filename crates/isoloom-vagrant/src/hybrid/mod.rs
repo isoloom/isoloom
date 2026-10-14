@@ -102,7 +102,7 @@ fn as_hybrid(e: impl Into<RenderError>) -> RenderError {
             refusal,
         },
         RenderError::Generate(GenerateError::Unsupported { what, .. }) => RenderError::Generate(GenerateError::Unsupported { target: Target::Hybrid, what }),
-        other => other,
+        other @ RenderError::Generate(_) => other,
     }
 }
 

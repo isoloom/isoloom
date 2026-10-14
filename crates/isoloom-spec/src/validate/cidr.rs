@@ -77,7 +77,8 @@ impl Cidr {
     /// The address of the `i`th tool (0-based): just below the controller (.252, .251, .250 in
     /// a /24), reserved for tools when the spec has any.
     pub fn tool(self, i: usize) -> Ipv4Addr {
-        Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 4 - i as u32)
+        let below = u32::try_from(i).unwrap_or(u32::MAX);
+        Ipv4Addr::from((self.base + (1u32 << (32 - self.len)) - 4).saturating_sub(below))
     }
 
     /// The router's address: the last usable address of the block (e.g. .254 in a /24).
@@ -100,15 +101,15 @@ pub const DOCKER_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
 /// Each network's block on the Docker target: its `docker.cidr` when set; its `cidr` when it's
 /// inside 10.0.0.0/8; otherwise moved there automatically, keeping its size (so each machine
 /// keeps its last octet): 192.168.X.0 -> 10.192.X.0, 172.N.X.0 -> 10.N.X.0, or the next free
-/// block when that one is taken. Validated specs only.
+/// block when that one is taken. Validated specs only: a network whose block doesn't parse is
+/// left out (validation reports it).
 pub fn docker_cidrs(spec: &Spec) -> Vec<(String, Cidr)> {
-    let parse = |s: &str| Cidr::parse(s).expect("validated cidr");
     let mut fixed: Vec<(String, Cidr)> = Vec::new();
     let mut moved: Vec<(String, Cidr)> = Vec::new();
     for (name, n) in &spec.networks {
-        let c = parse(&n.cidr);
-        match &n.docker {
-            Some(d) => fixed.push((name.clone(), parse(&d.cidr))),
+        let Some(c) = Cidr::parse(&n.cidr) else { continue };
+        match n.docker.as_ref().and_then(|d| Cidr::parse(&d.cidr)) {
+            Some(d) => fixed.push((name.clone(), d)),
             None if DOCKER_BLOCK.contains(c) => fixed.push((name.clone(), c)),
             None => moved.push((name.clone(), c)),
         }
@@ -120,7 +121,7 @@ pub fn docker_cidrs(spec: &Spec) -> Vec<(String, Cidr)> {
         taken.push(pick);
         out.insert(name, pick);
     }
-    spec.networks.keys().map(|n| (n.clone(), out[n])).collect()
+    spec.networks.keys().filter_map(|n| Some((n.clone(), *out.get(n)?))).collect()
 }
 
 /// Where a block outside 10.0.0.0/8 moves on Docker: the mapped block, else the next free one
@@ -135,12 +136,12 @@ fn moved_block(block: Cidr, taken: &[Cidr]) -> Cidr {
     let size = 1u32 << (32 - block.len);
     // The mapped block, else the next free one of the same size scanning 10.240.0.0 upward
     // within 10.0.0.0/8. A bounded, checked successor sequence: it can't overflow, and it
-    // ends at the top of the block so `find` terminates (and `expect` fires only on genuine
-    // exhaustion, which needs thousands of auto-moved networks).
+    // ends at the top of the block so `find` terminates. Running out needs thousands of
+    // auto-moved networks: the mapped block is kept then, and validation reports the overlap.
     let scan = std::iter::successors(Some(0x0af0_0000u32), move |&b| b.checked_add(size).filter(|&n| n <= 0x0aff_ffff));
     std::iter::once(first)
         .chain(scan)
         .map(|base| Cidr { base, len: block.len })
         .find(|cand| DOCKER_BLOCK.contains(*cand) && !taken.iter().any(|t| t.overlaps(*cand)))
-        .expect("10.0.0.0/8 has room for the Docker networks")
+        .unwrap_or(Cidr { base: first, len: block.len })
 }

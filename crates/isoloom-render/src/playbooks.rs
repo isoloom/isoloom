@@ -14,6 +14,8 @@
 //! run with no recap (a playbook that doesn't parse). Every wait and run is logged, so the output
 //! explains what happened.
 
+use std::fmt::Write as _;
+
 use isoloom_spec::model::Spec;
 use isoloom_spec::shell;
 
@@ -40,15 +42,19 @@ pub fn script(spec: &Spec, limit: &[String]) -> String {
     );
     for step in &spec.provision {
         let (dir, file) = step.ansible.rsplit_once('/').unwrap_or((".", &step.ansible));
-        let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect();
+        let extra = step.inventory.iter().fold(String::new(), |mut s, i| {
+            let _ = write!(s, " -i /opt/isoloom/{i}");
+            s
+        });
         let requirements = match &step.requirements {
             Some(r) => format!("retry_download ansible-galaxy install -r /opt/isoloom/{r}\n"),
             None => "[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\n".into(),
         };
-        script.push_str(&format!(
-            "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i /etc/isoloom/inventory.ini{extra}{}{limit} {file}\n",
+        let _ = writeln!(
+            script,
+            "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i /etc/isoloom/inventory.ini{extra}{}{limit} {file}",
             vars(step)
-        ));
+        );
     }
     script
 }

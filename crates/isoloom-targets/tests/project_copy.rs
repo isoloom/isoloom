@@ -78,15 +78,12 @@ fn scratch(name: &str) -> PathBuf {
     dir
 }
 
+/// A project under `dir` with what the archive must keep (links, a loop of links, an empty
+/// folder, an executable, a long path, generated files) and leave out (`.git`, Vagrant's
+/// state); its root, and the long path.
 #[cfg(unix)]
-#[test]
-fn the_archive_keeps_links_as_links_and_survives_a_loop() {
+fn tricky_project(dir: &Path) -> (std::path::PathBuf, String) {
     use std::os::unix::fs::{PermissionsExt, symlink};
-    if !have("ruby") || !have("tar") {
-        eprintln!("skipped: needs ruby and tar");
-        return;
-    }
-    let dir = scratch("project-tar");
     let root = dir.join("project");
     for d in ["vendor/goat", "empty", ".git", ".isoloom/hybrid", ".isoloom/vagrant/.vagrant", "sub/.vagrant"] {
         std::fs::create_dir_all(root.join(d)).unwrap();
@@ -105,7 +102,18 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() {
     let long = format!("{}/{}.txt", "d".repeat(120), "f".repeat(110));
     std::fs::create_dir_all(root.join(&long).parent().unwrap()).unwrap();
     std::fs::write(root.join(&long), "long").unwrap();
+    (root, long)
+}
 
+#[cfg(unix)]
+#[test]
+fn the_archive_keeps_links_as_links_and_survives_a_loop() {
+    if !have("ruby") || !have("tar") {
+        eprintln!("skipped: needs ruby and tar");
+        return;
+    }
+    let dir = scratch("project-tar");
+    let (root, long) = tricky_project(&dir);
     let run = |generated: bool, out: &str| archive(&dir, &root, generated, out);
 
     let list = run(false, "project.tgz");
@@ -122,8 +130,13 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() {
     let all = run(true, "all.tgz");
     assert!(has(&all, ".isoloom/vagrant/Vagrantfile"), "{all}");
     assert!(!all.contains(".vagrant/"), "{all}");
+    unpacks_as_packed(&dir, &long);
+    let _ = std::fs::remove_dir_all(&dir);
+}
 
-    // Unpacked as the VM does.
+/// `dir`'s project.tgz, unpacked as the VM does: the links and the long path as they were.
+#[cfg(unix)]
+fn unpacks_as_packed(dir: &Path, long: &str) {
     let out = dir.join("out");
     std::fs::create_dir_all(&out).unwrap();
     let st = Command::new("tar")
@@ -135,8 +148,7 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() {
         .unwrap();
     assert!(st.success());
     assert_eq!(std::fs::read_link(out.join("vendor/goat/self")).unwrap(), Path::new("."));
-    assert_eq!(std::fs::read_to_string(out.join(&long)).unwrap(), "long");
-    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(std::fs::read_to_string(out.join(long)).unwrap(), "long");
 }
 
 #[test]

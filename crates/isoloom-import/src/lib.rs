@@ -17,10 +17,20 @@ mod yaml;
 
 pub use error::ImportError;
 
+/// A whole, non-negative number of `x` (already rounded by the caller) as a `u32`; `None` when it
+/// doesn't fit (negative, too large, not a number).
+pub(crate) fn whole_u32(x: f64) -> Option<u32> {
+    // Checked against u32's range first, so the cast neither truncates nor loses a sign.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    (x.is_finite() && (0.0..=f64::from(u32::MAX)).contains(&x)).then_some(x as u32)
+}
+
 /// A drafted `isoloom.yml` and the notes on it.
 #[derive(Debug, Clone)]
 pub struct Draft {
+    /// The drafted spec, as YAML ready to write to `isoloom.yml`.
     pub yaml: String,
+    /// What the source said that the draft doesn't carry as it was, grouped by [`NoteKind`].
     pub notes: Vec<Note>,
 }
 
@@ -29,10 +39,13 @@ pub struct Draft {
 pub struct Note {
     /// Where in the source, e.g. `services.web.ports`.
     pub at: String,
+    /// What became of it, which says whether it needs the user's attention.
     pub kind: NoteKind,
+    /// The note itself: what was dropped or changed, and what to do about it.
     pub text: String,
 }
 
+/// What became of something the source said, from what needs checking to what needs nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NoteKind {
     /// Changed on the way in (renamed, re-addressed): check it.
@@ -52,6 +65,7 @@ pub enum NoteKind {
 }
 
 impl NoteKind {
+    /// Every kind, in the order the notes are listed.
     pub const ALL: [NoteKind; 7] = [
         NoteKind::Changed,
         NoteKind::InImage,
@@ -62,6 +76,7 @@ impl NoteKind {
         NoteKind::Tooling,
     ];
 
+    /// The heading the notes of this kind are listed under.
     pub fn title(self) -> &'static str {
         match self {
             NoteKind::Changed => "Changed on the way in: check these",

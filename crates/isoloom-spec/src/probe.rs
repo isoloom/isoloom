@@ -10,7 +10,14 @@ use crate::model::Machine;
 /// writes the address its own way), or a host as written (an address, an outside name).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Host {
-    Machine { name: String, network: String },
+    /// A machine of the environment, on one of its networks.
+    Machine {
+        /// The machine's name.
+        name: String,
+        /// The network whose address the probe uses.
+        network: String,
+    },
+    /// A host as written: an address or an outside name.
     Literal(String),
 }
 
@@ -26,7 +33,9 @@ impl fmt::Display for Host {
 /// An HTTP request's parts (the URL as parsed from the spec).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Url {
+    /// The scheme is `https` (else `http`).
     pub https: bool,
+    /// The host the request goes to.
     pub host: Host,
     /// None: the scheme's default port.
     pub port: Option<u16>,

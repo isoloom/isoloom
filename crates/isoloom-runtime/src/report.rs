@@ -83,7 +83,7 @@ pub fn graph_dot(r: &Value) -> String {
         let mut label = m.clone();
         let services: Vec<String> = v["services"].as_array().into_iter().flatten().map(port_text).collect();
         if !services.is_empty() {
-            label.push_str(&format!("\\n:{}", services.join(" :")));
+            let _ = write!(label, "\\n:{}", services.join(" :"));
         }
         let shape = match MachineKind::of(v) {
             MachineKind::Access => "egg",
@@ -373,7 +373,7 @@ pub fn table(head: &[String], rows: &[Vec<String>], markdown: bool) -> String {
     let widths: Vec<usize> = (0..head.len())
         .map(|i| {
             rows.iter()
-                .map(|r| r.get(i).map(String::len).unwrap_or(0))
+                .map(|r| r.get(i).map_or(0, String::len))
                 .chain(std::iter::once(head[i].len()))
                 .max()
                 .unwrap_or(0)

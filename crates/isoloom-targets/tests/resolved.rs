@@ -15,15 +15,14 @@ fn example(name: &str) -> isoloom_spec::Spec {
 }
 
 fn contents(files: &[isoloom_targets::GeneratedFile], suffix: &str) -> String {
-    files
-        .iter()
-        .find(|f| f.path.ends_with(suffix))
-        .map(|f| f.contents.clone())
-        .unwrap_or_else(|| panic!("no {suffix} among {:?}", files.iter().map(|f| &f.path).collect::<Vec<_>>()))
+    files.iter().find(|f| f.path.ends_with(suffix)).map_or_else(
+        || panic!("no {suffix} among {:?}", files.iter().map(|f| &f.path).collect::<Vec<_>>()),
+        |f| f.contents.clone(),
+    )
 }
 
 #[test]
-fn addresses_routers_and_targets_match_the_generators() {
+fn addresses_and_routers_match_the_generators() {
     let spec = example("segmented");
     let r = resolve(&spec);
     assert_eq!(lookup(&r, "resolved_version").unwrap(), 1);
@@ -47,7 +46,11 @@ fn addresses_routers_and_targets_match_the_generators() {
         }
     }
     assert!(vagrant.contains(lookup(&r, "router.addresses.front").unwrap().as_str().unwrap()));
-    // Targets: what generates, and why the others don't.
+}
+
+#[test]
+fn targets_say_what_generates_and_why_the_others_dont() {
+    let r = resolve(&example("segmented"));
     let generated = lookup(&r, "targets.generated").unwrap().as_array().unwrap();
     assert!(generated.iter().any(|t| t == "docker") && generated.iter().any(|t| t == "vagrant"));
     assert!(generated.iter().any(|t| t == "cloud-vm"));
@@ -61,7 +64,11 @@ fn addresses_routers_and_targets_match_the_generators() {
             .unwrap()
             .contains("containers and others are VMs")
     );
-    // Checks by position, with the runner each target names them by.
+}
+
+#[test]
+fn checks_are_listed_by_position_with_their_runner() {
+    let r = resolve(&example("segmented"));
     assert_eq!(lookup(&r, "checks.default_position").unwrap(), "user");
     assert_eq!(lookup(&r, "checks.positions.0.runner").unwrap(), "isoloom-check");
     assert_eq!(lookup(&r, "checks.positions.1.runner").unwrap(), "isoloom-check-cache");

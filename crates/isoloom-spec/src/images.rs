@@ -19,8 +19,10 @@ use crate::model::{DockerImpl, Spec, VmImage, VmImpl};
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Table {
+    /// An OS name's image per target, instead of the built-in one.
     #[serde(default)]
     pub os: IndexMap<String, VmImage>,
+    /// The access machine, when the spec leaves it to the runner.
     #[serde(default)]
     pub access: Option<Access>,
 }
@@ -91,10 +93,15 @@ impl Table {
 /// boxes when the main one has no build for them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VagrantBox {
+    /// The box's name on Vagrant Cloud (`bento/debian-12`).
     pub name: String,
+    /// The version known to work (`None`: the latest).
     pub version: Option<String>,
+    /// The box the libvirt provider boots, when the main one has no libvirt build.
     pub libvirt: Option<String>,
+    /// The box the QEMU provider boots, when the main one has no QEMU build.
     pub qemu: Option<String>,
+    /// The box the Hyper-V provider boots.
     pub hyperv: HyperVBox,
 }
 
@@ -104,7 +111,12 @@ pub enum HyperVBox {
     /// The main box (it has a Hyper-V build at its version).
     Main,
     /// Another box, or another version of the main one (`None`: its latest).
-    Other { name: String, version: Option<String> },
+    Other {
+        /// The box's name.
+        name: String,
+        /// Its version (`None`: the latest).
+        version: Option<String>,
+    },
     /// No Hyper-V build known for this OS: give one with `vm.image.hyperv`.
     Missing,
 }

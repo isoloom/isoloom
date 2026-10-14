@@ -1,5 +1,6 @@
 //! The command (and its working directory) that brings each target up or tears it down.
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use isoloom_spec::Target;
@@ -71,7 +72,7 @@ fn compose_up(dir: &Path, out: &Path, instance: Option<u8>, down: bool) -> Invoc
         .join(" ");
     let mut script = format!("{prefix} up -d --build --wait {}", plan.wait.iter().map(|w| q(w)).collect::<Vec<_>>().join(" "));
     for j in &plan.jobs {
-        script.push_str(&format!(" && {prefix} up --no-deps --exit-code-from {j} {j}", j = q(j)));
+        let _ = write!(script, " && {prefix} up --no-deps --exit-code-from {j} {j}", j = q(j));
     }
     invocation("sh", vec![s("-c"), script], dir)
 }

@@ -23,7 +23,7 @@ fn azure(spec: &Spec) -> String {
 }
 
 #[test]
-fn azure_uses_azurerm_with_static_addresses_and_the_shared_outputs() {
+fn azure_uses_azurerm_with_static_addresses() {
     let tf = azure(&example("hello-stack"));
     // The azurerm provider and an Azure VM, not an AWS instance.
     assert!(tf.contains("azurerm = { source = \"hashicorp/azurerm\", version = \"~> 5.0\" }"), "{tf}");
@@ -39,6 +39,11 @@ fn azure_uses_azurerm_with_static_addresses_and_the_shared_outputs() {
     // A static public IP it is reached on (the `ip` output).
     assert!(tf.contains("resource \"azurerm_public_ip\" \"web\""));
     assert!(tf.contains("allocation_method   = \"Static\""));
+}
+
+#[test]
+fn azure_has_the_shared_outputs() {
+    let tf = azure(&example("hello-stack"));
     // The module outputs (docs/cloud-modules.md), identical in name and shape to AWS.
     assert!(tf.contains("output \"machines\""));
     assert!(tf.contains("output \"ssh_users\""));

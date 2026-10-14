@@ -1,5 +1,7 @@
 //! The transport's unit tests: which provisioners each planned step becomes.
 
+use std::fmt::Write as _;
+
 use isoloom_plan::Environment;
 use isoloom_plan::lifecycle::Step;
 use isoloom_spec::model::Target;
@@ -117,8 +119,10 @@ fn the_inputs_file_quotes_every_value() {
     let script: String = s[start..]
         .lines()
         .take(3)
-        .map(|l| format!("{}\n", l.trim_start()))
-        .collect::<String>()
+        .fold(String::new(), |mut s, l| {
+            let _ = writeln!(s, "{}", l.trim_start());
+            s
+        })
         .replace("/tmp/isoloom-inputs.env", "\"$OUT\"");
     let dir = std::env::temp_dir().join(format!("isoloom-inputs-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("a temporary folder");

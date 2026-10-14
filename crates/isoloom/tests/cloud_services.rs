@@ -142,12 +142,19 @@ fn run_applies_a_copy_after_the_before_steps_and_retries() {
         .output()
         .unwrap();
     assert!(o.status.success(), "{}", text(&o));
+    assert!(text(&o).contains("applying again (1 of 1)"), "{}", text(&o));
+    applied_in_a_copy(&lab);
+    destroyed_from_the_copy(&lab);
+}
+
+/// After `run`: the inputs and values written, the before step run in the module's copy, the
+/// apply retried once, the environment deployed.
+fn applied_in_a_copy(lab: &Lab) {
     // The input, in its place in the list, kept for `down`; the fixed values apart.
     let inputs: serde_json::Value = serde_json::from_str(&read(&lab.out().join("inputs.tfvars.json"))).unwrap();
     assert_eq!(inputs, serde_json::json!({ "allow": ["203.0.113.7/32"] }));
     let fixed: serde_json::Value = serde_json::from_str(&read(&lab.out().join("terraform.tfvars.json"))).unwrap();
     assert_eq!(fixed, serde_json::json!({ "n": 2 }));
-    assert!(text(&o).contains("applying again (1 of 1)"), "{}", text(&o));
     let module = lab.out().join("module");
     assert!(module.join("main.tf").is_file());
     assert!(module.join("key.pub").is_file(), "the step ran in the copy");
@@ -159,12 +166,15 @@ fn run_applies_a_copy_after_the_before_steps_and_retries() {
     assert_eq!(read(&lab.tf.join("applies")).trim(), "2");
     assert!(!lab.out().join("deploying").exists(), "the marker goes once applied");
     assert_eq!(lab.status_state().as_deref(), Some("deployed (1 resources)"));
+}
 
+/// `down` after `run`: Terraform destroys from the module's copy, and the environment is gone.
+fn destroyed_from_the_copy(lab: &Lab) {
     let o = lab.isoloom(&["down", "cloud-services"]);
     assert!(o.status.success(), "{}", text(&o));
     let log = read(&lab.tf.join("log"));
     // The canonical path: on macOS the temporary folder (/var) is a link to /private/var.
-    let module = module.canonicalize().unwrap();
+    let module = lab.out().join("module").canonicalize().unwrap();
     assert!(log.lines().any(|l| l.contains(&format!("-chdir={} destroy", module.display()))), "{log}");
     assert_eq!(lab.status_state(), None);
 }

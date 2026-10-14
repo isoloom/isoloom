@@ -85,7 +85,7 @@ pub fn runner(env: &Environment, dir: &str, file: &str, position: &Position, gro
     };
     let run_script = |path: &str| format!("cd /opt/isoloom && sh {path}");
     let run_playbook = |path: &str| {
-        let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
+        let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
         let file = path.rsplit('/').next().unwrap_or(path);
         format!(
             "export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False && cd /opt/isoloom/{dir} && ansible-playbook -i /etc/isoloom/inventory.ini {file}"

@@ -91,7 +91,7 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         .ok_or(ImportError::NoServices)?;
     let mut notes = Notes::default();
     note_duplicates(&mut notes, dups);
-    let name = root.get("name").and_then(str_of).map(|n| label(&n)).unwrap_or_else(|| label(fallback_name));
+    let name = root.get("name").and_then(str_of).map_or_else(|| label(fallback_name), |n| label(&n));
     note_top_level(&mut notes, root);
     let mut import = Import::new(services, notes);
     // Networks: declared ones, then the default network for services that name none.

@@ -37,7 +37,7 @@ pub fn outputs(dir: &Path, instance: Option<u8>) -> indexmap::IndexMap<String, S
         .iter()
         .filter_map(|(name, output)| {
             let v = &json[output]["value"];
-            let text = v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
+            let text = v.as_str().map_or_else(|| v.to_string(), String::from);
             (!v.is_null()).then(|| (name.clone(), text))
         })
         .collect()

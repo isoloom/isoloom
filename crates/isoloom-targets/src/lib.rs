@@ -184,8 +184,10 @@ fn first_problem(spec: &Spec) -> Option<String> {
 fn on_docker(spec: &Spec) -> Spec {
     let mut s = spec.clone();
     for (name, c) in docker_cidrs(spec) {
-        let n = s.networks.get_mut(&name).expect("same networks");
-        n.cidr = format!("{}/{}", Ipv4Addr::from(c.base), c.len);
+        // `docker_cidrs` names the spec's own networks.
+        if let Some(n) = s.networks.get_mut(&name) {
+            n.cidr = format!("{}/{}", Ipv4Addr::from(c.base), c.len);
+        }
     }
     s
 }

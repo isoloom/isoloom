@@ -204,7 +204,10 @@ pub fn render(env: &Environment, access: &Access<'_>) -> String {
 
 /// `k=v` lines of a `[group:vars]` section (written as is: Ansible reads the rest of the line).
 fn group_vars(vars: &Vars) -> String {
-    vars.iter().map(|(k, v)| format!("{k}={v}\n")).collect()
+    vars.iter().fold(String::new(), |mut s, (k, v)| {
+        let _ = writeln!(s, "{k}={v}");
+        s
+    })
 }
 
 /// A host's line: its name, `ansible_host`, the access's variables, then its `host_vars`.
@@ -250,7 +253,10 @@ pub fn python_literal(v: &serde_json::Value) -> String {
 
 /// The `host_vars` of one machine as ` key='value'` pairs, the way its inventory line ends.
 pub fn host_vars_suffix(host_vars: &IndexMap<String, serde_json::Value>) -> String {
-    host_vars.iter().map(|(k, v)| format!(" {k}={}", single_quoted(&python_literal(v)))).collect()
+    host_vars.iter().fold(String::new(), |mut s, (k, v)| {
+        let _ = write!(s, " {k}={}", single_quoted(&python_literal(v)));
+        s
+    })
 }
 
 #[cfg(test)]

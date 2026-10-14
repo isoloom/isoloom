@@ -40,8 +40,11 @@ pub const DIR: &str = "profiles";
 /// A profile, read and checked against nothing yet (see [`Profile::check`]).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Profile {
+    /// The profile's name: its file name without `.yml` (`isoloom run --profile <name>`).
     pub name: String,
+    /// The profile's file.
     pub path: PathBuf,
+    /// What the profile is for, as `isoloom profiles` lists it.
     pub description: Option<String>,
     /// The target the profile runs on: the default when none is given, and the only one allowed.
     pub target: Option<Target>,

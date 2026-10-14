@@ -651,7 +651,7 @@ fn linux_machines_leave_windows_out_of_etc_hosts() {
     .unwrap();
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     let start = vf.find("config.vm.define \"lx01\"").unwrap();
-    let end = vf[start + 20..].find("config.vm.define").map(|i| start + 20 + i).unwrap_or(vf.len());
+    let end = vf[start + 20..].find("config.vm.define").map_or(vf.len(), |i| start + 20 + i);
     let lx = &vf[start..end];
     // The Windows DC isn't added to lx01's /etc/hosts by name.
     assert!(
@@ -928,9 +928,8 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
     );
 }
 
-#[test]
-fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
-    // dns serves 53 over UDP (published) and TCP; syslog serves UDP only; app waits for dns.
+/// dns serves 53 over UDP (published) and TCP; syslog serves UDP only; app waits for dns.
+fn udp_spec() -> isoloom_spec::Spec {
     let spec = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  far: { cidr: 10.9.1.0/24 }\nreach: [{ from: far, to: lab, ports: [53] }]\nmachines:\n  \
          dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
@@ -939,7 +938,12 @@ fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
     )
     .unwrap();
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
+    spec
+}
 
+#[test]
+fn a_udp_service_is_published_as_udp_on_docker() {
+    let spec = udp_spec();
     // Docker: published as `<port>/udp`, labelled udp, and the healthcheck probes TCP 53 only;
     // a machine with only UDP services has none.
     let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents(&generate(&spec, Target::Docker).unwrap(), ".isoloom/docker/compose.yml")).unwrap();
@@ -947,7 +951,16 @@ fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
     let ports = serde_yaml_ng::to_string(&svc("dns")["ports"]).unwrap();
     assert!(ports.contains("+10053}:53/udp"), "{ports}");
     assert_eq!(svc("dns")["labels"]["isoloom.service.53-udp"].as_str(), Some("udp:53"));
-    // A name shared by the TCP and UDP services keeps both apart (`dns`, `dns-udp`).
+    assert_eq!(svc("dns")["labels"]["isoloom.service.53"].as_str(), Some("tcp:53"));
+    let probe = serde_yaml_ng::to_string(&svc("dns")["healthcheck"]).unwrap();
+    assert!(probe.contains("127.0.0.1 53"), "{probe}");
+    assert!(svc("syslog").get("healthcheck").is_none());
+    assert!(serde_yaml_ng::to_string(&svc("syslog")["ports"]).unwrap().contains(":514/udp"));
+}
+
+#[test]
+fn a_udp_and_a_tcp_service_sharing_a_name_stay_apart() {
+    // `dns` and `dns-udp`, on Docker and on the clouds.
     let named = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
          dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, name: dns, publish: 10053 }, { port: 53, name: dns, publish: 1053 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
@@ -959,12 +972,11 @@ fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
     assert_eq!(c["services"]["dns"]["labels"]["isoloom.service.dns"].as_str(), Some("tcp:53"));
     let aws = contents(&generate(&named, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
     assert!(aws.contains("\"dns/dns-udp\"") && aws.contains("\"dns/dns\""), "{aws}");
-    assert_eq!(svc("dns")["labels"]["isoloom.service.53"].as_str(), Some("tcp:53"));
-    let probe = serde_yaml_ng::to_string(&svc("dns")["healthcheck"]).unwrap();
-    assert!(probe.contains("127.0.0.1 53"), "{probe}");
-    assert!(svc("syslog").get("healthcheck").is_none());
-    assert!(serde_yaml_ng::to_string(&svc("syslog")["ports"]).unwrap().contains(":514/udp"));
+}
 
+#[test]
+fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() {
+    let spec = udp_spec();
     // Kubernetes: UDP container ports and Service ports, named apart from the TCP one; the
     // NetworkPolicy for `reach` already opens both protocols.
     let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
@@ -992,7 +1004,11 @@ fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
     // The clouds: published as UDP.
     let aws = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
     assert!(aws.contains("from_port   = 1514\n    to_port     = 1514\n    protocol    = \"udp\""), "{aws}");
+}
 
+#[test]
+fn a_udp_service_is_never_waited_for_nor_checked() {
+    let spec = udp_spec();
     // No derived check probes UDP (nothing tells an answer from a drop); TCP 53 is checked.
     let plan = isoloom_plan::checks::plan(&spec);
     let names: Vec<&String> = plan.iter().map(|c| &c.name).collect();
@@ -1151,15 +1167,24 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
         "{web}"
     );
     assert!(web.contains("IsoloomHyperV.prune([\"isoloom-segmented-front\"])"), "{web}");
+    hyperv_router_and_macs(&v, spec.networks.len());
+}
+
+/// On Hyper-V the router is on every network (`networks` of them), with an adapter on each;
+/// every adapter of the Vagrantfile `v` has its own MAC.
+fn hyperv_router_and_macs(v: &str, networks: usize) {
     // The router is on every network, with an adapter on each; every adapter has its own MAC.
-    let router = define_block(&v, "isoloom-router");
-    assert_eq!(router.matches("\", \"0215").count(), spec.networks.len(), "{router}");
+    let router = define_block(v, "isoloom-router");
+    assert_eq!(router.matches("\", \"0215").count(), networks, "{router}");
     let macs: Vec<&str> = v.match_indices("\"0215").map(|(i, _)| &v[i..i + 14]).collect();
     let mut unique = macs.clone();
     unique.sort_unstable();
     unique.dedup();
-    assert!(macs.len() > spec.networks.len() && macs.len() == unique.len(), "{macs:?}");
+    assert!(macs.len() > networks && macs.len() == unique.len(), "{macs:?}");
+}
 
+#[test]
+fn vagrant_on_hyperv_takes_windows_and_privileged_machines() {
     // Windows: the box's Hyper-V build from `vm.image.hyperv`, a static address through WMI.
     let (_, win) = example("windows-hello");
     let v = contents(&generate(&win, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");

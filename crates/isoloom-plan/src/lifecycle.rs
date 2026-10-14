@@ -206,9 +206,9 @@ fn runs(m: &Machine) -> Vec<Step> {
         if is_reboot(s) {
             Step::Reboot
         } else {
-            let kind = if s.ends_with(".sh") {
+            let kind = if has_extension(s, "sh") {
                 RunKind::Shell
-            } else if s.ends_with(".ps1") {
+            } else if has_extension(s, "ps1") {
                 RunKind::PowerShell
             } else {
                 RunKind::Playbook
@@ -217,6 +217,12 @@ fn runs(m: &Machine) -> Vec<Step> {
         }
     }));
     steps
+}
+
+/// Whether a provisioning step's file has this extension, in any case (`setup.SH` is a shell
+/// script): how the plan and the backends tell a step's kind.
+pub fn has_extension(path: &str, extension: &str) -> bool {
+    std::path::Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case(extension))
 }
 
 /// Whether a machine is a Windows VM.

@@ -4,12 +4,15 @@
 
 ### Per-cloud refusals surfaced
 - `resolved.json`'s `targets` gains `clouds`: for a generated `cloud-vm`, the clouds whose module is written (`generated`) and each refused cloud with its reason (`refused`), from `cloud_vm::cloud_refusals`. The snapshot stays at version 1 (a new field). Every example's `resolved.json` is regenerated.
-- `isoloom targets` lists the refused clouds under `cloud-vm` (`    ✗ gcp (machine `web01`: Windows on GCP comes later)`).
+- `isoloom targets` lists the refused clouds under `cloud-vm`, one indented line each (``✗ gcp (machine `web01`: Windows on GCP comes later)``).
 - Library: `isoloom_targets::cloud_refusals(spec, target)` (and `CloudRefusal`).
 
 ### `isoloom-core` removed
 - Breaking (library): the `isoloom-core` facade crate is gone. Depend on the crates that hold what you use: `isoloom-spec` (`load`, `parse`, `validate`, `derive`, `effective`, `totals`, the model, `instance`, `defaults`, `profile`), `isoloom-plan` (`checks`), `isoloom-targets` (`generate`, `generate_all`, `generate_instance`, `refusal`, `refusal_on`, `resolved`) and `isoloom-runtime` (`registry`, `host`, `events`, `tool`, `report`). Each item keeps its name: `isoloom_core::generate::X` is `isoloom_targets::X`, `isoloom_core::{coverage, import}` are `isoloom_coverage` and `isoloom_import`, `isoloom_core::ignore` is `isoloom_render::ignore`. README, "Using the library", lists the supported surface; CI's API report covers those four crates.
 - Its integration tests moved into the crates they test (`isoloom-targets/tests` for the generators over the examples, `isoloom-spec/tests`, `isoloom-import/tests` with the import fixtures, `isoloom-coverage/tests`, `isoloom-runtime/tests`).
+
+### Every lint denied (#106)
+- Every workspace lint is at `deny`, with no tracked exception left: `missing_docs` (every public item of the library crates is documented; the spec's fields' docs are the descriptions `isoloom schema` prints), `expect_used`, `too_many_lines` (60), `cognitive_complexity` (15) and the pedantic lints that were still allowed. Functions over the limits are split, `expect`s outside tests are gone, and the few local `#[allow]`s left each say why.
 
 ### cloud-docker and cloud-services rendered from the plan; playbooks retried on unreachable hosts (#20)
 - `cloud-docker` is a backend of its own (`CloudDockerBackend`): the Compose file is the Compose backend's, and each cloud's module (AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle Cloud) and `docker-vm`'s Proxmox module are built with the HCL builder from the plan, with no text templates or post-passes left. Every module passes `terraform fmt -check`. Its refusals come from its capabilities (Compose's) and its own limit (arm64), without rendering.

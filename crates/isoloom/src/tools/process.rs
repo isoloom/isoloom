@@ -46,10 +46,7 @@ pub fn spawn_error(program: &str, e: &std::io::Error) -> Failure {
 /// created exclusively (fails if it already exists), so a local attacker can't pre-place a
 /// symlink at a guessable path and have us clobber a victim file or run a swapped script.
 pub fn private_dir(prefix: &str) -> Res<std::path::PathBuf> {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+    let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     let dir = std::env::temp_dir().join(format!("{prefix}-{}-{nonce:x}", std::process::id()));
     std::fs::create_dir(&dir)?;
     Ok(dir)

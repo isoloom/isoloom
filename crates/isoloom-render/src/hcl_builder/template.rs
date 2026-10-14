@@ -1,5 +1,7 @@
 //! Strings that hold Terraform expressions: text and interpolations, kept apart until written.
 
+use std::fmt::Write as _;
+
 use hcl::expr::{Expression, TemplateExpr};
 
 use super::escape::{quoted_inside, strings_escaped};
@@ -117,7 +119,9 @@ impl Template {
                     }
                     raw.push_str(&text);
                 }
-                Part::Expr(e) => raw.push_str(&format!("${{{}}}", strings_escaped(e))),
+                Part::Expr(e) => {
+                    let _ = write!(raw, "${{{}}}", strings_escaped(e));
+                }
             }
         }
         Expression::TemplateExpr(Box::new(TemplateExpr::QuotedString(raw)))

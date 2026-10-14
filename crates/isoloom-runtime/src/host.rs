@@ -18,8 +18,11 @@ use crate::model::Target;
 /// What a target needs from the host, and whether it is there.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Readiness {
+    /// The target checked.
     pub target: Target,
+    /// The cloud checked, for the cloud targets (one readiness per cloud).
     pub cloud: Option<String>,
+    /// Whether the host can run the target now.
     pub ready: bool,
     /// What was found, and what is missing (each a short line).
     pub notes: Vec<String>,
@@ -43,11 +46,15 @@ impl Readiness {
 /// How the probes see the host: run a tool, read an environment variable, test a path.
 /// Replaceable for tests.
 pub struct Host<'a> {
+    /// Runs a tool with its arguments: its stdout when it succeeds.
     pub run: &'a dyn Fn(&str, &[&str]) -> Option<String>,
+    /// An environment variable's value, when set.
     pub env: &'a dyn Fn(&str) -> Option<String>,
+    /// Whether a path exists.
     pub exists: &'a dyn Fn(&Path) -> bool,
     /// Whether a path opens for reading and writing (a device such as `/dev/kvm`).
     pub opens: &'a dyn Fn(&Path) -> bool,
+    /// The user's home folder, where the clouds' credentials files are looked for.
     pub home: PathBuf,
 }
 
@@ -108,7 +115,7 @@ pub fn run_limited_in(program: &str, args: &[&str], secs: u64, env: &[(String, S
 }
 
 /// The real host.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity)] // closures can't be named in a type alias on stable Rust; the tuple is `Host`'s fields.
 pub fn real_host() -> (
     impl Fn(&str, &[&str]) -> Option<String>,
     impl Fn(&str) -> Option<String>,
@@ -178,6 +185,7 @@ fn with_real_host<R>(extra: &[(String, String)], f: impl FnOnce(&Host) -> R) -> 
     })
 }
 
+/// The clouds the cloud targets run on, by the name `--host` and the modules' folders use.
 pub const CLOUDS: &[&str] = &["aws", "azure", "gcp", "digitalocean", "linode", "oci"];
 
 /// Why KVM can't be used here, on Linux: no `/dev/kvm` (virtualization off, or a VM without

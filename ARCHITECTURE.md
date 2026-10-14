@@ -171,24 +171,22 @@ The gates every change passes are listed in [CONTRIBUTING.md](CONTRIBUTING.md). 
 once in the root `Cargo.toml` (`[workspace.lints]`) and inherited by every crate with
 `[lints] workspace = true`; `clippy.toml` holds the shape limits.
 
-Enforced now (`deny`, so `cargo clippy --workspace --all-targets -- -D warnings` fails on them):
+Every lint is at `deny`, so `cargo clippy --workspace --all-targets -- -D warnings` fails on
+any of them, on every target (macOS, Linux, Windows):
 
 - rust: `unsafe_code` is `forbid`, with no exception (a profile's inputs reach every tool through
-  `Command::envs`, from `tools::process::command` in the command line); rustdoc:
-  `broken_intra_doc_links`, `bare_urls`.
+  `Command::envs`, from `tools::process::command` in the command line); `missing_docs` (every
+  public item of a library crate says what it is for); rustdoc: `broken_intra_doc_links`,
+  `bare_urls`.
 - clippy: `pedantic`, except the commented allow-list in `Cargo.toml` (`must_use_candidate`,
   `missing_errors_doc`, `missing_panics_doc`, `doc_markdown`, `similar_names`); `unwrap_used`,
-  `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic: `clippy.toml`);
-  `print_stdout` (the command line allows it at its root: printing is its interface);
-  `too_many_arguments` above 5 (two functions carry a targeted, commented `#[allow]`:
-  `appliance` and `readiness` in isoloom-compose's `render.rs`).
+  `expect_used`, `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic:
+  `clippy.toml`); `print_stdout` (the command line allows it at its root: printing is its
+  interface); the shape limits of `clippy.toml`: `too_many_lines` above 60, `too_many_arguments`
+  above 5, `cognitive_complexity` above 15.
 
-Tracked (`allow` today, denied by the end of Wave 2, issue #106): `missing_docs` for library
-crates; `expect_used`; `too_many_lines` (60) and `cognitive_complexity` (15), whose thresholds
-are already in `clippy.toml`; and the pedantic lints still hit by code moving onto the plan IR
-(`case_sensitive_file_extension_comparisons`, `cast_possible_truncation`, `format_collect`,
-`format_push_string`, `map_unwrap_or`, `match_wildcard_for_single_variants`,
-`stable_sort_primitive`).
+There is no blanket exception: a local `#[allow]` carries a one-line reason, only where
+splitting or restructuring would read worse (`git grep -n '#\[allow'` lists them).
 
 ### Tests
 

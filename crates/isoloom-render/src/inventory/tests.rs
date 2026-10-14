@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)] // test helpers: a failing test is the report.
 
 use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
