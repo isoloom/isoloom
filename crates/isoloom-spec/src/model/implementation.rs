@@ -1,0 +1,219 @@
+//! How each kind of target produces a machine: the `docker:` and `vm:` blocks, appliances,
+//! images, and the provisioning a VM runs.
+
+use indexmap::IndexMap;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use super::Resources;
+
+/// How a container produces a machine: an image, or one built from the project.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DockerImpl {
+    /// A published image (exactly one of `image` and `build`).
+    #[serde(default)]
+    pub image: Option<String>,
+    /// A build context in the project folder.
+    #[serde(default)]
+    pub build: Option<String>,
+    /// The Dockerfile, a file anywhere in the project (default: `Dockerfile` in `build`): an
+    /// image of your own around a vendored project's source, without moving that source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dockerfile: Option<String>,
+    /// Build arguments (`ARG`s of the Dockerfile), fixed values.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub args: IndexMap<String, String>,
+    /// One-shot jobs (scripts or folders in the project) run before the machine counts as ready.
+    #[serde(default)]
+    pub init: Vec<String>,
+    /// The image runs no service of its own (a stock Linux image whose command is a shell that
+    /// exits at once): keep the container running idle, as a machine to work from.
+    #[serde(default)]
+    pub idle: bool,
+    /// The image is a network appliance Isoloom knows how to wire (a router or switch OS in a
+    /// container): its management port, interface order and startup configuration are set the
+    /// way the image expects, its addresses go into that configuration. Docker only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub appliance: Option<Appliance>,
+    /// An appliance's own configuration (a file in the project), added to the one Isoloom
+    /// generates (hostname, credentials, interfaces and their addresses).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<String>,
+    /// The firmware an emulator boots (a file in the project): the IOS `.bin` of a Dynamips
+    /// router. Isoloom builds the emulator's container itself, so no `image` then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub firmware: Option<String>,
+}
+
+/// A network appliance image (see [`DockerImpl::appliance`]). The images aren't Isoloom's to
+/// ship: the user builds them from software they are licensed for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Appliance {
+    /// Cisco IOL (IOS on Linux, from Cisco Modeling Labs) as vrnetlab packages it
+    /// (`vrnetlab/cisco_iol:<version>`): a router.
+    CiscoIol,
+    /// Cisco IOL-L2 (`vrnetlab/cisco_iol:L2-<version>`): a switch.
+    CiscoIolL2,
+    /// Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router.
+    CiscoVios,
+    /// Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch.
+    /// `cisco-viosl2`, as the image is named, is read too.
+    #[serde(alias = "cisco-viosl2")]
+    CiscoViosL2,
+    /// Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm).
+    CiscoCsr1000v,
+    /// Cisco Catalyst 8000v (IOS XE) in QEMU (`vrnetlab/cisco_c8000v:<version>`, needs /dev/kvm).
+    CiscoC8000v,
+    /// A classic Cisco 7200 router emulated by Dynamips, booting the IOS `.bin` in `firmware`.
+    CiscoDynamips,
+}
+
+/// How a VM produces a machine: its OS, and the steps that set it up.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VmImpl {
+    /// An OS name from [`KNOWN_OS`]; each target maps it to an image. May come from `common:`
+    /// or a group (`vm: {}` in the machine).
+    #[serde(default)]
+    pub os: String,
+    /// Steps run inside the VM, in order: `.sh` on Linux (and Ansible playbooks, `.yml`),
+    /// `.ps1` on Windows. On Linux, the step `reboot` restarts the machine and goes on with the
+    /// next step once it is back (a new kernel, a changed boot configuration).
+    #[serde(default)]
+    pub provision: Vec<String>,
+    /// The image to use instead of the built-in one for `os`, per target.
+    #[serde(default)]
+    pub image: Option<VmImage>,
+}
+
+/// The `vm.provision` step that restarts a Linux machine; the steps after it run once the
+/// machine is back.
+pub const REBOOT_STEP: &str = "reboot";
+
+/// Whether a `vm.provision` step is the [`REBOOT_STEP`] rather than a file.
+pub fn is_reboot(step: &str) -> bool {
+    step == REBOOT_STEP
+}
+
+/// How a Windows box answers WinRM. Most boxes (StefanScherer, gusztavvargadr) use plain HTTP
+/// on 5985 with basic auth; some (GOAD's Windows Server 2025 box) only listen on HTTPS 5986.
+/// Isoloom can't tell from the box name, so a non-default box declares it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Winrm {
+    /// HTTP on 5985, basic auth (the default for the common Windows boxes).
+    #[default]
+    Plaintext,
+    /// HTTPS on 5986, NTLM (certificate not verified).
+    Ssl,
+}
+
+/// How a machine resolves names.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Dns {
+    /// DNS server addresses, in order (e.g. the lab's domain controller).
+    #[serde(default)]
+    pub servers: Vec<String>,
+    /// Search domains appended to bare names.
+    #[serde(default)]
+    pub search: Vec<String>,
+    /// The machine's own domain name.
+    #[serde(default)]
+    pub domain: Option<String>,
+}
+
+/// A machine's own image, per target, instead of the built-in one for its OS.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VmImage {
+    /// A Vagrant box name (e.g. `StefanScherer/windows_2019`).
+    #[serde(default)]
+    pub vagrant: Option<String>,
+    /// The box version to pin.
+    #[serde(default)]
+    pub vagrant_version: Option<String>,
+    /// The box Vagrant's QEMU provider boots instead (libvirt format), when `vagrant` has none
+    /// (e.g. `peru/windows-server-2019-standard-x64-eval`).
+    #[serde(default)]
+    pub qemu: Option<String>,
+    /// The box Vagrant's Hyper-V provider boots instead, when `vagrant` has no Hyper-V build
+    /// (its latest version that has one).
+    #[serde(default)]
+    pub hyperv: Option<String>,
+    /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
+    #[serde(default)]
+    pub winrm: Option<Winrm>,
+}
+
+/// The controller's settings (`controller:`), the fields a machine uses for the same things.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Controller {
+    /// The box to use instead of Isoloom's (Vagrant): a specific Ansible version, a mirror.
+    #[serde(default)]
+    pub image: Option<VmImage>,
+    /// CPUs, memory (and disk on Proxmox), for many forks against a large environment.
+    #[serde(default)]
+    pub resources: Option<Resources>,
+    /// Keep it running once provisioning is done (to use it as a jump host). By default it
+    /// halts, keeping its disk: `isoloom test` and `isoloom provision` boot it when they need it.
+    #[serde(default)]
+    pub keep_running: bool,
+}
+
+/// One environment-level provisioning step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Provision {
+    /// An Ansible playbook in the project, run against the whole environment.
+    pub ansible: String,
+    /// More inventory files in the project (groups, variables), next to the one Isoloom writes
+    /// (every machine's address and connection, in the `linux` or `windows` group).
+    #[serde(default)]
+    pub inventory: Vec<String>,
+    /// Inventory groups: a name -> the machines in it.
+    #[serde(default)]
+    pub groups: IndexMap<String, Vec<String>>,
+    /// Extra variables for the playbook, of any YAML type (strings, numbers, booleans, lists,
+    /// maps): passed as JSON (`-e`), which keeps their types.
+    #[serde(default)]
+    pub vars: IndexMap<String, serde_json::Value>,
+    /// Variables per machine (a machine's name -> its variables), on its line of the inventory
+    /// Isoloom writes: what a playbook keys on per host (its domain, a role flag).
+    #[serde(default)]
+    pub host_vars: IndexMap<String, IndexMap<String, serde_json::Value>>,
+    /// The Ansible Galaxy requirements to install first (collections, roles); by default
+    /// `requirements.yml` next to the playbook, when there is one.
+    #[serde(default)]
+    pub requirements: Option<String>,
+}
+
+/// OS names a `vm:` may use. Each target maps them to its own images (e.g. Windows from an
+/// evaluation ISO locally, a license-included image in the cloud).
+pub const KNOWN_OS: &[&str] = &[
+    "debian-11",
+    "debian-12",
+    "debian-13",
+    "ubuntu-14.04",
+    "ubuntu-16.04",
+    "ubuntu-18.04",
+    "ubuntu-20.04",
+    "ubuntu-22.04",
+    "ubuntu-24.04",
+    "rocky-9",
+    "almalinux-9",
+    "centos-7",
+    "fedora-42",
+    "kali",
+    "windows-10",
+    "windows-11",
+    "windows-server-2008r2",
+    "windows-server-2012r2",
+    "windows-server-2016",
+    "windows-server-2019",
+    "windows-server-2022",
+    "windows-server-2025",
+];

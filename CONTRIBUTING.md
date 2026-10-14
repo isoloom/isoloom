@@ -41,6 +41,12 @@ cd examples/hello-stack && isoloom run docker . && git diff --exit-code -- .isol
 
 - **Shape:** functions at most 60 lines, at most 5 parameters (`clippy.toml`), one concept
   per module.
+- **File size:** every source file under `crates/*/src` holds at most 400 lines of code.
+  Blank lines, comment-only lines and the inline `#[cfg(test)] mod tests` block don't count,
+  and a separate `tests.rs` is not counted at all. A file over the limit is split into
+  cohesive submodules (a long data table by section), with `pub use` re-exports keeping its
+  public paths, or its tests move to a `tests.rs`. `crates/isoloom-spec/tests/code_size.rs`
+  enforces it.
 - **Errors:** typed, with `thiserror`, one enum per library crate; variants carry the field
   path and reason ([ADR 0004](docs/adr/0004-error-model.md)). No new `String` errors.
 - **No `unwrap`, `expect` or `panic`** outside tests. A spec reaching a generator is validated:
