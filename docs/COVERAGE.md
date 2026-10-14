@@ -11,7 +11,11 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [Docker Compose](#docker-compose) | 68% | 148 | 99 | 4 | 45 |
-| [Vagrant](#vagrant) | 88% | 36 | 32 | 0 | 4 |
+| [Vagrant](#vagrant) | 90% | 42 | 38 | 0 | 4 |
+| [Vagrant: networks](#vagrant-networks) | 73% | 38 | 28 | 0 | 10 |
+| [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
+| [Vagrant: provisioners](#vagrant-provisioners) | 94% | 57 | 54 | 0 | 3 |
+| [Vagrant: communicators](#vagrant-communicators) | 100% | 8 | 8 | 0 | 0 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 7 | 7 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
@@ -20,6 +24,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
 | [Vagrant: QEMU](#vagrant-qemu) | 36% | 15 | 4 | 3 | 8 |
 | [Vagrant: ESXi](#vagrant-esxi) | 57% | 19 | 11 | 0 | 8 |
+| [Vagrant: Docker](#vagrant-docker) | 92% | 13 | 12 | 0 | 1 |
 | [Terraform: Proxmox](#terraform-proxmox) | 46% | 15 | 7 | 0 | 8 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 63% | 19 | 12 | 0 | 7 |
@@ -430,7 +435,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant
 
-88% of 36 portable features (32 done, 0 partly, 4 to do; 62 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners).
+90% of 42 portable features (38 done, 0 partly, 4 to do; 100 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners, communicators, pushes).
 
 ### Machine settings (config.vm)
 
@@ -476,15 +481,15 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `provider` | Yes | Yes | From `machines.*.resources` (see each provider below) |
 | `provision` | Yes | Yes | From `machines.*.vm.provision` (see the provisioners below) |
 | `provisioners` | n/a | No | Vagrant's own list behind `provision` |
-| `synced_folder` | Yes | Yes | Disabled: the project is copied into each VM instead |
+| `synced_folder` | Yes | Yes | The default `/vagrant` share turned off: the project is copied into each VM instead |
 | `usable_port_range` | n/a | No | How Vagrant picks host ports for forwarded ports |
 
 ### Network types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `private_network` | Yes | Yes | From `networks and machines.*.networks` |
 | `forwarded_port` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback; `protocol: "udp"` with `protocol: udp`) |
+| `private_network` | Yes | Yes | From `networks and machines.*.networks` |
 | `public_network` | Yes | Not yet | A network bridged to the outside (Compose `external`, a host bridge, a VPC) |
 
 ### Provisioners
@@ -493,26 +498,597 @@ Only what the examples generate is checked: a feature no example uses can still 
 | --- | --- | --- | --- |
 | `shell` | Yes | Yes | From `machines.*.vm.provision` (.sh, .yml, .yaml, `reboot`), and Isoloom's own steps |
 | `file` | Yes | Another way | Via `isoloom_project` (below) copies the project; a file provisioner follows symlinks and lists files when the Vagrantfile loads |
-| `isoloom_project` | Yes | Yes | Isoloom's own provisioner, defined in the Vagrantfile: the project into each VM as a tar.gz built when the step runs, symlinks kept as links |
-| `ansible_local` | Yes | Another way | Via a shell provisioner running the playbook with `ansible-playbook -c local` inside the VM, the machine as its inventory (as on every VM target) |
 | `ansible` | Yes | Another way | Via the same playbooks, run inside the VM by a shell provisioner |
-| `chef` | Yes | Another way | Via a `.sh` provisioning step can run any tool |
-| `puppet` | Yes | Another way | Via a `.sh` provisioning step can run any tool |
-| `salt` | Yes | Another way | Via a `.sh` provisioning step can run any tool |
-| `cfengine` | Yes | Another way | Via a `.sh` provisioning step can run any tool |
+| `ansible_local` | Yes | Another way | Via a shell provisioner running the playbook with `ansible-playbook -c local` inside the VM, the machine as its inventory (as on every VM target) |
+| `chef_solo` | Yes | Another way | Via a `.sh` provisioning step runs the tool (the script installs it) |
+| `chef_zero` | Yes | Another way | Via a `.sh` provisioning step runs the tool (the script installs it) |
+| `chef_client` | Yes | Another way | Via a `.sh` provisioning step runs the tool (the script installs it) |
+| `chef_apply` | Yes | Another way | Via a `.sh` provisioning step runs the tool (the script installs it) |
+| `container` | Yes | Another way | Via `docker:` (containers come from the Compose output; VMs run services natively) |
 | `docker` | Yes | Another way | Via `docker:` (containers come from the Compose output; VMs run services natively) |
 | `podman` | Yes | Another way | Via `docker:` (containers come from the Compose output; VMs run services natively) |
-| `container` | Yes | Another way | Via `docker:` (containers come from the Compose output; VMs run services natively) |
+| `puppet` | Yes | Another way | Via a `.sh` provisioning step runs the tool (the script installs it) |
+| `puppet_server` | Yes | Another way | Via a `.sh` provisioning step runs the tool (the script installs it) |
+| `salt` | Yes | Another way | Via a `.sh` provisioning step runs the tool (the script installs it) |
+| `cfengine` | Yes | Another way | Via a `.sh` provisioning step runs the tool (the script installs it) |
+| `isoloom_project` | Yes | Yes | Isoloom's own provisioner, defined in the Vagrantfile: the project into each VM as a tar.gz built when the step runs, symlinks kept as links |
 
 ### Other settings
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `config.ssh` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `config.ssh` | Yes | Yes | A jump host from ISOLOOM_SSH_PROXY_COMMAND, when set; see the communicators' table |
 | `config.winrm` | Yes | Yes | From `vm.os` (the Windows box's own account, over WinRM) |
 | `config.winssh` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
-| `config.trigger` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `config.trigger` | Yes | Yes | Hyper-V: each network's private switch made before a VM starts and removed after the last one, its adapters attached and addressed |
 | `config.vagrant` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `config.push` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+
+### Push strategies
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `atlas` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `heroku` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `local-exec` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: address` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: app` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: dir` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: exclude` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: excludes` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: include` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: includes` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: token` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: token_from_vagrant_login` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: uploader_path` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `atlas: vcs` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: destination` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: dir` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: exclude` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: excludes` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: host` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: include` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: includes` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: passive` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: password` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: secure` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `ftp: username` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `heroku: app` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `heroku: dir` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `heroku: git_bin` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `heroku: remote` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `local-exec: args` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `local-exec: inline` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+| `local-exec: script` | n/a | No | `vagrant push` publishes the project elsewhere: not the environment's behavior |
+
+## Vagrant: networks
+
+73% of 38 portable features (28 done, 0 partly, 10 to do; 58 features in all). From Vagrant 2.4.9 (the networking docs and the providers' network code) and vagrant-libvirt 0.12.2 (its network options).
+
+### Network types
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `forwarded_port: auto_correct` | n/a | No | Vagrant moving a forward to a free host port: published ports are fixed |
+| `forwarded_port: disabled` | Yes | Yes | A Windows box's own RDP forward, turned off so VMs don't compete for the host port |
+| `forwarded_port: guest` | Yes | Yes | From `machines.*.services[].publish` |
+| `forwarded_port: guest_ip` | Yes | Another way | Via machines.*.services[].port (forwarded to the machine itself) |
+| `forwarded_port: host` | Yes | Yes | From `machines.*.services[].publish` |
+| `forwarded_port: host_ip` | Yes | Yes | The host's loopback: a published port isn't open to the LAN |
+| `forwarded_port: id` | Yes | Yes | A Windows box's own RDP forward, turned off so VMs don't compete for the host port |
+| `forwarded_port: protocol` | Yes | Yes | From `machines.*.services[].protocol` |
+| `private_network: adapter` | n/a | No | Which adapter and host network the provider uses |
+| `private_network: adapter_ip` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
+| `private_network: auto_config` | Yes | Yes | Off for the hybrid target's Docker host: its containers take the addresses on those networks |
+| `private_network: bridge` | Yes | Yes | Hyper-V: each VM on the networks' private switches |
+| `private_network: dhcp_ip` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
+| `private_network: dhcp_lower` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
+| `private_network: dhcp_upper` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
+| `private_network: intnet` | Yes | Another way | Via `virtualbox__intnet`, the same option scoped to VirtualBox |
+| `private_network: ip` | Yes | Yes | From `machines.*.networks` (fixed addresses) |
+| `private_network: libvirt__adapter` | n/a | No | How vagrant-libvirt names and cleans up its interfaces |
+| `private_network: libvirt__always_destroy` | n/a | No | How vagrant-libvirt names and cleans up its interfaces |
+| `private_network: libvirt__bus` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `private_network: libvirt__dhcp_bootp_file` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `private_network: libvirt__dhcp_bootp_server` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `private_network: libvirt__dhcp_enabled` | Yes | Yes | Off: machines get fixed addresses |
+| `private_network: libvirt__dhcp_start` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
+| `private_network: libvirt__dhcp_stop` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
+| `private_network: libvirt__domain_name` | Yes | Another way | Via machines.*.dns.domain |
+| `private_network: libvirt__driver_name` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `private_network: libvirt__driver_queues` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `private_network: libvirt__forward_device` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `private_network: libvirt__forward_mode` | Yes | Another way | Via networks.*.internet (out through Isoloom's router, the same on every target) |
+| `private_network: libvirt__guest_ipv6` | Yes | Not yet | IPv6 networks |
+| `private_network: libvirt__host_ip` | Yes | Another way | Via `ip` and `netmask`: libvirt derives the network from them |
+| `private_network: libvirt__iface_name` | n/a | No | How vagrant-libvirt names and cleans up its interfaces |
+| `private_network: libvirt__ipv6_address` | Yes | Not yet | IPv6 networks |
+| `private_network: libvirt__ipv6_prefix` | Yes | Not yet | IPv6 networks |
+| `private_network: libvirt__mac` | No | No | Cloud VMs get their MAC and addresses from the provider |
+| `private_network: libvirt__model_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `private_network: libvirt__mtu` | No | No | Cloud networks set their own MTU |
+| `private_network: libvirt__netmask` | Yes | Another way | Via `ip` and `netmask`: libvirt derives the network from them |
+| `private_network: libvirt__network_address` | Yes | Another way | Via `ip` and `netmask`: libvirt derives the network from them |
+| `private_network: libvirt__network_name` | Yes | Yes | From `networks` (a libvirt network each, named after the environment) |
+| `private_network: libvirt__slot` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `private_network: libvirt__tftp_root` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `private_network: libvirt__tunnel_ip` | No | No | Links libvirt hosts together: other targets join machines on one network of their own |
+| `private_network: libvirt__tunnel_local_ip` | No | No | Links libvirt hosts together: other targets join machines on one network of their own |
+| `private_network: libvirt__tunnel_local_port` | No | No | Links libvirt hosts together: other targets join machines on one network of their own |
+| `private_network: libvirt__tunnel_port` | No | No | Links libvirt hosts together: other targets join machines on one network of their own |
+| `private_network: libvirt__tunnel_type` | No | No | Links libvirt hosts together: other targets join machines on one network of their own |
+| `private_network: mac` | Yes | Yes | The hybrid target's Docker host: a fixed MAC per network, so its macvlan networks find their adapter |
+| `private_network: name` | n/a | No | Which adapter and host network the provider uses |
+| `private_network: netmask` | Yes | Yes | From `networks.*.cidr` |
+| `private_network: nic_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `private_network: type` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
+| `private_network: virtualbox__intnet` | Yes | Yes | From `networks` (an internal network each: between the VMs only, no host adapter) |
+| `public_network: auto_config` | Yes | Not yet | With `public_network` (a network bridged to the outside) |
+| `public_network: bridge` | Yes | Not yet | With `public_network` (a network bridged to the outside) |
+| `public_network: ip` | Yes | Not yet | With `public_network` (a network bridged to the outside) |
+| `public_network: use_dhcp_assigned_default_route` | Yes | Not yet | With `public_network` (a network bridged to the outside) |
+
+## Vagrant: disks and synced folders
+
+100% of 12 portable features (12 done, 0 partly, 0 to do; 28 features in all). From Vagrant 2.4.9 (the disk config class and the synced folder docs).
+
+### Disk options
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `disk_ext` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `file` | No | No | Display, input and host devices: containers and cloud VMs have none |
+| `id` | n/a | No | Vagrant's own identifier for the disk |
+| `name` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
+| `primary` | Yes | Yes | The VM's own disk, `:disk` and primary, grown to `disk_gb` |
+| `provider_config` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `size` | Yes | Yes | From `machines.*.resources.disk_gb` |
+| `type` | Yes | Yes | The VM's own disk, `:disk` and primary, grown to `disk_gb` |
+
+### Synced folder options
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `create` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `disabled` | Yes | Yes | The default `/vagrant` share, turned off |
+| `group` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `id` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `mount_options` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `nfs_export` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `nfs_udp` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `nfs_version` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `owner` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `rsync__args` | Yes | Another way | Via the project copied into each VM by `isoloom_project` (`.isoloomignore` says what stays out) |
+| `rsync__auto` | Yes | Another way | Via the project copied into each VM by `isoloom_project` (`.isoloomignore` says what stays out) |
+| `rsync__chown` | Yes | Another way | Via the project copied into each VM by `isoloom_project` (`.isoloomignore` says what stays out) |
+| `rsync__exclude` | Yes | Another way | Via the project copied into each VM by `isoloom_project` (`.isoloomignore` says what stays out) |
+| `rsync__rsync_ownership` | Yes | Another way | Via the project copied into each VM by `isoloom_project` (`.isoloomignore` says what stays out) |
+| `rsync__rsync_path` | Yes | Another way | Via the project copied into each VM by `isoloom_project` (`.isoloomignore` says what stays out) |
+| `rsync__verbose` | Yes | Another way | Via the project copied into each VM by `isoloom_project` (`.isoloomignore` says what stays out) |
+| `smb_host` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `smb_password` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `smb_username` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+| `type` | No | No | A live share of the user's folder: cloud VMs and Proxmox can't mount it (the project is copied into each VM instead) |
+
+## Vagrant: provisioners
+
+94% of 57 portable features (54 done, 0 partly, 3 to do; 315 features in all). From Vagrant 2.4.9 (each provisioner's config class, with the classes it inherits from).
+
+### Provisioners
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `*: after` | Yes | Another way | Via the order of machines.*.vm.provision (steps run as listed) |
+| `*: before` | Yes | Another way | Via the order of machines.*.vm.provision (steps run as listed) |
+| `*: communicator_required` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `*: config` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `*: id` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `*: name` | Yes | Yes | Each step's name, shown as it runs |
+| `*: preserve_order` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `*: run` | Yes | Yes | `never` for the checks, run only when asked |
+| `*: type` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: args` | Yes | Another way | Via machines.*.inputs (values reach a script as environment variables) |
+| `shell: binary` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: env` | Yes | Yes | From `machines.*.inputs` (from the host's environment) |
+| `shell: inline` | Yes | Yes | From `machines.*.vm.provision, and Isoloom's own steps` |
+| `shell: keep_color` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: md5` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: name` | Yes | Another way | Via `*: name`, the same label |
+| `shell: path` | Yes | Yes | The checks script, run from the project |
+| `shell: powershell_args` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: powershell_elevated_interactive` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: privileged` | n/a | No | Steps run as root, Vagrant's default |
+| `shell: reboot` | Yes | Yes | From `machines.*.vm.provision` (`reboot`) |
+| `shell: reset` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: sensitive` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: sha1` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: sha256` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: sha384` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: sha512` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `shell: upload_path` | n/a | No | How Vagrant runs the step: not the machine's state |
+| `file: destination` | Yes | Another way | Via `isoloom_project` copies the project into each VM |
+| `file: source` | Yes | Another way | Via `isoloom_project` copies the project into each VM |
+| `ansible: ask_become_pass` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: ask_sudo_pass` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: ask_vault_pass` | Yes | Not yet | Secrets: an Ansible vault's password |
+| `ansible: become` | Yes | Another way | Via the playbook's own `become` |
+| `ansible: become_user` | Yes | Another way | Via the playbook's own `become` |
+| `ansible: compatibility_mode` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: config_file` | Yes | Another way | Via an `ansible.cfg` beside the playbook, in the project |
+| `ansible: extra_vars` | Yes | Another way | Via provision[].vars |
+| `ansible: force_remote_user` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: galaxy_command` | Yes | Another way | Via provision[].requirements |
+| `ansible: galaxy_role_file` | Yes | Another way | Via provision[].requirements |
+| `ansible: galaxy_roles_path` | Yes | Another way | Via provision[].requirements |
+| `ansible: groups` | Yes | Another way | Via provision[].groups |
+| `ansible: host_key_checking` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: host_vars` | Yes | Another way | Via provision[].host_vars |
+| `ansible: inventory_path` | Yes | Another way | Via provision[].inventory |
+| `ansible: limit` | Yes | Another way | Via the playbook's own `hosts` |
+| `ansible: playbook` | Yes | Another way | Via provision[].ansible |
+| `ansible: playbook_command` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: raw_arguments` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: raw_ssh_args` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: show_deprecation_info` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: skip_tags` | n/a | No | Running part of a playbook: a debugging aid |
+| `ansible: start_at_task` | n/a | No | Running part of a playbook: a debugging aid |
+| `ansible: sudo` | Yes | Another way | Via the playbook's own `become` |
+| `ansible: sudo_user` | Yes | Another way | Via the playbook's own `become` |
+| `ansible: tags` | n/a | No | Running part of a playbook: a debugging aid |
+| `ansible: vault_password_file` | Yes | Not yet | Secrets: an Ansible vault's password |
+| `ansible: verbose` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible: version` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: become` | Yes | Another way | Via the playbook's own `become` |
+| `ansible_local: become_user` | Yes | Another way | Via the playbook's own `become` |
+| `ansible_local: compatibility_mode` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: config_file` | Yes | Another way | Via an `ansible.cfg` beside the playbook, in the project |
+| `ansible_local: extra_vars` | Yes | Another way | Via provision[].vars |
+| `ansible_local: galaxy_command` | Yes | Another way | Via provision[].requirements |
+| `ansible_local: galaxy_role_file` | Yes | Another way | Via provision[].requirements |
+| `ansible_local: galaxy_roles_path` | Yes | Another way | Via provision[].requirements |
+| `ansible_local: groups` | Yes | Another way | Via provision[].groups |
+| `ansible_local: host_vars` | Yes | Another way | Via provision[].host_vars |
+| `ansible_local: install` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: install_mode` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: inventory_path` | Yes | Another way | Via provision[].inventory |
+| `ansible_local: limit` | Yes | Another way | Via the playbook's own `hosts` |
+| `ansible_local: pip_args` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: pip_install_cmd` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: playbook` | Yes | Another way | Via provision[].ansible |
+| `ansible_local: playbook_command` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: provisioning_path` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: raw_arguments` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: show_deprecation_info` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: skip_tags` | n/a | No | Running part of a playbook: a debugging aid |
+| `ansible_local: start_at_task` | n/a | No | Running part of a playbook: a debugging aid |
+| `ansible_local: sudo` | Yes | Another way | Via the playbook's own `become` |
+| `ansible_local: sudo_user` | Yes | Another way | Via the playbook's own `become` |
+| `ansible_local: tags` | n/a | No | Running part of a playbook: a debugging aid |
+| `ansible_local: tmp_path` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: vault_password_file` | Yes | Not yet | Secrets: an Ansible vault's password |
+| `ansible_local: verbose` | n/a | No | How Vagrant installs and runs Ansible |
+| `ansible_local: version` | n/a | No | How Vagrant installs and runs Ansible |
+| `chef_solo: add_recipe` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: add_role` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: arguments` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: attempts` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: binary_env` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: binary_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: channel` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: cookbooks_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: custom_config_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: data_bags_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: enable_reporting` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: encrypted_data_bag_secret_key_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: environment` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: environments_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: file_backup_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: file_cache_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: formatter` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: http_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: http_proxy_pass` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: http_proxy_user` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: https_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: https_proxy_pass` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: https_proxy_user` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: install` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: installer_download_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: json` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: legacy_mode` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: log_level` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: no_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: node_name` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: nodes_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: omnibus_url` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: prepare_folders_config` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: product` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: provisioning_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: recipe_url` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: roles_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: run_list` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: synced_folder_type` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: verbose_logging` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_solo: version` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: add_recipe` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: add_role` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: arguments` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: attempts` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: binary_env` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: binary_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: channel` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: cookbooks_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: custom_config_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: data_bags_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: enable_reporting` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: encrypted_data_bag_secret_key_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: environment` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: environments_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: file_backup_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: file_cache_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: formatter` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: http_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: http_proxy_pass` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: http_proxy_user` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: https_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: https_proxy_pass` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: https_proxy_user` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: install` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: installer_download_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: json` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: log_level` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: no_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: node_name` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: nodes_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: omnibus_url` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: prepare_folders_config` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: product` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: provisioning_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: roles_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: run_list` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: synced_folder_type` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: verbose_logging` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_zero: version` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: add_recipe` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: add_role` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: arguments` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: attempts` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: binary_env` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: binary_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: channel` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: chef_server_url` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: client_key_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: custom_config_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: delete_client` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: delete_node` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: enable_reporting` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: encrypted_data_bag_secret_key_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: environment` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: file_backup_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: file_cache_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: formatter` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: http_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: http_proxy_pass` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: http_proxy_user` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: https_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: https_proxy_pass` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: https_proxy_user` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: install` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: installer_download_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: json` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: log_level` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: no_proxy` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: node_name` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: omnibus_url` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: product` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: provisioning_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: run_list` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: validation_client_name` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: validation_key_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: verbose_logging` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_client: version` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: binary_env` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: binary_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: channel` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: install` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: installer_download_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: log_level` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: omnibus_url` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: product` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: recipe` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: upload_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `chef_apply: version` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `container: build_image` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `container: images` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `container: post_install_provision` | n/a | No | How Vagrant installs the container engine |
+| `container: post_install_provisioner` | n/a | No | How Vagrant installs the container engine |
+| `container: pull_images` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `container: run` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `docker: build_image` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `docker: images` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `docker: post_install_provision` | n/a | No | How Vagrant installs the container engine |
+| `docker: post_install_provisioner` | n/a | No | How Vagrant installs the container engine |
+| `docker: pull_images` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `docker: run` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `podman: build_image` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `podman: images` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `podman: kubic` | n/a | No | How Vagrant installs the container engine |
+| `podman: post_install_provision` | n/a | No | How Vagrant installs the container engine |
+| `podman: post_install_provisioner` | n/a | No | How Vagrant installs the container engine |
+| `podman: pull_images` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `podman: run` | Yes | Another way | Via the docker-vm output (containers on one VM, from the Compose file) |
+| `puppet: binary_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: environment` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: environment_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: environment_variables` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: expanded_module_paths` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: facter` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: hiera_config_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: manifest_file` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: manifests_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: module_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: nfs` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: options` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: structured_facts` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: synced_folder_args` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: synced_folder_type` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: temp_dir` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet: working_directory` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet_server: binary_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet_server: client_cert_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet_server: client_private_key_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet_server: facter` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet_server: options` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet_server: puppet_node` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `puppet_server: puppet_server` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: always_install` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: bootstrap_options` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: bootstrap_script` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: colorize` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: grains_config` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: install_args` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: install_master` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: install_syndic` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: install_type` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: log_level` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: master_config` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: master_id` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: master_json_config` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: master_key` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: master_pub` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: masterless` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: minion_config` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: minion_id` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: minion_json_config` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: minion_key` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: minion_pub` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: no_minion` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: orchestrations` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: pillar` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: pillar_data` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: python_version` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: run_highstate` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: run_overstate` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: run_service` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: salt_args` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: salt_call_args` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: seed_master` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: temp_config_dir` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: verbose` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `salt: version` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: am_policy_hub` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: classes` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: deb_repo_file` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: deb_repo_line` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: extra_agent_args` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: files_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: force_bootstrap` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: install` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: mode` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: package_name` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: policy_server_address` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: repo_gpg_key_url` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: run_file` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: upload_path` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: yum_repo_file` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `cfengine: yum_repo_url` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
+| `isoloom_project: generated` | Yes | Yes | The generated files a step needs, such as the checks, copied with the project |
+| `isoloom_project: extra` | Yes | Yes | The generated files a step needs, such as the checks, copied with the project |
+
+## Vagrant: communicators
+
+100% of 8 portable features (8 done, 0 partly, 0 to do; 76 features in all). From Vagrant 2.4.9 (the SSH, WinRM and Windows OpenSSH config classes).
+
+### SSH (config.ssh)
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compression` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `config` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `connect_retries` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `connect_retry_delay` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `connect_timeout` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `default` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `disable_deprecated_algorithms` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `dsa_authentication` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `export_command_template` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `extra_args` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `forward_agent` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `forward_env` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `forward_x11` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `guest_port` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `host` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `insert_key` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `keep_alive` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `key_type` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `keys_only` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `paranoid` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `password` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `port` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `private_key_path` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `proxy_command` | Yes | Yes | ISOLOOM_SSH_PROXY_COMMAND, when set: the VMs reached through a jump host |
+| `pty` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `remote_user` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `shell` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `ssh_command` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `sudo_command` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `username` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+| `verify_host_key` | n/a | No | How Vagrant reaches the VM over SSH: not the environment's behavior |
+
+### WinRM (config.winrm)
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `basic_auth_only` | Yes | Yes | From `machines.*.vm.image.winrm` (plain HTTP with basic authentication, unless the box says `ssl`) |
+| `codepage` | n/a | No | How Vagrant reaches the VM over WinRM: not the environment's behavior |
+| `execution_time_limit` | n/a | No | How Vagrant reaches the VM over WinRM: not the environment's behavior |
+| `guest_port` | n/a | No | How Vagrant reaches the VM over WinRM: not the environment's behavior |
+| `host` | n/a | No | How Vagrant reaches the VM over WinRM: not the environment's behavior |
+| `max_tries` | Yes | Yes | Waits for a Windows VM's first boot, longer under emulation |
+| `password` | Yes | Yes | From `vm.os` (the Windows box's own account) |
+| `port` | n/a | No | How Vagrant reaches the VM over WinRM: not the environment's behavior |
+| `retry_delay` | Yes | Yes | Waits for a Windows VM's first boot, longer under emulation |
+| `ssl_peer_verification` | n/a | No | How Vagrant reaches the VM over WinRM: not the environment's behavior |
+| `timeout` | Yes | Yes | Waits for a Windows VM's first boot, longer under emulation |
+| `transport` | Yes | Yes | From `machines.*.vm.image.winrm` (plain HTTP with basic authentication, unless the box says `ssl`) |
+| `username` | Yes | Yes | From `vm.os` (the Windows box's own account) |
+
+### Windows OpenSSH (config.winssh)
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compression` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `config` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `connect_retries` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `connect_retry_delay` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `connect_timeout` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `default` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `disable_deprecated_algorithms` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `dsa_authentication` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `export_command_template` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `extra_args` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `forward_agent` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `forward_env` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `forward_x11` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `guest_port` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `host` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `insert_key` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `keep_alive` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `key_type` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `keys_only` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `paranoid` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `password` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `port` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `private_key_path` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `proxy_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `pty` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `remote_user` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `shell` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `ssh_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `sudo_command` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `upload_directory` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `username` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
+| `verify_host_key` | n/a | No | How Vagrant reaches a Windows VM over OpenSSH (the communicator itself, `config.winssh`, is planned) |
 
 ## Vagrant: VirtualBox
 
@@ -768,7 +1344,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `enable_virtualization_extensions` | Yes | Yes | From `machines.*.privileged` (nested virtualization) |
 | `ip_address_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `linked_clone` | Yes | Yes | A differencing disk, so a clone is instant instead of copying the whole box |
-| `mac` | No | No | Cloud VMs get their MAC address from the provider |
+| `mac` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `maxmemory` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `memory` | Yes | Yes | From `machines.*.resources` |
 | `vlan_id` | Yes | Another way | Via `config.vm.network private_network`, the same on every provider |
@@ -865,7 +1441,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `guest_custom_vmx_settings` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_disk_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_guestos` | Yes | Not yet | With Windows guests (which make an environment VM-only) |
-| `guest_mac_address` | No | No | Cloud VMs get their MAC address from the provider |
+| `guest_mac_address` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `guest_memsize` | Yes | Yes | From `machines.*.resources` |
 | `guest_name` | Yes | Yes | From the environment and machine names |
 | `guest_name_prefix` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
@@ -883,7 +1459,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `local_lax` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `local_private_keys` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `local_use_ip_cache` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `mac_address` | No | No | Cloud VMs get their MAC address from the provider |
+| `mac_address` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `memsize` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
 | `nic_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `numvcpus` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
@@ -900,6 +1476,43 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `vm_disk_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `vmname` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
 | `vmname_prefix` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
+
+## Vagrant: Docker
+
+92% of 13 portable features (12 done, 0 partly, 1 to do; 28 features in all). From Vagrant 2.4.9 (the provider's config class).
+
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `auth_server` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `build_args` | Yes | Another way | Via machines.*.docker.args, in the Compose output |
+| `build_dir` | Yes | Another way | Via machines.*.docker.build, in the Compose output |
+| `cmd` | Yes | Not yet | A machine's own command, instead of its image's |
+| `compose` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `compose_configuration` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `create_args` | No | No | Raw commands for one hypervisor: no other target understands them |
+| `dockerfile` | Yes | Another way | Via machines.*.docker.dockerfile, in the Compose output |
+| `email` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `env` | Yes | Another way | Via machines.*.environment, in the Compose output |
+| `expose` | Yes | Another way | Via machines.*.services[].port, in the Compose output |
+| `force_host_vm` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `git_repo` | Yes | Another way | Via machines.*.docker.build, in the Compose output |
+| `has_ssh` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `host_vm_build_dir_options` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `image` | Yes | Another way | Via machines.*.docker.image, in the Compose output |
+| `link` | Yes | Another way | Via networks (machines reach each other by name), in the Compose output |
+| `name` | Yes | Another way | Via the environment and machine names, in the Compose output |
+| `password` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `ports` | Yes | Another way | Via machines.*.services[].publish, in the Compose output |
+| `privileged` | Yes | Another way | Via machines.*.privileged, in the Compose output |
+| `pull` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `remains_running` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `stop_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `username` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
+| `vagrant_machine` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `vagrant_vagrantfile` | n/a | No | Vagrant tooling, not the environment's behavior |
+| `volumes` | Yes | Another way | Via machines.*.volumes, in the Compose output |
 
 ## Terraform: Proxmox
 

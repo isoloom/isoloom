@@ -98,7 +98,7 @@ fn winrm(r: &mut Ruby, transport: Winrm) {
             r.assign("m.winrm.basic_auth_only", true);
         }
     }
-    r.assign("m.winrm.retry_limit", 30u32);
+    r.assign("m.winrm.max_tries", 30u32);
     r.assign("m.winrm.retry_delay", 10u32);
 }
 

@@ -124,6 +124,10 @@ fn docs_coverage_is_up_to_date() {
 // From the formats' side.
 
 use isoloom_coverage::{Support, formats, vagrant};
+use isoloom_spec::model::Target;
+
+#[path = "support/vagrantfile.rs"]
+mod vagrantfile;
 
 /// Every committed output of a generator, across the examples: each file must exist in at
 /// least one example, so a renamed output can't silently leave the check with nothing to read.
@@ -145,66 +149,102 @@ fn outputs(files: &[&str]) -> Vec<String> {
 /// Checks a format's rows against what the generator really writes: every key written has a
 /// row marked as written, and every row marked as written is written by some example.
 fn written_matches(rows: &[(String, Support)], written: &BTreeSet<String>, format: &str) {
+    // Every mismatch at once: one run says everything to reclassify.
+    let mut wrong = Vec::new();
     for key in written {
-        let row = rows.iter().find(|(k, _)| k == key);
-        assert!(row.is_some(), "{format}: Isoloom writes `{key}`, which has no coverage row");
-        assert!(
-            row.unwrap().1.written(),
-            "{format}: Isoloom writes `{key}`, but its row says {}",
-            row.unwrap().1.kind()
-        );
-    }
-    for (key, s) in rows {
-        if s.written() {
-            assert!(written.contains(key), "{format}: `{key}` is marked as written, but no example's output has it");
+        match rows.iter().find(|(k, _)| k == key) {
+            None => wrong.push(format!("Isoloom writes `{key}`, which has no coverage row")),
+            Some((_, s)) if !s.written() => wrong.push(format!("Isoloom writes `{key}`, but its row says {}", s.kind())),
+            Some(_) => {}
         }
     }
+    for (key, s) in rows {
+        if s.written() && !written.contains(key) {
+            wrong.push(format!("`{key}` is marked as written, but no example's output has it"));
+        }
+    }
+    assert!(wrong.is_empty(), "{format}:\n{}", wrong.join("\n"));
+}
+
+/// Every Vagrantfile the generators write for the examples: the vagrant output (every provider
+/// is a block of the same file), docker-vm and hybrid, generated now rather than read from the
+/// committed copies, so the check follows the generators.
+fn vagrantfiles() -> Vec<String> {
+    let mut found = Vec::new();
+    for target in [Target::Vagrant, Target::DockerVm, Target::Hybrid] {
+        let before = found.len();
+        for entry in std::fs::read_dir(examples()).unwrap() {
+            let dir = entry.unwrap().path();
+            let Ok(spec) = load(&dir) else { continue };
+            let Ok(files) = generate(&spec, target) else { continue };
+            found.extend(files.into_iter().filter(|f| f.path.ends_with("/Vagrantfile")).map(|f| f.contents));
+        }
+        assert!(found.len() > before, "no example generates a Vagrantfile for {target:?}");
+    }
+    found
 }
 
 #[test]
 fn vagrant_written_settings_match_the_generated_files() {
-    let mut written = BTreeSet::new();
-    for text in outputs(&[".isoloom/vagrant/Vagrantfile", ".isoloom/hybrid/Vagrantfile", ".isoloom/docker-vm/Vagrantfile"]) {
-        let mut provider: Option<String> = None;
-        for line in text.lines() {
-            let line = line.trim_start();
-            // Inside `m.vm.provider "x" do |v|`: every `v.setting` is that provider's.
-            if let Some(p) = &provider {
-                if line == "end" {
-                    provider = None;
-                } else if let Some(rest) = line.strip_prefix("v.") {
-                    let name: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-                    written.insert(format!("provider {p}: {name}"));
-                }
-            }
-            // `config.vm.x`, `m.vm.x`, `o.vm.x`: a machine setting; network, provision and
-            // provider settings also name their type.
-            if line.starts_with("m.winrm.") || line.starts_with("config.winrm.") {
-                written.insert("config.winrm".to_string());
-                continue;
-            }
-            let Some(rest) = ["config.vm.", "m.vm.", "o.vm."].iter().find_map(|p| line.strip_prefix(p)) else {
-                continue;
-            };
-            let name: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-            let kind = rest.split('"').nth(1).unwrap_or_default();
-            match name.as_str() {
-                "network" | "provision" => {
-                    written.insert(format!("config.vm.{name} {kind}"));
-                    written.insert(format!("config.vm.{name}"));
-                }
-                "provider" => {
-                    written.insert("config.vm.provider".to_string());
-                    provider = Some(kind.to_string());
-                }
-                _ => {
-                    written.insert(format!("config.vm.{name}"));
-                }
-            }
-        }
-    }
     let rows: Vec<(String, Support)> = vagrant::formats().into_iter().flat_map(|f| f.rows).collect();
+    let common = |key: &str| rows.iter().any(|(k, _)| *k == format!("config.vm.provision *: {key}"));
+    let mut written = BTreeSet::new();
+    for text in vagrantfiles() {
+        written.extend(vagrantfile::written(&text, &common));
+    }
     written_matches(&rows, &written, "Vagrant");
+}
+
+#[test]
+fn a_vagrantfile_reads_back_into_its_settings() {
+    let text = r#"
+Vagrant.configure("2") do |config|
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.define "a" do |m|
+    m.vm.network "forwarded_port", guest: 53, host: 10053, protocol: "udp" # a: comment
+    m.vm.disk :disk, size: "10GB"
+    m.vm.provision "shell", name: "x", run: "never", inline: <<~'SH'
+      m.vm.nothing = "inside the script"
+    SH
+    m.vm.provider "qemu" do |v, o|
+      v.smp = "cpus=2"
+      if x
+        o.winrm.timeout = 1
+      end
+      v.memory = "1G"
+    end
+    m.trigger.before :up, type: :action do |t|
+    end
+  end
+end
+"#;
+    let common = |k: &str| ["name", "run"].contains(&k);
+    let got: Vec<String> = vagrantfile::written(text, &common).into_iter().collect();
+    let want = [
+        "config.trigger",
+        "config.vm.define",
+        "config.vm.disk",
+        "config.vm.disk: size",
+        "config.vm.disk: type",
+        "config.vm.network",
+        "config.vm.network forwarded_port",
+        "config.vm.network forwarded_port: guest",
+        "config.vm.network forwarded_port: host",
+        "config.vm.network forwarded_port: protocol",
+        "config.vm.provider",
+        "config.vm.provision",
+        "config.vm.provision *: name",
+        "config.vm.provision *: run",
+        "config.vm.provision shell",
+        "config.vm.provision shell: inline",
+        "config.vm.synced_folder",
+        "config.vm.synced_folder: disabled",
+        "config.winrm",
+        "config.winrm.timeout",
+        "provider qemu: memory",
+        "provider qemu: smp",
+    ];
+    assert_eq!(got, want);
 }
 
 /// Which committed Terraform files each provider table describes.

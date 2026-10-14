@@ -410,7 +410,7 @@ Vagrant.configure("2") do |config|
     m.winrm.password = "vagrant"
     m.winrm.transport = :plaintext
     m.winrm.basic_auth_only = true
-    m.winrm.retry_limit = 30
+    m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
     m.vm.network "private_network", ip: "192.168.57.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-windows-hello-lab", libvirt__network_name: "isoloom-windows-hello-lab", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 80, host: 8082, host_ip: "127.0.0.1"
@@ -450,7 +450,7 @@ Vagrant.configure("2") do |config|
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
-        o.winrm.retry_limit = 180
+        o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
       o.vm.provision "shell", name: "lab network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the lab network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 192.168.57.10 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 192.168.57.10 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"lab network: 192.168.57.10/24 on $($a.Name)\""
