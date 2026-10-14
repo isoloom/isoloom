@@ -25,7 +25,10 @@ const SUB: &str = "digitalocean";
 const RULES: Rules = Rules {
     cloud: "DigitalOcean",
     single_machine: true,
-    limits: single_network::limits("arm64 on DigitalOcean comes later (it has no arm64 droplets)"),
+    limits: single_network::limits(
+        "arm64 on DigitalOcean comes later (it has no arm64 droplets)",
+        "DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one)",
+    ),
     has_image: |os| image(os).is_some(),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
 };

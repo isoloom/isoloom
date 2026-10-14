@@ -5,6 +5,8 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::Ipv6;
+
 /// A network: an address block, whether it reaches the internet, and what routes it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -45,6 +47,11 @@ pub struct Network {
     /// touching it, no `gateway` machine).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tc: Option<Tc>,
+    /// The network's IPv6 block: dual-stack beside `cidr`, or IPv6-only (`only: true`).
+    /// Machines get an IPv6 address on it (derived from their octet, or handed out by the
+    /// target) and routes to the other IPv6 blocks the `reach` rules open. See [`Ipv6`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ipv6: Option<Ipv6>,
 }
 
 /// Link impairment (Linux netem on the router's interface into the network).

@@ -46,6 +46,7 @@ pub fn forward_rules(spec: &Spec) -> Vec<String> {
             ));
             rules.push(format!("ip saddr {from} ip daddr {to} icmp type echo-request accept"));
         }
+        rules.extend(crate::ipv6::forward_rules(spec, &r.from, &r.to, &r.ports));
     }
     rules
 }

@@ -72,7 +72,7 @@ pub fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &
             };
             persisted(r, env, machine, &early);
         }
-        (Os::Linux, Step::Trunks | Step::Tc) => persisted(r, env, machine, step),
+        (Os::Linux, Step::Trunks | Step::Tc | Step::Ipv6 { .. }) => persisted(r, env, machine, step),
         (Os::Linux, Step::WaitFor { machine: dep, ports }) => wait_for(r, env, machine, dep, ports),
         (Os::Windows, Step::Run { path, .. }) => {
             if let Some(script) = steps::windows(env, machine, step) {
@@ -104,6 +104,7 @@ fn label(step: &Step) -> String {
         Step::Settings => "settings".into(),
         Step::Hosts { .. } => "hosts".into(),
         Step::Routes { .. } => "routes".into(),
+        Step::Ipv6 { .. } => "ipv6".into(),
         Step::Trunks => "trunks".into(),
         Step::Volumes { .. } => "volumes".into(),
         Step::SharedVolume { volume, .. } => format!("volume {volume}"),
@@ -158,9 +159,14 @@ fn persisted(r: &mut Ruby, env: &Environment, machine: &str, step: &Step) {
     let (name, what, on_link_up): (&str, &str, bool) = match step {
         Step::Routes { .. } => ("routes", ROUTES, true),
         Step::Trunks => ("trunks", "802.1Q interfaces of the isoloom trunks", true),
+        Step::Ipv6 { .. } => ("ipv6", "IPv6 addresses and routes on the isoloom networks", true),
         _ => ("tc", "Link impairment (networks.*.tc) on this machine's interfaces", false),
     };
-    let after: &[&str] = if name == "routes" { &["trunks"] } else { &[] };
+    let after: &[&str] = match name {
+        "routes" => &["trunks"],
+        "ipv6" => &["routes"],
+        _ => &[],
+    };
     shell(r, &label(step), &boot::at_boot(name, what, &script, on_link_up, after));
 }
 

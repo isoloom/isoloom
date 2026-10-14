@@ -82,8 +82,12 @@ pub fn router_vm(r: &mut Ruby, ctx: &Ctx) {
     let tc = router::tc_script(spec)
         .map(|t| boot::at_boot("tc", "Link impairment (networks.*.tc) on the isoloom router's interfaces", &t, false, &[]))
         .unwrap_or_default();
+    let pairs: Vec<_> = env.router6.iter().filter_map(|(n, v6)| Some((*routed.get(n)?, *v6))).collect();
+    let v6 = isoloom_render::ipv6::router_linux(&pairs)
+        .map(|s| boot::at_boot("ipv6", "IPv6 addresses of the isoloom router", &s, true, &[]))
+        .unwrap_or_default();
     let script = format!(
-        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{tc}",
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
         router::nftables(spec),
     );
     define(r, router::NAME, |r| {

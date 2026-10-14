@@ -103,18 +103,25 @@ fn winrm(r: &mut Ruby, transport: Winrm) {
 }
 
 /// The VM on network `net` at `ip`: a VirtualBox internal network (isolated from the host's
-/// LAN) or a libvirt network without DHCP, named after the environment.
+/// LAN) or a libvirt network without DHCP, named after the environment. On an IPv6 network,
+/// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
+/// provider's VM gets its IPv6 address from the set-up steps.
 pub fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
     let netname = format!("isoloom-{}-{net}", env.name);
-    r.call(
-        Call::new("m.vm.network")
-            .arg(Value::str("private_network"))
-            .kw("ip", Value::str(&ip.to_string()))
-            .kw("netmask", Value::str(&netmask(env.spec(), net).to_string()))
-            .kw("virtualbox__intnet", Value::str(&netname))
-            .kw("libvirt__network_name", Value::str(&netname))
-            .kw("libvirt__dhcp_enabled", false),
-    );
+    let mut call = Call::new("m.vm.network")
+        .arg(Value::str("private_network"))
+        .kw("ip", Value::str(&ip.to_string()))
+        .kw("netmask", Value::str(&netmask(env.spec(), net).to_string()))
+        .kw("virtualbox__intnet", Value::str(&netname))
+        .kw("libvirt__network_name", Value::str(&netname))
+        .kw("libvirt__dhcp_enabled", false);
+    if let Some(v6) = &env.networks[net].ipv6 {
+        call = call
+            .kw("libvirt__guest_ipv6", Value::str("yes"))
+            .kw("libvirt__ipv6_address", Value::str(&v6.gateway.to_string()))
+            .kw("libvirt__ipv6_prefix", Value::str(&isoloom_spec::validate::IPV6_PREFIX.to_string()));
+    }
+    r.call(call);
 }
 
 /// The machine as its providers see it.

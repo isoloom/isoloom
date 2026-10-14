@@ -2,8 +2,8 @@
 //! what the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DISKS, ENVIRONMENT, IMAGES, IPV6, MANAGED, OLDER_NAME, PLACEMENT, PROTECT,
-    PUBLIC_DNS,
+    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DIGITALOCEAN_IPV6, DISKS, ENVIRONMENT, IMAGES, MANAGED, OLDER_NAME, PLACEMENT,
+    PROTECT, PUBLIC_DNS,
 };
 use super::table::{Provider, Rules, Table};
 
@@ -75,7 +75,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         &[
             (CLOUD, "backups backup_policy backup_policy.* droplet_agent monitoring gpu_partition_mode"),
             (PROTECT, "graceful_shutdown resize_disk"),
-            (IPV6, "ipv6 ipv6_address"),
+            (DIGITALOCEAN_IPV6, "ipv6 ipv6_address"),
             (ALIAS, "private_networking public_networking"),
             (DISKS, "volume_ids"),
         ],

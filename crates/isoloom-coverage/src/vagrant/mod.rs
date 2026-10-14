@@ -112,7 +112,9 @@ pub(crate) const VM_NAME: Support = Emitted {
 pub(crate) const MAC: Support = NotPortable {
     why: "cloud VMs get their MAC and addresses from the provider",
 };
-pub(crate) const IPV6: Support = Planned { note: "IPv6 networks" };
+pub(crate) const IPV6: Support = Emitted {
+    from: "networks.*.ipv6 (the libvirt network carries the block; the set-up steps give each VM its address; not run on a real host)",
+};
 
 /// The Vagrant tables: `config.vm` and the other blocks, their options, then one per provider.
 pub fn formats() -> Vec<Format> {

@@ -9,10 +9,12 @@
 
 mod checks;
 mod cidr;
+mod cidr6;
 mod cloud;
 mod constraints;
 mod files;
 mod groups;
+mod ipv6;
 mod machines;
 mod networks;
 mod provision;
@@ -32,6 +34,7 @@ use std::collections::BTreeSet;
 use crate::model::{Machine, Spec};
 
 pub use cidr::{Cidr, DOCKER_BLOCK, PRIVATE, docker_cidrs};
+pub use cidr6::{Cidr6, PREFIX as IPV6_PREFIX};
 pub use files::validate_files;
 pub use settings::CONTAINER_SYSCTLS;
 
@@ -108,6 +111,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     tools::each(spec, &mut p);
     machines::external(spec, &mut p);
     networks::tc(spec, &mut p);
+    ipv6::check(spec, &mut p);
     top::message(spec, &mut p);
     groups::check(spec, &mut p);
     checks::check(spec, &mut p);

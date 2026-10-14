@@ -81,7 +81,7 @@ pub fn vms(env: &Environment) -> impl Iterator<Item = (&str, &MachinePlan)> {
 /// Whether a step sets up something a restart undoes (interfaces and routes are not kept): a
 /// transport runs it again after each `reboot` step.
 pub fn at_every_boot(step: &Step) -> bool {
-    matches!(step, Step::Trunks | Step::Routes { .. })
+    matches!(step, Step::Trunks | Step::Routes { .. } | Step::Ipv6 { .. })
 }
 
 /// A step's Linux script as one command: `sh -c '<script>'` (as root: cloud-init), or with

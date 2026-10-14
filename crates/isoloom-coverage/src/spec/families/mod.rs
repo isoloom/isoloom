@@ -6,6 +6,7 @@ mod cloud_vm;
 mod compose;
 mod external;
 pub mod fields;
+mod ipv6;
 mod kubernetes;
 mod proxmox;
 pub mod shared;

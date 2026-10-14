@@ -39,6 +39,7 @@ pub const LIMITS: Limits = Limits {
     gateways: Some("networks with a `gateway` machine in the cloud come later"),
     playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none"),
+    ipv6: Some("Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept"),
 };
 
 /// The `cloud-vm` module on Google Cloud.

@@ -2,7 +2,7 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, EGRESS_RULES, ENVIRONMENT, IMAGES, IPV6, MANAGED, PLACEMENT, PROTECT,
+    ACCOUNT, ADDRESSES, ALIAS, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, EGRESS_RULES, ENVIRONMENT, IMAGES, LINODE_IPV6, MANAGED, PLACEMENT, PROTECT,
     PUBLIC_DNS, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
@@ -86,7 +86,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (PROTECT, "disabled"),
             (ALIAS, "interfaces"),
             (CLOUD, "nodebalancers"),
-            (IPV6, "inbound.ipv6 outbound.ipv6"),
+            (LINODE_IPV6, "inbound.ipv6 outbound.ipv6"),
             (
                 EGRESS_RULES,
                 "outbound outbound.action outbound.description outbound.ipv4 outbound.label outbound.ports outbound.protocol",
@@ -109,9 +109,9 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 interface.ipam_address interface.ip_ranges interface.ipv4.nat_1_1",
             ),
             (ADDRESSES, "private_ip"),
-            (IPV6, "interface.ipv6 interface.ipv6.*"),
+            (LINODE_IPV6, "interface.ipv6 interface.ipv6.*"),
         ],
     ),
-    ("linode_vpc", &[(IPV6, "ipv6 ipv6.*"), (ALIAS, "ipv4 ipv4.range"), (CLOUD, "vpc_type")]),
-    ("linode_vpc_subnet", &[(IPV6, "ipv6 ipv6.*")]),
+    ("linode_vpc", &[(LINODE_IPV6, "ipv6 ipv6.*"), (ALIAS, "ipv4 ipv4.range"), (CLOUD, "vpc_type")]),
+    ("linode_vpc_subnet", &[(LINODE_IPV6, "ipv6 ipv6.*")]),
 ];

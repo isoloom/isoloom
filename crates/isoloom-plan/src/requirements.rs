@@ -33,6 +33,12 @@ pub enum Feature {
     Ulimits,
     /// Link impairment (`tc`), applied on the path into a network.
     TrafficControl,
+    /// Dual-stack networks (`ipv6`), with addresses derived from the octets.
+    Ipv6,
+    /// IPv6-only networks (`ipv6.only`).
+    Ipv6Only,
+    /// IPv6 addresses the target hands out (`ipv6.addresses: auto`).
+    Ipv6Auto,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -79,6 +85,21 @@ pub enum Requirement {
     },
     /// A network has `tc`.
     TrafficControl,
+    /// A network has an IPv6 block.
+    Ipv6 {
+        /// The first such network.
+        network: String,
+    },
+    /// A network is IPv6-only.
+    Ipv6Only {
+        /// The first such network.
+        network: String,
+    },
+    /// A network leaves its IPv6 addresses to the target.
+    Ipv6Auto {
+        /// The first such network.
+        network: String,
+    },
 }
 
 impl Requirement {
@@ -95,6 +116,9 @@ impl Requirement {
             Requirement::MachineAliases => Feature::MachineAliases,
             Requirement::Ulimits { .. } => Feature::Ulimits,
             Requirement::TrafficControl => Feature::TrafficControl,
+            Requirement::Ipv6 { .. } => Feature::Ipv6,
+            Requirement::Ipv6Only { .. } => Feature::Ipv6Only,
+            Requirement::Ipv6Auto { .. } => Feature::Ipv6Auto,
         }
     }
 }
@@ -129,6 +153,15 @@ impl fmt::Display for Requirement {
                 write!(f, "machine `{machine}` sets `ulimits`: Kubernetes has no per-container process limits")
             }
             Requirement::TrafficControl => f.write_str("link impairment (`tc`) needs a router in the path; Kubernetes has none"),
+            Requirement::Ipv6 { network } => write!(f, "network `{network}` is IPv6 (`ipv6`), which this target's networks don't carry yet"),
+            Requirement::Ipv6Only { network } => write!(
+                f,
+                "network `{network}` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport)"
+            ),
+            Requirement::Ipv6Auto { network } => write!(
+                f,
+                "network `{network}` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`"
+            ),
         }
     }
 }
@@ -194,6 +227,7 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
             .map(|(name, _)| Requirement::Gateway { network: name.clone() }),
     );
     out.extend(limits(spec));
+    out.extend(crate::ipv6::requirements(spec));
     out
 }
 

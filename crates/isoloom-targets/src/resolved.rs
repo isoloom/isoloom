@@ -96,9 +96,7 @@ fn networks(spec: &Spec, routed: bool) -> Map<String, Value> {
     let mut networks = Map::new();
     for (name, n) in &spec.networks {
         let Some(c) = Cidr::parse(&n.cidr) else { continue };
-        networks.insert(
-            name.clone(),
-            json!({
+        let mut network = json!({
                 "cidr": n.cidr,
                 "docker_cidr": docker_blocks[name],
                 "internet": n.internet,
@@ -106,8 +104,11 @@ fn networks(spec: &Spec, routed: bool) -> Map<String, Value> {
                 "gateway_address": c.gateway().to_string(),
                 "router": (routed && router::plain(spec, name)).then(|| c.router().to_string()),
                 "controller": c.controller().to_string(),
-            }),
-        );
+        });
+        if let Some(v6) = &n.ipv6 {
+            network["ipv6"] = json!(v6);
+        }
+        networks.insert(name.clone(), network);
     }
     networks
 }
@@ -129,7 +130,7 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Value {
         .into_iter()
         .map(|(to, via)| json!({ "to": to, "via": via.to_string() }))
         .collect();
-    json!({
+    let mut out = json!({
         "access": m.access,
         "supplied": m.supplied,
         "shapes": shapes,
@@ -152,7 +153,12 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Value {
         "routes": routes,
         "default_gateway": router::default_gateway(spec, name, m).map(|a| a.to_string()),
         "offline": !m.networks.keys().any(|n| spec.networks[n].internet) && router::default_gateway(spec, name, m).is_none(),
-    })
+    });
+    let v6 = isoloom_plan::ipv6::addresses(spec, m);
+    if !v6.is_empty() {
+        out["ipv6_addresses"] = v6.iter().map(|(n, a)| (n.clone(), json!(a.to_string()))).collect::<Map<_, _>>().into();
+    }
+    out
 }
 
 /// A machine's address on each of its networks, as `on` (the spec, or the spec on Docker) gives them.

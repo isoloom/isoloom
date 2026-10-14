@@ -41,6 +41,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
             lines.extend(default.map(|gw| format!("ip route replace default via {gw}")));
             lines_or_none(&lines)
         }
+        Step::Ipv6 { addresses, routes } => Some(crate::ipv6::linux(addresses, routes)),
         Step::Trunks => trunk_commands(env, machine),
         Step::Volumes { paths } => (!paths.is_empty()).then(|| format!("mkdir -p {}\n", paths.iter().map(|p| quote(p)).collect::<Vec<_>>().join(" "))),
         Step::SharedVolume { volume, path, role } => Some(shared_volume(volume, path, role)),
@@ -82,6 +83,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
                 .collect::<Vec<_>>()
                 .join("; "),
         ),
+        Step::Ipv6 { addresses, routes } => Some(crate::ipv6::windows(addresses, routes)),
         Step::Project => Some(format!(
             "$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n{}",
             crate::UNTAR_PS1
@@ -271,6 +273,7 @@ pub fn reboot_check() -> String {
 /// nftables comes from the machine's package manager (Alpine's too: the controller's default box).
 fn egress(env: &Environment) -> String {
     let lab = env.networks.values().map(|n| n.cidr.as_str()).collect::<Vec<_>>().join(", ");
+    let lab6 = crate::ipv6::egress_rule(env);
     let load = crate::boot::at_boot(
         "egress",
         "No new connection leaves the isoloom networks",
@@ -280,7 +283,7 @@ fn egress(env: &Environment) -> String {
     );
     format!(
         "{}\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\n\
-         printf '%s\\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    oifname \"lo\" accept' '    ip daddr != {{ {lab} }} ct state new drop' '  }}' '}}' > /etc/isoloom-egress.nft\n{load}",
+         printf '%s\\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    oifname \"lo\" accept' '    ip daddr != {{ {lab} }} ct state new drop'{lab6} '  }}' '}}' > /etc/isoloom-egress.nft\n{load}",
         machine_setup::PKG
     )
 }

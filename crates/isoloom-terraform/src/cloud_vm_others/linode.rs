@@ -25,7 +25,10 @@ const SUB: &str = "linode";
 const RULES: Rules = Rules {
     cloud: "Linode",
     single_machine: false,
-    limits: single_network::limits("arm64 on Linode comes later (it has no arm64 plans)"),
+    limits: single_network::limits(
+        "arm64 on Linode comes later (it has no arm64 plans)",
+        "a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept",
+    ),
     has_image: |os| image(os).is_some(),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
 };

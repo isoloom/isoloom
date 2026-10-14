@@ -149,7 +149,7 @@ const EVERY_FIELD: &str = r#"
 version: 1
 name: every-field
 networks:
-  out: { cidr: 10.1.0.0/24, internet: true, docker: { cidr: 10.1.0.0/24 } }
+  out: { cidr: 10.1.0.0/24, internet: true, docker: { cidr: 10.1.0.0/24 }, ipv6: { cidr: "fd00:1::/64", addresses: auto, only: false } }
   dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw, docker: { cidr: 10.1.1.0/24 } }
   far: { cidr: 10.1.2.0/24, tc: { delay: 50ms, jitter: 5ms, loss: 0.5, rate: 10mbit } }
   office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, switch: fw, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }

@@ -114,8 +114,38 @@ pub const CLOUD: Support = NotPortable {
 pub const SERVER: Support = NotPortable {
     why: "tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it",
 };
-/// IPv6.
-pub const IPV6: Support = Planned { note: "with IPv6 networks" };
+/// IPv6 on AWS: the VPC's block is Amazon's.
+pub const AWS_IPV6: Support = NotPortable {
+    why: "an AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS",
+};
+/// IPv6 on Google Cloud: the VPC's range is Google's.
+pub const GCP_IPV6: Support = NotPortable {
+    why: "Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud",
+};
+/// IPv6 on Linode: the VPC's ranges are Linode's.
+pub const LINODE_IPV6: Support = NotPortable {
+    why: "Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode",
+};
+/// IPv6 on DigitalOcean: its VPCs are IPv4 only.
+pub const DIGITALOCEAN_IPV6: Support = NotPortable {
+    why: "DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one): Isoloom refuses IPv6 networks on DigitalOcean",
+};
+/// IPv6 on a cloud whose network takes the spec's block (Azure, Oracle Cloud).
+pub const IPV6_GATED: Support = Planned {
+    note: "the cloud takes the spec's unique local block (the Azure module writes it), but cloud-vm generates only when AWS takes the environment, which it refuses with IPv6",
+};
+/// IPv6 on Oracle Cloud: its VCNs take unique local prefixes, not written yet.
+pub const OCI_IPV6: Support = Planned {
+    note: "dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then",
+};
+/// A public IPv6 address.
+pub const PUBLIC_IPV6: Support = NotPortable {
+    why: "a public IPv6 address: local targets have none, and Isoloom reaches machines over IPv4",
+};
+/// IPv6 on Proxmox: the set-up steps give the address.
+pub const PROXMOX_IPV6: Support = Equivalent {
+    via: "networks.*.ipv6: a set-up step gives each VM its IPv6 address, the same on every VM target (not run on a real host)",
+};
 /// Data disks.
 pub const DISKS: Support = Planned {
     note: "with data disks: persistent volumes on VMs",

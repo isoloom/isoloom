@@ -11,7 +11,7 @@ use isoloom_spec::shell;
 
 use crate::network::{self, MACHINE_LABEL};
 use crate::objects::{
-    ClaimResources, ClaimSpec, DeploymentSpec, Image, IpBlock, Labels, Manifest, Metadata, NetworkPolicySpec, Peer, PodTemplate, PolicyPort, Rule, Selector,
+    ClaimResources, ClaimSpec, DeploymentSpec, Image, Labels, Manifest, Metadata, NetworkPolicySpec, Peer, PodTemplate, PolicyPort, Rule, Selector,
     ServicePort, ServiceSpec, Strategy,
 };
 use crate::pod;
@@ -169,8 +169,11 @@ fn service(m: &Machine) -> Option<Manifest> {
             protocol: udp(sv.protocol),
         })
         .collect();
+    let (ip_family_policy, ip_families) = crate::ipv6::families(m.env, m.plan);
     let spec = ServiceSpec {
         kind: None,
+        ip_family_policy,
+        ip_families,
         selector: m.selector(),
         ports,
     };
@@ -184,8 +187,11 @@ fn published(m: &Machine) -> Vec<Manifest> {
     if ports.is_empty() {
         return Vec::new();
     }
+    let (ip_family_policy, ip_families) = crate::ipv6::families(m.env, m.plan);
     let service = ServiceSpec {
         kind: Some("LoadBalancer"),
+        ip_family_policy,
+        ip_families,
         selector: m.selector(),
         ports: ports
             .iter()
@@ -198,10 +204,13 @@ fn published(m: &Machine) -> Vec<Manifest> {
             .collect(),
     };
     let anyone = Rule {
-        from: vec![Peer {
-            ip_block: Some(IpBlock { cidr: "0.0.0.0/0".into() }),
-            ..Peer::default()
-        }],
+        from: crate::ipv6::anyone(m.env, m.plan)
+            .into_iter()
+            .map(|b| Peer {
+                ip_block: Some(b),
+                ..Peer::default()
+            })
+            .collect(),
         ports: ports
             .iter()
             .map(|p| PolicyPort {

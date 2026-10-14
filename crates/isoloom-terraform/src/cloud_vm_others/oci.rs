@@ -31,7 +31,10 @@ const SHAPE: &str = "VM.Standard.E4.Flex";
 const RULES: Rules = Rules {
     cloud: "Oracle Cloud",
     single_machine: false,
-    limits: single_network::limits("arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images)"),
+    limits: single_network::limits(
+        "arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images)",
+        "dual-stack virtual cloud networks on Oracle Cloud come later",
+    ),
     has_image: |_| true,
     images: "Ubuntu 22.04/24.04",
 };
