@@ -39,7 +39,7 @@ machines:
   web:
     networks: { servers: 10 }
     rate_limit: 10mbit
-    services: [{ port: 80, publish: 8080 }]
+    ports: [{ port: 80, publish: 8080 }]
     vm: { os: debian-12, provision: [s.sh] }
   admin: { networks: { office.vlan10: 50, office.vlan20: 50 }, vm: { os: debian-12, provision: [s.sh] } }
 ";
@@ -96,7 +96,7 @@ name: lxc
 networks:
   lab: { cidr: 10.9.0.0/24 }
 machines:
-  web: { networks: { lab: 10 }, services: [{ port: 80 }], environment: { MODE: lab }, docker: { image: 'nginx:1.27', lxc: true } }
+  web: { networks: { lab: 10 }, ports: [{ port: 80 }], environment: { MODE: lab }, docker: { image: 'nginx:1.27', lxc: true } }
   box: { networks: { lab: 11 }, depends_on: [web], vm: { os: debian-12, provision: [s.sh] } }
 ";
 

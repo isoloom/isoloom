@@ -123,7 +123,7 @@ fn kind(name: &str) -> Option<Support> {
             from: "machines (one pod each)",
         },
         "Service" => Emitted {
-            from: "machines.*.services (its name for the others, and what it publishes)",
+            from: "machines.*.ports (its name for the others, and what it publishes)",
         },
         "NetworkPolicy" => Emitted { from: "networks and reach" },
         "PersistentVolumeClaim" => Emitted { from: "volumes" },

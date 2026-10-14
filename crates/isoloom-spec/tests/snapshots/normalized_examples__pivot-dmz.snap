@@ -41,7 +41,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 80
         name: ~
         http: false
@@ -74,7 +74,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 8080
         name: ~
         http: false
@@ -103,7 +103,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 5432
         name: ~
         http: false
@@ -132,7 +132,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services: []
+    ports: []
     inputs: []
     resources: ~
     depends_on: []

@@ -21,7 +21,7 @@ machines:
       servers: [10.60.0.2]
       search: [arm.lab]
       domain: arm.lab
-    services: [{ port: 80, http: true, publish: 8085 }]
+    ports: [{ port: 80, http: true, publish: 8085 }]
     docker: { image: nginx:1.27 }
 
 checks:

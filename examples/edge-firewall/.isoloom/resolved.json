@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "edge-firewall",
   "instance": null,
   "inputs": [],
@@ -71,7 +71,7 @@
         "dmz": "10.70.10.1",
         "lan": "10.70.20.1"
       },
-      "services": [
+      "ports": [
         {
           "port": 8080,
           "name": "status",
@@ -93,7 +93,9 @@
       ],
       "routes": [],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "web": {
       "access": false,
@@ -112,7 +114,7 @@
       "docker_addresses": {
         "dmz": "10.70.10.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,
@@ -136,7 +138,9 @@
         }
       ],
       "default_gateway": "10.70.10.1",
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "cache": {
       "access": false,
@@ -155,7 +159,7 @@
       "docker_addresses": {
         "lan": "10.70.20.20"
       },
-      "services": [
+      "ports": [
         {
           "port": 6379,
           "name": "redis",
@@ -179,7 +183,9 @@
         }
       ],
       "default_gateway": "10.70.20.1",
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "user": {
       "access": true,
@@ -197,7 +203,7 @@
       "docker_addresses": {
         "outside": "10.70.0.10"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -218,7 +224,9 @@
         }
       ],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [

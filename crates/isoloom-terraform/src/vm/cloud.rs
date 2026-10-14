@@ -79,7 +79,7 @@ pub fn windows_refusal(name: &str, m: &Machine) -> Option<String> {
 pub fn windows_udp_redirect(spec: &isoloom_spec::model::Spec) -> Option<String> {
     spec.machines.iter().find_map(|(name, m)| {
         let windows = m.vm.as_ref().is_some_and(|v| isoloom_spec::images::is_windows(&v.os));
-        let s = m.services.iter().find(|s| !s.protocol.is_tcp() && s.publish.is_some_and(|h| h != s.port))?;
+        let s = m.ports.iter().find(|s| !s.protocol.is_tcp() && s.publish.is_some_and(|h| h != s.port))?;
         windows.then(|| {
             format!(
                 "machine `{name}`: UDP port {} published as {} on a Windows VM in the cloud (its port proxy is TCP only): publish it on its own port",
@@ -232,10 +232,10 @@ pub fn outputs(env: &Environment, reach: &Reach, m: &mut Module) {
     let published: Vec<(String, Expression)> = vms(env)
         .flat_map(|(n, _)| {
             let sm = &env.spec().machines[n];
-            sm.services.iter().filter_map(move |sv| {
+            sm.ports.iter().filter_map(move |sv| {
                 let h = sv.publish?;
                 let at = Template::new().with_expr((reach.public_ip)(n)).with_text(format!(":{h}"));
-                Some((format!("{n}/{}", sm.service_label(sv)), at.into_expression()))
+                Some((format!("{n}/{}", sm.port_label(sv)), at.into_expression()))
             })
         })
         .collect();

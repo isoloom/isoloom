@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "cisco-dynamips",
   "instance": null,
   "inputs": [],
@@ -53,7 +53,7 @@
         "site-a": "10.93.1.1",
         "wan": "10.93.0.2"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -92,7 +92,7 @@
         "site-b": "10.93.2.1",
         "wan": "10.93.0.3"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -129,7 +129,7 @@
       "docker_addresses": {
         "site-a": "10.93.1.10"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -159,7 +159,7 @@
       "docker_addresses": {
         "site-b": "10.93.2.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,

@@ -1,6 +1,6 @@
 //! Pictures and tables of an environment, from the resolved snapshot: `isoloom graph` draws
 //! the networks, machines, reach rules and gateways (D2 or Graphviz; SVG/PNG when the renderer
-//! is installed); `isoloom report` prints addressing, services, wiring and resources as text or
+//! is installed); `isoloom report` prints addressing, ports, wiring and resources as text or
 //! Markdown. Both read what `resolved::resolve` (in isoloom-targets) worked out, so they can't disagree
 //! with the generated files.
 
@@ -23,7 +23,7 @@ pub fn graph_d2(r: &Value) -> String {
     out.push('\n');
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
         let mut label = m.clone();
-        let services: Vec<String> = v["services"]
+        let ports: Vec<String> = v["ports"]
             .as_array()
             .into_iter()
             .flatten()
@@ -32,9 +32,9 @@ pub fn graph_d2(r: &Value) -> String {
                 None => port_text(s),
             })
             .collect();
-        if !services.is_empty() {
+        if !ports.is_empty() {
             label.push_str("\\n");
-            label.push_str(&services.join(", "));
+            label.push_str(&ports.join(", "));
         }
         let shape = match MachineKind::of(v) {
             MachineKind::Access => "person",
@@ -81,9 +81,9 @@ pub fn graph_dot(r: &Value) -> String {
     }
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
         let mut label = m.clone();
-        let services: Vec<String> = v["services"].as_array().into_iter().flatten().map(port_text).collect();
-        if !services.is_empty() {
-            let _ = write!(label, "\\n:{}", services.join(" :"));
+        let ports: Vec<String> = v["ports"].as_array().into_iter().flatten().map(port_text).collect();
+        if !ports.is_empty() {
+            let _ = write!(label, "\\n:{}", ports.join(" :"));
         }
         let shape = match MachineKind::of(v) {
             MachineKind::Access => "egg",
@@ -167,7 +167,7 @@ fn id(name: &str) -> String {
 /// The reports `isoloom report` knows.
 pub const REPORTS: &[(&str, &str)] = &[
     ("addressing", "every machine's address on every network"),
-    ("services", "what answers on which port, and from which networks it may be reached"),
+    ("ports", "what answers on which port, and from which networks it may be reached"),
     (
         "wiring",
         "how each target lays the networks out: Docker blocks, VirtualBox and libvirt network names, Kubernetes labels",
@@ -179,7 +179,7 @@ pub const REPORTS: &[(&str, &str)] = &[
 pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String, crate::ReportError> {
     let (head, rows) = match name {
         "addressing" => addressing(r),
-        "services" => services(r),
+        "ports" | "services" => ports(r),
         "wiring" => wiring(r),
         "resources" => resources(r),
         other => {
@@ -192,7 +192,7 @@ pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String, crate::Re
     Ok(table(&head, &rows, markdown))
 }
 
-/// Under Vagrant's Hyper-V provider the published ports (`127.0.0.1:<port>` in the services
+/// Under Vagrant's Hyper-V provider the published ports (`127.0.0.1:<port>` in the ports
 /// report) aren't there: Hyper-V forwards none. A note saying so and where they are instead,
 /// when the environment publishes any.
 pub fn hyperv_ports_note(r: &Value) -> Option<String> {
@@ -201,7 +201,7 @@ pub fn hyperv_ports_note(r: &Value) -> Option<String> {
         .into_iter()
         .flatten()
         .flat_map(|(m, v)| {
-            v["services"].as_array().into_iter().flatten().filter_map(move |s| {
+            v["ports"].as_array().into_iter().flatten().filter_map(move |s| {
                 s["publish"]
                     .as_u64()
                     .map(|p| format!("127.0.0.1:{p} ({m}:{})", s["port"].as_u64().unwrap_or(0)))
@@ -239,7 +239,7 @@ fn addressing(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     (head, rows)
 }
 
-/// A service's port as shown: `53`, or `53/udp` for a UDP one.
+/// A port as shown: `53`, or `53/udp` for a UDP one.
 fn port_text(s: &Value) -> String {
     match s["protocol"].as_str() {
         Some(p) if p != "tcp" => format!("{}/{p}", s["port"]),
@@ -247,7 +247,7 @@ fn port_text(s: &Value) -> String {
     }
 }
 
-fn services(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
+fn ports(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     let head = ["machine", "port", "name", "http", "published", "reachable from"]
         .iter()
         .map(std::string::ToString::to_string)
@@ -256,7 +256,7 @@ fn services(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     let nets: Vec<String> = r["networks"].as_object().into_iter().flatten().map(|(n, _)| n.clone()).collect();
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
         let own: Vec<&str> = v["addresses"].as_object().into_iter().flatten().map(|(n, _)| n.as_str()).collect();
-        for s in v["services"].as_array().into_iter().flatten() {
+        for s in v["ports"].as_array().into_iter().flatten() {
             let port = s["port"].as_u64().unwrap_or(0);
             let mut from: Vec<String> = Vec::new();
             for n in &nets {

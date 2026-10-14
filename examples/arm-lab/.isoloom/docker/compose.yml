@@ -43,7 +43,7 @@ services:
       isoloom-probe-arm64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.80: http:80
+      isoloom.port.80: http:80
       isoloom.managed: 'true'
       isoloom.environment: arm-lab
     restart: unless-stopped

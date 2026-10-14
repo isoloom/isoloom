@@ -15,14 +15,14 @@ networks:
 machines:
   web:
     networks: { app: 10 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     environment: { APP_MODE: production }
     sysctls: { net.core.somaxconn: 4096 }
     ulimits: { nofile: { soft: 8192, hard: 16384 } }
     disks: { cache: { size_gb: 50, fs: xfs, mount: /var/cache/web } }
     docker: { image: "nginx:1.27-alpine" }
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/web.sh]
       tpm: true
 

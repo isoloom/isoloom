@@ -32,7 +32,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     let snapshot = spec::snapshot_of(&a.dir, a.instance, &a.sets)?;
     print!("{}", isoloom_runtime::report::report(&a.name, &snapshot, a.md)?);
     // Published ports on Hyper-V (the provider the defaults or Vagrant pick): not forwarded.
-    if a.name == "services"
+    if matches!(a.name.as_str(), "ports" | "services")
         && tools::vagrant::provider(&a.dir).as_deref() == Some("hyperv")
         && let Some(note) = isoloom_runtime::report::hyperv_ports_note(&snapshot)
     {

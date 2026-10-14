@@ -22,7 +22,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 80
         name: ~
         http: true
@@ -49,7 +49,7 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
-    services:
+    ports:
       - port: 6379
         name: redis
         http: false
@@ -69,7 +69,7 @@ machines:
       image: ~
 common:
   vm:
-    os: debian-12
+    os: debian@12
 groups:
   pair:
     members:

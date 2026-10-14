@@ -4,7 +4,7 @@
 
 use serde_json::{Value, json};
 
-use crate::model::{KNOWN_OS, Spec};
+use crate::model::Spec;
 
 /// Where the schema is published.
 pub const SCHEMA_URL: &str = "https://www.isoloom.com/schema/v1.json";
@@ -79,9 +79,11 @@ fn networks(s: &mut Value) {
     );
 }
 
-/// The machines: known OS names, the last octet on each network, absolute volume paths.
+/// The machines: the OS spellings (`debian@12`, `debian`, `debian-12`), the last octet on each network, absolute volume paths.
 fn machines(s: &mut Value) {
-    set(s, &["$defs", "VmImpl", "properties", "os"], "enum", json!(KNOWN_OS));
+    let os = json!(crate::os::spellings());
+    set(s, &["$defs", "VmImpl", "properties", "os"], "enum", os.clone());
+    set(s, &["$defs", "Machine", "properties", "os"], "enum", os);
     // `vm: {}` is complete when `common:` or a group supplies the OS.
     set(s, &["$defs", "VmImpl"], "required", json!([]));
     set(

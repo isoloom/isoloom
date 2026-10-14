@@ -529,6 +529,17 @@ More DNS names the machine answers to besides its own (a fully qualified name an
 - **Planned for:** `external`
 - **Not used by:** `kubernetes`, `helm`, `kustomize`, `cloud-services`
 
+### `machines.*.os`
+
+The machine's OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default version (`debian` is `debian@12`). The older names (`debian-12`) are read too. `vm.os` defaults to it, and a machine with neither `docker:` nor `vm:` runs as a VM of this OS (`vm: { os }`).
+
+- **Type:** string
+- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`, `debian-11`, `debian-12`, `debian-13`, `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `ubuntu-20.04`, `ubuntu-22.04`, `ubuntu-24.04`, `rocky-9`, `almalinux-9`, `alpine-3.19`, `fedora-42`, `centos-7`, `windows-10`, `windows-11`, `windows-server-2008r2`, `windows-server-2012r2`, `windows-server-2016`, `windows-server-2019`, `windows-server-2022`, `windows-server-2025`
+- **Example:** `machines: { a: { os: debian@12 } }`
+- **Rendered by:** `vagrant`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `external`
+- **Planned for:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `cloud-docker`
+- **Not used by:** `cloud-services`
+
 ### `machines.*.arch`
 
 The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
@@ -848,28 +859,28 @@ The ceiling a process may raise its soft limit to.
 - **Type:** integer
 - **Targets:** as [`machines.*.ulimits`](#machinesulimits)
 
-### `machines.*.services`
+### `machines.*.ports`
 
-The ports the machine answers on: what is published, opened by `reach`, waited for and checked.
+The ports the machine answers on, each with its protocol, an HTTP probe and whether it is published or dormant: what is published, opened by `reach`, waited for and checked. Named `services` before 1.0, a key still read, with a warning, for at least one release.
 
 - **Type:** list of mappings
 
-### `machines.*.services[].port`
+### `machines.*.ports[].port`
 
-The port the service listens on inside the machine (what the other machines and the checks connect to).
+The port the machine listens on (what the other machines and the checks connect to).
 
 - **Type:** integer
 - **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `external`
 - **Not used by:** `cloud-services`
 
-### `machines.*.services[].name`
+### `machines.*.ports[].name`
 
-A name for the service (`web`, `api`): how outputs and messages refer to it. Default: its port.
+A name for the port (`web`, `api`): how outputs and messages refer to it. Default: its port.
 
 - **Type:** string
-- **Read by Isoloom itself:** names the service for people and runners
+- **Read by Isoloom itself:** names the port for people and runners
 
-### `machines.*.services[].http`
+### `machines.*.ports[].http`
 
 It speaks HTTP: derived checks request a page instead of only connecting.
 
@@ -877,49 +888,49 @@ It speaks HTTP: derived checks request a page instead of only connecting.
 - **Default:** `false`
 - **Read by Isoloom itself:** tells runners they can open it in a browser
 
-### `machines.*.services[].tls`
+### `machines.*.ports[].tls`
 
-It speaks TLS (HTTPS for an `http` service): probes and checks use TLS, certificates unchecked (lab services sign their own).
+It speaks TLS (HTTPS for an `http` port): probes and checks use TLS, certificates unchecked (lab services sign their own).
 
 - **Type:** boolean
 - **Read by Isoloom itself:** derived checks reach it over TLS (HTTPS for an `http` service)
 
-### `machines.*.services[].publish`
+### `machines.*.ports[].publish`
 
 Reachable from the user's machine on this port (loopback only), besides the environment's own networks.
 
 - **Type:** integer
-- **Example:** `machines: { a: { services: [{ port: 80, publish: 8080 }] } }`
+- **Example:** `machines: { a: { ports: [{ port: 80, publish: 8080 }] } }`
 - **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`
 - **Not used by:** `cloud-services`, `external`
 
-### `machines.*.services[].fixed`
+### `machines.*.ports[].fixed`
 
 Keep `publish` as the host port on local Docker too (normally a free one is picked, so labs never collide): for apps whose pages call `localhost:<that port>` themselves. The environment can't start while another holds that port.
 
 - **Type:** boolean
-- **Example:** `machines: { a: { services: [{ port: 80, publish: 8080, fixed: true }] } }`
+- **Example:** `machines: { a: { ports: [{ port: 80, publish: 8080, fixed: true }] } }`
 - **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`
 - **Not used by:** `cloud-services`, `external`
 
-### `machines.*.services[].dormant`
+### `machines.*.ports[].dormant`
 
-Only answers later, once something wakes it (the bind shell an exploit opens): declared, published and opened by `reach` like any service, but nothing waits for it (healthcheck, readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.
+Only answers later, once something wakes it (the bind shell an exploit opens): declared, published and opened by `reach` like any port, but nothing waits for it (healthcheck, readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.
 
 - **Type:** boolean
-- **Example:** `machines: { a: { services: [{ port: 80 }, { port: 4444, dormant: true }] } }`
+- **Example:** `machines: { a: { ports: [{ port: 80 }, { port: 4444, dormant: true }] } }`
 - **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `external`
 - **Not used by:** `cloud-services`
 
-### `machines.*.services[].protocol`
+### `machines.*.ports[].protocol`
 
-`tcp` (default) or `udp` (DNS, SNMP, TFTP, syslog): published, forwarded and opened as UDP. UDP has no handshake, so nothing waits for it (healthcheck, readiness probe, `depends_on`) and no derived check probes it: a check of your own says how (`exec: dig`). A port served over both is two services, one per protocol.
+`tcp` (default) or `udp` (DNS, SNMP, TFTP, syslog): published, forwarded and opened as UDP. UDP has no handshake, so nothing waits for it (healthcheck, readiness probe, `depends_on`) and no derived check probes it: a check of your own says how (`exec: dig`). A port served over both is two entries, one per protocol.
 
 - **Type:** string
 - **Allowed:**
   - `tcp`: TCP, the default.
   - `udp`: UDP.
-- **Example:** `machines: { a: { services: [{ port: 80 }, { port: 53, protocol: udp }] } }`
+- **Example:** `machines: { a: { ports: [{ port: 80 }, { port: 53, protocol: udp }] } }`
 - **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `external`
 - **Partly rendered by:** `vagrant`, `hybrid` (not yet: vagrant-libvirt skips UDP forwarded ports (`isoloom run` warns): reach the machine's address instead)
 - **Not used by:** `cloud-services`
@@ -1045,7 +1056,7 @@ Scripts in the project run inside the machine before its command, at every start
 
 ### `machines.*.healthcheck`
 
-When the machine counts as healthy beyond its services' ports answering: a command or a page, with its pace. Checked beside the port probe, never instead of it.
+When the machine counts as healthy beyond its ports answering: a command or a page, with its pace. Checked beside the port probe, never instead of it.
 
 - **Type:** mapping
 
@@ -1128,7 +1139,7 @@ A grace period after start before the first try counts (`30s`). Default: 10s.
 
 ### `machines.*.depends_on`
 
-Machines that must be ready (their services answering) before this one starts.
+Machines that must be ready (their ports answering) before this one starts.
 
 - **Type:** list of strings
 - **Example:** `machines: { b: { depends_on: [a] } }`
@@ -1427,10 +1438,10 @@ How a VM produces this machine (services installed natively, no Docker inside).
 
 ### `machines.*.vm.os`
 
-The OS, one of the names Isoloom knows; each target maps it to an image. May come from `common:` or a group (`vm: {}` in the machine).
+The OS, as `<family>@<version>` (`debian@12`), a family alone for its pinned default, or an older name (`debian-12`); each target maps it to an image. Defaults to the machine's `os`, which it must agree with when both are set. May come from `common:` or a group (`vm: {}` in the machine).
 
 - **Type:** string
-- **Allowed:** `debian-11`, `debian-12`, `debian-13`, `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `ubuntu-20.04`, `ubuntu-22.04`, `ubuntu-24.04`, `rocky-9`, `almalinux-9`, `centos-7`, `fedora-42`, `kali`, `windows-10`, `windows-11`, `windows-server-2008r2`, `windows-server-2012r2`, `windows-server-2016`, `windows-server-2019`, `windows-server-2022`, `windows-server-2025`
+- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`, `debian-11`, `debian-12`, `debian-13`, `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `ubuntu-20.04`, `ubuntu-22.04`, `ubuntu-24.04`, `rocky-9`, `almalinux-9`, `alpine-3.19`, `fedora-42`, `centos-7`, `windows-10`, `windows-11`, `windows-server-2008r2`, `windows-server-2012r2`, `windows-server-2016`, `windows-server-2019`, `windows-server-2022`, `windows-server-2025`
 - **Rendered by:** `vagrant`, `hybrid`
 - **Partly rendered by:** `proxmox`, `esxi`, `cloud-vm` (every cloud) (not yet: Kali)
 - **Partly rendered by:** `external` (not yet: Windows hosts skip the machine's own steps)
@@ -2332,7 +2343,7 @@ Keep it running once provisioning is done (to use it as a jump host). By default
 
 ### `checks`
 
-Black-box checks that prove the behavior on every target: scripts, or declared probes (`http`, `tcp`, `exec`, `script`) run from a machine of the environment. Isoloom adds derived checks of its own from `services` and `reach`.
+Black-box checks that prove the behavior on every target: scripts, or declared probes (`http`, `tcp`, `exec`, `script`) run from a machine of the environment. Isoloom adds derived checks of its own from `ports` and `reach`.
 
 - **Type:** list of strings or mappings
 - **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-docker`, `cloud-services`

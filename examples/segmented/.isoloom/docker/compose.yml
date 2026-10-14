@@ -79,7 +79,7 @@ services:
           cpus: '1'
           memory: 1024M
     labels:
-      isoloom.service.redis: tcp:6379
+      isoloom.port.redis: tcp:6379
       isoloom.managed: 'true'
       isoloom.environment: segmented
     restart: unless-stopped
@@ -144,8 +144,8 @@ services:
       cache-routes:
         condition: service_healthy
     labels:
-      isoloom.service.80: http:80
-      isoloom.service.shell: tcp:4444
+      isoloom.port.80: http:80
+      isoloom.port.shell: tcp:4444
       isoloom.managed: 'true'
       isoloom.environment: segmented
     restart: unless-stopped

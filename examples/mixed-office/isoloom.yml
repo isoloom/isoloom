@@ -12,19 +12,19 @@ networks:
 machines:
   files01:
     networks: { office: 10 }
-    services: [{ port: 445 }]
+    ports: [{ port: 445 }]
     resources: { cpus: 2, memory_mb: 3072 }
     vm:
-      os: windows-server-2019
+      os: windows-server@2019
       provision: [provision/share.ps1]
       tpm: true   # a TPM 2.0 (for BitLocker): AWS has no Windows image for it yet, Azure does
 
   intranet:
     networks: { office: 20 }
-    services: [{ port: 80, http: true, publish: 8083 }]
+    ports: [{ port: 80, http: true, publish: 8083 }]
     docker: { image: nginx:1.27 }
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/intranet.sh]
 
 checks:

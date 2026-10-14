@@ -27,7 +27,7 @@ machines:
 
   files:
     networks: { office.vlan10: 10, office.vlan20: 10 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     docker: { image: "nginx:1.27-alpine" }
 
   staff:

@@ -35,7 +35,7 @@ fn the_router_applies_netem_on_its_interface_into_the_network() {
 fn impairment_is_checked() {
     let p = |nets: &str, reach: &str| -> Vec<String> {
         let yaml = format!(
-            "version: 1\nname: t\nnetworks:\n{nets}{reach}machines:\n  a: {{ networks: {{ x: 5 }}, services: [{{ port: 80 }}], docker: {{ image: x }} }}\n  b: {{ networks: {{ y: 5 }}, docker: {{ image: x }} }}\n"
+            "version: 1\nname: t\nnetworks:\n{nets}{reach}machines:\n  a: {{ networks: {{ x: 5 }}, ports: [{{ port: 80 }}], docker: {{ image: x }} }}\n  b: {{ networks: {{ y: 5 }}, docker: {{ image: x }} }}\n"
         );
         validate(&parse(&yaml).unwrap()).into_iter().map(|p| p.to_string()).collect()
     };

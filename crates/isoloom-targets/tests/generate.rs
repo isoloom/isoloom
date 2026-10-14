@@ -386,7 +386,7 @@ fn a_network_can_name_its_docker_block() {
 #[test]
 fn windows_machines_use_winrm_and_powershell() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    services: [{ port: 389 }]\n    vm:\n      os: windows-server-2019\n      provision: [provision/dc.ps1]\n  web:\n    networks: { lab: 20 }\n    depends_on: [dc01]\n    vm:\n      os: windows-server-2019\n      image: { vagrant: example/win2019, vagrant_version: '1.0' }\n      provision: [provision/web.ps1]\n",
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm:\n      os: windows-server-2019\n      provision: [provision/dc.ps1]\n  web:\n    networks: { lab: 20 }\n    depends_on: [dc01]\n    vm:\n      os: windows-server-2019\n      image: { vagrant: example/win2019, vagrant_version: '1.0' }\n      provision: [provision/web.ps1]\n",
     )
     .unwrap();
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
@@ -647,7 +647,7 @@ fn linux_machines_leave_windows_out_of_etc_hosts() {
     // A Linux member joining an AD domain must not have the Windows DC in /etc/hosts by its
     // short name: that shadows AD DNS and breaks the Kerberos SPN lookup on realm join.
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    services: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\n  lx01:\n    networks: { lab: 12 }\n    services: [{ port: 22 }]\n    depends_on: [dc01]\n    vm: { os: ubuntu-24.04, provision: [p.sh] }\n",
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\n  lx01:\n    networks: { lab: 12 }\n    ports: [{ port: 22 }]\n    depends_on: [dc01]\n    vm: { os: ubuntu-24.04, provision: [p.sh] }\n",
     )
     .unwrap();
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
@@ -667,7 +667,7 @@ fn linux_machines_leave_windows_out_of_etc_hosts() {
 #[test]
 fn an_idle_container_is_kept_running() {
     let spec = parse(
-        "version: 1\nname: idle\nnetworks:\n  lan: { cidr: 10.10.1.0/24 }\nmachines:\n  box:\n    networks: { lan: 10 }\n    docker: { image: \"alpine:3.20\", idle: true }\n  web:\n    networks: { lan: 11 }\n    services: [{ port: 80 }]\n    docker: { image: \"nginx:1.27-alpine\" }\n",
+        "version: 1\nname: idle\nnetworks:\n  lan: { cidr: 10.10.1.0/24 }\nmachines:\n  box:\n    networks: { lan: 10 }\n    docker: { image: \"alpine:3.20\", idle: true }\n  web:\n    networks: { lan: 11 }\n    ports: [{ port: 80 }]\n    docker: { image: \"nginx:1.27-alpine\" }\n",
     )
     .expect("spec parses");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
@@ -827,11 +827,11 @@ networks: { lan: { cidr: 10.70.0.0/24 } }
 machines:
   db:
     networks: { lan: 20 }
-    services: [{ port: 5432 }]
+    ports: [{ port: 5432 }]
     docker: { image: "postgres:17", init: [seed.sh] }
   web:
     networks: { lan: 10 }
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     depends_on: [db]
     docker: { image: "nginx:1.27-alpine", init: [setup.sh, warm.sh] }
 "#,
@@ -876,8 +876,8 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
     // 4444 is the shell an exploit opens: `shell` has nothing else, `web` serves 80 too.
     let spec = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
-         shell: { networks: { lab: 5 }, services: [{ port: 4444, dormant: true, publish: 4444 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
-         web: { networks: { lab: 10 }, services: [{ port: 80 }, { port: 4444, dormant: true }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
+         shell: { networks: { lab: 5 }, ports: [{ port: 4444, dormant: true, publish: 4444 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
+         web: { networks: { lab: 10 }, ports: [{ port: 80 }, { port: 4444, dormant: true }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
          app: { networks: { lab: 20 }, depends_on: [web], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
     )
     .unwrap();
@@ -925,7 +925,7 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
     let problems: Vec<String> = isoloom_spec::validate(&bad).iter().map(std::string::ToString::to_string).collect();
     assert_eq!(
         problems,
-        ["machines.app.depends_on[0]: `shell`'s services are all dormant (they answer later), so there's nothing to wait for"]
+        ["machines.app.depends_on[0]: `shell`'s ports are all dormant (they answer later), so there's nothing to wait for"]
     );
 }
 
@@ -933,8 +933,8 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
 fn udp_spec() -> isoloom_spec::Spec {
     let spec = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  far: { cidr: 10.9.1.0/24 }\nreach: [{ from: far, to: lab, ports: [53] }]\nmachines:\n  \
-         dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
-         syslog: { networks: { lab: 6 }, services: [{ port: 514, protocol: udp, publish: 1514 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
+         dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
+         syslog: { networks: { lab: 6 }, ports: [{ port: 514, protocol: udp, publish: 1514 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
          app: { networks: { far: 20 }, depends_on: [dns], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
     )
     .unwrap();
@@ -951,8 +951,8 @@ fn a_udp_service_is_published_as_udp_on_docker() {
     let svc = |n: &str| compose["services"][n].clone();
     let ports = serde_yaml_ng::to_string(&svc("dns")["ports"]).unwrap();
     assert!(ports.contains("+10053}:53/udp"), "{ports}");
-    assert_eq!(svc("dns")["labels"]["isoloom.service.53-udp"].as_str(), Some("udp:53"));
-    assert_eq!(svc("dns")["labels"]["isoloom.service.53"].as_str(), Some("tcp:53"));
+    assert_eq!(svc("dns")["labels"]["isoloom.port.53-udp"].as_str(), Some("udp:53"));
+    assert_eq!(svc("dns")["labels"]["isoloom.port.53"].as_str(), Some("tcp:53"));
     let probe = serde_yaml_ng::to_string(&svc("dns")["healthcheck"]).unwrap();
     assert!(probe.contains("127.0.0.1 53"), "{probe}");
     assert!(svc("syslog").get("healthcheck").is_none());
@@ -964,13 +964,13 @@ fn a_udp_and_a_tcp_service_sharing_a_name_stay_apart() {
     // `dns` and `dns-udp`, on Docker and on the clouds.
     let named = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
-         dns: { networks: { lab: 5 }, services: [{ port: 53, protocol: udp, name: dns, publish: 10053 }, { port: 53, name: dns, publish: 1053 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+         dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, name: dns, publish: 10053 }, { port: 53, name: dns, publish: 1053 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
     )
     .unwrap();
     assert_eq!(isoloom_spec::validate(&named), vec![]);
     let c: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents(&generate(&named, Target::Docker).unwrap(), ".isoloom/docker/compose.yml")).unwrap();
-    assert_eq!(c["services"]["dns"]["labels"]["isoloom.service.dns-udp"].as_str(), Some("udp:53"));
-    assert_eq!(c["services"]["dns"]["labels"]["isoloom.service.dns"].as_str(), Some("tcp:53"));
+    assert_eq!(c["services"]["dns"]["labels"]["isoloom.port.dns-udp"].as_str(), Some("udp:53"));
+    assert_eq!(c["services"]["dns"]["labels"]["isoloom.port.dns"].as_str(), Some("tcp:53"));
     let aws = contents(&generate(&named, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
     assert!(aws.contains("\"dns/dns-udp\"") && aws.contains("\"dns/dns\""), "{aws}");
 }
@@ -1018,8 +1018,8 @@ fn a_udp_service_is_never_waited_for_nor_checked() {
 
     // The snapshot says so.
     let snap = isoloom_targets::resolved::resolve(&spec);
-    assert_eq!(snap["machines"]["dns"]["services"][0]["protocol"], "udp");
-    assert!(snap["machines"]["dns"]["services"][1].get("protocol").is_none());
+    assert_eq!(snap["machines"]["dns"]["ports"][0]["protocol"], "udp");
+    assert!(snap["machines"]["dns"]["ports"][1].get("protocol").is_none());
 
     // Depending on a machine with only UDP services waits for nothing: refused.
     let mut bad = spec.clone();
@@ -1027,13 +1027,13 @@ fn a_udp_service_is_never_waited_for_nor_checked() {
     let problems: Vec<String> = isoloom_spec::validate(&bad).iter().map(std::string::ToString::to_string).collect();
     assert_eq!(
         problems,
-        ["machines.app.depends_on[0]: `syslog`'s services are all UDP (no handshake to wait for), so there's nothing to wait for"]
+        ["machines.app.depends_on[0]: `syslog`'s ports are all UDP (no handshake to wait for), so there's nothing to wait for"]
     );
 }
 
 #[test]
 fn a_udp_service_is_validated() {
-    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { networks: { lab: 5 }, docker: { image: x }, services: ";
+    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { networks: { lab: 5 }, docker: { image: x }, ports: ";
     let problems = |svcs: &str| -> Vec<String> {
         isoloom_spec::validate(&parse(&format!("{base}{svcs} }}\n")).unwrap())
             .iter()
@@ -1044,7 +1044,7 @@ fn a_udp_service_is_validated() {
     assert_eq!(problems("[{ port: 53, protocol: udp }, { port: 53, protocol: tcp }]"), Vec::<String>::new());
     assert_eq!(
         problems("[{ port: 53, protocol: udp }, { port: 53, protocol: udp }]"),
-        ["machines.a.services[1].port: port 53 (UDP) is listed twice"]
+        ["machines.a.ports[1].port: port 53 (UDP) is listed twice"]
     );
     // A host port may be published once per protocol.
     assert_eq!(
@@ -1053,7 +1053,7 @@ fn a_udp_service_is_validated() {
     );
     assert_eq!(
         problems("[{ port: 69, protocol: udp, http: true }]"),
-        ["machines.a.services[0]: `http` and `tls` run over TCP: a UDP service has neither"]
+        ["machines.a.ports[0]: `http` and `tls` run over TCP: a UDP port has neither"]
     );
     let err = parse(&format!("{base}[{{ port: 53, protocol: sctp }}] }}\n")).unwrap_err().to_string();
     assert!(err.contains("sctp"), "{err}");
@@ -1070,7 +1070,7 @@ fn provider_block<'a>(vf: &'a str, vm: &str, provider: &str) -> &'a str {
 fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
     // GOAD-Mini's shape: one Windows DC and the controller running the lab's playbooks.
     let spec = parse(
-        "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    services: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\nprovision:\n  - ansible: ansible/main.yml\n",
+        "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\nprovision:\n  - ansible: ansible/main.yml\n",
     )
     .unwrap();
     assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("qemu")), None);

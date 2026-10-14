@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "supplier-portal-api",
   "instance": null,
   "inputs": [
@@ -37,7 +37,7 @@
       "docker_addresses": {
         "lab": "10.20.0.32"
       },
-      "services": [
+      "ports": [
         {
           "port": 3207,
           "name": "mysql",
@@ -59,7 +59,9 @@
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "web": {
       "access": false,
@@ -78,7 +80,7 @@
       "docker_addresses": {
         "lab": "10.20.0.31"
       },
-      "services": [
+      "ports": [
         {
           "port": 3206,
           "name": "portal",
@@ -100,7 +102,9 @@
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [

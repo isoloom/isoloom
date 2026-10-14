@@ -19,12 +19,12 @@ machines:
     volumes: { shared: /srv/shared }
     disks: { data: { size_gb: 50, mount: /srv/data } }
     docker: { image: "alpine:3.20", idle: true, init: [steps/write.sh] }
-    vm: { os: debian-12, provision: [steps/write.sh] }
+    vm: { os: debian@12, provision: [steps/write.sh] }
   reader:
     networks: { app: 11 }
     volumes: { shared: /data/shared }
     docker: { image: "alpine:3.20", idle: true }
-    vm: { os: debian-12, provision: [steps/look.sh] }
+    vm: { os: debian@12, provision: [steps/look.sh] }
 
 checks:
   - name: the reader sees what the writer wrote

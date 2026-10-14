@@ -25,7 +25,7 @@ fn contents(files: &[isoloom_targets::GeneratedFile], suffix: &str) -> String {
 fn addresses_and_routers_match_the_generators() {
     let spec = example("segmented");
     let r = resolve(&spec);
-    assert_eq!(lookup(&r, "resolved_version").unwrap(), 1);
+    assert_eq!(lookup(&r, "resolved_version").unwrap(), 2);
     assert_eq!(lookup(&r, "machines.web.addresses.front").unwrap(), "10.61.10.10");
     assert_eq!(lookup(&r, "networks.back.router").unwrap(), "10.61.20.254");
     assert_eq!(lookup(&r, "networks.back.internet").unwrap(), false);
@@ -148,4 +148,18 @@ fn only_a_generated_cloud_vm_lists_its_clouds() {
     let generated = clouds["cloud-vm"]["generated"].as_array().unwrap().len();
     let refused = clouds["cloud-vm"]["refused"].as_object().unwrap().len();
     assert_eq!(generated + refused, 6);
+}
+
+#[test]
+fn each_machine_records_its_resolved_os_and_its_ports() {
+    let spec = isoloom_spec::parse(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { os: windows-server, networks: { lab: 5 }, ports: [{ port: 3389 }], vm: { provision: [a.ps1] } }\n  b: { networks: { lab: 6 }, docker: { image: x } }\n",
+    )
+    .unwrap();
+    let r = resolve(&spec);
+    assert_eq!(lookup(&r, "machines.a.os").unwrap(), "windows-server-2022");
+    assert_eq!(lookup(&r, "machines.a.os_family").unwrap(), "windows-server");
+    assert_eq!(lookup(&r, "machines.a.os_version").unwrap(), "2022", "the pinned default, recorded");
+    assert_eq!(lookup(&r, "machines.a.ports.0.port").unwrap(), 3389);
+    assert!(lookup(&r, "machines.b.os_family").is_none(), "a container without an `os` has none");
 }

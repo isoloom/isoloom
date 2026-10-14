@@ -22,7 +22,7 @@ const MAX_DEPTH: usize = 10;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Field {
     /// Its path, the way the spec table names rows: `*` for a name the author chooses, `[]` for
-    /// the items of a list (`machines.*.services[].port`).
+    /// the items of a list (`machines.*.ports[].port`).
     pub path: String,
     /// Its type in words (`string`, `list of mappings`, `map of name to integer`).
     pub kind: String,

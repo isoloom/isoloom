@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "arm-lab",
   "instance": null,
   "inputs": [],
@@ -33,7 +33,7 @@
       "docker_addresses": {
         "lab": "10.60.0.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,

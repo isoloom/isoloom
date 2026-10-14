@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "several-addresses",
   "instance": null,
   "inputs": [],
@@ -33,7 +33,7 @@
       "docker_addresses": {
         "office": "10.86.0.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,
@@ -53,6 +53,8 @@
       "routes": [],
       "default_gateway": null,
       "offline": false,
+      "os_family": "debian",
+      "os_version": "12",
       "more_addresses": {
         "office": [
           "10.86.0.11",
@@ -76,7 +78,7 @@
       "docker_addresses": {
         "office": "10.86.0.40"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -89,6 +91,8 @@
       "routes": [],
       "default_gateway": null,
       "offline": false,
+      "os_family": "debian",
+      "os_version": "12",
       "more_addresses": {
         "office": [
           "10.86.0.48",
@@ -126,7 +130,7 @@
       "docker_addresses": {
         "office": "10.86.0.20"
       },
-      "services": [],
+      "ports": [],
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -138,7 +142,9 @@
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [

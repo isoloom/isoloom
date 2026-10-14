@@ -49,13 +49,13 @@ fn public_network(o: &str) -> Option<Support> {
 fn forwarded_port(o: &str) -> Option<Support> {
     Some(match o {
         "guest" | "host" => Emitted {
-            from: "machines.*.services[].publish",
+            from: "machines.*.ports[].publish",
         },
         "host_ip" => Emitted {
             from: "(the host's loopback: a published port isn't open to the LAN)",
         },
         "protocol" => Emitted {
-            from: "machines.*.services[].protocol",
+            from: "machines.*.ports[].protocol",
         },
         "id" | "disabled" => Emitted {
             from: "(a Windows box's own RDP forward, turned off so VMs don't compete for the host port)",
@@ -64,7 +64,7 @@ fn forwarded_port(o: &str) -> Option<Support> {
             note: "Vagrant moving a forward to a free host port: published ports are fixed",
         },
         "guest_ip" => Equivalent {
-            via: "machines.*.services[].port (forwarded to the machine itself)",
+            via: "machines.*.ports[].port (forwarded to the machine itself)",
         },
         _ => return None,
     })

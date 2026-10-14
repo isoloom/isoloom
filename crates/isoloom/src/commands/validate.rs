@@ -20,14 +20,22 @@ pub struct Args {
 
 pub fn run(a: &Args) -> Res<ExitCode> {
     let spec = spec::load_spec(&a.dir)?;
+    let warnings = isoloom_spec::warnings(&spec);
     let mut problems = isoloom_spec::validate(&spec);
     if !a.skip_files {
         problems.extend(isoloom_spec::validate_files(&spec, &a.dir));
     }
     if a.json {
-        let list: Vec<_> = problems.iter().map(|p| serde_json::json!({ "at": p.at, "message": p.message })).collect();
-        output::print_json(&serde_json::json!({ "ok": problems.is_empty(), "problems": list }))?;
-    } else if problems.is_empty() {
+        let list = |ps: &[isoloom_spec::Problem]| ps.iter().map(|p| serde_json::json!({ "at": p.at, "message": p.message })).collect::<Vec<_>>();
+        let out = serde_json::json!({ "ok": problems.is_empty(), "problems": list(&problems), "warnings": list(warnings) });
+        output::print_json(&out)?;
+        return Ok(output::exit_code(problems.is_empty()));
+    }
+    // Warnings (keys renamed before 1.0) never make the spec invalid.
+    for w in warnings {
+        println!("⚠ {w}");
+    }
+    if problems.is_empty() {
         println!("✓ {} is valid", spec.name);
     } else {
         for p in &problems {

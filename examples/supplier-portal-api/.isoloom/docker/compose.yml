@@ -38,7 +38,7 @@ services:
           cpus: '1'
           memory: 1024M
     labels:
-      isoloom.service.mysql: tcp:3207
+      isoloom.port.mysql: tcp:3207
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
     restart: unless-stopped
@@ -100,7 +100,7 @@ services:
           cpus: '1'
           memory: 1024M
     labels:
-      isoloom.service.portal: http:3206
+      isoloom.port.portal: http:3206
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
     restart: unless-stopped

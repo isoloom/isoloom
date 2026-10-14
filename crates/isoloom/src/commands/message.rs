@@ -33,7 +33,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     };
     let message = match on {
         Some(t) => {
-            let publishes = spec.machines.values().any(|m| m.services.iter().any(|s| s.publish.is_some()));
+            let publishes = spec.machines.values().any(|m| m.ports.iter().any(|s| s.publish.is_some()));
             let ports = compose::real_ports(&spec::abs(&a.dir)?, t, a.instance, publishes);
             isoloom_targets::resolved::render_message_at(&spec, a.instance, t, &ports)?
         }

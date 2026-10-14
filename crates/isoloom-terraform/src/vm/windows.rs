@@ -6,7 +6,7 @@
 use isoloom_plan::{Environment, Step};
 use isoloom_render::hcl_builder::{Block, Expression, list, reference, string};
 use isoloom_render::steps;
-use isoloom_spec::model::Service;
+use isoloom_spec::model::Port;
 
 use super::provisioner::{Connection, Provisioner, Upload};
 use super::{linux, res};
@@ -138,8 +138,8 @@ fn setup_script(w: &Machine) -> String {
             computer_name(w.name).to_uppercase()
         ),
     ];
-    ps.extend(m.services.iter().filter_map(port_proxy));
-    ps.extend(m.services.iter().flat_map(firewall));
+    ps.extend(m.ports.iter().filter_map(port_proxy));
+    ps.extend(m.ports.iter().flat_map(firewall));
     let runs = has_runs(w);
     for step in w.env.machines[w.name].lifecycle.iter().filter(|s| !(w.skip)(s)) {
         if *step == Step::Project && !runs {
@@ -152,7 +152,7 @@ fn setup_script(w: &Machine) -> String {
 
 /// A published TCP port that differs from the service's own, forwarded to it (Windows' port
 /// proxy is TCP only: validation refuses a UDP one).
-fn port_proxy(sv: &Service) -> Option<String> {
+fn port_proxy(sv: &Port) -> Option<String> {
     let h = sv.publish.filter(|h| *h != sv.port && sv.protocol.is_tcp())?;
     Some(format!(
         "netsh interface portproxy add v4tov4 listenport={h} listenaddress=0.0.0.0 connectport={p} connectaddress=127.0.0.1 | Out-Null",
@@ -161,7 +161,7 @@ fn port_proxy(sv: &Service) -> Option<String> {
 }
 
 /// A service's firewall openings: its port, and the published port when that differs.
-pub fn firewall(sv: &Service) -> Vec<String> {
+pub fn firewall(sv: &Port) -> Vec<String> {
     let (proto, suffix) = if sv.protocol.is_tcp() { ("TCP", "") } else { ("UDP", " udp") };
     let rule =
         |p: u16| format!("New-NetFirewallRule -DisplayName 'isoloom {p}{suffix}' -Direction Inbound -Protocol {proto} -LocalPort {p} -Action Allow | Out-Null");

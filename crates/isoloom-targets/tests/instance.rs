@@ -21,11 +21,11 @@ fn an_instance_gets_its_own_name_blocks_and_ports() {
     // addresses (what VMs use) stay as written.
     assert_eq!(two.networks["app"].docker.as_ref().unwrap().cidr, "10.62.0.0/24");
     assert_eq!(two.networks["app"].cidr, "10.60.0.0/24");
-    assert_eq!(two.machines["web"].services[0].publish, Some(8280));
+    assert_eq!(two.machines["web"].ports[0].publish, Some(8280));
     assert!(instance::apply(&spec, 0).is_err());
     assert!(instance::apply(&spec, 100).is_err());
     let mut high = spec.clone();
-    high.machines["web"].services[0].publish = Some(65500);
+    high.machines["web"].ports[0].publish = Some(65500);
     assert!(instance::apply(&high, 1).unwrap_err().contains("65500"));
 }
 

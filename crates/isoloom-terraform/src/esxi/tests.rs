@@ -22,7 +22,7 @@ networks:
 machines:
   web:
     networks: { front: 10, back: 10 }
-    services: [{ port: 80, publish: 8080 }]
+    ports: [{ port: 80, publish: 8080 }]
     vm: { os: ubuntu-24.04, provision: [web.sh] }
   db:
     networks: { back: 20 }

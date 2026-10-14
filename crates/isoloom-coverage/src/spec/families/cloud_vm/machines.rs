@@ -14,35 +14,35 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
-        "machines.*.services[].port",
+        "machines.*.ports[].port",
         Done {
             how: "machines depending on it wait until it answers; the Windows firewall opened for it",
             proof: "hello-stack",
         },
     ),
     (
-        "machines.*.services[].publish",
+        "machines.*.ports[].publish",
         Done {
             how: "ingress from `allowed_cidr` on the public address, a differing port redirected inside; the `published` output lists them",
             proof: "hello-stack",
         },
     ),
     (
-        "machines.*.services[].fixed",
+        "machines.*.ports[].fixed",
         Done {
             how: "the public address serves `publish` as is",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].dormant",
+        "machines.*.ports[].dormant",
         Done {
             how: "left out of the dependency waits; no derived check expects it to answer",
             proof: "segmented",
         },
     ),
     (
-        "machines.*.services[].protocol",
+        "machines.*.ports[].protocol",
         Done {
             how: "`udp`: UDP ingress and redirect, left out of the waits; `reach` opens TCP and UDP",
             proof: "udp-dns",
@@ -83,6 +83,13 @@ pub const CELLS: &[(&str, Status)] = &[
         Done {
             how: "in every VM's hosts file after the machine's name",
             proof: PROBE,
+        },
+    ),
+    (
+        "machines.*.os",
+        Done {
+            how: "the cloud's image for the machine: `vm.os` defaults to it, and a machine with neither `docker:` nor `vm:` is a VM of it",
+            proof: "hello-stack",
         },
     ),
     (

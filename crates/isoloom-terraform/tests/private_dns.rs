@@ -16,7 +16,7 @@ dns: { private: true, domain: corp.internal }
 networks:
   office: { cidr: 10.84.0.0/24 }
 machines:
-  web: { networks: { office: 10 }, aliases: [www], services: [{ port: 80 }], vm: { os: debian-12, provision: [web.sh] } }
+  web: { networks: { office: 10 }, aliases: [www], ports: [{ port: 80 }], vm: { os: debian-12, provision: [web.sh] } }
 ";
 
 fn env(spec: &str, target: Target) -> Environment {

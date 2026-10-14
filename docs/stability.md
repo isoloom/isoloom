@@ -69,7 +69,7 @@ When a field is renamed or retired:
 4. The changelog lists each deprecation when it starts, and each removal in the major release
    notes.
 
-The first rename planned under this policy is a machine's `services:`, becoming `ports:`.
+The first rename under this policy is a machine's `services:`, now `ports:`: the old key is read with a warning.
 
 ## What isn't covered
 

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use super::super::yaml::{DraftYaml, Header, ServiceEntry};
+use super::super::yaml::{DraftYaml, Header, PortEntry};
 use super::Machine;
 use super::networks::Networks;
 
@@ -45,7 +45,7 @@ pub(super) fn draft_yaml(env: &Environment, machines: &[Machine]) -> String {
 fn machine(y: &mut DraftYaml, m: &Machine) {
     y.machine(&m.name);
     y.machine_networks(m.networks.iter().map(|(n, o)| (n, *o)));
-    y.services(m.ports.iter().map(|key| ServiceEntry {
+    y.ports(m.ports.iter().map(|key| PortEntry {
         port: key.0,
         udp: !key.1.is_tcp(),
         publish: m.publish.get(key).copied(),

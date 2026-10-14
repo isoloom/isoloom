@@ -133,9 +133,9 @@ fn container(field: &str) -> Option<Support> {
         "env" => Emitted {
             from: "machines.*.environment and machines.*.inputs",
         },
-        "ports" => Emitted { from: "machines.*.services" },
+        "ports" => Emitted { from: "machines.*.ports" },
         "readinessProbe" => Emitted {
-            from: "machines.*.services and machines.*.healthcheck (ready when its services' ports answer, dormant ones aside, and its own check passes)",
+            from: "machines.*.ports and machines.*.healthcheck (ready when its services' ports answer, dormant ones aside, and its own check passes)",
         },
         "resources" => Emitted { from: "machines.*.resources" },
         "securityContext" => Emitted {
@@ -155,7 +155,7 @@ fn container(field: &str) -> Option<Support> {
             via: "machines.*.docker.init: a container beside the machine's, run once it answers",
         },
         "startupProbe" => Emitted {
-            from: "machines.*.services, when machines.*.healthcheck.http is the readiness probe (the ports answer first)",
+            from: "machines.*.ports, when machines.*.healthcheck.http is the readiness probe (the ports answer first)",
         },
         "livenessProbe" => Tooling {
             note: "restarts a container Kubernetes finds unhealthy: the cluster's self-healing, not the machine's behavior",
@@ -172,10 +172,10 @@ fn container(field: &str) -> Option<Support> {
 fn container_parts(definition: &str, field: &str) -> Option<Support> {
     Some(match (definition, field) {
         ("ContainerPort", "containerPort") => Emitted {
-            from: "machines.*.services[].port",
+            from: "machines.*.ports[].port",
         },
         ("ContainerPort", "protocol") => Emitted {
-            from: "machines.*.services[].protocol",
+            from: "machines.*.ports[].protocol",
         },
         ("ContainerPort", "name") => Tooling {
             note: "a name for the port within Kubernetes: Isoloom refers to ports by number",
@@ -184,7 +184,7 @@ fn container_parts(definition: &str, field: &str) -> Option<Support> {
             via: "`publish`: a LoadBalancer Service on the published port",
         },
         ("Probe", "exec") | ("ExecAction", "command") => Emitted {
-            from: "machines.*.services and machines.*.healthcheck.test (Isoloom's port probe, the same on every target, and the machine's own command)",
+            from: "machines.*.ports and machines.*.healthcheck.test (Isoloom's port probe, the same on every target, and the machine's own command)",
         },
         ("Probe", "periodSeconds") => Emitted {
             from: "machines.*.healthcheck.interval (else every 5 seconds)",

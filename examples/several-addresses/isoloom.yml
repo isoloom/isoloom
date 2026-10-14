@@ -16,20 +16,20 @@ machines:
   # A site per address: nginx answers on all three.
   web:
     networks: { office: [10, 11, 12] }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/web.sh]
   # A decoy at .40 that also answers on the whole of 10.86.0.48/28.
   decoy:
     networks: { office: [40, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63] }
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/decoy.sh]
   client:
     networks: { office: 20 }
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/client.sh]
 
 checks:

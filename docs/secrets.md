@@ -21,12 +21,12 @@ secrets:
 machines:
   db:
     networks: { lan: 10 }
-    services: [{ port: 5432 }]
+    ports: [{ port: 5432 }]
     secrets: [db-password]                       # /run/secrets/db-password
     docker: { image: "postgres:16" }
   web:
     networks: { lan: 11 }
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     secrets:
       - api-key
       - { source: db-password, target: /etc/app/db, uid: 101, gid: 101, mode: 0400 }

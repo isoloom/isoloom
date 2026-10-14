@@ -80,7 +80,7 @@ fn rendering_twice_gives_the_same_files() {
 /// A container `web` and a VM `db` on one network, with `extra` appended.
 fn mixed(extra: &str) -> Environment {
     let text = format!(
-        "version: 1\nname: m\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    networks: {{ lab: 10 }}\n    services: [{{ port: 80 }}]\n    docker: {{ image: nginx }}\n  db:\n    networks: {{ lab: 20 }}\n    services: [{{ port: 5432 }}]\n    vm: {{ os: debian-12 }}\n{extra}"
+        "version: 1\nname: m\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    networks: {{ lab: 10 }}\n    ports: [{{ port: 80 }}]\n    docker: {{ image: nginx }}\n  db:\n    networks: {{ lab: 20 }}\n    ports: [{{ port: 5432 }}]\n    vm: {{ os: debian-12 }}\n{extra}"
     );
     let spec = isoloom_spec::parse(&text).expect("parses");
     Environment::build(&spec, Target::Hybrid, None)
@@ -136,7 +136,7 @@ fn docker_vm_refuses_what_compose_cannot_run() {
 #[test]
 fn hybrid_forwards_a_fixed_published_port() {
     let mut spec = mixed("").spec().clone();
-    let web = &mut spec.machines["web"].services[0];
+    let web = &mut spec.machines["web"].ports[0];
     web.publish = Some(8080);
     web.fixed = true;
     let files = HybridBackend.render(&Environment::build(&spec, Target::Hybrid, None)).expect("renders");
@@ -149,7 +149,7 @@ fn hybrid_forwards_a_fixed_published_port() {
 fn only_containers_and_vms_make_an_environment_mixed() {
     // An external machine waiting for a container is neither a VM nor a container: the Docker
     // targets still render the environment.
-    let text = "version: 1\nname: x\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  cache:\n    networks: { lab: 20 }\n    services: [{ port: 6379 }]\n    docker: { image: redis }\n  web:\n    networks: { lab: 10 }\n    depends_on: [cache]\n    external: { address: 10.9.0.10 }\n";
+    let text = "version: 1\nname: x\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  cache:\n    networks: { lab: 20 }\n    ports: [{ port: 6379 }]\n    docker: { image: redis }\n  web:\n    networks: { lab: 10 }\n    depends_on: [cache]\n    external: { address: 10.9.0.10 }\n";
     let spec = isoloom_spec::parse(text).expect("parses");
     for target in [Target::DockerVm, Target::Hybrid] {
         assert!(Environment::build(&spec, target, None).requirements.is_empty(), "{target:?}");

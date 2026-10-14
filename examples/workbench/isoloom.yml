@@ -14,5 +14,5 @@ machines:
     docker: { image: "alpine:3.20", idle: true }
   web:
     networks: { lan: 11 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     docker: { image: "nginx:1.27-alpine" }

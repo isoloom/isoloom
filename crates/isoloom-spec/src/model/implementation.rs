@@ -85,8 +85,10 @@ pub enum Appliance {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VmImpl {
-    /// The OS, one of the names Isoloom knows; each target maps it to an image. May come from
-    /// `common:` or a group (`vm: {}` in the machine).
+    /// The OS, as `<family>@<version>` (`debian@12`), a family alone for its pinned default, or
+    /// an older name (`debian-12`); each target maps it to an image. Defaults to the machine's
+    /// `os`, which it must agree with when both are set. May come from `common:` or a group
+    /// (`vm: {}` in the machine).
     #[serde(default)]
     pub os: String,
     /// Steps run inside the VM, in order: `.sh` on Linux (and Ansible playbooks, `.yml`),
@@ -253,8 +255,10 @@ pub struct Provision {
     pub requirements: Option<String>,
 }
 
-/// OS names a `vm:` may use. Each target maps them to its own images (e.g. Windows from an
-/// evaluation ISO locally, a license-included image in the cloud).
+/// The image table's OS names, the ones every target maps to its own images (e.g. Windows from
+/// an evaluation ISO locally, a license-included image in the cloud). A spec writes them as
+/// `<family>@<version>` ([`crate::os`]), or by these names, which stay valid. In the order of
+/// [`crate::os::FAMILIES`].
 pub const KNOWN_OS: &[&str] = &[
     "debian-11",
     "debian-12",
@@ -267,9 +271,10 @@ pub const KNOWN_OS: &[&str] = &[
     "ubuntu-24.04",
     "rocky-9",
     "almalinux-9",
-    "centos-7",
-    "fedora-42",
+    "alpine-3.19",
     "kali",
+    "fedora-42",
+    "centos-7",
     "windows-10",
     "windows-11",
     "windows-server-2008r2",

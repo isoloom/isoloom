@@ -43,7 +43,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.status: http:8080
+      isoloom.port.status: http:8080
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
@@ -104,7 +104,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.80: http:80
+      isoloom.port.80: http:80
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
@@ -161,7 +161,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.redis: tcp:6379
+      isoloom.port.redis: tcp:6379
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped

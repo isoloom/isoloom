@@ -253,16 +253,16 @@ fn two_access_machines() {
 #[test]
 fn port_published_twice() {
     let yaml = with_machines(&[
-        "a: { networks: { lab: 5 }, services: [{ port: 80, publish: 8080 }], docker: { image: nginx } }",
-        "b: { networks: { lab: 6 }, services: [{ port: 80, publish: 8080 }], docker: { image: nginx } }",
+        "a: { networks: { lab: 5 }, ports: [{ port: 80, publish: 8080 }], docker: { image: nginx } }",
+        "b: { networks: { lab: 6 }, ports: [{ port: 80, publish: 8080 }], docker: { image: nginx } }",
     ]);
-    assert_problem(&yaml, "machines.b.services[0].publish", "already published by `a`");
+    assert_problem(&yaml, "machines.b.ports[0].publish", "already published by `a`");
 }
 
 #[test]
 fn fixed_without_publish() {
-    let yaml = with_machine("{ networks: { lab: 5 }, services: [{ port: 80, fixed: true }], docker: { image: nginx } }");
-    assert_problem(&yaml, "machines.m.services[0].fixed", "give one");
+    let yaml = with_machine("{ networks: { lab: 5 }, ports: [{ port: 80, fixed: true }], docker: { image: nginx } }");
+    assert_problem(&yaml, "machines.m.ports[0].fixed", "give one");
 }
 
 #[test]
@@ -471,7 +471,7 @@ fn tool_publish_without_port() {
 fn tool_publish_taken_by_a_machine() {
     let yaml = format!(
         "{}tools:\n  kali: {{ image: alpine, port: 80, publish: 8080 }}\n",
-        with_machine("{ networks: { lab: 5 }, services: [{ port: 80, publish: 8080 }], docker: { image: nginx } }")
+        with_machine("{ networks: { lab: 5 }, ports: [{ port: 80, publish: 8080 }], docker: { image: nginx } }")
     );
     assert_problem(&yaml, "tools.kali.publish", "already published by a machine");
 }

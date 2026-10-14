@@ -241,9 +241,9 @@ fn a_lans_switch_is_checked() {
     );
     let p = problems(&spec(
         &format!("switch: sw, {vlans}"),
-        "{ services: [{ port: 22 }], docker: { image: x, appliance: cisco-iol-l2 } }",
+        "{ ports: [{ port: 22 }], docker: { image: x, appliance: cisco-iol-l2 } }",
     ));
-    assert!(p.contains("no `services` or `aliases`"), "{p}");
+    assert!(p.contains("no `ports` or `aliases`"), "{p}");
     // A LAN without VLANs has no switch; a machine that isn't a switch still needs a network.
     let p = problems(&spec("switch: sw", good));
     assert!(p.contains("networks.office.switch: only a LAN split into `vlans` has a switch"), "{p}");

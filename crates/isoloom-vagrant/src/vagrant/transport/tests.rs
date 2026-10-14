@@ -24,11 +24,11 @@ machines:
     networks: { back: 10 }
     inputs: [TOKEN]
     depends_on: [dc]
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     vm: { os: debian-12, provision: [a.sh, reboot, site.yml] }
   dc:
     networks: { front: 20 }
-    services: [{ port: 389 }]
+    ports: [{ port: 389 }]
     inputs: [TOKEN]
     vm: { os: windows-server-2019, provision: [dc.ps1] }
 ";

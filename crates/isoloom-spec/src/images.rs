@@ -40,6 +40,17 @@ pub struct Access {
 }
 
 impl Table {
+    /// The table's image for an OS by its image-table name (`debian-12`), whichever of the
+    /// OS's spellings the table's key is written in (`debian@12`, `debian`).
+    fn image_of(&self, os: &str) -> Option<&VmImage> {
+        self.os.get(os).or_else(|| {
+            self.os
+                .iter()
+                .find(|(k, _)| crate::os::resolve(k).is_ok_and(|o| o.name == os))
+                .map(|(_, image)| image)
+        })
+    }
+
     /// Reads a table from YAML. Unknown fields are errors.
     pub fn parse(yaml: &str) -> Result<Table, String> {
         serde_yaml_ng::from_str(yaml).map_err(|e| e.to_string())
@@ -53,7 +64,7 @@ impl Table {
         for m in out.machines.values_mut() {
             if let Some(vm) = &mut m.vm
                 && vm.image.is_none()
-                && let Some(image) = self.os.get(&vm.os)
+                && let Some(image) = self.image_of(&vm.os)
             {
                 vm.image = Some(image.clone());
             }
@@ -79,10 +90,11 @@ impl Table {
             if m.vm.is_none()
                 && let Some(os) = &access.vm
             {
+                let os = crate::os::resolve(os).map_or_else(|_| os.clone(), |o| o.name.to_string());
                 m.vm = Some(VmImpl {
-                    os: os.clone(),
+                    image: self.image_of(&os).cloned(),
+                    os,
                     provision: Vec::new(),
-                    image: self.os.get(os).cloned(),
                     tpm: None,
                     boot: None,
                 });
@@ -204,6 +216,8 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         // End of life (2024): for labs about older systems.
         "centos-7" => h(b("bento/centos-7", None, Some("generic/centos7")), "generic/centos7", ROBOXES),
         "fedora-42" => no_hyperv(b("bento/fedora-42", None, None)),
+        // The box Isoloom's own controller boots (roboxes, with libvirt and Hyper-V builds).
+        "alpine-3.19" => b("generic/alpine319", None, None),
         // Kali's own box has a Hyper-V build.
         "kali" => b("kalilinux/rolling", None, None),
         _ => return None,

@@ -65,19 +65,19 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
-        "machines.*.services[].name",
+        "machines.*.ports[].name",
         Descriptive {
-            note: "names the service for people and runners",
+            note: "names the port for people and runners",
         },
     ),
     (
-        "machines.*.services[].tls",
+        "machines.*.ports[].tls",
         Descriptive {
             note: "derived checks reach it over TLS (HTTPS for an `http` service)",
         },
     ),
     (
-        "machines.*.services[].http",
+        "machines.*.ports[].http",
         Descriptive {
             note: "tells runners they can open it in a browser",
         },

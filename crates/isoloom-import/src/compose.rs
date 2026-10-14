@@ -188,7 +188,7 @@ fn prune_depends_on(machines: &mut [Machine], notes: &mut Notes) {
             notes.add(
                 format!("machines.{}.depends_on", m.name),
                 NoteKind::Changed,
-                format!("`{d}` has no known TCP port (UDP has no handshake), so there's nothing to wait for; add its `services` and the dependency back"),
+                format!("`{d}` has no known TCP port (UDP has no handshake), so there's nothing to wait for; add its `ports` and the dependency back"),
             );
         }
     }

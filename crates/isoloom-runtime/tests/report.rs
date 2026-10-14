@@ -41,7 +41,7 @@ fn reports_cover_addresses_services_wiring_and_resources() {
     );
     assert!(addressing.lines().any(|l| l.starts_with("web") && l.contains("10.61.10.10")), "{addressing}");
     assert!(addressing.contains("(router)"), "{addressing}");
-    let services = report("services", &r, true).unwrap();
+    let services = report("ports", &r, true).unwrap();
     assert!(services.starts_with("| machine | port | name | http | published | reachable from |"));
     // The cache answers on 6379 from its own network and from front (reach rule), not from access.
     assert!(services.contains("| cache | 6379 | redis |  |  | front, back |"), "{services}");

@@ -13,18 +13,18 @@ networks:
 machines:
   web:
     networks: { lab: 20 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/web.sh]
     external: { address: 192.168.1.20, user: florian, key: ~/.ssh/id_ed25519 }
   cache:
     networks: { lab: 21 }
     # Kernel-level access (it changes a kernel boot option).
     privileged: true
-    services: [{ port: 6379, name: redis }]
+    ports: [{ port: 6379, name: redis }]
     vm:
-      os: debian-12
+      os: debian@12
       # A kernel boot option, the restart that applies it, then Redis.
       provision: [provision/cache-boot.sh, reboot, provision/cache.sh]
     external: { address: 192.168.1.21, user: florian, key: ~/.ssh/id_ed25519 }

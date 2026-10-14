@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "hello-stack",
   "instance": null,
   "inputs": [],
@@ -34,7 +34,7 @@
       "docker_addresses": {
         "app": "10.60.0.20"
       },
-      "services": [
+      "ports": [
         {
           "port": 6379,
           "name": "redis",
@@ -55,7 +55,9 @@
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "debian",
+      "os_version": "12"
     },
     "web": {
       "access": false,
@@ -74,7 +76,7 @@
       "docker_addresses": {
         "app": "10.60.0.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,
@@ -95,7 +97,9 @@
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [

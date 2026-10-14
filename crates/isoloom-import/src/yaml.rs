@@ -1,5 +1,5 @@
 //! Writing a draft `isoloom.yml`: the parts every import writes the same way (the header,
-//! networks, a machine's networks, services and resources). Each import writes the rest itself.
+//! networks, a machine's networks, ports and resources). Each import writes the rest itself.
 
 use std::fmt::Display;
 
@@ -23,14 +23,14 @@ pub(super) struct Header<'a> {
     pub name: &'a str,
 }
 
-/// One entry of a machine's `services` list.
-pub(super) struct ServiceEntry {
+/// One entry of a machine's `ports` list.
+pub(super) struct PortEntry {
     pub port: u16,
     pub udp: bool,
     pub publish: Option<u16>,
 }
 
-impl ServiceEntry {
+impl PortEntry {
     fn flow(&self) -> String {
         let udp = if self.udp { ", protocol: udp" } else { "" };
         match self.publish {
@@ -87,11 +87,11 @@ impl DraftYaml {
         self.line(format!("    networks: {{ {joins} }}"));
     }
 
-    /// The machine's `services`, when it has any.
-    pub fn services(&mut self, services: impl IntoIterator<Item = ServiceEntry>) {
-        let services: Vec<String> = services.into_iter().map(|s| s.flow()).collect();
-        if !services.is_empty() {
-            self.line(format!("    services: [{}]", services.join(", ")));
+    /// The machine's `ports`, when it has any.
+    pub fn ports(&mut self, ports: impl IntoIterator<Item = PortEntry>) {
+        let ports: Vec<String> = ports.into_iter().map(|s| s.flow()).collect();
+        if !ports.is_empty() {
+            self.line(format!("    ports: [{}]", ports.join(", ")));
         }
     }
 

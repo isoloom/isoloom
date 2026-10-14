@@ -49,12 +49,12 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec, String> {
     shift_ipv6(&mut s, n)?;
     // Published host ports: 100 apart per instance (8080 -> 8180 for instance 1).
     for (mname, m) in &mut s.machines {
-        for svc in &mut m.services {
+        for svc in &mut m.ports {
             if let Some(p) = svc.publish {
                 let shifted = u32::from(p) + 100 * u32::from(n);
                 svc.publish =
                     Some(u16::try_from(shifted).map_err(|_| {
-                        format!("machines.{mname}.services: published port {p} leaves no room for instance {n} (ports shift by 100 per instance)")
+                        format!("machines.{mname}.ports: published port {p} leaves no room for instance {n} (ports shift by 100 per instance)")
                     })?);
             }
         }

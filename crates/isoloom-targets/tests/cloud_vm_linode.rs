@@ -29,11 +29,11 @@ networks:
 machines:
   web:
     networks: { lab: 10 }
-    services: [{ port: 80, http: true, publish: 8080 }]
+    ports: [{ port: 80, http: true, publish: 8080 }]
     vm: { os: debian-12, provision: [p.sh] }
   db:
     networks: { lab: 11 }
-    services: [{ port: 5432, name: postgres }]
+    ports: [{ port: 5432, name: postgres }]
     vm: { os: ubuntu-24.04, provision: [p.sh] }
 ",
     )
@@ -72,11 +72,11 @@ reach:
 machines:
   web:
     networks: { a: 10 }
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     vm: { os: debian-12, provision: [p.sh] }
   db:
     networks: { b: 10 }
-    services: [{ port: 5432 }]
+    ports: [{ port: 5432 }]
     vm: { os: debian-12, provision: [p.sh] }
 ",
     )
@@ -102,7 +102,7 @@ networks:
 machines:
   web:
     networks: { a: 10, b: 10 }
-    services: [{ port: 80 }]
+    ports: [{ port: 80 }]
     vm: { os: debian-12, provision: [p.sh] }
 ",
     )

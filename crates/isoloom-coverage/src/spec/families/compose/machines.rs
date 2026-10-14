@@ -1,6 +1,6 @@
 //! The Docker Compose output's cells for the machines' fields and the shared volumes.
 
-use crate::spec::status::Status::{Done, NotApplicable};
+use crate::spec::status::Status::{Done, NotApplicable, Planned};
 use crate::spec::status::{NOT_A_VM, PROBE, Status};
 
 /// The cells of this section.
@@ -13,35 +13,35 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
-        "machines.*.services[].port",
+        "machines.*.ports[].port",
         Done {
             how: "a healthcheck, so `depends_on` and `up --wait` wait for it",
             proof: "hello-stack",
         },
     ),
     (
-        "machines.*.services[].publish",
+        "machines.*.ports[].publish",
         Done {
             how: "a published port, on the host's loopback",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].fixed",
+        "machines.*.ports[].fixed",
         Done {
             how: "the `publish` port itself on the host, not a free one",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].dormant",
+        "machines.*.ports[].dormant",
         Done {
             how: "left out of the healthcheck (so `depends_on` and `up --wait` don't wait for it) and of the derived checks that expect an answer; still published and opened by `reach`",
             proof: "segmented",
         },
     ),
     (
-        "machines.*.services[].protocol",
+        "machines.*.ports[].protocol",
         Done {
             how: "`udp`: published as `<port>/udp`; left out of the healthcheck and the derived checks (no handshake); opened by `reach` (TCP and UDP alike)",
             proof: "udp-dns",
@@ -268,6 +268,12 @@ pub const CELLS: &[(&str, Status)] = &[
         Done {
             how: "kept running idle (`entrypoint: [sleep, infinity]`), a machine to work from",
             proof: "workbench",
+        },
+    ),
+    (
+        "machines.*.os",
+        Planned {
+            note: "a container of the OS family, from the service catalogue; today `os` names the machine's VM only",
         },
     ),
     ("machines.*.vm.os", NOT_A_VM),

@@ -19,30 +19,30 @@ machines:
   cache:
     networks: { back: 20 }
     arch: amd64
-    services: [{ port: 6379, name: redis }]
+    ports: [{ port: 6379, name: redis }]
     resources: { cpus: 1, memory_mb: 1024, disk_gb: 10 }
     volumes: { data: /data }
     docker:
       image: "redis:7-alpine"
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/cache.sh]
 
   web:
     networks: { front: 10 }
-    services: [{ port: 80, http: true }, { port: 4444, name: shell, dormant: true }]
+    ports: [{ port: 80, http: true }, { port: 4444, name: shell, dormant: true }]
     depends_on: [cache]
     docker:
       build: build/web
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/web.sh]
 
   user:
     access: true
     networks: { access: 10 }
     vm:
-      os: debian-12
+      os: debian@12
 
 checks:
   - name: the web page answers through the router

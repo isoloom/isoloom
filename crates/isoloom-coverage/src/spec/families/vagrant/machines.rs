@@ -13,35 +13,35 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
-        "machines.*.services[].port",
+        "machines.*.ports[].port",
         Done {
             how: "machines depending on it wait until it answers",
             proof: "hello-stack",
         },
     ),
     (
-        "machines.*.services[].publish",
+        "machines.*.ports[].publish",
         Done {
             how: "a forwarded port, on the host's loopback",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].fixed",
+        "machines.*.ports[].fixed",
         Done {
             how: "Vagrant forwards `publish` as is",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].dormant",
+        "machines.*.ports[].dormant",
         Done {
             how: "left out of the dependency waits and of the derived checks that expect an answer; still forwarded and opened by `reach`",
             proof: "segmented",
         },
     ),
     (
-        "machines.*.services[].protocol",
+        "machines.*.ports[].protocol",
         Partial {
             how: "`udp`: forwarded as UDP; left out of the dependency waits and the derived checks; opened by `reach`",
             gap: "vagrant-libvirt skips UDP forwarded ports (`isoloom run` warns): reach the machine's address instead",
@@ -82,6 +82,13 @@ pub const CELLS: &[(&str, Status)] = &[
         Done {
             how: "in every Linux VM's /etc/hosts, after the machine's name",
             proof: "edge-firewall",
+        },
+    ),
+    (
+        "machines.*.os",
+        Done {
+            how: "the machine's Vagrant box: `vm.os` defaults to it (`debian@12` is `debian-12`), and a machine with neither `docker:` nor `vm:` is a VM of it",
+            proof: "hello-stack",
         },
     ),
     (

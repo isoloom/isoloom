@@ -10,24 +10,24 @@ networks:
 
 machines:
   cache:
+    os: debian@12     # a VM of Debian 12 where a VM runs it (`vm.os` defaults to it)
     networks: { app: 20 }
-    services: [{ port: 6379, name: redis }]
+    ports: [{ port: 6379, name: redis }]
     volumes: { data: /data }
     docker:
       image: "redis:7-alpine"
       init: [build/cache/seed.sh]
     vm:
-      os: debian-12
       provision: [provision/cache.sh]
 
   web:
+    os: debian@12
     networks: { app: 10 }
-    services: [{ port: 80, http: true, publish: 8080 }]
+    ports: [{ port: 80, http: true, publish: 8080 }]
     depends_on: [cache]
     docker:
       build: build/web
     vm:
-      os: debian-12
       provision: [provision/web.sh]
 
 checks:
@@ -60,6 +60,6 @@ checks:
     expect: 405
 
 message: |
-  The page answers at http://localhost:{{ machines.web.services.0.publish }}/ (and at
+  The page answers at http://localhost:{{ machines.web.ports.0.publish }}/ (and at
   http://web/ from inside). The cache at {{ machines.cache.addresses.app }}:6379 holds the
   greeting seeded at start; nothing here reaches the internet.

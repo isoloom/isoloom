@@ -1,6 +1,6 @@
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 1,
+  "resolved_version": 2,
   "name": "windows-hello",
   "instance": null,
   "inputs": [],
@@ -33,7 +33,7 @@
       "docker_addresses": {
         "lab": "10.192.57.10"
       },
-      "services": [
+      "ports": [
         {
           "port": 80,
           "name": null,
@@ -52,7 +52,9 @@
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "windows-server",
+      "os_version": "2019"
     }
   },
   "start_order": [

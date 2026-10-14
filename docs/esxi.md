@@ -44,7 +44,7 @@ run on a real ESXi host yet.
   generalized with sysprep. The VM gets the guest OS type ESXi tunes it for (`guestos`, such as
   `windows2019srv-64`). cloudbase-init reads its addresses from the same metadata, then runs
   its set-up at the first boot, as on Proxmox: the `isoloom` administrator with the generated
-  password, its name, the project in `C:\isoloom`, its services' firewall openings, its steps,
+  password, its name, the project in `C:\isoloom`, its ports' firewall openings, its steps,
   and WinRM over HTTP last. Terraform's WinRM can't go through the router, so the controller
   waits for its ready marker over WinRM before the playbooks.
 - **The controller.** When the spec has `provision:` playbooks, an Ubuntu VM on every network

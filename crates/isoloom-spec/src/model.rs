@@ -1,5 +1,5 @@
 //! The isoloom format, version 1: what an environment looks like from outside (machines,
-//! networks, who reaches whom, the services that answer) and, per machine, how each kind of
+//! networks, who reaches whom, the ports that answer) and, per machine, how each kind of
 //! target produces it (`docker:` and/or `vm:`).
 
 mod boot;
@@ -29,7 +29,7 @@ pub use constraints::{Constraints, Mirrors, Proxy};
 pub use hardware::{DEFAULT_GPU_DRIVER, Device, DeviceFull, DeviceInput, GpuCount, Gpus, GpusFull, GpusInput};
 pub use implementation::{Appliance, Controller, Dns, DockerImpl, KNOWN_OS, Provision, REBOOT_STEP, VmImage, VmImpl, Winrm, is_reboot};
 pub use ipv6::{Ipv6, Ipv6Addresses};
-pub use machine::{Arch, Machine, Octets, Protocol, Resources, ScalarSchema, Service};
+pub use machine::{Arch, Machine, Octets, Port, Protocol, Resources, ScalarSchema};
 pub use machine_file::{DEFAULT_FILE_MODE, MachineFile};
 pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
 pub use private_dns::EnvironmentDns;
@@ -110,7 +110,7 @@ pub struct Spec {
     pub controller: Option<Controller>,
     /// Black-box checks that prove the behavior on every target: scripts, or declared probes
     /// (`http`, `tcp`, `exec`, `script`) run from a machine of the environment. Isoloom adds
-    /// derived checks of its own from `services` and `reach`.
+    /// derived checks of its own from `ports` and `reach`.
     #[serde(default)]
     pub checks: Vec<Check>,
     /// Narrows the targets derived from the implementations (e.g. not tested on Proxmox yet).
@@ -130,6 +130,12 @@ pub struct Spec {
     #[serde(skip)]
     #[schemars(skip)]
     pub clones: IndexMap<String, Vec<String>>,
+    /// What the spec still writes the way it did before 1.0 (a machine's `services`, now
+    /// `ports`): read as the new form, reported by `isoloom validate` as warnings. Filled when
+    /// parsing.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub warnings: Vec<crate::validate::Problem>,
 }
 
 impl Spec {

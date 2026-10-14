@@ -15,18 +15,18 @@ reach:
 machines:
   web:
     networks: { back: 10 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     docker:
       image: "nginx:1.27-alpine"
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/web.sh]
 
   user:
     access: true
     networks: { front: 10 }
     vm:
-      os: debian-12
+      os: debian@12
 
 checks:
   - name: the web page answers over IPv6 through the router

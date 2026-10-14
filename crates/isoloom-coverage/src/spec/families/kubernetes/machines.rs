@@ -1,6 +1,6 @@
 //! The Kubernetes output's cells for the machines' fields and the shared volumes.
 
-use crate::spec::status::Status::{Done, NotApplicable, Partial};
+use crate::spec::status::Status::{Done, NotApplicable, Partial, Planned};
 use crate::spec::status::{NOT_A_VM, PROBE, Status};
 
 /// The cells of this section.
@@ -14,35 +14,35 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
-        "machines.*.services[].port",
+        "machines.*.ports[].port",
         Done {
             how: "container ports, a Service named after the machine, a readiness probe dependents wait for",
             proof: "hello-stack",
         },
     ),
     (
-        "machines.*.services[].publish",
+        "machines.*.ports[].publish",
         Done {
             how: "a LoadBalancer Service `<machine>-published` on the published port and a policy letting anyone in on it",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].fixed",
+        "machines.*.ports[].fixed",
         Done {
             how: "the LoadBalancer answers on `publish` itself",
             proof: "supplier-portal-api",
         },
     ),
     (
-        "machines.*.services[].dormant",
+        "machines.*.ports[].dormant",
         Done {
             how: "left out of the readiness probe and the dependents' waits",
             proof: "segmented",
         },
     ),
     (
-        "machines.*.services[].protocol",
+        "machines.*.ports[].protocol",
         Done {
             how: "`udp`: UDP container, Service and LoadBalancer ports; left out of the probe and waits",
             proof: "udp-dns",
@@ -271,6 +271,12 @@ pub const CELLS: &[(&str, Status)] = &[
         Done {
             how: "`command: [sleep, infinity]`",
             proof: "workbench",
+        },
+    ),
+    (
+        "machines.*.os",
+        Planned {
+            note: "a container of the OS family, from the service catalogue; today `os` names the machine's VM only",
         },
     ),
     ("machines.*.vm.os", NOT_A_VM),

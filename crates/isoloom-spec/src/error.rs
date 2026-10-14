@@ -7,6 +7,8 @@ use std::path::PathBuf;
 /// The step of loading that turned the YAML into the spec the rest of Isoloom reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
+    /// Keys renamed before 1.0 (a machine's `services`, now `ports`), moved to their new names.
+    Renamed,
     /// `-s key=value` overrides and a profile's `spec:`, merged into the document.
     Overrides,
     /// `count:` clones of a machine.

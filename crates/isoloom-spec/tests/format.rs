@@ -62,7 +62,7 @@ const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }
 #[test]
 fn asking_for_an_impossible_target_names_the_machines() {
     let p = problems(&format!(
-        "{BASE}targets: [docker]\nmachines:\n  dc: {{ networks: {{ lab: 5 }}, services: [{{ port: 389 }}], vm: {{ os: windows-server-2022, provision: [p.ps1] }} }}\n"
+        "{BASE}targets: [docker]\nmachines:\n  dc: {{ networks: {{ lab: 5 }}, ports: [{{ port: 389 }}], vm: {{ os: windows-server-2022, provision: [p.ps1] }} }}\n"
     ));
     assert_eq!(p, ["targets[0]: `docker` needs a `docker:` implementation on every machine; missing on: dc"]);
 }
@@ -88,7 +88,7 @@ fn addresses_and_networks_are_checked() {
 #[test]
 fn dependencies_must_exist_have_services_and_not_loop() {
     let p = problems(&format!(
-        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, services: [{{ port: 1 }}], depends_on: [b], docker: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, services: [{{ port: 2 }}], depends_on: [a], docker: {{ image: x }} }}\n  c: {{ networks: {{ lab: 7 }}, depends_on: [ghost], docker: {{ image: x }} }}\n"
+        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, ports: [{{ port: 1 }}], depends_on: [b], docker: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, ports: [{{ port: 2 }}], depends_on: [a], docker: {{ image: x }} }}\n  c: {{ networks: {{ lab: 7 }}, depends_on: [ghost], docker: {{ image: x }} }}\n"
     ));
     assert!(p.iter().any(|m| m == "machines: depends_on forms a cycle: a -> b -> a"), "{p:?}");
     assert!(p.iter().any(|m| m == "machines.c.depends_on[0]: no machine named `ghost`"), "{p:?}");
@@ -118,7 +118,7 @@ fn a_machine_needs_an_implementation_unless_it_is_the_access_machine() {
         "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }} }}\n  u: {{ access: true, networks: {{ lab: 6 }} }}\n"
     ));
     assert!(
-        p.contains(&"machines.a: give the machine at least one implementation: `docker:` and/or `vm:`".to_string()),
+        p.contains(&"machines.a: give the machine at least one implementation: `docker:` and/or `vm:` (or an `os:`, a VM of that OS)".to_string()),
         "{p:?}"
     );
     assert!(!p.iter().any(|m| m.starts_with("machines.u")), "{p:?}");
@@ -179,7 +179,7 @@ fn a_gateway_is_a_machine_on_the_network_at_the_gateway_address() {
 
 #[test]
 fn machines_behind_a_gateway_start_after_it() {
-    let looped = "version: 1\nname: t\nnetworks:\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }\nmachines:\n  fw: { networks: { dmz: 1 }, depends_on: [web], docker: { image: a } }\n  web: { networks: { dmz: 10 }, services: [{ port: 80 }], docker: { image: a } }\n";
+    let looped = "version: 1\nname: t\nnetworks:\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }\nmachines:\n  fw: { networks: { dmz: 1 }, depends_on: [web], docker: { image: a } }\n  web: { networks: { dmz: 10 }, ports: [{ port: 80 }], docker: { image: a } }\n";
     assert!(problems(looped).iter().any(|p| p.contains("cycle: fw -> web -> fw")));
 }
 

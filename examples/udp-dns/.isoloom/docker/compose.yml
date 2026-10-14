@@ -76,8 +76,8 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.service.dns-udp: udp:53
-      isoloom.service.dns: tcp:53
+      isoloom.port.dns-udp: udp:53
+      isoloom.port.dns: tcp:53
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
     restart: unless-stopped

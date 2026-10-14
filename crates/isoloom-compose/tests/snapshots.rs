@@ -35,7 +35,7 @@ machines:
   web:
     networks: { lan: 10 }
     inputs: [FLAG]
-    services: [{ port: 8000 }]
+    ports: [{ port: 8000 }]
     docker: { image: "python:3-alpine" }
     command: [python3, -m, http.server, "8000"]
     working_dir: /srv
@@ -43,7 +43,7 @@ machines:
     healthcheck: { test: "test -s /srv/flag && echo $FLAG", interval: 2s, retries: 30 }
   api:
     networks: { lan: 11 }
-    services: [{ port: 9000 }]
+    ports: [{ port: 9000 }]
     docker: { image: "python:3-alpine" }
     command: python3 -m http.server 9000
     healthcheck: { http: { port: 9000, path: /health }, start_period: 1m }

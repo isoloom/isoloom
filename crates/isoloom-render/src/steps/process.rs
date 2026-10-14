@@ -208,7 +208,7 @@ machines:
     networks: { lan: 10 }
     inputs: [FLAG]
     environment: { MODE: lab }
-    services: [{ port: 8000 }]
+    ports: [{ port: 8000 }]
     vm: { os: debian-12, provision: [setup.sh] }
     command: [python3, -m, http.server, '8000']
     working_dir: /srv/site

@@ -17,19 +17,19 @@ reach:
 machines:
   web:
     networks: { far: 10 }
-    services: [{ port: 80, http: true }]
+    ports: [{ port: 80, http: true }]
     docker:
       build: build/web
       dockerfile: build/web.Dockerfile
       args: { NGINX_TAG: 1.27-alpine }
     vm:
-      os: debian-12
+      os: debian@12
       provision: [provision/web.sh]
   user:
     access: true
     networks: { branch: 10 }
     vm:
-      os: debian-12
+      os: debian@12
 
 tools:
   shell: {}                 # a toolbox on both networks to watch the link from (isoloom connect shell)

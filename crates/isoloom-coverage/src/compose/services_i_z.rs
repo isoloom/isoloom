@@ -31,7 +31,7 @@ pub(super) const SERVICES_I_Z: &[(&str, Support)] = &[
     (
         "services.*.labels",
         Emitted {
-            from: "machines.*.services (isoloom.service.<name>, for tools reading the containers); isoloom.managed and isoloom.environment on every service, for `isoloom gc`",
+            from: "machines.*.ports (isoloom.port.<name>, for tools reading the containers); isoloom.managed and isoloom.environment on every service, for `isoloom gc`",
         },
     ),
     ("services.*.links", LEGACY),
@@ -140,7 +140,7 @@ pub(super) const SERVICES_I_Z: &[(&str, Support)] = &[
     (
         "services.*.ports",
         Emitted {
-            from: "machines.*.services[].publish (on the host's loopback; `/udp` with `protocol: udp`)",
+            from: "machines.*.ports[].publish (on the host's loopback; `/udp` with `protocol: udp`)",
         },
     ),
     (
