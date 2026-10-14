@@ -236,56 +236,9 @@ pub fn plan(spec: &Spec) -> Vec<Resolved> {
 fn declared(d: &Declared, default: &Position) -> Option<Resolved> {
     let position = d.from.as_ref().map(|f| Position::Machine(f.clone())).unwrap_or_else(|| default.clone());
     let (probe, default_wait, what) = if let Some(u) = &d.http {
-        let url = Url::parse(u)?;
-        let expect = match &d.expect {
-            None => HttpExpect::Status(200),
-            Some(Expect::Status(s)) => HttpExpect::Status(*s),
-            Some(Expect::Text(t)) if t == "any" => HttpExpect::Any,
-            Some(Expect::Text(t)) if t == "blocked" => HttpExpect::Blocked,
-            Some(Expect::Text(_)) => return None,
-        };
-        let wait = if expect == HttpExpect::Blocked { 0 } else { 30 };
-        let request = HttpRequest {
-            method: d.method.clone(),
-            headers: d.headers.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-            body: d.body.clone(),
-            contains: d.contains.clone(),
-            follow: d.follow,
-        };
-        let what = match (&expect, &request.method) {
-            (HttpExpect::Blocked, _) => format!("{u} blocked"),
-            (_, Some(m)) => format!("{} {u}", m.to_uppercase()),
-            _ => u.to_string(),
-        };
-        (Probe::Http { url, expect, request }, wait, what)
+        declared_http(d, u)?
     } else if let Some(t) = &d.tcp {
-        let (host, port) = t.rsplit_once(':')?;
-        let port: u16 = port.parse().ok().filter(|p| *p > 0)?;
-        let expect = match d.expect.as_ref() {
-            None => TcpExpect::Open,
-            Some(Expect::Text(t)) if t == "open" => TcpExpect::Open,
-            Some(Expect::Text(t)) if t == "blocked" => TcpExpect::Blocked,
-            _ => return None,
-        };
-        let wait = if expect == TcpExpect::Blocked { 0 } else { 30 };
-        let what = match expect {
-            TcpExpect::Blocked => format!("{t} blocked"),
-            TcpExpect::Open => t.to_string(),
-        };
-        let exchange = TcpExchange {
-            send: d.send.clone(),
-            contains: d.contains.clone(),
-        };
-        (
-            Probe::Tcp {
-                host: Host::Literal(host.to_string()),
-                port,
-                expect,
-                exchange,
-            },
-            wait,
-            what,
-        )
+        declared_tcp(d, t)?
     } else if let Some(c) = &d.exec {
         let expect = match &d.expect {
             None => None,
@@ -307,6 +260,63 @@ fn declared(d: &Declared, default: &Position) -> Option<Resolved> {
         wait: d.wait.unwrap_or(default_wait),
         derived: false,
     })
+}
+
+/// A declared probe, the seconds it waits by default, and what its name says it checks.
+type DeclaredProbe = (Probe, u32, String);
+
+/// A declared `http` check (to URL `u`).
+fn declared_http(d: &Declared, u: &str) -> Option<DeclaredProbe> {
+    let url = Url::parse(u)?;
+    let expect = match &d.expect {
+        None => HttpExpect::Status(200),
+        Some(Expect::Status(s)) => HttpExpect::Status(*s),
+        Some(Expect::Text(t)) if t == "any" => HttpExpect::Any,
+        Some(Expect::Text(t)) if t == "blocked" => HttpExpect::Blocked,
+        Some(Expect::Text(_)) => return None,
+    };
+    let wait = if expect == HttpExpect::Blocked { 0 } else { 30 };
+    let request = HttpRequest {
+        method: d.method.clone(),
+        headers: d.headers.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+        body: d.body.clone(),
+        contains: d.contains.clone(),
+        follow: d.follow,
+    };
+    let what = match (&expect, &request.method) {
+        (HttpExpect::Blocked, _) => format!("{u} blocked"),
+        (_, Some(m)) => format!("{} {u}", m.to_uppercase()),
+        _ => u.to_string(),
+    };
+    Some((Probe::Http { url, expect, request }, wait, what))
+}
+
+/// A declared `tcp` check (to `host:port` `t`).
+fn declared_tcp(d: &Declared, t: &str) -> Option<DeclaredProbe> {
+    let (host, port) = t.rsplit_once(':')?;
+    let port: u16 = port.parse().ok().filter(|p| *p > 0)?;
+    let expect = match d.expect.as_ref() {
+        None => TcpExpect::Open,
+        Some(Expect::Text(t)) if t == "open" => TcpExpect::Open,
+        Some(Expect::Text(t)) if t == "blocked" => TcpExpect::Blocked,
+        _ => return None,
+    };
+    let wait = if expect == TcpExpect::Blocked { 0 } else { 30 };
+    let what = match expect {
+        TcpExpect::Blocked => format!("{t} blocked"),
+        TcpExpect::Open => t.to_string(),
+    };
+    let exchange = TcpExchange {
+        send: d.send.clone(),
+        contains: d.contains.clone(),
+    };
+    let probe = Probe::Tcp {
+        host: Host::Literal(host.to_string()),
+        port,
+        expect,
+        exchange,
+    };
+    Some((probe, wait, what))
 }
 
 /// Whether a machine can run checks: Linux (or supplied by the runner), not Windows.
@@ -350,63 +360,73 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
             if a == b {
                 continue;
             }
-            let multi = mb.networks.len() > 1;
             // A UDP service has no handshake: nothing tells "answers" from "blocked" without
             // speaking its protocol, so only the author's checks probe it.
             for svc in mb.services.iter().filter(|s| s.protocol.is_tcp()) {
-                let paths: Vec<(&String, bool)> = mb.networks.keys().map(|n| (n, allowed(spec, ma, n, svc.port))).collect();
-                let on = |n: &str| if multi { format!(" on {n}") } else { String::new() };
-                if paths.iter().all(|(_, ok)| !ok) {
-                    for (n, _) in &paths {
-                        out.push(Resolved {
-                            name: format!("{b}:{}{} blocked from {a}", svc.port, on(n)),
-                            position: position.clone(),
-                            probe: Probe::Tcp {
-                                host: Host::Machine {
-                                    name: b.clone(),
-                                    network: (*n).clone(),
-                                },
-                                port: svc.port,
-                                expect: TcpExpect::Blocked,
-                                exchange: TcpExchange::default(),
-                            },
-                            wait: 0,
-                            derived: true,
-                        });
-                    }
-                    continue;
-                }
-                // A dormant service answers once something wakes it, not before: nothing
-                // to expect yet (still blocked from where `reach` doesn't let it through).
-                if svc.dormant {
-                    continue;
-                }
-                for (n, _) in paths.iter().filter(|(_, ok)| *ok) {
-                    out.push(Resolved {
-                        name: format!("{b}:{}{} from {a}", svc.port, on(n)),
-                        position: position.clone(),
-                        probe: answers(b, n, svc),
-                        wait: 30,
-                        derived: true,
-                    });
-                }
+                out.extend(service_from(spec, (a, ma), (b, mb), svc));
             }
         }
         if !ma.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.internet)) {
-            out.push(Resolved {
-                name: format!("no internet from {a}"),
-                position,
-                probe: Probe::Http {
-                    url: Url::parse("http://1.1.1.1/").expect("a URL"),
-                    expect: HttpExpect::Blocked,
-                    request: HttpRequest::default(),
-                },
-                wait: 0,
-                derived: true,
-            });
+            let probe = Probe::Http {
+                url: Url::parse("http://1.1.1.1/").expect("a URL"),
+                expect: HttpExpect::Blocked,
+                request: HttpRequest::default(),
+            };
+            out.push(derived_check(format!("no internet from {a}"), position, probe, 0));
         }
     }
     out
+}
+
+/// The derived checks of machine `b`'s TCP service `svc` from machine `a`: it answers on every
+/// path that is open, or is blocked on all of them when none is.
+fn service_from(spec: &Spec, (a, ma): (&str, &Machine), (b, mb): (&str, &Machine), svc: &Service) -> Vec<Resolved> {
+    let position = Position::Machine(a.to_string());
+    let paths: Vec<(&String, bool)> = mb.networks.keys().map(|n| (n, allowed(spec, ma, n, svc.port))).collect();
+    let on = |n: &str| on_network(mb, n);
+    if paths.iter().all(|(_, ok)| !ok) {
+        return paths
+            .iter()
+            .map(|(n, _)| {
+                let probe = Probe::Tcp {
+                    host: Host::Machine {
+                        name: b.to_string(),
+                        network: (*n).clone(),
+                    },
+                    port: svc.port,
+                    expect: TcpExpect::Blocked,
+                    exchange: TcpExchange::default(),
+                };
+                derived_check(format!("{b}:{}{} blocked from {a}", svc.port, on(n)), position.clone(), probe, 0)
+            })
+            .collect();
+    }
+    // A dormant service answers once something wakes it, not before: nothing
+    // to expect yet (still blocked from where `reach` doesn't let it through).
+    if svc.dormant {
+        return Vec::new();
+    }
+    paths
+        .iter()
+        .filter(|(_, ok)| *ok)
+        .map(|(n, _)| derived_check(format!("{b}:{}{} from {a}", svc.port, on(n)), position.clone(), answers(b, n, svc), 30))
+        .collect()
+}
+
+/// ` on <network>` when machine `m` is on several networks (the name must say which address).
+fn on_network(m: &Machine, n: &str) -> String {
+    if m.networks.len() > 1 { format!(" on {n}") } else { String::new() }
+}
+
+/// A check Isoloom derives from the spec.
+fn derived_check(name: String, position: Position, probe: Probe, wait: u32) -> Resolved {
+    Resolved {
+        name,
+        position,
+        probe,
+        wait,
+        derived: true,
+    }
 }
 
 /// The derived checks of an environment where no machine can run them (only Windows machines,
@@ -418,18 +438,11 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
 pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
     let mut out = Vec::new();
     for (b, mb) in &spec.machines {
-        let multi = mb.networks.len() > 1;
         // A dormant service answers only once woken, a UDP one isn't probed, as above.
         for svc in mb.services.iter().filter(|s| !s.dormant && s.protocol.is_tcp()) {
             for n in mb.networks.keys() {
-                let on = if multi { format!(" on {n}") } else { String::new() };
-                out.push(Resolved {
-                    name: format!("{b}:{}{on} from the networks", svc.port),
-                    position: Position::Networks,
-                    probe: answers(b, n, svc),
-                    wait: 30,
-                    derived: true,
-                });
+                let name = format!("{b}:{}{} from the networks", svc.port, on_network(mb, n));
+                out.push(derived_check(name, Position::Networks, answers(b, n, svc), 30));
             }
         }
     }
@@ -518,122 +531,135 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
         if c.derived {
             s.push_str("if [ \"${ISOLOOM_DERIVED:-1}\" != 0 ]; then\n");
         }
-        let n = sq(&c.name);
-        let body = match &c.probe {
-            Probe::Http { url, expect, request } if !request.is_plain() && *expect != HttpExpect::Blocked => {
-                let text = url.render(&(r.host)(&url.host, position));
-                let mut args = String::new();
-                if request.follow {
-                    args.push_str(&format!(" -L --max-redirs {HTTP_MAX_REDIRECTS}"));
-                }
-                let method = request.method.as_deref().map(str::to_uppercase);
-                match method.as_deref() {
-                    // Following redirects, a POST is sent as curl sends a form (`--data-binary`,
-                    // or an empty `-d ''`), not forced with `-X`: a 301/302/303 is then followed
-                    // with a GET, as browsers do. `-X POST` would POST to every hop (a login
-                    // page's redirect to a GET-only page answering 405).
-                    Some("POST") if request.follow => {
-                        if request.body.is_none() {
-                            args.push_str(" -d ''");
-                        }
-                    }
-                    Some("HEAD") if request.follow => args.push_str(" -I"),
-                    Some(m) => args.push_str(&format!(" -X {}", sq(m))),
-                    None => {}
-                }
-                for (k, v) in &request.headers {
-                    args.push_str(&format!(" -H {}", sq(&format!("{k}: {v}"))));
-                }
-                if let Some(b) = &request.body {
-                    args.push_str(&format!(" --data-binary {}", sq(b)));
-                }
-                let want = match expect {
-                    HttpExpect::Status(code) => code.to_string(),
-                    _ => "any".to_string(),
-                };
-                format!(
-                    "if _retry {w} _req {want} {t}{args} {u}; then pass {n}; else fail {n} \"$out\"; fi\n",
-                    w = c.wait,
-                    t = sq(request.contains.as_deref().unwrap_or("")),
-                    u = sq(&text),
-                )
-            }
-            Probe::Http { url, expect, request } => {
-                let text = url.render(&(r.host)(&url.host, position));
-                let (u, ut) = (sq(&text), dq(&text));
-                // `_http`'s second argument: follow redirects.
-                let f = if request.follow { " follow" } else { "" };
-                let after = if request.follow { " (after redirects)" } else { "" };
-                match expect {
-                    HttpExpect::Status(code) => format!(
-                        "if _retry {w} _http_is {u} {code}{f}; then pass {n}; else fail {n} \"expected HTTP {code} from {ut}{after}, got $(_http {u}{f})\"; fi\n",
-                        w = c.wait
-                    ),
-                    HttpExpect::Any => format!(
-                        "if _retry {w} _http_any {u}{f}; then pass {n}; else fail {n} \"nothing answers at {ut}\"; fi\n",
-                        w = c.wait
-                    ),
-                    HttpExpect::Blocked => {
-                        format!("c=$(_http {u}); if [ \"$c\" = 000 ]; then pass {n}; else fail {n} \"{ut} answered (HTTP $c); it should be blocked\"; fi\n")
-                    }
-                }
-            }
-            Probe::Tcp {
-                host,
-                port,
-                expect: TcpExpect::Open,
-                exchange: TcpExchange { send, contains: Some(want) },
-            } => format!(
-                "if _retry {w} _tcp_read {h} {port} {snd} {t}; then pass {n}; else fail {n} \"$out\"; fi\n",
-                w = c.wait,
-                h = sq(&(r.host)(host, position)),
-                snd = sq(send.as_deref().unwrap_or("")),
-                t = sq(want),
-            ),
-            Probe::Tcp { host, port, expect, .. } => {
-                let text = (r.host)(host, position);
-                let (h, ht) = (sq(&text), dq(&text));
-                match expect {
-                    TcpExpect::Open => format!(
-                        "if _retry {w} _tcp {h} {port}; then pass {n}; else fail {n} \"nothing listens at {ht}:{port}\"; fi\n",
-                        w = c.wait
-                    ),
-                    TcpExpect::Blocked => {
-                        format!("if _tcp {h} {port}; then fail {n} \"{ht}:{port} answered; it should be blocked\"; else pass {n}; fi\n")
-                    }
-                }
-            }
-            Probe::Exec { command, expect } => format!(
-                "if _retry {w} _exec {cmd} {want}; then pass {n}; else fail {n} \"$(printf '%s' \"$out\" | tail -n 1)\"; fi\n",
-                w = c.wait,
-                cmd = sq(command),
-                want = sq(expect.as_deref().unwrap_or("")),
-            ),
-            Probe::Script { path } => format!(
-                "echo {hdr}\nif _retry {w} sh -c {cmd}; then pass {n}; else fail {n} \"{p} exited non-zero\"; fi\n",
-                hdr = sq(&format!("== {path}")),
-                w = c.wait,
-                cmd = sq(&(r.script)(path)),
-                p = dq(path)
-            ),
-            Probe::Playbook { path } => match r.playbook {
-                Some(pb) => format!(
-                    "echo {hdr}\nif _retry {w} sh -c {cmd}; then pass {n}; else fail {n} \"{p} failed\"; fi\n",
-                    hdr = sq(&format!("== {path}")),
-                    w = c.wait,
-                    cmd = sq(&pb(path)),
-                    p = dq(path)
-                ),
-                None => format!("fail {n} \"Ansible checks don't run from this position\"\n"),
-            },
-        };
-        s.push_str(&body);
+        s.push_str(&check_lines(c, position, r));
         if c.derived {
             s.push_str("fi\n");
         }
     }
     s.push_str("\necho \"isoloom-check: END $passed passed, $failed failed\"\n[ \"$failed\" -eq 0 ]\n");
     s
+}
+
+/// The sh lines that run one check and print its PASS or FAIL line.
+fn check_lines(c: &Resolved, position: &Position, r: &Render) -> String {
+    let n = sq(&c.name);
+    let host = |h: &Host| (r.host)(h, position);
+    match &c.probe {
+        Probe::Http { url, expect, request } if !request.is_plain() && *expect != HttpExpect::Blocked => {
+            http_request_lines(&n, c.wait, &url.render(&host(&url.host)), *expect, request)
+        }
+        Probe::Http { url, expect, request } => http_lines(&n, c.wait, &url.render(&host(&url.host)), *expect, request.follow),
+        Probe::Tcp {
+            host: h,
+            port,
+            expect: TcpExpect::Open,
+            exchange: TcpExchange { send, contains: Some(want) },
+        } => format!(
+            "if _retry {w} _tcp_read {h} {port} {snd} {t}; then pass {n}; else fail {n} \"$out\"; fi\n",
+            w = c.wait,
+            h = sq(&host(h)),
+            snd = sq(send.as_deref().unwrap_or("")),
+            t = sq(want),
+        ),
+        Probe::Tcp { host: h, port, expect, .. } => tcp_lines(&n, c.wait, &host(h), *port, *expect),
+        Probe::Exec { command, expect } => format!(
+            "if _retry {w} _exec {cmd} {want}; then pass {n}; else fail {n} \"$(printf '%s' \"$out\" | tail -n 1)\"; fi\n",
+            w = c.wait,
+            cmd = sq(command),
+            want = sq(expect.as_deref().unwrap_or("")),
+        ),
+        Probe::Script { path } => project_file_lines(&n, c.wait, path, &(r.script)(path), "exited non-zero"),
+        Probe::Playbook { path } => match r.playbook {
+            Some(pb) => project_file_lines(&n, c.wait, path, &pb(path), "failed"),
+            None => format!("fail {n} \"Ansible checks don't run from this position\"\n"),
+        },
+    }
+}
+
+/// An HTTP check beyond a GET and its status (a method, headers, a body, text to find), with
+/// curl: `_req`.
+fn http_request_lines(n: &str, wait: u32, url: &str, expect: HttpExpect, request: &HttpRequest) -> String {
+    let want = match expect {
+        HttpExpect::Status(code) => code.to_string(),
+        _ => "any".to_string(),
+    };
+    format!(
+        "if _retry {wait} _req {want} {t}{args} {u}; then pass {n}; else fail {n} \"$out\"; fi\n",
+        t = sq(request.contains.as_deref().unwrap_or("")),
+        args = curl_args(request),
+        u = sq(url),
+    )
+}
+
+/// The curl arguments for a request's redirects, method, headers and body.
+fn curl_args(request: &HttpRequest) -> String {
+    let mut args = String::new();
+    if request.follow {
+        args.push_str(&format!(" -L --max-redirs {HTTP_MAX_REDIRECTS}"));
+    }
+    let method = request.method.as_deref().map(str::to_uppercase);
+    match method.as_deref() {
+        // Following redirects, a POST is sent as curl sends a form (`--data-binary`,
+        // or an empty `-d ''`), not forced with `-X`: a 301/302/303 is then followed
+        // with a GET, as browsers do. `-X POST` would POST to every hop (a login
+        // page's redirect to a GET-only page answering 405).
+        Some("POST") if request.follow => {
+            if request.body.is_none() {
+                args.push_str(" -d ''");
+            }
+        }
+        Some("HEAD") if request.follow => args.push_str(" -I"),
+        Some(m) => args.push_str(&format!(" -X {}", sq(m))),
+        None => {}
+    }
+    for (k, v) in &request.headers {
+        args.push_str(&format!(" -H {}", sq(&format!("{k}: {v}"))));
+    }
+    if let Some(b) = &request.body {
+        args.push_str(&format!(" --data-binary {}", sq(b)));
+    }
+    args
+}
+
+/// A plain HTTP check: a status, any answer, or none.
+fn http_lines(n: &str, wait: u32, url: &str, expect: HttpExpect, follow: bool) -> String {
+    let (u, ut) = (sq(url), dq(url));
+    // `_http`'s second argument: follow redirects.
+    let f = if follow { " follow" } else { "" };
+    let after = if follow { " (after redirects)" } else { "" };
+    match expect {
+        HttpExpect::Status(code) => format!(
+            "if _retry {wait} _http_is {u} {code}{f}; then pass {n}; else fail {n} \"expected HTTP {code} from {ut}{after}, got $(_http {u}{f})\"; fi\n"
+        ),
+        HttpExpect::Any => format!("if _retry {wait} _http_any {u}{f}; then pass {n}; else fail {n} \"nothing answers at {ut}\"; fi\n"),
+        HttpExpect::Blocked => {
+            format!("c=$(_http {u}); if [ \"$c\" = 000 ]; then pass {n}; else fail {n} \"{ut} answered (HTTP $c); it should be blocked\"; fi\n")
+        }
+    }
+}
+
+/// A bare TCP check: something listens, or nothing does.
+fn tcp_lines(n: &str, wait: u32, host: &str, port: u16, expect: TcpExpect) -> String {
+    let (h, ht) = (sq(host), dq(host));
+    match expect {
+        TcpExpect::Open => {
+            format!("if _retry {wait} _tcp {h} {port}; then pass {n}; else fail {n} \"nothing listens at {ht}:{port}\"; fi\n")
+        }
+        TcpExpect::Blocked => {
+            format!("if _tcp {h} {port}; then fail {n} \"{ht}:{port} answered; it should be blocked\"; else pass {n}; fi\n")
+        }
+    }
+}
+
+/// A project file (a script, a playbook) run by `cmd`, its path echoed first; `failure` says
+/// what went wrong after the path.
+fn project_file_lines(n: &str, wait: u32, path: &str, cmd: &str, failure: &str) -> String {
+    format!(
+        "echo {hdr}\nif _retry {wait} sh -c {cmd}; then pass {n}; else fail {n} \"{p} {failure}\"; fi\n",
+        hdr = sq(&format!("== {path}")),
+        cmd = sq(cmd),
+        p = dq(path)
+    )
 }
 
 /// The helpers every runner starts with.
