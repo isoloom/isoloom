@@ -58,6 +58,8 @@ pub enum Feature {
     /// A process Isoloom starts on the machine: its own `command`, `before` steps, `working_dir`
     /// or `healthcheck`.
     MachineProcess,
+    /// A VM booting its own way (`vm.boot`): a kernel, firmware, boot order or network boot.
+    OwnBoot,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -163,6 +165,11 @@ pub enum Requirement {
         /// The first machine that does.
         machine: String,
     },
+    /// A VM sets `vm.boot`.
+    OwnBoot {
+        /// The first VM that does.
+        machine: String,
+    },
 }
 
 impl Requirement {
@@ -190,6 +197,7 @@ impl Requirement {
             Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
             Requirement::Tpm { .. } => Feature::Tpm,
             Requirement::MachineProcess { .. } => Feature::MachineProcess,
+            Requirement::OwnBoot { .. } => Feature::OwnBoot,
         }
     }
 }
@@ -199,15 +207,16 @@ impl Requirement {
 const OWN_PROCESS: &str =
     "sets its own process (`command`, `working_dir`, `before` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it";
 
+/// Why an `exec` check needs a container where it stands.
+const IN_A_CONTAINER: &str = "needs `from:` a machine with its own container (it runs inside it)";
+
 impl fmt::Display for Requirement {
     /// Why a backend without the capability refuses the environment, in the user's terms.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Requirement::EnvironmentProvisioning => f.write_str("environment-level provisioning (`provision:`) runs on VM targets for now"),
             Requirement::PlaybookChecks => f.write_str("Ansible checks (.yml) run on VM targets for now"),
-            Requirement::ExecWithoutContainer { check } => {
-                write!(f, "`exec` check \"{check}\" needs `from:` a machine with its own container (it runs inside it)")
-            }
+            Requirement::ExecWithoutContainer { check } => write!(f, "`exec` check \"{check}\" {IN_A_CONTAINER}"),
             Requirement::NetworkAppliance { machine } => write!(
                 f,
                 "machine `{machine}` is a network appliance (`docker.appliance`), which runs on the Docker targets"
@@ -262,6 +271,7 @@ impl fmt::Display for Requirement {
             ),
             Requirement::Tpm { machine } => no_tpm(f, machine),
             Requirement::MachineProcess { machine } => write!(f, "machine `{machine}` {OWN_PROCESS}"),
+            Requirement::OwnBoot { machine } => crate::boot::no_own_boot(f, machine),
         }
     }
 }

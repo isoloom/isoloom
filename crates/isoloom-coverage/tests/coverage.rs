@@ -53,6 +53,31 @@ fn written_matches(rows: &[(String, Support)], written: &BTreeSet<String>, forma
     assert!(wrong.is_empty(), "{format}:\n{}", wrong.join("\n"));
 }
 
+/// A machine with its own box source and boot, which no example needs (a lab about the boot
+/// itself, served on libvirt).
+const OWN_BOOT: &str = "
+version: 1
+name: own-boot
+networks: { lan: { cidr: 10.30.0.0/24 } }
+machines:
+  pxe:
+    networks: { lan: 10 }
+    vm:
+      os: debian-12
+      provision: [setup.sh]
+      image: { vagrant: lab/debian-12, box_url: 'https://boxes.example/debian-12.box', box_server_url: 'https://boxes.example' }
+      boot:
+        kernel: /var/lib/isoloom/vmlinuz
+        initrd: /var/lib/isoloom/initrd.img
+        cmdline: console=ttyS0
+        dtb: /var/lib/isoloom/board.dtb
+        loader: /usr/share/OVMF/OVMF_CODE.fd
+        nvram: /var/lib/isoloom/pxe_VARS.fd
+        firmware_format: raw
+        order: [network, hd]
+        network: { tftp_root: /srv/tftp, file: pxelinux.0, server: 10.30.0.1 }
+";
+
 /// Specs for what no example exercises: a VM on the host's LAN, at a fixed address and by DHCP
 /// with the LAN's default route (`public_network`); a Windows 11 machine (the TPM its OS
 /// expects) and a Windows box reached over OpenSSH (`winssh`) that requires a TPM.
@@ -83,7 +108,8 @@ machines:
 
 /// Every Vagrantfile the generators write for the examples: the vagrant output (every provider
 /// is a block of the same file), docker-vm and hybrid, generated now rather than read from the
-/// committed copies, so the check follows the generators; then the fixtures' on `vagrant`.
+/// committed copies, so the check follows the generators; then the fixtures' (and
+/// [`OWN_BOOT`]) on `vagrant`.
 fn vagrantfiles() -> Vec<String> {
     let mut found = Vec::new();
     for target in [Target::Vagrant, Target::DockerVm, Target::Hybrid] {
@@ -100,6 +126,10 @@ fn vagrantfiles() -> Vec<String> {
         let files = generate(&isoloom_spec::parse(fixture).unwrap(), Target::Vagrant).unwrap();
         found.extend(files.into_iter().filter(|f| f.path.ends_with("/Vagrantfile")).map(|f| f.contents));
     }
+    let fixture = isoloom_spec::parse(OWN_BOOT).unwrap();
+    assert_eq!(isoloom_spec::validate(&fixture), vec![], "the own-boot fixture");
+    let files = generate(&fixture, Target::Vagrant).unwrap();
+    found.extend(files.into_iter().filter(|f| f.path.ends_with("/Vagrantfile")).map(|f| f.contents));
     found
 }
 

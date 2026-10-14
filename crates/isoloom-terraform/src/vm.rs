@@ -40,6 +40,7 @@ pub mod controller;
 pub mod limits;
 pub mod linux;
 pub mod module;
+pub mod own_image;
 pub mod provisioner;
 pub mod versions;
 pub mod windows;

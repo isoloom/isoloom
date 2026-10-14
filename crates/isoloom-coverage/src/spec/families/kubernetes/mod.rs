@@ -14,4 +14,6 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::outside::KUBERNETES,
     super::machine_files::KUBERNETES,
     super::process::KUBERNETES,
+    super::own_image::CONTAINER_IMAGES,
+    super::own_image::CONTAINER_BOOT,
 ];

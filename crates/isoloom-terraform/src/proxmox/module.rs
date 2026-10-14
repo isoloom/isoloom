@@ -69,6 +69,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
             .build(),
     );
     images(env, m);
+    super::image::downloads(env, m);
 }
 
 fn variables() -> Vec<Block> {
@@ -210,7 +211,7 @@ fn locals(env: &Environment) -> Block {
 /// A cloud image per OS (the router's and the controller's Debian among them), per environment:
 /// a shared file would go with whichever environment is destroyed first.
 fn images(env: &Environment, m: &mut Module) {
-    let mut oses: Vec<&str> = vms(env).filter_map(|(_, mp)| os(mp)).collect();
+    let mut oses: Vec<&str> = vms(env).filter(|(_, mp)| !super::image::has_own(mp)).filter_map(|(_, mp)| os(mp)).collect();
     oses.push(controller::OS);
     oses.sort_unstable();
     oses.dedup();

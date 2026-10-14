@@ -11,28 +11,28 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [Docker Compose](#docker-compose) | 85% | 150 | 127 | 3 | 20 |
-| [Vagrant](#vagrant) | 95% | 42 | 40 | 0 | 2 |
-| [Vagrant: networks](#vagrant-networks) | 92% | 38 | 35 | 0 | 3 |
+| [Vagrant](#vagrant) | 100% | 42 | 42 | 0 | 0 |
+| [Vagrant: networks](#vagrant-networks) | 100% | 38 | 38 | 0 | 0 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
 | [Vagrant: provisioners](#vagrant-provisioners) | 94% | 57 | 54 | 0 | 3 |
 | [Vagrant: communicators](#vagrant-communicators) | 100% | 11 | 11 | 0 | 0 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 7 | 7 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
-| [Vagrant: libvirt](#vagrant-libvirt) | 52% | 19 | 10 | 0 | 9 |
+| [Vagrant: libvirt](#vagrant-libvirt) | 94% | 19 | 18 | 0 | 1 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: UTM](#vagrant-utm) | 100% | 3 | 3 | 0 | 0 |
-| [Vagrant: QEMU](#vagrant-qemu) | 85% | 14 | 12 | 0 | 2 |
+| [Vagrant: QEMU](#vagrant-qemu) | 92% | 14 | 13 | 0 | 1 |
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 19 | 19 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
-| [Terraform: Proxmox](#terraform-proxmox) | 64% | 128 | 83 | 0 | 45 |
+| [Terraform: Proxmox](#terraform-proxmox) | 67% | 127 | 86 | 0 | 41 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
-| [Terraform: AWS](#terraform-aws) | 69% | 132 | 92 | 0 | 40 |
-| [Terraform: Azure](#terraform-azure) | 75% | 135 | 102 | 0 | 33 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 67% | 95 | 64 | 0 | 31 |
-| [Terraform: DigitalOcean](#terraform-digitalocean) | 75% | 36 | 27 | 0 | 9 |
-| [Terraform: Linode](#terraform-linode) | 59% | 59 | 35 | 0 | 24 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 48% | 152 | 73 | 0 | 79 |
+| [Terraform: AWS](#terraform-aws) | 72% | 132 | 96 | 0 | 36 |
+| [Terraform: Azure](#terraform-azure) | 80% | 135 | 108 | 0 | 27 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 68% | 95 | 65 | 0 | 30 |
+| [Terraform: DigitalOcean](#terraform-digitalocean) | 77% | 36 | 28 | 0 | 8 |
+| [Terraform: Linode](#terraform-linode) | 66% | 59 | 39 | 0 | 20 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 50% | 152 | 76 | 0 | 76 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
@@ -436,7 +436,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant
 
-95% of 42 portable features (40 done, 0 partly, 2 to do; 100 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners, communicators, pushes).
+100% of 42 portable features (42 done, 0 partly, 0 to do; 100 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners, communicators, pushes).
 
 ### Machine settings (config.vm)
 
@@ -461,8 +461,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `box_download_location_trusted` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `box_download_options` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `box_extra_download_options` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `box_server_url` | Yes | Not yet | Custom images (a box URL, a Proxmox template, a cloud image) |
-| `box_url` | Yes | Not yet | Custom images (a box URL, a Proxmox template, a cloud image) |
+| `box_server_url` | Yes | Yes | From `machines.*.vm.image.box_server_url` |
+| `box_url` | Yes | Yes | From `machines.*.vm.image.box_url` (a URL, or a .box file in the project) |
 | `box_version` | Yes | Yes | From `machines.*.vm.image.vagrant_version, or a built-in pin` |
 | `clone` | n/a | No | Starts from another Vagrant machine; machines start from their image |
 | `cloud_init` | Yes | Another way | Via provisioning steps run any setup |
@@ -565,7 +565,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: networks
 
-92% of 38 portable features (35 done, 0 partly, 3 to do; 58 features in all). From Vagrant 2.4.9 (the networking docs and the providers' network code) and vagrant-libvirt 0.12.2 (its network options).
+100% of 38 portable features (38 done, 0 partly, 0 to do; 58 features in all). From Vagrant 2.4.9 (the networking docs and the providers' network code) and vagrant-libvirt 0.12.2 (its network options).
 
 ### Network types
 
@@ -591,9 +591,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `private_network: libvirt__adapter` | n/a | No | How vagrant-libvirt names and cleans up its interfaces |
 | `private_network: libvirt__always_destroy` | n/a | No | How vagrant-libvirt names and cleans up its interfaces |
 | `private_network: libvirt__bus` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `private_network: libvirt__dhcp_bootp_file` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
-| `private_network: libvirt__dhcp_bootp_server` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
-| `private_network: libvirt__dhcp_enabled` | Yes | Yes | Off: machines get fixed addresses |
+| `private_network: libvirt__dhcp_bootp_file` | Yes | Yes | From `machines.*.vm.boot.network.file` (on the machine's first network, DHCP on) |
+| `private_network: libvirt__dhcp_bootp_server` | Yes | Yes | From `machines.*.vm.boot.network.server` |
+| `private_network: libvirt__dhcp_enabled` | Yes | Yes | Off: machines get fixed addresses; on where a machine boots from the network, `vm.boot.network` |
 | `private_network: libvirt__dhcp_start` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
 | `private_network: libvirt__dhcp_stop` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
 | `private_network: libvirt__domain_name` | Yes | Another way | Via machines.*.dns.domain |
@@ -613,7 +613,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `private_network: libvirt__network_address` | Yes | Another way | Via `ip` and `netmask`: libvirt derives the network from them |
 | `private_network: libvirt__network_name` | Yes | Yes | From `networks` (a libvirt network each, named after the environment) |
 | `private_network: libvirt__slot` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `private_network: libvirt__tftp_root` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `private_network: libvirt__tftp_root` | Yes | Yes | From `machines.*.vm.boot.network.tftp_root` |
 | `private_network: libvirt__tunnel_ip` | No | No | Links libvirt hosts together: other targets join machines on one network of their own |
 | `private_network: libvirt__tunnel_local_ip` | No | No | Links libvirt hosts together: other targets join machines on one network of their own |
 | `private_network: libvirt__tunnel_local_port` | No | No | Links libvirt hosts together: other targets join machines on one network of their own |
@@ -1174,15 +1174,15 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: libvirt
 
-52% of 19 portable features (10 done, 0 partly, 9 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
+94% of 19 portable features (18 done, 0 partly, 1 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
 
 ### Settings
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `autostart` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `boot` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
-| `boot_order` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `boot` | Yes | Yes | From `machines.*.vm.boot.order` (one `boot` per device, in order) |
+| `boot_order` | Yes | Another way | Via `boot`: each call adds its device to the order |
 | `cdroms` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `channel` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `channels` | No | No | Display, input and host devices: containers and cloud VMs have none |
@@ -1193,7 +1193,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `clock_timer` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `clock_timers` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `clock_timezone` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `cmd_line` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `cmd_line` | Yes | Yes | From `machines.*.vm.boot.cmdline` |
 | `connect_via_ssh` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `cpu_affinity` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `cpu_fallback` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
@@ -1216,7 +1216,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `disk_driver_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `disks` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
 | `driver` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `dtb` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `dtb` | Yes | Yes | From `machines.*.vm.boot.dtb` |
 | `emulator_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `features` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `features_hyperv` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
@@ -1233,15 +1233,15 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `host_device_exclude_prefixes` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `hyperv_feature` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `id_ssh_key_file` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `initrd` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `initrd` | Yes | Yes | From `machines.*.vm.boot.initrd` |
 | `input` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `inputs` | No | No | Display, input and host devices: containers and cloud VMs have none |
-| `kernel` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `kernel` | Yes | Yes | From `machines.*.vm.boot.kernel` |
 | `keymap` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `kvm_hidden` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `launchsecurity` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `launchsecurity_data` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `loader` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `loader` | Yes | Yes | From `machines.*.vm.boot.loader` |
 | `machine_arch` | Yes | Yes | From `machines.*.arch` |
 | `machine_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `machine_virtual_size` | Yes | Yes | From `machines.*.resources.disk_gb` (the root filesystem grown into it) |
@@ -1275,7 +1275,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `nic_model_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `nodeset` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `numa_nodes` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `nvram` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `nvram` | Yes | Yes | From `machines.*.vm.boot.nvram` |
 | `password` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `pci` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `pcis` | No | No | Display, input and host devices: containers and cloud VMs have none |
@@ -1375,7 +1375,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: QEMU
 
-85% of 14 portable features (12 done, 0 partly, 2 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
+92% of 14 portable features (13 done, 0 partly, 1 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
 
 ### Settings
 
@@ -1393,7 +1393,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `extra_image_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `extra_netdev_args` | n/a | No | Options of the NAT adapter Vagrant reaches the VM through (user-mode networking), not of the lab's networks |
 | `extra_qemu_args` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `firmware_format` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
+| `firmware_format` | Yes | Yes | From `machines.*.vm.boot.firmware_format` (the plugin's own firmware boots the box: the other `vm.boot` fields are refused on QEMU) |
 | `graceful_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `homebrew_prefix` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `image_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
@@ -1517,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-64% of 128 portable features (83 done, 0 partly, 45 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
+67% of 127 portable features (86 done, 0 partly, 41 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1750,9 +1750,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `acpi` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `acpi` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `bios` | Yes | Yes | Written by the generator |
-| `boot_order` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `boot_order` | Yes | Yes | Written by the generator |
 | `delete_unreferenced_disks_on_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `hook_script_file_id` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
@@ -1866,8 +1866,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `disk.speed.write_burstable` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `efi_disk` | Yes | Yes | Written by the generator |
 | `efi_disk.datastore_id` | Yes | Yes | Written by the generator |
-| `efi_disk.file_format` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
-| `efi_disk.pre_enrolled_keys` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `efi_disk.file_format` | Yes | Yes | Written by the generator |
+| `efi_disk.pre_enrolled_keys` | Yes | Yes | Written by the generator |
 | `efi_disk.type` | Yes | Yes | Written by the generator |
 | `hostpci` | Yes | Not yet | With GPU and device passthrough |
 | `hostpci.device` | Yes | Not yet | With GPU and device passthrough |
@@ -1972,7 +1972,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: AWS
 
-69% of 132 portable features (92 done, 0 partly, 40 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
+72% of 132 portable features (96 done, 0 partly, 36 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1985,9 +1985,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_account_region` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_accountaccess_application` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_accountaccess_entitlement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_ami` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
-| `aws_ami_copy` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
-| `aws_ami_from_instance` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `aws_ami` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `aws_ami_copy` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `aws_ami_from_instance` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `aws_ami_launch_permission` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_arcregionswitch_plan` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_arczonalshift_autoshift_observer_notification_status` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -2111,7 +2111,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_ebs_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `aws_ebs_snapshot_block_public_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_ebs_snapshot_copy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
-| `aws_ebs_snapshot_import` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `aws_ebs_snapshot_import` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `aws_ebs_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `aws_ebs_volume_copy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `aws_ec2_allowed_images_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3128,7 +3128,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: Azure
 
-75% of 135 portable features (102 done, 0 partly, 33 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+80% of 135 portable features (108 done, 0 partly, 27 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3182,7 +3182,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `azurerm_disk_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_disk_encryption_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_federated_identity_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `azurerm_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `azurerm_lighthouse_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_lighthouse_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_linux_virtual_machine` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
@@ -3299,9 +3299,9 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `azurerm_security_center_storage_defender` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_security_center_subscription_pricing` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_security_center_workspace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_shared_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
-| `azurerm_shared_image_gallery` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
-| `azurerm_shared_image_version` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `azurerm_shared_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `azurerm_shared_image_gallery` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `azurerm_shared_image_version` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `azurerm_site_recovery_fabric` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `azurerm_site_recovery_hyperv_network_mapping` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `azurerm_site_recovery_hyperv_replication_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -3486,7 +3486,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `resource_group_name` | Yes | Yes | Written by the generator |
 | `secure_boot_enabled` | Yes | Yes | Written by the generator |
 | `size` | Yes | Yes | Written by the generator |
-| `source_image_id` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `source_image_id` | Yes | Yes | Written by the generator |
 | `tags` | Yes | Yes | Written by the generator |
 | `user_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `virtual_machine_scale_set_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -3785,7 +3785,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `resource_group_name` | Yes | Yes | Written by the generator |
 | `secure_boot_enabled` | Yes | Not yet | With a TPM on Windows in the cloud: AWS's NitroTPM Windows images (TPM-Windows_Server-*) first |
 | `size` | Yes | Yes | Written by the generator |
-| `source_image_id` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `source_image_id` | Yes | Yes | Written by the generator |
 | `tags` | Yes | Yes | Written by the generator |
 | `timezone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `user_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -3854,7 +3854,7 @@ And 894 other resource types that only this cloud has: its managed services, net
 
 ## Terraform: Google Cloud
 
-67% of 95 portable features (64 done, 0 partly, 31 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+68% of 95 portable features (65 done, 0 partly, 30 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3922,7 +3922,7 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `google_compute_firewall_policy_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_firewall_policy_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_firewall_policy_with_rules` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `google_compute_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `google_compute_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `google_compute_image_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_image_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_image_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -4663,13 +4663,13 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: DigitalOcean
 
-75% of 36 portable features (27 done, 0 partly, 9 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
+77% of 36 portable features (28 done, 0 partly, 8 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `digitalocean_custom_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `digitalocean_custom_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `digitalocean_droplet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `digitalocean_droplet_autoscale` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `digitalocean_droplet_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -4794,19 +4794,19 @@ And 55 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Linode
 
-59% of 59 portable features (35 done, 0 partly, 24 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
+66% of 59 portable features (39 done, 0 partly, 20 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `linode_account_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `linode_consumer_image_share_group_token` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `linode_consumer_image_share_group_token` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `linode_firewall` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `linode_firewall_device` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_firewall_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_iam_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `linode_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `linode_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `linode_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `linode_instance_config` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_instance_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
@@ -4822,8 +4822,8 @@ And 55 other resource types that only this cloud has: its managed services, netw
 | `linode_networking_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `linode_placement_group_assignment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `linode_producer_image_share_group` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
-| `linode_producer_image_share_group_member` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `linode_producer_image_share_group` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `linode_producer_image_share_group_member` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `linode_reserved_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_reserved_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_sshkey` | Yes | Another way | Via each instance's own `authorized_keys`, which installs the environment's key without storing it in the account |
@@ -5312,7 +5312,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Oracle Cloud
 
-48% of 152 portable features (73 done, 0 partly, 79 to do; 1320 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
+50% of 152 portable features (76 done, 0 partly, 76 to do; 1320 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5389,14 +5389,14 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `oci_core_compute_gpu_memory_fabric` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_compute_host` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_compute_host_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `oci_core_compute_image_capability_schema` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `oci_core_compute_image_capability_schema` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `oci_core_dedicated_vm_host` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_default_dhcp_options` | n/a | No | The account's default network: Isoloom builds its own |
 | `oci_core_default_drg_route_table` | n/a | No | The account's default network: Isoloom builds its own |
 | `oci_core_default_route_table` | n/a | No | The account's default network: Isoloom builds its own |
 | `oci_core_default_security_list` | n/a | No | The account's default network: Isoloom builds its own |
 | `oci_core_dhcp_options` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
-| `oci_core_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `oci_core_image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `oci_core_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_instance_configuration` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_instance_maintenance_event` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -5413,7 +5413,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `oci_core_route_table` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_route_table_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `oci_core_security_list` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_shape_management` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `oci_core_shape_management` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
 | `oci_core_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_vcn` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_vlan` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
@@ -7358,6 +7358,27 @@ is marked ✗, with its reason below.
 | `machines.*.vm.image.hyperv` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.image.winrm` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.image.winssh` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.box_url` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.box_server_url` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.proxmox` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `machines.*.vm.image.aws` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.azure` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.gcp` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.digitalocean` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.linode` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.image.oci` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
+| `machines.*.vm.boot.kernel` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.initrd` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.cmdline` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.dtb` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.loader` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.nvram` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.network.tftp_root` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.network.file` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.network.server` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.firmware` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.firmware_format` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
+| `machines.*.vm.boot.order` | n/a | n/a | n/a | n/a | n/a | ◐ | n/a | ✗ | ◐ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a |
 | `machines.*.vm.provision` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ◐ |
 | `machines.*.vm.tpm` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ◐ | n/a | n/a | n/a |
 | `provision[].ansible` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | planned | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✓ |
@@ -7400,16 +7421,16 @@ is marked ✗, with its reason below.
 | kubernetes | 75% of 93 | 65 | 11 | 1 | 16 |
 | helm | 75% of 93 | 65 | 11 | 1 | 16 |
 | kustomize | 75% of 93 | 65 | 11 | 1 | 16 |
-| vagrant | 92% of 93 | 85 | 2 | 0 | 6 |
+| vagrant | 87% of 107 | 87 | 14 | 0 | 6 |
 | docker-vm | 84% of 101 | 84 | 3 | 0 | 14 |
-| hybrid | 77% of 112 | 84 | 5 | 7 | 16 |
-| proxmox | 89% of 90 | 80 | 1 | 3 | 6 |
-| aws | 68% of 90 | 56 | 12 | 6 | 16 |
-| azure | 68% of 90 | 56 | 12 | 7 | 15 |
-| gcp | 68% of 90 | 56 | 12 | 6 | 16 |
-| digitalocean | 53% of 90 | 45 | 7 | 6 | 32 |
-| linode | 56% of 90 | 47 | 8 | 6 | 29 |
-| oci | 57% of 90 | 47 | 9 | 6 | 28 |
+| hybrid | 70% of 126 | 86 | 5 | 7 | 28 |
+| proxmox | 81% of 103 | 83 | 2 | 3 | 15 |
+| aws | 62% of 108 | 62 | 12 | 6 | 28 |
+| azure | 62% of 108 | 62 | 12 | 7 | 27 |
+| gcp | 62% of 108 | 62 | 12 | 6 | 28 |
+| digitalocean | 50% of 108 | 51 | 7 | 6 | 44 |
+| linode | 52% of 108 | 53 | 8 | 6 | 41 |
+| oci | 53% of 108 | 53 | 9 | 6 | 40 |
 | cloud-docker | 83% of 101 | 83 | 3 | 0 | 15 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
 | external | 49% of 74 | 32 | 9 | 14 | 19 |
@@ -7455,6 +7476,10 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`)
 - **external**: Machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook (`machines.*.files[].path`, `machines.*.files[].source`, `machines.*.files[].content`, `machines.*.files[].uid`, `machines.*.files[].gid`, `machines.*.files[].mode`)
 - **hybrid**: Machine `r` is a network appliance (`docker.appliance`), which runs on the Docker targets (`machines.*.docker.appliance`, `machines.*.docker.firmware`, `machines.*.docker.config`)
+- **hybrid, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`, `machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`, `machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`, `machines.*.vm.boot.firmware`, `machines.*.vm.boot.firmware_format`, `machines.*.vm.boot.order`)
+- **proxmox**: Machine `a` sets `vm.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`)
+- **proxmox**: Machine `a` sets `vm.boot.loader`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`)
+- **proxmox**: Machine `a` sets `vm.boot.network`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`)
 - **digitalocean**: Machine `a` asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none (`machines.*.vm.tpm`)
 - **linode**: Machine `a` asks for a virtual TPM (`vm.tpm: true`): Linode gives none (`machines.*.vm.tpm`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, cloud-docker**: Environment-level provisioning (`provision:`) runs on VM targets for now (`provision[].ansible`, `provision[].inventory`, `provision[].groups`, `provision[].vars`, `provision[].host_vars`, `controller`, `provision[].requirements`)

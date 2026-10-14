@@ -55,6 +55,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         size: (cpus, memory, disk.unwrap_or(8)),
         boot: Boot::Image(res(controller::OS)),
         tpm: false,
+        own_boot: None,
         agent: false,
         nics,
         dns: Some(

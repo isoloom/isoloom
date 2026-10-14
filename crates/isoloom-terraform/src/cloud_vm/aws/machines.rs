@@ -11,7 +11,7 @@ use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 use super::network::{controller_group, name_with, resource, security_group};
 use super::{image_user, instance_type, linux_user_data, r, vpc_does};
 use crate::vm::linux::{self, Hooks};
-use crate::vm::{cloud, controller, os, res, windows};
+use crate::vm::{cloud, controller, os, own_image, res, windows};
 
 /// The address Terraform reaches a machine at: its instance's own public address on one
 /// network, its Elastic IP on several (AWS doesn't auto-assign one then).
@@ -24,18 +24,23 @@ pub fn public_ip(env: &Environment, name: &str) -> Expression {
     }
 }
 
+/// The machine's AMI: its own (`vm.image.aws`), else the one looked up for its OS.
+fn ami(mp: &isoloom_plan::MachinePlan) -> Expression {
+    own_image::of(mp, own_image::aws).map_or_else(|| r(&format!("data.aws_ami.{}.id", res(os(mp).unwrap_or_default()))), string)
+}
+
 /// A Linux machine: its security group, its instance, its set-up over SSH.
 pub fn linux(env: &Environment, name: &str, m: &mut Module) {
     let mp = &env.machines[name];
     let id = res(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, name, false));
-    let ami = res(os(mp).unwrap_or_default());
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
     let mut instance = resource("aws_instance", &id)
-        .add_attribute(("ami", r(&format!("data.aws_ami.{ami}.id"))))
+        .add_attribute(("ami", ami(mp)))
         .add_attribute(("instance_type", string(instance_type(mem))));
-    if mp.tpm.is_some() {
-        instance = instance.add_block(nitro_tpm(&ami));
+    // A looked-up AMI says whether it has NitroTPM; an own AMI is the author's to choose.
+    if mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none() {
+        instance = instance.add_block(nitro_tpm(&res(os(mp).unwrap_or_default())));
     }
     if mp.addresses.len() > 1 {
         m.blocks(several_networks(env, name, instance));
@@ -179,7 +184,7 @@ pub fn windows(env: &Environment, name: &str, m: &mut Module) {
     // Windows wants 2 GB and more.
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB).max(2048);
     let instance = resource("aws_instance", &id)
-        .add_attribute(("ami", r(&format!("data.aws_ami.{}.id", res(os(mp).unwrap_or_default())))))
+        .add_attribute(("ami", ami(mp)))
         .add_attribute(("instance_type", string(instance_type(mem))))
         .add_attribute(("subnet_id", r(&format!("aws_subnet.{}.id", res(net)))))
         .add_attribute(("private_ip", string(addr.to_string())))

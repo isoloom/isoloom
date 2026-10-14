@@ -11,7 +11,7 @@ use isoloom_spec::model::{Protocol, Target};
 use crate::vm::cloud::{redirects, reschedule_auto_stop};
 use crate::vm::limits::Limits;
 use crate::vm::linux::Hooks;
-use crate::vm::{controller, is_windows, os, vms};
+use crate::vm::{controller, is_windows, os, own_image, vms};
 
 /// What a single-network cloud takes, and how it says it doesn't.
 #[derive(Debug, Clone, Copy)]
@@ -28,6 +28,8 @@ pub struct Rules {
     pub images: &'static str,
     /// Whether its VMs can have a virtual TPM.
     pub tpm: bool,
+    /// The field of `vm.image` naming a machine's own image there, which stands in for its OS's.
+    pub own: own_image::Field,
 }
 
 /// The features every cloud lacks for now, `arm64` and `ipv6` the cloud's own.
@@ -74,7 +76,8 @@ pub fn refusal(env: &Environment, rules: &Rules) -> Option<String> {
     }
     vms(env).find_map(|(name, mp)| {
         let os = os(mp).unwrap_or_default();
-        (!(rules.has_image)(os)).then(|| format!("machine `{name}`: no {cloud} image for `{os}` yet ({})", rules.images))
+        (!(rules.has_image)(os) && own_image::of(mp, rules.own).is_none())
+            .then(|| format!("machine `{name}`: no {cloud} image for `{os}` yet ({})", rules.images))
     })
 }
 

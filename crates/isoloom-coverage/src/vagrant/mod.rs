@@ -20,7 +20,7 @@ mod qemu;
 
 use super::{
     Format, Support,
-    Support::{Emitted, Equivalent, NotPortable, Planned, Tooling, Unclassified},
+    Support::{Emitted, Equivalent, NotPortable, Tooling, Unclassified},
 };
 
 /// The Vagrant release every list from hashicorp/vagrant comes from (the plugins pin their own).
@@ -83,9 +83,6 @@ pub(crate) const NO_SHARED_FOLDERS: Support = Tooling {
 };
 pub(crate) const PRIVATE_NETWORKS: Support = Equivalent {
     via: "`config.vm.network private_network`, the same on every provider",
-};
-pub(crate) const IMAGE_BOOTS: Support = Planned {
-    note: "custom images with their own kernel and boot (makes an environment VM-only)",
 };
 pub(crate) const LINKED_CLONE: Support = Tooling {
     note: "faster starts from one image: no change in behavior",

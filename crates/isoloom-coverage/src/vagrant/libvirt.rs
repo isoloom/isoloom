@@ -1,9 +1,9 @@
 //! The settings of vagrant-libvirt.
 
-use super::{ARCH, DEVICES, DISK, HOST_TUNING, IMAGE_BOOTS, MORE_DISKS, RESOURCES, TOOLING, USER_SETUP};
+use super::{ARCH, DEVICES, DISK, HOST_TUNING, MORE_DISKS, RESOURCES, TOOLING, USER_SETUP};
 use crate::{
     Support,
-    Support::{Emitted, Planned, Tooling},
+    Support::{Emitted, Equivalent, Planned, Tooling},
 };
 
 pub(super) fn classify(s: &str) -> Option<Support> {
@@ -21,7 +21,30 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         "tpm_path" => Tooling {
             note: "the host's own TPM device, passed through: the emulated TPM gives each VM one of its own",
         },
-        "boot" | "boot_order" | "kernel" | "cmd_line" | "initrd" | "dtb" | "loader" | "nvram" => IMAGE_BOOTS,
+        "boot" => Emitted {
+            from: "machines.*.vm.boot.order (one `boot` per device, in order)",
+        },
+        "boot_order" => Equivalent {
+            via: "`boot`: each call adds its device to the order",
+        },
+        "kernel" => Emitted {
+            from: "machines.*.vm.boot.kernel",
+        },
+        "cmd_line" => Emitted {
+            from: "machines.*.vm.boot.cmdline",
+        },
+        "initrd" => Emitted {
+            from: "machines.*.vm.boot.initrd",
+        },
+        "dtb" => Emitted {
+            from: "machines.*.vm.boot.dtb",
+        },
+        "loader" => Emitted {
+            from: "machines.*.vm.boot.loader",
+        },
+        "nvram" => Emitted {
+            from: "machines.*.vm.boot.nvram",
+        },
         "uri" | "driver" | "host" | "port" | "connect_via_ssh" | "socket" | "username" | "password" | "id_ssh_key_file" | "proxy_command" | "system_uri"
         | "qemu_use_session" | "storage_pool_name" | "storage_pool_path" | "snapshot_pool_name" | "emulator_path" => USER_SETUP,
         "default_prefix" => Emitted {

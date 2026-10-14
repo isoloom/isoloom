@@ -14,4 +14,6 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::outside::CLOUD_VM,
     super::machine_files::VM,
     super::process::VM,
+    super::own_image::CLOUD_IMAGES,
+    super::own_image::CLOUD_BOOT,
 ];

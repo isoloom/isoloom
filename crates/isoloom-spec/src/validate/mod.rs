@@ -8,6 +8,7 @@
 //! their own process), provisioning and the controller, tools, link impairment, the message,
 //! groups, checks and targets.
 
+mod boot;
 mod checks;
 mod cidr;
 mod cidr6;
@@ -120,6 +121,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     windows::check(spec, &mut p);
     process::check(spec, &mut p);
     machines::cycle(spec, &mut p);
+    boot::check(spec, &mut p);
     provision::controller(spec, &mut p);
     provision::steps(spec, &mut p);
     tools::reserved(spec, &blocks, &mut p);

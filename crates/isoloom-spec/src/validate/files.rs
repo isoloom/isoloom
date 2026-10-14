@@ -93,6 +93,10 @@ fn machines(spec: &Spec, paths: &mut Paths) {
             for (i, s) in v.provision.iter().enumerate().filter(|(_, s)| !crate::model::is_reboot(s)) {
                 paths.check(format!("machines.{name}.vm.provision[{i}]"), s);
             }
+            // A box file in the project (a URL is Vagrant's to fetch).
+            if let Some(u) = v.image.as_ref().and_then(|i| i.box_url.as_deref()).filter(|u| !u.contains("://")) {
+                paths.check(format!("machines.{name}.vm.image.box_url"), u);
+            }
         }
     }
 }

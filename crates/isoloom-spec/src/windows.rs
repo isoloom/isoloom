@@ -44,6 +44,7 @@ mod tests {
             provision: Vec::new(),
             image: None,
             tpm: tpm_field,
+            boot: None,
         }
     }
 
@@ -60,12 +61,8 @@ mod tests {
         let mut v = vm("windows-server-2022", None);
         assert!(!winssh(&v));
         v.image = Some(crate::model::VmImage {
-            vagrant: None,
-            vagrant_version: None,
-            qemu: None,
-            hyperv: None,
-            winrm: None,
             winssh: true,
+            ..Default::default()
         });
         assert!(winssh(&v));
         v.os = "debian-12".into();

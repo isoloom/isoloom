@@ -1,6 +1,6 @@
 //! The settings of vagrant-qemu, for Apple Silicon Macs.
 
-use super::{HOST_TUNING, IMAGE_BOOTS, RESOURCES, TOOLING, USER_SETUP};
+use super::{HOST_TUNING, RESOURCES, TOOLING, USER_SETUP};
 use crate::{
     Support,
     Support::{Emitted, Equivalent, Planned, Tooling},
@@ -37,7 +37,9 @@ pub(super) fn classify(s: &str) -> Option<Support> {
             from: "(always: each VM forwards SSH from its own host port)",
         },
         "machine" | "cpu" | "net_device" | "drive_interface" | "extra_drive_args" | "extra_image_opts" | "extra_qemu_args" => HOST_TUNING,
-        "firmware_format" => IMAGE_BOOTS,
+        "firmware_format" => Emitted {
+            from: "machines.*.vm.boot.firmware_format (the plugin's own firmware boots the box: the other `vm.boot` fields are refused on QEMU)",
+        },
         "image_path" | "qemu_bin" | "qemu_dir" | "default_qemu_dir" | "homebrew_prefix" => USER_SETUP,
         "control_port" | "debug_port" | "ssh_host" | "ssh_port" | "no_daemonize" | "other_default" | "graceful_timeout" => TOOLING,
         _ => return None,

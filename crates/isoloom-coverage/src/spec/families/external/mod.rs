@@ -14,4 +14,6 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::outside::EXTERNAL,
     super::machine_files::EXTERNAL,
     super::process::EXTERNAL,
+    super::own_image::EXTERNAL_IMAGES,
+    super::own_image::EXTERNAL_BOOT,
 ];
