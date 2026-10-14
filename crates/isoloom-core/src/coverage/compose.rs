@@ -339,15 +339,14 @@ fn rows() -> Vec<(String, Support)> {
         ("services.*.uts", SHARED_NAMESPACE),
         (
             "services.*.volumes",
-            Partial {
-                from: "machines.*.volumes (seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts)",
-                gap: "data shared between machines",
+            Emitted {
+                from: "machines.*.volumes and volumes (shared between machines; seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts)",
             },
         ),
         (
             "services.*.volumes_from",
-            Planned {
-                note: "with volumes (data shared between machines)",
+            Equivalent {
+                via: "volumes (a volume shared between machines, each mounting it at its own path)",
             },
         ),
         ("services.*.working_dir", IMAGE),

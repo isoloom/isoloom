@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 92% | 58 | 53 | 1 | 4 |
+| [Docker Compose](#docker-compose) | 94% | 58 | 55 | 0 | 3 |
 | [Vagrant](#vagrant) | 88% | 36 | 32 | 0 | 4 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -36,7 +36,7 @@ when a table disagrees with what Isoloom really generates.
 
 ## Docker Compose
 
-92% of 58 portable features (53 done, 1 partly, 4 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+94% of 58 portable features (55 done, 0 partly, 3 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
 
 ### Top level
 
@@ -147,8 +147,8 @@ when a table disagrees with what Isoloom really generates.
 | `user` | Yes | Yes | Isoloom's check runner, as root to drop its default route on offline networks; a machine's own user is its image's |
 | `userns_mode` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `uts` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
-| `volumes` | Yes | Partly | From `machines.*.volumes` (seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts); not yet: data shared between machines |
-| `volumes_from` | Yes | Not yet | With volumes (data shared between machines) |
+| `volumes` | Yes | Yes | From `machines.*.volumes and volumes` (shared between machines; seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts) |
+| `volumes_from` | Yes | Another way | Via volumes (a volume shared between machines, each mounting it at its own path) |
 | `working_dir` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 
 ### Networks

@@ -21,6 +21,7 @@
 use std::fmt::Write;
 use std::net::Ipv4Addr;
 
+use super::machine_setup::PKG;
 use super::{GenerateError, GeneratedFile, OUTPUT_DIR, address, address_for, common_unsupported, header, netmask, router, start_order, trunks};
 use indexmap::IndexMap;
 
@@ -240,7 +241,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         };
         providers(&mut out, &label, &format!("{}-{name}", spec.name), size, &nets, libvirt_box, &qemu);
         disk_step(size, windows, &mut out);
-        settings_step(m, windows, &mut out);
+        settings_step(spec, name, m, windows, &mut out);
 
         if windows {
             windows_steps(spec, name, m, vm, &mut out);
@@ -606,20 +607,17 @@ fn indent(script: &str, spaces: usize) -> String {
         .collect()
 }
 
-/// Installs packages with the machine's own package manager (Debian and Ubuntu, or the
-/// RHEL family: Rocky, AlmaLinux, CentOS, Fedora).
-const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }";
-
 /// The libvirt box of Isoloom's own Debian VMs (router, controller, tool shell): libvirt can't
 /// run `bento/debian-12`.
 const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
 
-/// The machine's environment, sysctls and ulimits (see `machine_setup`), before its steps.
-fn settings_step(m: &Machine, windows: bool, out: &mut String) {
+/// The machine's environment, sysctls, ulimits and shared volumes (see `machine_setup`),
+/// before its steps.
+fn settings_step(spec: &Spec, name: &str, m: &Machine, windows: bool, out: &mut String) {
     let script = if windows {
         super::machine_setup::windows(m)
     } else {
-        super::machine_setup::linux(m)
+        super::machine_setup::linux(spec, name, m)
     };
     if let Some(script) = script {
         let _ = writeln!(out, "    m.vm.provision \"shell\", name: \"settings\", inline: {}", rb(&script));

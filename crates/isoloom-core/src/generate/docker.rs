@@ -407,7 +407,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             svc.insert(s("ports"), Value::Sequence(ports));
         }
         if !m.volumes.is_empty() {
-            let mounts = m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", volume_name(name, v)))).collect();
+            let mounts = m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", spec.volume_key(name, v)))).collect();
             svc.insert(s("volumes"), Value::Sequence(mounts));
         }
         // A network appliance: its files, its start, its interfaces in the order it expects.
@@ -553,7 +553,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
             j.insert(s("entrypoint"), list([s("/bin/sh"), s(mounted.clone())]));
             // The job runs "in" the machine: its volumes too, as a VM's steps see its disk.
             let mut mounts = vec![s(format!("{ROOT}/{script}:{mounted}:ro"))];
-            mounts.extend(m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", volume_name(name, v)))));
+            mounts.extend(m.volumes.iter().map(|(v, path)| s(format!("{}:{path}", spec.volume_key(name, v)))));
             j.insert(s("volumes"), Value::Sequence(mounts));
             j.insert(s("network_mode"), s(format!("service:{name}")));
             if let Some(env) = environment(spec, m) {
@@ -753,7 +753,7 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
     for (name, m) in &spec.machines {
         if m.docker.is_some() {
             for v in m.volumes.keys() {
-                volumes.insert(s(volume_name(name, v)), Value::Mapping(Mapping::new()));
+                volumes.insert(s(spec.volume_key(name, v)), Value::Mapping(Mapping::new()));
             }
         }
     }
@@ -834,11 +834,6 @@ pub fn generate(spec: &Spec, original: &Spec) -> Result<Vec<GeneratedFile>, Gene
     files.extend(runner_files);
     files.extend(appliance_files);
     Ok(files)
-}
-
-/// A machine's volume, named for Compose (scoped to the environment by Compose itself).
-fn volume_name(machine: &str, volume: &str) -> String {
-    format!("{machine}-{volume}")
 }
 
 /// The `shell` tool's image: a toolbox with tcpdump, nmap, curl, dig, netcat and more.

@@ -620,7 +620,7 @@ pub(super) fn linux_setup_cmds(
             hosts.iter().map(|h| format!("'{h}'")).collect::<Vec<_>>().join(" ")
         ));
     }
-    cmds.extend(super::machine_setup::sudo_command(m));
+    cmds.extend(super::machine_setup::sudo_command(spec, name, m));
     if !m.volumes.is_empty() {
         cmds.push(format!("sudo mkdir -p {}", m.volumes.values().cloned().collect::<Vec<_>>().join(" ")));
     }
