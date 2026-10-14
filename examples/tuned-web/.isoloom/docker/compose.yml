@@ -21,6 +21,8 @@ services:
         ipv4_address: 10.83.0.10
     environment:
       APP_MODE: production
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -32,8 +34,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -49,9 +49,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:web
     volumes:
     - ./checks/web.sh:/isoloom/run.sh:ro
-    network_mode: service:web
     depends_on:
       web:
         condition: service_healthy
@@ -65,13 +65,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: tuned-web
+    restart: no
 networks:
   app:
     ipam:

@@ -7,11 +7,18 @@
 name: cisco-dynamips
 services:
   r1:
-    volumes:
-    - ./appliances/r1/base.cfg:/config/base.cfg:ro
-    - ../../configs/r1.cfg:/config/own.cfg:ro
-    - ../../images/c7200.bin:/firmware/ios.bin:ro
+    build:
+      context: ./appliances/r1/build
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: cisco-dynamips
     platform: linux/amd64
+    sysctls:
+      net.ipv4.ip_forward: '1'
+    entrypoint:
+    - /bin/sh
+    - -c
+    - cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; cd /tmp && exec dynamips $$DYNAMIPS_ARGS /firmware/ios.bin
     hostname: r1
     networks:
       isoloom-mgmt:
@@ -29,34 +36,27 @@ services:
     cap_add:
     - NET_ADMIN
     - NET_RAW
-    sysctls:
-      net.ipv4.ip_forward: '1'
     extra_hosts:
     - host-b:10.93.2.10
-    build:
-      context: ./appliances/r1/build
-      labels:
-        isoloom.managed: 'true'
-        isoloom.environment: cisco-dynamips
-    entrypoint:
-    - /bin/sh
-    - -c
-    - cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; cd /tmp && exec dynamips $$DYNAMIPS_ARGS /firmware/ios.bin
     environment:
       DYNAMIPS_ARGS: -P 7200 -r 512 -T 2000 -C /config/startup-config.cfg -p 1:PA-2FE-TX -s 0:0:linux_eth:eth1 -s 1:0:linux_eth:eth2
-    restart: unless-stopped
+    volumes:
+    - ./appliances/r1/base.cfg:/config/base.cfg:ro
+    - ../../configs/r1.cfg:/config/own.cfg:ro
+    - ../../images/c7200.bin:/firmware/ios.bin:ro
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+    restart: unless-stopped
   r1-routes:
     image: alpine:3.20
-    network_mode: service:r1
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip addr flush dev eth1 && ip addr flush dev eth2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:r1
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -67,16 +67,23 @@ services:
     depends_on:
       r1:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+    restart: unless-stopped
   r2:
-    volumes:
-    - ./appliances/r2/base.cfg:/config/base.cfg:ro
-    - ../../configs/r2.cfg:/config/own.cfg:ro
-    - ../../images/c7200.bin:/firmware/ios.bin:ro
+    build:
+      context: ./appliances/r2/build
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: cisco-dynamips
     platform: linux/amd64
+    sysctls:
+      net.ipv4.ip_forward: '1'
+    entrypoint:
+    - /bin/sh
+    - -c
+    - cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; cd /tmp && exec dynamips $$DYNAMIPS_ARGS /firmware/ios.bin
     hostname: r2
     networks:
       isoloom-mgmt:
@@ -94,34 +101,27 @@ services:
     cap_add:
     - NET_ADMIN
     - NET_RAW
-    sysctls:
-      net.ipv4.ip_forward: '1'
     extra_hosts:
     - host-a:10.93.1.10
-    build:
-      context: ./appliances/r2/build
-      labels:
-        isoloom.managed: 'true'
-        isoloom.environment: cisco-dynamips
-    entrypoint:
-    - /bin/sh
-    - -c
-    - cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; cd /tmp && exec dynamips $$DYNAMIPS_ARGS /firmware/ios.bin
     environment:
       DYNAMIPS_ARGS: -P 7200 -r 512 -T 2000 -C /config/startup-config.cfg -p 1:PA-2FE-TX -s 0:0:linux_eth:eth1 -s 1:0:linux_eth:eth2
-    restart: unless-stopped
+    volumes:
+    - ./appliances/r2/base.cfg:/config/base.cfg:ro
+    - ../../configs/r2.cfg:/config/own.cfg:ro
+    - ../../images/c7200.bin:/firmware/ios.bin:ro
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+    restart: unless-stopped
   r2-routes:
     image: alpine:3.20
-    network_mode: service:r2
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip addr flush dev eth1 && ip addr flush dev eth2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:r2
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -132,10 +132,10 @@ services:
     depends_on:
       r2:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+    restart: unless-stopped
   host-a:
     image: alpine:3.20
     platform: linux/amd64
@@ -149,19 +149,19 @@ services:
     extra_hosts:
     - r2:10.93.2.1
     - host-b:10.93.2.10
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+    restart: unless-stopped
   host-a-routes:
     image: alpine:3.20
-    network_mode: service:host-a
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace default via 10.93.1.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:host-a
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -174,10 +174,10 @@ services:
         condition: service_started
       r1:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+    restart: unless-stopped
   host-b:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -188,6 +188,8 @@ services:
     extra_hosts:
     - r1:10.93.1.1
     - host-a:10.93.1.10
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -199,8 +201,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -211,13 +211,13 @@ services:
     restart: unless-stopped
   host-b-routes:
     image: alpine:3.20
-    network_mode: service:host-b
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace default via 10.93.2.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:host-b
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -230,10 +230,10 @@ services:
         condition: service_started
       r2:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+    restart: unless-stopped
   isoloom-check-host-a:
     image: curlimages/curl:8.11.1
     profiles:
@@ -241,9 +241,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:host-a
     volumes:
     - ./checks/host-a.sh:/isoloom/run.sh:ro
-    network_mode: service:host-a
     depends_on:
       r1-routes:
         condition: service_healthy
@@ -267,13 +267,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+    restart: no
 networks:
   site-a:
     ipam:

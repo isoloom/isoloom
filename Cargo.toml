@@ -30,3 +30,4 @@ indexmap = { version = "2", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 schemars = { version = "1", features = ["indexmap2"] }
 hcl-rs = "0.19"
+insta = { version = "1", features = ["yaml"] }

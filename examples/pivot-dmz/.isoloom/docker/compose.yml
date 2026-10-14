@@ -8,11 +8,13 @@ name: pivot-dmz
 services:
   isoloom-router:
     image: alpine:3.20
-    hostname: isoloom-router
-    cap_add:
-    - NET_ADMIN
     sysctls:
       net.ipv4.ip_forward: '1'
+    entrypoint:
+    - /bin/sh
+    - -c
+    - apk add --no-cache nftables >/dev/null && printf '%s' "$$RULES" | nft -f - && exec sleep infinity
+    hostname: isoloom-router
     networks:
       dmz:
         ipv4_address: 10.30.10.254
@@ -20,6 +22,8 @@ services:
         ipv4_address: 10.30.20.254
       access:
         ipv4_address: 10.30.99.254
+    cap_add:
+    - NET_ADMIN
     environment:
       RULES: |
         table inet isoloom {
@@ -31,10 +35,6 @@ services:
             ip saddr 10.30.10.0/24 ip daddr 10.30.20.0/24 icmp type echo-request accept
           }
         }
-    entrypoint:
-    - /bin/sh
-    - -c
-    - apk add --no-cache nftables >/dev/null && printf '%s' "$$RULES" | nft -f - && exec sleep infinity
     healthcheck:
       test:
       - CMD-SHELL
@@ -42,10 +42,10 @@ services:
       interval: 3s
       timeout: 3s
       retries: 60
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
+    restart: unless-stopped
   gateway:
     build:
       context: ../../build/gateway
@@ -62,6 +62,8 @@ services:
         ipv4_address: 10.30.20.10
     extra_hosts:
     - user:10.30.99.10
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -73,8 +75,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -86,13 +86,13 @@ services:
     restart: unless-stopped
   gateway-routes:
     image: alpine:3.20
-    network_mode: service:gateway
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace 10.30.99.0/24 via 10.30.10.254 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:gateway
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -105,10 +105,10 @@ services:
         condition: service_started
       isoloom-router:
         condition: service_healthy
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
+    restart: unless-stopped
   app:
     build:
       context: ../../build/app
@@ -123,6 +123,8 @@ services:
         ipv4_address: 10.30.20.20
     extra_hosts:
     - user:10.30.99.10
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -134,8 +136,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -146,13 +146,13 @@ services:
     restart: unless-stopped
   app-routes:
     image: alpine:3.20
-    network_mode: service:app
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace 10.30.10.0/24 via 10.30.20.254 && ip route replace 10.30.99.0/24 via 10.30.20.254 && (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:app
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -165,10 +165,10 @@ services:
         condition: service_started
       isoloom-router:
         condition: service_healthy
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
+    restart: unless-stopped
   db:
     image: postgres:16
     platform: linux/amd64
@@ -178,6 +178,8 @@ services:
         ipv4_address: 10.30.20.30
     extra_hosts:
     - user:10.30.99.10
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -189,8 +191,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -201,13 +201,13 @@ services:
     restart: unless-stopped
   db-routes:
     image: alpine:3.20
-    network_mode: service:db
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace 10.30.10.0/24 via 10.30.20.254 && ip route replace 10.30.99.0/24 via 10.30.20.254 && (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:db
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -220,12 +220,17 @@ services:
         condition: service_started
       isoloom-router:
         condition: service_healthy
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
+    restart: unless-stopped
   isoloom-access:
     image: alpine:3.20
+    profiles:
+    - check
+    entrypoint:
+    - sleep
+    - infinity
     hostname: user
     networks:
       access:
@@ -234,23 +239,20 @@ services:
     - gateway:10.30.10.10
     - app:10.30.20.20
     - db:10.30.20.30
-    entrypoint:
-    - sleep
-    - infinity
-    profiles:
-    - check
     labels:
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
   isoloom-access-routes:
     image: alpine:3.20
-    network_mode: service:isoloom-access
-    cap_add:
-    - NET_ADMIN
+    profiles:
+    - check
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace 10.30.10.0/24 via 10.30.99.254 && ip route replace 10.30.20.0/24 via 10.30.99.254 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:isoloom-access
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -263,12 +265,10 @@ services:
         condition: service_started
       isoloom-router:
         condition: service_healthy
-    restart: unless-stopped
-    profiles:
-    - check
     labels:
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
+    restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -276,10 +276,10 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:isoloom-access
     volumes:
     - ./checks/user.sh:/isoloom/run.sh:ro
     - ../..:/isoloom/project:ro
-    network_mode: service:isoloom-access
     depends_on:
       gateway:
         condition: service_healthy
@@ -307,9 +307,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:gateway
     volumes:
     - ./checks/gateway.sh:/isoloom/run.sh:ro
-    network_mode: service:gateway
     depends_on:
       gateway:
         condition: service_healthy
@@ -333,9 +333,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:app
     volumes:
     - ./checks/app.sh:/isoloom/run.sh:ro
-    network_mode: service:app
     depends_on:
       gateway:
         condition: service_healthy
@@ -359,9 +359,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:db
     volumes:
     - ./checks/db.sh:/isoloom/run.sh:ro
-    network_mode: service:db
     depends_on:
       gateway:
         condition: service_healthy
@@ -385,13 +385,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: pivot-dmz
+    restart: no
 networks:
   dmz:
     ipam:

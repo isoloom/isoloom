@@ -16,10 +16,10 @@ services:
     networks:
       lan:
         ipv4_address: 10.90.0.10
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: workbench
+    restart: unless-stopped
   web:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -27,6 +27,8 @@ services:
     networks:
       lan:
         ipv4_address: 10.90.0.11
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -38,8 +40,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -55,9 +55,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:bench
     volumes:
     - ./checks/bench.sh:/isoloom/run.sh:ro
-    network_mode: service:bench
     depends_on:
       web:
         condition: service_healthy
@@ -73,13 +73,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: workbench
+    restart: no
 networks:
   lan:
     ipam:

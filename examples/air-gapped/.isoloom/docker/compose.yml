@@ -14,6 +14,8 @@ services:
     networks:
       lab:
         ipv4_address: 10.62.0.20
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -25,8 +27,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -42,6 +42,8 @@ services:
     networks:
       lab:
         ipv4_address: 10.62.0.10
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -53,8 +55,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -72,9 +72,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:store
     volumes:
     - ./checks/store.sh:/isoloom/run.sh:ro
-    network_mode: service:store
     depends_on:
       store:
         condition: service_healthy
@@ -90,9 +90,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:app
     volumes:
     - ./checks/app.sh:/isoloom/run.sh:ro
-    network_mode: service:app
     depends_on:
       store:
         condition: service_healthy
@@ -108,13 +108,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: air-gapped
+    restart: no
 networks:
   lab:
     ipam:

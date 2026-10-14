@@ -18,26 +18,26 @@ services:
         ipv4_address: 10.84.0.10
     volumes:
     - shared:/srv/shared
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
+    restart: unless-stopped
   writer-init-1:
     image: alpine:3.20
     entrypoint:
     - /bin/sh
     - /isoloom/init/write.sh
+    network_mode: service:writer
     volumes:
     - ../../steps/write.sh:/isoloom/init/write.sh:ro
     - shared:/srv/shared
-    network_mode: service:writer
     depends_on:
       writer:
         condition: service_started
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
+    restart: no
   reader:
     image: alpine:3.20
     platform: linux/amd64
@@ -50,10 +50,10 @@ services:
         ipv4_address: 10.84.0.11
     volumes:
     - shared:/data/shared
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
+    restart: unless-stopped
   isoloom-check-reader:
     image: curlimages/curl:8.11.1
     profiles:
@@ -61,9 +61,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:reader
     volumes:
     - ./checks/reader.sh:/isoloom/run.sh:ro
-    network_mode: service:reader
     depends_on:
       writer-init-1:
         condition: service_completed_successfully

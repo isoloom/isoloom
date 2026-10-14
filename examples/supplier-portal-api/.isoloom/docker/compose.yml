@@ -16,6 +16,8 @@ services:
     environment:
       API_URL: ${API_URL:-}
       LAUNCH_TOKEN: ${LAUNCH_TOKEN:-}
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -27,8 +29,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -47,19 +47,19 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/init/seed.sh
-    volumes:
-    - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro
     network_mode: service:database
     environment:
       API_URL: ${API_URL:-}
       LAUNCH_TOKEN: ${LAUNCH_TOKEN:-}
+    volumes:
+    - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro
     depends_on:
       database:
         condition: service_healthy
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
+    restart: no
   web:
     build:
       context: ../../build/web
@@ -74,6 +74,8 @@ services:
         ipv4_address: 10.20.0.31
     ports:
     - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:3206:3206
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -85,8 +87,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -111,11 +111,11 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    networks:
+      lab: null
     volumes:
     - ./checks/networks.sh:/isoloom/run.sh:ro
     - ../..:/isoloom/project:ro
-    networks:
-      lab: null
     depends_on:
       database:
         condition: service_healthy
@@ -133,9 +133,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:database
     volumes:
     - ./checks/database.sh:/isoloom/run.sh:ro
-    network_mode: service:database
     depends_on:
       database:
         condition: service_healthy
@@ -153,9 +153,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:web
     volumes:
     - ./checks/web.sh:/isoloom/run.sh:ro
-    network_mode: service:web
     depends_on:
       database:
         condition: service_healthy
@@ -173,13 +173,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
+    restart: no
 networks:
   lab:
     ipam:

@@ -2,21 +2,23 @@
 //! of the spec (no file system access), so `isoloom check` can regenerate in memory and
 //! compare with what's committed. Output lives under `.isoloom/<target>/` in the project.
 
+pub mod backends;
 pub mod resolved;
+
+pub use backends::{BACKENDS, LegacyBackend, backend};
+pub use isoloom_plan::Environment;
+pub use isoloom_render::backend::{Backend, Files, RenderError};
 
 pub use isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
 pub use isoloom_kubernetes::project_copies;
 pub use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, constraints, machine_setup, provision_script, router_name};
 pub use isoloom_spec::validate::docker_cidrs;
 
-use isoloom_compose::{appliances, docker};
-use isoloom_external::external;
-use isoloom_kubernetes::kubernetes;
+use isoloom_compose::appliances;
 use isoloom_plan::checks;
-use isoloom_render::{address, project, router, start_order};
+use isoloom_render::{address, router, start_order};
 use isoloom_spec::{groups, images, instance, model, targets, validate};
-use isoloom_terraform::{cloud_docker, cloud_services, cloud_vm, proxmox};
-use isoloom_vagrant::{docker_vm, hybrid, vagrant};
+use isoloom_vagrant::vagrant;
 
 /// The network appliances' management network (see `docker.appliance`).
 pub const APPLIANCE_MGMT_CIDR: &str = appliances::MGMT_CIDR;
@@ -47,7 +49,7 @@ pub const GENERATED_TARGETS: &[Target] = &[
 
 /// The files for one target.
 pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
-    let mut files = target_files(spec, target)?;
+    let mut files = target_files(spec, target, None)?;
     // The resolved snapshot goes with every target (the same file each time).
     files.push(resolved::file(spec));
     Ok(files)
@@ -57,7 +59,7 @@ pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, Gener
 /// suffixed, Docker blocks and published ports moved, everything under `.isoloom-<n>/`.
 pub fn generate_instance(spec: &Spec, target: Target, n: u8) -> Result<Vec<GeneratedFile>, GenerateError> {
     let applied = crate::instance::apply(spec, n).map_err(|what| GenerateError::Unsupported { target, what })?;
-    let mut files = target_files(&applied, target)?;
+    let mut files = target_files(&applied, target, Some(n))?;
     files.push(resolved::file_with(&applied, Some(n)));
     Ok(files
         .into_iter()
@@ -68,53 +70,15 @@ pub fn generate_instance(spec: &Spec, target: Target, n: u8) -> Result<Vec<Gener
         .collect())
 }
 
-/// A target's own files, without the snapshot (which asks every generator whether it would
-/// refuse the spec, so it can't be part of what a generator produces).
-fn target_files(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
+/// A target's own files, without the snapshot (which asks every backend whether it would
+/// refuse the spec, so it can't be part of what a backend renders): the plan for the target,
+/// rendered by its backend.
+fn target_files(spec: &Spec, target: Target, instance: Option<u8>) -> Result<Vec<GeneratedFile>, GenerateError> {
     if !effective(spec).contains(&target) {
         return Err(GenerateError::NotPossible(target));
     }
-    // Network appliances run on Docker Compose only (their wiring is Docker's).
-    if !matches!(target, Target::Docker | Target::Hosted | Target::CloudDocker | Target::DockerVm)
-        && let Some((name, _, _)) = appliances::appliances(spec).first()
-    {
-        return Err(GenerateError::Unsupported {
-            target,
-            what: format!("machine `{name}` is a network appliance (`docker.appliance`), which runs on the Docker targets"),
-        });
-    }
-    let mut files = target_files_raw(spec, target)?;
-    for f in files.iter_mut().filter(|f| f.path.ends_with(".tf")) {
-        project::terraform(&mut f.contents);
-    }
-    constraints::rewrite_images(spec, &mut files);
-    constraints::terraform_prelude(spec, &mut files);
-    Ok(files)
-}
-
-fn target_files_raw(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
-    match target {
-        // A hosting service runs the same Compose file.
-        Target::Docker | Target::Hosted => docker::generate(&on_docker(spec), spec),
-        // Docker on one VM runs the Compose file: both are generated.
-        Target::CloudDocker => {
-            let mut files = docker::generate(&on_docker(spec), spec)?;
-            files.extend(cloud_docker::generate(spec)?);
-            Ok(files)
-        }
-        Target::DockerVm => {
-            let mut files = docker::generate(&on_docker(spec), spec)?;
-            files.extend(docker_vm::generate(spec)?);
-            Ok(files)
-        }
-        Target::Kubernetes => kubernetes::generate(spec),
-        Target::Hybrid => hybrid::generate(spec),
-        Target::Vagrant => vagrant::generate(spec),
-        Target::Proxmox => proxmox::generate(spec),
-        Target::CloudVm => cloud_vm::generate(spec),
-        Target::External => external::generate(spec),
-        Target::CloudServices => cloud_services::generate(spec),
-    }
+    let backend = backend(target).ok_or(GenerateError::NoGenerator(target))?;
+    backend.render(&Environment::build(spec, target, instance)).map_err(GenerateError::from)
 }
 
 /// Every target the spec allows and that has a generator: the files, and why the others
@@ -153,10 +117,10 @@ pub fn refusal(spec: &Spec, target: Target) -> Option<String> {
     if let Some(problem) = first_problem(spec) {
         return Some(problem);
     }
-    match target_files(spec, target) {
-        Err(GenerateError::Unsupported { what, .. }) => Some(what),
-        _ => None,
+    if !effective(spec).contains(&target) {
+        return None;
     }
+    backend(target)?.refusal(&Environment::build(spec, target, None))
 }
 
 /// [`refusal`], for a target run with a given provider: why `target` can't run this spec when
