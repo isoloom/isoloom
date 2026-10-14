@@ -24,7 +24,7 @@ pub fn bring_up(dir: &Path, t: Target, cloud: Option<&str>, instance: Option<u8>
             let verb = if down { "delete --ignore-not-found=true" } else { "apply" };
             invocation("sh", vec![s("-c"), format!("{build} | kubectl {verb} -f -")], dir)
         }
-        Target::Proxmox => tf_run(down, out.join("proxmox")),
+        Target::Proxmox | Target::Esxi => tf_run(down, out.join(t.id())),
         Target::CloudVm => tf_run(down, cloud_vm_module(&out, cloud)?),
         Target::CloudDocker => tf_run(down, out.join("cloud-docker").join(target::docker_cloud(cloud)?)),
         // Nothing to create or destroy: `run` provisions over SSH (see external::external_up),

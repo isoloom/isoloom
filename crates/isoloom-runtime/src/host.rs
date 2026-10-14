@@ -240,6 +240,10 @@ pub fn check_with(target: Target, cloud: Option<&str>, h: &Host) -> Readiness {
             terraform(h, &mut notes);
             proxmox(h, &mut notes);
         }
+        Target::Esxi => {
+            terraform(h, &mut notes);
+            esxi(h, &mut notes);
+        }
         Target::CloudDocker | Target::CloudVm | Target::CloudServices => {
             terraform(h, &mut notes);
             let (found, missing) = cloud_credentials(cloud.unwrap_or("aws"), h);
@@ -359,6 +363,23 @@ fn proxmox(h: &Host, notes: &mut Notes) {
             .map(|_| "API token".to_string())
             .or_else(|| (h.env)("PROXMOX_VE_USERNAME").map(|_| "username/password".to_string())),
         "no Proxmox credentials (PROXMOX_VE_API_TOKEN, or PROXMOX_VE_USERNAME and PROXMOX_VE_PASSWORD)",
+    );
+}
+
+/// The ESXi module's needs: ovftool (the provider deploys the OVAs with it) and the host's
+/// address and password, given to Terraform as `TF_VAR_` variables.
+fn esxi(h: &Host, notes: &mut Notes) {
+    notes.need(
+        (h.run)("ovftool", &["--version"]).map(|_| "ovftool".to_string()),
+        "ovftool isn't installed (the ESXi provider deploys the images with it)",
+    );
+    notes.need(
+        (h.env)("TF_VAR_esxi_hostname").map(|e| format!("ESXi host {e}")),
+        "TF_VAR_esxi_hostname isn't set",
+    );
+    notes.need(
+        (h.env)("TF_VAR_esxi_password").map(|_| "ESXi password".to_string()),
+        "TF_VAR_esxi_password isn't set",
     );
 }
 

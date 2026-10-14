@@ -105,7 +105,7 @@ fn files(env: &Environment) -> Vec<Expression> {
 }
 
 /// Forwarding on: IPv4, and IPv6 when a network is IPv6.
-fn forwarding(env: &Environment) -> &'static str {
+pub(crate) fn forwarding(env: &Environment) -> &'static str {
     if env.networks.values().any(|n| n.ipv6.is_some()) {
         "net.ipv4.ip_forward=1\nnet.ipv6.conf.all.forwarding=1\n"
     } else {
@@ -117,7 +117,7 @@ fn forwarding(env: &Environment) -> &'static str {
 /// forwarded from the uplink address (anything not from the environment), and the internet for
 /// every network (machines install their software; offline machines block it themselves once
 /// set up).
-fn ruleset(env: &Environment) -> String {
+pub(crate) fn ruleset(env: &Environment) -> String {
     let lab = format!("{{ {} }}", env.networks.values().map(|n| n.cidr.as_str()).collect::<Vec<_>>().join(", "));
     let mut forward: Vec<String> = router::forward_rules(env.spec());
     let mut dnat = String::new();

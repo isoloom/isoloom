@@ -15,8 +15,18 @@ fn ids(targets: Vec<Target>) -> Vec<&'static str> {
     targets.into_iter().map(Target::id).collect()
 }
 
-const ALL: [&str; 8] = ["docker", "hosted", "docker-vm", "cloud-docker", "kubernetes", "vagrant", "proxmox", "cloud-vm"];
-const VM_OR_HYBRID: [&str; 4] = ["hybrid", "vagrant", "proxmox", "cloud-vm"];
+const ALL: [&str; 9] = [
+    "docker",
+    "hosted",
+    "docker-vm",
+    "cloud-docker",
+    "kubernetes",
+    "vagrant",
+    "proxmox",
+    "esxi",
+    "cloud-vm",
+];
+const VM_OR_HYBRID: [&str; 5] = ["hybrid", "vagrant", "proxmox", "esxi", "cloud-vm"];
 
 #[test]
 fn supplier_portal_runs_everywhere() {

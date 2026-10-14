@@ -9,6 +9,7 @@
 mod aws;
 mod azure;
 mod digitalocean;
+mod esxi;
 mod google;
 mod linode;
 mod oci;
@@ -17,18 +18,15 @@ mod support;
 pub mod table;
 mod utility;
 
-use super::vagrant::names;
-use super::{
-    Format,
-    Support::{Planned, Tooling, Unclassified},
-};
+use super::Format;
 
 pub use table::Table;
 
-/// Every Terraform table built from a provider's schema: Proxmox, the six clouds, then the
-/// utility providers.
+/// Every Terraform table built from a provider's schema: Proxmox, ESXi, the six clouds, then
+/// the utility providers.
 pub const TABLES: &[Table] = &[
     proxmox::TABLE,
+    esxi::TABLE,
     aws::TABLE,
     azure::TABLE,
     google::TABLE,
@@ -38,38 +36,7 @@ pub const TABLES: &[Table] = &[
     utility::TABLE,
 ];
 
-/// The Terraform tables: Proxmox, ESXi, one per cloud, and the utility providers.
+/// The Terraform tables, in that order.
 pub fn formats() -> Vec<Format> {
-    let mut all: Vec<Format> = TABLES.iter().map(Table::format).collect();
-    all.insert(1, esxi());
-    all
-}
-
-const ESXI: &str = include_str!("../coverage/terraform/esxi.txt");
-
-/// Standalone ESXi hosts (no vCenter), with the community provider josenk/esxi: no generator
-/// writes it yet, so its resource types are the whole table.
-fn esxi() -> Format {
-    let rows = names(ESXI)
-        .into_iter()
-        .map(|r| {
-            let s = match r {
-                "esxi_guest" | "esxi_portgroup" | "esxi_vswitch" | "esxi_virtual_disk" => Planned {
-                    note: "with the ESXi generator: a VM per machine, a port group per network",
-                },
-                "esxi_resource_pool" => Tooling {
-                    note: "where the host places the VMs: no change in behavior",
-                },
-                _ => Unclassified,
-            };
-            (format!("resource {r}"), s)
-        })
-        .collect();
-    Format {
-        name: "Terraform: ESXi",
-        file: ".isoloom/esxi/ (planned)",
-        source: "josenk/esxi 1.10.3 (its resource types)",
-        rows,
-        collapse_not_portable: false,
-    }
+    TABLES.iter().map(Table::format).collect()
 }

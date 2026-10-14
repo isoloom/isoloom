@@ -126,7 +126,8 @@ extract oci oracle/oci 9.8.0 \
   resource:oci_core_security_list resource:oci_core_subnet resource:oci_core_instance \
   resource:oci_core_network_security_group resource:oci_core_network_security_group_security_rule \
   data:oci_core_images data:oci_identity_availability_domains
-extract esxi josenk/esxi 1.10.3
+extract esxi josenk/esxi 1.10.3 \
+  resource:esxi_guest resource:esxi_portgroup resource:esxi_vswitch
 # The utility providers the modules use beside each platform's (keys, passwords, files, waits),
 # and the ones a module may need next (cloud-init documents, HTTP checks, triggers): all of them.
 extract terraform terraform.io/builtin/terraform built-in all

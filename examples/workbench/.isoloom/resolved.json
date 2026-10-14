@@ -121,6 +121,7 @@
       "hybrid": "only when some machines are containers and others are VMs",
       "vagrant": "needs `vm:` on bench, web",
       "proxmox": "needs `docker.lxc` or `vm:` on bench, web",
+      "esxi": "needs `vm:` on bench, web",
       "cloud-vm": "needs `vm:` on bench, web",
       "external": "needs `external:` on bench, web",
       "cloud-services": "left out by `targets:`"

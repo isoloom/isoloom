@@ -19,6 +19,8 @@ pub const LINODE: Provider = ("linode", "linode/linode", "~> 4.7.0");
 pub const OCI: Provider = ("oci", "oracle/oci", "~> 9.8.0");
 /// Proxmox.
 pub const PROXMOX: Provider = ("proxmox", "bpg/proxmox", "~> 0.115.0");
+/// Standalone ESXi hosts.
+pub const ESXI: Provider = ("esxi", "josenk/esxi", "~> 1.10.3");
 /// Keys: the controller's.
 pub const TLS: Provider = ("tls", "hashicorp/tls", "~> 4.4.1");
 /// Passwords: the Windows machines' and Linode's root ones.

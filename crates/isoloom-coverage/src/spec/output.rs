@@ -13,7 +13,7 @@ pub enum Family {
     Kubernetes,
     /// The Vagrantfile.
     Vagrant,
-    /// The Proxmox Terraform module.
+    /// The Proxmox Terraform module, and the ESXi one built the same way.
     Proxmox,
     /// The cloud VM Terraform modules, one per cloud.
     CloudVm,
@@ -70,6 +70,8 @@ pub enum Output {
     Hybrid,
     /// `proxmox`: the Proxmox module.
     Proxmox,
+    /// `esxi`: the ESXi module, the Proxmox family's router and steps over SSH.
+    Esxi,
     /// `cloud-vm`: one cloud's module (its folder name: `aws`, `azure`...).
     CloudVm(&'static str),
     /// `cloud-docker`: the Compose file on a cloud VM.
@@ -94,6 +96,7 @@ impl Output {
             Output::DockerVm,
             Output::Hybrid,
             Output::Proxmox,
+            Output::Esxi,
         ];
         all.extend(isoloom_terraform::cloud_vm::CLOUDS.iter().map(|(cloud, _)| Output::CloudVm(cloud)));
         all.extend([Output::CloudDocker, Output::CloudServices, Output::External]);
@@ -120,6 +123,7 @@ impl Output {
             Output::DockerVm => Target::DockerVm,
             Output::Hybrid => Target::Hybrid,
             Output::Proxmox => Target::Proxmox,
+            Output::Esxi => Target::Esxi,
             Output::CloudVm(_) => Target::CloudVm,
             Output::CloudDocker => Target::CloudDocker,
             Output::CloudServices => Target::CloudServices,
@@ -134,7 +138,7 @@ impl Output {
             Output::Kubernetes | Output::Helm | Output::Kustomize => Family::Kubernetes,
             Output::Vagrant => Family::Vagrant,
             Output::Hybrid => return None,
-            Output::Proxmox => Family::Proxmox,
+            Output::Proxmox | Output::Esxi => Family::Proxmox,
             Output::CloudVm(_) => Family::CloudVm,
             Output::CloudServices => Family::CloudServices,
             Output::External => Family::External,

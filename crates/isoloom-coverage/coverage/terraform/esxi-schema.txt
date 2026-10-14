@@ -1,0 +1,56 @@
+# Settings, and arguments and nested blocks of what Isoloom writes, of registry.terraform.io/josenk/esxi 1.10.3
+provider esxi_hostname
+provider esxi_hostport
+provider esxi_hostssl
+provider esxi_password
+provider esxi_username
+resource esxi_guest
+resource esxi_guest boot_disk_size
+resource esxi_guest boot_disk_type
+resource esxi_guest boot_firmware
+resource esxi_guest clone_from_vm
+resource esxi_guest disk_store
+resource esxi_guest guest_name
+resource esxi_guest guest_shutdown_timeout
+resource esxi_guest guest_startup_timeout
+resource esxi_guest guestinfo
+resource esxi_guest guestos
+resource esxi_guest host_ovf
+resource esxi_guest id
+resource esxi_guest memsize
+resource esxi_guest notes
+resource esxi_guest numvcpus
+resource esxi_guest ovf_properties_timer
+resource esxi_guest ovf_source
+resource esxi_guest power
+resource esxi_guest resource_pool_name
+resource esxi_guest virthwver
+resource esxi_guest network_interfaces
+resource esxi_guest network_interfaces.mac_address
+resource esxi_guest network_interfaces.nic_type
+resource esxi_guest network_interfaces.virtual_network
+resource esxi_guest ovf_properties
+resource esxi_guest ovf_properties.key
+resource esxi_guest ovf_properties.value
+resource esxi_guest virtual_disks
+resource esxi_guest virtual_disks.slot
+resource esxi_guest virtual_disks.virtual_disk_id
+resource esxi_portgroup
+resource esxi_portgroup forged_transmits
+resource esxi_portgroup id
+resource esxi_portgroup mac_changes
+resource esxi_portgroup name
+resource esxi_portgroup promiscuous_mode
+resource esxi_portgroup vlan
+resource esxi_portgroup vswitch
+resource esxi_vswitch
+resource esxi_vswitch forged_transmits
+resource esxi_vswitch id
+resource esxi_vswitch link_discovery_mode
+resource esxi_vswitch mac_changes
+resource esxi_vswitch mtu
+resource esxi_vswitch name
+resource esxi_vswitch ports
+resource esxi_vswitch promiscuous_mode
+resource esxi_vswitch uplink
+resource esxi_vswitch uplink.name

@@ -1,5 +1,5 @@
 //! The registry of backends, one per generated target. Every target renders the plan: Compose,
-//! Kubernetes, external, docker-vm, hybrid, Vagrant, Proxmox, cloud-vm, cloud-docker and
+//! Kubernetes, external, docker-vm, hybrid, Vagrant, Proxmox, ESXi, cloud-vm, cloud-docker and
 //! cloud-services.
 
 use isoloom_compose::ComposeBackend;
@@ -10,6 +10,7 @@ use isoloom_spec::model::Target;
 use isoloom_terraform::cloud_docker::CloudDockerBackend;
 use isoloom_terraform::cloud_services::CloudServicesBackend;
 use isoloom_terraform::cloud_vm::CloudVmBackend;
+use isoloom_terraform::esxi::EsxiBackend;
 use isoloom_terraform::proxmox::ProxmoxBackend;
 use isoloom_vagrant::vagrant::VagrantBackend;
 use isoloom_vagrant::{DockerVmBackend, HybridBackend};
@@ -22,6 +23,7 @@ static KUBERNETES: KubernetesBackend = KubernetesBackend;
 static HYBRID: HybridBackend = HybridBackend;
 static VAGRANT: VagrantBackend = VagrantBackend;
 static PROXMOX: ProxmoxBackend = ProxmoxBackend;
+static ESXI: EsxiBackend = EsxiBackend;
 static CLOUD_VM: CloudVmBackend = CloudVmBackend;
 static EXTERNAL: ExternalBackend = ExternalBackend;
 static CLOUD_SERVICES: CloudServicesBackend = CloudServicesBackend;
@@ -36,6 +38,7 @@ pub static BACKENDS: &[&dyn Backend] = &[
     &HYBRID,
     &VAGRANT,
     &PROXMOX,
+    &ESXI,
     &CLOUD_VM,
     &EXTERNAL,
     &CLOUD_SERVICES,

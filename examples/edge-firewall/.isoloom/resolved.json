@@ -250,6 +250,7 @@
       "kubernetes",
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm"
     ],
     "generated": [
@@ -262,6 +263,7 @@
     "refused": {
       "kubernetes": "machine `aliases` (dotted DNS names) aren't Kubernetes Service names",
       "proxmox": "networks with a `gateway` machine on Proxmox come later",
+      "esxi": "networks with a `gateway` machine on ESXi come later",
       "cloud-vm": "no cloud can run it (aws, azure, gcp: networks with a `gateway` machine in the cloud come later; digitalocean: DigitalOcean cloud-vm takes single-network labs so far; linode: Linode cloud-vm takes single-network labs so far; oci: Oracle Cloud cloud-vm takes single-network labs so far)"
     },
     "not_possible": {

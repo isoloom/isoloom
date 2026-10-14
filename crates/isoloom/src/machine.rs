@@ -121,7 +121,7 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
             "cloud services have no machines to reach: use their outputs (`isoloom message`)",
         )),
         Target::External => external(&call, m),
-        Target::Proxmox => proxmox(&call),
+        Target::Proxmox | Target::Esxi => behind_router(&call, env.target.id()),
     }
 }
 
@@ -294,9 +294,10 @@ fn external(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
     Ok(c)
 }
 
-fn proxmox(call: &Call) -> Res<Command> {
-    // Through the router (the only VM on the uplink), as the `isoloom` user.
-    let outputs = terraform::output(&call.out().join("proxmox"))?;
+/// Proxmox and ESXi (`dir`, the target's folder): through the router (the only VM on the
+/// uplink), as the `isoloom` user.
+fn behind_router(call: &Call, dir: &str) -> Res<Command> {
+    let outputs = terraform::output(&call.out().join(dir))?;
     let router = outputs["address"]
         .as_str()
         .ok_or("the module has no `address` output; is it applied?")?

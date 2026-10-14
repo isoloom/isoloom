@@ -6,5 +6,6 @@ pub mod cloud_docker;
 pub mod cloud_services;
 pub mod cloud_vm;
 pub mod cloud_vm_others;
+pub mod esxi;
 pub mod proxmox;
 pub mod vm;

@@ -31,9 +31,9 @@ mod links;
 mod lxc;
 mod machine;
 pub(crate) mod module;
-mod outputs;
+pub(crate) mod outputs;
 mod outside;
-mod router;
+pub(crate) mod router;
 mod windows;
 
 pub use crate::vm::res;

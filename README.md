@@ -41,7 +41,7 @@ checks:                          # plus the checks Isoloom derives from services
 ```
 
 - **Targets are derived, not declared.** Every machine has `docker:` → Docker targets; every
-  machine has `vm:` → VM targets (Vagrant, Proxmox, cloud). A Windows machine has only `vm:`, so
+  machine has `vm:` → VM targets (Vagrant, Proxmox, ESXi, cloud). A Windows machine has only `vm:`, so
   that environment never gets a broken Docker file. On Proxmox, a machine with only `docker:` may
   opt in to run as an LXC container (`docker.lxc: true`, Proxmox VE 9.1 or later): no Docker
   runtime, so what a container can't carry (volumes, files, healthchecks...) is refused. `targets:` can only narrow the list.
@@ -238,7 +238,9 @@ for a **hosting service**), **Kubernetes** (manifests, NetworkPolicies for netwo
 **hybrid** (containers and VMs on the same networks), **Docker on one VM** (Vagrant, Proxmox),
 **Proxmox** (one VM per machine, or an LXC container with `docker.lxc`; its own SDN network,
 router and firewall, VLANs as tags, `networks.*.mtu` and `machines.*.rate_limit` on each device,
-arm64 VMs emulated, everything in a pool), **Docker on one cloud
+arm64 VMs emulated, everything in a pool), **ESXi** (one VM per Linux machine on a standalone host, a vSwitch per
+network and a router: [docs/esxi.md](docs/esxi.md), which also says when to use it rather than
+Vagrant's ESXi provider), **Docker on one cloud
 VM** and **one cloud VM per machine** (AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle),
 **existing hosts** reached over SSH, and **cloud services** (a Terraform module applied into
 your own cloud account). Routers enforce `reach` between networks; a network can name its own
@@ -250,7 +252,7 @@ Run for real in CI: Docker (hello-stack, air-gapped, segmented, edge-firewall, s
 (hello-stack, segmented). Run by hand: VirtualBox (several examples, Windows Server 2019); on
 AWS, one cloud VM per machine with Ansible provisioning, Docker on a cloud VM, and cloud services
 (cloud-bucket and thirteen AWS labs); Docker on a cloud VM on Azure. Generated and validated
-only: Proxmox, the other clouds, ESXi. The workflows that run VirtualBox, libvirt, Proxmox and the
+only: Proxmox, the other clouds, ESXi (Vagrant's provider and the `esxi` target). The workflows that run VirtualBox, libvirt, Proxmox and the
 six clouds for real are in place. Each one starts once its runner or secrets are provided
 ([docs/real-targets.md](docs/real-targets.md)).
 
