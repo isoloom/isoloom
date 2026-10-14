@@ -279,7 +279,7 @@ resource "proxmox_virtual_environment_file" "web" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'printf '\\''%s\\n'\\'' '\\''10.75.1.10 user'\\'' >> /etc/hosts'",
+        "sh -c 'for l in '\\''10.75.1.10 user'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
         "sh -c 'ip route replace 10.75.1.0/24 via 10.75.2.254'",
         "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
         "sh -c 'IF=$(ip -o -4 addr show | awk '\\''$4 ~ /^10\\.75\\.2\\.10\\//{print $2}'\\'' | head -n 1); [ -n \"$IF\" ] && tc qdisc replace dev \"$IF\" root netem delay 80ms 10ms loss 1% rate 10mbit'",
@@ -343,7 +343,7 @@ resource "proxmox_virtual_environment_file" "user" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'printf '\\''%s\\n'\\'' '\\''10.75.2.10 web'\\'' >> /etc/hosts'",
+        "sh -c 'for l in '\\''10.75.2.10 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
         "sh -c 'ip route replace 10.75.2.0/24 via 10.75.1.254'",
         "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
       ]
