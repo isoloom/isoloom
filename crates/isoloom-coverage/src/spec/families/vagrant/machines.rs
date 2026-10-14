@@ -93,9 +93,8 @@ pub const CELLS: &[(&str, Status)] = &[
     ),
     (
         "machines.*.privileged",
-        Done {
-            how: "nested virtualization on Hyper-V (`enable_virtualization_extensions`); elsewhere a VM already has kernel access",
-            proof: "existing-hosts",
+        NotApplicable {
+            why: "a VM already has kernel access: its workload runs as root (VMs inside it take `nested_virtualization`)",
         },
     ),
     (

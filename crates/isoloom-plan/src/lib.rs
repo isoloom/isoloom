@@ -7,6 +7,7 @@ pub mod ansible;
 pub mod boot;
 pub mod checks;
 pub mod environment;
+pub mod hardware;
 pub mod images;
 pub mod ipv6;
 pub mod lifecycle;

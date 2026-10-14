@@ -2,8 +2,8 @@
 //! the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEVICES, DISKS, ENVIRONMENT, GCP_IPV6, IMAGES, LOCATION,
-    MANAGED, MONITORING, MTU, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT,
+    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DISKS, ENVIRONMENT, GCP_IPV6, GPU_SCHEDULING,
+    IMAGES, LOCATION, MANAGED, MONITORING, MTU, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -173,7 +173,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 confidential_instance_config.* instance_encryption_key instance_encryption_key.* network_interface.igmp_query
                 network_interface.nic_type network_interface.queue_count network_interface.network_attachment
                 network_interface.access_config.network_tier network_interface.alias_ip_range network_interface.alias_ip_range.*
-                network_performance_config network_performance_config.* params params.* scheduling scheduling.* service_account service_account.*
+                network_performance_config network_performance_config.* params params.* scheduling.* service_account service_account.*
                 shielded_instance_config.enable_integrity_monitoring workload_identity_config workload_identity_config.*",
             ),
             (ROUTER, "can_ip_forward"),
@@ -187,17 +187,15 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 boot_disk.initialize_params.snapshot boot_disk.initialize_params.type boot_disk.initialize_params.architecture
                 network_interface.network network_interface.subnetwork_project network_interface.access_config.nat_ip",
             ),
-            (
-                CPUS,
-                "advanced_machine_features advanced_machine_features.threads_per_core advanced_machine_features.visible_core_count",
-            ),
-            (NESTED, "advanced_machine_features.enable_nested_virtualization"),
+            (CPUS, "advanced_machine_features.threads_per_core advanced_machine_features.visible_core_count"),
+            (NESTED, "advanced_machine_features advanced_machine_features.enable_nested_virtualization"),
             (
                 DISKS,
                 "attached_disk attached_disk.device_name attached_disk.force_attach attached_disk.mode attached_disk.source scratch_disk
                 scratch_disk.*",
             ),
-            (DEVICES, "guest_accelerator guest_accelerator.*"),
+            (ACCELERATORS, "guest_accelerator guest_accelerator.*"),
+            (GPU_SCHEDULING, "scheduling scheduling.on_host_maintenance"),
             (
                 GCP_IPV6,
                 "network_interface.internal_ipv6_prefix_length network_interface.ipv6_address network_interface.stack_type

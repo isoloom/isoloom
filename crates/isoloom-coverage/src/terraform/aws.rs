@@ -188,8 +188,8 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "security_groups user_data_base64 user_data_replace_on_change volume_tags root_block_device.delete_on_termination network_interface
                 network_interface.* secondary_network_interface secondary_network_interface.*",
             ),
-            (CPUS, "cpu_options cpu_options.core_count cpu_options.threads_per_core"),
-            (NESTED, "cpu_options.nested_virtualization"),
+            (CPUS, "cpu_options.core_count cpu_options.threads_per_core"),
+            (NESTED, "cpu_options cpu_options.nested_virtualization"),
             (
                 DISKS,
                 "ebs_block_device ebs_block_device.delete_on_termination ebs_block_device.device_name ebs_block_device.volume_size

@@ -109,8 +109,8 @@ fn utm_refuses_vms_on_a_network() {
 }
 
 #[test]
-fn vmware_runs_a_privileged_machine_with_nested_virtualization() {
-    let spec = "version: 1\nname: t\nmachines:\n  a:\n    privileged: true\n    vm: { os: debian-12, provision: [p.sh] }\n  b:\n    vm: { os: debian-12, provision: [p.sh] }\n";
+fn vmware_runs_a_machine_with_nested_virtualization() {
+    let spec = "version: 1\nname: t\nmachines:\n  a:\n    nested_virtualization: true\n    vm: { os: debian-12, provision: [p.sh] }\n  b:\n    vm: { os: debian-12, provision: [p.sh] }\n";
     let vf = vagrantfile(spec);
     assert!(provider_block(&vf, "a", "vmware_desktop").contains("v.vmx[\"vhv.enable\"] = \"TRUE\""));
     assert!(!provider_block(&vf, "b", "vmware_desktop").contains("vhv.enable"));

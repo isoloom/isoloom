@@ -59,10 +59,29 @@ pub struct Machine {
     /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
     #[serde(default)]
     pub arch: Arch,
-    /// The machine needs kernel-level access (nested containers or VMs, loading kernel modules,
-    /// raw devices). A container runs privileged; a VM already has it (its workload is root).
+    /// The machine needs kernel-level access (nested containers, loading kernel modules, raw
+    /// devices). A container runs privileged; a VM already has it (its workload is root). VMs
+    /// inside a VM need `nested_virtualization`.
     #[serde(default)]
     pub privileged: bool,
+    /// The machine runs VMs of its own: its VM gets the CPU's virtualization extensions (each
+    /// hypervisor's nested virtualization). A VM only: a container can't, so the machine needs
+    /// a `vm:`. Targets whose VMs can't nest refuse it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub nested_virtualization: bool,
+    /// GPUs for the machine: a count (`1`), `all`, or `{ count, ids, driver, capabilities,
+    /// options }`. A container gets the host's (Docker, Kubernetes); a VM gets them passed
+    /// through (Proxmox, by `ids`) or sized with them (a cloud's GPU instance type). Other
+    /// targets refuse it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<super::GpusInput>")]
+    pub gpus: Option<super::Gpus>,
+    /// The host's devices given to the machine: `/dev/fuse`, `host:guest[:permissions]`, or
+    /// `{ host, guest, permissions }` (`r`, `w`, `m`). A container on the user's own Docker
+    /// host only: a VM has its own devices (a GPU reaches a VM through `gpus`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(with = "Vec<super::DeviceInput>")]
+    pub devices: Vec<super::Device>,
     /// The machine's root filesystem is read-only (hardening): nothing can be written outside
     /// its declared `volumes`. Applies to containers; a VM's root stays writable.
     #[serde(default)]

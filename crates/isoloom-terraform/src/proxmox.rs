@@ -23,6 +23,7 @@
 
 mod boot;
 mod controller;
+mod gpus;
 mod image;
 mod machine;
 pub(crate) mod module;
@@ -79,7 +80,7 @@ fn image_url(os: &str) -> Option<&'static str> {
 /// no cloud image (its own image stands in for its OS's), then what a Windows machine can't
 /// have here yet, then a boot of its own Proxmox has no setting for.
 pub fn refusal(env: &Environment) -> Option<String> {
-    LIMITS.refusal(env).or_else(|| {
+    LIMITS.refusal(env).or_else(|| gpus::refusal(env)).or_else(|| {
         vms(env)
             .find_map(|(name, mp)| {
                 let os = os(mp).unwrap_or_default();
@@ -121,6 +122,10 @@ impl Backend for ProxmoxBackend {
             Feature::MachineProcess,
             // A machine's firmware and boot order; its own `refusal` says what Proxmox can't boot.
             Feature::OwnBoot,
+            // Passed through by PCI id or resource mapping (`gpus.ids`, refused without).
+            Feature::VmGpus,
+            // The VMs take the server's CPU (`cpu.type = host`).
+            Feature::NestedVirtualization,
         ])
     }
 

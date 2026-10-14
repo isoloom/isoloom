@@ -259,7 +259,8 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
             Feature::Ipv6Auto,
             Feature::Secrets,
             Feature::OwnedProjectFiles,
-            Feature::MachineProcess
+            Feature::MachineProcess,
+            Feature::ContainerGpus
         ])
     );
 }

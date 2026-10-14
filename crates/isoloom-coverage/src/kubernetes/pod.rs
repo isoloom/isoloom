@@ -16,8 +16,10 @@ const API: Support = Tooling {
 const HOST: Support = NotPortable {
     why: "shares the node's own namespaces: cloud VMs have no host to share",
 };
-const DEVICES: Support = Planned {
-    note: "device passthrough (GPUs), where the cluster offers it",
+/// Dynamic resource allocation: the GPUs are the device plugin's resource instead, which every
+/// cluster with GPUs offers (a DRA driver is still the exception).
+const DEVICES: Support = Equivalent {
+    via: "machines.*.gpus, as the device plugin's resource in `limits` (`nvidia.com/gpu`, `amd.com/gpu`, `gpu.intel.com/i915`)",
 };
 /// Windows containers (ADR 0006): Isoloom's Windows machines are full Windows VMs (a desktop or a
 /// server with WinRM, a domain controller), which no Windows container image is.
@@ -217,7 +219,7 @@ fn container_parts(definition: &str, field: &str) -> Option<Support> {
         },
         ("Probe", "terminationGracePeriodSeconds") => SCHEDULING,
         ("ResourceRequirements", "limits") => Emitted {
-            from: "machines.*.resources (cpus, memory_mb)",
+            from: "machines.*.resources (cpus, memory_mb) and machines.*.gpus (the device plugin's resource)",
         },
         ("ResourceRequirements", "requests") => Tooling {
             note: "what the scheduler reserves on a node: the limits are the machine's size",

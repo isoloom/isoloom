@@ -57,6 +57,7 @@ fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ip
         hyperv: HyperV::helper(env, at),
         tpm: None,
         esxi_guestos: None,
+        nested: false,
     }
 }
 

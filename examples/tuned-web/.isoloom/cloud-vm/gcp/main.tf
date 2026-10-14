@@ -139,10 +139,6 @@ resource "google_compute_firewall" "web_ssh" {
 }
 
 resource "google_compute_instance" "web" {
-  shielded_instance_config {
-    enable_secure_boot = true
-    enable_vtpm        = true
-  }
   project      = local.project
   name         = "${local.name}-web"
   machine_type = "e2-small"
@@ -166,6 +162,10 @@ resource "google_compute_instance" "web" {
     managed-by          = "isoloom"
     isoloom-instance    = local.name
     isoloom-expires-at  = var.expires_at
+  }
+  shielded_instance_config {
+    enable_secure_boot = true
+    enable_vtpm        = true
   }
 }
 

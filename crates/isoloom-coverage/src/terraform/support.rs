@@ -2,7 +2,7 @@
 //! decided by the questions of docs/adr/0006-coverage-classification.md. A family is a reviewed
 //! decision; a resource or argument no family names stays unclassified and fails the tests.
 
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
 
 /// A resource type, data source, argument or block Isoloom writes.
 pub const WRITTEN: Support = Emitted {
@@ -150,13 +150,30 @@ pub const PROXMOX_IPV6: Support = Equivalent {
 pub const DISKS: Support = Planned {
     note: "with data disks: persistent volumes on VMs",
 };
-/// Nested virtualization.
-pub const NESTED: Support = Planned {
-    note: "with nested virtualization",
+/// Nested virtualization: the cloud's switch, or the block holding it.
+pub const NESTED: Support = Emitted {
+    from: "machines.*.nested_virtualization",
 };
-/// GPUs and other devices.
-pub const DEVICES: Support = Planned {
-    note: "with GPU and device passthrough",
+/// A GPU passed through to a VM.
+pub const GPU_PASSTHROUGH: Support = Emitted {
+    from: "machines.*.gpus.ids (a PCIe device per id: a PCI address, or a resource mapping)",
+};
+/// How the server hands a PCI device over.
+pub const PASSTHROUGH_TUNING: Support = NotPortable {
+    why: "how the Proxmox server hands its PCI device over (a vGPU slice, a ROM, the primary display): no other target exposes it",
+};
+/// A host's USB devices for a VM.
+pub const USB: Support = NotPortable {
+    why: "a host's USB device for a VM: `devices` reach containers only (a VM has its own virtual devices), and cloud VMs have none",
+};
+/// GPUs attached to a machine type that carries none.
+pub const ACCELERATORS: Support = Equivalent {
+    via: "machines.*.gpus.count, as a G2 machine type (its L4 GPUs attached)",
+};
+/// What a GPU instance needs: maintenance stops it instead of moving it.
+pub const GPU_SCHEDULING: Support = Partial {
+    from: "machines.*.gpus.count (`on_host_maintenance = TERMINATE`)",
+    gap: "the other scheduling options: the cloud's own",
 };
 /// TPM and secure boot.
 pub const TPM: Support = Planned {

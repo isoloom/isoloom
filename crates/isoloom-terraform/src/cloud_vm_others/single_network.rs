@@ -9,6 +9,7 @@ use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::{Protocol, Target};
 
 use crate::vm::cloud::{redirects, reschedule_auto_stop};
+use crate::vm::gpus::{self, GpuSizes};
 use crate::vm::limits::Limits;
 use crate::vm::linux::Hooks;
 use crate::vm::{controller, is_windows, os, own_image, vms};
@@ -30,6 +31,10 @@ pub struct Rules {
     pub tpm: bool,
     /// The field of `vm.image` naming a machine's own image there, which stands in for its OS's.
     pub own: own_image::Field,
+    /// Its GPU instance types.
+    pub gpus: GpuSizes,
+    /// Whether its VMs can run VMs of their own (`nested_virtualization`).
+    pub nests: bool,
 }
 
 /// The features every cloud lacks for now, `arm64` and `ipv6` the cloud's own.
@@ -65,7 +70,12 @@ pub fn refusal(env: &Environment, rules: &Rules) -> Option<String> {
     if rules.single_machine && vms(env).count() > 1 {
         return Some(format!("{cloud} cloud-vm takes single-machine labs so far (it can't pin private addresses)"));
     }
-    if let Some(why) = rules.limits.refusal(env) {
+    if let Some(why) = rules
+        .limits
+        .refusal(env)
+        .or_else(|| gpus::refusal(env, &rules.gpus))
+        .or_else(|| crate::vm::nested::refusal(env, rules.cloud, rules.nests))
+    {
         return Some(why);
     }
     if let Some((name, _)) = vms(env)

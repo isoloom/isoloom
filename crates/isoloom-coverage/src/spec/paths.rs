@@ -16,6 +16,7 @@ const WHOLE: &[&str] = &[
     // The secrets' stores, and where each machine places its secrets: one feature each.
     "secrets",
     "machines.*.secrets",
+    "machines.*.gpus.options",
 ];
 
 /// Where in the spec names are chosen by the author (map keys become `*`).

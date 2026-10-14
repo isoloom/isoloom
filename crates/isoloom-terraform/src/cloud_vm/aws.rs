@@ -20,13 +20,15 @@ mod network;
 mod outputs;
 
 use isoloom_plan::{Environment, Step};
-use isoloom_render::hcl_builder::{Block, Expression, Module, index, list, null, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, index, list, null, reference, string};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 use isoloom_spec::images::is_windows as is_windows_os;
 use isoloom_spec::validate::Cidr;
 
+use crate::vm::gpus::{self, GpuSizes};
 use crate::vm::limits::Limits;
 use crate::vm::module::{Variable, project_lists, terraform};
+use crate::vm::nested;
 use crate::vm::versions;
 use crate::vm::{cloud, own_image};
 use crate::vm::{controller, is_windows, os, res, vms};
@@ -42,6 +44,35 @@ pub const LIMITS: Limits = Limits {
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none"),
     ipv6: Some("an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks"),
 };
+
+/// AWS's GPU instance types: NVIDIA T4s (G4dn). New accounts have no quota for them until
+/// they ask (Service Quotas, "Running On-Demand G and VT instances").
+pub const GPUS: GpuSizes = GpuSizes {
+    cloud: "AWS",
+    gpu: "NVIDIA T4",
+    sizes: &[(1, "g4dn.xlarge"), (4, "g4dn.12xlarge"), (8, "g4dn.metal")],
+    none: "",
+};
+
+/// The instance types whose CPUs nest (8th-generation Intel), by memory in MB.
+const NESTING: &[(u32, &str)] = &[(8192, "m8i.large"), (16384, "m8i.xlarge"), (32768, "m8i.2xlarge")];
+
+/// A machine's instance type: its GPUs', a nesting one, else by its memory.
+pub fn machine_type(mp: &isoloom_plan::MachinePlan, memory_mb: u32) -> &'static str {
+    GPUS.of(mp).or_else(|| nested::size(mp, memory_mb, NESTING)).unwrap_or(instance_type(memory_mb))
+}
+
+/// The instance's nested virtualization switch, when the machine runs VMs of its own.
+pub fn nesting(b: BlockBuilder, mp: &isoloom_plan::MachinePlan) -> BlockBuilder {
+    if !nested::wanted(mp) {
+        return b;
+    }
+    b.add_block(
+        Block::builder("cpu_options")
+            .add_attribute(("nested_virtualization", string("enabled")))
+            .build(),
+    )
+}
 
 /// The AMI lookup and SSH user for an OS name: (owner, name filter, ssh user).
 fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
@@ -80,7 +111,12 @@ pub fn instance_type(memory_mb: u32) -> &'static str {
 /// images (a machine's own AMI stands in for its OS's). This refuses the whole `cloud-vm` target
 /// (AWS is its reference cloud).
 pub fn refusal(env: &Environment) -> Option<String> {
-    LIMITS.refusal(env).or_else(|| networks_refusal(env)).or_else(|| machines_refusal(env))
+    LIMITS
+        .refusal(env)
+        .or_else(|| networks_refusal(env))
+        .or_else(|| machines_refusal(env))
+        .or_else(|| gpus::refusal(env, &GPUS))
+        .or_else(|| nested::refusal(env, "AWS", true))
 }
 
 fn networks_refusal(env: &Environment) -> Option<String> {

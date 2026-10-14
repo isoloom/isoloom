@@ -2,6 +2,7 @@
 //! doesn't list is one every output treats alike ([`super::shared`]).
 
 mod environment;
+mod hardware;
 mod machines;
 
 use crate::spec::status::Status;
@@ -16,4 +17,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::process::COMPOSE,
     super::own_image::CONTAINER_IMAGES,
     super::own_image::CONTAINER_BOOT,
+    hardware::CELLS,
 ];

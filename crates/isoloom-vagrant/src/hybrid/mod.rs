@@ -50,6 +50,7 @@ impl Backend for HybridBackend {
             Feature::TrafficControl,
             Feature::Tpm,
             Feature::MachineProcess,
+            Feature::NestedVirtualization,
         ])
     }
 

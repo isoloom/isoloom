@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 85% | 150 | 127 | 3 | 20 |
+| [Docker Compose](#docker-compose) | 96% | 151 | 143 | 4 | 4 |
 | [Vagrant](#vagrant) | 100% | 42 | 42 | 0 | 0 |
 | [Vagrant: networks](#vagrant-networks) | 100% | 38 | 38 | 0 | 0 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
@@ -18,26 +18,26 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: communicators](#vagrant-communicators) | 100% | 11 | 11 | 0 | 0 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 7 | 7 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 100% | 5 | 5 | 0 | 0 |
-| [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
-| [Vagrant: libvirt](#vagrant-libvirt) | 94% | 19 | 18 | 0 | 1 |
+| [Vagrant: Parallels](#vagrant-parallels) | 100% | 7 | 7 | 0 | 0 |
+| [Vagrant: libvirt](#vagrant-libvirt) | 100% | 19 | 19 | 0 | 0 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: UTM](#vagrant-utm) | 100% | 3 | 3 | 0 | 0 |
 | [Vagrant: QEMU](#vagrant-qemu) | 92% | 14 | 13 | 0 | 1 |
-| [Vagrant: ESXi](#vagrant-esxi) | 100% | 19 | 19 | 0 | 0 |
+| [Vagrant: ESXi](#vagrant-esxi) | 100% | 20 | 20 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
-| [Terraform: Proxmox](#terraform-proxmox) | 67% | 127 | 86 | 0 | 41 |
+| [Terraform: Proxmox](#terraform-proxmox) | 76% | 119 | 91 | 0 | 28 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
-| [Terraform: AWS](#terraform-aws) | 72% | 132 | 96 | 0 | 36 |
+| [Terraform: AWS](#terraform-aws) | 73% | 132 | 97 | 0 | 35 |
 | [Terraform: Azure](#terraform-azure) | 80% | 135 | 108 | 0 | 27 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 68% | 95 | 65 | 0 | 30 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 72% | 97 | 69 | 2 | 26 |
 | [Terraform: DigitalOcean](#terraform-digitalocean) | 77% | 36 | 28 | 0 | 8 |
 | [Terraform: Linode](#terraform-linode) | 66% | 59 | 39 | 0 | 20 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 50% | 152 | 76 | 0 | 76 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 50% | 152 | 77 | 0 | 75 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 96% | 204 | 197 | 1 | 6 |
+| [Kubernetes](#kubernetes) | 97% | 204 | 199 | 1 | 4 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
 | [Helm](#helm) | 100% | 19 | 19 | 0 | 0 |
 
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-85% of 150 portable features (127 done, 3 partly, 20 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+96% of 151 portable features (143 done, 4 partly, 4 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -179,19 +179,19 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `deploy.resources.limits.cpus` | Yes | Yes | From `machines.*.resources.cpus` |
 | `deploy.resources.limits.memory` | Yes | Yes | From `machines.*.resources.memory_mb` |
 | `deploy.resources.limits.pids` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `deploy.resources.reservations` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `deploy.resources.reservations` | Yes | Partly | From `machines.*.gpus` (its devices); not yet: cpus and memory: a machine's size is its limit |
 | `deploy.resources.reservations.cpus` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `deploy.resources.reservations.memory` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `deploy.resources.reservations.generic_resources` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
 | `deploy.resources.reservations.generic_resources[].discrete_resource_spec` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
 | `deploy.resources.reservations.generic_resources[].discrete_resource_spec.kind` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
 | `deploy.resources.reservations.generic_resources[].discrete_resource_spec.value` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
-| `deploy.resources.reservations.devices` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `deploy.resources.reservations.devices[].capabilities` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `deploy.resources.reservations.devices[].count` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `deploy.resources.reservations.devices[].device_ids` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `deploy.resources.reservations.devices[].driver` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `deploy.resources.reservations.devices[].options` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `deploy.resources.reservations.devices` | Yes | Yes | From `machines.*.gpus` |
+| `deploy.resources.reservations.devices[].capabilities` | Yes | Yes | From `machines.*.gpus` |
+| `deploy.resources.reservations.devices[].count` | Yes | Yes | From `machines.*.gpus` |
+| `deploy.resources.reservations.devices[].device_ids` | Yes | Yes | From `machines.*.gpus` |
+| `deploy.resources.reservations.devices[].driver` | Yes | Yes | From `machines.*.gpus` |
+| `deploy.resources.reservations.devices[].options` | Yes | Yes | From `machines.*.gpus` |
 | `deploy.restart_policy` | Yes | Another way | Via restart (always unless-stopped: machines stay up like VMs) |
 | `deploy.restart_policy.condition` | Yes | Another way | Via restart (always unless-stopped: machines stay up like VMs) |
 | `deploy.restart_policy.delay` | Yes | Another way | Via restart (always unless-stopped: machines stay up like VMs) |
@@ -217,10 +217,10 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `develop.watch[].exec.environment` | n/a | No | Compose tooling, not the environment's behavior |
 | `develop.watch[].initial_sync` | n/a | No | Compose tooling, not the environment's behavior |
 | `device_cgroup_rules` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `devices` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
-| `devices[].source` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
-| `devices[].target` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
-| `devices[].permissions` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
+| `devices` | Yes | Yes | From `machines.*.devices` |
+| `devices[].source` | Yes | Yes | From `machines.*.devices` |
+| `devices[].target` | Yes | Yes | From `machines.*.devices` |
+| `devices[].permissions` | Yes | Yes | From `machines.*.devices` |
 | `dns` | Yes | Yes | From `machines.*.dns.servers` (and the Kubernetes dnsConfig) |
 | `dns_opt` | Yes | Yes | From `machines.*.dns.options` (and the Kubernetes dnsConfig) |
 | `dns_search` | Yes | Yes | From `machines.*.dns.search` (and the Kubernetes dnsConfig) |
@@ -237,12 +237,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `extends.file` | n/a | No | Compose tooling, not the environment's behavior |
 | `external_links` | n/a | No | Legacy; replaced by networks |
 | `extra_hosts` | Yes | Yes | From `machines.*.networks` (names of machines on other networks) |
-| `gpus` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `gpus[].capabilities` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `gpus[].count` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `gpus[].device_ids` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `gpus[].driver` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
-| `gpus[].options` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `gpus` | Yes | Another way | Via machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads) |
+| `gpus[].capabilities` | Yes | Another way | Via machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads) |
+| `gpus[].count` | Yes | Another way | Via machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads) |
+| `gpus[].device_ids` | Yes | Another way | Via machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads) |
+| `gpus[].driver` | Yes | Another way | Via machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads) |
+| `gpus[].options` | Yes | Another way | Via machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads) |
 | `group_add` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
 | `healthcheck` | Yes | Yes | From `machines.*.services and machines.*.healthcheck` (a probe of every port, and the machine's own check beside it) |
 | `healthcheck.disable` | n/a | No | Turns off the image's own check: Isoloom's readiness is its own probe |
@@ -1103,7 +1103,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `check_guest_additions` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `cpus` | Yes | Yes | From `machines.*.resources` |
 | `customizations` | No | No | Raw commands for one hypervisor: no other target understands them |
-| `customize` | Yes | Yes | From `machines.*.vm.tpm` (a TPM 2.0, `--tpm-type`), and the hybrid target's Docker host (its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks); no spec field writes raw commands |
+| `customize` | Yes | Yes | From `machines.*.vm.tpm` (a TPM 2.0, `--tpm-type`), machines.*.nested_virtualization (`--nested-hw-virt on`), and the hybrid target's Docker host (its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks); no spec field writes raw commands |
 | `default_nic_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `destroy_unused_network_interfaces` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `functional_vboxsf` | n/a | No | Shared folders are off: the project is copied into each VM |
@@ -1145,12 +1145,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `utility_host` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `utility_port` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `verify_vmnet` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `vmx` | Yes | Yes | From `machines.*.resources and machines.*.privileged: displayName, numvcpus, memsize, and vhv.enable` (nested virtualization) |
+| `vmx` | Yes | Yes | From `machines.*.resources and machines.*.nested_virtualization: displayName, numvcpus, memsize, and vhv.enable` (nested virtualization) |
 | `whitelist_verified` | n/a | No | Vagrant tooling, not the environment's behavior |
 
 ## Vagrant: Parallels
 
-100% of 6 portable features (6 done, 0 partly, 0 to do; 15 features in all). From vagrant-parallels 2.4.7 (its config class).
+100% of 7 portable features (7 done, 0 partly, 0 to do; 15 features in all). From vagrant-parallels 2.4.7 (its config class).
 
 ### Settings
 
@@ -1159,7 +1159,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `check_guest_tools` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `cpus` | Yes | Yes | From `machines.*.resources` |
 | `customizations` | No | No | Raw commands for one hypervisor: no other target understands them |
-| `customize` | No | No | Raw commands for one hypervisor: no other target understands them |
+| `customize` | Yes | Yes | From `machines.*.nested_virtualization` (`--nested-virt on`); no spec field writes raw commands |
 | `destroy_unused_network_interfaces` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `functional_psf` | n/a | No | Shared folders are off: the project is copied into each VM |
 | `linked_clone` | Yes | Yes | A differencing disk, so a clone is instant instead of copying the whole box |
@@ -1174,7 +1174,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: libvirt
 
-94% of 19 portable features (18 done, 0 partly, 1 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
+100% of 19 portable features (19 done, 0 partly, 0 to do; 146 features in all). From vagrant-libvirt 0.12.2 (its config class).
 
 ### Settings
 
@@ -1270,7 +1270,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `memtune` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `memtunes` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `mgmt_attach` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `nested` | Yes | Not yet | Nested virtualization: running VMs inside (makes an environment VM-only) |
+| `nested` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `nic_adapter_count` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `nic_model_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `nodeset` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
@@ -1342,7 +1342,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `enable_automatic_checkpoints` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `enable_checkpoints` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `enable_enhanced_session_mode` | No | No | Display, input and host devices: containers and cloud VMs have none |
-| `enable_virtualization_extensions` | Yes | Yes | From `machines.*.privileged` (nested virtualization) |
+| `enable_virtualization_extensions` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `ip_address_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `linked_clone` | Yes | Yes | A differencing disk, so a clone is instant instead of copying the whole box |
 | `mac` | No | No | Cloud VMs get their MAC and addresses from the provider |
@@ -1418,7 +1418,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: ESXi
 
-100% of 19 portable features (19 done, 0 partly, 0 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
+100% of 20 portable features (20 done, 0 partly, 0 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
 
 ### Settings
 
@@ -1439,7 +1439,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `esxi_virtual_network` | Yes | Yes | From networks: a port group per network, from ESXI_VIRTUAL_NETWORK |
 | `guest_autostart` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_boot_disk_size` | Yes | Yes | From `machines.*.resources.disk_gb` (the root filesystem grown into it) |
-| `guest_custom_vmx_settings` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
+| `guest_custom_vmx_settings` | Yes | Yes | From `machines.*.nested_virtualization` (`vhv.enable`); no spec field writes raw settings |
 | `guest_disk_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_guestos` | Yes | Yes | From `machines.*.vm.os` (a Windows VM's guest OS; a Linux box keeps its own) |
 | `guest_mac_address` | No | No | Cloud VMs get their MAC and addresses from the provider |
@@ -1517,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-67% of 127 portable features (86 done, 0 partly, 41 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
+76% of 119 portable features (91 done, 0 partly, 28 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1869,15 +1869,15 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `efi_disk.file_format` | Yes | Yes | Written by the generator |
 | `efi_disk.pre_enrolled_keys` | Yes | Yes | Written by the generator |
 | `efi_disk.type` | Yes | Yes | Written by the generator |
-| `hostpci` | Yes | Not yet | With GPU and device passthrough |
-| `hostpci.device` | Yes | Not yet | With GPU and device passthrough |
-| `hostpci.id` | Yes | Not yet | With GPU and device passthrough |
-| `hostpci.mapping` | Yes | Not yet | With GPU and device passthrough |
-| `hostpci.mdev` | Yes | Not yet | With GPU and device passthrough |
-| `hostpci.pcie` | Yes | Not yet | With GPU and device passthrough |
-| `hostpci.rom_file` | Yes | Not yet | With GPU and device passthrough |
-| `hostpci.rombar` | Yes | Not yet | With GPU and device passthrough |
-| `hostpci.xvga` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci` | Yes | Yes | From `machines.*.gpus.ids` (a PCIe device per id: a PCI address, or a resource mapping) |
+| `hostpci.device` | Yes | Yes | From `machines.*.gpus.ids` (a PCIe device per id: a PCI address, or a resource mapping) |
+| `hostpci.id` | Yes | Yes | From `machines.*.gpus.ids` (a PCIe device per id: a PCI address, or a resource mapping) |
+| `hostpci.mapping` | Yes | Yes | From `machines.*.gpus.ids` (a PCIe device per id: a PCI address, or a resource mapping) |
+| `hostpci.mdev` | No | No | How the Proxmox server hands its PCI device over (a vGPU slice, a ROM, the primary display): no other target exposes it |
+| `hostpci.pcie` | Yes | Yes | From `machines.*.gpus.ids` (a PCIe device per id: a PCI address, or a resource mapping) |
+| `hostpci.rom_file` | No | No | How the Proxmox server hands its PCI device over (a vGPU slice, a ROM, the primary display): no other target exposes it |
+| `hostpci.rombar` | No | No | How the Proxmox server hands its PCI device over (a vGPU slice, a ROM, the primary display): no other target exposes it |
+| `hostpci.xvga` | No | No | How the Proxmox server hands its PCI device over (a vGPU slice, a ROM, the primary display): no other target exposes it |
 | `initialization` | Yes | Yes | Written by the generator |
 | `initialization.datastore_id` | Yes | Yes | Written by the generator |
 | `initialization.file_format` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -1937,10 +1937,10 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `tpm_state` | Yes | Yes | Written by the generator |
 | `tpm_state.datastore_id` | Yes | Yes | Written by the generator |
 | `tpm_state.version` | Yes | Yes | Written by the generator |
-| `usb` | Yes | Not yet | With GPU and device passthrough |
-| `usb.host` | Yes | Not yet | With GPU and device passthrough |
-| `usb.mapping` | Yes | Not yet | With GPU and device passthrough |
-| `usb.usb3` | Yes | Not yet | With GPU and device passthrough |
+| `usb` | No | No | A host's USB device for a VM: `devices` reach containers only (a VM has its own virtual devices), and cloud VMs have none |
+| `usb.host` | No | No | A host's USB device for a VM: `devices` reach containers only (a VM has its own virtual devices), and cloud VMs have none |
+| `usb.mapping` | No | No | A host's USB device for a VM: `devices` reach containers only (a VM has its own virtual devices), and cloud VMs have none |
+| `usb.usb3` | No | No | A host's USB device for a VM: `devices` reach containers only (a VM has its own virtual devices), and cloud VMs have none |
 | `vga` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `vga.clipboard` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `vga.memory` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -1972,7 +1972,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: AWS
 
-72% of 132 portable features (96 done, 0 partly, 36 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
+73% of 132 portable features (97 done, 0 partly, 35 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -2789,10 +2789,10 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `capacity_reservation_specification.capacity_reservation_target` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `capacity_reservation_specification.capacity_reservation_target.capacity_reservation_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `capacity_reservation_specification.capacity_reservation_target.capacity_reservation_resource_group_arn` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `cpu_options` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
+| `cpu_options` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `cpu_options.amd_sev_snp` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `cpu_options.core_count` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
-| `cpu_options.nested_virtualization` | Yes | Not yet | With nested virtualization |
+| `cpu_options.nested_virtualization` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `cpu_options.threads_per_core` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
 | `credit_specification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `credit_specification.cpu_credits` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -3854,7 +3854,7 @@ And 894 other resource types that only this cloud has: its managed services, net
 
 ## Terraform: Google Cloud
 
-68% of 95 portable features (65 done, 0 partly, 30 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+72% of 97 portable features (69 done, 2 partly, 26 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4416,8 +4416,8 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `resource_policies` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `tags` | Yes | Yes | Written by the generator |
 | `zone` | Yes | Yes | Written by the generator |
-| `advanced_machine_features` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
-| `advanced_machine_features.enable_nested_virtualization` | Yes | Not yet | With nested virtualization |
+| `advanced_machine_features` | Yes | Yes | From `machines.*.nested_virtualization` |
+| `advanced_machine_features.enable_nested_virtualization` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `advanced_machine_features.enable_uefi_networking` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `advanced_machine_features.performance_monitoring_unit` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `advanced_machine_features.threads_per_core` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
@@ -4471,9 +4471,9 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `confidential_instance_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `confidential_instance_config.confidential_instance_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `confidential_instance_config.enable_confidential_compute` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `guest_accelerator` | Yes | Not yet | With GPU and device passthrough |
-| `guest_accelerator.count` | Yes | Not yet | With GPU and device passthrough |
-| `guest_accelerator.type` | Yes | Not yet | With GPU and device passthrough |
+| `guest_accelerator` | Yes | Another way | Via machines.*.gpus.count, as a G2 machine type (its L4 GPUs attached) |
+| `guest_accelerator.count` | Yes | Another way | Via machines.*.gpus.count, as a G2 machine type (its L4 GPUs attached) |
+| `guest_accelerator.type` | Yes | Another way | Via machines.*.gpus.count, as a G2 machine type (its L4 GPUs attached) |
 | `instance_encryption_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `instance_encryption_key.kms_key_self_link` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `instance_encryption_key.kms_key_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -4512,13 +4512,13 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `reservation_affinity.specific_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `reservation_affinity.specific_reservation.key` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `reservation_affinity.specific_reservation.values` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `scheduling` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling` | Yes | Partly | From `machines.*.gpus.count` (`on_host_maintenance = TERMINATE`); not yet: the other scheduling options: the cloud's own |
 | `scheduling.automatic_restart` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.availability_domain` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.host_error_timeout_seconds` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.instance_termination_action` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.min_node_cpus` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.on_host_maintenance` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.on_host_maintenance` | Yes | Partly | From `machines.*.gpus.count` (`on_host_maintenance = TERMINATE`); not yet: the other scheduling options: the cloud's own |
 | `scheduling.preemptible` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.provisioning_model` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.termination_time` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -5312,7 +5312,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Oracle Cloud
 
-50% of 152 portable features (76 done, 0 partly, 76 to do; 1320 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
+50% of 152 portable features (77 done, 0 partly, 75 to do; 1320 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5741,7 +5741,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `placement_constraint_details.compute_host_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `placement_constraint_details.type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `platform_config` | Yes | Yes | Written by the generator |
-| `platform_config.are_virtual_instructions_enabled` | Yes | Not yet | With nested virtualization |
+| `platform_config.are_virtual_instructions_enabled` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `platform_config.config_map` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `platform_config.is_access_control_service_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `platform_config.is_input_output_memory_management_unit_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -6748,7 +6748,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-96% of 204 portable features (197 done, 1 partly, 6 to do; 375 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+97% of 204 portable features (199 done, 1 partly, 4 to do; 375 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -6834,7 +6834,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `PodSpec: priority` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: priorityClassName` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: readinessGates` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
-| `PodSpec: resourceClaims` | Yes | Not yet | Device passthrough (GPUs), where the cluster offers it |
+| `PodSpec: resourceClaims` | Yes | Another way | Via machines.*.gpus, as the device plugin's resource in `limits` (`nvidia.com/gpu`, `amd.com/gpu`, `gpu.intel.com/i915`) |
 | `PodSpec: resources` | Yes | Another way | Via each container's `resources` |
 | `PodSpec: restartPolicy` | Yes | Yes | From `checks` (run once) |
 | `PodSpec: runtimeClassName` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
@@ -6892,8 +6892,8 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `SecretKeySelector: key` | Yes | Yes | From `machines.*.inputs` (the inputs' Secret) |
 | `SecretKeySelector: name` | Yes | Yes | From `machines.*.inputs` (the inputs' Secret) |
 | `SecretKeySelector: optional` | Yes | Yes | From `inputs` (an unset input is empty) |
-| `ResourceRequirements: claims` | Yes | Not yet | Device passthrough (GPUs), where the cluster offers it |
-| `ResourceRequirements: limits` | Yes | Yes | From `machines.*.resources` (cpus, memory_mb) |
+| `ResourceRequirements: claims` | Yes | Another way | Via machines.*.gpus, as the device plugin's resource in `limits` (`nvidia.com/gpu`, `amd.com/gpu`, `gpu.intel.com/i915`) |
+| `ResourceRequirements: limits` | Yes | Yes | From `machines.*.resources` (cpus, memory_mb) and machines.*.gpus (the device plugin's resource) |
 | `ResourceRequirements: requests` | n/a | No | What the scheduler reserves on a node: the limits are the machine's size |
 | `Probe: exec` | Yes | Yes | From `machines.*.services and machines.*.healthcheck.test` (Isoloom's port probe, the same on every target, and the machine's own command) |
 | `Probe: failureThreshold` | Yes | Yes | From `machines.*.healthcheck.retries` (else for up to 5 minutes) |
@@ -7310,7 +7310,16 @@ is marked ✗, with its reason below.
 | `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.aliases` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.arch` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
-| `machines.*.privileged` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.privileged` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.nested_virtualization` | ✗ | ✗ | ✗ | ✗ | ✗ | ◐ | ✗ | ✗ | ✓ | ◐ | ✗ | ◐ | ✗ | ✗ | ◐ | ✗ | n/a | n/a |
+| `machines.*.gpus.count` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ◐ | ◐ | ◐ | ◐ | ◐ | ✗ | ✗ | n/a | n/a |
+| `machines.*.gpus.ids` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.gpus.driver` | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | n/a | ◐ | ◐ | ◐ | ◐ | ◐ | ✗ | ✗ | n/a | n/a |
+| `machines.*.gpus.capabilities` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✗ | n/a | n/a |
+| `machines.*.gpus.options` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✗ | n/a | n/a |
+| `machines.*.devices[].host` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.devices[].guest` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.devices[].permissions` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
 | `machines.*.read_only` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.tmpfs` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.shm_size` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
@@ -7416,22 +7425,22 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 87% of 101 | 87 | 3 | 0 | 11 |
-| hosted | 87% of 101 | 87 | 3 | 0 | 11 |
-| kubernetes | 75% of 93 | 65 | 11 | 1 | 16 |
-| helm | 75% of 93 | 65 | 11 | 1 | 16 |
-| kustomize | 75% of 93 | 65 | 11 | 1 | 16 |
-| vagrant | 87% of 107 | 87 | 14 | 0 | 6 |
-| docker-vm | 84% of 101 | 84 | 3 | 0 | 14 |
-| hybrid | 70% of 126 | 86 | 5 | 7 | 28 |
-| proxmox | 81% of 103 | 83 | 2 | 3 | 15 |
-| aws | 62% of 108 | 62 | 12 | 6 | 28 |
-| azure | 62% of 108 | 62 | 12 | 7 | 27 |
-| gcp | 62% of 108 | 62 | 12 | 6 | 28 |
-| digitalocean | 50% of 108 | 51 | 7 | 6 | 44 |
-| linode | 52% of 108 | 53 | 8 | 6 | 41 |
-| oci | 53% of 108 | 53 | 9 | 6 | 40 |
-| cloud-docker | 83% of 101 | 83 | 3 | 0 | 15 |
+| docker | 87% of 110 | 95 | 3 | 0 | 12 |
+| hosted | 87% of 110 | 95 | 3 | 0 | 12 |
+| kubernetes | 71% of 102 | 67 | 12 | 1 | 22 |
+| helm | 71% of 102 | 67 | 12 | 1 | 22 |
+| kustomize | 71% of 102 | 67 | 12 | 1 | 22 |
+| vagrant | 81% of 115 | 86 | 15 | 0 | 14 |
+| docker-vm | 77% of 110 | 84 | 3 | 0 | 23 |
+| hybrid | 65% of 135 | 86 | 5 | 7 | 37 |
+| proxmox | 78% of 109 | 85 | 2 | 3 | 19 |
+| aws | 60% of 115 | 62 | 15 | 6 | 32 |
+| azure | 60% of 115 | 62 | 14 | 7 | 32 |
+| gcp | 60% of 115 | 62 | 15 | 6 | 32 |
+| digitalocean | 48% of 115 | 51 | 9 | 6 | 49 |
+| linode | 50% of 115 | 53 | 10 | 6 | 46 |
+| oci | 50% of 115 | 53 | 10 | 6 | 46 |
+| cloud-docker | 76% of 110 | 83 | 3 | 0 | 24 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
 | external | 49% of 74 | 32 | 9 | 14 | 19 |
 
@@ -7471,6 +7480,23 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **linode**: Machine `a`: arm64 on Linode comes later (it has no arm64 plans) (`machines.*.arch`)
 - **oci**: Machine `a`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images) (`machines.*.arch`)
 - **cloud-docker**: Machine `a`: arm64 on a cloud VM comes later (Graviton instances and arm64 images) (`machines.*.arch`)
+- **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, cloud-docker**: Machine `a` runs VMs inside (`nested_virtualization`), which a container can't: it runs as a VM on the VM targets (`machines.*.nested_virtualization`)
+- **azure**: Machine `a`: nested virtualization (`nested_virtualization`) on Azure comes later (AWS, Google Cloud and Oracle Cloud have it) (`machines.*.nested_virtualization`)
+- **digitalocean**: Machine `a`: nested virtualization (`nested_virtualization`) on DigitalOcean comes later (AWS, Google Cloud and Oracle Cloud have it) (`machines.*.nested_virtualization`)
+- **linode**: Machine `a`: nested virtualization (`nested_virtualization`) on Linode comes later (AWS, Google Cloud and Oracle Cloud have it) (`machines.*.nested_virtualization`)
+- **vagrant**: Machine `a` asks for GPUs (`gpus`): Vagrant passes no GPU to a local VM (Proxmox and the cloud targets do) (`machines.*.gpus.count`, `machines.*.gpus.ids`, `machines.*.gpus.driver`, `machines.*.gpus.capabilities`, `machines.*.gpus.options`)
+- **docker-vm, hybrid, cloud-docker**: Machine `a` asks for GPUs (`gpus`): its container runs on a VM Isoloom creates, which has no GPU (the `docker` and `kubernetes` targets give the host's) (`machines.*.gpus.count`, `machines.*.gpus.ids`, `machines.*.gpus.driver`, `machines.*.gpus.capabilities`, `machines.*.gpus.options`)
+- **proxmox**: Machine `a`: Proxmox passes the server's GPUs by name: list them in `gpus.ids` (PCI addresses such as 0000:01:00.0, or resource mappings) (`machines.*.gpus.count`)
+- **oci**: Machine `a`: GPUs on Oracle Cloud come later (its GPU shapes are fixed, not the flexible shape every machine has, and take images built for them) (`machines.*.gpus.count`, `machines.*.gpus.ids`, `machines.*.gpus.driver`)
+- **kubernetes, helm, kustomize**: Machine `a`: `gpus.ids`: Kubernetes' scheduler picks the GPUs; give a `count` instead (`machines.*.gpus.ids`)
+- **aws**: Machine `a`: a AWS VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids` (`machines.*.gpus.ids`)
+- **azure**: Machine `a`: a Azure VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids` (`machines.*.gpus.ids`)
+- **gcp**: Machine `a`: a Google Cloud VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids` (`machines.*.gpus.ids`)
+- **digitalocean**: Machine `a`: a DigitalOcean VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids` (`machines.*.gpus.ids`)
+- **linode**: Machine `a`: a Linode VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids` (`machines.*.gpus.ids`)
+- **kubernetes, helm, kustomize**: Machine `a`: `gpus.options` are Docker's GPU driver options, which Kubernetes has no place for (`machines.*.gpus.options`)
+- **kubernetes, helm, kustomize, docker-vm, hybrid, cloud-docker**: Machine `a` is given host devices (`devices`): only a container on your own Docker host reaches them (the `docker` target), not one in a VM Isoloom creates or a Kubernetes pod (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
+- **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` is given host devices (`devices`): a VM has its own virtual devices, so only a container gets the host's (a GPU reaches a VM through `gpus`) (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
 - **external**: Machine `a` sets its own process (`command`, `working_dir`, `before` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it (`machines.*.command`, `machines.*.working_dir`, `machines.*.before`, `machines.*.healthcheck.test`, `machines.*.healthcheck.http.port`, `machines.*.healthcheck.http.path`, `machines.*.healthcheck.interval`, `machines.*.healthcheck.timeout`, `machines.*.healthcheck.retries`, `machines.*.healthcheck.start_period`)
 - **digitalocean**: DigitalOcean cloud-vm takes single-machine labs so far (it can't pin private addresses) (`machines.*.depends_on`, `volumes.*.owner`, `machines.*.access`)
 - **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`)

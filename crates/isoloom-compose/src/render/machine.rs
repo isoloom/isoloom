@@ -18,6 +18,7 @@ pub(super) fn machine(env: &Environment, name: &str, mp: &MachinePlan, ts: &[tru
     let mut svc = base(env, name, mp, m, ts);
     appliance(env, name, m, &mut svc, &mut out.files);
     readiness(env, mp, m, &mut svc, &mut out.probe_archs);
+    super::hardware::machine(&mp.hardware, &mut svc);
     out.services.insert(name.to_string(), svc);
     if sidecars::needs_routes(env, name) {
         out.services.insert(format!("{name}-routes"), sidecars::routes(env, name, name));
@@ -247,7 +248,10 @@ fn readiness(env: &Environment, mp: &MachinePlan, m: &Machine, svc: &mut Service
     };
     if limits.cpus.is_some() || limits.memory.is_some() {
         svc.deploy = Some(Deploy {
-            resources: Resources { limits },
+            resources: Resources {
+                limits: Some(limits),
+                reservations: None,
+            },
         });
     }
     // What the machine serves, for tools reading the running containers (dashboards, runners):

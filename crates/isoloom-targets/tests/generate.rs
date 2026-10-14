@@ -1180,10 +1180,13 @@ fn vagrant_on_hyperv_takes_windows_and_privileged_machines() {
     assert!(v.contains("IsoloomHyperV.ports(machine, [[80, 8082]])"), "{v}");
     assert!(v.contains("mac = '02:15:") && v.contains("ip = '192.168.57.10'; mask = '255.255.255.0'"), "{v}");
 
-    // A privileged machine runs VMs of its own: nested virtualization.
+    // Nested virtualization comes from `nested_virtualization`, not from `privileged`.
     let (_, hosts) = example("existing-hosts");
     let v = contents(&generate(&hosts, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
-    assert!(define_block(&v, "cache").contains("v.enable_virtualization_extensions = true"));
+    assert!(!define_block(&v, "cache").contains("enable_virtualization_extensions"));
+    let nested = parse("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  hv: { networks: { lab: 10 }, nested_virtualization: true, vm: { os: debian-12, provision: [a.sh] } }\n").unwrap();
+    let v = contents(&generate(&nested, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    assert!(define_block(&v, "hv").contains("v.enable_virtualization_extensions = true"), "{v}");
 }
 
 #[test]

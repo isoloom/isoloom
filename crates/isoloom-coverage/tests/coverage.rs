@@ -80,7 +80,8 @@ machines:
 
 /// Specs for what no example exercises: a VM on the host's LAN, at a fixed address and by DHCP
 /// with the LAN's default route (`public_network`); a Windows 11 machine (the TPM its OS
-/// expects) and a Windows box reached over OpenSSH (`winssh`) that requires a TPM.
+/// expects), a Windows box reached over OpenSSH (`winssh`) that requires a TPM, and a machine
+/// running VMs of its own (every provider's nested virtualization switch).
 const VAGRANT_FIXTURES: &[&str] = &[
     "
 version: 1
@@ -103,6 +104,13 @@ machines:
   srv01:
     networks: { lab: 10 }
     vm: { os: windows-server-2022, provision: [setup.ps1], image: { winssh: true }, tpm: true }
+",
+    "
+version: 1
+name: nested-fixture
+networks: { lab: { cidr: 10.9.0.0/24 } }
+machines:
+  hv: { networks: { lab: 10 }, nested_virtualization: true, vm: { os: debian-12, provision: [setup.sh] } }
 ",
 ];
 

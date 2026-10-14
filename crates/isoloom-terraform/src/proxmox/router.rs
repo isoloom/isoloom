@@ -51,6 +51,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         own_boot: None,
         agent: true,
         nics,
+        pci: Vec::new(),
         dns: None,
         ips: vec![ip_config("dhcp", None)],
         depends_on: vec![reference("proxmox_sdn_applier.env")],

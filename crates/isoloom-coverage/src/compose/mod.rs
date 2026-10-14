@@ -15,7 +15,7 @@ mod top;
 
 use super::{
     Format, Support,
-    Support::{Emitted, Equivalent, InImage, NotPortable, Partial, Planned, Tooling},
+    Support::{Emitted, Equivalent, InImage, NotPortable, Partial, Tooling},
 };
 
 /// Keys listed as one row, without the keys below them: a job and a `pre_start` hook are whole
@@ -58,15 +58,22 @@ const FILE_OWNER: Support = Partial {
     from: "machines.*.files[].uid, gid and mode (a file's `content`)",
     gap: "a project file (`source`) is mounted as it is: an owner or mode for it is refused",
 };
-const GPUS: Support = Planned {
-    note: "GPU passthrough where the target has a GPU, refused where it has none",
+/// A container's GPUs, as the device request Isoloom writes (refused where the containers run
+/// on a VM Isoloom creates, which has no GPU).
+const GPUS: Support = Emitted { from: "machines.*.gpus" };
+const GPUS_KEY: Support = Equivalent {
+    via: "machines.*.gpus, written as `deploy.resources.reservations.devices` (the same request, which every Compose version reads)",
 };
-const DEVICES: Support = Planned {
-    note: "device passthrough where the target has the device, refused where it has none",
+const RESERVED: Support = Partial {
+    from: "machines.*.gpus (its devices)",
+    gap: "cpus and memory: a machine's size is its limit",
 };
 const IPV6: Support = Support::Emitted {
     from: "networks.*.ipv6 (each machine's address from its octet; none with `addresses: auto`)",
 };
+/// The host's devices, in the long form (refused where the containers run on a VM Isoloom
+/// creates, which has none of the host's).
+const DEVICES: Support = Emitted { from: "machines.*.devices" };
 const MODEL_RUNNER: Support = NotPortable {
     why: "served by Docker's model runner: VMs and the cloud have none",
 };

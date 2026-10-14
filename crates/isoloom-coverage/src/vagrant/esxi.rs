@@ -22,6 +22,9 @@ pub(super) fn classify(s: &str) -> Option<Support> {
             from: "the ESXI_* environment variables (the host is the user's)",
         },
         "guest_boot_disk_size" => DISK,
+        "guest_custom_vmx_settings" => Emitted {
+            from: "machines.*.nested_virtualization (`vhv.enable`); no spec field writes raw settings",
+        },
         "guest_storage" => MORE_DISKS,
         "guest_guestos" => Emitted {
             from: "machines.*.vm.os (a Windows VM's guest OS; a Linux box keeps its own)",
@@ -30,14 +33,9 @@ pub(super) fn classify(s: &str) -> Option<Support> {
             via: "guest_guestos, the plugin's newer name for it",
         },
         "guest_mac_address" | "mac_address" => MAC,
-        "guest_nic_type"
-        | "nic_type"
-        | "guest_virtualhw_version"
-        | "virtualhw_version"
-        | "custom_vmx_settings"
-        | "guest_custom_vmx_settings"
-        | "guest_disk_type"
-        | "vm_disk_type" => HOST_TUNING,
+        "guest_nic_type" | "nic_type" | "guest_virtualhw_version" | "virtualhw_version" | "custom_vmx_settings" | "guest_disk_type" | "vm_disk_type" => {
+            HOST_TUNING
+        }
         "encoded_esxi_password" | "esxi_private_keys" | "vm_disk_store" | "esxi_resource_pool" | "resource_pool" | "local_private_keys" => USER_SETUP,
         "clone_from_vm" => LINKED_CLONE,
         s if s.starts_with("supported_") => Tooling {

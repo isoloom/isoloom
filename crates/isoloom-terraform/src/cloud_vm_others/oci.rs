@@ -16,6 +16,7 @@ use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::single_network::{self, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, name_with, shutdown_script};
+use crate::vm::gpus::GpuSizes;
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
@@ -39,6 +40,14 @@ const RULES: Rules = Rules {
     images: "Ubuntu 22.04/24.04",
     tpm: true,
     own: own_image::oci,
+    gpus: GpuSizes {
+        cloud: "Oracle Cloud",
+        gpu: "",
+        sizes: &[],
+        none: "GPUs on Oracle Cloud come later (its GPU shapes are fixed, not the flexible shape every machine has, and take images built for them)",
+    },
+    // The AMD shape exposes its virtualization instructions when asked (`platform_config`).
+    nests: true,
 };
 
 /// The `cloud-vm` module on Oracle Cloud.
@@ -285,7 +294,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
             .add_attribute(("display_name", name_with(&format!("-{name}"))))
             .add_attribute(("shape", string(SHAPE)))
             .add_block(shape)
-            .add_blocks(shielded(mp.tpm.is_some()))
+            .add_blocks(platform(mp))
             .add_block(source)
             .add_block(vnic)
             .add_attribute(("metadata", metadata))
@@ -302,17 +311,25 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
     m.block(linux::provisioner(machine).block());
 }
 
-/// A shielded instance, when the machine has a TPM: its virtual TPM, secure and measured boot
-/// (the platform of the AMD shape; Canonical's images are shielded-instance images).
-fn shielded(tpm: bool) -> Option<Block> {
-    tpm.then(|| {
-        Block::builder("platform_config")
-            .add_attribute(("type", string("AMD_VM")))
+/// The AMD shape's platform, when the machine asks for what it gives: a shielded instance for a
+/// TPM (its virtual TPM, secure and measured boot; Canonical's images are shielded-instance
+/// images), and the virtualization instructions for a machine running VMs of its own.
+fn platform(mp: &isoloom_plan::MachinePlan) -> Option<Block> {
+    let (tpm, nested) = (mp.tpm.is_some(), crate::vm::nested::wanted(mp));
+    if !tpm && !nested {
+        return None;
+    }
+    let mut b = Block::builder("platform_config").add_attribute(("type", string("AMD_VM")));
+    if tpm {
+        b = b
             .add_attribute(("is_secure_boot_enabled", boolean(true)))
             .add_attribute(("is_measured_boot_enabled", boolean(true)))
-            .add_attribute(("is_trusted_platform_module_enabled", boolean(true)))
-            .build()
-    })
+            .add_attribute(("is_trusted_platform_module_enabled", boolean(true)));
+    }
+    if nested {
+        b = b.add_attribute(("are_virtual_instructions_enabled", boolean(true)));
+    }
+    Some(b.build())
 }
 
 /// The first availability domain's name.

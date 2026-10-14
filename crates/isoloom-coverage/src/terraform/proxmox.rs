@@ -1,7 +1,10 @@
 //! Proxmox (bpg/proxmox): its resource types, and the arguments of what the proxmox target and
 //! docker-vm's Proxmox module write.
 
-use super::support::{ALIAS, ARCH, CREDENTIALS, DEVICES, FIREWALL, MTU, ORDER, PRIVATE_DNS, PROTECT, PROXMOX_IPV6, SERVER, SHARED, TC, TPM, VLANS};
+use super::support::{
+    ALIAS, ARCH, CREDENTIALS, FIREWALL, GPU_PASSTHROUGH, MTU, ORDER, PASSTHROUGH_TUNING, PRIVATE_DNS, PROTECT, PROXMOX_IPV6, SERVER, SHARED, TC, TPM, USB,
+    VLANS,
+};
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
 
@@ -171,7 +174,9 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (SERVER, "acpi"),
             (ARCH, "cpu.architecture cpu.flags"),
             (TPM, "tpm_state tpm_state.*"),
-            (DEVICES, "hostpci hostpci.* usb usb.*"),
+            (GPU_PASSTHROUGH, "hostpci hostpci.device hostpci.id hostpci.mapping hostpci.pcie"),
+            (PASSTHROUGH_TUNING, "hostpci.mdev hostpci.rom_file hostpci.rombar hostpci.xvga"),
+            (USB, "usb usb.*"),
             (ORDER, "startup startup.*"),
             (SHARED, "virtiofs virtiofs.*"),
             (PRIVATE_DNS, "initialization.dns.domain"),

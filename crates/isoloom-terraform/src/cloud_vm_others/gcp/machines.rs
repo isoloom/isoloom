@@ -4,14 +4,14 @@
 use std::net::Ipv4Addr;
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, list, null, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, null, number, object, reference, string};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
-use super::{image, machine_type, public_ip, user, vpc_does};
+use super::{GPUS, NESTING, image, machine_type, public_ip, user, vpc_does};
 use crate::vm::cloud::{self, name_with, resource};
 use crate::vm::linux::{self, Hooks};
-use crate::vm::{controller, os, own_image, res};
+use crate::vm::{controller, nested, os, own_image, res};
 
 /// A Linux machine: what may reach it, its instance, its set-up over SSH.
 pub fn linux(env: &Environment, name: &str, m: &mut Module) {
@@ -24,13 +24,16 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         m.blocks(rest.iter().cloned());
     }
     let os = os(mp).unwrap_or_default();
+    let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
     m.block(instance(&Instance {
         env,
         id: &id,
         who: name,
         os,
         own: own_image::of(mp, own_image::gcp),
-        memory: mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
+        machine_type: GPUS.of(mp).or_else(|| nested::size(mp, memory, NESTING)).unwrap_or(machine_type(memory)),
+        gpus: GPUS.of(mp).is_some(),
+        nested: nested::wanted(mp),
         disk: Some(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)),
         on: (net, *address),
         tpm: mp.tpm.is_some(),
@@ -127,7 +130,12 @@ struct Instance<'a> {
     os: &'a str,
     /// Its own image (`vm.image.gcp`), instead of its OS's.
     own: Option<&'a str>,
-    memory: u32,
+    /// Its machine type.
+    machine_type: &'a str,
+    /// Whether the machine type carries GPUs (which can't move to another host live).
+    gpus: bool,
+    /// Whether it runs VMs of its own.
+    nested: bool,
     /// Its boot disk in GB (the image's size when `None`).
     disk: Option<u32>,
     /// Its network and address there.
@@ -151,7 +159,22 @@ fn instance(i: &Instance) -> Block {
         .add_block(Block::builder("access_config").build())
         .build();
     let key = isoloom_render::hcl_builder::Template::text(format!("{user}:")).with_expr(reference("var.ssh_public_key"));
-    let mut b = resource("google_compute_instance", i.id);
+    let b = resource("google_compute_instance", i.id)
+        .add_attribute(("project", reference("local.project")))
+        .add_attribute(("name", name_with(&format!("-{}", i.who))))
+        .add_attribute(("machine_type", string(i.machine_type)))
+        .add_attribute(("zone", reference("local.zone")))
+        .add_attribute(("tags", list([name_with(&format!("-{}", i.who))])))
+        .add_block(Block::builder("boot_disk").add_block(params.build()).build())
+        .add_block(nic)
+        .add_attribute(("metadata", object([("ssh-keys", key.into_expression())])))
+        .add_attribute(("metadata_startup_script", cloud::auto_stop(cloud::shutdown_script(), null())))
+        .add_attribute(("labels", cloud::tags(i.env)));
+    hardware(b, i).build()
+}
+
+/// The instance's shielded VM, nested virtualization and GPU scheduling, as it asks for them.
+fn hardware(mut b: BlockBuilder, i: &Instance) -> BlockBuilder {
     if i.tpm {
         // Google's public images are all shielded-VM images: a vTPM and secure boot.
         b = b.add_block(
@@ -161,17 +184,15 @@ fn instance(i: &Instance) -> Block {
                 .build(),
         );
     }
-    b.add_attribute(("project", reference("local.project")))
-        .add_attribute(("name", name_with(&format!("-{}", i.who))))
-        .add_attribute(("machine_type", string(machine_type(i.memory))))
-        .add_attribute(("zone", reference("local.zone")))
-        .add_attribute(("tags", list([name_with(&format!("-{}", i.who))])))
-        .add_block(Block::builder("boot_disk").add_block(params.build()).build())
-        .add_block(nic)
-        .add_attribute(("metadata", object([("ssh-keys", key.into_expression())])))
-        .add_attribute(("metadata_startup_script", cloud::auto_stop(cloud::shutdown_script(), null())))
-        .add_attribute(("labels", cloud::tags(i.env)))
-        .build()
+    if i.nested {
+        let features = Block::builder("advanced_machine_features").add_attribute(("enable_nested_virtualization", isoloom_render::hcl_builder::boolean(true)));
+        b = b.add_block(features.build());
+    }
+    if i.gpus {
+        // A GPU stays with its host: maintenance stops the VM instead of moving it.
+        b = b.add_block(Block::builder("scheduling").add_attribute(("on_host_maintenance", string("TERMINATE"))).build());
+    }
+    b
 }
 
 /// The controller: what may reach it (its network, SSH from `allowed_cidr`), its instance at the
@@ -194,7 +215,9 @@ pub fn controller(env: &Environment, m: &mut Module) {
         who: "controller",
         os: controller::OS,
         own: None,
-        memory,
+        machine_type: machine_type(memory),
+        gpus: false,
+        nested: false,
         disk,
         on: (net, address),
         tpm: false,

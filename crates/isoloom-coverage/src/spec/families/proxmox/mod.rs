@@ -2,6 +2,7 @@
 //! doesn't list is one every output treats alike ([`super::shared`]).
 
 mod environment;
+mod hardware;
 mod machines;
 
 use crate::spec::status::Status;
@@ -16,4 +17,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::process::VM,
     super::own_image::PROXMOX_IMAGES,
     super::own_image::PROXMOX_BOOT,
+    hardware::CELLS,
 ];
