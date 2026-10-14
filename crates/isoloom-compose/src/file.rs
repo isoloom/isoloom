@@ -19,6 +19,9 @@ pub struct ComposeFile {
     /// Its secrets, each read from a variable of Compose's own environment.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
     pub secrets: IndexMap<String, Secret>,
+    /// The machines' files, each a config its service mounts.
+    #[serde(skip_serializing_if = "IndexMap::is_empty")]
+    pub configs: IndexMap<String, Config>,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference.
@@ -107,6 +110,9 @@ pub struct Service {
     /// The secrets it gets, as files.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub secrets: Vec<ServiceSecret>,
+    /// The configs placed in the container, each at its path.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub configs: Vec<ConfigMount>,
     /// How Docker decides the container is healthy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<Healthcheck>,
@@ -345,4 +351,34 @@ pub struct Labelled {
     /// The volume's labels (Isoloom's own, to find what it created).
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
     pub labels: IndexMap<String, String>,
+}
+
+/// A config: a file of the project (`file`, mounted as it is) or text (`content`, copied in with
+/// the owner and mode its mount gives).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Config {
+    /// A file, from the Compose file's folder.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// The text (`$` written `$$`: no interpolation).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+}
+
+/// Where a service has a config, its owner and its mode.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct ConfigMount {
+    /// The config.
+    pub source: String,
+    /// The path in the container.
+    pub target: String,
+    /// The owner's user id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
+    /// The owner's group id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gid: Option<String>,
+    /// The mode, in octal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
 }

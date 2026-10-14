@@ -48,6 +48,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Project => Some(format!(
             "mkdir -p {PROJECT_DIR} && tar -xzf {PROJECT_ARCHIVE} -C {PROJECT_DIR} --strip-components=1 && rm -f {PROJECT_ARCHIVE}\n"
         )),
+        Step::Files { files } => Some(crate::machine_files::linux(files)),
         Step::Inputs { persist } => (*persist).then(|| format!("mkdir -p /var/lib/isoloom && install -m 600 {INPUTS_FILE} {KEPT_INPUTS_FILE}\n")),
         Step::WaitFor { machine: dep, ports } => Some(format!("{}\n", router::wait_for(dep, ports, WAIT_TIMEOUT))),
         Step::Run { kind: RunKind::PowerShell, .. } => None,
@@ -88,6 +89,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             "$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n{}",
             crate::UNTAR_PS1
         )),
+        Step::Files { files } => Some(crate::machine_files::windows(files)),
         Step::Run {
             path,
             kind: RunKind::PowerShell,

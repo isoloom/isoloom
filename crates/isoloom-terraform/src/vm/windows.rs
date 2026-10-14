@@ -119,9 +119,9 @@ fn rename(w: &Machine, connection: &Connection) -> [Block; 2] {
     [rename.block(), pause]
 }
 
-/// Whether it runs steps of its own (it gets the project then).
+/// Whether its steps read the project (it gets the project then).
 fn has_runs(w: &Machine) -> bool {
-    w.env.machines[w.name].lifecycle.iter().any(|s| matches!(s, Step::Run { .. }))
+    isoloom_plan::machine_files::reads_project(&w.env.machines[w.name].lifecycle)
 }
 
 /// The set-up script: its name checked, published ports forwarded, its services' ports opened,

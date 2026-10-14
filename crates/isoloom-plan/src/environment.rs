@@ -12,7 +12,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
 use isoloom_spec::images;
-use isoloom_spec::model::{Arch, Constraints, External, Machine, Protocol, Spec, Target, Tc, Ulimit, Winrm};
+use isoloom_spec::model::{Arch, Constraints, External, Machine, MachineFile, Protocol, Spec, Target, Tc, Ulimit, Winrm};
 use isoloom_spec::validate::docker_cidrs;
 
 use crate::addressing::{address, address_for, host_address, start_order};
@@ -122,6 +122,8 @@ pub struct MachinePlan {
     pub ports: Vec<PublishedPort>,
     /// Its volumes, in spec order.
     pub volumes: Vec<Volume>,
+    /// The files placed on it, in spec order.
+    pub files: Vec<MachineFile>,
     /// The settings a container gets from its runtime and a VM from its set-up.
     pub settings: Settings,
     /// The inputs it reads (environment variables given at run time).
@@ -293,6 +295,7 @@ impl Environment {
         let mut requirements = requirements::of(spec);
         requirements.extend(outside::requirements(original));
         requirements.extend(requirements::mixed_shapes(spec, |n| machines.get(n).map(|m| m.shape)));
+        requirements.extend(crate::machine_files::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
         Environment {
             name: spec.name.clone(),
             target,
@@ -401,6 +404,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         offline: routing::offline(spec, name, m),
         ports: published(m),
         volumes: volumes(spec, name, m),
+        files: m.files.clone(),
         settings: Settings {
             environment: m.environment.clone(),
             sysctls: m.sysctls.clone(),

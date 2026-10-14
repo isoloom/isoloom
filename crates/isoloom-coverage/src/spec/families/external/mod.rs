@@ -7,4 +7,10 @@ mod machines;
 use crate::spec::status::Status;
 
 /// The external output's cells, section by section.
-pub const PARTS: &[&[(&str, Status)]] = &[environment::CELLS, machines::CELLS, super::ipv6::EXTERNAL, super::outside::EXTERNAL];
+pub const PARTS: &[&[(&str, Status)]] = &[
+    environment::CELLS,
+    machines::CELLS,
+    super::ipv6::EXTERNAL,
+    super::outside::EXTERNAL,
+    super::machine_files::EXTERNAL,
+];

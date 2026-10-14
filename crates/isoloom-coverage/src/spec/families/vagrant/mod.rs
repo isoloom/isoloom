@@ -7,4 +7,10 @@ mod machines;
 use crate::spec::status::Status;
 
 /// The Vagrant output's cells, section by section.
-pub const PARTS: &[&[(&str, Status)]] = &[environment::CELLS, machines::CELLS, super::ipv6::VAGRANT, super::outside::VAGRANT];
+pub const PARTS: &[&[(&str, Status)]] = &[
+    environment::CELLS,
+    machines::CELLS,
+    super::ipv6::VAGRANT,
+    super::outside::VAGRANT,
+    super::machine_files::VM,
+];

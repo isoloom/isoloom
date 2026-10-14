@@ -109,6 +109,7 @@ fn label(step: &Step) -> String {
         Step::Volumes { .. } => "volumes".into(),
         Step::SharedVolume { volume, .. } => format!("volume {volume}"),
         Step::Project => "project".into(),
+        Step::Files { .. } => "files".into(),
         Step::Inputs { .. } => "inputs".into(),
         Step::WaitFor { machine, .. } => format!("wait for {machine}"),
         Step::Run { path, .. } => path.clone(),

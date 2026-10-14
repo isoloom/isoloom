@@ -43,6 +43,7 @@
 pub mod chart;
 mod checks;
 mod dns;
+mod files;
 mod ipv6;
 pub mod kustomize;
 mod machine;
@@ -68,13 +69,20 @@ pub const CHART: &str = "chart";
 pub const CHART_PROJECT_FILES: &str = "files/project";
 
 /// What Kubernetes can render: IPv6 networks of every kind (the cluster picks pod addresses,
-/// so a network's IPv6 side sets the Services' IP families) and secrets (a Secret `isoloom run`
-/// creates). No controller (no `provision:`, no Ansible checks), `exec` checks run inside a
+/// so a network's IPv6 side sets the Services' IP families), secrets (a Secret `isoloom run`
+/// creates) and a project file with its own owner and mode (copied into place by an init
+/// container). No controller (no `provision:`, no Ansible checks), `exec` checks run inside a
 /// container, no network appliances, Service names have no dots, no gateway machine routes a
 /// network, containers have no ulimits, with no router in the path there is nothing to impair
 /// links with, and a Secret volume's files belong to root.
 pub fn capabilities() -> Capabilities {
-    Capabilities::of([Feature::Ipv6, Feature::Ipv6Only, Feature::Ipv6Auto, Feature::Secrets])
+    Capabilities::of([
+        Feature::Ipv6,
+        Feature::Ipv6Only,
+        Feature::Ipv6Auto,
+        Feature::Secrets,
+        Feature::OwnedProjectFiles,
+    ])
 }
 
 /// The `kubernetes` target's backend.

@@ -7,4 +7,10 @@ mod machines;
 use crate::spec::status::Status;
 
 /// The Proxmox output's cells, section by section.
-pub const PARTS: &[&[(&str, Status)]] = &[environment::CELLS, machines::CELLS, super::ipv6::PROXMOX, super::outside::PROXMOX];
+pub const PARTS: &[&[(&str, Status)]] = &[
+    environment::CELLS,
+    machines::CELLS,
+    super::ipv6::PROXMOX,
+    super::outside::PROXMOX,
+    super::machine_files::VM,
+];

@@ -5,7 +5,7 @@
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-use isoloom_spec::model::{Machine, Spec, is_reboot};
+use isoloom_spec::model::{Machine, MachineFile, Spec, is_reboot};
 
 use crate::addressing::address_for;
 use crate::environment::Route;
@@ -62,6 +62,12 @@ pub enum Step {
     },
     /// The project copied to `/opt/isoloom`.
     Project,
+    /// The machine's `files`, each placed at its path with its owner and mode (a `source` read
+    /// from the unpacked project).
+    Files {
+        /// The files, in spec order.
+        files: Vec<MachineFile>,
+    },
     /// The inputs made available to the steps.
     Inputs {
         /// Kept on disk (a reboot comes and `/tmp` is emptied at boot).
@@ -144,6 +150,7 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
     if !own.is_empty() {
         steps.push(Step::Volumes { paths: own });
     }
+    steps.extend(crate::machine_files::step(m));
     steps.extend(m.depends_on.iter().filter_map(|dep| {
         let ports = spec.machines[dep].ready_ports();
         (!ports.is_empty()).then(|| Step::WaitFor { machine: dep.clone(), ports })

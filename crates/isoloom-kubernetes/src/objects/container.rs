@@ -168,7 +168,7 @@ pub struct VolumeMount {
     /// Whether it can't write to it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub read_only: bool,
-    /// One file of the volume alone, mounted at the path (a secret's key).
+    /// The one file or folder of the volume it sees there, instead of the whole volume.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_path: Option<String>,
 }

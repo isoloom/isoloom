@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Dns, DockerImpl, External, MachineSecret, Ulimit, VmImpl};
+use super::{Dns, DockerImpl, External, MachineFile, MachineSecret, Ulimit, VmImpl};
 
 /// A machine's CPU architecture. Every target has one: a container platform, a box
 /// architecture, a cloud instance family. Defaults to x86-64.
@@ -121,6 +121,10 @@ pub struct Machine {
     /// its claim from the image while it is empty), so init jobs can add to them.
     #[serde(default)]
     pub volumes: IndexMap<String, String>,
+    /// Files placed at a path on the machine (a configuration the image doesn't carry), from
+    /// the project or written inline, with their owner and mode: on every target.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<MachineFile>,
     /// The machine the user lands on. It may have no implementation: the runner supplies it.
     #[serde(default)]
     pub access: bool,

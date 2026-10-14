@@ -170,6 +170,14 @@ impl Manifest {
         }
     }
 
+    /// Text files for pods (a machine's `files` written in the spec).
+    pub fn text_config_map(name: &str, data: IndexMap<String, Text>) -> Manifest {
+        Manifest {
+            data,
+            ..Manifest::new("v1", "ConfigMap", name, None)
+        }
+    }
+
     /// Secret values, base64-encoded.
     pub fn secret(name: &str, data: IndexMap<String, Text>) -> Manifest {
         Manifest {
