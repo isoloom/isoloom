@@ -1,9 +1,9 @@
-//! The registry of backends, one per generated target. Compose renders the plan; the targets
+//! The registry of backends, one per generated target. Compose and external render the plan; the targets
 //! not migrated yet go through [`LegacyBackend`], which runs today's generator on the spec the
 //! plan was built from, with the text post-passes it still needs, so their output is unchanged.
 
 use isoloom_compose::ComposeBackend;
-use isoloom_external::external;
+use isoloom_external::ExternalBackend;
 use isoloom_kubernetes::kubernetes;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::backend::{Backend, Files, RenderError};
@@ -96,7 +96,7 @@ static HYBRID: LegacyBackend = legacy(Target::Hybrid, hybrid::generate);
 static VAGRANT: LegacyBackend = legacy(Target::Vagrant, vagrant::generate);
 static PROXMOX: LegacyBackend = legacy(Target::Proxmox, proxmox::generate);
 static CLOUD_VM: LegacyBackend = legacy(Target::CloudVm, cloud_vm::generate);
-static EXTERNAL: LegacyBackend = legacy(Target::External, external::generate);
+static EXTERNAL: ExternalBackend = ExternalBackend;
 static CLOUD_SERVICES: LegacyBackend = legacy(Target::CloudServices, cloud_services::generate);
 
 /// Every backend, in the order targets are listed.

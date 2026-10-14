@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### One Ansible inventory, and the external target on the plan
+- One inventory renderer (`isoloom_render::inventory`) from the plan, with each target's way of reaching its hosts as an `Access` (Vagrant, Proxmox, a cloud, external). The external target and Proxmox use it; Vagrant and the clouds switch as they move onto the plan. Proxmox's controller inventory now has the spec's `groups:` (it only had the `provision:` steps' groups), so a playbook can target `pair` in ansible-pair there too.
+- The external target renders from the plan (`ExternalBackend`): the same inventory, `machines.json` and check runners as before, byte for byte, and its refusals come from its capabilities.
+- A machine with `external:` is planned as what it is (a VM, a container) on every target but `external`; it was planned as an existing host everywhere.
+- Breaking (library): `isoloom_external::generate` is replaced by `isoloom_external::render(&Environment)` and `ExternalBackend`. `MachinePlan` gains `os`, `winrm`, `external` and `host_vars`, `Environment` gains `inventory_groups`.
+
 ### Quality gates
 - Workspace lints (clippy pedantic with a short allow-list, no `unsafe`, no `unwrap`, `panic`, `dbg!` or `todo!`, at most 5 parameters), `clippy.toml` shape limits, and new CI jobs: per-crate line coverage floors (cargo-llvm-cov), API docs without warnings, unused dependencies (cargo-machete), `cargo deny check` (advisories, licenses, bans, sources), spelling (typos) and determinism (every example rendered twice). Lints not passing yet are listed in ARCHITECTURE.md, to deny by the end of Wave 2.
 - Property tests for IPv4 blocks and the shell, HCL, Ruby and PowerShell quoting; snapshot tests of every example's normalized spec. Ruby strings now escape `#$` and `#@` (interpolations) as well as `#{`; PowerShell strings double the typographic single quotes, which PowerShell also reads as quotes. One `rb` helper in isoloom-render replaces the Vagrant crate's three copies.

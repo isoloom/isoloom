@@ -712,39 +712,10 @@ fn controller(spec: &Spec, tf: &mut String, nets: &[&String]) {
 }
 
 /// The controller's inventory: every machine at its first address, as the `isoloom` user with
-/// the controller's key (cloud-init made that user on each VM); then the spec's groups.
+/// the controller's key (cloud-init made that user on each VM), and the inventory groups.
 fn inventory(spec: &Spec) -> String {
-    let (mut linux, mut windows) = (String::new(), String::new());
-    for (name, m) in &spec.machines {
-        let Some(vm) = &m.vm else { continue };
-        let Some((net, octet)) = m.networks.first() else { continue };
-        if images::is_windows(&vm.os) {
-            let _ = writeln!(windows, "{name} ansible_host={}{}", address(spec, net, *octet), super::host_vars(spec, name));
-        } else {
-            let _ = writeln!(
-                linux,
-                "{name} ansible_host={} ansible_user=isoloom{}",
-                address(spec, net, *octet),
-                super::host_vars(spec, name)
-            );
-        }
-    }
-    let mut inv = format!("[linux]\n{linux}\n[windows]\n{windows}\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n");
-    let mut groups: indexmap::IndexMap<&str, Vec<&str>> = indexmap::IndexMap::new();
-    for step in &spec.provision {
-        for (g, members) in &step.groups {
-            let e = groups.entry(g.as_str()).or_default();
-            for mbr in members {
-                if !e.contains(&mbr.as_str()) {
-                    e.push(mbr);
-                }
-            }
-        }
-    }
-    for (g, members) in groups {
-        let _ = write!(inv, "\n[{g}]\n{}\n", members.join("\n"));
-    }
-    inv
+    let env = isoloom_plan::Environment::build(spec, Target::Proxmox, None);
+    isoloom_render::inventory::render(&env, &isoloom_render::inventory::Access::proxmox())
 }
 
 /// A Terraform resource name from a machine, network or OS name.

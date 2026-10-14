@@ -26,7 +26,7 @@ isoloom.yml -> spec -> plan -> render -> backends -> .isoloom/<target>/...
    the router, VLAN trunks, image constraints and `.isoloomignore`. `backend` defines the
    `Backend` trait: a target, its capabilities, and `render(&Environment)`.
 4. **Backends** (`isoloom-compose`, `-kubernetes`, `-vagrant`, `-terraform`, `-external`):
-   each turns the plan (Compose, through typed structs in `file`) or, until it migrates, the
+   each turns the plan (Compose, through typed structs in `file`; external) or, until it migrates, the
    spec into its target's files. Every generator is a pure function of the
    spec: no file system access, so `isoloom check` can regenerate in memory and compare with
    what is committed.
@@ -42,7 +42,18 @@ requirements), a `MachineLifecycle` made of `Step`s with one Linux and one Windo
 each, and a `Backend` trait (`capabilities()` plus `render(&Environment)`). Refusal then becomes
 "requirements minus capabilities" instead of each generator deciding on its own. Until every
 backend moves to the plan (Wave 2), `LegacyBackend` keeps the other generators running
-unchanged; Compose is the first on the plan.
+unchanged; Compose and external are on the plan.
+
+### The Ansible inventory
+
+Every target that runs playbooks writes the same inventory, rendered once by
+`isoloom_render::inventory::render(env, &access)` from the plan: the hosts (VMs at their first
+address; on `external`, the existing hosts at their `external` address), the `linux` and
+`windows` groups, each host's `host_vars` (typed as Python literals), `ansible_become` on Linux,
+then the inventory groups (`Environment::inventory_groups`: the `provision:` steps' `groups:`,
+then the spec's `groups:`, members limited to the hosts). What differs per target is how a host
+is reached, an `Access`: `Access::vagrant()`, `Access::proxmox()`, `Access::cloud(user_of_os,
+windows_password)`, `Access::external()`. A backend never writes inventory lines itself.
 
 ## Crate map
 
@@ -50,7 +61,7 @@ unchanged; Compose is the first on the plan.
 |---|---|
 | `isoloom-spec` | The model, parsing and loading, the JSON schema, normalization (groups, clones, VLANs, profiles, instances, defaults, the image table), validation, shell quoting |
 | `isoloom-plan` | The target-neutral plan: `Environment`, addressing, routing, images, the lifecycle steps, checks, requirements and refusal |
-| `isoloom-render` | The `Backend` trait and shared rendering pieces: addresses, header, Ansible runs, HCL, Ruby and PowerShell quoting, step scripts, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
+| `isoloom-render` | The `Backend` trait and shared rendering pieces: addresses, header, Ansible runs, the Ansible inventory, HCL, Ruby and PowerShell quoting, step scripts, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
 | `isoloom-compose` | The Docker Compose backend (`docker`, `hosted`, and the Compose file Docker-on-a-VM targets carry), with the network appliances |
 | `isoloom-kubernetes` | The Kubernetes backend: manifests, Kustomize, the Helm chart |
 | `isoloom-vagrant` | The Vagrant backends: `vagrant` (every provider), `docker-vm`, `hybrid` |
