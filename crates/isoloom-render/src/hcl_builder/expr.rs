@@ -55,13 +55,19 @@ pub fn list(items: impl IntoIterator<Item = Expression>) -> Expression {
     Expression::Array(items.into_iter().collect())
 }
 
+/// Words a bare object key can't be: HCL reads them as a `for` expression or a literal.
+const KEYWORDS: [&str; 6] = ["for", "if", "in", "null", "true", "false"];
+
 /// An object, in the order given. A key that is an identifier is written bare, any other quoted.
 pub fn object<K: AsRef<str>>(items: impl IntoIterator<Item = (K, Expression)>) -> Expression {
     let object: Object<ObjectKey, Expression> = items
         .into_iter()
         .map(|(k, v)| {
             let k = k.as_ref();
-            let key = Identifier::new(k).map_or_else(|_| ObjectKey::Expression(string(k)), ObjectKey::Identifier);
+            let key = match Identifier::new(k) {
+                Ok(i) if !KEYWORDS.contains(&k) => ObjectKey::Identifier(i),
+                _ => ObjectKey::Expression(string(k)),
+            };
             (key, v)
         })
         .collect();

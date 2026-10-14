@@ -284,6 +284,12 @@ mod tests {
     }
 
     #[test]
+    fn a_key_that_is_a_keyword_is_quoted() {
+        let b = Block::builder("x").add_attribute(("m", object([("for", number(1)), ("web", number(2))]))).build();
+        assert_eq!(rendered(b), "x {\n  m = { \"for\" = 1, web = 2 }\n}\n");
+    }
+
+    #[test]
     fn comments_and_blank_lines_between_blocks() {
         let mut m = Module::new("# head\n");
         m.commented("one\ntwo", Block::builder("a").build());

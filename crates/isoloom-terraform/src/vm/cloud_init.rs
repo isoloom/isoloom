@@ -105,7 +105,10 @@ pub fn machine(env: &Environment, machine: &str, config: &mut CloudConfig) {
     let mp = &env.machines[machine];
     config.bootcmd.extend(prelude(env));
     if !mp.inputs.is_empty() {
-        config.files.push(file(steps::INPUTS_FILE, Some("0600"), module::inputs_file(&mp.inputs)));
+        // Written outside /tmp (emptied at boot, maybe after cloud-init writes its files), then
+        // put where the steps read it once the boot is done.
+        config.files.push(file(steps::KEPT_INPUTS_FILE, Some("0600"), module::inputs_file(&mp.inputs)));
+        config.runcmd.push(format!("install -m 600 {} {}", steps::KEPT_INPUTS_FILE, steps::INPUTS_FILE));
     }
     let mut parts: Vec<Vec<String>> = vec![Vec::new()];
     let mut again: Vec<String> = Vec::new();

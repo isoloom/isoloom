@@ -265,15 +265,16 @@ resource "proxmox_virtual_environment_file" "database" {
       packages = ["nftables", "curl", "netcat-openbsd"]
       write_files = concat(local.project_files, [
         {
-          path        = "/tmp/isoloom-inputs.env"
+          path        = "/var/lib/isoloom/inputs.env"
           permissions = "0600"
           content = join("\n", [
-            "API_URL=${jsonencode(lookup(var.inputs, "API_URL", ""))}",
-            "LAUNCH_TOKEN=${jsonencode(lookup(var.inputs, "LAUNCH_TOKEN", ""))}"
+            "API_URL='${replace(lookup(var.inputs, "API_URL", ""), "'", "'\\''")}'",
+            "LAUNCH_TOKEN='${replace(lookup(var.inputs, "LAUNCH_TOKEN", ""), "'", "'\\''")}'"
           ])
         }
       ])
       runcmd = [
+        "install -m 600 /var/lib/isoloom/inputs.env /tmp/isoloom-inputs.env",
         "sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' >> /etc/hosts'",
         "sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
         "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"

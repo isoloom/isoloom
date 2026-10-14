@@ -185,8 +185,8 @@ resource "terraform_data" "database" {
   }
   provisioner "file" {
     content = join("\n", [
-      "API_URL=${jsonencode(lookup(var.inputs, "API_URL", ""))}",
-      "LAUNCH_TOKEN=${jsonencode(lookup(var.inputs, "LAUNCH_TOKEN", ""))}"
+      "API_URL='${replace(lookup(var.inputs, "API_URL", ""), "'", "'\\''")}'",
+      "LAUNCH_TOKEN='${replace(lookup(var.inputs, "LAUNCH_TOKEN", ""), "'", "'\\''")}'"
     ])
     destination = "/tmp/isoloom-inputs.env"
   }

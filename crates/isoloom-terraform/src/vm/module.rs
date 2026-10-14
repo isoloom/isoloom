@@ -88,12 +88,15 @@ pub fn inputs_variable() -> Block {
     v.block()
 }
 
-/// A machine's inputs file (`KEY=value` lines, each value quoted for `sh`'s `.`), from
-/// `var.inputs`.
+/// A machine's inputs file (`KEY='value'` lines, read with `sh`'s `.`), from `var.inputs`.
+/// Each value is single-quoted (its quotes written `'\''`), so `sh` takes it as it is: no `$`,
+/// backtick or `$(...)` expands.
 pub fn inputs_file(inputs: &[String]) -> Expression {
     let lines = inputs.iter().map(|i| {
-        Template::text(format!("{i}="))
-            .with_expr(call("jsonencode", [call("lookup", [reference("var.inputs"), string(i.as_str()), string("")])]))
+        let value = call("lookup", [reference("var.inputs"), string(i.as_str()), string("")]);
+        Template::text(format!("{i}='"))
+            .with_expr(call("replace", [value, string("'"), string("'\\''")]))
+            .with_text("'")
             .into_expression()
     });
     call("join", [string("\n"), list(lines)])
