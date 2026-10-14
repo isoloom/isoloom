@@ -46,6 +46,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         )),
         Step::Inputs { persist } => (*persist).then(|| format!("mkdir -p /var/lib/isoloom && install -m 600 {INPUTS_FILE} {KEPT_INPUTS_FILE}\n")),
         Step::WaitFor { machine: dep, ports } => Some(format!("{}\n", router::wait_for(dep, ports, WAIT_TIMEOUT))),
+        Step::Run { kind: RunKind::PowerShell, .. } => None,
         Step::Run { path, kind } => Some(run(env, machine, path, *kind)),
         Step::Reboot => Some(reboot()),
         Step::Egress => Some(egress(env)),
@@ -73,10 +74,21 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::Routes { routes, .. } if !routes.is_empty() => Some(
             routes
                 .iter()
-                .map(|r| format!("route -p add {} {} {}", network_of(&r.cidr), mask_of(&r.cidr), r.via))
+                .map(|r| format!("route -p add {} MASK {} {}", network_of(&r.cidr), mask_of(&r.cidr), r.via))
                 .collect::<Vec<_>>()
                 .join("; "),
         ),
+        Step::Project => Some(format!(
+            "$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n{}",
+            crate::UNTAR_PS1
+        )),
+        Step::Run {
+            path,
+            kind: RunKind::PowerShell,
+        } => Some(format!(
+            "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
+            ps(path)
+        )),
         Step::Ready => Some("New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready".into()),
         _ => None,
     }
@@ -172,6 +184,8 @@ fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> String {
         _ => String::new(),
     };
     match kind {
+        // A Windows script: rendered by `windows` only.
+        RunKind::PowerShell => String::new(),
         RunKind::Shell => format!("cd {PROJECT_DIR} && sh -c {}\n", quote(&format!("{inputs}sh {path}"))),
         RunKind::Playbook => format!(
             "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)\n\

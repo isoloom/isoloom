@@ -106,6 +106,8 @@ pub enum RunKind {
     Shell,
     /// An Ansible playbook, run locally.
     Playbook,
+    /// A PowerShell script (a Windows machine's).
+    PowerShell,
 }
 
 /// The set-up steps of VM `name`.
@@ -200,7 +202,13 @@ fn runs(m: &Machine) -> Vec<Step> {
         if is_reboot(s) {
             Step::Reboot
         } else {
-            let kind = if s.ends_with(".sh") { RunKind::Shell } else { RunKind::Playbook };
+            let kind = if s.ends_with(".sh") {
+                RunKind::Shell
+            } else if s.ends_with(".ps1") {
+                RunKind::PowerShell
+            } else {
+                RunKind::Playbook
+            };
             Step::Run { path: s.clone(), kind }
         }
     }));
