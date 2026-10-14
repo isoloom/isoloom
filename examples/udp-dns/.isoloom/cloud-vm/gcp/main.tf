@@ -97,10 +97,10 @@ locals {
   zone    = "${var.region}-a"
 }
 
-# The environment's networks: one VPC, a subnetwork per network with its exact range.
-resource "google_compute_network" "env" {
+# The environment's networks: a VPC network each, holding a subnetwork with its exact range.
+resource "google_compute_network" "servers" {
   project                 = local.project
-  name                    = local.name
+  name                    = "${local.name}-servers"
   auto_create_subnetworks = false
   mtu                     = 1500
 }
@@ -108,24 +108,48 @@ resource "google_compute_network" "env" {
 resource "google_compute_subnetwork" "servers" {
   project       = local.project
   name          = "${local.name}-servers"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.servers.id
   ip_cidr_range = "10.66.10.0/24"
   region        = var.region
+}
+
+resource "google_compute_network" "users" {
+  project                 = local.project
+  name                    = "${local.name}-users"
+  auto_create_subnetworks = false
+  mtu                     = 1500
 }
 
 resource "google_compute_subnetwork" "users" {
   project       = local.project
   name          = "${local.name}-users"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.users.id
   ip_cidr_range = "10.66.20.0/24"
   region        = var.region
 }
 
+resource "google_compute_network_peering" "servers_users" {
+  name                 = "${local.name}-servers-users"
+  network              = google_compute_network.servers.self_link
+  peer_network         = google_compute_network.users.self_link
+  export_custom_routes = true
+  import_custom_routes = true
+}
+
+resource "google_compute_network_peering" "users_servers" {
+  name                 = "${local.name}-users-servers"
+  network              = google_compute_network.users.self_link
+  peer_network         = google_compute_network.servers.self_link
+  export_custom_routes = true
+  import_custom_routes = true
+  depends_on           = [google_compute_network_peering.servers_users]
+}
+
 # Machine `dns`: what may reach it.
-resource "google_compute_firewall" "dns_net" {
+resource "google_compute_firewall" "dns_net_servers" {
   project       = local.project
-  name          = "${local.name}-dns-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-dns-net-servers"
+  network       = google_compute_network.servers.id
   direction     = "INGRESS"
   source_ranges = ["10.66.10.0/24"]
   target_tags   = ["${local.name}-dns"]
@@ -137,7 +161,7 @@ resource "google_compute_firewall" "dns_net" {
 resource "google_compute_firewall" "dns_ssh" {
   project       = local.project
   name          = "${local.name}-dns-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.servers.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-dns"]
@@ -150,7 +174,7 @@ resource "google_compute_firewall" "dns_ssh" {
 resource "google_compute_firewall" "dns_reach_users" {
   project       = local.project
   name          = "${local.name}-dns-reach-users"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.servers.id
   direction     = "INGRESS"
   source_ranges = ["10.66.20.0/24"]
   target_tags   = ["${local.name}-dns"]
@@ -167,7 +191,7 @@ resource "google_compute_firewall" "dns_reach_users" {
 resource "google_compute_firewall" "dns_published" {
   project       = local.project
   name          = "${local.name}-dns-published"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.servers.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-dns"]
@@ -236,10 +260,10 @@ resource "terraform_data" "dns" {
 }
 
 # Machine `client`: what may reach it.
-resource "google_compute_firewall" "client_net" {
+resource "google_compute_firewall" "client_net_users" {
   project       = local.project
-  name          = "${local.name}-client-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-client-net-users"
+  network       = google_compute_network.users.id
   direction     = "INGRESS"
   source_ranges = ["10.66.20.0/24"]
   target_tags   = ["${local.name}-client"]
@@ -251,7 +275,7 @@ resource "google_compute_firewall" "client_net" {
 resource "google_compute_firewall" "client_ssh" {
   project       = local.project
   name          = "${local.name}-client-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.users.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-client"]

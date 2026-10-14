@@ -1,19 +1,23 @@
 //! Google Cloud: `.isoloom/cloud-vm/gcp/main.tf`, rendered from the plan through the VM core.
 //!
 //! - A project of its own (created and billed when none is given, deleted with the environment),
-//!   one VPC network holding every network as a subnetwork with its exact range; firewall rules
-//!   matching each machine by its tag do what the AWS security groups do.
+//!   a VPC network per network holding a subnetwork with its exact range, peered or routed
+//!   through a machine (`network`); firewall rules matching each machine by its tag do what the
+//!   AWS security groups do.
 //! - Each machine is a `google_compute_instance` at its address with a public address, set up
 //!   over SSH through the core's `remote-exec` transport. The SSH user comes from the
-//!   `ssh-keys` metadata (created at first boot): the image's usual user, as on AWS.
+//!   `ssh-keys` metadata (created at first boot): the image's usual user, as on AWS. A machine
+//!   on several networks has an interface in each VPC (up to 8, as many as its vCPUs, two at least), IP
+//!   forwarding on so replies leave from the right one.
+//! - A network a machine routes (`gateway:`): the machine takes the highest free address there,
+//!   since Google Cloud keeps both the first address (the gateway's) and the second to last (the
+//!   router's).
 //!
-//! What Google Cloud can't do the AWS way yet, so its refusal declines it:
-//! - Several interfaces: each must be on a VPC network of its own, which one VPC can't give. So
-//!   a machine on more than one network (and, with more than one network, the controller, which
-//!   is on them all) comes later.
-//! - Windows: its first-boot set-up and WinRM differ enough that it comes later.
+//! What Google Cloud can't do the AWS way yet, so its refusal declines it: Windows, whose
+//! first-boot set-up and WinRM differ enough that it comes later.
 
 mod machines;
+mod network;
 
 use isoloom_plan::{Capabilities, Environment, Step};
 use isoloom_render::backend::{Backend, Files, RenderError};
@@ -24,12 +28,12 @@ use isoloom_render::{GeneratedFile, OUTPUT_DIR, gcp_project_name, header};
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
-use crate::vm::cloud::{self, Reach, name_with, resource};
+use crate::vm::cloud::{self, Reach, resource};
 use crate::vm::gpus::{self, GpuSizes};
 use crate::vm::limits::Limits;
 use crate::vm::module::{Provider, Variable, project_lists, terraform};
 use crate::vm::versions;
-use crate::vm::{controller, res, vms};
+use crate::vm::{controller, gateways, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
 const SUB: &str = "gcp";
@@ -37,11 +41,8 @@ const SUB: &str = "gcp";
 /// What Google Cloud can't host yet.
 pub const LIMITS: Limits = Limits {
     arm64: Some("arm64 on Google Cloud comes later (Arm-based machine types and arm64 images)"),
-    // A route can't be as specific as a subnetwork's, so within one VPC nothing goes through a
-    // machine; a VPC per network comes with multi-NIC machines.
-    gateways: Some(
-        "a Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network",
-    ),
+    // A VPC per network: a route in one VPC to another's range goes through a machine.
+    gateways: None,
     playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none"),
     ipv6: Some("Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept"),
@@ -129,42 +130,91 @@ pub fn refusal(env: &Environment) -> Option<String> {
         if isoloom_spec::images::is_windows(&vm.os) {
             return Some(format!("machine `{name}`: Windows on GCP comes later"));
         }
-        if m.networks.len() > 1 {
-            return Some(format!(
-                "machine `{name}`: GCP multi-NIC comes later (each interface needs its own VPC network)"
-            ));
+        if let Some(why) = interfaces_refusal(env, name) {
+            return Some(why);
         }
         if image(&vm.os).is_none() && crate::vm::own_image::of_machine(m, crate::vm::own_image::gcp).is_none() {
             return Some(format!("machine `{name}`: no GCP image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04)", vm.os));
         }
-        if let Some((net, _)) = m.networks.iter().find(|(_, o)| **o == 1) {
+        // A gateway machine's gateway address moves to a free one (`vm::gateways`).
+        if let Some((net, _)) = m.networks.iter().find(|(n, o)| **o == 1 && !gateways::is_gateway_address(env, name, n)) {
             return Some(format!(
                 "machine `{name}`: Google Cloud keeps a subnetwork's first address (.1, its gateway) on `{net}`"
             ));
         }
     }
-    // The controller sits on every network; with more than one it is itself multi-NIC.
-    (controller::needed(env) && env.networks.len() > 1).then(|| "the Ansible controller spans several networks: GCP multi-NIC comes later".to_string())
+    if let Some((net, _)) = gateways::routed(env).into_iter().find(|(n, _)| relocate(env, n).is_none()) {
+        return Some(format!(
+            "network `{net}`: no address left for its gateway machine (Google Cloud keeps the router's)"
+        ));
+    }
+    // The controller sits on every network, an interface on each.
+    (controller::needed(env) && env.networks.len() > MAX_NICS).then(|| {
+        format!(
+            "the Ansible controller spans {} networks: a Google Cloud VM takes {MAX_NICS} interfaces at most",
+            env.networks.len()
+        )
+    })
+}
+
+/// The most interfaces a Google Cloud VM takes (one per VPC network).
+const MAX_NICS: usize = 8;
+
+/// Why machine `name`'s networks can't each be an interface, if they can't: more than 8, or more
+/// than its machine type's vCPUs allow (two at least).
+fn interfaces_refusal(env: &Environment, name: &str) -> Option<String> {
+    let mp = env.machines.get(name)?;
+    let nics = mp.addresses.len();
+    if nics > MAX_NICS {
+        return Some(format!(
+            "machine `{name}` is on {nics} networks: a Google Cloud VM takes {MAX_NICS} interfaces at most"
+        ));
+    }
+    let t = machines::machine_type_of(mp);
+    (vcpus(t) < nics).then(|| {
+        format!(
+            "machine `{name}` is on {nics} networks: a {t} takes {} interfaces at most (one per vCPU)",
+            vcpus(t)
+        )
+    })
+}
+
+/// The vCPUs of a machine type (`e2-standard-4`: 4), as many interfaces as it takes; the shared
+/// core types take two.
+fn vcpus(t: &str) -> usize {
+    t.rsplit('-').next().and_then(|n| n.parse().ok()).unwrap_or(2).max(2)
+}
+
+/// A machine type with room for `nics` interfaces: the E2 standard type with enough vCPUs when
+/// the memory's own has too few (a GPU or nested type keeps its own; the refusal checks it).
+fn for_nics(t: &'static str, nics: usize) -> &'static str {
+    match t {
+        _ if vcpus(t) >= nics || !t.starts_with("e2-") => t,
+        _ if nics <= 4 => "e2-standard-4",
+        _ => "e2-standard-8",
+    }
+}
+
+/// Where a gateway machine goes on the network it routes: the highest address nothing else takes.
+fn relocate(env: &Environment, net: &str) -> Option<std::net::Ipv4Addr> {
+    gateways::free_address(env, net, Cidr::parse(&env.networks.get(net)?.cidr)?)
 }
 
 /// The MTUs a Google Cloud VPC takes.
 const MTUS: std::ops::RangeInclusive<u16> = 1300..=8896;
 
-/// The VPC's MTU: the one the networks set (one VPC holds them all, so they share it), else
-/// Ethernet's 1500, as on every other target (Google's default is 1460).
-fn mtu(env: &Environment) -> u16 {
-    env.networks.values().find_map(|n| n.mtu).unwrap_or(1500)
+/// A network's VPC's MTU: the one it sets, else Ethernet's 1500, as on every other target
+/// (Google's default is 1460).
+fn mtu(n: &isoloom_plan::NetworkPlan) -> u16 {
+    n.mtu.unwrap_or(1500)
 }
 
-/// Why the networks' MTUs can't be the VPC's, if they can't.
+/// Why a network's MTU can't be its VPC's, if it can't.
 fn mtu_refusal(env: &Environment) -> Option<String> {
-    let mut set = env.networks.iter().filter_map(|(name, n)| n.mtu.map(|m| (name, m)));
-    let (first, value) = set.next()?;
-    if !MTUS.contains(&value) {
-        return Some(format!("network `{first}`'s `mtu` ({value}): a Google Cloud VPC takes 1300 to 8896"));
-    }
-    set.find(|(_, m)| *m != value)
-        .map(|(other, m)| format!("networks `{first}` ({value}) and `{other}` ({m}) set different MTUs: on Google Cloud they share one VPC, so one MTU"))
+    env.networks
+        .iter()
+        .find_map(|(name, n)| n.mtu.filter(|m| !MTUS.contains(m)).map(|m| (name, m)))
+        .map(|(name, m)| format!("network `{name}`'s `mtu` ({m}): a Google Cloud VPC takes 1300 to 8896"))
 }
 
 /// The steps the VPC does itself: it routes between subnetworks.
@@ -174,6 +224,7 @@ fn vpc_does(step: &Step) -> bool {
 
 /// The module.
 pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
+    let env = &*gateways::relocated_with(env, &|e, n, _| relocate(e, n));
     let mut m = Module::new(format!("{}{USAGE}", header("#")));
     m.block(terraform(&providers(env)));
     m.blocks(variables(env));
@@ -184,7 +235,7 @@ pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_bu
             .build(),
     );
     project(env, &mut m);
-    network(env, &mut m);
+    network::blocks(env, &mut m);
     crate::vm::private_dns::gcp(env, own_project(), &mut m);
     if controller::needed(env) {
         m.commented("The controller's own key: it runs the playbooks over SSH on every machine.", controller::key());
@@ -279,28 +330,4 @@ fn project(env: &Environment, m: &mut Module) {
     );
     let zone = Template::new().with_expr(reference("var.region")).with_text("-a").into_expression();
     m.blocks(cloud::id_and_locals(env, vec![("project", project), ("zone", zone)]));
-}
-
-/// The networks: one VPC, a subnetwork per network with its exact range.
-fn network(env: &Environment, m: &mut Module) {
-    m.commented(
-        "The environment's networks: one VPC, a subnetwork per network with its exact range.",
-        resource("google_compute_network", "env")
-            .add_attribute(("project", reference("local.project")))
-            .add_attribute(("name", reference("local.name")))
-            .add_attribute(("auto_create_subnetworks", boolean(false)))
-            .add_attribute(("mtu", number(u64::from(mtu(env)))))
-            .build(),
-    );
-    for (net, p) in &env.networks {
-        m.block(
-            resource("google_compute_subnetwork", &res(net))
-                .add_attribute(("project", reference("local.project")))
-                .add_attribute(("name", name_with(&format!("-{net}"))))
-                .add_attribute(("network", reference("google_compute_network.env.id")))
-                .add_attribute(("ip_cidr_range", string(p.cidr.as_str())))
-                .add_attribute(("region", reference("var.region")))
-                .build(),
-        );
-    }
 }

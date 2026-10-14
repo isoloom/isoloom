@@ -213,8 +213,10 @@ const PROXMOX_FIXTURES: &[&str] = &[
 
 /// Whole environments with what no example needs, on the clouds (not run on a real host): a
 /// machine on two dual-stack networks, the first leaving its IPv6 addresses to the cloud (Oracle
-/// Cloud's secondary VNIC at its derived address on an IPv6 subnet).
+/// Cloud's secondary VNIC at its derived address on an IPv6 subnet), and the private zone on a
+/// dual-stack network (Azure's AAAA records).
 const CLOUD_FIXTURES: &[&str] = &[
+    "version: 1\nname: names6\ndns: { private: true }\nnetworks:\n  lan: { cidr: 10.30.0.0/24, ipv6: { cidr: 'fd00:30::/64' } }\nmachines:\n  web: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh] } }\n",
     "version: 1\nname: v6\nnetworks:\n  a: { cidr: 10.30.0.0/24, ipv6: { cidr: 'fd00:30::/64', addresses: auto } }\n  b: { cidr: 10.31.0.0/24, ipv6: { cidr: 'fd00:31::/64' } }\nmachines:\n  web: { networks: { a: 10, b: 10 }, vm: { os: debian-12, provision: [s.sh] } }\n",
 ];
 

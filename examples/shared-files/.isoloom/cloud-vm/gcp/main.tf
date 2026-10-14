@@ -97,10 +97,10 @@ locals {
   zone    = "${var.region}-a"
 }
 
-# The environment's networks: one VPC, a subnetwork per network with its exact range.
-resource "google_compute_network" "env" {
+# The environment's networks: a VPC network each, holding a subnetwork with its exact range.
+resource "google_compute_network" "app" {
   project                 = local.project
-  name                    = local.name
+  name                    = "${local.name}-app"
   auto_create_subnetworks = false
   mtu                     = 1500
 }
@@ -108,16 +108,16 @@ resource "google_compute_network" "env" {
 resource "google_compute_subnetwork" "app" {
   project       = local.project
   name          = "${local.name}-app"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.app.id
   ip_cidr_range = "10.84.0.0/24"
   region        = var.region
 }
 
 # Machine `writer`: what may reach it.
-resource "google_compute_firewall" "writer_net" {
+resource "google_compute_firewall" "writer_net_app" {
   project       = local.project
-  name          = "${local.name}-writer-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-writer-net-app"
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = ["10.84.0.0/24"]
   target_tags   = ["${local.name}-writer"]
@@ -129,7 +129,7 @@ resource "google_compute_firewall" "writer_net" {
 resource "google_compute_firewall" "writer_ssh" {
   project       = local.project
   name          = "${local.name}-writer-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-writer"]
@@ -209,10 +209,10 @@ resource "terraform_data" "writer" {
 }
 
 # Machine `reader`: what may reach it.
-resource "google_compute_firewall" "reader_net" {
+resource "google_compute_firewall" "reader_net_app" {
   project       = local.project
-  name          = "${local.name}-reader-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-reader-net-app"
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = ["10.84.0.0/24"]
   target_tags   = ["${local.name}-reader"]
@@ -224,7 +224,7 @@ resource "google_compute_firewall" "reader_net" {
 resource "google_compute_firewall" "reader_ssh" {
   project       = local.project
   name          = "${local.name}-reader-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-reader"]

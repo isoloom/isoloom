@@ -97,10 +97,10 @@ locals {
   zone    = "${var.region}-a"
 }
 
-# The environment's networks: one VPC, a subnetwork per network with its exact range.
-resource "google_compute_network" "env" {
+# The environment's networks: a VPC network each, holding a subnetwork with its exact range.
+resource "google_compute_network" "app" {
   project                 = local.project
-  name                    = local.name
+  name                    = "${local.name}-app"
   auto_create_subnetworks = false
   mtu                     = 1500
 }
@@ -108,16 +108,16 @@ resource "google_compute_network" "env" {
 resource "google_compute_subnetwork" "app" {
   project       = local.project
   name          = "${local.name}-app"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.app.id
   ip_cidr_range = "10.60.0.0/24"
   region        = var.region
 }
 
 # Machine `cache`: what may reach it.
-resource "google_compute_firewall" "cache_net" {
+resource "google_compute_firewall" "cache_net_app" {
   project       = local.project
-  name          = "${local.name}-cache-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-cache-net-app"
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = ["10.60.0.0/24"]
   target_tags   = ["${local.name}-cache"]
@@ -129,7 +129,7 @@ resource "google_compute_firewall" "cache_net" {
 resource "google_compute_firewall" "cache_ssh" {
   project       = local.project
   name          = "${local.name}-cache-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-cache"]
@@ -197,10 +197,10 @@ resource "terraform_data" "cache" {
 }
 
 # Machine `web`: what may reach it.
-resource "google_compute_firewall" "web_net" {
+resource "google_compute_firewall" "web_net_app" {
   project       = local.project
-  name          = "${local.name}-web-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-web-net-app"
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = ["10.60.0.0/24"]
   target_tags   = ["${local.name}-web"]
@@ -212,7 +212,7 @@ resource "google_compute_firewall" "web_net" {
 resource "google_compute_firewall" "web_ssh" {
   project       = local.project
   name          = "${local.name}-web-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-web"]
@@ -225,7 +225,7 @@ resource "google_compute_firewall" "web_ssh" {
 resource "google_compute_firewall" "web_published" {
   project       = local.project
   name          = "${local.name}-web-published"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.app.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-web"]

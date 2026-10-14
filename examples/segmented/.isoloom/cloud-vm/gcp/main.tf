@@ -97,10 +97,10 @@ locals {
   zone    = "${var.region}-a"
 }
 
-# The environment's networks: one VPC, a subnetwork per network with its exact range.
-resource "google_compute_network" "env" {
+# The environment's networks: a VPC network each, holding a subnetwork with its exact range.
+resource "google_compute_network" "front" {
   project                 = local.project
-  name                    = local.name
+  name                    = "${local.name}-front"
   auto_create_subnetworks = false
   mtu                     = 1500
 }
@@ -108,32 +108,99 @@ resource "google_compute_network" "env" {
 resource "google_compute_subnetwork" "front" {
   project       = local.project
   name          = "${local.name}-front"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.front.id
   ip_cidr_range = "10.61.10.0/24"
   region        = var.region
+}
+
+resource "google_compute_network" "back" {
+  project                 = local.project
+  name                    = "${local.name}-back"
+  auto_create_subnetworks = false
+  mtu                     = 1500
 }
 
 resource "google_compute_subnetwork" "back" {
   project       = local.project
   name          = "${local.name}-back"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.back.id
   ip_cidr_range = "10.61.20.0/24"
   region        = var.region
+}
+
+resource "google_compute_network" "access" {
+  project                 = local.project
+  name                    = "${local.name}-access"
+  auto_create_subnetworks = false
+  mtu                     = 1500
 }
 
 resource "google_compute_subnetwork" "access" {
   project       = local.project
   name          = "${local.name}-access"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.access.id
   ip_cidr_range = "10.61.99.0/24"
   region        = var.region
 }
 
+resource "google_compute_network_peering" "front_back" {
+  name                 = "${local.name}-front-back"
+  network              = google_compute_network.front.self_link
+  peer_network         = google_compute_network.back.self_link
+  export_custom_routes = true
+  import_custom_routes = true
+}
+
+resource "google_compute_network_peering" "back_front" {
+  name                 = "${local.name}-back-front"
+  network              = google_compute_network.back.self_link
+  peer_network         = google_compute_network.front.self_link
+  export_custom_routes = true
+  import_custom_routes = true
+  depends_on           = [google_compute_network_peering.front_back]
+}
+
+resource "google_compute_network_peering" "front_access" {
+  name                 = "${local.name}-front-access"
+  network              = google_compute_network.front.self_link
+  peer_network         = google_compute_network.access.self_link
+  export_custom_routes = true
+  import_custom_routes = true
+  depends_on           = [google_compute_network_peering.back_front]
+}
+
+resource "google_compute_network_peering" "access_front" {
+  name                 = "${local.name}-access-front"
+  network              = google_compute_network.access.self_link
+  peer_network         = google_compute_network.front.self_link
+  export_custom_routes = true
+  import_custom_routes = true
+  depends_on           = [google_compute_network_peering.front_access]
+}
+
+resource "google_compute_network_peering" "back_access" {
+  name                 = "${local.name}-back-access"
+  network              = google_compute_network.back.self_link
+  peer_network         = google_compute_network.access.self_link
+  export_custom_routes = true
+  import_custom_routes = true
+  depends_on           = [google_compute_network_peering.access_front]
+}
+
+resource "google_compute_network_peering" "access_back" {
+  name                 = "${local.name}-access-back"
+  network              = google_compute_network.access.self_link
+  peer_network         = google_compute_network.back.self_link
+  export_custom_routes = true
+  import_custom_routes = true
+  depends_on           = [google_compute_network_peering.back_access]
+}
+
 # Machine `cache`: what may reach it.
-resource "google_compute_firewall" "cache_net" {
+resource "google_compute_firewall" "cache_net_back" {
   project       = local.project
-  name          = "${local.name}-cache-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-cache-net-back"
+  network       = google_compute_network.back.id
   direction     = "INGRESS"
   source_ranges = ["10.61.20.0/24"]
   target_tags   = ["${local.name}-cache"]
@@ -145,7 +212,7 @@ resource "google_compute_firewall" "cache_net" {
 resource "google_compute_firewall" "cache_ssh" {
   project       = local.project
   name          = "${local.name}-cache-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.back.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-cache"]
@@ -158,7 +225,7 @@ resource "google_compute_firewall" "cache_ssh" {
 resource "google_compute_firewall" "cache_reach_front" {
   project       = local.project
   name          = "${local.name}-cache-reach-front"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.back.id
   direction     = "INGRESS"
   source_ranges = ["10.61.10.0/24"]
   target_tags   = ["${local.name}-cache"]
@@ -231,10 +298,10 @@ resource "terraform_data" "cache" {
 }
 
 # Machine `web`: what may reach it.
-resource "google_compute_firewall" "web_net" {
+resource "google_compute_firewall" "web_net_front" {
   project       = local.project
-  name          = "${local.name}-web-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-web-net-front"
+  network       = google_compute_network.front.id
   direction     = "INGRESS"
   source_ranges = ["10.61.10.0/24"]
   target_tags   = ["${local.name}-web"]
@@ -246,7 +313,7 @@ resource "google_compute_firewall" "web_net" {
 resource "google_compute_firewall" "web_ssh" {
   project       = local.project
   name          = "${local.name}-web-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.front.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-web"]
@@ -259,7 +326,7 @@ resource "google_compute_firewall" "web_ssh" {
 resource "google_compute_firewall" "web_reach_access" {
   project       = local.project
   name          = "${local.name}-web-reach-access"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.front.id
   direction     = "INGRESS"
   source_ranges = ["10.61.99.0/24"]
   target_tags   = ["${local.name}-web"]
@@ -326,10 +393,10 @@ resource "terraform_data" "web" {
 }
 
 # Machine `user`: what may reach it.
-resource "google_compute_firewall" "user_net" {
+resource "google_compute_firewall" "user_net_access" {
   project       = local.project
-  name          = "${local.name}-user-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-user-net-access"
+  network       = google_compute_network.access.id
   direction     = "INGRESS"
   source_ranges = ["10.61.99.0/24"]
   target_tags   = ["${local.name}-user"]
@@ -341,7 +408,7 @@ resource "google_compute_firewall" "user_net" {
 resource "google_compute_firewall" "user_ssh" {
   project       = local.project
   name          = "${local.name}-user-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.access.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-user"]

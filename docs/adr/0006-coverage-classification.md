@@ -99,6 +99,17 @@ managed service; they are Planned. Azure `azurerm_windows_virtual_machine`, Goog
 `google_project` and `google_project_service`, and Linode `linode_vpc` and `linode_vpc_subnet`
 are written and now checked against every module that writes them.
 
+## Re-decided rows (Azure and Google Cloud networking)
+
+| Row | Was | Now | Why |
+| --- | --- | --- | --- |
+| Google `scheduling`, `scheduling.on_host_maintenance` | Partial | Written | Its uses are covered: `TERMINATE` for a GPU machine, Google's default `MIGRATE` for the rest. The gap named the other scheduling options, which are rows of their own and classified on their own. |
+| Google `scheduling.preemptible`, `provisioning_model`, `instance_termination_action`, `termination_time`, `availability_domain`, `min_node_cpus`, `node_affinities` | Not portable | Tooling | Spot and preemptible billing, and placement on sole-tenant nodes: placement and billing of VMs, as `PLACEMENT` says elsewhere. No spec field asks for them, and a spot VM stopped by the cloud is not a lab behavior. |
+| Google `scheduling.automatic_restart`, `host_error_timeout_seconds`, `on_instance_stop_action`, `local_ssd_recovery_timeout`, `max_run_duration` | Not portable | Not portable | The cloud's own recovery and lifetime policies: no other VM target restarts a VM after its host fails or ends it after a set time (Isoloom's own auto-stop is a Terraform variable, not a spec field). |
+| Google `google_compute_network_peering` | Not portable | Written | Peering is how one VPC network per network joins the networks no machine routes, as one VPC did. It stays a cloud network service for any other use; Isoloom writes it for its own networks. |
+| Google `google_compute_route`, `can_ip_forward` | Planned | Written | With a VPC network per network, a route in one to another's range goes through a machine. Google refuses a route as specific as a subnetwork of its own VPC, which is why one VPC couldn't. |
+| Azure `azurerm_route_table` `route`, `route.*` | (new) | Equivalent | The same routes as `azurerm_route` resources of their own. |
+
 ## Re-decided rows (Windows guests)
 
 | Row | Was | Now | Why |

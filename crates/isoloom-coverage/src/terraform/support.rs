@@ -2,7 +2,7 @@
 //! decided by the questions of docs/adr/0006-coverage-classification.md. A family is a reviewed
 //! decision; a resource or argument no family names stays unclassified and fails the tests.
 
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
 
 /// A resource type, data source, argument or block Isoloom writes.
 pub const WRITTEN: Support = Emitted {
@@ -46,14 +46,6 @@ pub const SDN_DNS: Support = Equivalent {
 /// A Proxmox LXC container's names.
 pub const ROUTER_DNS: Support = Equivalent {
     via: "dns.private: the router's dnsmasq, a container's resolver, answers every name and alias under the zone's domain too",
-};
-/// Reverse names.
-pub const REVERSE_DNS: Support = Planned {
-    note: "reverse names: PTR records in a reverse zone per network, beside the private zone (`dns.private`)",
-};
-/// IPv6 names in the private zone.
-pub const PRIVATE_DNS_IPV6: Support = Planned {
-    note: "AAAA records in the private zone, with IPv6 networks on cloud-vm",
 };
 /// What a written private zone resource can also do, with no change for the environment.
 pub const ZONE_SETTINGS: Support = Tooling {
@@ -194,11 +186,6 @@ pub const USB: Support = NotPortable {
 pub const ACCELERATORS: Support = Equivalent {
     via: "machines.*.gpus.count, as a G2 machine type (its L4 GPUs attached)",
 };
-/// What a GPU instance needs: maintenance stops it instead of moving it.
-pub const GPU_SCHEDULING: Support = Partial {
-    from: "machines.*.gpus.count (`on_host_maintenance = TERMINATE`)",
-    gap: "the other scheduling options: the cloud's own",
-};
 /// TPM and secure boot.
 pub const TPM: Support = Planned {
     note: "with Windows 11's TPM and secure boot",
@@ -214,10 +201,6 @@ pub const CPUS: Support = Equivalent {
 /// NAT for private networks: every cloud machine has its own public address.
 pub const NAT: Support = Equivalent {
     via: "each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out",
-};
-/// Routes through a machine.
-pub const ROUTER: Support = Planned {
-    note: "with `networks.*.gateway`: a network routed through one of its machines",
 };
 /// VLAN tags on a cloud VM's interface.
 pub const CLOUD_VLANS: Support = NotPortable {

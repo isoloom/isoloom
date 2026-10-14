@@ -97,10 +97,10 @@ locals {
   zone    = "${var.region}-a"
 }
 
-# The environment's networks: one VPC, a subnetwork per network with its exact range.
-resource "google_compute_network" "env" {
+# The environment's networks: a VPC network each, holding a subnetwork with its exact range.
+resource "google_compute_network" "office" {
   project                 = local.project
-  name                    = local.name
+  name                    = "${local.name}-office"
   auto_create_subnetworks = false
   mtu                     = 1500
 }
@@ -108,7 +108,7 @@ resource "google_compute_network" "env" {
 resource "google_compute_subnetwork" "office" {
   project       = local.project
   name          = "${local.name}-office"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.office.id
   ip_cidr_range = "10.84.0.0/24"
   region        = var.region
 }
@@ -120,7 +120,7 @@ resource "google_project_service" "dns" {
   disable_on_destroy = false
 }
 
-# The environment's names, served by Cloud DNS inside the VPC network (`dns.private`).
+# The environment's names, served by Cloud DNS inside the VPC networks (`dns.private`).
 resource "google_dns_managed_zone" "private" {
   project    = local.project
   name       = "${local.name}-private"
@@ -128,7 +128,7 @@ resource "google_dns_managed_zone" "private" {
   visibility = "private"
   private_visibility_config {
     networks {
-      network_url = google_compute_network.env.id
+      network_url = google_compute_network.office.id
     }
   }
   depends_on = [google_project_service.dns]
@@ -162,10 +162,10 @@ resource "google_dns_record_set" "client_corp_internal" {
 }
 
 # Machine `web`: what may reach it.
-resource "google_compute_firewall" "web_net" {
+resource "google_compute_firewall" "web_net_office" {
   project       = local.project
-  name          = "${local.name}-web-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-web-net-office"
+  network       = google_compute_network.office.id
   direction     = "INGRESS"
   source_ranges = ["10.84.0.0/24"]
   target_tags   = ["${local.name}-web"]
@@ -177,7 +177,7 @@ resource "google_compute_firewall" "web_net" {
 resource "google_compute_firewall" "web_ssh" {
   project       = local.project
   name          = "${local.name}-web-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.office.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-web"]
@@ -243,10 +243,10 @@ resource "terraform_data" "web" {
 }
 
 # Machine `client`: what may reach it.
-resource "google_compute_firewall" "client_net" {
+resource "google_compute_firewall" "client_net_office" {
   project       = local.project
-  name          = "${local.name}-client-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-client-net-office"
+  network       = google_compute_network.office.id
   direction     = "INGRESS"
   source_ranges = ["10.84.0.0/24"]
   target_tags   = ["${local.name}-client"]
@@ -258,7 +258,7 @@ resource "google_compute_firewall" "client_net" {
 resource "google_compute_firewall" "client_ssh" {
   project       = local.project
   name          = "${local.name}-client-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.office.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-client"]

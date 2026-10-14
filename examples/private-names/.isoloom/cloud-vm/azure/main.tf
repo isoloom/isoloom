@@ -134,6 +134,36 @@ resource "azurerm_private_dns_a_record" "client_corp_internal" {
   tags                = local.tags
 }
 
+# The reverse names of 0.84.10.in-addr.arpa: each machine's name at its address.
+resource "azurerm_private_dns_zone" "reverse_0_84_10" {
+  name                = "0.84.10.in-addr.arpa"
+  resource_group_name = azurerm_resource_group.env.name
+  tags                = local.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "reverse_0_84_10" {
+  name                = local.name
+  private_dns_zone_id = azurerm_private_dns_zone.reverse_0_84_10.id
+  virtual_network_id  = azurerm_virtual_network.env.id
+  tags                = local.tags
+}
+
+resource "azurerm_private_dns_ptr_record" "web_corp_internal" {
+  name                = "10"
+  private_dns_zone_id = azurerm_private_dns_zone.reverse_0_84_10.id
+  ttl                 = 60
+  records             = ["web.corp.internal"]
+  tags                = local.tags
+}
+
+resource "azurerm_private_dns_ptr_record" "client_corp_internal" {
+  name                = "20"
+  private_dns_zone_id = azurerm_private_dns_zone.reverse_0_84_10.id
+  ttl                 = 60
+  records             = ["client.corp.internal"]
+  tags                = local.tags
+}
+
 # Machine `web`: what may reach it.
 resource "azurerm_network_security_group" "web" {
   name                = "${local.name}-web"

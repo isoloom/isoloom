@@ -10,7 +10,7 @@ use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
 use super::{USER, image, machine_size, public_ip as address_of, size, vnet_does};
 use crate::vm::cloud::{self, name_with};
 use crate::vm::linux::{self, Hooks};
-use crate::vm::{controller, os, own_image, res, windows};
+use crate::vm::{controller, gateways, os, own_image, res, windows};
 
 /// A Linux machine: its security group, public IP, interfaces and VM, its set-up over SSH.
 pub fn linux(env: &Environment, name: &str, m: &mut Module) {
@@ -35,7 +35,10 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
     ));
     m.blocks(crate::vm::disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
     let hooks = Hooks {
-        at_boot: cloud::interfaces(env, &mp.addresses, &|n| mac(&nic_id(&id, n))),
+        at_boot: cloud::interfaces(env, &mp.addresses, &|n| mac(&nic_id(&id, n)))
+            .into_iter()
+            .chain(gateways::at_boot(mp))
+            .collect(),
         after_reboot: vec![cloud::reschedule_auto_stop()],
         before_egress: cloud::redirects(mp),
         skip: vnet_does,
@@ -58,19 +61,19 @@ fn mac(nic: &str) -> Expression {
 }
 
 /// An interface per network (the first carries the public IP; forwarding on for a machine on
-/// several), each with its association to the machine's security group.
+/// several, and for a gateway), each with its association to the machine's security group.
 fn nics(id: &str, who: &str, mp: &MachinePlan) -> Vec<Block> {
-    controller_nics(id, who, &mp.addresses, &mp.addresses6)
+    controller_nics(id, who, (&mp.addresses, &mp.addresses6), mp.is_gateway)
 }
 
 /// The same from the addresses themselves (each IPv6 one beside its network's IPv4 one).
 fn controller_nics(
     id: &str,
     who: &str,
-    addresses: &indexmap::IndexMap<String, std::net::Ipv4Addr>,
-    addresses6: &indexmap::IndexMap<String, std::net::Ipv6Addr>,
+    (addresses, addresses6): (&indexmap::IndexMap<String, std::net::Ipv4Addr>, &indexmap::IndexMap<String, std::net::Ipv6Addr>),
+    gateway: bool,
 ) -> Vec<Block> {
-    let forwarding = addresses.len() > 1;
+    let forwarding = gateway || addresses.len() > 1;
     addresses
         .iter()
         .enumerate()
@@ -275,7 +278,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
         .iter()
         .map(|(n, p)| (n.clone(), Cidr::parse(&p.cidr).map_or(std::net::Ipv4Addr::UNSPECIFIED, Cidr::controller)))
         .collect();
-    m.blocks(controller_nics(id, "controller", &addresses, &indexmap::IndexMap::new()));
+    m.blocks(controller_nics(id, "controller", (&addresses, &indexmap::IndexMap::new()), false));
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, memory, disk) = controller::size(env);
     let disk = disk.unwrap_or(30).max(30);
