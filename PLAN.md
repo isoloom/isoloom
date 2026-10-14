@@ -73,7 +73,7 @@ Isoloom exists for the Cyber CTF launcher. Its three modes must work in 1.0, on 
 | IaC tools in 1.0 | The current families: Compose, Kubernetes/Helm/Kustomize, Vagrant (every provider), Terraform/OpenTofu for Proxmox, ESXi and the six clouds. Pulumi and Podman: not yet. |
 | Secrets | A conversion layer per tool: the spec names secrets and where they come from, and each output gets that tool's native mechanism. Values never land in a generated file. On clouds that means the cloud's own store: AWS Secrets Manager or SSM, Azure Key Vault, Google Secret Manager, OCI Vault. Where a cloud has none (DigitalOcean, Linode), a documented fallback is used. |
 | Terraform provider | Only the provider plugin is dropped for 1.0 (recommended; the maintainer had no preference). Terraform output (Proxmox, the clouds, cloud-docker, cloud-services) is core to 1.0. In a converter, Terraform users point a `module` at the generated folder or use the published registry modules. Revisit later as an Isothrum provider that runs labs. |
-| Isothrum licence | GPL-3.0, like GNS3. Isoloom stays Apache-2.0, which GPL-3.0 code may use. |
+| Licences (everything open source) | **Isoloom:** Apache-2.0, already published, for the widest adoption as the converter. **Isothrum** (runner, desktop app, editor): GPL-3.0, like GNS3. **Isothrum website**, if opened: AGPL-3.0, so hosted modified copies must be shared too. **Cyber CTF launcher:** GPL-3.0, matching the runner it links. The GPL and AGPL repositories take contributions under a CLA, so the copyright holder can still dual-license commercially. Isoloom only needs a DCO sign-off. The CTF lab content and courses are a separate decision. |
 | Compatibility | Fresh start: no aliases or deprecations carried into 1.0 (`services:`, old OS names, `qemu_refusal`...). Old specs move with a one-time `isoloom migrate`. |
 | Workflow | Local development on `main`. No PRs, no CI (all workflows disabled), no releases. The checks run locally. At the first satisfying version: squash the history, re-enable CI, tag 1.0.0. |
 | Docs | Written at the end, inside the repo. The website is rewritten from them. |
@@ -154,7 +154,8 @@ Make the codebase smaller before building on it.
    - A machine has an `os` (family@version), plus either `service:` (one or a list, from the catalogue) or `app:` (a custom image or build recipe), plus the shared fields: networks and addresses, ports, files, secrets, volumes and disks, resources, command, healthcheck, hardware and DNS.
    - A per-target `overrides:` block holds rare platform specifics, such as a Vagrant box or an instance type.
 2. **`isoloom-catalogue`.**
-   - The data format: `entry.yml`, `contract.yml`, roles and the vendored official Galaxy content.
+   - The data format: `entry.yml`, `contract.yml` and roles.
+   - Official Galaxy collections are GPL-3.0, so Apache-2.0 Isoloom only **references** them (a pinned `requirements.yml` with checksums) and never embeds them in its binary. The GPL-3.0 Isothrum runner fetches or bundles them. Isoloom's own roles stay Apache-2.0.
    - The loader, validator and resolution.
    - Salvage from the stopped `v1/catalogue-engine` branch: format, loader, and the start of the nginx entry.
 3. **The configuration resource model** in the plan. Catalogue entries are written in it, not as raw roles. The plan's current set-up steps (raw shell and PowerShell) move onto it.
@@ -274,11 +275,7 @@ Then the security review of secrets handling and of every place that writes cred
 
 0. **Real infrastructure for the launcher's server and cloud modes:** a Proxmox and/or ESXi host, and budget-capped cloud accounts (which clouds first?), so those modes are proven before 1.0 rather than only validated.
 
-1. **The launcher and the GPL-3.0 runner.** A program that links a GPL-3.0 library must itself be GPL-compatible. Two ways keep the launcher's own licence free:
-   - **Process boundary:** the launcher talks to the runner through its CLI or a daemon API, never by linking it.
-   - **CLA:** you keep the right to relicense your own runner code, through a contributor licence agreement for outside contributions.
-
-   Decide before Phase 9.
+1. **CTF lab content and courses licence:** proprietary, or a content licence such as Creative Commons. Separate from the code.
 2. **Pulumi and Podman:** revisit after 1.0.
 
 ## 6. Salvage branches (local, not pushed)
