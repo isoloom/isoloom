@@ -161,4 +161,4 @@ isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
 
 ## License
 
-Isoloom is licensed under the [Apache License, Version 2.0](LICENSE). Contributions are accepted under the same license.
+Isoloom is dual-licensed under the [MIT License](LICENSE-MIT) or the [Apache License, Version 2.0](LICENSE-APACHE), at your option. Contributions are accepted under the same terms.

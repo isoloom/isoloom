@@ -73,7 +73,7 @@ Isoloom exists for the Cyber CTF launcher. Its three modes must work in 1.0, on 
 | IaC tools in 1.0 | The current families: Compose, Kubernetes/Helm/Kustomize, Vagrant (every provider), Terraform/OpenTofu for Proxmox, ESXi and the six clouds. Pulumi and Podman: not yet. |
 | Secrets | A conversion layer per tool: the spec names secrets and where they come from, and each output gets that tool's native mechanism. Values never land in a generated file. On clouds that means the cloud's own store: AWS Secrets Manager or SSM, Azure Key Vault, Google Secret Manager, OCI Vault. Where a cloud has none (DigitalOcean, Linode), a documented fallback is used. |
 | Terraform provider | Only the provider plugin is dropped for 1.0 (recommended; the maintainer had no preference). Terraform output (Proxmox, the clouds, cloud-docker, cloud-services) is core to 1.0. In a converter, Terraform users point a `module` at the generated folder or use the published registry modules. Revisit later as an Isothrum provider that runs labs. |
-| Licences (everything open source) | **Isoloom:** Apache-2.0, already published, for the widest adoption as the converter. **Isothrum** (runner, desktop app, editor): GPL-3.0, like GNS3. **Isothrum website**, if opened: AGPL-3.0, so hosted modified copies must be shared too. **Cyber CTF launcher:** GPL-3.0, matching the runner it links. The GPL and AGPL repositories take contributions under a CLA, so the copyright holder can still dual-license commercially. Isoloom only needs a DCO sign-off. The CTF lab content and courses are a separate decision. |
+| Licences (everything open source, least constraints) | **Isoloom, Isothrum (runner, desktop app, editor, website if opened) and the Cyber CTF launcher:** dual-licensed `MIT OR Apache-2.0`, the Rust ecosystem's standard. Each user picks either. MIT has the fewest conditions; Apache-2.0 adds a patent grant. No CLA, only a DCO sign-off. Anyone may build anything on them, closed products included. Official Ansible collections (GPL-3.0) are referenced, never embedded in a binary. The CTF lab content and courses are a separate decision. |
 | Compatibility | Fresh start: no aliases or deprecations carried into 1.0 (`services:`, old OS names, `qemu_refusal`...). Old specs move with a one-time `isoloom migrate`. |
 | Workflow | Local development on `main`. No PRs, no CI (all workflows disabled), no releases. The checks run locally. At the first satisfying version: squash the history, re-enable CI, tag 1.0.0. |
 | Docs | Written at the end, inside the repo. The website is rewritten from them. |
@@ -155,7 +155,7 @@ Make the codebase smaller before building on it.
    - A per-target `overrides:` block holds rare platform specifics, such as a Vagrant box or an instance type.
 2. **`isoloom-catalogue`.**
    - The data format: `entry.yml`, `contract.yml` and roles.
-   - Official Galaxy collections are GPL-3.0, so Apache-2.0 Isoloom only **references** them (a pinned `requirements.yml` with checksums) and never embeds them in its binary. The GPL-3.0 Isothrum runner fetches or bundles them. Isoloom's own roles stay Apache-2.0.
+   - Official Galaxy collections are GPL-3.0, so the permissively licensed Isoloom only **references** them (a pinned `requirements.yml` with checksums) and never embeds them in its binary. The runner fetches them at run time. Isoloom's own roles are MIT OR Apache-2.0.
    - The loader, validator and resolution.
    - Salvage from the stopped `v1/catalogue-engine` branch: format, loader, and the start of the nginx entry.
 3. **The configuration resource model** in the plan. Catalogue entries are written in it, not as raw roles. The plan's current set-up steps (raw shell and PowerShell) move onto it.
@@ -255,7 +255,7 @@ Then the security review of secrets handling and of every place that writes cred
 
 ### Phase 9: The Isothrum runner
 
-1. **Create the runner engine** in `isoloom/isothrum` (a crate plus a CLI), under GPL-3.0 like GNS3. It executes Isoloom run manifests, on macOS, Windows and Linux hosts.
+1. **Create the runner engine** in `isoloom/isothrum` (a crate plus a CLI), under MIT OR Apache-2.0. It executes Isoloom run manifests, on macOS, Windows and Linux hosts.
 2. **Port into it:**
    - the launcher's runtime: lifecycle, locks, deploy worker, drivers, recovery, reaper, budgets, remote servers;
    - Isoloom's moved run part: secrets delivery, host readiness, registry, WinRM retries.

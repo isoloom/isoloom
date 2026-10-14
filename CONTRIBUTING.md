@@ -77,4 +77,4 @@ cd examples/hello-stack && isoloom run docker . && git diff --exit-code -- .isol
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the [Apache License, Version 2.0](LICENSE), the license of the project.
+By contributing, you agree that your contributions are dual-licensed under the [MIT License](LICENSE-MIT) and the [Apache License, Version 2.0](LICENSE-APACHE), the project's licenses. Sign off each commit (`git commit -s`, the Developer Certificate of Origin).

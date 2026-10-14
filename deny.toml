@@ -23,7 +23,7 @@ allow = [
 confidence-threshold = 0.9
 
 [licenses.private]
-# The workspace's own crates are Apache-2.0 (the workspace `license`) and `publish = false`.
+# The workspace's own crates are MIT OR Apache-2.0 (the workspace `license`) and `publish = false`.
 ignore = true
 
 [bans]
