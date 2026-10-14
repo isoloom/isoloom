@@ -111,6 +111,8 @@ const fn na(why: &'static str) -> Status {
     Status::NotApplicable { why }
 }
 const VM_PLANNED: Status = planned("with the Proxmox generator");
+/// `vm.image` names Vagrant boxes: the Proxmox generator boots the OS's cloud image instead.
+const PROXMOX_IMAGE: Status = na("names a Vagrant box: Proxmox boots the OS's cloud image");
 const NOT_A_CONTAINER: Status = na("VM outputs build machines from `vm:`");
 const NOT_A_VM: Status = na("container outputs build machines from `docker:`");
 
@@ -171,6 +173,128 @@ pub fn table() -> Vec<Row> {
             ),
         ),
         ("machines.*.volumes", done("the VM's own disk keeps the data; the path is created", "segmented")),
+        (
+            "volumes.*.owner",
+            done("the owner's VM exports it over NFS; the others mount it", "shared-files"),
+        ),
+        ("inputs", done("a sensitive `inputs` variable, given at apply", "supplier-portal-api")),
+        (
+            "machines.*.inputs",
+            done("/etc/isoloom/inputs.env (0600), read by that machine's steps only", "supplier-portal-api"),
+        ),
+        (
+            "machines.*.services[].publish",
+            done(
+                "forwarded by the router from its uplink address; the `published` output lists them",
+                "supplier-portal-api",
+            ),
+        ),
+        (
+            "machines.*.services[].fixed",
+            done("the router forwards `publish` as is", "supplier-portal-api"),
+        ),
+        (
+            "machines.*.environment",
+            done("/etc/environment and systemd's default environment, before the steps", "tuned-web"),
+        ),
+        ("machines.*.sysctls", done("/etc/sysctl.d, applied before the steps", "tuned-web")),
+        (
+            "machines.*.ulimits",
+            done("limits.d and systemd's default limits, before the steps", "tuned-web"),
+        ),
+        (
+            "machines.*.arch",
+            Status::Partial {
+                how: "amd64 VMs",
+                gap: "arm64 (refused: uncommon on Proxmox hosts)",
+                proof: "segmented",
+            },
+        ),
+        ("machines.*.privileged", na("a VM already has kernel access: its workload runs as root")),
+        (
+            "machines.*.read_only",
+            na("a VM's root filesystem stays writable; use `volumes` for data that must persist"),
+        ),
+        ("machines.*.tmpfs", na("a VM mounts tmpfs in its own provisioning (fstab)")),
+        ("machines.*.shm_size", na("a VM sizes /dev/shm in its own provisioning")),
+        (
+            "machines.*.dns.servers",
+            planned("written as cloud-init's resolver, but no example proves it on Proxmox yet"),
+        ),
+        (
+            "machines.*.dns.domain",
+            planned("written as cloud-init's domain, but no example proves it on Proxmox yet"),
+        ),
+        ("machines.*.vm.image.vagrant", PROXMOX_IMAGE),
+        ("machines.*.vm.image.vagrant_version", PROXMOX_IMAGE),
+        ("machines.*.vm.image.qemu", PROXMOX_IMAGE),
+        (
+            "provision[].ansible",
+            done("run from a controller VM on every network, once every machine is up", "ansible-pair"),
+        ),
+        (
+            "provision[].inventory",
+            done("more inventory files, next to the one Isoloom writes", "ansible-pair"),
+        ),
+        ("provision[].groups", done("groups in the inventory Isoloom writes", "ansible-pair")),
+        ("provision[].vars", done("extra variables (`-e`)", "ansible-pair")),
+        (
+            "provision[].host_vars",
+            done("on each machine's line of the inventory Isoloom writes", "ansible-pair"),
+        ),
+        ("provision[].requirements", done("Galaxy collections and roles installed first", "ansible-pair")),
+        (
+            "controller",
+            done(
+                "the controller VM's resources (it boots the Debian cloud image: `image` names a Vagrant box)",
+                "ansible-pair",
+            ),
+        ),
+        (
+            "checks[]",
+            done(
+                "a runner per position (.isoloom/proxmox/checks/), piped over SSH through the router by `isoloom test proxmox`",
+                "hello-stack",
+            ),
+        ),
+        ("checks[].name", done("the runner's PASS/FAIL line", "hello-stack")),
+        ("checks[].from", done("the runner on that machine", "segmented")),
+        (
+            "checks[].http",
+            done("curl (else wget, else bash) from the machine, retried for `wait`", "hello-stack"),
+        ),
+        ("checks[].tcp", done("nc (else bash) from the machine", "segmented")),
+        ("checks[].method", done("curl -X", "hello-stack")),
+        ("checks[].headers", done("curl -H", "hello-stack")),
+        ("checks[].body", done("curl --data-binary", "hello-stack")),
+        (
+            "checks[].contains",
+            done(
+                "the response body (http, curl) or the first 5s read from the connection (tcp, nc else bash), searched for the text",
+                "hello-stack",
+            ),
+        ),
+        (
+            "checks[].follow",
+            done(
+                "redirects followed (curl -L --max-redirs 5; wget, which follows anyway, reads the last of at most 6 answers), the final status compared",
+                "hello-stack",
+            ),
+        ),
+        (
+            "checks[].send",
+            done("a line written to the connection before reading (nc else bash)", "hello-stack"),
+        ),
+        ("checks[].exec", done("the command in the machine's own shell", "hello-stack")),
+        ("checks[].script", done("sh, from /opt/isoloom", "slow-link")),
+        (
+            "checks[].expect",
+            done(
+                "a status code, `any` or `blocked` (http); `open` or `blocked` (tcp); text (exec)",
+                "hello-stack",
+            ),
+        ),
+        ("checks[].wait", done("retried every 2s until it passes or the time is up", "segmented")),
     ];
     for (path, status) in proxmox {
         if let Some(r) = rows.iter_mut().find(|r| r.path == *path) {
@@ -476,7 +600,10 @@ fn base_table() -> Vec<Row> {
         common(
             "machines.*.resources.disk_gb",
             na("containers share the host's disk"),
-            planned("the box's disk size is used as is"),
+            done(
+                "the VM's disk on every provider (`vm.disk`, or the provider's own disk size), the root filesystem grown into it",
+                "segmented",
+            ),
         ),
         common(
             "machines.*.depends_on",

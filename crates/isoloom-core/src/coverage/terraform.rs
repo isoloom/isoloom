@@ -1,8 +1,9 @@
 //! Terraform: each provider's resource types, from `terraform providers schema -json`
 //! (`coverage/terraform/*.txt`, refreshed by scripts/terraform-resources.sh). Every type must
-//! be classified here, or the coverage tests fail. No Terraform generator exists yet: the
-//! resources an environment needs are "not yet"; the arguments of each are detailed when its
-//! generator is built.
+//! be classified here, or the coverage tests fail. The generators for Proxmox and the six
+//! clouds write some of them: those are "written", and the coverage tests check them against
+//! every committed `main.tf` of the examples. The resources an environment needs but no
+//! generator writes yet are "not yet".
 
 use super::vagrant::names;
 use super::{Format, Support, Support::*};
@@ -25,8 +26,10 @@ pub struct Cloud {
     pub list: &'static str,
     pub environment: &'static [&'static str],
     pub windows: &'static [&'static str],
-    /// What the cloud generators (cloud-docker, and on AWS cloud-vm) write today.
+    /// What the cloud generators (cloud-vm and cloud-docker) write today.
     pub generated: &'static [&'static str],
+    /// Types an environment would need, whose effect the generators get another way.
+    pub equivalent: &'static [(&'static str, &'static str)],
 }
 
 pub const CLOUDS: &[Cloud] = &[
@@ -70,6 +73,7 @@ pub const CLOUDS: &[Cloud] = &[
             "aws_instance",
             "aws_key_pair",
         ],
+        equivalent: &[],
     },
     Cloud {
         name: "Terraform: Azure",
@@ -104,7 +108,9 @@ pub const CLOUDS: &[Cloud] = &[
             "azurerm_network_interface",
             "azurerm_network_interface_security_group_association",
             "azurerm_linux_virtual_machine",
+            "azurerm_windows_virtual_machine",
         ],
+        equivalent: &[],
     },
     Cloud {
         name: "Terraform: Google Cloud",
@@ -128,7 +134,10 @@ pub const CLOUDS: &[Cloud] = &[
             "google_compute_subnetwork",
             "google_compute_firewall",
             "google_compute_instance",
+            "google_project",
+            "google_project_service",
         ],
+        equivalent: &[],
     },
     Cloud {
         name: "Terraform: DigitalOcean",
@@ -146,6 +155,7 @@ pub const CLOUDS: &[Cloud] = &[
         ],
         windows: &[],
         generated: &["digitalocean_vpc", "digitalocean_ssh_key", "digitalocean_droplet", "digitalocean_firewall"],
+        equivalent: &[],
     },
     Cloud {
         name: "Terraform: Linode",
@@ -163,7 +173,11 @@ pub const CLOUDS: &[Cloud] = &[
             "linode_volume",
         ],
         windows: &[],
-        generated: &["linode_instance", "linode_firewall"],
+        generated: &["linode_instance", "linode_firewall", "linode_vpc", "linode_vpc_subnet"],
+        equivalent: &[(
+            "linode_sshkey",
+            "each instance's own `authorized_keys`, which installs the environment's key without storing it in the account",
+        )],
     },
     Cloud {
         name: "Terraform: Oracle Cloud",
@@ -193,6 +207,7 @@ pub const CLOUDS: &[Cloud] = &[
             "oci_core_subnet",
             "oci_core_instance",
         ],
+        equivalent: &[],
     },
 ];
 
@@ -205,8 +220,10 @@ fn cloud(c: &Cloud) -> Format {
         .map(|r| {
             let s = if c.generated.contains(&r) {
                 Emitted {
-                    from: "the cloud-docker target (one VM running the Compose file), and on AWS the cloud-vm target (a VM per machine)",
+                    from: "(written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file)",
                 }
+            } else if let Some((_, via)) = c.equivalent.iter().find(|(t, _)| *t == r) {
+                Equivalent { via }
             } else if c.environment.contains(&r) {
                 Planned {
                     note: "with the cloud generator (one VM per machine)",
@@ -223,7 +240,7 @@ fn cloud(c: &Cloud) -> Format {
         .collect();
     Format {
         name: c.name,
-        file: ".isoloom/cloud/ (planned)",
+        file: ".isoloom/cloud-vm/ and .isoloom/cloud-docker/",
         source: c.source,
         rows,
         collapse_not_portable: true,
@@ -272,7 +289,7 @@ pub fn formats() -> Vec<Format> {
         .collect();
     let mut all = vec![Format {
         name: "Terraform: Proxmox",
-        file: ".isoloom/proxmox/ (planned)",
+        file: ".isoloom/proxmox/ and .isoloom/docker-vm/proxmox/",
         source: "bpg/proxmox 0.115.0 (its resource types)",
         rows,
         collapse_not_portable: false,
@@ -295,8 +312,8 @@ fn proxmox(r: &str) -> Option<Support> {
         },
         "sdn_zone_simple" | "sdn_vnet" | "sdn_applier" => Emitted { from: "networks" },
         "pool" | "pool_membership" => GENERATOR,
-        "cloned_vm" => Planned {
-            note: "linked clones: faster starts from one image (no change in behavior)",
+        "cloned_vm" => Tooling {
+            note: "linked clones: faster starts from one image, no change in behavior (as on Hyper-V and ESXi)",
         },
         "sdn_subnet" => Equivalent {
             via: "the router VM, which holds each network's router address (a subnet would put it on the host bridge, which routes between networks)",

@@ -373,8 +373,9 @@ fn rows() -> Vec<(String, Support)> {
         ("networks.*.enable_ipv6", Planned { note: "IPv6 networks" }),
         (
             "networks.*.external",
-            Planned {
-                note: "joining a network outside the environment (a Docker network, a host bridge, a VPC)",
+            Partial {
+                from: "(the hybrid target: its containers join the macvlan networks the Docker host VM creates, shared with the VMs)",
+                gap: "joining a network outside the environment (a Docker network, a host bridge, a VPC)",
             },
         ),
         (
@@ -392,8 +393,8 @@ fn rows() -> Vec<(String, Support)> {
         ),
         (
             "networks.*.name",
-            Tooling {
-                note: "Compose scopes names to the environment",
+            Emitted {
+                from: "(the hybrid target: the Docker network its host VM created for each network; elsewhere Compose scopes names to the environment)",
             },
         ),
         // Volumes.
