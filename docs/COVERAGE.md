@@ -28,6 +28,9 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Terraform: DigitalOcean](#terraform-digitalocean) | 50% | 8 | 4 | 0 | 4 |
 | [Terraform: Linode](#terraform-linode) | 55% | 9 | 5 | 0 | 4 |
 | [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 46% | 13 | 6 | 0 | 7 |
+| [cloud-init](#cloud-init) | 95% | 80 | 76 | 0 | 4 |
+| [Ansible inventory](#ansible-inventory) | 95% | 31 | 28 | 3 | 0 |
+| [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
 
 Done includes features produced another way, or set in the image. The lists come from the
 formats themselves (every key of the Compose schema, every setting of Vagrant and each provider
@@ -934,3 +937,386 @@ And 38 other resource types: this cloud's managed services (databases, storage, 
 | `oci_core_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
 
 And 1007 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+
+## cloud-init
+
+95% of 80 portable features (76 done, 0 partly, 4 to do; 149 features in all). From cloud-init 26.2's schema-cloud-config-v1.json (crates/isoloom-coverage/coverage/cloud-init.txt).
+
+### Top level
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allow_public_ssh_keys` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ansible` | Yes | Another way | Via provision[].ansible (the controller runs the playbooks) |
+| `apk_repos` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `apt` | Yes | Another way | Via constraints (the prelude points apt and dnf at the proxy and the mirrors) |
+| `apt_pipelining` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `apt_reboot_if_required` | n/a | No | A deprecated spelling of a key in this table |
+| `apt_update` | n/a | No | A deprecated spelling of a key in this table |
+| `apt_upgrade` | n/a | No | A deprecated spelling of a key in this table |
+| `authkey_hash` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `autoinstall` | No | No | Ubuntu's installer: the targets boot ready-made images |
+| `bootcmd` | Yes | Yes | From `constraints` (the prelude, at every boot) |
+| `byobu_by_default` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `ca-certs` | n/a | No | A deprecated spelling of a key in this table |
+| `ca_certs` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `chef` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `chpasswd` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `cloud_config_modules` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `cloud_final_modules` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `cloud_init_modules` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `create_hostname_file` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `device_aliases` | Yes | Not yet | Data disks, partitioned and formatted (Wave 3: persistent volumes and data disks) |
+| `disable_ec2_metadata` | No | No | EC2's metadata service: AWS only |
+| `disable_root` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `disable_root_opts` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `disk_setup` | Yes | Not yet | Data disks, partitioned and formatted (Wave 3: persistent volumes and data disks) |
+| `drivers` | No | No | NVIDIA drivers: most targets have no GPU to pass through |
+| `fan` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `final_message` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `fqdn` | Yes | Not yet | A machine's full name, from its name and `dns.domain` |
+| `fs_setup` | Yes | Not yet | Data disks, partitioned and formatted (Wave 3: persistent volumes and data disks) |
+| `groups` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `growpart` | Yes | Another way | Via machines.*.resources.disk_gb (the disk-grow step) |
+| `grub-dpkg` | n/a | No | A deprecated spelling of a key in this table |
+| `grub_dpkg` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `hostname` | Yes | Yes | From `machines` |
+| `keyboard` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `landscape` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `launch-index` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `locale` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `locale_configfile` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `lxd` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `manage_etc_hosts` | Yes | Another way | Via machines and machines.*.aliases (the hosts step names every machine) |
+| `manage_resolv_conf` | Yes | Another way | Via machines.*.dns (Proxmox's own cloud-init DNS settings) |
+| `mcollective` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `merge_how` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `merge_type` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `migrate` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `mount_default_fields` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `mounts` | Yes | Another way | Via volumes (a shared volume is mounted from /etc/fstab) |
+| `no_ssh_fingerprints` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ntp` | Yes | Another way | Via constraints.ntp (the prelude sets the time servers) |
+| `output` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `package_reboot_if_required` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `package_update` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `package_upgrade` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `packages` | Yes | Yes | The tools the steps need: nftables, curl, the guest agent... |
+| `password` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `phone_home` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `power_state` | Yes | Yes | From `machines.*.vm.provision` (a reboot step) |
+| `prefer_fqdn_over_hostname` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `preserve_hostname` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `puppet` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `random_seed` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `reporting` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `resize_rootfs` | Yes | Another way | Via machines.*.resources.disk_gb (the disk-grow step) |
+| `resolv_conf` | Yes | Another way | Via machines.*.dns (Proxmox's own cloud-init DNS settings) |
+| `rh_subscription` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `rpi` | No | No | Raspberry Pi hardware: no VM target has it |
+| `rsyslog` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `runcmd` | Yes | Yes | From `machines.*.vm.provision` (every step, in order) |
+| `salt_minion` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `snap` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `spacewalk` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `ssh` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_authorized_keys` | Yes | Another way | Via users.*.ssh_authorized_keys (Isoloom's user's keys) |
+| `ssh_deletekeys` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_fp_console_blacklist` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_genkeytypes` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_import_id` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_key_console_blacklist` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_keys` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_publish_hostkeys` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_pwauth` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_quiet_keygen` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `swap` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `system_info` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `timezone` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `ubuntu_advantage` | n/a | No | A deprecated spelling of a key in this table |
+| `ubuntu_pro` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `updates` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `user` | n/a | No | Isoloom's own user: it needs a name, sudo, a shell and the key, nothing more |
+| `users` | Yes | Yes | Isoloom's user, with the operator's and the controller's keys |
+| `vendor_data` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `version` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
+| `wireguard` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `write_files` | Yes | Yes | From `machines.*.vm.provision` (the project's files, the router's and the steps' files) |
+| `yum_repo_dir` | Yes | Another way | Via constraints (the prelude points apt and dnf at the proxy and the mirrors) |
+| `yum_repos` | Yes | Another way | Via constraints (the prelude points apt and dnf at the proxy and the mirrors) |
+| `zypper` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+
+### Users (users.*)
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `create-groups` | n/a | No | A deprecated spelling of a key in this table |
+| `create_groups` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `doas` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `expiredate` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `gecos` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `groups` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `hashed-passwd` | n/a | No | A deprecated spelling of a key in this table |
+| `hashed_passwd` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `homedir` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `inactive` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `lock-passwd` | n/a | No | A deprecated spelling of a key in this table |
+| `lock_passwd` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `name` | Yes | Yes | `isoloom` |
+| `no-create-home` | n/a | No | A deprecated spelling of a key in this table |
+| `no-log-init` | n/a | No | A deprecated spelling of a key in this table |
+| `no-user-group` | n/a | No | A deprecated spelling of a key in this table |
+| `no_create_home` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `no_log_init` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `no_user_group` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `passwd` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `plain-text-passwd` | n/a | No | A deprecated spelling of a key in this table |
+| `plain_text_passwd` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `primary-group` | n/a | No | A deprecated spelling of a key in this table |
+| `primary_group` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `selinux-user` | n/a | No | A deprecated spelling of a key in this table |
+| `selinux_user` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `shell` | Yes | Yes | Bash |
+| `snapuser` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
+| `ssh-authorized-keys` | n/a | No | A deprecated spelling of a key in this table |
+| `ssh-import-id` | n/a | No | A deprecated spelling of a key in this table |
+| `ssh-redirect-user` | n/a | No | A deprecated spelling of a key in this table |
+| `ssh_authorized_keys` | Yes | Yes | The operator's key, and the controller's |
+| `ssh_import_id` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `ssh_redirect_user` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
+| `sudo` | Yes | Yes | Passwordless sudo: the steps run as root |
+| `system` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+| `uid` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
+
+### Files (write_files.*)
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `append` | n/a | No | How a file is written: Isoloom sets the path, mode, encoding and content it needs |
+| `content` | Yes | Yes | From `machines.*.vm.provision` (the project's files) |
+| `defer` | n/a | No | How a file is written: Isoloom sets the path, mode, encoding and content it needs |
+| `encoding` | Yes | Yes | Base64, for the project's files |
+| `owner` | n/a | No | How a file is written: Isoloom sets the path, mode, encoding and content it needs |
+| `path` | Yes | Yes | From `machines.*.vm.provision` (the project's files) |
+| `permissions` | Yes | Yes | The inputs file and the reboot scripts |
+| `source` | n/a | No | How a file is written: Isoloom sets the path, mode, encoding and content it needs |
+
+### Restart (power_state)
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `condition` | Yes | Yes | Only while a reboot step has a part left |
+| `delay` | n/a | No | When cloud-init restarts the machine: right away, once it is done, is what the steps need |
+| `message` | Yes | Yes | The reboot step |
+| `mode` | Yes | Yes | Reboot |
+| `timeout` | n/a | No | When cloud-init restarts the machine: right away, once it is done, is what the steps need |
+
+## Ansible inventory
+
+95% of 31 portable features (28 done, 3 partly, 0 to do; 143 features in all). From ansible-core v2.21.5's behavioral parameters, and pywinrm v0.5.0's for `ansible_winrm_*` (crates/isoloom-coverage/coverage/ansible-inventory.txt).
+
+### Parameters
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `ansible_admin_users` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_async_dir` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_become` | Yes | Yes | Every Linux host: the steps and playbooks run as root |
+| `ansible_become_exe` | Yes | Another way | Via (passwordless sudo as root: Isoloom's user needs no other method, user or password) |
+| `ansible_become_flags` | Yes | Another way | Via (passwordless sudo as root: Isoloom's user needs no other method, user or password) |
+| `ansible_become_method` | Yes | Another way | Via (passwordless sudo as root: Isoloom's user needs no other method, user or password) |
+| `ansible_become_pass` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_become_password` | Yes | Another way | Via (passwordless sudo as root: Isoloom's user needs no other method, user or password) |
+| `ansible_become_user` | Yes | Another way | Via (passwordless sudo as root: Isoloom's user needs no other method, user or password) |
+| `ansible_common_remote_group` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_connection` | Yes | Partly | From `machines.*.vm.os` (WinRM for Windows; SSH with PowerShell on external); not yet: Proxmox's Windows VMs (no WinRM account yet) |
+| `ansible_connection_user` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_control_path` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_control_path_dir` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_deprecation_warnings` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_docker_extra_args` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_facts_modules` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_host` | Yes | Yes | From `machines` (the first address; `external.address` on external) |
+| `ansible_host_key_checking` | Yes | Another way | Via (the controller's ANSIBLE_HOST_KEY_CHECKING=False: the machines are new) |
+| `ansible_inject_invocation` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_interpreter_python_fallback` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_local_become_strip_preamble` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_local_become_success_timeout` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_module_compression` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_network_os` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_no_target_syslog` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_password` | Yes | Partly | The Vagrant boxes' account; the clouds' Windows password; not yet: Proxmox's Windows VMs (no WinRM account yet) |
+| `ansible_pipelining` | Yes | Another way | Via (the controller's ANSIBLE_PIPELINING=True) |
+| `ansible_port` | Yes | Yes | From `machines.*.external.port and machines.*.vm.image.winrm` |
+| `ansible_private_key` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_private_key_file` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_private_key_passphrase` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_psrp_auth` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_ca_cert` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_cert_trust_path` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_cert_validation` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_certificate_key_password` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_certificate_key_pem` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_certificate_pem` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_configuration_name` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_connection_backoff` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_connection_timeout` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_credssp_auth_mechanism` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_credssp_disable_tlsv1_2` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_credssp_minimum_version` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_host` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_ignore_proxy` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_max_envelope_size` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_message_encryption` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_negotiate_delegate` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_negotiate_hostname_override` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_negotiate_send_cbt` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_negotiate_service` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_no_profile` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_operation_timeout` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_path` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_port` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_protocol` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_proxy` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_read_timeout` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_reconnection_backoff` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_reconnection_retries` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_psrp_user` | n/a | No | PSRP, another Windows transport: Isoloom reaches Windows over WinRM or SSH |
+| `ansible_python_interpreter` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_python_module_rlimit_nofile` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_remote_tmp` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_runas_flags` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_runas_pass` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_runas_user` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_scp_executable` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_scp_extra_args` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_sftp_batch_mode` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_sftp_executable` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_sftp_extra_args` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_shell_allow_world_readable_temp` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_shell_executable` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_shell_type` | Yes | Yes | PowerShell, for Windows hosts over SSH on external |
+| `ansible_ssh_args` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_common_args` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_executable` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_extra_args` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_host` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_host_key_checking` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_pass` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_password` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_password_mechanism` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_pipelining` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_pkcs11_provider` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_port` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_private_key` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_private_key_file` | Yes | Yes | From `machines.*.external.key` (the controller's own key elsewhere) |
+| `ansible_ssh_private_key_passphrase` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_retries` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_timeout` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_transfer_method` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_use_tty` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_ssh_user` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_ssh_verbosity` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_sshpass_prompt` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_su_exe` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_su_flags` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_su_pass` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_su_prompt_l10n` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_su_user` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_sudo_chdir` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_sudo_exe` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_sudo_flags` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_sudo_pass` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_sudo_user` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_system_tmpdirs` | Yes | Another way | Via provision[].host_vars (any variable, on the host's line) |
+| `ansible_target_log_info` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+| `ansible_timeout` | n/a | No | How the controller's SSH client connects: Isoloom's defaults reach every machine |
+| `ansible_user` | Yes | Partly | From `machines.*.external.user and machines.*.vm.os` (each image's own user; `isoloom` on Proxmox); not yet: Proxmox's Windows VMs (no WinRM account yet) |
+| `ansible_win_async_startup_timeout` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_ca_trust_path` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_cert_key_pem` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_cert_pem` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_connection_timeout` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_credssp_disable_tlsv1_2` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_host` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_winrm_kerberos_delegation` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_kerberos_hostname_override` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_keytab` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_kinit_args` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_kinit_cmd` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_kinit_env_vars` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_kinit_mode` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_message_encryption` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_operation_timeout_sec` | Yes | Yes | 400 s: a domain controller's promotion keeps a call waiting |
+| `ansible_winrm_pass` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_winrm_password` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_winrm_path` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_port` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_winrm_proxy` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_read_timeout_sec` | Yes | Yes | 500 s, longer than the operation timeout |
+| `ansible_winrm_realm` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_scheme` | Yes | Yes | From `machines.*.vm.image.winrm` (plain HTTP on the clouds) |
+| `ansible_winrm_send_cbt` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_server_cert_validation` | Yes | Yes | Off: the machines' certificates are self-signed |
+| `ansible_winrm_service` | n/a | No | How the controller's WinRM client connects: Isoloom's defaults reach every Windows machine |
+| `ansible_winrm_transport` | Yes | Yes | From `machines.*.vm.image.winrm` (NTLM over HTTPS, basic over HTTP) |
+| `ansible_winrm_user` | n/a | No | Another spelling of a parameter in this table (an older or a method-specific one) |
+| `ansible_worker_session_isolation` | n/a | No | Ansible's own behavior on the controller, not the machine's |
+
+## Dockerfile
+
+100% of 24 portable features (24 done, 0 partly, 0 to do; 44 features in all). From BuildKit's Dockerfile frontend dockerfile/1.28.0 (crates/isoloom-coverage/coverage/dockerfile.txt).
+
+### Instructions
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `ADD` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `ADD --checksum` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `ADD --chmod` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `ADD --chown` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `ADD --exclude` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `ADD --keep-git-dir` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `ADD --link` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `ADD --unpack` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `ARG` | Yes | Another way | Via machines.*.docker.args (Compose's build arguments) |
+| `CMD` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `COPY` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `COPY --chmod` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `COPY --chown` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `COPY --exclude` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `COPY --from` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `COPY --link` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `COPY --parents` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `ENTRYPOINT` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `ENV` | Yes | Another way | Via machines.*.environment (set on the machine itself) |
+| `EXPOSE` | Yes | Another way | Via machines.*.services (every port is reachable on the machine's networks) |
+| `FROM` | Yes | Yes | From `machines.*.docker.appliance` (the emulator's base image, through the registry mirrors) |
+| `FROM --platform` | Yes | Another way | Via machines.*.arch (Compose's platform for the build) |
+| `HEALTHCHECK` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --interval` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --retries` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --start-interval` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --start-period` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
+| `HEALTHCHECK --timeout` | Yes | Another way | Via machines.*.services (Isoloom probes every port, in Compose's healthcheck) |
+| `LABEL` | n/a | No | Image metadata: no effect on the machine |
+| `MAINTAINER` | n/a | No | Image metadata: no effect on the machine |
+| `ONBUILD` | n/a | No | Runs in images built from this one, not in this machine |
+| `RUN` | Yes | Yes | From `machines.*.docker.appliance` (installs the emulator) |
+| `RUN --device` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `RUN --mount` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `RUN --network` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `RUN --security` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `SHELL` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `STOPSIGNAL` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `USER` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+| `VOLUME` | Yes | Another way | Via machines.*.volumes |
+| `WORKDIR` | Yes | In the image | The machine's own Dockerfile (`machines.*.docker.build`), built as is; on a VM, its provisioning (`vm.provision`) |
+
+### Parser directives
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `check` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `escape` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
+| `syntax` | n/a | No | How the image is built (caching, layers, sandboxing), not what the machine is |
