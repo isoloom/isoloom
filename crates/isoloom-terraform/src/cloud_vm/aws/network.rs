@@ -1,7 +1,7 @@
 //! The VPC, its subnets, and each machine's security group.
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, list, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, list, number, object, string};
 
 use super::{first_zone, r};
 use crate::vm::res;
@@ -56,7 +56,7 @@ fn subnet(net: &str, cidr: &str, added: bool) -> [Block; 2] {
         .add_attribute(("vpc_id", r("aws_vpc.env.id")))
         .add_attribute(("cidr_block", string(cidr)))
         .add_attribute(("availability_zone", first_zone()))
-        .add_attribute(("tags", object([("Name", name_tag(&format!("-{net}")))])));
+        .add_attribute(("tags", object([("Name", name_with(&format!("-{net}")))])));
     if added {
         s = s.add_attribute(("depends_on", list([r(&format!("aws_vpc_ipv4_cidr_block_association.{id}"))])));
     }
@@ -69,15 +69,7 @@ fn subnet(net: &str, cidr: &str, added: bool) -> [Block; 2] {
     ]
 }
 
-/// `"${local.name}<suffix>"`.
-pub fn name_tag(suffix: &str) -> Expression {
-    Template::new().with_expr(reference("local.name")).with_text(suffix).into_expression()
-}
-
-/// A `resource` block, started.
-pub fn resource(kind: &str, name: &str) -> isoloom_render::hcl_builder::BlockBuilder {
-    Block::builder("resource").add_label(kind).add_label(name)
-}
+pub use crate::vm::cloud::{name_with, resource};
 
 /// An `ingress` rule.
 fn ingress(description: &str, ports: (u16, u16), protocol: &str, cidrs: Expression) -> Block {
@@ -107,7 +99,7 @@ pub fn security_group(env: &Environment, name: &str, windows: bool) -> Block {
     let spec = env.spec();
     let m = &spec.machines[name];
     let mut b = resource("aws_security_group", &res(name))
-        .add_attribute(("name", name_tag(&format!("-{name}"))))
+        .add_attribute(("name", name_with(&format!("-{name}"))))
         .add_attribute(("vpc_id", r("aws_vpc.env.id")));
     for n in m.networks.keys() {
         b = b.add_block(ingress(
@@ -149,7 +141,7 @@ pub fn security_group(env: &Environment, name: &str, windows: bool) -> Block {
 /// The controller's: every network may reach it, and SSH from `allowed_cidr`.
 pub fn controller_group(env: &Environment) -> Block {
     let mut b = resource("aws_security_group", "isoloom_controller")
-        .add_attribute(("name", name_tag("-controller")))
+        .add_attribute(("name", name_with("-controller")))
         .add_attribute(("vpc_id", r("aws_vpc.env.id")));
     for (n, p) in &env.networks {
         b = b.add_block(ingress(n, (0, 0), "-1", list([string(p.cidr.as_str())])));

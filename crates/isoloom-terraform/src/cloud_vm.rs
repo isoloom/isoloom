@@ -2,33 +2,94 @@
 //! `.isoloom/cloud-vm/<cloud>/`, and the check runners every cloud shares under
 //! `.isoloom/cloud-vm/checks/`.
 //!
-//! AWS is the target's reference cloud: its limits refuse the whole target ([`aws::refusal`]),
-//! and it renders from the plan through the VM core (`crate::vm`). The other clouds are each a
-//! backend of their own ([`CLOUDS`]: DigitalOcean, Linode, Oracle Cloud), or drivers that still
-//! read the spec (`crate::cloud_vm_others::DRIVERS`: Azure, Google Cloud): a cloud whose own
-//! refusal fires drops only its module (best-effort: a lab runs on the clouds whose model fits
-//! it). The drivers' modules still get the text passes they were written for (the project lists,
-//! the constraints' preamble); the backends' need none.
+//! Each cloud is a backend of its own ([`CLOUDS`]: AWS, Azure, Google Cloud, DigitalOcean,
+//! Linode, Oracle Cloud): its capabilities, its refusal read from the plan, its module, rendered
+//! from the plan through the VM core (`crate::vm`). AWS is the target's reference cloud: its
+//! refusal refuses the whole target ([`aws::refusal`]). Another cloud whose refusal fires drops
+//! only its module (best-effort: a lab runs on the clouds whose model fits it);
+//! [`cloud_refusals`] says which and why.
 
 pub mod aws;
-pub mod legacy;
 
-pub use legacy::{
-    CONTROLLER_OS, REBOOT_MARK, aligned, checks_output, cidr, has_windows, hcl_cmd, image_user, instance_type, inventory, linux_machines, linux_setup_cmds,
-    needs_controller, redirects, remote_exec, tf_expr, windows_firewall, windows_project, windows_udp_redirect,
-};
+pub use aws::{image_user, instance_type};
 
 use isoloom_plan::{Capabilities, Environment, Feature};
+use isoloom_render::GenerateError;
 use isoloom_render::backend::{self, Backend, Files, RenderError};
-use isoloom_render::{GenerateError, constraints, project};
 use isoloom_spec::model::Target;
 
+use crate::cloud_vm_others::azure::AzureBackend;
+use crate::cloud_vm_others::digitalocean::DigitalOceanBackend;
+use crate::cloud_vm_others::gcp::GcpBackend;
+use crate::cloud_vm_others::linode::LinodeBackend;
+use crate::cloud_vm_others::oci::OciBackend;
 use crate::vm::checks;
 
 /// The target's folder under `.isoloom/`.
 pub const DIR: &str = "cloud-vm";
 
-/// The `cloud-vm` backend: AWS from the plan, then the other clouds' drivers.
+/// Every cloud on the plan, by its folder under `.isoloom/cloud-vm/`, AWS first.
+pub static CLOUDS: &[(&str, &dyn Backend)] = &[
+    ("aws", &AwsBackend),
+    ("azure", &AzureBackend),
+    ("gcp", &GcpBackend),
+    ("digitalocean", &DigitalOceanBackend),
+    ("linode", &LinodeBackend),
+    ("oci", &OciBackend),
+];
+
+/// Each cloud on the plan, AWS first, with why it can't run the environment (`None`: its module
+/// is written).
+pub fn cloud_refusals(env: &Environment) -> Vec<(&'static str, Option<String>)> {
+    CLOUDS.iter().map(|(name, b)| (*name, b.refusal(env))).collect()
+}
+
+/// What the clouds of the target can render: environment-level provisioning (a controller),
+/// playbook checks (refused by each cloud's own limit until the cloud runs them), `exec` checks
+/// (run on the machine), machine aliases and ulimits (the set-up steps), and gateway networks
+/// and link impairment (refused by each cloud's own limits, with their own reasons: the plan's
+/// requirements name other targets).
+pub fn capabilities() -> Capabilities {
+    Capabilities::of([
+        Feature::EnvironmentProvisioning,
+        Feature::PlaybookChecks,
+        Feature::ExecWithoutContainer,
+        Feature::Gateways,
+        Feature::MachineAliases,
+        Feature::Ulimits,
+        Feature::TrafficControl,
+    ])
+}
+
+/// A cloud's refusal, `why`, as a rendering error.
+pub(crate) fn unsupported(why: String) -> RenderError {
+    RenderError::Generate(GenerateError::Unsupported {
+        target: Target::CloudVm,
+        what: why,
+    })
+}
+
+/// A cloud's `render`: the plan's requirements, then its own refusal, then its module.
+pub(crate) fn render_cloud(
+    env: &Environment,
+    refusal: fn(&Environment) -> Option<String>,
+    render: fn(&Environment) -> Result<isoloom_render::GeneratedFile, isoloom_render::hcl_builder::Error>,
+) -> Result<Files, RenderError> {
+    backend::check(Target::CloudVm, env, &capabilities())?;
+    if let Some(why) = refusal(env) {
+        return Err(unsupported(why));
+    }
+    Ok(vec![render(env).map_err(|e| unsupported(format!("the module couldn't be written: {e}")))?])
+}
+
+/// A cloud's `refusal`: the plan's requirements, then its own.
+pub(crate) fn refuse_cloud(env: &Environment, refusal: fn(&Environment) -> Option<String>) -> Option<String> {
+    isoloom_plan::refusal(&env.requirements, &capabilities())
+        .map(|r| r.to_string())
+        .or_else(|| refusal(env))
+}
+
+/// The `cloud-vm` backend: every cloud whose model fits the environment, AWS required.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CloudVmBackend;
 
@@ -37,80 +98,44 @@ impl Backend for CloudVmBackend {
         Target::CloudVm
     }
 
-    /// Environment-level provisioning (a controller), playbook checks (refused by AWS's own
-    /// limit until the cloud runs them) and `exec` checks (run on the machine).
     fn capabilities(&self) -> Capabilities {
-        Capabilities::of([
-            Feature::EnvironmentProvisioning,
-            Feature::PlaybookChecks,
-            Feature::ExecWithoutContainer,
-            // Gateway networks are refused by the target's own limit (`LIMITS.gateways`), with
-            // its own reason: the plan's requirement names hybrid.
-            Feature::Gateways,
-            Feature::MachineAliases,
-            Feature::Ulimits,
-            Feature::TrafficControl,
-        ])
+        capabilities()
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        backend::check(Target::CloudVm, env, &self.capabilities())?;
-        if let Some(what) = aws::refusal(env) {
-            return Err(unsupported(what));
+        let mut files = AwsBackend.render(env)?;
+        for (_, cloud) in CLOUDS.iter().skip(1) {
+            if cloud.refusal(env).is_none() {
+                files.extend(cloud.render(env)?);
+            }
         }
-        let mut files = vec![aws::render(env).map_err(|e| unsupported(format!("the AWS module couldn't be written: {e}")))?];
-        files.extend(others(env)?);
         files.extend(checks::runners(env, DIR));
         Ok(files)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
-        isoloom_plan::refusal(&env.requirements, &self.capabilities())
-            .map(|r| r.to_string())
-            .or_else(|| aws::refusal(env))
+        AwsBackend.refusal(env)
     }
 }
 
-fn unsupported(what: String) -> RenderError {
-    RenderError::Generate(GenerateError::Unsupported { target: Target::CloudVm, what })
-}
+/// The `cloud-vm` module on AWS.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AwsBackend;
 
-/// The clouds rendered from the plan besides AWS, each a backend of its own: a cloud whose
-/// refusal fires drops only its module.
-pub static CLOUDS: &[(&str, &dyn Backend)] = &[
-    ("digitalocean", &crate::cloud_vm_others::digitalocean::DigitalOceanBackend),
-    ("linode", &crate::cloud_vm_others::linode::LinodeBackend),
-    ("oci", &crate::cloud_vm_others::oci::OciBackend),
-];
-
-/// Each cloud of [`CLOUDS`] and why it would refuse `env`, if it would.
-pub fn cloud_refusals(env: &Environment) -> Vec<(&'static str, Option<String>)> {
-    CLOUDS.iter().map(|(name, b)| (*name, b.refusal(env))).collect()
-}
-
-/// The other clouds' modules, for the clouds whose model fits the spec: the backends', then the
-/// drivers' with their text passes. A cloud that accepts the spec and still fails to render
-/// fails the target (its module isn't dropped silently).
-fn others(env: &Environment) -> Result<Files, RenderError> {
-    let mut files = Files::new();
-    for (_, b) in CLOUDS.iter().filter(|(_, b)| b.refusal(env).is_none()) {
-        files.extend(b.render(env)?);
+impl Backend for AwsBackend {
+    fn target(&self) -> Target {
+        Target::CloudVm
     }
-    files.extend(legacy_drivers(env));
-    Ok(files)
-}
 
-/// The clouds still reading the spec, with their text passes.
-fn legacy_drivers(env: &Environment) -> Files {
-    let spec = env.spec();
-    let mut files: Files = crate::cloud_vm_others::DRIVERS
-        .iter()
-        .filter(|(_, _, refusal)| refusal(spec).is_none())
-        .map(|(_, build, _)| build(spec))
-        .collect();
-    for f in &mut files {
-        project::terraform(&mut f.contents);
+    fn capabilities(&self) -> Capabilities {
+        capabilities()
     }
-    constraints::terraform_prelude(spec, &mut files);
-    files
+
+    fn render(&self, env: &Environment) -> Result<Files, RenderError> {
+        render_cloud(env, aws::refusal, aws::render)
+    }
+
+    fn refusal(&self, env: &Environment) -> Option<String> {
+        refuse_cloud(env, aws::refusal)
+    }
 }

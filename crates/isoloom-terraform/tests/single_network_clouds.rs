@@ -62,9 +62,12 @@ fn rendering_twice_gives_the_same_files() {
     }
 }
 
-/// Each cloud's refusal of `example`, in `CLOUDS` order.
+/// Each single-network cloud's refusal of `example`, in `CLOUDS` order.
 fn refusals(example: &str) -> Vec<(&'static str, Option<String>)> {
     cloud_refusals(&env(example))
+        .into_iter()
+        .filter(|(n, _)| ["digitalocean", "linode", "oci"].contains(n))
+        .collect()
 }
 
 #[test]

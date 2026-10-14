@@ -2,7 +2,7 @@
 //! their refusals, capabilities, set-up hooks and published ports are the same, read from the
 //! plan.
 
-use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan, Step};
+use isoloom_plan::{Capabilities, Environment, MachinePlan, Step};
 use isoloom_render::backend::{self, Files, RenderError};
 use isoloom_render::hcl_builder::Template;
 use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR};
@@ -38,14 +38,10 @@ pub const fn limits(arm64: &'static str) -> Limits {
     }
 }
 
-/// What the plan may ask of these clouds; their own rules refuse the rest.
+/// What the plan may ask of these clouds (every cloud's: `cloud_vm::capabilities`); their own
+/// rules refuse the rest.
 pub fn capabilities() -> Capabilities {
-    Capabilities::of([
-        Feature::EnvironmentProvisioning,
-        Feature::PlaybookChecks,
-        Feature::ExecWithoutContainer,
-        Feature::Gateways,
-    ])
+    crate::cloud_vm::capabilities()
 }
 
 /// Why the cloud can't run this environment, if it can't: one network, Linux only, no

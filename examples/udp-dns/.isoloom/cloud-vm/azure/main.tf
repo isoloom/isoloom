@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 5.0"
-    }
+    azurerm = { source = "hashicorp/azurerm", version = "~> 5.0" }
   }
 }
 
@@ -20,21 +17,26 @@ variable "subscription_id" {
   default     = null
   description = "Default: ARM_SUBSCRIPTION_ID from the environment"
 }
+
 variable "region" {
   type    = string
   default = "swedencentral"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -62,7 +64,12 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-udp-dns-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "udp-dns", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+  tags = {
+    isoloom-environment = "udp-dns"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "azurerm_resource_group" "env" {
@@ -76,8 +83,8 @@ resource "azurerm_virtual_network" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
-  address_space       = ["10.66.10.0/24", "10.66.20.0/24"]
   tags                = local.tags
+  address_space       = ["10.66.10.0/24", "10.66.20.0/24"]
 }
 
 resource "azurerm_subnet" "servers" {
@@ -172,9 +179,9 @@ resource "azurerm_public_ip" "dns" {
   name                = "${local.name}-dns"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
+  tags                = local.tags
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = local.tags
 }
 
 resource "azurerm_network_interface" "dns_servers" {
@@ -200,6 +207,7 @@ resource "azurerm_linux_virtual_machine" "dns" {
   name                  = "${local.name}-dns"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
+  tags                  = local.tags
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.dns_servers.id]
@@ -219,7 +227,6 @@ resource "azurerm_linux_virtual_machine" "dns" {
     sku       = "12-gen2"
     version   = "latest"
   }
-  tags = local.tags
 }
 
 resource "terraform_data" "dns" {
@@ -230,9 +237,6 @@ resource "terraform_data" "dns" {
     user        = "isoloom"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
-  }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom"]
   }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-dns.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
@@ -245,13 +249,13 @@ resource "terraform_data" "dns" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.66.20.10 client' | sudo tee -a /etc/hosts >/dev/null",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/dns.sh'",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.66.20.10 client'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/dns.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting udp dport 10053 redirect to :53",
-      "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -301,9 +305,9 @@ resource "azurerm_public_ip" "client" {
   name                = "${local.name}-client"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
+  tags                = local.tags
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = local.tags
 }
 
 resource "azurerm_network_interface" "client_users" {
@@ -329,6 +333,7 @@ resource "azurerm_linux_virtual_machine" "client" {
   name                  = "${local.name}-client"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
+  tags                  = local.tags
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.client_users.id]
@@ -348,7 +353,6 @@ resource "azurerm_linux_virtual_machine" "client" {
     sku       = "12-gen2"
     version   = "latest"
   }
-  tags = local.tags
 }
 
 resource "terraform_data" "client" {
@@ -359,9 +363,6 @@ resource "terraform_data" "client" {
     user        = "isoloom"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
-  }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom"]
   }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-client.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
@@ -374,30 +375,23 @@ resource "terraform_data" "client" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.66.10.53 dns' | sudo tee -a /etc/hosts >/dev/null",
-      "sh -c 'i=0; until (bash -c '\\''</dev/tcp/dns/53'\\'' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\"'",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/client.sh'",
-      "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
-      "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.66.10.53 dns'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/dns/53'\\'' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\"'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [terraform_data.dns]
 }
 
 output "machines" {
-  value = {
-    dns    = azurerm_public_ip.dns.ip_address
-    client = azurerm_public_ip.client.ip_address
-  }
+  value = { dns = azurerm_public_ip.dns.ip_address, client = azurerm_public_ip.client.ip_address }
 }
 
 output "ssh_users" {
-  value = {
-    dns    = "isoloom"
-    client = "isoloom"
-  }
+  value = { dns = "isoloom", client = "isoloom" }
 }
 
 output "ip" {
@@ -411,15 +405,25 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "client", machine = "client", host = azurerm_public_ip.client.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/client.sh" },
-    { position = "dns", machine = "dns", host = azurerm_public_ip.dns.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/dns.sh" }
+    {
+      position = "client"
+      machine  = "client"
+      host     = azurerm_public_ip.client.ip_address
+      user     = "isoloom"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/client.sh"
+    },
+    {
+      position = "dns"
+      machine  = "dns"
+      host     = azurerm_public_ip.dns.ip_address
+      user     = "isoloom"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/dns.sh"
+    }
   ]
 }
 
 output "published" {
-  value = {
-    "dns/dns-udp" = "${azurerm_public_ip.dns.ip_address}:10053"
-  }
+  value = { "dns/dns-udp" = "${azurerm_public_ip.dns.ip_address}:10053" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

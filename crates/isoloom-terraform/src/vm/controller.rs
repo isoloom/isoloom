@@ -100,6 +100,8 @@ pub struct Ssh<'a> {
     pub replace_on: Expression,
     /// Its address.
     pub host: Expression,
+    /// The SSH user (it has `sudo`).
+    pub user: String,
     /// Its extra interfaces, found by MAC (as a machine's `at_boot`).
     pub at_boot: Vec<Template>,
     /// The inventory.
@@ -127,10 +129,7 @@ pub fn provisioner(c: Ssh) -> Provisioner {
     Provisioner {
         name: "isoloom_controller".into(),
         replace_on: c.replace_on,
-        connection: Connection::Ssh {
-            host: c.host,
-            user: "admin".into(),
-        },
+        connection: Connection::Ssh { host: c.host, user: c.user },
         uploads: vec![
             Upload::Project {
                 id: "controller".into(),

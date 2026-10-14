@@ -1,4 +1,4 @@
-//! The AWS and Proxmox modules of a few examples, rendered from their plan, as snapshots; their
+//! The AWS, Azure, Google Cloud and Proxmox modules of a few examples, rendered from their plan, as snapshots; their
 //! determinism, and refusals read from the plan without rendering.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
@@ -33,6 +33,14 @@ fn aws(example: &str) -> String {
     module(&CloudVmBackend, example, "cloud-vm/aws/main.tf")
 }
 
+fn azure(example: &str) -> String {
+    module(&CloudVmBackend, example, "cloud-vm/azure/main.tf")
+}
+
+fn gcp(example: &str) -> String {
+    module(&CloudVmBackend, example, "cloud-vm/gcp/main.tf")
+}
+
 fn proxmox(example: &str) -> String {
     module(&ProxmoxBackend, example, "proxmox/main.tf")
 }
@@ -55,6 +63,31 @@ fn aws_windows_hello() {
 #[test]
 fn aws_ansible_pair() {
     insta::assert_snapshot!(aws("ansible-pair"));
+}
+
+#[test]
+fn azure_hello_stack() {
+    insta::assert_snapshot!(azure("hello-stack"));
+}
+
+#[test]
+fn azure_segmented() {
+    insta::assert_snapshot!(azure("segmented"));
+}
+
+#[test]
+fn azure_windows_hello() {
+    insta::assert_snapshot!(azure("windows-hello"));
+}
+
+#[test]
+fn gcp_solo_web() {
+    insta::assert_snapshot!(gcp("solo-web"));
+}
+
+#[test]
+fn gcp_hello_stack() {
+    insta::assert_snapshot!(gcp("hello-stack"));
 }
 
 #[test]
@@ -113,4 +146,41 @@ fn a_windows_machine_is_refused_by_proxmox_only() {
     assert!(CloudVmBackend.refusal(&e(Target::CloudVm)).is_none());
     let why = ProxmoxBackend.refusal(&e(Target::Proxmox)).expect("refused");
     assert!(why.contains("no Proxmox image for `windows-server-2019`"), "{why}");
+}
+
+#[test]
+fn each_cloud_refuses_on_its_own() {
+    use isoloom_terraform::cloud_vm::cloud_refusals;
+    // Two networks, each machine on one: AWS, Azure and Google Cloud take it.
+    let refusals = cloud_refusals(&env("segmented", Target::CloudVm));
+    let names: Vec<&str> = refusals.iter().map(|(n, _)| *n).collect();
+    assert_eq!(names, ["aws", "azure", "gcp", "digitalocean", "linode", "oci"]);
+    assert!(refusals[..3].iter().all(|(_, why)| why.is_none()), "{refusals:?}");
+    // A Windows machine: Google Cloud only.
+    let refusals = cloud_refusals(&env("windows-hello", Target::CloudVm));
+    assert_eq!(refusals[2].1.as_deref(), Some("machine `web01`: Windows on GCP comes later"));
+    let files = CloudVmBackend.render(&env("windows-hello", Target::CloudVm)).unwrap();
+    assert!(files.iter().any(|f| f.path.ends_with("cloud-vm/azure/main.tf")));
+    assert!(!files.iter().any(|f| f.path.ends_with("cloud-vm/gcp/main.tf")));
+}
+
+#[test]
+fn a_cloud_refuses_from_the_plan_without_rendering() {
+    use isoloom_terraform::cloud_vm::CLOUDS;
+    let spec = isoloom_spec::parse(
+        "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    vm: { os: debian-12 }\n",
+    )
+    .unwrap();
+    let e = Environment::build(&spec, Target::CloudVm, None);
+    for (name, why) in [
+        ("azure", "machine `w`: arm64 on Azure comes later (Arm-based sizes and arm64 images)"),
+        (
+            "gcp",
+            "machine `w`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images)",
+        ),
+    ] {
+        let (_, cloud) = CLOUDS.iter().find(|(n, _)| *n == name).unwrap();
+        assert_eq!(cloud.refusal(&e).as_deref(), Some(why));
+        assert!(cloud.render(&e).unwrap_err().to_string().ends_with(why));
+    }
 }

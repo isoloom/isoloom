@@ -134,12 +134,8 @@ fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() {
     ] {
         let tf = file(&files, &format!(".isoloom/cloud-vm/{cloud}/main.tf")).unwrap();
         assert!(tf.contains("isoloom_controller"), "{cloud}");
-        // AWS writes each entry one item a line (the HCL builder), Azure on one line.
-        let entry = if cloud == "aws" {
-            format!("position = \"networks\"\n      machine  = \"controller\"\n      host     = {host}")
-        } else {
-            format!("{{ position = \"networks\", machine = \"controller\", host = {host}")
-        };
+        // Each entry one item a line (the HCL builder).
+        let entry = format!("position = \"networks\"\n      machine  = \"controller\"\n      host     = {host}");
         assert!(tf.contains(&entry), "{cloud}: {tf}");
     }
 }

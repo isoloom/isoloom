@@ -1,4 +1,4 @@
-//! The `cloud-vm` Azure driver: a faithful port of the AWS one to the azurerm provider. These
+//! The `cloud-vm` Azure module: the AWS model on the azurerm provider, from the plan. These
 //! assert the Azure-specific facts; `generate.rs` checks the committed output stays in sync.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
@@ -25,8 +25,7 @@ fn azure(spec: &Spec) -> String {
 fn azure_uses_azurerm_with_static_addresses_and_the_shared_outputs() {
     let tf = azure(&example("hello-stack"));
     // The azurerm provider and an Azure VM, not an AWS instance.
-    assert!(tf.contains("source  = \"hashicorp/azurerm\""), "{tf}");
-    assert!(tf.contains("version = \"~> 5.0\""), "{tf}");
+    assert!(tf.contains("azurerm = { source = \"hashicorp/azurerm\", version = \"~> 5.0\" }"), "{tf}");
     assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"web\""));
     // The module interface (docs/cloud-modules.md): a `region` var and ARM_SUBSCRIPTION_ID from the environment.
     assert!(tf.contains("variable \"region\""), "{tf}");
@@ -84,5 +83,8 @@ fn azure_runs_windows_over_winrm_and_a_controller_runs_the_checks() {
     assert!(tf.contains("type     = \"winrm\""));
     // A Windows-only environment: a Debian controller runs the checks from its public IP.
     assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"isoloom_controller\""));
-    assert!(tf.contains("host = azurerm_public_ip.isoloom_controller.ip_address"));
+    assert!(
+        tf.contains("machine  = \"controller\"\n      host     = azurerm_public_ip.isoloom_controller.ip_address"),
+        "{tf}"
+    );
 }

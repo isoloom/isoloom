@@ -1,6 +1,6 @@
 //! The Terraform VM core: what every Terraform target that runs one VM per machine shares, built
-//! once on the plan ([`Environment`]) with the HCL builder. AWS, Proxmox, DigitalOcean, Linode
-//! and Oracle Cloud render through it; Azure and Google Cloud move onto it next.
+//! once on the plan ([`Environment`]) with the HCL builder. Proxmox and every cloud of
+//! `cloud-vm` (AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle Cloud) render through it.
 //!
 //! A target brings its own resources (networks, instances, images, firewall rules) and picks a
 //! transport for the machines' set-up; the core brings the rest:
@@ -19,17 +19,19 @@
 //! - [`controller`]: the controller VM's part (its key, its set-up, the playbooks) and the
 //!   inventory.
 //! - [`checks`]: the check runners and the `checks` output.
-//! - [`cloud`]: what every cloud module repeats (the auto-stop, redirects, common variables,
-//!   the environment's id, the outputs).
+//! - [`cloud`]: what every cloud module repeats: the operator's variables, the environment's id
+//!   and names, the tags, the auto-stop, extra interfaces brought up by MAC, published-port
+//!   redirects, the Windows password and rules, and the outputs ([`cloud::outputs`], given how
+//!   the cloud reaches its machines).
 //! - [`module`]: the variables, the project lists and the outputs every module has.
 //! - [`provisioner`]: one `terraform_data` resource running files and commands on a machine.
 //!
-//! To move a cloud onto the core: implement `isoloom_render::backend::Backend` (or a driver of
-//! `cloud_vm`), write its resources with `isoloom_render::hcl_builder`, and for each machine
-//! call [`linux::provisioner`] (or [`windows::blocks`]) with how Terraform reaches it; its
-//! refusals come from [`limits`], computed from the plan. `cloud_vm::legacy` keeps the
-//! string-built helpers (`linux_setup_cmds`, `remote_exec`, `checks_output`...) until the last
-//! cloud has moved.
+//! To move a cloud onto the core: implement `isoloom_render::backend::Backend` for it (target
+//! `cloud-vm`, `cloud_vm::render_cloud` and `cloud_vm::refuse_cloud` do the rest) and add it to
+//! `cloud_vm::CLOUDS`; write its resources with `isoloom_render::hcl_builder`, and for each
+//! machine call [`linux::provisioner`] (or [`windows::blocks`], with its [`windows::Platform`])
+//! with how Terraform reaches it; its refusals come from [`limits`], computed from the plan,
+//! then its own rules (images, reserved addresses).
 
 pub mod checks;
 pub mod cloud;

@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 8.0"
-    }
+    google = { source = "hashicorp/google", version = "~> 8.0" }
   }
 }
 
@@ -20,30 +17,37 @@ variable "project" {
   default     = ""
   description = "An existing project; or leave empty and give billing_account for a project of its own"
 }
+
 variable "billing_account" {
   type        = string
   default     = ""
   description = "With no project: create one for this environment, billed here, deleted with it"
 }
+
 variable "org_id" {
   type    = string
   default = ""
 }
+
 variable "region" {
   type    = string
   default = "europe-west9"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -150,15 +154,13 @@ resource "google_compute_instance" "writer" {
     network_ip = "10.84.0.10"
     access_config {}
   }
-  metadata = {
-    ssh-keys = "admin:${var.ssh_public_key}"
-  }
+  metadata                = { ssh-keys = "admin:${var.ssh_public_key}" }
   metadata_startup_script = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
   labels = {
-    "isoloom-environment" = "shared-files"
-    "managed-by"          = "isoloom"
-    "isoloom-instance"   = local.name
-    "isoloom-expires-at" = var.expires_at
+    isoloom-environment = "shared-files"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
   }
 }
 
@@ -171,9 +173,6 @@ resource "terraform_data" "writer" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-writer.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -185,12 +184,11 @@ resource "terraform_data" "writer" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.84.0.11 reader' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\npkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra\nsystemctl daemon-reexec 2>/dev/null || true\n'",
-      "sudo mkdir -p /srv/shared",
-      "cd /opt/isoloom && sudo -E sh -c 'sh steps/write.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/write.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -238,15 +236,13 @@ resource "google_compute_instance" "reader" {
     network_ip = "10.84.0.11"
     access_config {}
   }
-  metadata = {
-    ssh-keys = "admin:${var.ssh_public_key}"
-  }
+  metadata                = { ssh-keys = "admin:${var.ssh_public_key}" }
   metadata_startup_script = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
   labels = {
-    "isoloom-environment" = "shared-files"
-    "managed-by"          = "isoloom"
-    "isoloom-instance"   = local.name
-    "isoloom-expires-at" = var.expires_at
+    isoloom-environment = "shared-files"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
   }
 }
 
@@ -259,9 +255,6 @@ resource "terraform_data" "reader" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-reader.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -273,12 +266,11 @@ resource "terraform_data" "reader" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.84.0.10 writer' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\npkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done\nsystemctl daemon-reexec 2>/dev/null || true\n'",
-      "sudo mkdir -p /data/shared",
-      "cd /opt/isoloom && sudo -E sh -c 'sh steps/look.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/look.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -291,10 +283,7 @@ output "machines" {
 }
 
 output "ssh_users" {
-  value = {
-    writer = "admin"
-    reader = "admin"
-  }
+  value = { writer = "admin", reader = "admin" }
 }
 
 output "ip" {
@@ -308,7 +297,13 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "reader", machine = "reader", host = google_compute_instance.reader.network_interface[0].access_config[0].nat_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh" }
+    {
+      position = "reader"
+      machine  = "reader"
+      host     = google_compute_instance.reader.network_interface[0].access_config[0].nat_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh"
+    }
   ]
 }
 

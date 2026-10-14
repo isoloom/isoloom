@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 5.0"
-    }
+    azurerm = { source = "hashicorp/azurerm", version = "~> 5.0" }
   }
 }
 
@@ -20,21 +17,26 @@ variable "subscription_id" {
   default     = null
   description = "Default: ARM_SUBSCRIPTION_ID from the environment"
 }
+
 variable "region" {
   type    = string
   default = "swedencentral"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -62,7 +64,12 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-shared-files-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "shared-files", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+  tags = {
+    isoloom-environment = "shared-files"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "azurerm_resource_group" "env" {
@@ -76,8 +83,8 @@ resource "azurerm_virtual_network" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
-  address_space       = ["10.84.0.0/24"]
   tags                = local.tags
+  address_space       = ["10.84.0.0/24"]
 }
 
 resource "azurerm_subnet" "app" {
@@ -132,9 +139,9 @@ resource "azurerm_public_ip" "writer" {
   name                = "${local.name}-writer"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
+  tags                = local.tags
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = local.tags
 }
 
 resource "azurerm_network_interface" "writer_app" {
@@ -160,6 +167,7 @@ resource "azurerm_linux_virtual_machine" "writer" {
   name                  = "${local.name}-writer"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
+  tags                  = local.tags
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.writer_app.id]
@@ -179,7 +187,6 @@ resource "azurerm_linux_virtual_machine" "writer" {
     sku       = "12-gen2"
     version   = "latest"
   }
-  tags = local.tags
 }
 
 resource "terraform_data" "writer" {
@@ -190,9 +197,6 @@ resource "terraform_data" "writer" {
     user        = "isoloom"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
-  }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom"]
   }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-writer.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
@@ -205,12 +209,11 @@ resource "terraform_data" "writer" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.84.0.11 reader' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\npkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra\nsystemctl daemon-reexec 2>/dev/null || true\n'",
-      "sudo mkdir -p /srv/shared",
-      "cd /opt/isoloom && sudo -E sh -c 'sh steps/write.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/write.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -260,9 +263,9 @@ resource "azurerm_public_ip" "reader" {
   name                = "${local.name}-reader"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
+  tags                = local.tags
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = local.tags
 }
 
 resource "azurerm_network_interface" "reader_app" {
@@ -288,6 +291,7 @@ resource "azurerm_linux_virtual_machine" "reader" {
   name                  = "${local.name}-reader"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
+  tags                  = local.tags
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.reader_app.id]
@@ -307,7 +311,6 @@ resource "azurerm_linux_virtual_machine" "reader" {
     sku       = "12-gen2"
     version   = "latest"
   }
-  tags = local.tags
 }
 
 resource "terraform_data" "reader" {
@@ -318,9 +321,6 @@ resource "terraform_data" "reader" {
     user        = "isoloom"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
-  }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom"]
   }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-reader.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
@@ -333,28 +333,21 @@ resource "terraform_data" "reader" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.84.0.10 writer' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\npkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done\nsystemctl daemon-reexec 2>/dev/null || true\n'",
-      "sudo mkdir -p /data/shared",
-      "cd /opt/isoloom && sudo -E sh -c 'sh steps/look.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/look.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
 
 output "machines" {
-  value = {
-    writer = azurerm_public_ip.writer.ip_address
-    reader = azurerm_public_ip.reader.ip_address
-  }
+  value = { writer = azurerm_public_ip.writer.ip_address, reader = azurerm_public_ip.reader.ip_address }
 }
 
 output "ssh_users" {
-  value = {
-    writer = "isoloom"
-    reader = "isoloom"
-  }
+  value = { writer = "isoloom", reader = "isoloom" }
 }
 
 output "ip" {
@@ -368,7 +361,13 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "reader", machine = "reader", host = azurerm_public_ip.reader.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh" }
+    {
+      position = "reader"
+      machine  = "reader"
+      host     = azurerm_public_ip.reader.ip_address
+      user     = "isoloom"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh"
+    }
   ]
 }
 

@@ -20,6 +20,8 @@ pub enum Connection {
         host: Expression,
         /// The password.
         password: Expression,
+        /// NTLM authentication (an image whose WinRM listener doesn't take Basic over HTTP).
+        ntlm: bool,
     },
 }
 
@@ -92,13 +94,20 @@ fn connection(c: &Connection) -> Block {
             .add_attribute(("user", string(user.as_str())))
             .add_attribute(("private_key", call("file", [call("pathexpand", [reference("var.ssh_private_key_file")])])))
             .add_attribute(("timeout", string("10m"))),
-        Connection::WinRm { host, password } => b
-            .add_attribute(("type", string("winrm")))
-            .add_attribute(("host", host.clone()))
-            .add_attribute(("user", string("isoloom")))
-            .add_attribute(("password", password.clone()))
-            .add_attribute(("https", isoloom_render::hcl_builder::boolean(false)))
-            .add_attribute(("timeout", string("30m"))),
+        Connection::WinRm { host, password, ntlm } => {
+            let b = b
+                .add_attribute(("type", string("winrm")))
+                .add_attribute(("host", host.clone()))
+                .add_attribute(("user", string("isoloom")))
+                .add_attribute(("password", password.clone()))
+                .add_attribute(("https", isoloom_render::hcl_builder::boolean(false)));
+            let b = if *ntlm {
+                b.add_attribute(("use_ntlm", isoloom_render::hcl_builder::boolean(true)))
+            } else {
+                b
+            };
+            b.add_attribute(("timeout", string("30m")))
+        }
     }
     .build()
 }
