@@ -1,0 +1,231 @@
+# Isoloom on the clouds for real (#145): one example brought up with `isoloom run cloud-docker`,
+# tested, torn down, on every cloud whose credentials are repository secrets. A cloud without
+# them is skipped, not failed. What the maintainer provides, the budget guard and the record
+# format: docs/real-targets.md.
+#
+# Each cloud's job:
+# - reaps what earlier runs left (expired tags, old `isoloom-*` names; scripts/real-targets/reap.sh);
+# - brings the example up at the cloud's smallest size, tagged to expire after MAX_HOURS, its
+#   machines set to stop on their own after the job's timeout;
+# - tests it, then tears it down in an `always()` step, and reaps the whole CI account for that
+#   cloud when anything failed or was cancelled;
+# - uploads its record (scripts/real-targets/record.sh).
+# The daily schedule only reaps, so a runner that died mid-run leaves nothing for long.
+name: Real targets (clouds)
+
+on:
+  workflow_dispatch:
+    inputs:
+      clouds:
+        description: Clouds to run, comma-separated (empty for every cloud with credentials)
+        type: string
+        default: ""
+      reap_only:
+        description: Only reap leftovers; bring nothing up
+        type: boolean
+        default: false
+  schedule:
+    - cron: "23 4 * * 2" # weekly: run, test, down, reap
+    - cron: "47 5 * * *" # daily: reap only
+
+permissions:
+  contents: read
+
+# One run at a time: a reap with --all must never meet another run's environment.
+concurrency:
+  group: real-cloud
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  EXAMPLE: solo-web
+  TARGET: cloud-docker
+  MAX_HOURS: ${{ vars.REAL_CLOUD_MAX_HOURS || '3' }}
+  REAP_ONLY: ${{ inputs.reap_only || github.event.schedule == '47 5 * * *' }}
+
+jobs:
+  # Which clouds have credentials. Secrets can't appear in a job's `if`, so this job reads them
+  # and says which clouds run. Forks never get here: they have no secrets, and the job is
+  # skipped there anyway.
+  gate:
+    if: ${{ !github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      clouds: ${{ steps.pick.outputs.clouds }}
+      any: ${{ steps.pick.outputs.any }}
+    steps:
+      - id: pick
+        env:
+          WANTED: ${{ inputs.clouds }}
+          AWS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' }}
+          AZURE: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_CLIENT_SECRET != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
+          GCP: ${{ secrets.GCP_CREDENTIALS_JSON != '' && secrets.GCP_PROJECT != '' }}
+          DIGITALOCEAN: ${{ secrets.DIGITALOCEAN_TOKEN != '' }}
+          LINODE: ${{ secrets.LINODE_TOKEN != '' }}
+          OCI: ${{ secrets.OCI_USER_OCID != '' && secrets.OCI_TENANCY_OCID != '' && secrets.OCI_FINGERPRINT != '' && secrets.OCI_PRIVATE_KEY != '' && secrets.OCI_COMPARTMENT_OCID != '' }}
+        run: |
+          clouds=()
+          for c in aws azure gcp digitalocean linode oci; do
+            have=${c^^}
+            if [ -n "$WANTED" ] && [[ ",${WANTED// /}," != *",$c,"* ]]; then
+              echo "$c: not asked for"
+            elif [ "${!have}" != true ]; then
+              echo "::notice title=$c skipped::no credentials in the repository secrets (docs/real-targets.md)"
+            else
+              echo "$c: credentials found"
+              clouds+=("$c")
+            fi
+          done
+          echo "clouds=$(printf '%s\n' "${clouds[@]}" | jq -Rsc 'split("\n") | map(select(. != ""))')" >> "$GITHUB_OUTPUT"
+          if [ "${#clouds[@]}" -gt 0 ]; then echo any=true; else echo any=false; fi >> "$GITHUB_OUTPUT"
+
+  cloud:
+    needs: gate
+    if: ${{ needs.gate.outputs.any == 'true' }}
+    runs-on: ubuntu-latest
+    # The budget's time cap: every step below has its own, and they add up to less, so `down`
+    # and the reaper still run inside it.
+    timeout-minutes: 130
+    strategy:
+      fail-fast: false
+      matrix:
+        cloud: ${{ fromJSON(needs.gate.outputs.clouds) }}
+    env:
+      CLOUD: ${{ matrix.cloud }}
+      # Only this leg's cloud gets its credentials; the others' stay out of its environment.
+      AWS_ACCESS_KEY_ID: ${{ matrix.cloud == 'aws' && secrets.AWS_ACCESS_KEY_ID || '' }}
+      AWS_SECRET_ACCESS_KEY: ${{ matrix.cloud == 'aws' && secrets.AWS_SECRET_ACCESS_KEY || '' }}
+      AWS_REGION: ${{ matrix.cloud == 'aws' && (vars.REAL_AWS_REGION || 'eu-west-3') || '' }}
+      ARM_CLIENT_ID: ${{ matrix.cloud == 'azure' && secrets.AZURE_CLIENT_ID || '' }}
+      ARM_CLIENT_SECRET: ${{ matrix.cloud == 'azure' && secrets.AZURE_CLIENT_SECRET || '' }}
+      ARM_TENANT_ID: ${{ matrix.cloud == 'azure' && secrets.AZURE_TENANT_ID || '' }}
+      ARM_SUBSCRIPTION_ID: ${{ matrix.cloud == 'azure' && secrets.AZURE_SUBSCRIPTION_ID || '' }}
+      CLOUDSDK_CORE_PROJECT: ${{ matrix.cloud == 'gcp' && secrets.GCP_PROJECT || '' }}
+      DIGITALOCEAN_TOKEN: ${{ matrix.cloud == 'digitalocean' && secrets.DIGITALOCEAN_TOKEN || '' }}
+      LINODE_TOKEN: ${{ matrix.cloud == 'linode' && secrets.LINODE_TOKEN || '' }}
+      OCI_COMPARTMENT_ID: ${{ matrix.cloud == 'oci' && secrets.OCI_COMPARTMENT_OCID || '' }}
+      OCI_REGION: ${{ matrix.cloud == 'oci' && (vars.REAL_OCI_REGION || 'eu-paris-1') || '' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Files the cloud's tools read: Google's key file (and gcloud's login, for the reaper),
+      # Oracle's config and its CLI (not on the runner image). Written under the runner's temp
+      # folder or home, never in the checkout. AWS, Azure, DigitalOcean and Linode read the
+      # environment.
+      - name: Credentials
+        timeout-minutes: 10
+        env:
+          GCP_CREDENTIALS_JSON: ${{ matrix.cloud == 'gcp' && secrets.GCP_CREDENTIALS_JSON || '' }}
+          OCI_USER_OCID: ${{ matrix.cloud == 'oci' && secrets.OCI_USER_OCID || '' }}
+          OCI_TENANCY_OCID: ${{ matrix.cloud == 'oci' && secrets.OCI_TENANCY_OCID || '' }}
+          OCI_FINGERPRINT: ${{ matrix.cloud == 'oci' && secrets.OCI_FINGERPRINT || '' }}
+          OCI_PRIVATE_KEY: ${{ matrix.cloud == 'oci' && secrets.OCI_PRIVATE_KEY || '' }}
+        run: |
+          case "$CLOUD" in
+            gcp)
+              umask 077
+              printf '%s' "$GCP_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp.json"
+              echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp.json" >> "$GITHUB_ENV"
+              gcloud auth activate-service-account --key-file "$RUNNER_TEMP/gcp.json" --quiet
+              ;;
+            oci)
+              umask 077
+              mkdir -p ~/.oci
+              printf '%s\n' "$OCI_PRIVATE_KEY" > ~/.oci/key.pem
+              printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
+                "$OCI_USER_OCID" "$OCI_FINGERPRINT" "$OCI_TENANCY_OCID" "$OCI_REGION" "$HOME/.oci/key.pem" > ~/.oci/config
+              pipx install oci-cli
+              ;;
+          esac
+
+      - name: Reap what earlier runs left (expired only)
+        timeout-minutes: 15
+        continue-on-error: ${{ env.REAP_ONLY != 'true' }}
+        run: scripts/real-targets/reap.sh "$CLOUD"
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        if: env.REAP_ONLY != 'true'
+        with:
+          terraform_wrapper: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        if: env.REAP_ONLY != 'true'
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: env.REAP_ONLY != 'true'
+      - name: Build
+        id: build
+        if: env.REAP_ONLY != 'true'
+        timeout-minutes: 15
+        run: |
+          cargo build -q -p isoloom
+          echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
+          echo "RECORD=$RUNNER_TEMP/record" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/record"
+
+      # The budget guard, as Terraform variables: the cloud's smallest size that runs the
+      # example (each overridable by a repository variable), the expiry tag the reaper reads,
+      # machines that stop on their own, SSH open to this runner only, a key for this run only.
+      - name: Budget guard
+        if: env.REAP_ONLY != 'true'
+        env:
+          AWS_SIZE: ${{ vars.REAL_AWS_SIZE || 't3.small' }}
+          AZURE_SIZE: ${{ vars.REAL_AZURE_SIZE || 'Standard_B2als_v2' }}
+          GCP_SIZE: ${{ vars.REAL_GCP_SIZE || 'e2-small' }}
+          DIGITALOCEAN_SIZE: ${{ vars.REAL_DIGITALOCEAN_SIZE || 's-1vcpu-2gb' }}
+          LINODE_SIZE: ${{ vars.REAL_LINODE_SIZE || 'g6-standard-1' }}
+        run: |
+          case "$CLOUD" in
+            aws) echo "TF_VAR_instance_type=$AWS_SIZE"; echo "TF_VAR_region=$AWS_REGION" ;;
+            azure) echo "TF_VAR_size=$AZURE_SIZE" ;;
+            gcp) echo "TF_VAR_machine_type=$GCP_SIZE"; echo "TF_VAR_project=$CLOUDSDK_CORE_PROJECT" ;;
+            digitalocean) echo "TF_VAR_size=$DIGITALOCEAN_SIZE" ;;
+            linode) echo "TF_VAR_type=$LINODE_SIZE" ;;
+            oci) echo "TF_VAR_compartment_id=$OCI_COMPARTMENT_ID"; echo "TF_VAR_region=$OCI_REGION" ;; # 1 OCPU, 4 GB: the module's only shape
+          esac >> "$GITHUB_ENV"
+          ssh-keygen -q -t ed25519 -N '' -C "isoloom-ci-$GITHUB_RUN_ID" -f "$RUNNER_TEMP/id_ed25519"
+          {
+            echo "TF_VAR_expires_at=$(( $(date +%s) + MAX_HOURS * 3600 ))"
+            echo "TF_VAR_auto_stop_minutes=100"
+            echo "TF_VAR_allowed_cidr=$(curl -fsS --retry 3 https://checkip.amazonaws.com)/32"
+            echo "TF_VAR_ssh_public_key=$(cat "$RUNNER_TEMP/id_ed25519.pub")"
+            echo "TF_VAR_ssh_private_key_file=$RUNNER_TEMP/id_ed25519"
+          } >> "$GITHUB_ENV"
+
+      - name: Run
+        if: env.REAP_ONLY != 'true'
+        timeout-minutes: 35
+        run: isoloom run "$TARGET" --cloud "$CLOUD" "examples/$EXAMPLE" --json | tee "$RECORD/run.jsonl"
+      - name: Test
+        if: env.REAP_ONLY != 'true'
+        timeout-minutes: 10
+        run: isoloom test "$TARGET" --cloud "$CLOUD" "examples/$EXAMPLE" --ssh-key "$RUNNER_TEMP/id_ed25519" --json | tee "$RECORD/test.jsonl"
+      - name: Down
+        id: down
+        if: always() && steps.build.outcome == 'success'
+        timeout-minutes: 20
+        run: isoloom down "$TARGET" --cloud "$CLOUD" "examples/$EXAMPLE" --json | tee "$RECORD/down.jsonl"
+      # `down` failed or never ran (cancelled): whatever is left in this cloud's CI account goes.
+      - name: Reap this cloud's CI account
+        if: always() && steps.build.outcome == 'success' && steps.down.outcome != 'success'
+        timeout-minutes: 15
+        run: scripts/real-targets/reap.sh "$CLOUD" --all
+
+      - name: Record
+        if: always() && steps.build.outcome == 'success'
+        env:
+          RECORD_TARGET: ${{ env.TARGET }}
+          RECORD_EXAMPLE: ${{ env.EXAMPLE }}
+          RECORD_CLOUD: ${{ matrix.cloud }}
+        run: |
+          RECORD_MODULE="examples/$EXAMPLE/.isoloom/$TARGET/$CLOUD" scripts/real-targets/record.sh "$RECORD" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && steps.build.outcome == 'success'
+        with:
+          name: record-${{ env.TARGET }}-${{ matrix.cloud }}-${{ env.EXAMPLE }}
+          path: ${{ runner.temp }}/record/record.json
+          if-no-files-found: warn
