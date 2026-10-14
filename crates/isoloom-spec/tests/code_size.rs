@@ -13,11 +13,7 @@ const MAX_CODE_LINES: usize = 400;
 /// Files still over the limit in `isoloom-coverage`, which the coverage units are rewriting in
 /// parallel. The list shrinks as those units land: a file leaves it once it is under the limit,
 /// and the test fails while a listed file is already under it.
-const COVERAGE_OVER_THE_LIMIT: &[&str] = &[
-    "isoloom-coverage/src/compose.rs",
-    "isoloom-coverage/src/spec.rs",
-    "isoloom-coverage/src/vagrant.rs",
-];
+const COVERAGE_OVER_THE_LIMIT: &[&str] = &["isoloom-coverage/src/spec.rs", "isoloom-coverage/src/vagrant.rs"];
 
 /// The workspace's `crates` directory.
 fn crates_dir() -> PathBuf {

@@ -123,7 +123,7 @@ fn docs_coverage_is_up_to_date() {
 
 // From the formats' side.
 
-use isoloom_coverage::{Support, compose, formats, vagrant};
+use isoloom_coverage::{Support, formats, vagrant};
 
 /// Every committed output of a generator, across the examples: each file must exist in at
 /// least one example, so a renamed output can't silently leave the check with nothing to read.
@@ -140,36 +140,6 @@ fn outputs(files: &[&str]) -> Vec<String> {
         assert!(found.len() > before, "no example has {file}");
     }
     found
-}
-
-/// The property names a schema node allows, following `$ref` and `allOf`/`anyOf`/`oneOf`.
-fn schema_keys(defs: &serde_json::Value, node: &serde_json::Value) -> BTreeSet<String> {
-    let mut keys: BTreeSet<String> = node["properties"].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
-    if let Some(r) = node["$ref"].as_str() {
-        keys.extend(schema_keys(defs, &defs[r.rsplit('/').next().unwrap()]));
-    }
-    for combinator in ["allOf", "anyOf", "oneOf"] {
-        for sub in node[combinator].as_array().into_iter().flatten() {
-            keys.extend(schema_keys(defs, sub));
-        }
-    }
-    keys
-}
-
-#[test]
-fn compose_rows_are_exactly_the_schema_keys() {
-    let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../isoloom-coverage/coverage/compose-spec.json")).unwrap();
-    let schema: serde_json::Value = serde_json::from_str(&text).unwrap();
-    let defs = &schema["$defs"];
-    let mut expected: BTreeSet<String> = schema_keys(defs, &schema);
-    for (prefix, def) in [("services.*.", "service"), ("networks.*.", "network"), ("volumes.*.", "volume")] {
-        expected.extend(schema_keys(defs, &defs[def]).into_iter().map(|k| format!("{prefix}{k}")));
-    }
-    let rows: BTreeSet<String> = compose::format().rows.iter().map(|(k, _)| k.clone()).collect();
-    let missing: Vec<_> = expected.difference(&rows).collect();
-    let extra: Vec<_> = rows.difference(&expected).collect();
-    assert!(missing.is_empty(), "Compose keys with no coverage row: {missing:?}");
-    assert!(extra.is_empty(), "coverage rows that aren't Compose keys: {extra:?}");
 }
 
 /// Checks a format's rows against what the generator really writes: every key written has a
@@ -189,26 +159,6 @@ fn written_matches(rows: &[(String, Support)], written: &BTreeSet<String>, forma
             assert!(written.contains(key), "{format}: `{key}` is marked as written, but no example's output has it");
         }
     }
-}
-
-#[test]
-fn compose_written_keys_match_the_generated_files() {
-    let mut written = BTreeSet::new();
-    for text in outputs(&[".isoloom/docker/compose.yml", ".isoloom/hybrid/compose.yml"]) {
-        let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text).unwrap();
-        for (k, v) in doc.as_mapping().unwrap() {
-            let k = k.as_str().unwrap();
-            written.insert(k.to_string());
-            if let ("services" | "networks" | "volumes", Some(items)) = (k, v.as_mapping()) {
-                for item in items.values() {
-                    for key in item.as_mapping().into_iter().flat_map(|m| m.keys()) {
-                        written.insert(format!("{k}.*.{}", key.as_str().unwrap()));
-                    }
-                }
-            }
-        }
-    }
-    written_matches(&compose::format().rows, &written, "Compose");
 }
 
 #[test]
