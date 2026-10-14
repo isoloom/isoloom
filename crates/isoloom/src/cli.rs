@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 
 use crate::commands::{
     capture, chart, check, connect, coverage, defaults, doctor, down, exec, gc, generate, graph, import, inspect, message, profiles, provision, report, reset,
-    resources, run, status, targets, tc, test, validate,
+    resources, run, schema, status, targets, tc, test, validate,
 };
 
 #[derive(Parser)]
@@ -99,10 +99,31 @@ pub enum Command {
     /// with `helm package`: the artifact to hand over or push to a chart registry.
     Chart(chart::Args),
     /// Print the JSON Schema of isoloom.yml (for editors: completion, hover docs, errors).
-    Schema,
+    Schema(schema::Args),
     /// Draft an isoloom.yml from files you already have.
     #[command(subcommand)]
     Import(import::Import),
     /// Show which features of each output format (Compose, Vagrant) a spec can produce.
     Coverage(coverage::Args),
+}
+
+impl Command {
+    /// Whether the command was asked for JSON events and errors (`--json` on a lifecycle
+    /// command). The other commands' `--json` prints one document of their own.
+    pub fn json_events(&self) -> bool {
+        match self {
+            Command::Run(a) => a.json,
+            Command::Reset(a) => a.json,
+            Command::Down(a) => a.json,
+            Command::Test(a) => a.json,
+            Command::Provision(a) => a.json,
+            Command::Gc(a) => a.json,
+            Command::Status(a) => a.json,
+            Command::Connect(a) => a.json,
+            Command::Exec(a) => a.json,
+            Command::Capture(a) => a.json,
+            Command::Tc(a) => a.json,
+            _ => false,
+        }
+    }
 }

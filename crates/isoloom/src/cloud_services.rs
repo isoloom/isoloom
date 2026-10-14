@@ -2,10 +2,13 @@
 //! hands the module, and the outputs `test` and the message read back from it.
 
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use isoloom_core as core;
 
+use isoloom_core::events::ErrorCode;
+
+use crate::failure::Failure;
 use crate::tools::terraform;
 use crate::{Res, spec};
 
@@ -13,7 +16,7 @@ use crate::{Res, spec};
 /// it isn't deployed or Terraform can't say).
 pub fn outputs(dir: &Path, instance: Option<u8>) -> indexmap::IndexMap<String, String> {
     let script = dir.join(core::instance::output_dir(instance)).join("cloud-services/outputs.sh");
-    let Ok(out) = Command::new("sh")
+    let Ok(out) = crate::tools::process::command("sh")
         .arg(&script)
         .envs(terraform::aws_session_env())
         .stderr(Stdio::null())
@@ -40,15 +43,17 @@ pub fn outputs(dir: &Path, instance: Option<u8>) -> indexmap::IndexMap<String, S
 /// Cloud services taking launch-time inputs: from the environment at `run`, written next to
 /// the state so `down` destroys with the same values.
 pub fn write_inputs(cloud: &core::CloudServices, wd: &Path) -> Res<()> {
-    if let Some(h) = cloud.hourly_usd {
+    if let Some(h) = cloud.hourly_usd
+        && !crate::output::json()
+    {
         eprintln!("note: about ${h:.2} an hour while it exists (cloud.hourly_usd); `isoloom down` destroys it");
     }
     let mut values = serde_json::Map::new();
     let mut missing = Vec::new();
     for (k, v) in &cloud.vars {
         if let Some(i) = core::CloudServices::input_of(v) {
-            match std::env::var(i) {
-                Ok(val) if !val.is_empty() => {
+            match spec::input(i) {
+                Some(val) if !val.is_empty() => {
                     values.insert(k.clone(), serde_json::Value::String(val));
                 }
                 _ => missing.push(i.to_string()),
@@ -56,7 +61,10 @@ pub fn write_inputs(cloud: &core::CloudServices, wd: &Path) -> Res<()> {
         }
     }
     if !missing.is_empty() {
-        return Err(format!("set {} in the environment (the services take them at launch)", missing.join(", ")).into());
+        let message = format!("set {} in the environment (the services take them at launch)", missing.join(", "));
+        return Err(Failure::new(ErrorCode::InputMissing, message)
+            .hint("set them in the shell, or in the profile's `inputs`")
+            .into());
     }
     if !values.is_empty() {
         let file = wd.join("inputs.tfvars.json");

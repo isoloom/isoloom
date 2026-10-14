@@ -40,7 +40,7 @@ fn run_recorder(script: &Path, file: &Path) -> Res<serde_json::Value> {
     ];
     let mut last = String::from("no Ruby found (Vagrant's own, or `ruby` on the PATH)");
     for ruby in rubies {
-        match std::process::Command::new(ruby).arg(script).arg(file).output() {
+        match crate::tools::process::command(ruby).arg(script).arg(file).output() {
             Ok(out) if out.status.success() => return Ok(serde_json::from_slice(&out.stdout)?),
             Ok(out) => {
                 last = format!(

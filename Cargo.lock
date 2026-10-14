@@ -429,6 +429,7 @@ dependencies = [
  "clap",
  "indexmap",
  "isoloom-core",
+ "isoloom-plan",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -537,6 +538,7 @@ name = "isoloom-runtime"
 version = "0.10.1"
 dependencies = [
  "isoloom-spec",
+ "schemars",
  "serde",
  "serde_json",
  "serde_yaml_ng",

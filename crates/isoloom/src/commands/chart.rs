@@ -1,7 +1,7 @@
 //! `isoloom chart`: the Kubernetes files (the chart with them), then `helm package`.
 
 use std::path::PathBuf;
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
 use isoloom_core as core;
 
@@ -37,7 +37,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
     let chart = dir.join(core::OUTPUT_DIR).join("kubernetes").join("chart");
     let dest = a.out.clone().unwrap_or_else(|| dir.clone());
     std::fs::create_dir_all(&dest)?;
-    let status = Command::new("helm")
+    let status = crate::tools::process::command("helm")
         .arg("package")
         .arg(&chart)
         .args(["--version", version, "--app-version", version, "--destination"])

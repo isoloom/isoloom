@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-runtime"
-description = "Isoloom's runtime state: the registry of running environments, host readiness and reports."
+description = "Isoloom's runtime: the registry of running environments, host readiness, reports and the lifecycle's JSON events."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +12,7 @@ thiserror.workspace = true
 isoloom-spec.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+schemars.workspace = true
 serde_yaml_ng.workspace = true
 
 [lints]

@@ -7,7 +7,10 @@ use isoloom_core::checks::Position;
 
 use super::Ctx;
 use super::runner::{Runner, piped, ssh_runner};
+use isoloom_core::events::ErrorCode;
+
 use crate::external::external_machines;
+use crate::failure::fail;
 use crate::tools::terraform;
 use crate::{Res, target};
 
@@ -24,7 +27,10 @@ fn from_position(position: &str) -> String {
 fn checks_output(outputs: &serde_json::Value, target: &str) -> Res<Vec<serde_json::Value>> {
     match outputs.get("checks").and_then(|v| v.as_array()) {
         Some(list) => Ok(list.clone()),
-        None => Err(format!("the module has no `checks` output: run `isoloom run {target}` first").into()),
+        None => Err(fail(
+            ErrorCode::NotRunning,
+            format!("the module has no `checks` output: run `isoloom run {target}` first"),
+        )),
     }
 }
 
@@ -54,7 +60,7 @@ pub fn cloud_docker(ctx: &Ctx) -> Res<Vec<Runner>> {
     let outputs = terraform::output(&ctx.out.join("cloud-docker").join(cloud))?;
     let host = outputs["ip"]
         .as_str()
-        .ok_or("the module has no `ip` output: run `isoloom run cloud-docker` first")?;
+        .ok_or_else(|| fail(ErrorCode::NotRunning, "the module has no `ip` output: run `isoloom run cloud-docker` first"))?;
     let user = outputs["ssh_user"].as_str().unwrap_or("root");
     let runners = ctx
         .positions
@@ -77,7 +83,7 @@ pub fn proxmox(ctx: &Ctx) -> Res<Vec<Runner>> {
     let outputs = terraform::output(&ctx.out.join("proxmox"))?;
     let router = outputs["address"]
         .as_str()
-        .ok_or("the module has no `address` output: run `isoloom run proxmox` first")?
+        .ok_or_else(|| fail(ErrorCode::NotRunning, "the module has no `address` output: run `isoloom run proxmox` first"))?
         .to_string();
     let list = checks_output(&outputs, "proxmox")?;
     let runners = list

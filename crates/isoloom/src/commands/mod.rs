@@ -35,6 +35,7 @@ pub mod validate;
 
 /// Runs the subcommand asked for.
 pub fn run(command: Command) -> Res<ExitCode> {
+    crate::output::use_json(command.json_events());
     match command {
         Command::Validate(a) => validate::run(&a),
         Command::Targets(a) => targets::run(&a),
@@ -60,7 +61,7 @@ pub fn run(command: Command) -> Res<ExitCode> {
         Command::Inspect(a) => inspect::run(a),
         Command::Profiles(a) => profiles::run(&a),
         Command::Chart(a) => chart::run(&a),
-        Command::Schema => schema::run(),
+        Command::Schema(a) => schema::run(&a),
         Command::Import(i) => import::run(i),
         Command::Coverage(a) => coverage::run(&a),
     }

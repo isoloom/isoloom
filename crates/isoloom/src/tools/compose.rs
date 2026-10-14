@@ -8,6 +8,9 @@ use isoloom_core as core;
 use isoloom_core::Target;
 use isoloom_core::model::Protocol;
 use isoloom_core::registry;
+use isoloom_plan::Environment;
+
+use crate::tools::process;
 
 /// A published port: (machine, container port, protocol, host port).
 pub type Published = (String, u16, Protocol, u16);
@@ -34,7 +37,7 @@ pub fn compose_files(dir: &Path, instance: Option<u8>) -> Vec<String> {
 
 /// `docker compose --progress quiet <files>`, run from the project folder.
 pub fn quiet(dir: &Path, instance: Option<u8>) -> Command {
-    let mut c = Command::new("docker");
+    let mut c = process::command("docker");
     c.args(["compose", "--progress", "quiet"]).args(compose_files(dir, instance));
     c.current_dir(dir);
     c
@@ -48,11 +51,17 @@ pub fn ps_items(text: &str) -> Vec<serde_json::Value> {
 
 /// The host ports an environment really got, for its message: local Docker publishes on free
 /// ports unless `ISOLOOM_PUBLISH_FIXED` pins them to the spec's; the other targets keep them.
-pub fn real_ports(dir: &Path, t: Target, instance: Option<u8>) -> Vec<Published> {
-    if t != Target::Docker || std::env::var_os("ISOLOOM_PUBLISH_FIXED").is_some_and(|v| !v.is_empty()) {
+/// Compose is asked only when the environment publishes a port (`publishes`).
+pub fn real_ports(dir: &Path, t: Target, instance: Option<u8>, publishes: bool) -> Vec<Published> {
+    if t != Target::Docker || !publishes || std::env::var_os("ISOLOOM_PUBLISH_FIXED").is_some_and(|v| !v.is_empty()) {
         return Vec::new();
     }
     docker_published(dir, instance)
+}
+
+/// Whether the plan publishes a port of any machine on the host.
+pub fn publishes(plan: &Environment) -> bool {
+    plan.machines.values().any(|m| !m.ports.is_empty())
 }
 
 /// The host ports a local Docker environment really got, as (machine, port, protocol, host
@@ -60,7 +69,7 @@ pub fn real_ports(dir: &Path, t: Target, instance: Option<u8>) -> Vec<Published>
 /// Compose file publishes on free loopback ports unless `ISOLOOM_PUBLISH_FIXED` is set, so the
 /// spec's `publish:` values aren't where it answers. Empty when Compose can't say.
 pub fn docker_published(dir: &Path, instance: Option<u8>) -> Vec<Published> {
-    let Ok(out) = Command::new("docker")
+    let Ok(out) = process::command("docker")
         .arg("compose")
         .args(compose_files(dir, instance))
         .args(["ps", "--format", "json"])

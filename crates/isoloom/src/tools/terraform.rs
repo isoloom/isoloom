@@ -2,25 +2,28 @@
 //! it can't find on its own.
 
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
-use crate::Res;
+use isoloom_core::events::ErrorCode;
+
+use crate::failure::fail;
 use crate::tools::process;
+use crate::{Res, spec};
 
 /// `terraform output -json` of a module, as a map of output name to value.
 pub fn output(module: &Path) -> Res<serde_json::Value> {
-    let out = Command::new("terraform")
+    let out = crate::tools::process::command("terraform")
         .args(["output", "-json"])
         .current_dir(module)
         .output()
         .map_err(|e| process::spawn_error("terraform", &e))?;
     if !out.status.success() {
-        return Err(format!(
+        let message = format!(
             "terraform output failed in {}: {}",
             module.display(),
             String::from_utf8_lossy(&out.stderr).trim()
-        )
-        .into());
+        );
+        return Err(fail(ErrorCode::ToolFailed, message));
     }
     let raw: serde_json::Value = serde_json::from_slice(&out.stdout)?;
     // Each output is { "value": ..., "type": ... }: keep the values.
@@ -37,10 +40,10 @@ pub fn output(module: &Path) -> Res<serde_json::Value> {
 /// which reads only keys, profiles with keys and SSO: nothing when keys are already set or the CLI
 /// has no session. Never written anywhere; the child process gets them in its environment.
 pub fn aws_session_env() -> Vec<(String, String)> {
-    if std::env::var_os("AWS_ACCESS_KEY_ID").is_some() {
+    if spec::input("AWS_ACCESS_KEY_ID").is_some() {
         return Vec::new();
     }
-    let Ok(out) = Command::new("aws")
+    let Ok(out) = crate::tools::process::command("aws")
         .args(["configure", "export-credentials", "--format", "env-no-export"])
         .stderr(Stdio::null())
         .output()

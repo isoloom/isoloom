@@ -8,6 +8,9 @@ use std::process::Command;
 use isoloom_core as core;
 use isoloom_core::{Target, shell};
 
+use isoloom_core::events::ErrorCode;
+
+use crate::failure::{Failure, fail};
 use crate::tools::{compose, kubectl, terraform};
 use crate::{Res, spec, target};
 
@@ -101,10 +104,11 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         return tool(&call);
     }
     let m = spec.machines.get(machine).ok_or_else(|| {
-        format!(
+        let message = format!(
             "no machine named `{machine}` (machines: {})",
             spec.machines.keys().cloned().collect::<Vec<_>>().join(", ")
-        )
+        );
+        Failure::new(ErrorCode::MachineUnknown, message).machine(machine)
     })?;
     match env.target {
         Target::Docker | Target::Hosted => docker(&call, m),
@@ -113,7 +117,10 @@ pub fn on_machine(env: &Env, machine: &str, cmd: Option<&str>, tty: bool, root: 
         Target::Kubernetes => kubernetes(&call, m),
         Target::CloudVm => cloud_vm(&call, m),
         Target::CloudDocker => cloud_docker(&call, m),
-        Target::CloudServices => Err("cloud services have no machines to reach: use their outputs (`isoloom message`)".into()),
+        Target::CloudServices => Err(fail(
+            ErrorCode::Unsupported,
+            "cloud services have no machines to reach: use their outputs (`isoloom message`)",
+        )),
         Target::External => external(&call, m),
         Target::Proxmox => proxmox(&call),
     }
@@ -139,7 +146,7 @@ fn tool(call: &Call) -> Res<Command> {
             Ok(c)
         }
         Target::Vagrant | Target::Hybrid if call.machine == "shell" => {
-            let mut c = Command::new("vagrant");
+            let mut c = crate::tools::process::command("vagrant");
             c.current_dir(call.out().join(target::vm_folder(target)));
             c.args(["ssh", &unit]);
             if call.command || call.root {
@@ -147,18 +154,18 @@ fn tool(call: &Call) -> Res<Command> {
             }
             Ok(c)
         }
-        other => Err(format!("tool `{}` has no form on {}", call.machine, other.id()).into()),
+        other => Err(fail(ErrorCode::Unsupported, format!("tool `{}` has no form on {}", call.machine, other.id()))),
     }
 }
 
 /// A machine without `docker:` is supplied by the runner on the container targets.
 fn container_only(call: &Call, m: &core::Machine, what: &str) -> Res<()> {
     if m.docker.is_none() {
-        return Err(format!(
+        let message = format!(
             "`{}` has no `docker:`: on {what} it is supplied by the runner, so there is nothing of it to reach",
             call.machine
-        )
-        .into());
+        );
+        return Err(Failure::new(ErrorCode::Unsupported, message).machine(call.machine).into());
     }
     Ok(())
 }
@@ -179,7 +186,7 @@ fn docker(call: &Call, m: &core::Machine) -> Res<Command> {
 fn local_vm(call: &Call, m: &core::Machine) -> Res<Command> {
     let Env { spec, target, .. } = *call.env;
     let machine = call.machine;
-    let mut c = Command::new("vagrant");
+    let mut c = crate::tools::process::command("vagrant");
     c.current_dir(call.out().join(target::vm_folder(target)));
     if target == Target::Hybrid && m.docker.is_some() {
         // A container of a hybrid environment lives on the Docker host VM.
@@ -191,7 +198,7 @@ fn local_vm(call: &Call, m: &core::Machine) -> Res<Command> {
             &format!("sudo docker exec {flags} {machine} sh -c {}", shell::quote(&call.inner)),
         ]);
     } else if is_windows(m) {
-        return Err(windows_hint(spec, machine).into());
+        return Err(Failure::new(ErrorCode::Unsupported, windows_hint(spec, machine)).machine(machine).into());
     } else {
         c.args(["ssh", machine]);
         if call.command || call.root {
@@ -218,7 +225,7 @@ fn compose_on_host(call: &Call) -> String {
 
 fn docker_vm(call: &Call, m: &core::Machine) -> Res<Command> {
     container_only(call, m, "Docker")?;
-    let mut c = Command::new("vagrant");
+    let mut c = crate::tools::process::command("vagrant");
     c.current_dir(call.out().join("docker-vm"));
     c.args(["ssh", "-c", &compose_on_host(call)]);
     Ok(c)
@@ -226,7 +233,7 @@ fn docker_vm(call: &Call, m: &core::Machine) -> Res<Command> {
 
 fn kubernetes(call: &Call, m: &core::Machine) -> Res<Command> {
     container_only(call, m, "Kubernetes")?;
-    let mut c = Command::new("kubectl");
+    let mut c = crate::tools::process::command("kubectl");
     c.args(["-n", &kubectl::namespace(&call.env.spec.name), "exec"]);
     if call.tty {
         c.arg("-it");
@@ -240,13 +247,21 @@ fn kubernetes(call: &Call, m: &core::Machine) -> Res<Command> {
 fn address_in(outputs: &serde_json::Value, machine: &str) -> Res<String> {
     Ok(outputs["machines"][machine]
         .as_str()
-        .ok_or_else(|| format!("no address for `{machine}` in the module's outputs; is it applied?"))?
+        .ok_or_else(|| {
+            Failure::new(
+                ErrorCode::NotRunning,
+                format!("no address for `{machine}` in the module's outputs; is it applied?"),
+            )
+            .machine(machine)
+        })?
         .to_string())
 }
 
 fn cloud_vm(call: &Call, m: &core::Machine) -> Res<Command> {
     if is_windows(m) {
-        return Err(windows_hint(call.env.spec, call.machine).into());
+        return Err(Failure::new(ErrorCode::Unsupported, windows_hint(call.env.spec, call.machine))
+            .machine(call.machine)
+            .into());
     }
     let module = call.out().join("cloud-vm").join(call.env.cloud.unwrap_or("aws"));
     let outputs = terraform::output(&module)?;
@@ -294,7 +309,7 @@ fn proxmox(call: &Call) -> Res<Command> {
 }
 
 fn ssh(key: Option<&Path>, user: &str, host: &str, tty: bool, jump: Option<&str>) -> Command {
-    let mut c = Command::new("ssh");
+    let mut c = crate::tools::process::command("ssh");
     c.args(["-o", "StrictHostKeyChecking=accept-new"]);
     if let Some(k) = key {
         c.arg("-i").arg(k);

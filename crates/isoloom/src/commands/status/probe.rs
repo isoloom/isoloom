@@ -32,7 +32,7 @@ pub fn probe(e: &Entry) -> String {
 fn run(program: &str, args: &[&str], wd: &Path) -> Result<String, String> {
     let cwd = std::env::current_dir().ok();
     let _ = std::env::set_current_dir(wd);
-    let out = core::host::run_limited(program, args, 30);
+    let out = core::host::run_limited_in(program, args, 30, crate::spec::child_env());
     if let Some(c) = cwd {
         let _ = std::env::set_current_dir(c);
     }
@@ -126,7 +126,7 @@ fn external(out: &Path) -> String {
             args.extend(m.ssh_args());
             args.push("true".into());
             let refs: Vec<&str> = args.iter().map(String::as_str).collect();
-            core::host::run_limited("ssh", &refs, 10).ok().flatten().is_some()
+            core::host::run_limited_in("ssh", &refs, 10, crate::spec::child_env()).ok().flatten().is_some()
         })
         .count();
     counted(up, machines.len())

@@ -70,9 +70,9 @@ windows_password)`, `Access::external()`. A backend never writes inventory lines
 | `isoloom-targets` | Dispatch to every backend, refusals, `generate_all`, the resolved snapshot |
 | `isoloom-import` | Drafting a spec from Compose, Vagrant and Terraform files, with notes for what the draft leaves out |
 | `isoloom-coverage` | The coverage map: what each output format can do and what Isoloom produces |
-| `isoloom-runtime` | Runtime state: the registry of running environments (`~/.isoloom/status.yml`), host readiness, the environment report |
+| `isoloom-runtime` | Runtime state: the registry of running environments (`~/.isoloom/status.yml`), host readiness, the environment report; the lifecycle's JSON events and errors (`events`, with an `Emitter` for embedders) and a tool run with its output as events (`tool`): see [docs/json.md](docs/json.md) |
 | `isoloom-core` | The facade other tools embed: re-exports the supported surface of the crates above |
-| `isoloom` | The command line: clap definitions in `cli.rs`, one module per subcommand in `commands/`, tool runners in `tools/` |
+| `isoloom` | The command line: clap definitions in `cli.rs`, one module per subcommand in `commands/`, tool runners in `tools/` (every tool started by `tools::process::command`), `--json` output in `output.rs` and the error codes in `failure.rs` |
 
 Dependencies point down the pipeline: `spec` depends on nothing of ours, `plan` on `spec`,
 `render` on both, backends on `render`, `targets` on the backends. Only `isoloom-core` and the
@@ -136,8 +136,9 @@ once in the root `Cargo.toml` (`[workspace.lints]`) and inherited by every crate
 
 Enforced now (`deny`, so `cargo clippy --workspace --all-targets -- -D warnings` fails on them):
 
-- rust: `unsafe_code` (one justified `#[allow]`: the profile inputs' `set_var` in
-  `crates/isoloom/src/spec.rs`); rustdoc: `broken_intra_doc_links`, `bare_urls`.
+- rust: `unsafe_code` is `forbid`, with no exception (a profile's inputs reach every tool through
+  `Command::envs`, from `tools::process::command` in the command line); rustdoc:
+  `broken_intra_doc_links`, `bare_urls`.
 - clippy: `pedantic`, except the commented allow-list in `Cargo.toml` (`must_use_candidate`,
   `missing_errors_doc`, `missing_panics_doc`, `doc_markdown`, `similar_names`); `unwrap_used`,
   `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic: `clippy.toml`);
@@ -152,8 +153,7 @@ crates; `expect_used`; `too_many_lines` (60) and `cognitive_complexity` (15), wh
 are already in `clippy.toml`; and the pedantic lints still hit by code moving onto the plan IR
 (`case_sensitive_file_extension_comparisons`, `cast_possible_truncation`, `format_collect`,
 `format_push_string`, `map_unwrap_or`, `match_wildcard_for_single_variants`,
-`stable_sort_primitive`). The command line's `set_var` goes when profile inputs reach child
-processes through `Command::env`; `unsafe_code` becomes `forbid` then.
+`stable_sort_primitive`).
 
 ### Tests
 

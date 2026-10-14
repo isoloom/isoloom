@@ -1,8 +1,6 @@
 //! kubectl for the Kubernetes target: the namespace an environment runs in, and the check
 //! manifests as Kustomize renders them.
 
-use std::process::Command;
-
 use crate::Res;
 use crate::tools::process;
 
@@ -13,7 +11,7 @@ pub fn namespace(name: &str) -> String {
 
 /// `kubectl kustomize` of a folder, as text.
 pub fn kustomize(dir: &str) -> Res<String> {
-    let out = Command::new("kubectl")
+    let out = crate::tools::process::command("kubectl")
         .args(["kustomize", "--load-restrictor", "LoadRestrictionsNone", dir])
         .output()
         .map_err(|e| process::spawn_error("kubectl", &e))?;

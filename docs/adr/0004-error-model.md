@@ -26,6 +26,10 @@ whether they name the field, the file or the fix.
 - New code adds no `String` errors. `unwrap`, `expect` and `panic` are denied outside tests;
   `expect_used` is tracked until the generators no longer `expect` on a validated spec.
 
+The command line's `--json` output turns any error into one document with a stable code
+(`isoloom_runtime::events::ErrorCode`, listed in `docs/json.md`): its own errors carry their
+code (`Failure` in `crates/isoloom/src/failure.rs`), the library's get one from their type.
+
 Today: `isoloom_spec::LoadError` (not found, ambiguous, read, YAML, normalization, profile),
 `isoloom_spec::Problem` for validation, `isoloom_import::ImportError`, and the runtime's
 `RegistryError`, `ReportError` and `HostError`. The remaining `String` errors (defaults,

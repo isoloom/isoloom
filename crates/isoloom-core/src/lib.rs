@@ -19,7 +19,8 @@
 //!   re-exported model types) and the modules [`model`], [`validate`](mod@validate),
 //!   [`targets`], [`generate`](mod@generate) (with [`resolved`], the snapshot), [`checks`] (the
 //!   check plan and the runner's output lines), [`instance`], [`defaults`], [`profile`], [`registry`]
-//!   (`~/.isoloom/status.yml`, see `docs/registry.md`) and [`host`].
+//!   (`~/.isoloom/status.yml`, see `docs/registry.md`), [`host`], and [`events`] (the lifecycle's
+//!   JSON events and errors, with an emitter to receive them; see `docs/json.md`).
 //! - **Internal**: every other module ([`clones`], [`groups`], [`vlans`], [`ignore`], [`images`],
 //!   [`import`], [`coverage`], [`report`], [`schema`], [`shell`]) is public for the `isoloom`
 //!   command line and may change in any release. Helpers no other crate needs are
@@ -40,7 +41,7 @@ pub use isoloom_coverage as coverage;
 pub use isoloom_import as import;
 pub use isoloom_plan::checks;
 pub use isoloom_render::ignore;
-pub use isoloom_runtime::{host, registry, report};
+pub use isoloom_runtime::{RegistryError, events, host, registry, report, tool};
 pub use isoloom_spec::{clones, defaults, groups, images, instance, model, profile, schema, shell, targets, vlans};
 pub use isoloom_targets as generate;
 pub use isoloom_targets::resolved;
