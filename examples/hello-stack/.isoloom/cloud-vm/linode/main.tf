@@ -9,14 +9,8 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    linode = {
-      source  = "linode/linode"
-      version = "~> 2.0"
-    }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.0"
-    }
+    linode = { source = "linode/linode", version = "~> 2.0" }
+    random = { source = "hashicorp/random", version = "~> 3.0" }
   }
 }
 
@@ -24,17 +18,21 @@ variable "region" {
   type    = string
   default = "fr-par"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -74,6 +72,8 @@ resource "linode_vpc_subnet" "env" {
   ipv4   = "10.60.0.0/24"
 }
 
+# Who may reach the machines: SSH and the published ports from allowed_cidr, everything from
+# the subnet, the rest dropped. One firewall for every instance.
 resource "linode_firewall" "env" {
   label           = local.name
   inbound_policy  = "DROP"
@@ -156,9 +156,6 @@ resource "terraform_data" "cache" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)", "sudo mkdir -p /opt/isoloom && sudo chown root /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-cache.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -170,13 +167,13 @@ resource "terraform_data" "cache" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.60.0.10 web' | sudo tee -a /etc/hosts >/dev/null",
-      "sudo mkdir -p /data",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/cache.sh'",
-      "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
-      "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.60.0.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.60.0.10 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'mkdir -p '\\''/data'\\'''",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache.sh'\\'''",
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.60.0.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [linode_firewall.env]
@@ -223,9 +220,6 @@ resource "terraform_data" "web" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)", "sudo mkdir -p /opt/isoloom && sudo chown root /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -237,31 +231,26 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.60.0.20 cache' | sudo tee -a /etc/hosts >/dev/null",
-      "sh -c 'i=0; until (bash -c '\\''</dev/tcp/cache/6379'\\'' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"cache didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\"'",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
+      "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.60.0.20 cache'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/cache/6379'\\'' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"cache didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\"'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting tcp dport 8080 redirect to :80",
-      "printf '%s\\n' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    ip daddr != { 10.60.0.0/24 } ct state new drop' '  }' '}' | sudo tee /etc/isoloom-egress.nft >/dev/null && sudo nft -f /etc/isoloom-egress.nft",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.60.0.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [linode_firewall.env, terraform_data.cache]
 }
 
 output "machines" {
-  value = {
-    cache = one(linode_instance.cache.ipv4)
-    web   = one(linode_instance.web.ipv4)
-  }
+  value = { cache = one(linode_instance.cache.ipv4), web = one(linode_instance.web.ipv4) }
 }
 
 output "ssh_users" {
-  value = {
-    cache = "root"
-    web   = "root"
-  }
+  value = { cache = "root", web = "root" }
 }
 
 output "ip" {
@@ -275,15 +264,25 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "cache", machine = "cache", host = one(linode_instance.cache.ipv4), user = "root", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh" },
-    { position = "web", machine = "web", host = one(linode_instance.web.ipv4), user = "root", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" }
+    {
+      position = "cache"
+      machine  = "cache"
+      host     = one(linode_instance.cache.ipv4)
+      user     = "root"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh"
+    },
+    {
+      position = "web"
+      machine  = "web"
+      host     = one(linode_instance.web.ipv4)
+      user     = "root"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh"
+    }
   ]
 }
 
 output "published" {
-  value = {
-    "web/80" = "${one(linode_instance.web.ipv4)}:8080"
-  }
+  value = { "web/80" = "${one(linode_instance.web.ipv4)}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

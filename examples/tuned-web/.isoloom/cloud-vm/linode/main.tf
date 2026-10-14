@@ -9,14 +9,8 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    linode = {
-      source  = "linode/linode"
-      version = "~> 2.0"
-    }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.0"
-    }
+    linode = { source = "linode/linode", version = "~> 2.0" }
+    random = { source = "hashicorp/random", version = "~> 3.0" }
   }
 }
 
@@ -24,17 +18,21 @@ variable "region" {
   type    = string
   default = "fr-par"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -74,6 +72,8 @@ resource "linode_vpc_subnet" "env" {
   ipv4   = "10.83.0.0/24"
 }
 
+# Who may reach the machines: SSH and the published ports from allowed_cidr, everything from
+# the subnet, the rest dropped. One firewall for every instance.
 resource "linode_firewall" "env" {
   label           = local.name
   inbound_policy  = "DROP"
@@ -149,9 +149,6 @@ resource "terraform_data" "web" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)", "sudo mkdir -p /opt/isoloom && sudo chown root /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -163,25 +160,22 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(APP_MODE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''APP_MODE=production\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"APP_MODE=production\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nprintf %s '\\''net.core.somaxconn = 4096\n'\\'' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\nmkdir -p /etc/security/limits.d && printf %s '\\''* soft nofile 8192\n* hard nofile 16384\nroot soft nofile 8192\nroot hard nofile 16384\n'\\'' > /etc/security/limits.d/90-isoloom.conf\nprintf %s '\\''[Manager]\nDefaultLimitNOFILE=8192:16384\n'\\'' > /etc/systemd/system.conf.d/90-isoloom-limits.conf\nsystemctl daemon-reexec 2>/dev/null || true\n'",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(APP_MODE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''APP_MODE=production\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"APP_MODE=production\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nprintf %s '\\''net.core.somaxconn = 4096\n'\\'' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\nmkdir -p /etc/security/limits.d && printf %s '\\''* soft nofile 8192\n* hard nofile 16384\nroot soft nofile 8192\nroot hard nofile 16384\n'\\'' > /etc/security/limits.d/90-isoloom.conf\nprintf %s '\\''[Manager]\nDefaultLimitNOFILE=8192:16384\n'\\'' > /etc/systemd/system.conf.d/90-isoloom-limits.conf\nsystemctl daemon-reexec 2>/dev/null || true'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [linode_firewall.env]
 }
 
 output "machines" {
-  value = {
-    web = one(linode_instance.web.ipv4)
-  }
+  value = { web = one(linode_instance.web.ipv4) }
 }
 
 output "ssh_users" {
-  value = {
-    web = "root"
-  }
+  value = { web = "root" }
 }
 
 output "ip" {
@@ -195,7 +189,13 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "web", machine = "web", host = one(linode_instance.web.ipv4), user = "root", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" }
+    {
+      position = "web"
+      machine  = "web"
+      host     = one(linode_instance.web.ipv4)
+      user     = "root"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh"
+    }
   ]
 }
 

@@ -1,6 +1,6 @@
 //! The Terraform VM core: what every Terraform target that runs one VM per machine shares, built
-//! once on the plan ([`Environment`]) with the HCL builder. AWS and Proxmox render through it;
-//! the other clouds move onto it next (Azure, Google Cloud, DigitalOcean, Linode, Oracle).
+//! once on the plan ([`Environment`]) with the HCL builder. AWS, Proxmox, DigitalOcean, Linode
+//! and Oracle Cloud render through it; Azure and Google Cloud move onto it next.
 //!
 //! A target brings its own resources (networks, instances, images, firewall rules) and picks a
 //! transport for the machines' set-up; the core brings the rest:
@@ -19,6 +19,8 @@
 //! - [`controller`]: the controller VM's part (its key, its set-up, the playbooks) and the
 //!   inventory.
 //! - [`checks`]: the check runners and the `checks` output.
+//! - [`cloud`]: what every cloud module repeats (the auto-stop, redirects, common variables,
+//!   the environment's id, the outputs).
 //! - [`module`]: the variables, the project lists and the outputs every module has.
 //! - [`provisioner`]: one `terraform_data` resource running files and commands on a machine.
 //!
@@ -30,6 +32,7 @@
 //! cloud has moved.
 
 pub mod checks;
+pub mod cloud;
 pub mod cloud_init;
 pub mod controller;
 pub mod limits;

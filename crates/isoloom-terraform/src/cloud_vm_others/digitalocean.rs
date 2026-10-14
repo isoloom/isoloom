@@ -1,28 +1,74 @@
-//! DigitalOcean `cloud-vm`: one droplet for the lab's single Linux machine, on a VPC with the
+//! DigitalOcean `cloud-vm`: `.isoloom/cloud-vm/digitalocean/main.tf`, rendered from the plan
+//! through the VM core. One droplet for the lab's single Linux machine, on a VPC with the
 //! network's range. DigitalOcean can't pin a droplet's private IPv4 to a chosen address, so the
-//! lab's fixed inter-machine addressing doesn't hold; this driver therefore takes only
-//! single-network, single-Linux-VM labs and refuses the rest. Best effort, by design.
+//! lab's fixed inter-machine addressing wouldn't hold: the backend takes only single-network,
+//! single-Linux-VM labs and refuses the rest.
 
-use std::fmt::Write;
+use isoloom_plan::{Capabilities, Environment};
+use isoloom_render::backend::{Backend, Files, RenderError};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, list, reference, string};
+use isoloom_render::{GeneratedFile, header};
+use isoloom_spec::DEFAULT_MEMORY_MB;
+use isoloom_spec::model::Target;
 
-use crate::cloud_vm::{aligned, has_windows, linux_setup_cmds, needs_controller, redirects, remote_exec};
-use crate::model::Spec;
-use crate::proxmox::res;
-use crate::{GeneratedFile, OUTPUT_DIR, header, start_order};
+use super::single_network::{self, Rules};
+use crate::vm::cloud::{self, Reach, auto_stop, shutdown_script, tag_list};
+use crate::vm::linux;
+use crate::vm::module::{Variable, project_lists, terraform};
+use crate::vm::{os, res, vms};
 
-/// The droplet image slug and SSH user for an OS name (DigitalOcean images log in as root).
-fn do_image(os: &str) -> Option<(&'static str, &'static str)> {
+/// The module's folder under `.isoloom/cloud-vm/`.
+const SUB: &str = "digitalocean";
+
+/// What DigitalOcean takes.
+const RULES: Rules = Rules {
+    cloud: "DigitalOcean",
+    single_machine: true,
+    limits: single_network::limits("arm64 on DigitalOcean comes later (it has no arm64 droplets)"),
+    has_image: |os| image(os).is_some(),
+    images: "Debian 12/13, Ubuntu 22.04/24.04",
+};
+
+/// The `cloud-vm` module on DigitalOcean.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DigitalOceanBackend;
+
+impl Backend for DigitalOceanBackend {
+    fn target(&self) -> Target {
+        Target::CloudVm
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        single_network::capabilities()
+    }
+
+    fn render(&self, env: &Environment) -> Result<Files, RenderError> {
+        single_network::render(env, &RULES, module)
+    }
+
+    fn refusal(&self, env: &Environment) -> Option<String> {
+        isoloom_plan::refusal(&env.requirements, &self.capabilities())
+            .map(|r| r.to_string())
+            .or_else(|| single_network::refusal(env, &RULES))
+    }
+}
+
+/// The droplet image slug for an OS (DigitalOcean's images log in as root).
+fn image(os: &str) -> Option<&'static str> {
     Some(match os {
-        "debian-12" => ("debian-12-x64", "root"),
-        "debian-13" => ("debian-13-x64", "root"),
-        "ubuntu-22.04" => ("ubuntu-22-04-x64", "root"),
-        "ubuntu-24.04" => ("ubuntu-24-04-x64", "root"),
+        "debian-12" => "debian-12-x64",
+        "debian-13" => "debian-13-x64",
+        "ubuntu-22.04" => "ubuntu-22-04-x64",
+        "ubuntu-24.04" => "ubuntu-24-04-x64",
         _ => return None,
     })
 }
 
+/// The SSH user of every droplet.
+const USER: &str = "root";
+
 /// The droplet size for a machine's memory.
-fn do_size(memory_mb: u32) -> &'static str {
+fn size(memory_mb: u32) -> &'static str {
     match memory_mb {
         0..=1024 => "s-1vcpu-1gb",
         1025..=2048 => "s-2vcpu-2gb",
@@ -31,214 +77,124 @@ fn do_size(memory_mb: u32) -> &'static str {
     }
 }
 
-/// Why DigitalOcean can't take this spec, if it can't. It keeps only single-network,
-/// single-Linux-VM labs, because it can't pin private addresses.
-pub fn refusal(spec: &Spec) -> Option<String> {
-    if spec.networks.len() != 1 {
-        return Some("DigitalOcean cloud-vm takes single-network labs so far".into());
+const USAGE: &str = "# Auth:   export DIGITALOCEAN_TOKEN=<token>\n# Start:  terraform -chdir=.isoloom/cloud-vm/digitalocean init && terraform -chdir=.isoloom/cloud-vm/digitalocean apply \\\n#           -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/digitalocean destroy (same variables)\n";
+
+/// The module: the VPC, the droplet, its firewall and set-up, the outputs.
+fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
+    let mut m = Module::new(format!("{}{USAGE}", header("#")));
+    m.block(terraform(&[("digitalocean", "digitalocean/digitalocean", "~> 2.0")]));
+    m.block(Variable::new("region", "string").default(string("fra1")).block());
+    m.blocks(cloud::variables(env));
+    m.block(Block::builder("provider").add_label("digitalocean").build());
+    m.blocks(cloud::id_and_locals(env, Vec::new()));
+    network(env, &mut m);
+    for (name, _) in vms(env) {
+        droplet(env, name, &mut m);
     }
-    if has_windows(spec) {
-        return Some("DigitalOcean cloud-vm is Linux only so far".into());
-    }
-    if needs_controller(spec) {
-        return Some("DigitalOcean cloud-vm has no Ansible controller yet".into());
-    }
-    if spec.machines.values().filter(|m| m.vm.is_some()).count() > 1 {
-        return Some("DigitalOcean cloud-vm takes single-machine labs so far (it can't pin private addresses)".into());
-    }
-    // An OS without a droplet image: refuse rather than build something that won't boot.
-    for (name, m) in &spec.machines {
-        if let Some(vm) = &m.vm
-            && do_image(&vm.os).is_none()
-        {
-            return Some(format!(
-                "machine `{name}`: no DigitalOcean image for `{}` yet (Debian 12/13, Ubuntu 22.04/24.04)",
-                vm.os
-            ));
-        }
-    }
-    None
+    let reach = Reach {
+        public_ip: &public_ip,
+        user: &|_| USER.to_string(),
+        controller: None,
+    };
+    cloud::outputs(env, &reach, &mut m);
+    m.fragment(&project_lists(true));
+    Ok(GeneratedFile {
+        path: single_network::path(SUB),
+        contents: m.render()?,
+    })
 }
 
-/// The droplet, firewall and set-up for the lab's single Linux machine. `refusal` has already
-/// ruled out everything else, so a single-network single-VM lab is assumed.
-pub fn build(spec: &Spec) -> GeneratedFile {
-    let net = spec.networks.keys().next().expect("validated: one network");
-    let net_cidr = spec.networks[net].cidr.clone();
-    let lab = format!("{{ {net_cidr} }}");
+/// A droplet's public address.
+fn public_ip(name: &str) -> Expression {
+    reference(&format!("digitalocean_droplet.{}.ipv4_address", res(name)))
+}
 
-    let name = start_order(spec)
-        .into_iter()
-        .find(|n| spec.machines[*n].vm.is_some())
-        .expect("validated: one VM machine");
-    let m = &spec.machines[name];
-    let vm = m.vm.as_ref().expect("checked");
-    let (slug, user) = do_image(&vm.os).expect("checked by refusal");
+fn resource(kind: &str, name: &str) -> BlockBuilder {
+    Block::builder("resource").add_label(kind).add_label(name)
+}
+
+/// The VPC with the network's range, and the SSH key.
+fn network(env: &Environment, m: &mut Module) {
+    let cidr = env.networks.values().next().map(|n| n.cidr.as_str()).unwrap_or_default();
+    m.commented(
+        "The environment's network: a VPC with the lab network's range. DigitalOcean assigns the\ndroplet a private address in it (it can't be pinned), so this is best-effort addressing.",
+        resource("digitalocean_vpc", "env")
+            .add_attribute(("name", reference("local.name")))
+            .add_attribute(("region", reference("var.region")))
+            .add_attribute(("ip_range", string(cidr)))
+            .build(),
+    );
+    m.block(
+        resource("digitalocean_ssh_key", "env")
+            .add_attribute(("name", reference("local.name")))
+            .add_attribute(("public_key", reference("var.ssh_public_key")))
+            .build(),
+    );
+}
+
+/// The droplet, its firewall, its set-up over SSH.
+fn droplet(env: &Environment, name: &str, m: &mut Module) {
+    let mp = &env.machines[name];
     let id = res(name);
-    let mem = m.resources.and_then(|r| r.memory_mb).unwrap_or(isoloom_spec::DEFAULT_MEMORY_MB);
-    // The droplet's public address.
-    let pip = format!("digitalocean_droplet.{id}.ipv4_address");
-    let redirects = redirects(m);
-
-    let mut tf = header("#");
-    tf.push_str(
-        "# Auth:   export DIGITALOCEAN_TOKEN=<token>\n# Start:  terraform -chdir=.isoloom/cloud-vm/digitalocean init && terraform -chdir=.isoloom/cloud-vm/digitalocean apply \\\n#           -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/digitalocean destroy (same variables)\n\n",
+    let slug = image(os(mp).unwrap_or_default()).unwrap_or_default();
+    m.block(
+        resource("digitalocean_droplet", &id)
+            .add_attribute(("name", cloud::name_with(&format!("-{name}"))))
+            .add_attribute(("region", reference("var.region")))
+            .add_attribute(("size", string(size(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))))
+            .add_attribute(("image", string(slug)))
+            .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
+            .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.fingerprint")])))
+            .add_attribute(("user_data", auto_stop(shutdown_script(), isoloom_render::hcl_builder::null())))
+            .add_attribute(("tags", tag_list(env)))
+            .build(),
     );
-    tf.push_str(
-        r#"terraform {
-  required_version = ">= 1.6"
-  backend "local" {}
-  required_providers {
-    digitalocean = {
-      source  = "digitalocean/digitalocean"
-      version = "~> 2.0"
-    }
-  }
-}
-
-variable "region" {
-  type    = string
-  default = "fra1"
-}
-variable "allowed_cidr" {
-  type        = string
-  description = "Who may reach the machine (SSH and the published ports), e.g. your IP/32"
-}
-variable "ssh_public_key" {
-  type = string
-}
-variable "ssh_private_key_file" {
-  type        = string
-  description = "The private key of ssh_public_key: Terraform sets the machine up over SSH"
-}
-variable "auto_stop_minutes" {
-  type        = number
-  default     = 0
-  description = "Shut the machine down after this many minutes (0: never)"
-}
-
-variable "expires_at" {
-  type        = string
-  default     = ""
-  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
-}
-"#,
+    m.commented(
+        "What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.",
+        firewall(env, &id),
     );
-    if !spec.inputs.is_empty() {
-        tf.push_str(
-            "variable \"inputs\" {\n  type        = map(string)\n  default     = {}\n  sensitive   = true\n  description = \"Values given at launch\"\n}\n",
-        );
+    let machine = linux::Machine {
+        env,
+        name,
+        replace_on: reference(&format!("digitalocean_droplet.{id}.id")),
+        host: public_ip(name),
+        user: USER.into(),
+        hooks: single_network::hooks(mp, Vec::new()),
+    };
+    m.block(linux::provisioner(machine).block());
+}
+
+/// A firewall rule: inbound from `sources` or outbound to `destinations`.
+fn rule(kind: &str, protocol: &str, ports: Option<&str>, addresses: Expression) -> Block {
+    let (block, key) = if kind == "inbound" {
+        ("inbound_rule", "source_addresses")
+    } else {
+        ("outbound_rule", "destination_addresses")
+    };
+    let mut b = Block::builder(block).add_attribute(("protocol", string(protocol)));
+    if let Some(p) = ports {
+        b = b.add_attribute(("port_range", string(p)));
     }
-    let _ = write!(
-        tf,
-        r##"
-provider "digitalocean" {{}}
+    b.add_attribute((key, addresses)).build()
+}
 
-resource "terraform_data" "id" {{
-  input = substr(replace(uuid(), "-", ""), 0, 8)
-  lifecycle {{
-    ignore_changes = [input]
-  }}
-}}
-
-locals {{
-  name = "isoloom-{env}-${{terraform_data.id.output}}"
-  root = abspath("${{path.module}}/../../..")
-}}
-
-# The environment's network: a VPC with the lab network's range. DigitalOcean assigns the
-# droplet a private address in it (it can't be pinned), so this is best-effort addressing.
-resource "digitalocean_vpc" "env" {{
-  name     = local.name
-  region   = var.region
-  ip_range = "{net_cidr}"
-}}
-
-resource "digitalocean_ssh_key" "env" {{
-  name       = local.name
-  public_key = var.ssh_public_key
-}}
-
-resource "digitalocean_droplet" "{id}" {{
-  name      = "${{local.name}}-{name}"
-  region    = var.region
-  size      = "{size}"
-  image     = "{slug}"
-  vpc_uuid  = digitalocean_vpc.env.id
-  ssh_keys  = [digitalocean_ssh_key.env.fingerprint]
-  user_data = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${{var.auto_stop_minutes}}\n" : null
-  tags      = concat(["isoloom", "{env}", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${{var.expires_at}}"])
-}}
-
-# What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.
-resource "digitalocean_firewall" "{id}" {{
-  name        = local.name
-  droplet_ids = [digitalocean_droplet.{id}.id]
-  inbound_rule {{
-    protocol         = "tcp"
-    port_range       = "22"
-    source_addresses = [var.allowed_cidr]
-  }}
-"##,
-        env = spec.name,
-        size = do_size(mem),
-    );
-    let mut published_out = Vec::new();
-    for sv in &m.services {
-        if let Some(h) = sv.publish {
-            let _ = write!(
-                tf,
-                "  inbound_rule {{\n    protocol         = \"{proto}\"\n    port_range       = \"{h}\"\n    source_addresses = [var.allowed_cidr]\n  }}\n",
-                proto = sv.protocol.id()
-            );
-            let label = m.service_label(sv);
-            published_out.push((format!("\"{name}/{label}\""), format!("\"${{{pip}}}:{h}\"")));
-        }
+/// SSH and the published ports from `allowed_cidr`, everything from the VPC, everything out.
+fn firewall(env: &Environment, id: &str) -> Block {
+    let allowed = || list([reference("var.allowed_cidr")]);
+    let vpc = || list([reference("digitalocean_vpc.env.ip_range")]);
+    let anywhere = || list([string("0.0.0.0/0"), string("::/0")]);
+    let mut b = resource("digitalocean_firewall", id)
+        .add_attribute(("name", reference("local.name")))
+        .add_attribute(("droplet_ids", list([reference(&format!("digitalocean_droplet.{id}.id"))])))
+        .add_block(rule("inbound", "tcp", Some("22"), allowed()));
+    for (protocol, port) in single_network::published_ports(env) {
+        b = b.add_block(rule("inbound", protocol.id(), Some(&port.to_string()), allowed()));
     }
-    tf.push_str(
-        "  inbound_rule {\n    protocol         = \"tcp\"\n    port_range       = \"1-65535\"\n    source_addresses = [digitalocean_vpc.env.ip_range]\n  }\n  inbound_rule {\n    protocol         = \"udp\"\n    port_range       = \"1-65535\"\n    source_addresses = [digitalocean_vpc.env.ip_range]\n  }\n  inbound_rule {\n    protocol         = \"icmp\"\n    source_addresses = [digitalocean_vpc.env.ip_range]\n  }\n  outbound_rule {\n    protocol              = \"tcp\"\n    port_range            = \"1-65535\"\n    destination_addresses = [\"0.0.0.0/0\", \"::/0\"]\n  }\n  outbound_rule {\n    protocol              = \"udp\"\n    port_range            = \"1-65535\"\n    destination_addresses = [\"0.0.0.0/0\", \"::/0\"]\n  }\n  outbound_rule {\n    protocol              = \"icmp\"\n    destination_addresses = [\"0.0.0.0/0\", \"::/0\"]\n  }\n}\n",
-    );
-
-    // Its set-up, over SSH. One network: the MAC closure is never called.
-    let cmds = linux_setup_cmds(spec, name, &lab, &redirects, &|_| String::new());
-    let mut prov = format!(
-        "\nresource \"terraform_data\" \"{id}\" {{\n  triggers_replace = [digitalocean_droplet.{id}.id]\n  connection {{\n    type        = \"ssh\"\n    host        = {pip}\n    user        = \"{user}\"\n    private_key = file(pathexpand(var.ssh_private_key_file))\n    timeout     = \"10m\"\n  }}\n  provisioner \"remote-exec\" {{\n    inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo mkdir -p /opt/isoloom && sudo chown {user} /opt/isoloom\"]\n  }}\n  provisioner \"local-exec\" {{\n    command = \"tar -czf \\\"${{path.module}}/.isoloom-project-{id}.tgz\\\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \\\"${{abspath(local_file.isoloom_project.filename)}}\\\" -C \\\"${{dirname(local.root)}}\\\" \\\"${{basename(local.root)}}\\\"\"\n  }}\n  provisioner \"file\" {{\n    source      = \"${{path.module}}/.isoloom-project-{id}.tgz\"\n    destination = \"/tmp/isoloom-project.tgz\"\n  }}\n"
-    );
-    if !m.inputs.is_empty() {
-        let lines: Vec<String> = m
-            .inputs
-            .iter()
-            .map(|i| format!("\"{i}=${{jsonencode(lookup(var.inputs, \"{i}\", \"\"))}}\""))
-            .collect();
-        let _ = write!(
-            prov,
-            "  provisioner \"file\" {{\n    content     = join(\"\\n\", [{}])\n    destination = \"/tmp/isoloom-inputs.env\"\n  }}\n",
-            lines.join(", ")
-        );
+    for (protocol, ports) in [("tcp", Some("1-65535")), ("udp", Some("1-65535")), ("icmp", None)] {
+        b = b.add_block(rule("inbound", protocol, ports, vpc()));
     }
-    prov.push_str(&remote_exec(&cmds));
-    prov.push_str("}\n");
-    tf.push_str(&prov);
-
-    // Outputs: the same shape as the AWS driver.
-    let machines = aligned(&[(name.to_string(), pip.clone())]);
-    let ssh_users = aligned(&[(name.to_string(), format!("\"{user}\""))]);
-    let _ = write!(
-        tf,
-        "\noutput \"machines\" {{\n  value = {{\n{machines}\n  }}\n}}\n\noutput \"ssh_users\" {{\n  value = {{\n{ssh_users}\n  }}\n}}\n\noutput \"ip\" {{\n  value = {pip}\n}}\n\noutput \"ready_file\" {{\n  value = \"/var/lib/isoloom/ready\"\n}}\n",
-    );
-    tf.push_str(&super::super::cloud_vm::checks_output(
-        spec,
-        &[(name.to_string(), pip.clone())],
-        &[(name.to_string(), format!("\"{user}\""))],
-        None,
-    ));
-    if !published_out.is_empty() {
-        let _ = write!(tf, "\noutput \"published\" {{\n  value = {{\n{}\n  }}\n}}\n", aligned(&published_out));
+    for (protocol, ports) in [("tcp", Some("1-65535")), ("udp", Some("1-65535")), ("icmp", None)] {
+        b = b.add_block(rule("outbound", protocol, ports, anywhere()));
     }
-
-    GeneratedFile {
-        path: format!("{OUTPUT_DIR}/cloud-vm/digitalocean/main.tf"),
-        contents: tf,
-    }
+    b.build()
 }

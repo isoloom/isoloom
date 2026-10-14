@@ -69,8 +69,10 @@ between two provisioners) or a cloud-init transport (the `Prelude` step as `boot
 as `runcmd`, a unit for what follows a reboot), Windows over WinRM, the controller and its
 inventory, the check runners and the `checks` output, and each target's limits (refusals read
 from the plan). A target adds its resources and hooks (interfaces found by MAC, the auto-stop,
-published-port redirects) and leaves out the steps its platform does itself. The other clouds
-still read the spec through `cloud_vm::legacy` until they move onto the core.
+published-port redirects) and leaves out the steps its platform does itself. DigitalOcean,
+Linode and Oracle Cloud render through the core too, each a backend of its own
+(`cloud_vm::CLOUDS`) whose refusal drops only its module; Azure and Google Cloud still read the
+spec through `cloud_vm::legacy` until they move onto the core.
 
 ## Crate map
 

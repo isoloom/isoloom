@@ -9,10 +9,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    digitalocean = {
-      source  = "digitalocean/digitalocean"
-      version = "~> 2.0"
-    }
+    digitalocean = { source = "digitalocean/digitalocean", version = "~> 2.0" }
   }
 }
 
@@ -20,21 +17,25 @@ variable "region" {
   type    = string
   default = "fra1"
 }
+
 variable "allowed_cidr" {
   type        = string
-  description = "Who may reach the machine (SSH and the published ports), e.g. your IP/32"
+  description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
-  description = "The private key of ssh_public_key: Terraform sets the machine up over SSH"
+  description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
-  description = "Shut the machine down after this many minutes (0: never)"
+  description = "Shut the machines down after this many minutes (0: never)"
 }
 
 variable "expires_at" {
@@ -134,9 +135,6 @@ resource "terraform_data" "web" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown root /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -148,25 +146,21 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting tcp dport 8080 redirect to :80",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
 
 output "machines" {
-  value = {
-    web = digitalocean_droplet.web.ipv4_address
-  }
+  value = { web = digitalocean_droplet.web.ipv4_address }
 }
 
 output "ssh_users" {
-  value = {
-    web = "root"
-  }
+  value = { web = "root" }
 }
 
 output "ip" {
@@ -178,9 +172,7 @@ output "ready_file" {
 }
 
 output "published" {
-  value = {
-    "web/80" = "${digitalocean_droplet.web.ipv4_address}:8080"
-  }
+  value = { "web/80" = "${digitalocean_droplet.web.ipv4_address}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what
