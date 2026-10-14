@@ -1,0 +1,15 @@
+[package]
+name = "isoloom-runtime"
+description = "Isoloom's runtime state: the registry of running environments, host readiness and reports."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+isoloom-spec.workspace = true
+isoloom-targets.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true

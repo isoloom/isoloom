@@ -1,9 +1,9 @@
 #!/bin/sh
-# Refreshes crates/isoloom-core/coverage/terraform/*.txt: the resource types each Terraform
+# Refreshes crates/isoloom-coverage/coverage/terraform/*.txt: the resource types each Terraform
 # provider offers, from `terraform providers schema -json` (names only).
 # Usage: sh scripts/terraform-resources.sh   (then `cargo test`: unclassified resources fail)
 set -eu
-OUT="$(cd "$(dirname "$0")/.." && pwd)/crates/isoloom-core/coverage/terraform"
+OUT="$(cd "$(dirname "$0")/.." && pwd)/crates/isoloom-coverage/coverage/terraform"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 extract() { # name source version

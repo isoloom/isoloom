@@ -136,7 +136,13 @@ answers from the controller), **declared** (`http`, `tcp`, `exec`, with `from`,
 ## Layout
 
 - `crates/isoloom-core`: the format as a library (parse, validate, derive targets, generators).
-  Other Rust tools can embed it directly (see [Using the library](#using-the-library)).
+  Other Rust tools can embed it directly (see [Using the library](#using-the-library)). It
+  re-exports the crates the work is split into, by layer and backend:
+  - `isoloom-spec` (model, parsing, normalization, validation), `isoloom-plan` (checks),
+    `isoloom-render` (pieces shared by the backends);
+  - the backends `isoloom-compose`, `isoloom-kubernetes`, `isoloom-terraform`, `isoloom-vagrant`
+    and `isoloom-external`, wired together by `isoloom-targets` (with the resolved snapshot);
+  - `isoloom-import`, `isoloom-coverage` and `isoloom-runtime` (registry, host readiness, report).
 - `crates/isoloom`: the command line.
 - `examples/`: environments used as tests, from a two-machine app and a segmented network to an
   Active Directory domain, Cisco routers and cloud services. Those with a committed `.isoloom/`

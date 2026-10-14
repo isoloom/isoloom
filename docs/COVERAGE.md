@@ -38,7 +38,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-95% of 59 portable features (56 done, 1 partly, 2 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-core/coverage/compose-spec.json).
+95% of 59 portable features (56 done, 1 partly, 2 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 

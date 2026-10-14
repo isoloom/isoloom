@@ -1,0 +1,698 @@
+//! Checks: what proves an environment behaves as its spec says, on every target.
+//!
+//! A spec's `checks:` hold scripts and declared probes (`http`, `tcp`, `exec`, `script`), each
+//! run from a position: a machine of the environment (its networks, its routes, its view), or
+//! the environment's networks at once when the spec has no access machine. Isoloom adds
+//! **derived checks** from the spec itself: every service must answer from every machine that
+//! `reach` lets through, and must not answer from the machines it doesn't; a machine whose
+//! networks are offline must not reach the internet.
+//!
+//! The planner here is target-independent: [`plan`] resolves every check to a position and a
+//! probe with symbolic hosts, and [`script`] turns one position's checks into a POSIX sh
+//! runner. Each generator decides how a position is realized (a container in a machine's
+//! network namespace, a provisioner on a VM, a Job with a machine's labels) and how a symbolic
+//! host is written (an address, or a name on Kubernetes). The runners print one line per
+//! check, `isoloom-check: PASS <name>` or `isoloom-check: FAIL <name>: <why>`, which
+//! `isoloom test` reads back.
+
+use crate::model::{Check, Declared, Expect, Machine, Service, Spec};
+pub use isoloom_spec::probe::{Host, Url, can_run_checks};
+
+/// Where a check runs from.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Position {
+    /// A machine of the environment (by name).
+    Machine(String),
+    /// The environment's networks at once: a spec without an access machine.
+    Networks,
+}
+
+impl Position {
+    /// A file-safe id: the machine's name, or `networks`.
+    pub fn id(&self) -> &str {
+        match self {
+            Position::Machine(m) => m,
+            Position::Networks => "networks",
+        }
+    }
+
+    /// How results name the position.
+    pub fn label(&self) -> String {
+        match self {
+            Position::Machine(m) => format!("from {m}"),
+            Position::Networks => "from the environment's networks".to_string(),
+        }
+    }
+}
+
+/// What an HTTP probe expects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HttpExpect {
+    Status(u16),
+    /// An answer of any status.
+    Any,
+    /// Nothing answers (the connection fails).
+    Blocked,
+}
+
+/// What a TCP probe expects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TcpExpect {
+    Open,
+    Blocked,
+}
+
+/// What an `http` check sends and looks for beyond a GET and its status (all optional).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HttpRequest {
+    pub method: Option<String>,
+    pub headers: Vec<(String, String)>,
+    pub body: Option<String>,
+    /// Text the response body must contain.
+    pub contains: Option<String>,
+    /// Follow redirects (up to [`HTTP_MAX_REDIRECTS`]) and compare the final status.
+    pub follow: bool,
+}
+
+impl HttpRequest {
+    /// Nothing beyond a GET and its status (following redirects or not).
+    fn is_plain(&self) -> bool {
+        self.method.is_none() && self.headers.is_empty() && self.body.is_none() && self.contains.is_none()
+    }
+}
+
+/// How many redirects an `http` check with `follow` goes through before giving up (the status
+/// compared is then that of the last answer, a redirect).
+pub const HTTP_MAX_REDIRECTS: u32 = 5;
+
+/// What a `tcp` check writes and reads beyond connecting (both optional; `send` needs `contains`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TcpExchange {
+    /// A line written once connected (a newline is added).
+    pub send: Option<String>,
+    /// Text the bytes read within [`TCP_READ_SECONDS`] must contain.
+    pub contains: Option<String>,
+}
+
+/// How long a `tcp` check with `contains` reads from the connection, per attempt.
+pub const TCP_READ_SECONDS: u32 = 5;
+
+/// One resolved probe.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Probe {
+    Http {
+        url: Url,
+        expect: HttpExpect,
+        /// A method, headers, a body, text to find: empty for a plain GET.
+        request: HttpRequest,
+    },
+    Tcp {
+        host: Host,
+        port: u16,
+        expect: TcpExpect,
+        /// A line to write and text to read back: empty for a bare connection.
+        exchange: TcpExchange,
+    },
+    /// A command inside the position's machine; `expect` is text the output must contain.
+    Exec { command: String, expect: Option<String> },
+    /// A script in the project, run with sh from the position.
+    Script { path: String },
+    /// An Ansible playbook in the project, run from the controller.
+    Playbook { path: String },
+}
+
+/// A check, resolved: where it runs, what it probes, how long it may take to pass.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Resolved {
+    pub name: String,
+    pub position: Position,
+    pub probe: Probe,
+    /// Seconds to keep retrying (0: one attempt).
+    pub wait: u32,
+    /// Derived from the spec by Isoloom (not written by the author).
+    pub derived: bool,
+}
+
+/// The position a check without `from` runs from: the access machine, else the networks.
+pub fn default_position(spec: &Spec) -> Position {
+    match spec.machines.iter().find(|(_, m)| m.access) {
+        Some((name, _)) => Position::Machine(name.clone()),
+        None => Position::Networks,
+    }
+}
+
+/// Every check of the spec, resolved: the author's in order, then the derived ones.
+/// Validated specs only (a declared check that validation rejects isn't resolved).
+pub fn plan(spec: &Spec) -> Vec<Resolved> {
+    let default = default_position(spec);
+    let mut out: Vec<Resolved> = spec
+        .checks
+        .iter()
+        .filter_map(|c| match c {
+            Check::Script(p) => Some(Resolved {
+                name: p.clone(),
+                position: default.clone(),
+                probe: if c.is_playbook() {
+                    Probe::Playbook { path: p.clone() }
+                } else {
+                    Probe::Script { path: p.clone() }
+                },
+                wait: 0,
+                derived: false,
+            }),
+            Check::Declared(d) => declared(d, &default),
+        })
+        .collect();
+    out.extend(derived(spec));
+    out
+}
+
+fn declared(d: &Declared, default: &Position) -> Option<Resolved> {
+    let position = d.from.as_ref().map(|f| Position::Machine(f.clone())).unwrap_or_else(|| default.clone());
+    let (probe, default_wait, what) = if let Some(u) = &d.http {
+        declared_http(d, u)?
+    } else if let Some(t) = &d.tcp {
+        declared_tcp(d, t)?
+    } else if let Some(c) = &d.exec {
+        let expect = match &d.expect {
+            None => None,
+            Some(Expect::Text(t)) => Some(t.clone()),
+            Some(Expect::Status(_)) => return None,
+        };
+        (Probe::Exec { command: c.clone(), expect }, 0, c.clone())
+    } else {
+        let p = d.script.as_ref()?;
+        (Probe::Script { path: p.clone() }, 0, p.clone())
+    };
+    Some(Resolved {
+        name: d.name.clone().unwrap_or_else(|| match &position {
+            Position::Machine(m) => format!("{what} from {m}"),
+            Position::Networks => what,
+        }),
+        position,
+        probe,
+        wait: d.wait.unwrap_or(default_wait),
+        derived: false,
+    })
+}
+
+/// A declared probe, the seconds it waits by default, and what its name says it checks.
+type DeclaredProbe = (Probe, u32, String);
+
+/// A declared `http` check (to URL `u`).
+fn declared_http(d: &Declared, u: &str) -> Option<DeclaredProbe> {
+    let url = Url::parse(u)?;
+    let expect = match &d.expect {
+        None => HttpExpect::Status(200),
+        Some(Expect::Status(s)) => HttpExpect::Status(*s),
+        Some(Expect::Text(t)) if t == "any" => HttpExpect::Any,
+        Some(Expect::Text(t)) if t == "blocked" => HttpExpect::Blocked,
+        Some(Expect::Text(_)) => return None,
+    };
+    let wait = if expect == HttpExpect::Blocked { 0 } else { 30 };
+    let request = HttpRequest {
+        method: d.method.clone(),
+        headers: d.headers.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+        body: d.body.clone(),
+        contains: d.contains.clone(),
+        follow: d.follow,
+    };
+    let what = match (&expect, &request.method) {
+        (HttpExpect::Blocked, _) => format!("{u} blocked"),
+        (_, Some(m)) => format!("{} {u}", m.to_uppercase()),
+        _ => u.to_string(),
+    };
+    Some((Probe::Http { url, expect, request }, wait, what))
+}
+
+/// A declared `tcp` check (to `host:port` `t`).
+fn declared_tcp(d: &Declared, t: &str) -> Option<DeclaredProbe> {
+    let (host, port) = t.rsplit_once(':')?;
+    let port: u16 = port.parse().ok().filter(|p| *p > 0)?;
+    let expect = match d.expect.as_ref() {
+        None => TcpExpect::Open,
+        Some(Expect::Text(t)) if t == "open" => TcpExpect::Open,
+        Some(Expect::Text(t)) if t == "blocked" => TcpExpect::Blocked,
+        _ => return None,
+    };
+    let wait = if expect == TcpExpect::Blocked { 0 } else { 30 };
+    let what = match expect {
+        TcpExpect::Blocked => format!("{t} blocked"),
+        TcpExpect::Open => t.to_string(),
+    };
+    let exchange = TcpExchange {
+        send: d.send.clone(),
+        contains: d.contains.clone(),
+    };
+    let probe = Probe::Tcp {
+        host: Host::Literal(host.to_string()),
+        port,
+        expect,
+        exchange,
+    };
+    Some((probe, wait, what))
+}
+
+/// Whether `from` may open connections to `to`'s address on `network`, port `port`: they share
+/// the network, or a `reach` rule from one of `from`'s networks opens it.
+pub fn allowed(spec: &Spec, from: &Machine, network: &str, port: u16) -> bool {
+    from.networks.contains_key(network)
+        || spec
+            .reach
+            .iter()
+            .any(|r| from.networks.contains_key(&r.from) && r.to == network && (r.ports.is_empty() || r.ports.contains(&port)))
+}
+
+/// The checks the spec implies, from every machine that can run them:
+/// - each TCP service of another machine answers at the addresses `reach` (or a shared network)
+///   lets this machine through to (not a `dormant` one: it answers only once woken), and
+/// - is blocked at every address when nothing lets it through at all. When one path is open and
+///   another isn't, the closed one isn't asserted: a machine with several interfaces answers for
+///   any of its addresses on an interface the traffic may use, so the outcome isn't the spec's
+///   to promise;
+/// - the internet doesn't answer from a machine whose networks are all offline.
+///
+/// When no machine can run checks (only Windows machines, or network appliances), they run from
+/// the environment's networks instead (see [`from_networks`]).
+pub fn derived(spec: &Spec) -> Vec<Resolved> {
+    if !spec.machines.values().any(can_run_checks) {
+        return from_networks(spec);
+    }
+    let mut out = Vec::new();
+    for (a, ma) in &spec.machines {
+        if !can_run_checks(ma) {
+            continue;
+        }
+        let position = Position::Machine(a.clone());
+        for (b, mb) in &spec.machines {
+            if a == b {
+                continue;
+            }
+            // A UDP service has no handshake: nothing tells "answers" from "blocked" without
+            // speaking its protocol, so only the author's checks probe it.
+            for svc in mb.services.iter().filter(|s| s.protocol.is_tcp()) {
+                out.extend(service_from(spec, &position, (a, ma), (b, mb), svc));
+            }
+        }
+        if !ma.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.internet)) {
+            let probe = Probe::Http {
+                url: Url::parse("http://1.1.1.1/").expect("a URL"),
+                expect: HttpExpect::Blocked,
+                request: HttpRequest::default(),
+            };
+            out.push(derived_check(format!("no internet from {a}"), position, probe, 0));
+        }
+    }
+    out
+}
+
+/// The derived checks of machine `b`'s TCP service `svc` from machine `a`: it answers on every
+/// path that is open, or is blocked on all of them when none is.
+fn service_from(spec: &Spec, position: &Position, (a, ma): (&str, &Machine), (b, mb): (&str, &Machine), svc: &Service) -> Vec<Resolved> {
+    let paths: Vec<(&String, bool)> = mb.networks.keys().map(|n| (n, allowed(spec, ma, n, svc.port))).collect();
+    if paths.iter().all(|(_, ok)| !ok) {
+        return paths
+            .iter()
+            .map(|(n, _)| {
+                let probe = Probe::Tcp {
+                    host: Host::Machine {
+                        name: b.to_string(),
+                        network: (*n).clone(),
+                    },
+                    port: svc.port,
+                    expect: TcpExpect::Blocked,
+                    exchange: TcpExchange::default(),
+                };
+                derived_check(format!("{b}:{}{} blocked from {a}", svc.port, on_network(mb, n)), position.clone(), probe, 0)
+            })
+            .collect();
+    }
+    // A dormant service answers once something wakes it, not before: nothing
+    // to expect yet (still blocked from where `reach` doesn't let it through).
+    if svc.dormant {
+        return Vec::new();
+    }
+    paths
+        .iter()
+        .filter(|(_, ok)| *ok)
+        .map(|(n, _)| {
+            derived_check(
+                format!("{b}:{}{} from {a}", svc.port, on_network(mb, n)),
+                position.clone(),
+                answers(b, n, svc),
+                30,
+            )
+        })
+        .collect()
+}
+
+/// ` on <network>` when machine `m` is on several networks (the name must say which address).
+fn on_network(m: &Machine, n: &str) -> String {
+    if m.networks.len() > 1 { format!(" on {n}") } else { String::new() }
+}
+
+/// A check Isoloom derives from the spec.
+fn derived_check(name: String, position: Position, probe: Probe, wait: u32) -> Resolved {
+    Resolved {
+        name,
+        position,
+        probe,
+        wait,
+        derived: true,
+    }
+}
+
+/// The derived checks of an environment where no machine can run them (only Windows machines,
+/// or network appliances): every service answers at each of its addresses, from the
+/// environment's networks (on VM targets, the controller, which stands on every network).
+/// Nothing stands where `reach` blocks a service or where a network is offline, so those aren't
+/// asserted. A target where the machines that could run them don't (the containers of a hybrid
+/// environment) uses it too.
+pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
+    let mut out = Vec::new();
+    for (b, mb) in &spec.machines {
+        // A dormant service answers only once woken, a UDP one isn't probed, as above.
+        for svc in mb.services.iter().filter(|s| !s.dormant && s.protocol.is_tcp()) {
+            for n in mb.networks.keys() {
+                let name = format!("{b}:{}{} from the networks", svc.port, on_network(mb, n));
+                out.push(derived_check(name, Position::Networks, answers(b, n, svc), 30));
+            }
+        }
+    }
+    out
+}
+
+/// The probe that machine `b`'s service answers at its address on network `n`.
+fn answers(b: &str, n: &str, svc: &Service) -> Probe {
+    let host = Host::Machine {
+        name: b.to_string(),
+        network: n.to_string(),
+    };
+    if svc.http {
+        Probe::Http {
+            url: Url {
+                https: svc.tls,
+                host,
+                port: Some(svc.port),
+                path: "/".into(),
+            },
+            expect: HttpExpect::Any,
+            request: HttpRequest::default(),
+        }
+    } else {
+        Probe::Tcp {
+            host,
+            port: svc.port,
+            expect: TcpExpect::Open,
+            exchange: TcpExchange::default(),
+        }
+    }
+}
+
+/// The checks grouped by position: the default position first, then machines in spec order.
+pub fn by_position<'a>(spec: &Spec, checks: &'a [Resolved]) -> Vec<(Position, Vec<&'a Resolved>)> {
+    let mut order: Vec<Position> = vec![default_position(spec)];
+    for m in spec.machines.keys() {
+        let p = Position::Machine(m.clone());
+        if !order.contains(&p) {
+            order.push(p);
+        }
+    }
+    if !order.contains(&Position::Networks) {
+        order.push(Position::Networks);
+    }
+    order
+        .into_iter()
+        .filter_map(|p| {
+            let group: Vec<&Resolved> = checks.iter().filter(|c| c.position == p).collect();
+            (!group.is_empty()).then_some((p, group))
+        })
+        .collect()
+}
+
+/// How a target writes the runner for one position.
+pub struct Render<'a> {
+    /// A symbolic host as this target reaches it from the position (an address, or a name).
+    pub host: &'a dyn Fn(&Host, &Position) -> String,
+    /// The shell command that runs a project script (`cd /opt/isoloom && sh checks/x.sh`).
+    pub script: &'a dyn Fn(&str) -> String,
+    /// The shell command that runs a playbook, when this target can.
+    pub playbook: Option<&'a dyn Fn(&str) -> String>,
+}
+
+/// Single-quoted for sh (the same as [`crate::shell::quote`]).
+use crate::shell::quote as sq;
+
+/// Escaped for the inside of a double-quoted sh string.
+fn dq(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"").replace('$', "\\$").replace('`', "\\`")
+}
+
+/// The sh runner for one position's checks. It needs `sh` and either `curl`, `wget` or `bash`
+/// (plus `nc` or `bash` for TCP), prints a PASS or FAIL line per check, and exits 1 when any
+/// failed. Derived checks are skipped when `ISOLOOM_DERIVED=0`.
+pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
+    let mut s = String::new();
+    s.push_str("#!/bin/sh\n");
+    s.push_str(&format!(
+        "# Generated by isoloom from isoloom.yml. Don't edit: change isoloom.yml and run\n# `isoloom generate`. `isoloom check` fails when this file is out of date.\n# The environment's checks, {}. `isoloom test` runs it and reads the PASS/FAIL lines.\n",
+        position.label()
+    ));
+    s.push_str(RUNTIME);
+    for c in checks {
+        s.push('\n');
+        if c.derived {
+            s.push_str("if [ \"${ISOLOOM_DERIVED:-1}\" != 0 ]; then\n");
+        }
+        s.push_str(&check_lines(c, position, r));
+        if c.derived {
+            s.push_str("fi\n");
+        }
+    }
+    s.push_str("\necho \"isoloom-check: END $passed passed, $failed failed\"\n[ \"$failed\" -eq 0 ]\n");
+    s
+}
+
+/// The sh lines that run one check and print its PASS or FAIL line.
+fn check_lines(c: &Resolved, position: &Position, r: &Render) -> String {
+    let n = sq(&c.name);
+    let host = |h: &Host| (r.host)(h, position);
+    match &c.probe {
+        Probe::Http { url, expect, request } if !request.is_plain() && *expect != HttpExpect::Blocked => {
+            http_request_lines(&n, c.wait, &url.render(&host(&url.host)), *expect, request)
+        }
+        Probe::Http { url, expect, request } => http_lines(&n, c.wait, &url.render(&host(&url.host)), *expect, request.follow),
+        Probe::Tcp {
+            host: h,
+            port,
+            expect: TcpExpect::Open,
+            exchange: TcpExchange { send, contains: Some(want) },
+        } => tcp_read_lines(&n, c.wait, &host(h), *port, (send.as_deref(), want)),
+        Probe::Tcp { host: h, port, expect, .. } => tcp_lines(&n, c.wait, &host(h), *port, *expect),
+        Probe::Exec { command, expect } => format!(
+            "if _retry {w} _exec {cmd} {want}; then pass {n}; else fail {n} \"$(printf '%s' \"$out\" | tail -n 1)\"; fi\n",
+            w = c.wait,
+            cmd = sq(command),
+            want = sq(expect.as_deref().unwrap_or("")),
+        ),
+        Probe::Script { path } => project_file_lines(&n, c.wait, path, &(r.script)(path), "exited non-zero"),
+        Probe::Playbook { path } => match r.playbook {
+            Some(pb) => project_file_lines(&n, c.wait, path, &pb(path), "failed"),
+            None => format!("fail {n} \"Ansible checks don't run from this position\"\n"),
+        },
+    }
+}
+
+/// An HTTP check beyond a GET and its status (a method, headers, a body, text to find), with
+/// curl: `_req`.
+fn http_request_lines(n: &str, wait: u32, url: &str, expect: HttpExpect, request: &HttpRequest) -> String {
+    let want = match expect {
+        HttpExpect::Status(code) => code.to_string(),
+        _ => "any".to_string(),
+    };
+    format!(
+        "if _retry {wait} _req {want} {t}{args} {u}; then pass {n}; else fail {n} \"$out\"; fi\n",
+        t = sq(request.contains.as_deref().unwrap_or("")),
+        args = curl_args(request),
+        u = sq(url),
+    )
+}
+
+/// The curl arguments for a request's redirects, method, headers and body.
+fn curl_args(request: &HttpRequest) -> String {
+    let mut args = String::new();
+    if request.follow {
+        args.push_str(&format!(" -L --max-redirs {HTTP_MAX_REDIRECTS}"));
+    }
+    let method = request.method.as_deref().map(str::to_uppercase);
+    match method.as_deref() {
+        // Following redirects, a POST is sent as curl sends a form (`--data-binary`,
+        // or an empty `-d ''`), not forced with `-X`: a 301/302/303 is then followed
+        // with a GET, as browsers do. `-X POST` would POST to every hop (a login
+        // page's redirect to a GET-only page answering 405).
+        Some("POST") if request.follow => {
+            if request.body.is_none() {
+                args.push_str(" -d ''");
+            }
+        }
+        Some("HEAD") if request.follow => args.push_str(" -I"),
+        Some(m) => args.push_str(&format!(" -X {}", sq(m))),
+        None => {}
+    }
+    for (k, v) in &request.headers {
+        args.push_str(&format!(" -H {}", sq(&format!("{k}: {v}"))));
+    }
+    if let Some(b) = &request.body {
+        args.push_str(&format!(" --data-binary {}", sq(b)));
+    }
+    args
+}
+
+/// A plain HTTP check: a status, any answer, or none.
+fn http_lines(n: &str, wait: u32, url: &str, expect: HttpExpect, follow: bool) -> String {
+    let (u, ut) = (sq(url), dq(url));
+    // `_http`'s second argument: follow redirects.
+    let f = if follow { " follow" } else { "" };
+    let after = if follow { " (after redirects)" } else { "" };
+    match expect {
+        HttpExpect::Status(code) => format!(
+            "if _retry {wait} _http_is {u} {code}{f}; then pass {n}; else fail {n} \"expected HTTP {code} from {ut}{after}, got $(_http {u}{f})\"; fi\n"
+        ),
+        HttpExpect::Any => format!("if _retry {wait} _http_any {u}{f}; then pass {n}; else fail {n} \"nothing answers at {ut}\"; fi\n"),
+        HttpExpect::Blocked => {
+            format!("c=$(_http {u}); if [ \"$c\" = 000 ]; then pass {n}; else fail {n} \"{ut} answered (HTTP $c); it should be blocked\"; fi\n")
+        }
+    }
+}
+
+/// A TCP check that writes a line (if any) and looks for text in what comes back: `_tcp_read`.
+fn tcp_read_lines(n: &str, wait: u32, host: &str, port: u16, (send, want): (Option<&str>, &str)) -> String {
+    format!(
+        "if _retry {wait} _tcp_read {h} {port} {snd} {t}; then pass {n}; else fail {n} \"$out\"; fi\n",
+        h = sq(host),
+        snd = sq(send.unwrap_or("")),
+        t = sq(want),
+    )
+}
+
+/// A bare TCP check: something listens, or nothing does.
+fn tcp_lines(n: &str, wait: u32, host: &str, port: u16, expect: TcpExpect) -> String {
+    let (h, ht) = (sq(host), dq(host));
+    match expect {
+        TcpExpect::Open => {
+            format!("if _retry {wait} _tcp {h} {port}; then pass {n}; else fail {n} \"nothing listens at {ht}:{port}\"; fi\n")
+        }
+        TcpExpect::Blocked => {
+            format!("if _tcp {h} {port}; then fail {n} \"{ht}:{port} answered; it should be blocked\"; else pass {n}; fi\n")
+        }
+    }
+}
+
+/// A project file (a script, a playbook) run by `cmd`, its path echoed first; `failure` says
+/// what went wrong after the path.
+fn project_file_lines(n: &str, wait: u32, path: &str, cmd: &str, failure: &str) -> String {
+    format!(
+        "echo {hdr}\nif _retry {wait} sh -c {cmd}; then pass {n}; else fail {n} \"{p} {failure}\"; fi\n",
+        hdr = sq(&format!("== {path}")),
+        cmd = sq(cmd),
+        p = dq(path)
+    )
+}
+
+/// The helpers every runner starts with.
+const RUNTIME: &str = r#"passed=0; failed=0
+pass() { passed=$((passed+1)); echo "isoloom-check: PASS $1"; }
+fail() { failed=$((failed+1)); echo "isoloom-check: FAIL $1: $2"; }
+# _http URL [follow] -> the status code, 000 when nothing answers (curl, else wget, else bash):
+# the first answer's, or with `follow` the last one's after at most 5 redirects (bash: the first).
+_http() {
+  if command -v curl >/dev/null 2>&1; then
+    if [ -n "$2" ]; then set -- "$1" -L --max-redirs 5; else set -- "$1"; fi
+    c=$(curl -sk -o /dev/null -m 5 -w '%{http_code}' "$@" 2>/dev/null)
+  elif command -v wget >/dev/null 2>&1; then
+    # wget follows redirects whatever it's told (busybox's can't be told): -S prints each answer.
+    if [ -n "$2" ]; then _n=6; else _n=1; fi
+    c=$(wget -q -S -O /dev/null -T 5 --no-check-certificate "$1" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | head -n $_n | tail -n 1)
+  else
+    u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
+    h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
+  fi
+  echo "${c:-000}"
+}
+_http_is() { [ "$(_http "$1" "$3")" = "$2" ]; }
+# _req STATUS|any TEXT CURL-ARGS... -> 0 when the request gets that status (any answer for `any`)
+# and its body contains TEXT (if any); $out says why not. Needs curl.
+_req() {
+  want=$1; text=$2; shift 2
+  command -v curl >/dev/null 2>&1 || { out="curl is needed for this check"; return 1; }
+  b=$(mktemp); c=$(curl -sk -m 10 -o "$b" -w '%{http_code}' "$@" 2>/dev/null); c=${c:-000}; r=0
+  if [ "$want" = any ]; then [ "$c" != 000 ] || r=1; else [ "$c" = "$want" ] || r=1; fi
+  if [ $r = 1 ]; then out="expected HTTP $want, got $c"
+  elif [ -n "$text" ] && ! grep -qF -- "$text" "$b"; then r=1; out="HTTP $c, but the response doesn't contain the expected text"
+  fi
+  rm -f "$b"; return $r
+}
+_http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
+# _tcp HOST PORT -> 0 when it connects (nc, else bash).
+_tcp() {
+  if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
+  else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  fi
+}
+# _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
+# LINE and a newline, if any) contain TEXT; $out says why not (nc, else bash). Stdin stays open
+# while reading (some nc quit at its end), and nc is stopped after 5s whatever its flavor.
+_tcp_read() {
+  f=$(mktemp); i=0; r=1
+  if command -v nc >/dev/null 2>&1; then
+    { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
+  else
+    H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
+  fi
+  p=$!
+  while :; do
+    if grep -qF -- "$4" "$f"; then r=0; break; fi
+    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    sleep 1; i=$((i+1))
+  done
+  [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
+  touch "$f.end"; kill $p 2>/dev/null
+  if [ $r = 1 ]; then
+    if [ -s "$f" ]; then out="$1:$2 answered \"$(head -c 100 "$f" | tr -d '\000\r' | tr '\n\t' '  ')\", without the expected text"
+    elif [ $i -lt 5 ]; then out="$1:$2 refused the connection or closed it without a word"
+    else out="nothing read from $1:$2 within 5s"; fi
+  fi
+  rm -f "$f" "$f.end"; return $r
+}
+# _exec COMMAND TEXT -> 0 when the command succeeds and its output contains TEXT (if any).
+_exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep -qF -- "$2"; }; }
+# _retry SECONDS COMMAND... -> keeps trying every 2s until it passes or the time is up.
+_retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
+"#;
+
+/// One line of a runner's output, as `isoloom test` reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Line {
+    Pass(String),
+    Fail(String, String),
+    /// The runner finished: how many passed and failed.
+    End(u32, u32),
+}
+
+/// Reads a runner's output line (anywhere in the line: tools prefix their output).
+pub fn parse_line(line: &str) -> Option<Line> {
+    let (_, rest) = line.split_once("isoloom-check: ")?;
+    if let Some(n) = rest.strip_prefix("PASS ") {
+        return Some(Line::Pass(n.trim_end().to_string()));
+    }
+    if let Some(r) = rest.strip_prefix("FAIL ") {
+        let (name, why) = r.split_once(": ").unwrap_or((r, ""));
+        return Some(Line::Fail(name.to_string(), why.trim_end().to_string()));
+    }
+    if let Some(r) = rest.strip_prefix("END ") {
+        let mut nums = r.split_whitespace().filter_map(|w| w.parse::<u32>().ok());
+        return Some(Line::End(nums.next()?, nums.next()?));
+    }
+    None
+}

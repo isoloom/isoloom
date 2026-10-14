@@ -1,0 +1,11 @@
+[package]
+name = "isoloom-plan"
+description = "The target-neutral plan of an environment: its checks."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+isoloom-spec.workspace = true

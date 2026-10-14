@@ -1,0 +1,354 @@
+//! Shared pieces every Isoloom backend renders with: addresses and names, the generated
+//! files' header, the controller's Ansible runs, HCL and shell quoting, the project copy, the
+//! hosts' setup, the router, VLAN trunks and the image constraints.
+
+pub mod constraints;
+pub mod ignore;
+pub mod machine_setup;
+pub mod project;
+pub mod router;
+pub mod trunks;
+
+use std::fmt;
+use std::net::Ipv4Addr;
+
+use isoloom_plan::checks;
+pub use isoloom_spec::files::GeneratedFile;
+use isoloom_spec::{model, shell, validate};
+
+use crate::model::{Spec, Target};
+use crate::validate::Cidr;
+
+/// The `provision[].host_vars` of `machine`, as ` key='value'` pairs for its inventory line.
+/// Ansible splits a host line like a shell and reads each value as a Python literal, so every
+/// value is written as one (a string quoted, so `"10"` stays a string; `True`, `None`, lists and
+/// dicts as Python spells them), then single-quoted for the split.
+pub fn host_vars(spec: &Spec, machine: &str) -> String {
+    fn py(v: &serde_json::Value) -> String {
+        use serde_json::Value;
+        match v {
+            Value::Null => "None".into(),
+            Value::Bool(b) => if *b { "True" } else { "False" }.into(),
+            Value::Number(n) => n.to_string(),
+            Value::String(s) => serde_json::to_string(s).expect("a string serializes"),
+            Value::Array(a) => format!("[{}]", a.iter().map(py).collect::<Vec<_>>().join(", ")),
+            Value::Object(o) => format!(
+                "{{{}}}",
+                o.iter()
+                    .map(|(k, v)| format!("{}: {}", serde_json::to_string(k).expect("a string serializes"), py(v)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        }
+    }
+    let mut out = String::new();
+    for step in &spec.provision {
+        for (k, v) in step.host_vars.get(machine).into_iter().flatten() {
+            out.push_str(&format!(" {k}='{}'", py(v).replace('\'', "'\"'\"'")));
+        }
+    }
+    out
+}
+
+/// The name of the router Isoloom adds (a Compose service, a VM) when `reach` rules need one.
+/// The controller's Vagrant box by default: Alpine, about 100 MB (Python, ansible-core and
+/// pywinrm run fine on it), for VirtualBox, libvirt, VMware and Parallels alike.
+pub const CONTROLLER_BOX: &str = "generic/alpine319";
+
+/// The controller's box: `controller.image.vagrant`, else [`CONTROLLER_BOX`].
+pub fn controller_box(spec: &Spec) -> (&str, Option<&str>) {
+    let image = spec.controller.as_ref().and_then(|c| c.image.as_ref());
+    match image.and_then(|i| i.vagrant.as_deref()) {
+        Some(b) => (b, image.and_then(|i| i.vagrant_version.as_deref())),
+        None => (CONTROLLER_BOX, None),
+    }
+}
+
+/// The controller's (CPUs, memory in MB, disk in GB if set): 1 CPU and 512 MB by default.
+pub fn controller_size(spec: &Spec) -> (u32, u32, Option<u32>) {
+    let r = spec.controller.as_ref().and_then(|c| c.resources.as_ref());
+    (
+        r.and_then(|r| r.cpus).unwrap_or(1),
+        r.and_then(|r| r.memory_mb).unwrap_or(512),
+        r.and_then(|r| r.disk_gb),
+    )
+}
+
+/// The controller's script that runs the environment's playbooks (`provision:`), as it runs
+/// when the environment comes up; with `limit`, only against those machines. `isoloom provision`
+/// runs it again on a running environment.
+pub fn provision_script(spec: &Spec, limit: &[String]) -> String {
+    ansible_runs(spec, limit)
+}
+
+pub fn router_name() -> &'static str {
+    router::NAME
+}
+
+/// Where generated files go, relative to the project folder.
+pub const OUTPUT_DIR: &str = ".isoloom";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GenerateError {
+    /// The spec's implementations don't allow this target (see `isoloom targets`).
+    NotPossible(Target),
+    /// The target is possible, but this generator doesn't support a feature the spec uses yet.
+    Unsupported { target: Target, what: String },
+    /// No generator exists for this target yet.
+    NoGenerator(Target),
+}
+
+impl fmt::Display for GenerateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GenerateError::NotPossible(t) => write!(f, "{}: not possible for this spec (see `isoloom targets`)", t.id()),
+            GenerateError::Unsupported { target, what } => write!(f, "{}: {what}", target.id()),
+            GenerateError::NoGenerator(t) => write!(f, "{}: no generator yet", t.id()),
+        }
+    }
+}
+
+impl std::error::Error for GenerateError {}
+
+/// The first lines of every generated file (`comment` is the target language's marker).
+/// The first non-access machine on arm64, if any: the cloud and Proxmox targets refuse these
+/// for now (they still assume x86-64 images and instance types).
+pub fn arm64_machine(spec: &Spec) -> Option<&str> {
+    spec.machines
+        .iter()
+        // Only machines the cloud actually builds: an access machine with no implementation isn't
+        // instantiated, so its arch is moot, but one that declares a container or VM is built and
+        // must not be silently given an x86 image.
+        .filter(|(_, m)| m.docker.is_some() || m.vm.is_some())
+        .find(|(_, m)| m.arch == crate::model::Arch::Arm64)
+        .map(|(n, _)| n.as_str())
+}
+
+/// A Google Cloud project's display name: `isoloom-<environment>`, cut to the 30 characters
+/// Google allows (a longer one fails at plan time), without a trailing hyphen.
+pub fn gcp_project_name(env: &str) -> String {
+    let full = format!("isoloom-{env}");
+    full.chars().take(30).collect::<String>().trim_end_matches('-').to_string()
+}
+
+pub fn header(comment: &str) -> String {
+    format!(
+        "{comment} Generated by isoloom from isoloom.yml. Don't edit: change isoloom.yml and run\n{comment} `isoloom generate`. `isoloom check` fails when this file is out of date.\n"
+    )
+}
+
+/// A machine's address on a network (validated specs only).
+pub fn address(spec: &Spec, network: &str, octet: u8) -> Ipv4Addr {
+    let cidr = Cidr::parse(&spec.networks[network].cidr).expect("validated cidr");
+    cidr.host(octet)
+        .or_else(|| (octet == cidr.gateway_octet()).then(|| cidr.gateway()))
+        .expect("validated address")
+}
+
+/// Dotted netmask of a network.
+pub fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
+    let cidr = Cidr::parse(&spec.networks[network].cidr).expect("validated cidr");
+    Ipv4Addr::from(if cidr.len == 0 { 0 } else { u32::MAX << (32 - cidr.len) })
+}
+
+/// Features no generator supports yet, shared by both (none today: kept as the place to
+/// refuse a spec feature before a generator learns it).
+pub fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> {
+    if target == Target::Docker && !spec.provision.is_empty() {
+        return Err(GenerateError::Unsupported {
+            target,
+            what: "environment-level provisioning (`provision:`) runs on VM targets for now".into(),
+        });
+    }
+    if target == Target::Docker
+        && let Some(what) = container_checks_unsupported(spec)
+    {
+        return Err(GenerateError::Unsupported { target, what });
+    }
+    Ok(())
+}
+
+/// What the container outputs (Compose, Kubernetes) can't run as checks yet: Ansible playbooks
+/// (they run from the VM targets' controller) and `exec` from a machine with no container of its
+/// own (`exec` checks are piped into the machine: `docker compose exec`, `kubectl exec`).
+pub fn container_checks_unsupported(spec: &Spec) -> Option<String> {
+    if spec.checks.iter().any(|c| c.is_playbook()) {
+        return Some("Ansible checks (.yml) run on VM targets for now".into());
+    }
+    for c in crate::checks::plan(spec) {
+        if !matches!(c.probe, crate::checks::Probe::Exec { .. }) {
+            continue;
+        }
+        let in_container = match &c.position {
+            crate::checks::Position::Machine(m) => spec.machines.get(m).is_some_and(|m| m.docker.is_some() && !m.supplied),
+            _ => false,
+        };
+        if !in_container {
+            return Some(format!(
+                "`exec` check \"{}\" needs `from:` a machine with its own container (it runs inside it)",
+                c.name
+            ));
+        }
+    }
+    None
+}
+
+/// A machine's names for a hosts line: its own, then its `aliases`.
+pub fn names_of(spec: &Spec, name: &str) -> String {
+    std::iter::once(name)
+        .chain(spec.machines.get(name).map(|m| m.aliases.iter().map(String::as_str)).into_iter().flatten())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Machines in start order: each after the machines it depends on (validated: no cycles).
+pub fn start_order(spec: &Spec) -> Vec<&str> {
+    let mut order: Vec<&str> = Vec::new();
+    fn visit<'a>(spec: &'a Spec, name: &'a str, order: &mut Vec<&'a str>) {
+        if order.contains(&name) {
+            return;
+        }
+        for dep in crate::validate::starts_after(spec, name, &spec.machines[name]) {
+            visit(spec, dep, order);
+        }
+        order.push(name);
+    }
+    for name in spec.machines.keys() {
+        visit(spec, name, &mut order);
+    }
+    order
+}
+
+/// The address `from` should use to reach `to`: on a network they share if any, else
+/// `to`'s first address.
+pub fn address_for(spec: &Spec, from: &str, to: &str) -> Ipv4Addr {
+    let a = &spec.machines[from];
+    let b = &spec.machines[to];
+    let (net, octet) = b
+        .networks
+        .iter()
+        .find(|(n, _)| a.networks.contains_key(*n))
+        .or_else(|| b.networks.first())
+        .expect("validated: machines have a network");
+    address(spec, net, *octet)
+}
+
+/// The host's own address on a network (Docker's bridge): the gateway address, unless a
+/// machine is the network's gateway; then the router's address, unused on such networks.
+pub fn host_address(spec: &Spec, network: &str) -> Ipv4Addr {
+    let cidr = Cidr::parse(&spec.networks[network].cidr).expect("validated cidr");
+    if spec.networks[network].gateway.is_some() {
+        cidr.router()
+    } else {
+        cidr.gateway()
+    }
+}
+
+/// The controller's script running the environment's playbooks (`provision:`), in order, with
+/// the inventory at /etc/isoloom/inventory.ini plus each step's own files. Shared with the
+/// cloud output.
+///
+/// `limit`: only these machines (`isoloom provision web`); every machine when empty.
+pub fn ansible_runs(spec: &Spec, limit: &[String]) -> String {
+    let limit = if limit.is_empty() {
+        String::new()
+    } else {
+        format!(" --limit {}", shell::quote(&limit.join(",")))
+    };
+    // Performance: gather facts once and cache them (the WinRM `setup` module is slow and the
+    // environment playbooks re-run across many imported plays), fan out across hosts (default
+    // forks is 5, too few for a multi-DC range), and pipeline SSH steps (a no-op over WinRM).
+    let mut script = String::from(
+        "set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False \
+         ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
+         ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n",
+    );
+    script.push_str(RETRIES);
+    for step in &spec.provision {
+        let dir = step.ansible.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
+        let file = step.ansible.rsplit('/').next().unwrap_or(&step.ansible);
+        let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect();
+        // As JSON: `-e k=v` splits values on spaces.
+        let vars = if step.vars.is_empty() {
+            String::new()
+        } else {
+            format!(" -e {}", shell::quote(&serde_json::to_string(&step.vars).expect("JSON values serialize")))
+        };
+        let requirements = match &step.requirements {
+            Some(r) => format!("retry_download ansible-galaxy install -r /opt/isoloom/{r}\n"),
+            None => "[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\n".into(),
+        };
+        script.push_str(&format!(
+            "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars}{limit} {file}\n"
+        ));
+    }
+    script
+}
+
+/// The shell helpers of [`ansible_runs`] (POSIX sh, safe under `set -e`):
+/// - `retry_download`: role downloads (Galaxy, from GitHub) fail now and then on the network;
+///   tried 5 times, with a growing pause (`ISOLOOM_RETRY_PAUSE` seconds, 15 by default).
+/// - `run_play`: a play cut by a dropped connection (WinRM's shell crashing mid-task, an SSH
+///   reset, a host briefly unreachable, often under CPU emulation) runs again, up to 4 times in
+///   all. The play is the environment's own setup, which re-runs idempotently, so it picks up
+///   where it stopped. A task that fails on its own isn't retried.
+pub const RETRIES: &str = r#"_isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'
+_isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
+retry_download() {
+  _isoloom_n=1
+  until "$@"; do
+    [ "$_isoloom_n" -lt 5 ] || return 1
+    echo "isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)"
+    sleep $((_isoloom_n * _isoloom_pause))
+    _isoloom_n=$((_isoloom_n + 1))
+  done
+}
+run_play() {
+  _isoloom_n=1
+  _isoloom_log=$(mktemp)
+  _isoloom_rcf=$(mktemp)
+  while :; do
+    { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
+    _isoloom_rc=$(cat "$_isoloom_rcf")
+    if [ "$_isoloom_rc" -eq 0 ]; then
+      rm -f "$_isoloom_log" "$_isoloom_rcf"
+      return 0
+    fi
+    if [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log"; then
+      echo "isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)"
+      sleep $((2 * _isoloom_pause))
+      _isoloom_n=$((_isoloom_n + 1))
+    else
+      rm -f "$_isoloom_log" "$_isoloom_rcf"
+      return "$_isoloom_rc"
+    fi
+  done
+}
+"#;
+
+/// Unpacks the project's tar.gz on Windows (`$archive`, `$dest`, `$strip` set before it).
+pub const UNTAR_PS1: &str = include_str!("untar.ps1");
+
+/// An HCL string literal (with Terraform's `${` and `%{` escaped).
+pub fn hcl(s: &str) -> String {
+    let escaped = s
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace("${", "$${")
+        .replace("%{", "%%{");
+    format!("\"{escaped}\"")
+}
+
+#[cfg(test)]
+mod gcp_project_name_tests {
+    #[test]
+    fn fits_google_limit() {
+        assert_eq!(super::gcp_project_name("web"), "isoloom-web");
+        let long = super::gcp_project_name("acme-web-2020-login-portal");
+        assert_eq!(long, "isoloom-acme-web-2020-login-po");
+        assert!(long.len() <= 30);
+        // Never ends on a hyphen once cut.
+        assert_eq!(super::gcp_project_name("abcdefghijklmnopqrstu-wxyz"), "isoloom-abcdefghijklmnopqrstu");
+    }
+}

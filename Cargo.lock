@@ -351,14 +351,163 @@ dependencies = [
 ]
 
 [[package]]
+name = "isoloom-compose"
+version = "0.10.1"
+dependencies = [
+ "indexmap",
+ "isoloom-plan",
+ "isoloom-render",
+ "isoloom-spec",
+ "serde_json",
+ "serde_yaml_ng",
+]
+
+[[package]]
 name = "isoloom-core"
+version = "0.10.1"
+dependencies = [
+ "indexmap",
+ "isoloom-compose",
+ "isoloom-coverage",
+ "isoloom-external",
+ "isoloom-import",
+ "isoloom-kubernetes",
+ "isoloom-plan",
+ "isoloom-render",
+ "isoloom-runtime",
+ "isoloom-spec",
+ "isoloom-targets",
+ "isoloom-terraform",
+ "isoloom-vagrant",
+ "jsonschema",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+]
+
+[[package]]
+name = "isoloom-coverage"
+version = "0.10.1"
+dependencies = [
+ "isoloom-spec",
+ "serde_json",
+ "serde_yaml_ng",
+]
+
+[[package]]
+name = "isoloom-external"
+version = "0.10.1"
+dependencies = [
+ "isoloom-plan",
+ "isoloom-render",
+ "isoloom-spec",
+ "serde_json",
+]
+
+[[package]]
+name = "isoloom-import"
 version = "0.10.1"
 dependencies = [
  "hcl-rs",
  "indexmap",
- "jsonschema",
+ "isoloom-coverage",
+ "isoloom-spec",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+]
+
+[[package]]
+name = "isoloom-kubernetes"
+version = "0.10.1"
+dependencies = [
+ "indexmap",
+ "isoloom-compose",
+ "isoloom-plan",
+ "isoloom-render",
+ "isoloom-spec",
+ "serde_json",
+ "serde_yaml_ng",
+]
+
+[[package]]
+name = "isoloom-plan"
+version = "0.10.1"
+dependencies = [
+ "isoloom-spec",
+]
+
+[[package]]
+name = "isoloom-render"
+version = "0.10.1"
+dependencies = [
+ "indexmap",
+ "isoloom-plan",
+ "isoloom-spec",
+ "serde_json",
+]
+
+[[package]]
+name = "isoloom-runtime"
+version = "0.10.1"
+dependencies = [
+ "isoloom-spec",
+ "isoloom-targets",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+]
+
+[[package]]
+name = "isoloom-spec"
+version = "0.10.1"
+dependencies = [
+ "indexmap",
  "schemars",
  "serde",
+ "serde_json",
+ "serde_yaml_ng",
+]
+
+[[package]]
+name = "isoloom-targets"
+version = "0.10.1"
+dependencies = [
+ "indexmap",
+ "isoloom-compose",
+ "isoloom-external",
+ "isoloom-kubernetes",
+ "isoloom-plan",
+ "isoloom-render",
+ "isoloom-spec",
+ "isoloom-terraform",
+ "isoloom-vagrant",
+ "serde_json",
+]
+
+[[package]]
+name = "isoloom-terraform"
+version = "0.10.1"
+dependencies = [
+ "indexmap",
+ "isoloom-compose",
+ "isoloom-plan",
+ "isoloom-render",
+ "isoloom-spec",
+ "serde_json",
+]
+
+[[package]]
+name = "isoloom-vagrant"
+version = "0.10.1"
+dependencies = [
+ "indexmap",
+ "isoloom-compose",
+ "isoloom-plan",
+ "isoloom-render",
+ "isoloom-spec",
+ "isoloom-terraform",
  "serde_json",
  "serde_yaml_ng",
 ]
