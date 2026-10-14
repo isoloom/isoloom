@@ -158,3 +158,7 @@ isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
   [docs/registry.md](docs/registry.md); the cloud modules' variables and outputs in
   [docs/cloud-modules.md](docs/cloud-modules.md); the resolved snapshot
   (`.isoloom/resolved.json`) carries its own `version`.
+
+## License
+
+Isoloom is licensed under the [Apache License, Version 2.0](LICENSE). Contributions are accepted under the same license.
