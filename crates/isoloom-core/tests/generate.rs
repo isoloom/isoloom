@@ -743,9 +743,11 @@ fn the_resolved_snapshot_tells_infra_from_targets() {
 fn the_provision_script_can_be_limited_to_machines() {
     let (_, spec) = example("ansible-pair");
     let all = isoloom_core::generate::provision_script(&spec, &[]);
-    assert!(!all.contains("--limit"));
+    // The helpers retry on unreachable hosts with `--limit @<retry file>`: only the runs count.
+    let runs = |s: &str| s.lines().filter(|l| l.starts_with("run_play ")).map(String::from).collect::<Vec<_>>();
+    assert!(runs(&all).iter().all(|l| !l.contains("--limit")), "{all}");
     let some = isoloom_core::generate::provision_script(&spec, &["web".into(), "cache".into()]);
-    assert!(some.contains(" --limit 'web,cache' "), "{some}");
+    assert!(runs(&some).iter().all(|l| l.ends_with(" --limit 'web,cache'")), "{some}");
 }
 
 #[test]

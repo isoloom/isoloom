@@ -544,10 +544,10 @@ Vagrant.configure("2") do |config|
     SH
     m.vm.provision "shell", name: "ansible", inline: <<~'SH'
       set -e
-      mkdir -p /tmp/isoloom-facts
-      export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200
-      _isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'
+      mkdir -p /tmp/isoloom-facts /tmp/isoloom-retry
+      export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200 ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry
       _isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
+      _isoloom_attempts=3
       retry_download() {
         _isoloom_n=1
         until "$@"; do
@@ -557,30 +557,56 @@ Vagrant.configure("2") do |config|
           _isoloom_n=$((_isoloom_n + 1))
         done
       }
+      play_outcome() {
+        awk '
+          { gsub(/\033\[[0-9;]*m/, "") }
+          /^PLAY RECAP/ { recap = 1; next }
+          recap && / : ok=/ {
+            for (i = 1; i <= NF; i++) {
+              split($i, kv, "=")
+              if (kv[1] == "failed") failed += kv[2]
+              if (kv[1] == "unreachable") unreachable += kv[2]
+            }
+          }
+          END { if (failed > 0) print "failed"; else if (unreachable > 0) print "unreachable"; else print "none" }
+        ' "$1"
+      }
       run_play() {
-        _isoloom_n=1
+        _isoloom_book=$1
+        shift
+        _isoloom_retry="${ANSIBLE_RETRY_FILES_SAVE_PATH:-.}/${_isoloom_book%.*}.retry"
         _isoloom_log=$(mktemp)
         _isoloom_rcf=$(mktemp)
+        _isoloom_n=1
+        rm -f "$_isoloom_retry"
         while :; do
-          { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
-          _isoloom_rc=$(cat "$_isoloom_rcf")
-          if [ "$_isoloom_rc" -eq 0 ]; then
-            rm -f "$_isoloom_log" "$_isoloom_rcf"
-            return 0
-          fi
-          if [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log"; then
-            echo "isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)"
-            sleep $((2 * _isoloom_pause))
-            _isoloom_n=$((_isoloom_n + 1))
+          if [ "$_isoloom_n" -eq 1 ]; then
+            { "$@" "$_isoloom_book" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
           else
-            rm -f "$_isoloom_log" "$_isoloom_rcf"
-            return "$_isoloom_rc"
+            { "$@" "$_isoloom_book" --limit "@$_isoloom_retry" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
           fi
+          _isoloom_rc=$(cat "$_isoloom_rcf")
+          [ "$_isoloom_rc" -ne 0 ] || break
+          _isoloom_outcome=$(play_outcome "$_isoloom_log")
+          if [ "$_isoloom_outcome" != unreachable ] || [ ! -s "$_isoloom_retry" ]; then
+            echo "isoloom: $_isoloom_book failed (exit $_isoloom_rc, recap: $_isoloom_outcome): not retried, only unreachable hosts are"
+            break
+          fi
+          _isoloom_hosts=$(tr '\n' ' ' < "$_isoloom_retry" | sed 's/ *$//')
+          if [ "$_isoloom_n" -ge "$_isoloom_attempts" ]; then
+            echo "isoloom: $_isoloom_book: hosts still unreachable after $_isoloom_n attempts: $_isoloom_hosts"
+            break
+          fi
+          _isoloom_n=$((_isoloom_n + 1))
+          echo "isoloom: $_isoloom_book: unreachable: $_isoloom_hosts; waiting $((4 * _isoloom_pause)) s, then attempt $_isoloom_n/$_isoloom_attempts on them (--limit @$_isoloom_retry)"
+          sleep $((4 * _isoloom_pause))
         done
+        rm -f "$_isoloom_log" "$_isoloom_rcf"
+        return "$_isoloom_rc"
       }
       cd /opt/isoloom/ansible
       retry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml
-      run_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}' site.yml
+      run_play 'site.yml' ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}'
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
     m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/web-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
