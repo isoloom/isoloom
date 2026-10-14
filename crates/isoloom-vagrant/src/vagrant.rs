@@ -25,6 +25,7 @@
 //!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
 //!   guest ([`hyperv`]); [`hyperv_refusal`] says when a machine has no Hyper-V box.
 
+mod bridged;
 mod checks;
 mod helpers;
 pub mod hyperv;
@@ -75,6 +76,7 @@ pub fn capabilities() -> Capabilities {
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Ipv6,
+        Feature::BridgedNetworks,
     ])
 }
 
@@ -255,7 +257,7 @@ pub fn qemu_refusal(spec: &Spec) -> Option<String> {
     let in_their_place = checks::in_their_place(&env);
     let checks = checks::Checks::of(&env, &in_their_place);
     let with_controller = env.controller.is_some() || !checks.controller.is_empty();
-    qemu::refusal(qemu::links(&env, with_controller))
+    qemu::refusal(qemu::links(&env, with_controller)).or_else(|| bridged::provider_refusal(&env, "QEMU"))
 }
 
 /// Why this environment's VMs can't all have their networks under Vagrant's UTM provider, if
@@ -277,5 +279,12 @@ pub fn utm_refusal(spec: &Spec) -> Option<String> {
 /// a machine whose OS has no known Hyper-V box and whose spec gives none (`vm.image.hyperv`).
 /// `refusal_on` asks it for `hyperv`.
 pub fn hyperv_refusal(spec: &Spec) -> Option<String> {
-    hyperv::refusal(&Environment::build(spec, Target::Vagrant, None))
+    let env = Environment::build(spec, Target::Vagrant, None);
+    hyperv::refusal(&env).or_else(|| bridged::provider_refusal(&env, "Hyper-V"))
+}
+
+/// Why this environment can't run under Vagrant's libvirt provider, if it can't: a bridged
+/// network (`refusal_on` asks it for `libvirt`).
+pub fn libvirt_refusal(spec: &Spec) -> Option<String> {
+    bridged::provider_refusal(&Environment::build(spec, Target::Vagrant, None), "libvirt")
 }

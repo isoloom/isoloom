@@ -22,9 +22,11 @@ use crate::sidecars;
 use machine::machine;
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,
-/// gateway machines, ulimits, `tc` (in a sidecar), IPv6 networks of every kind and secrets
-/// (Compose's own, owners included). No controller: no `provision:`, no Ansible
-/// checks; `exec` checks run inside a container.
+/// gateway machines, ulimits, `tc` (in a sidecar), IPv6 networks of every kind, secrets
+/// (Compose's own, owners included) and existing Docker networks. No controller: no
+/// `provision:`, no Ansible checks; `exec` checks run inside a container. No bridged
+/// networks: a container reaches the host's LAN through a macvlan network made beforehand
+/// (`external`).
 pub fn capabilities() -> isoloom_plan::Capabilities {
     isoloom_plan::Capabilities::of([
         Feature::NetworkAppliances,
@@ -37,11 +39,13 @@ pub fn capabilities() -> isoloom_plan::Capabilities {
         Feature::Ipv6Auto,
         Feature::Secrets,
         Feature::SecretOwners,
+        Feature::ExternalNetworks,
     ])
 }
 
 /// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
-/// secrets, which `isoloom run` hands only to a Compose it starts on this machine.
+/// secrets, which `isoloom run` hands only to a Compose it starts on this machine, and existing
+/// networks, which a fresh Docker host VM has none of.
 pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
     isoloom_plan::Capabilities::of([
         Feature::NetworkAppliances,
@@ -121,6 +125,8 @@ pub fn compose_file(target: Target, env: &Environment) -> Result<Rendered, Rende
     probes(env, &out.probe_archs, &mut out.services);
     file.services = out.services;
     label(env, &mut file);
+    // Existing networks aren't the environment's: unlabelled, so nothing collects them.
+    file.networks.extend(crate::outside::networks(env));
     let mut files = runners;
     files.extend(out.files);
     Ok(Rendered { file, files })

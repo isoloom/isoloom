@@ -153,6 +153,8 @@ networks:
   dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw, docker: { cidr: 10.1.1.0/24 } }
   far: { cidr: 10.1.2.0/24, tc: { delay: 50ms, jitter: 5ms, loss: 0.5, rate: 10mbit } }
   office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, switch: fw, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
+  corp: { cidr: 10.3.0.0/24, external: corp-net }
+  home: { cidr: 10.4.0.0/24, bridged: { interface: en0, dhcp: true, default_route: true, vlan: 20 } }
 reach: [{ from: out, to: dmz, ports: [80] }]
 inputs: [TOKEN]
 secrets: { token: { env: TOKEN } }

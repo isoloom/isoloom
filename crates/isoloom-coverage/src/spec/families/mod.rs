@@ -8,6 +8,7 @@ mod external;
 pub mod fields;
 mod ipv6;
 mod kubernetes;
+mod outside;
 mod proxmox;
 pub mod shared;
 mod vagrant;

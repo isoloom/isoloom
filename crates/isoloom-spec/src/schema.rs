@@ -69,6 +69,8 @@ fn networks(s: &mut Value) {
         json!({ "pattern": "^[1-9][0-9]{0,3}$" }),
     );
     set(s, &["$defs", "Vlan", "properties", "cidr"], "pattern", json!(network));
+    set(s, &["$defs", "Bridged", "properties", "vlan"], "minimum", json!(1));
+    set(s, &["$defs", "Bridged", "properties", "vlan"], "maximum", json!(4094));
     set(
         s,
         &["$defs", "NetworkDocker", "properties", "cidr"],
@@ -86,7 +88,8 @@ fn machines(s: &mut Value) {
         s,
         &["$defs", "Machine", "properties", "networks"],
         "additionalProperties",
-        json!({ "type": "integer", "minimum": 1, "maximum": 254 }),
+        // 0: an address from the LAN's DHCP server, on a `bridged: { dhcp: true }` network.
+        json!({ "type": "integer", "minimum": 0, "maximum": 254 }),
     );
     set(
         s,

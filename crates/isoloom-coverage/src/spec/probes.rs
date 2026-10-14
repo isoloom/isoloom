@@ -47,6 +47,8 @@ pub fn probe(path: &str) -> Option<String> {
         "networks.*.ipv6.only" => "networks: { lan: { internet: false, ipv6: { cidr: 'fd00:20::/64', only: true } } }".to_string(),
         "networks.*.gateway" => "{ networks: { dmz: { cidr: 10.20.1.0/24, gateway: a } }, machines: { a: { networks: { dmz: 1 } } } }".to_string(),
         "networks.*.vlans.*.cidr" | "networks.*.vlans.*.internet" => vlans(path),
+        "networks.*.external" => "{ networks: { corp: { cidr: 10.77.0.0/24, external: corp-net } }, machines: { a: { networks: { corp: 10 } } } }".to_string(),
+        "networks.*.bridged.interface" | "networks.*.bridged.dhcp" | "networks.*.bridged.default_route" | "networks.*.bridged.vlan" => bridged(path),
         "networks.*.switch" => SWITCH.to_string(),
         "reach[].from" | "reach[].to" | "reach[].ports" => {
             let b = B.replace("lan: 11", "dmz: 11");
@@ -83,6 +85,18 @@ pub fn probe(path: &str) -> Option<String> {
 /// A router appliance beside the machine (an appliance is a container only).
 fn appliance(extra: &str) -> String {
     format!("machines: {{ r: {{ networks: {{ lan: 2 }}, docker: {{ image: vrnetlab/cisco_iol, appliance: cisco-iol{extra} }} }} }}")
+}
+
+/// The host's LAN, bridged, with the machine on it after its own network: at a fixed address,
+/// or by DHCP (`0`).
+fn bridged(path: &str) -> String {
+    let (bridged, octet) = match path {
+        "networks.*.bridged.dhcp" => ("dhcp: true", 0),
+        "networks.*.bridged.default_route" => ("dhcp: true, default_route: true", 0),
+        "networks.*.bridged.vlan" => ("vlan: 20", 50),
+        _ => ("interface: en0", 50),
+    };
+    format!("{{ networks: {{ home: {{ cidr: 192.168.1.0/24, bridged: {{ {bridged} }} }} }}, machines: {{ a: {{ networks: {{ home: {octet} }} }} }} }}")
 }
 
 /// A LAN with a VLAN the machine is on.

@@ -66,6 +66,7 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
     for t in trunks::of(ts, name) {
         svc.networks.insert(trunks::link_network(t), mac(&trunks::mac(t, 0)));
     }
+    svc.networks.extend(crate::outside::attachments(mp));
     if mp.is_gateway {
         // It routes: forwarding on, and the right to set its own firewall rules.
         svc.cap_add = vec!["NET_ADMIN".into()];

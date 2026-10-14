@@ -36,6 +36,7 @@ pub fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         for (net, ip) in &mp.addresses {
             private_network(r, env, net, *ip);
         }
+        super::bridged::networks(r, env, mp);
         for p in &mp.ports {
             r.call(vagrantfile::forwarded_port("m", p.port, p.publish, p.protocol));
         }

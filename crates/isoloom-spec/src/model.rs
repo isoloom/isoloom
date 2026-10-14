@@ -2,6 +2,7 @@
 //! networks, who reaches whom, the services that answer) and, per machine, how each kind of
 //! target produces it (`docker:` and/or `vm:`).
 
+mod bridged;
 mod checks;
 mod cloud;
 mod constraints;
@@ -20,7 +21,7 @@ pub use constraints::{Constraints, Mirrors, Proxy};
 pub use implementation::{Appliance, Controller, Dns, DockerImpl, KNOWN_OS, Provision, REBOOT_STEP, VmImage, VmImpl, Winrm, is_reboot};
 pub use ipv6::{Ipv6, Ipv6Addresses};
 pub use machine::{Arch, Machine, Protocol, Resources, ScalarSchema, Service};
-pub use network::{Network, NetworkDocker, Reach, Tc, Vlan};
+pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
 pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, secret_variable};
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, TOOL_RECIPES, Tool, ULIMITS, Ulimit};
 pub use target::{Shape, Target};

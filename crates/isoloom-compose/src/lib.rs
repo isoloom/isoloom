@@ -6,6 +6,7 @@ pub mod appliances;
 pub mod docker;
 pub mod file;
 mod ipv6;
+mod outside;
 pub mod render;
 mod sidecars;
 

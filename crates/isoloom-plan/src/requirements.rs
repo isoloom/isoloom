@@ -43,6 +43,10 @@ pub enum Feature {
     Secrets,
     /// A secret file owned by a given user or group (`uid`, `gid`).
     SecretOwners,
+    /// Joining an existing network by name (`external`), which the target never makes.
+    ExternalNetworks,
+    /// Bridging a network to an interface of the host (`bridged`).
+    BridgedNetworks,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -114,6 +118,18 @@ pub enum Requirement {
         /// The first machine whose secret does.
         machine: String,
     },
+    /// A network is an existing one, joined by name.
+    ExternalNetwork {
+        /// The network.
+        network: String,
+        /// Its name on the target.
+        name: String,
+    },
+    /// A network is bridged to an interface of the host.
+    BridgedNetwork {
+        /// The network.
+        network: String,
+    },
 }
 
 impl Requirement {
@@ -135,6 +151,8 @@ impl Requirement {
             Requirement::Ipv6Auto { .. } => Feature::Ipv6Auto,
             Requirement::Secrets { .. } => Feature::Secrets,
             Requirement::SecretOwner { .. } => Feature::SecretOwners,
+            Requirement::ExternalNetwork { .. } => Feature::ExternalNetworks,
+            Requirement::BridgedNetwork { .. } => Feature::BridgedNetworks,
         }
     }
 }
@@ -185,6 +203,14 @@ impl fmt::Display for Requirement {
             Requirement::SecretOwner { machine } => write!(
                 f,
                 "a secret of machine `{machine}` sets `uid` or `gid`: a Kubernetes Secret volume's files belong to root"
+            ),
+            Requirement::ExternalNetwork { network, name } => write!(
+                f,
+                "network `{network}` is an existing network (`external: {name}`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones)"
+            ),
+            Requirement::BridgedNetwork { network } => write!(
+                f,
+                "network `{network}` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)"
             ),
         }
     }

@@ -10,9 +10,9 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 78% | 150 | 115 | 4 | 31 |
-| [Vagrant](#vagrant) | 90% | 42 | 38 | 0 | 4 |
-| [Vagrant: networks](#vagrant-networks) | 81% | 38 | 31 | 0 | 7 |
+| [Docker Compose](#docker-compose) | 78% | 150 | 116 | 3 | 31 |
+| [Vagrant](#vagrant) | 92% | 42 | 39 | 0 | 3 |
+| [Vagrant: networks](#vagrant-networks) | 92% | 38 | 35 | 0 | 3 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
 | [Vagrant: provisioners](#vagrant-provisioners) | 94% | 57 | 54 | 0 | 3 |
 | [Vagrant: communicators](#vagrant-communicators) | 100% | 8 | 8 | 0 | 0 |
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-78% of 150 portable features (115 done, 4 partly, 31 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+78% of 150 portable features (116 done, 3 partly, 31 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -368,7 +368,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `name` | Yes | Yes | The hybrid target: the Docker network its host VM created for each network; elsewhere Compose scopes names to the environment |
+| `name` | Yes | Yes | From `networks.*.external` (the existing network's name; on the hybrid target, the Docker network its host VM created for each network; elsewhere Compose scopes names to the environment) |
 | `driver` | No | No | Docker network drivers (overlay, macvlan) have no VM equivalent |
 | `driver_opts` | No | No | Docker network driver options |
 | `ipam` | Yes | Yes | From `networks.*.cidr` |
@@ -379,7 +379,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ipam.config[].gateway` | Yes | Yes | The address Docker takes, when the first one is a machine's or the router's |
 | `ipam.config[].aux_addresses` | n/a | No | Addresses Docker must not hand out: every machine has a fixed one |
 | `ipam.options` | No | No | Docker IPAM driver options |
-| `external` | Yes | Partly | The hybrid target: its containers join the macvlan networks the Docker host VM creates, shared with the VMs; not yet: joining a network outside the environment (a Docker network, a host bridge, a VPC) |
+| `external` | Yes | Yes | From `networks.*.external` (an existing Docker network, joined by name at fixed addresses; on the hybrid target, the macvlan networks its Docker host VM creates, shared with the VMs) |
 | `external.name` | n/a | No | Legacy spelling of `name` |
 | `internal` | Yes | Yes | From `networks.*.internet: false` (when nothing routes) |
 | `enable_ipv4` | Yes | Yes | From `networks.*.ipv6.only` (off on an IPv6-only network) |
@@ -436,7 +436,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant
 
-90% of 42 portable features (38 done, 0 partly, 4 to do; 100 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners, communicators, pushes).
+92% of 42 portable features (39 done, 0 partly, 3 to do; 100 features in all). From Vagrant 2.4.9 (config.vm, network types, provisioners, communicators, pushes).
 
 ### Machine settings (config.vm)
 
@@ -491,7 +491,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | --- | --- | --- | --- |
 | `forwarded_port` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback; `protocol: "udp"` with `protocol: udp`) |
 | `private_network` | Yes | Yes | From `networks and machines.*.networks` |
-| `public_network` | Yes | Not yet | A network bridged to the outside (Compose `external`, a host bridge, a VPC) |
+| `public_network` | Yes | Yes | From `networks.*.bridged` (the host's LAN, through the interface it names; not on QEMU, Hyper-V or libvirt yet) |
 
 ### Provisioners
 
@@ -565,7 +565,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: networks
 
-81% of 38 portable features (31 done, 0 partly, 7 to do; 58 features in all). From Vagrant 2.4.9 (the networking docs and the providers' network code) and vagrant-libvirt 0.12.2 (its network options).
+92% of 38 portable features (35 done, 0 partly, 3 to do; 58 features in all). From Vagrant 2.4.9 (the networking docs and the providers' network code) and vagrant-libvirt 0.12.2 (its network options).
 
 ### Network types
 
@@ -625,10 +625,10 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `private_network: nic_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `private_network: type` | Yes | Another way | Via machines.*.networks (a fixed address on every target, instead of DHCP) |
 | `private_network: virtualbox__intnet` | Yes | Yes | From `networks` (an internal network each: between the VMs only, no host adapter) |
-| `public_network: auto_config` | Yes | Not yet | With `public_network` (a network bridged to the outside) |
-| `public_network: bridge` | Yes | Not yet | With `public_network` (a network bridged to the outside) |
-| `public_network: ip` | Yes | Not yet | With `public_network` (a network bridged to the outside) |
-| `public_network: use_dhcp_assigned_default_route` | Yes | Not yet | With `public_network` (a network bridged to the outside) |
+| `public_network: auto_config` | Yes | Another way | Via networks.*.bridged (Vagrant always configures the bridged interface: a fixed address, or DHCP) |
+| `public_network: bridge` | Yes | Yes | From `networks.*.bridged.interface` |
+| `public_network: ip` | Yes | Yes | From `machines.*.networks` (a fixed address on a bridged network; DHCP otherwise) |
+| `public_network: use_dhcp_assigned_default_route` | Yes | Yes | From `networks.*.bridged.default_route` |
 
 ## Vagrant: disks and synced folders
 
@@ -7269,6 +7269,11 @@ is marked ✗, with its reason below.
 | `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.only` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✗ |
+| `networks.*.external` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.interface` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.dhcp` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.default_route` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `networks.*.bridged.vlan` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
 | `reach[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
@@ -7366,22 +7371,22 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 91% of 80 | 73 | 0 | 0 | 7 |
-| hosted | 91% of 80 | 73 | 0 | 0 | 7 |
-| kubernetes | 75% of 72 | 49 | 11 | 1 | 11 |
-| helm | 75% of 72 | 49 | 11 | 1 | 11 |
-| kustomize | 75% of 72 | 49 | 11 | 1 | 11 |
-| vagrant | 92% of 70 | 63 | 3 | 0 | 4 |
-| docker-vm | 88% of 80 | 71 | 0 | 0 | 9 |
-| hybrid | 78% of 89 | 68 | 3 | 7 | 11 |
-| proxmox | 86% of 68 | 58 | 1 | 3 | 6 |
-| aws | 66% of 68 | 40 | 11 | 6 | 11 |
-| azure | 66% of 68 | 40 | 11 | 7 | 10 |
-| gcp | 66% of 68 | 40 | 11 | 6 | 11 |
-| digitalocean | 47% of 68 | 29 | 7 | 6 | 26 |
-| linode | 51% of 68 | 31 | 8 | 6 | 23 |
-| oci | 51% of 68 | 31 | 8 | 6 | 23 |
-| cloud-docker | 87% of 80 | 70 | 0 | 0 | 10 |
+| docker | 87% of 85 | 74 | 0 | 0 | 11 |
+| hosted | 87% of 85 | 74 | 0 | 0 | 11 |
+| kubernetes | 70% of 77 | 49 | 11 | 1 | 16 |
+| helm | 70% of 77 | 49 | 11 | 1 | 16 |
+| kustomize | 70% of 77 | 49 | 11 | 1 | 16 |
+| vagrant | 90% of 75 | 66 | 3 | 0 | 6 |
+| docker-vm | 83% of 85 | 71 | 0 | 0 | 14 |
+| hybrid | 73% of 94 | 68 | 3 | 7 | 16 |
+| proxmox | 86% of 73 | 63 | 1 | 3 | 6 |
+| aws | 62% of 73 | 40 | 11 | 6 | 16 |
+| azure | 62% of 73 | 40 | 11 | 7 | 15 |
+| gcp | 62% of 73 | 40 | 11 | 6 | 16 |
+| digitalocean | 44% of 73 | 29 | 7 | 6 | 31 |
+| linode | 47% of 73 | 31 | 8 | 6 | 28 |
+| oci | 47% of 73 | 31 | 8 | 6 | 28 |
+| cloud-docker | 82% of 85 | 70 | 0 | 0 | 15 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
 | external | 62% of 58 | 32 | 9 | 14 | 3 |
 
@@ -7409,6 +7414,9 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **oci**: Network `lan` is IPv6: dual-stack virtual cloud networks on Oracle Cloud come later (`networks.*.ipv6.cidr`)
 - **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static` (`networks.*.ipv6.addresses`)
 - **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci, external**: Network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport) (`networks.*.ipv6.only`)
+- **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
+- **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)
+- **vagrant**: Network `home`: Vagrant's bridged networks take no VLAN tag (Proxmox does) (`networks.*.bridged.vlan`)
 - **vagrant, docker-vm, hybrid, proxmox, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Machine `a` gets `secrets`, which `isoloom run` delivers on the Docker and Kubernetes targets for now (`secrets`, `machines.*.secrets`)
 - **proxmox**: Machine `a`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts) (`machines.*.arch`)
 - **aws**: Machine `a`: arm64 on AWS comes later (Graviton instances and arm64 AMIs) (`machines.*.arch`)

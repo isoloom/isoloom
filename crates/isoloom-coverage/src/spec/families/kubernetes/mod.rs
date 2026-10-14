@@ -7,4 +7,4 @@ mod machines;
 use crate::spec::status::Status;
 
 /// The Kubernetes output's cells, section by section.
-pub const PARTS: &[&[(&str, Status)]] = &[environment::CELLS, machines::CELLS, super::ipv6::KUBERNETES];
+pub const PARTS: &[&[(&str, Status)]] = &[environment::CELLS, machines::CELLS, super::ipv6::KUBERNETES, super::outside::KUBERNETES];

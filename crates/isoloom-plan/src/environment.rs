@@ -21,6 +21,7 @@ use crate::checks::{self, Resolved};
 use crate::images::{Images, tag_of};
 use crate::ipv6::{self, Ipv6Plan, Route6};
 use crate::lifecycle::{self, MachineLifecycle};
+use crate::outside::{self, OutsideAddress, OutsideNetwork};
 use crate::requirements::{self, Requirement};
 use crate::routing;
 use crate::secrets::SecretFile;
@@ -36,6 +37,9 @@ pub struct Environment {
     pub instance: Option<u8>,
     /// Its networks, in spec order.
     pub networks: IndexMap<String, NetworkPlan>,
+    /// The networks outside the environment (`external`, `bridged`), in spec order: never in
+    /// [`Environment::networks`] nor in the spec the backends read.
+    pub outside: IndexMap<String, OutsideNetwork>,
     /// Isoloom's router, when `reach` rules need one: its address on each network it routes.
     pub router: Option<IndexMap<String, Ipv4Addr>>,
     /// The router's IPv6 address on each IPv6 network it routes (empty without a router).
@@ -143,6 +147,8 @@ pub struct MachinePlan {
     pub external: Option<External>,
     /// Its variables from the `provision:` steps' `host_vars`, merged in step order.
     pub host_vars: IndexMap<String, serde_json::Value>,
+    /// Its addresses on the outside networks it joins, after its own networks.
+    pub outside: IndexMap<String, OutsideAddress>,
 }
 
 impl MachinePlan {
@@ -271,11 +277,21 @@ impl Environment {
     /// Plans a validated `spec` for `target` (`instance`: the copy it is, when several run).
     pub fn build(spec: &Spec, target: Target, instance: Option<u8>) -> Environment {
         let original = spec;
-        let laid_out = lay_out(spec, target);
+        // Laid out with the outside networks (so a moved block avoids them), then without them.
+        let laid_out = outside::without(&lay_out(spec, target));
         let spec = &laid_out;
         let router = routing::needed(spec).then(|| routing::networks(spec).map(|n| (n.clone(), routing::address(spec, n))).collect());
-        let machines: IndexMap<String, MachinePlan> = spec.machines.iter().map(|(n, m)| (n.clone(), machine(spec, target, n, m))).collect();
+        let machines: IndexMap<String, MachinePlan> = spec
+            .machines
+            .iter()
+            .map(|(n, m)| {
+                let mut mp = machine(spec, target, n, m);
+                mp.outside = original.machines.get(n).map(|m| outside::addresses(original, m)).unwrap_or_default();
+                (n.clone(), mp)
+            })
+            .collect();
         let mut requirements = requirements::of(spec);
+        requirements.extend(outside::requirements(original));
         requirements.extend(requirements::mixed_shapes(spec, |n| machines.get(n).map(|m| m.shape)));
         Environment {
             name: spec.name.clone(),
@@ -286,6 +302,7 @@ impl Environment {
                 .keys()
                 .map(|n| (n.clone(), network(spec, &original.networks[n].cidr, n)))
                 .collect(),
+            outside: outside::networks(original),
             router,
             router6: ipv6::router(spec),
             machines,
@@ -415,6 +432,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         winrm: m.vm.as_ref().filter(|v| images::is_windows(&v.os)).map(images::winrm),
         external: m.external.clone(),
         host_vars: ansible::host_vars(spec, name),
+        outside: IndexMap::new(),
     }
 }
 
