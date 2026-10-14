@@ -11,10 +11,12 @@
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
-use isoloom_spec::model::{Arch, Constraints, Machine, Protocol, Spec, Target, Tc, Ulimit};
+use isoloom_spec::images;
+use isoloom_spec::model::{Arch, Constraints, External, Machine, Protocol, Spec, Target, Tc, Ulimit, Winrm};
 use isoloom_spec::validate::docker_cidrs;
 
 use crate::addressing::{address, address_for, host_address, start_order};
+use crate::ansible;
 use crate::checks::{self, Resolved};
 use crate::images::{Images, tag_of};
 use crate::lifecycle::{self, MachineLifecycle};
@@ -48,6 +50,8 @@ pub struct Environment {
     pub requirements: Vec<Requirement>,
     /// The image references to pull, through the registry mirrors.
     pub images: Images,
+    /// The Ansible inventory groups and their members (see [`ansible::groups`]).
+    pub inventory_groups: IndexMap<String, Vec<String>>,
     spec: Spec,
 }
 
@@ -79,7 +83,7 @@ pub enum MachineShape {
     Vm,
     /// An access machine the runner supplies (nothing to build).
     Supplied,
-    /// An existing machine, reached as it is.
+    /// An existing machine, reached as it is (every machine on the `external` target).
     External,
 }
 
@@ -118,6 +122,22 @@ pub struct MachinePlan {
     pub depends_on: Vec<String>,
     /// The set-up steps of a VM, in order (empty for the other shapes).
     pub lifecycle: MachineLifecycle,
+    /// The OS of its VM implementation (`debian-12`, `windows-server-2022`...), whatever the
+    /// target: an existing host keeps the OS its `vm:` names.
+    pub os: Option<String>,
+    /// How its Windows VM answers WinRM (`None` off Windows).
+    pub winrm: Option<Winrm>,
+    /// Its SSH endpoint as an existing host (`external:`), when the spec gives one.
+    pub external: Option<External>,
+    /// Its variables from the `provision:` steps' `host_vars`, merged in step order.
+    pub host_vars: IndexMap<String, serde_json::Value>,
+}
+
+impl MachinePlan {
+    /// Whether it runs Windows.
+    pub fn is_windows(&self) -> bool {
+        self.os.as_deref().is_some_and(images::is_windows)
+    }
 }
 
 /// A route to a network a machine isn't on.
@@ -257,6 +277,7 @@ impl Environment {
             constraints: spec.constraints.clone(),
             requirements: requirements::of(spec),
             images: Images::of(spec),
+            inventory_groups: ansible::groups(spec),
             spec: laid_out.clone(),
         }
     }
@@ -304,7 +325,7 @@ fn network(spec: &Spec, declared: &str, name: &str) -> NetworkPlan {
 }
 
 fn shape(target: Target, m: &Machine) -> MachineShape {
-    if m.external.is_some() || target == Target::External {
+    if target == Target::External {
         return MachineShape::External;
     }
     let container = match target {
@@ -353,6 +374,10 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         } else {
             Vec::new()
         },
+        os: m.vm.as_ref().map(|v| v.os.clone()),
+        winrm: m.vm.as_ref().filter(|v| images::is_windows(&v.os)).map(images::winrm),
+        external: m.external.clone(),
+        host_vars: ansible::host_vars(spec, name),
     }
 }
 

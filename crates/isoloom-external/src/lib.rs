@@ -1,8 +1,5 @@
-//! The `external` backend: an environment on hosts that already exist.
+//! The `external` backend: an environment on hosts that already exist, rendered from the plan.
 
 pub mod external;
 
-pub use external::generate;
-use isoloom_plan::checks;
-use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, address, header, host_vars};
-use isoloom_spec::{groups, images, model};
+pub use external::{ExternalBackend, render};
