@@ -113,6 +113,7 @@ pub const CELLS: &[(&str, Status)] = &[
             note: "passed to the steps and playbooks",
         },
     ),
+    ("secrets", crate::spec::status::SECRETS_ON_VMS),
     (
         "provision[].ansible",
         Done {

@@ -13,6 +13,9 @@ const WHOLE: &[&str] = &[
     "machines.*.environment",
     "machines.*.sysctls",
     "machines.*.ulimits",
+    // The secrets' stores, and where each machine places its secrets: one feature each.
+    "secrets",
+    "machines.*.secrets",
 ];
 
 /// Where in the spec names are chosen by the author (map keys become `*`).

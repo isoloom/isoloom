@@ -1,6 +1,6 @@
 //! Volumes: what a pod mounts, and the claims Isoloom's volumes are.
 
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
 
 const PLUGIN: Support = NotPortable {
     why: "one storage system's plugin: no other target has it",
@@ -21,6 +21,7 @@ pub(super) fn classify(definition: &str, field: &str) -> Option<Support> {
         "Volume" => volume(field),
         "VolumeMount" => mount(field),
         "PersistentVolumeClaimVolumeSource" | "ConfigMapVolumeSource" | "EmptyDirVolumeSource" => source(definition, field),
+        "SecretVolumeSource" | "KeyToPath" => secret(definition, field),
         "PersistentVolumeClaimSpec" | "VolumeResourceRequirements" => claim(definition, field),
         _ => None,
     }
@@ -38,8 +39,8 @@ fn volume(field: &str) -> Option<Support> {
         "emptyDir" => Emitted {
             from: "machines.*.tmpfs and machines.*.shm_size (and Isoloom's probe)",
         },
-        "secret" => Planned {
-            note: "real secrets: files a machine reads, not environment variables",
+        "secret" => Emitted {
+            from: "machines.*.secrets (keys of the `isoloom-secrets` Secret, which `isoloom run` creates)",
         },
         "ephemeral" => Equivalent {
             via: "`emptyDir`, scratch space that goes with the pod",
@@ -88,8 +89,9 @@ fn mount(field: &str) -> Option<Support> {
         "readOnly" => Emitted {
             from: "(Isoloom's probe, mounted read-only)",
         },
-        "subPath" => Planned {
-            note: "a machine's `files`, each mounted at its own path",
+        "subPath" => Partial {
+            from: "machines.*.secrets (each secret's key at its path)",
+            gap: "a machine's `files`, each mounted at its own path",
         },
         "recursiveReadOnly" => Equivalent { via: "`readOnly`" },
         "subPathExpr" | "mountPropagation" | "bindMountOptions" => MOUNT_DETAIL,
@@ -106,6 +108,29 @@ fn source(definition: &str, field: &str) -> Option<Support> {
         },
         ("ConfigMapVolumeSource", "items" | "optional" | "defaultUser") | ("EmptyDirVolumeSource", "mode") => MOUNT_DETAIL,
         ("EmptyDirVolumeSource", "medium" | "sizeLimit") => TMPFS,
+        _ => return None,
+    })
+}
+
+/// The secrets' volume: some keys of the Secret, each a file with its mode.
+fn secret(definition: &str, field: &str) -> Option<Support> {
+    Some(match (definition, field) {
+        ("SecretVolumeSource", "secretName") => Emitted {
+            from: "secrets (the `isoloom-secrets` Secret)",
+        },
+        ("SecretVolumeSource", "items") | ("KeyToPath", "key" | "path") => Emitted {
+            from: "machines.*.secrets (the machine's own secrets only)",
+        },
+        ("KeyToPath", "mode") => Emitted {
+            from: "machines.*.secrets[].mode (default 0444)",
+        },
+        ("SecretVolumeSource", "defaultMode") => Equivalent { via: "each key's `mode`" },
+        ("SecretVolumeSource", "defaultUser") | ("KeyToPath", "user") => Planned {
+            note: "a secret's `uid` on Kubernetes, once the clusters Isoloom targets all have it",
+        },
+        ("SecretVolumeSource", "optional") => Tooling {
+            note: "`isoloom run` creates the Secret before the pods start: a missing secret stops the run instead",
+        },
         _ => return None,
     })
 }

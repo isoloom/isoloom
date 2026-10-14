@@ -55,6 +55,7 @@ pub const CELLS: &[(&str, Status)] = &[
             proof: "supplier-portal-api",
         },
     ),
+    ("machines.*.secrets", crate::spec::status::SECRETS_ON_VMS),
     (
         "machines.*.environment",
         Done {

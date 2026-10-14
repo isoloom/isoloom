@@ -55,9 +55,6 @@ const BUILD: Support = Tooling {
 const FILES: Support = Planned {
     note: "machine files: content placed at a path on the machine, on every target",
 };
-const SECRETS: Support = Planned {
-    note: "real secrets (#147): files from a secret store, never environment values",
-};
 const GPUS: Support = Planned {
     note: "GPU passthrough where the target has a GPU, refused where it has none",
 };

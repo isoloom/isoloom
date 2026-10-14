@@ -2,7 +2,7 @@
 //!
 //! `cli` holds the command line's definition and `commands` one file per subcommand. The other
 //! modules are what several commands share: the spec with its profile (`spec`), the target to
-//! use (`target`), the files written for it (`generated`, `prepare`), the tools each target runs
+//! use (`target`), the files written for it (`generated`, `prepare`), the secrets handed to it (`secrets`), the tools each target runs
 //! with (`tools`), and a running environment's machines (`machine`, `external`).
 
 // The command line prints its results: that is its interface, not stray debugging output.
@@ -21,6 +21,7 @@ mod generated;
 mod machine;
 mod output;
 mod prepare;
+mod secrets;
 mod spec;
 mod target;
 mod tools;

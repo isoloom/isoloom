@@ -46,6 +46,11 @@ pub enum Status {
 /// [`super::probes`]) generates for it, which the tests check.
 pub const PROBE: &str = "(probe)";
 
+/// A VM or existing-host output's cell for secrets: what delivering them there comes with.
+pub const SECRETS_ON_VMS: Status = Status::Planned {
+    note: "secrets on VMs and existing hosts: files written over the machine's connection by `isoloom run`",
+};
+
 /// A container output's cell for a field of `vm:`.
 pub const NOT_A_VM: Status = Status::NotApplicable {
     why: "container outputs build machines from `docker:`",

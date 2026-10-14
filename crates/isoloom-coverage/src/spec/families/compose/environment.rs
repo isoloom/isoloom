@@ -118,6 +118,13 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "secrets",
+        crate::spec::status::Status::Done {
+            how: "top-level `secrets`, each read by Compose from `ISOLOOM_SECRET_<NAME>`, which `isoloom run` sets from the store (never in the file)",
+            proof: crate::spec::status::PROBE,
+        },
+    ),
+    (
         "provision[].ansible",
         Planned {
             note: "environment-level provisioning on containers (a controller container)",

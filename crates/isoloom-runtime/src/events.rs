@@ -127,6 +127,9 @@ pub enum ErrorCode {
     /// A launch-time input the environment needs isn't set (in the shell or the profile's
     /// `inputs`).
     InputMissing,
+    /// A secret the environment needs can't be read from its store (unset, unreadable, the
+    /// store's command missing or failing).
+    SecretMissing,
     /// No target by that name.
     TargetUnknown,
     /// The spec can't run on the target, or several targets are possible and none was named.
@@ -167,6 +170,7 @@ impl ErrorCode {
             Self::SpecInvalid => "spec_invalid",
             Self::Profile => "profile",
             Self::InputMissing => "input_missing",
+            Self::SecretMissing => "secret_missing",
             Self::TargetUnknown => "target_unknown",
             Self::TargetUnavailable => "target_unavailable",
             Self::GenerateFailed => "generate_failed",

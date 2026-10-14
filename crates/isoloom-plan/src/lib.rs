@@ -11,9 +11,11 @@ pub mod ipv6;
 pub mod lifecycle;
 pub mod requirements;
 pub mod routing;
+pub mod secrets;
 
 pub use environment::{Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Size, Volume, VolumeKind};
 pub use lifecycle::{MachineLifecycle, Step};
 pub use requirements::{Capabilities, Feature, Refusal, Requirement, refusal};
+pub use secrets::SecretFile;
 
 use isoloom_spec::{model, shell};

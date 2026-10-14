@@ -55,6 +55,13 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.secrets",
+        crate::spec::status::Status::Done {
+            how: "the service's `secrets`, files at their paths with their owner and mode (its init jobs' too)",
+            proof: crate::spec::status::PROBE,
+        },
+    ),
+    (
         "machines.*.environment",
         Done {
             how: "the container's environment (and its Kubernetes env)",

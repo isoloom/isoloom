@@ -16,7 +16,7 @@ use isoloom_runtime::events::{ErrorCode, Scope};
 use crate::failure::Failure;
 use crate::prepare::{Prepared, prepare};
 use crate::tools::{compose, process, terraform};
-use crate::{Res, cloud_services, external, output, spec};
+use crate::{Res, cloud_services, external, output, secrets, spec};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -101,10 +101,13 @@ pub fn up_or_down(ask: &Ask, down: bool) -> Res<Brought> {
     let p = prepare(ask.dir, ask.target, ask.images, ask.instance, ask.sets)?;
     output::done(&prep, Some(p.target.id().to_string()));
     let (t, dir) = (p.target, &p.dir);
+    let mut values = Vec::new();
     if !down {
         let ready = Scope::step(Some(t.id()), "ready");
         output::begin(&ready, None);
         ready_here(&p, ask.cloud)?;
+        // Every secret read before anything starts: a missing one stops the run here.
+        values = secrets::read(&p)?;
         output::done(&ready, None);
     }
     if t == Target::External && !down {
@@ -114,7 +117,7 @@ pub fn up_or_down(ask: &Ask, down: bool) -> Res<Brought> {
     let project = matches!(t, Target::Docker | Target::Hosted)
         .then(|| compose::compose_project(dir, ask.instance))
         .flatten();
-    let tool = launch(&p, ask, down)?;
+    let tool = launch(&p, ask, down, &values)?;
     let message = done::after(&p, ask, down, &tool, project);
     Ok(Brought {
         target: t,
@@ -123,8 +126,9 @@ pub fn up_or_down(ask: &Ask, down: bool) -> Res<Brought> {
     })
 }
 
-/// Runs the target's tool that brings the environment up (or down): the `up` (`down`) step.
-fn launch(p: &Prepared, ask: &Ask, down: bool) -> Res<Invocation> {
+/// Runs the target's tool that brings the environment up (or down): the `up` (`down`) step,
+/// with the secrets handed to it.
+fn launch(p: &Prepared, ask: &Ask, down: bool, values: &secrets::Values) -> Res<Invocation> {
     let t = p.target;
     let mut tool = bring_up(&p.dir, t, ask.cloud, ask.instance, down)?;
     // The preferred Vagrant provider, from the defaults.
@@ -153,6 +157,7 @@ fn launch(p: &Prepared, ask: &Ask, down: bool) -> Res<Invocation> {
     if matches!(t, Target::CloudServices | Target::CloudVm | Target::CloudDocker) {
         cmd.envs(terraform::aws_session_env());
     }
+    secrets::deliver(p, values, &mut cmd)?;
     let status = process::run_step(&mut cmd, &at)?;
     if !status.success() {
         return Err(Failure::new(ErrorCode::ToolFailed, format!("{} exited with {status}", tool.program)).into());

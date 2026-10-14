@@ -39,6 +39,10 @@ pub enum Feature {
     Ipv6Only,
     /// IPv6 addresses the target hands out (`ipv6.addresses: auto`).
     Ipv6Auto,
+    /// Secrets delivered as files when the machines start (`machines.*.secrets`).
+    Secrets,
+    /// A secret file owned by a given user or group (`uid`, `gid`).
+    SecretOwners,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -100,6 +104,16 @@ pub enum Requirement {
         /// The first such network.
         network: String,
     },
+    /// A machine gets secrets.
+    Secrets {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine's secret sets its owner (`uid` or `gid`).
+    SecretOwner {
+        /// The first machine whose secret does.
+        machine: String,
+    },
 }
 
 impl Requirement {
@@ -119,6 +133,8 @@ impl Requirement {
             Requirement::Ipv6 { .. } => Feature::Ipv6,
             Requirement::Ipv6Only { .. } => Feature::Ipv6Only,
             Requirement::Ipv6Auto { .. } => Feature::Ipv6Auto,
+            Requirement::Secrets { .. } => Feature::Secrets,
+            Requirement::SecretOwner { .. } => Feature::SecretOwners,
         }
     }
 }
@@ -161,6 +177,14 @@ impl fmt::Display for Requirement {
             Requirement::Ipv6Auto { network } => write!(
                 f,
                 "network `{network}` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`"
+            ),
+            Requirement::Secrets { machine } => write!(
+                f,
+                "machine `{machine}` gets `secrets`, which `isoloom run` delivers on the Docker and Kubernetes targets for now"
+            ),
+            Requirement::SecretOwner { machine } => write!(
+                f,
+                "a secret of machine `{machine}` sets `uid` or `gid`: a Kubernetes Secret volume's files belong to root"
             ),
         }
     }
@@ -240,6 +264,20 @@ fn limits(spec: &Spec) -> Vec<Requirement> {
     }
     if spec.networks.values().any(|n| n.tc.is_some()) {
         out.push(Requirement::TrafficControl);
+    }
+    out.extend(secrets(spec));
+    out
+}
+
+/// What the machines' secrets ask for: delivering them at all, then owning their files.
+fn secrets(spec: &Spec) -> Vec<Requirement> {
+    let mut out = Vec::new();
+    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| !m.secrets.is_empty()) {
+        out.push(Requirement::Secrets { machine: name.clone() });
+    }
+    let owned = |m: &isoloom_spec::Machine| m.secrets.iter().any(|s| s.mount().uid.is_some() || s.mount().gid.is_some());
+    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| owned(m)) {
+        out.push(Requirement::SecretOwner { machine: name.clone() });
     }
     out
 }

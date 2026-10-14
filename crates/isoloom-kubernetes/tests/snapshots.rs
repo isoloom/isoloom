@@ -220,6 +220,6 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
     );
     assert_eq!(
         isoloom_kubernetes::KubernetesBackend.capabilities(),
-        isoloom_plan::Capabilities::of([Feature::Ipv6, Feature::Ipv6Only, Feature::Ipv6Auto])
+        isoloom_plan::Capabilities::of([Feature::Ipv6, Feature::Ipv6Only, Feature::Ipv6Auto, Feature::Secrets])
     );
 }

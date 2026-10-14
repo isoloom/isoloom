@@ -119,6 +119,9 @@ fn manifests(env: &Environment, r: &Rendered) -> Result<String, RenderError> {
             literals.join(" ")
         );
     }
+    if let Some(usage) = crate::secrets::usage(env, ns) {
+        out.push_str(&usage);
+    }
     out.push('\n');
     out.push_str(&documents(&r.objects)?);
     Ok(out)

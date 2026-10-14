@@ -23,6 +23,7 @@ use crate::ipv6::{self, Ipv6Plan, Route6};
 use crate::lifecycle::{self, MachineLifecycle};
 use crate::requirements::{self, Requirement};
 use crate::routing;
+use crate::secrets::SecretFile;
 
 /// One environment, planned for one target.
 #[derive(Debug, Clone, PartialEq)]
@@ -121,6 +122,8 @@ pub struct MachinePlan {
     pub settings: Settings,
     /// The inputs it reads (environment variables given at run time).
     pub inputs: Vec<String>,
+    /// The secrets it gets as files, delivered at run time (never their values).
+    pub secrets: Vec<SecretFile>,
     /// Its size.
     pub size: Size,
     /// Its CPU architecture.
@@ -387,6 +390,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
             ulimits: m.ulimits.clone(),
         },
         inputs: m.inputs.clone(),
+        secrets: m.secrets.iter().map(SecretFile::of).collect(),
         size: m
             .resources
             .map(|r| Size {

@@ -315,6 +315,11 @@
           "const": "input_missing"
         },
         {
+          "description": "A secret the environment needs can't be read from its store (unset, unreadable, the\nstore's command missing or failing).",
+          "type": "string",
+          "const": "secret_missing"
+        },
+        {
           "description": "No target by that name.",
           "type": "string",
           "const": "target_unknown"

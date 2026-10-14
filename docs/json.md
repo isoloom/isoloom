@@ -45,7 +45,8 @@ present, `null` when they don't apply.
 | Step | Command | What it covers |
 |---|---|---|
 | `prepare` | run, down, reset, test, provision | Load and validate the spec, choose the target (its id is the `done` event's `detail`), write its files |
-| `ready` | run, reset | This host has what the target needs (`isoloom doctor`) |
+| `ready` | run, reset | This host has what the target needs (`isoloom doctor`), and every secret can be read from its store |
+| `secrets` | run, reset (Kubernetes) | The `isoloom-secrets` Secret applied from the secrets' stores, before the manifests |
 | `provision` | run (external), provision | A machine's steps (`machine` set) or the environment's playbooks |
 | `up`, `down` | run, down, reset, status `--cleanup` | The target's tool bringing the environment up or tearing it down |
 | `baseline`, `restore` | run, reset (Vagrant) | Saving or restoring the baseline snapshot |
@@ -91,6 +92,7 @@ was running, `machine` the machine it is about, `hint` what to do when there is 
 | `spec_invalid` | The spec parses but has problems (listed in `problems`) |
 | `profile` | The profile can't be read or doesn't fit the spec |
 | `input_missing` | A launch-time input the environment needs isn't set (in the shell or the profile's `inputs`) |
+| `secret_missing` | A secret the environment needs can't be read from its store (unset, unreadable, the store's command missing or failing); the message names each one |
 | `target_unknown` | No target by that name |
 | `target_unavailable` | The spec can't run on the target, or several are possible and none was named |
 | `generate_failed` | The target's files couldn't be generated |

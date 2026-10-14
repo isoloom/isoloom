@@ -3,6 +3,7 @@
 //! tools, then the networks and volumes; every resource labelled as the environment's.
 
 mod machine;
+mod secrets;
 
 pub(crate) use machine::mac;
 
@@ -21,9 +22,27 @@ use crate::sidecars;
 use machine::machine;
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,
-/// gateway machines, ulimits, `tc` (in a sidecar) and IPv6 networks of every kind. No controller: no `provision:`, no Ansible
+/// gateway machines, ulimits, `tc` (in a sidecar), IPv6 networks of every kind and secrets
+/// (Compose's own, owners included). No controller: no `provision:`, no Ansible
 /// checks; `exec` checks run inside a container.
 pub fn capabilities() -> isoloom_plan::Capabilities {
+    isoloom_plan::Capabilities::of([
+        Feature::NetworkAppliances,
+        Feature::Gateways,
+        Feature::MachineAliases,
+        Feature::Ulimits,
+        Feature::TrafficControl,
+        Feature::Ipv6,
+        Feature::Ipv6Only,
+        Feature::Ipv6Auto,
+        Feature::Secrets,
+        Feature::SecretOwners,
+    ])
+}
+
+/// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
+/// secrets, which `isoloom run` hands only to a Compose it starts on this machine.
+pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
     isoloom_plan::Capabilities::of([
         Feature::NetworkAppliances,
         Feature::Gateways,
@@ -62,7 +81,7 @@ pub fn render(target: Target, env: &Environment) -> Result<Files, RenderError> {
     let yaml = to_yaml(target, &file)?;
     let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
-        contents: format!("{}{USAGE}{}\n{yaml}", header("#"), moved(env)),
+        contents: format!("{}{USAGE}{}{}\n{yaml}", header("#"), secrets::usage(&file), moved(env)),
     }];
     files.extend(mounted);
     Ok(files)
@@ -96,6 +115,7 @@ pub fn compose_file(target: Target, env: &Environment) -> Result<Rendered, Rende
         name: env.name.clone(),
         networks: networks(env, &ts),
         volumes: volumes(env, &out.probe_archs),
+        secrets: secrets::of_file(env),
         ..ComposeFile::default()
     };
     probes(env, &out.probe_archs, &mut out.services);
