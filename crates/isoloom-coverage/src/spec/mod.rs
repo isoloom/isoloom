@@ -75,7 +75,7 @@ impl Row {
 /// Compose (its containers) and Vagrant (its VMs). `None` when the tables don't state it.
 pub fn claim(path: &str, output: Output) -> Option<Status> {
     if output == Output::Esxi
-        && let Some((_, s)) = families::links::ESXI.iter().find(|(p, _)| *p == path)
+        && let Some((_, s)) = families::links::ESXI.iter().chain(families::virtiofs::ESXI).find(|(p, _)| *p == path)
     {
         return Some(*s);
     }

@@ -11,6 +11,7 @@ use isoloom_plan::lifecycle::{RunKind, SharedRole, Step};
 use crate::shell::quote;
 use crate::{address, constraints, machine_setup, router, trunks};
 
+mod host_folder;
 mod process;
 
 /// Where the project is unpacked on a VM.
@@ -201,8 +202,12 @@ fn trunk_commands(env: &Environment, machine: &str) -> Option<String> {
 }
 
 /// A shared volume: its owner serves the directory over NFS to the machines mounting it; each
-/// of them mounts it at its own path (at boot too), waiting up to 15 minutes for the owner.
+/// of them mounts it at its own path (at boot too), waiting up to 15 minutes for the owner. A
+/// folder of the server (virtiofs) is mounted by each of them alike instead.
 fn shared_volume(volume: &str, path: &str, role: &SharedRole) -> String {
+    if let SharedRole::HostFolder { tag_file, folder } = role {
+        return host_folder::linux(volume, path, tag_file, folder.as_deref());
+    }
     let mut sh = format!("{}\nmkdir -p {}\n", machine_setup::PKG, quote(path));
     match role {
         SharedRole::Serve { clients, folders } => {
@@ -239,6 +244,7 @@ fn shared_volume(volume: &str, path: &str, role: &SharedRole) -> String {
                 p = quote(path),
             );
         }
+        SharedRole::HostFolder { .. } => {}
     }
     sh
 }

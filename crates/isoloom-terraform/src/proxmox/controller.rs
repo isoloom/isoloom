@@ -68,6 +68,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         ips,
         depends_on,
         data_disks: Vec::new(),
+        folders: Vec::new(),
     };
     m.block(vm.block(env));
 }

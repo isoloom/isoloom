@@ -1935,6 +1935,62 @@ An existing volume, by its name on the platform (a Docker volume, a Kubernetes c
 - **Refused by:** `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `external`: volume `data` is an existing one (`external`): Docker and Kubernetes mount one by name, this target has none to mount
 - **Not used by:** `cloud-services`
 
+### `volumes.*.virtiofs`
+
+On Proxmox, the volume as a folder of the server, shared into each VM that mounts it (virtiofs) instead of over NFS from its owner: `virtiofs: {}` takes the defaults. Every other target ignores it.
+
+- **Type:** mapping
+
+### `volumes.*.virtiofs.mapping`
+
+An existing directory mapping of the cluster, by its id (Datacenter, Resource Mappings, Directory mappings). By default Isoloom creates one, `iso<slot>-<volume>`, for the folder `<virtiofs_root>/<environment>/<volume>` on the node.
+
+- **Type:** string
+- **Example:** `volumes: { data: { virtiofs: { mapping: lab-data, cache: never, direct_io: true, xattr: true, acl: true } } }`
+- **Rendered by:** `proxmox`
+- **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `cloud-services`, `external`
+
+### `volumes.*.virtiofs.cache`
+
+How the guests cache the folder: `auto` (the default: metadata kept a short while, so another VM's changes show within a second), `always`, `metadata` or `never` (every access goes to the server: slowest, always current).
+
+- **Type:** string
+- **Allowed:**
+  - `auto`: Metadata and lookups kept a short while, or until they change: Proxmox's default.
+  - `always`: Everything kept: fastest, but another VM's changes may not show.
+  - `metadata`: Metadata kept, data read each time.
+  - `never`: Nothing kept: every access goes to the server.
+- **Example:** `volumes: { data: { virtiofs: { mapping: lab-data, cache: never, direct_io: true, xattr: true, acl: true } } }`
+- **Rendered by:** `proxmox`
+- **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `cloud-services`, `external`
+
+### `volumes.*.virtiofs.direct_io`
+
+Reads and writes that bypass the guest's page cache when a program asks for it (`O_DIRECT`), for databases that manage their own cache. Off by default.
+
+- **Type:** boolean
+- **Example:** `volumes: { data: { virtiofs: { mapping: lab-data, cache: never, direct_io: true, xattr: true, acl: true } } }`
+- **Rendered by:** `proxmox`
+- **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `cloud-services`, `external`
+
+### `volumes.*.virtiofs.xattr`
+
+Pass extended attributes through (SELinux labels, file capabilities). Off by default.
+
+- **Type:** boolean
+- **Example:** `volumes: { data: { virtiofs: { mapping: lab-data, cache: never, direct_io: true, xattr: true, acl: true } } }`
+- **Rendered by:** `proxmox`
+- **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `cloud-services`, `external`
+
+### `volumes.*.virtiofs.acl`
+
+Pass POSIX ACLs through (`setfacl`), which implies `xattr`. Off by default.
+
+- **Type:** boolean
+- **Example:** `volumes: { data: { virtiofs: { mapping: lab-data, cache: never, direct_io: true, xattr: true, acl: true } } }`
+- **Rendered by:** `proxmox`
+- **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `cloud-services`, `external`
+
 ## `constraints`
 
 ### `constraints`

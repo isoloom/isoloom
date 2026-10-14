@@ -285,7 +285,8 @@ export TF_VAR_proxmox_ssh_private_key_file=~/.ssh/pve TF_VAR_ssh_public_key="$(c
 ```
 
 Optional variables: `node` (default `pve`), `datastore` (`local-lvm`), `image_datastore`
-(`local`), `slot` (unique per environment on the cluster) and `proxmox_insecure`.
+(`local`), `slot` (unique per environment on the cluster), `proxmox_insecure` and, with
+`virtiofs` volumes, `virtiofs_root` (`/srv/isoloom`).
 
 **Run, test, down:** `terraform init && terraform apply -auto-approve` in `.isoloom/proxmox`;
 `test` pipes each check runner over SSH through the router (`isoloom@<router>`); `down` runs
@@ -298,6 +299,13 @@ kernel, loader or network boot (Proxmox boots the disk through its own firmware)
 and `gpus` as a count (list them in `gpus.ids`). An LXC container takes no `files` or `secrets`.
 A data disk is a `disk` block on the VM, set up by cloud-init; an LXC container refuses data
 disks. `persistent` and `external` volumes are refused.
+
+**Shared volumes as folders of the server.** A shared volume with `virtiofs` is a folder of the
+server mounted by each VM through virtiofs, instead of NFS from its owner. The module creates a
+directory mapping per volume, `iso<slot>-<volume>`, for `<virtiofs_root>/<environment>/<volume>`
+(`virtiofs_root` defaults to `/srv/isoloom`); make that folder on the node before `apply`, or
+name a mapping you made with `virtiofs.mapping`. See
+[Storage](storage.md#folders-of-the-proxmox-server-virtiofs).
 
 **Not run on a real host.** The weekly workflow (hello-stack, segmented) starts once a runner
 that reaches a cluster exists ([Real targets in CI](real-targets.md#proxmox)).

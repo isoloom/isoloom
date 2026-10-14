@@ -22,6 +22,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     m.blocks(variables());
     m.blocks(super::windows::variables(env));
     m.blocks(super::lxc::variables(env));
+    m.blocks(super::virtiofs::variables(env));
     if !env.spec().inputs.is_empty() {
         m.block(inputs_variable());
     }
@@ -68,6 +69,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     images(env, m);
     super::image::downloads(env, m);
     super::firewall::ipsets(env, m);
+    super::virtiofs::mappings(env, m);
 }
 
 /// The environment's pool, as a VM or a container names it.

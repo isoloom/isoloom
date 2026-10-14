@@ -229,10 +229,6 @@ pub const MTU: Support = Planned { note: "a network's MTU" };
 pub const CLOUD_VLANS: Support = NotPortable {
     why: "a cloud carries no 802.1Q tags between VMs (Google Cloud's VLAN interfaces and Oracle Cloud's VLANs end at its own virtual switch): Isoloom gives each VLAN a subnet of its own, and a machine on several an interface on each",
 };
-/// Shared folders.
-pub const SHARED: Support = Planned {
-    note: "shared volumes (`volumes`) as host folders",
-};
 /// Start order on a server restart.
 pub const ORDER: Support = Tooling {
     note: "the start order when the server restarts: `depends_on` orders the first start",

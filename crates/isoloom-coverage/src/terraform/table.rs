@@ -190,7 +190,12 @@ impl Table {
             _ => format!("unknown {line}"),
         };
         if written.contains(&key) {
-            let support = if key.starts_with("data ") { self.generated } else { WRITTEN };
+            // A written argument's own rule may say more (a feature not run on a real host).
+            let own = match parts.as_slice() {
+                [_, t, path] => self.argument(t, path).filter(|s| s.written()),
+                _ => None,
+            };
+            let support = if key.starts_with("data ") { self.generated } else { own.unwrap_or(WRITTEN) };
             return (key, support);
         }
         let support = match parts.as_slice() {

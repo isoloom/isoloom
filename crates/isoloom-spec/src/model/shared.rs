@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Arch, Dns, Mount, Resources, ScalarSchema, Tmpfs, VmImage};
+use super::{Arch, Dns, Mount, Resources, ScalarSchema, Tmpfs, Virtiofs, VmImage};
 #[cfg(doc)]
 use super::{Machine, Spec};
 
@@ -172,6 +172,11 @@ pub struct SharedVolume {
     /// the environment's namespace): Isoloom mounts it and never creates or removes it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external: Option<String>,
+    /// On Proxmox, the volume as a folder of the server, shared into each VM that mounts it
+    /// (virtiofs) instead of over NFS from its owner: `virtiofs: {}` takes the defaults. Every
+    /// other target ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub virtiofs: Option<Virtiofs>,
 }
 
 /// A process limit (see [`Machine::ulimits`]): one value for the soft and hard limits, or both.

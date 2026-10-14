@@ -131,6 +131,16 @@ pub enum SharedRole {
         /// The owner, named in errors.
         owner: String,
     },
+    /// It mounts a folder of the server the target shares into the VM (virtiofs on Proxmox),
+    /// as every other machine using the volume does: no owner serves it. The plan never makes
+    /// this role; a target that shares the volume so puts it in place of the other two.
+    HostFolder {
+        /// A file the target writes in the machine, holding the folder's mount tag (the tag is
+        /// only known once the target's own names are, a slot in them).
+        tag_file: String,
+        /// The folder of the volume it takes (`subpath`), if not all of it.
+        folder: Option<String>,
+    },
 }
 
 /// How a `provision` step runs.

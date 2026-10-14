@@ -34,6 +34,45 @@ machines:
 and Kubernetes take them. A Compose file run on a VM (`docker-vm`, `cloud-docker`) and the VM
 targets refuse them, since their storage goes with the VM.
 
+### Folders of the Proxmox server (`virtiofs`)
+
+On Proxmox, a shared volume can be a folder of the server instead, shared into each VM that
+mounts it through virtiofs (Proxmox VE 8.4 or later). No machine serves it: the VMs read and
+write the server's folder directly, and the data stays on the server when the environment goes.
+Every other target ignores the setting and shares the volume as usual.
+
+```yaml
+volumes:
+  site: { owner: writer, virtiofs: {} }                 # the defaults
+  media: { virtiofs: { mapping: lab-media, cache: never, xattr: true } }
+```
+
+| Field | What it does |
+| --- | --- |
+| `mapping` | An existing directory mapping of the cluster, by its id. Without it, the module creates one, `iso<slot>-<volume>`, for `<virtiofs_root>/<environment>/<volume>` on the node (`virtiofs_root` is a module variable, `/srv/isoloom` by default). |
+| `cache` | How the guests cache the folder: `auto` (the default, another VM's changes show within a second), `always`, `metadata` or `never`. |
+| `direct_io` | Honor `O_DIRECT`, for databases that manage their own cache. Off by default. |
+| `xattr` | Pass extended attributes through. Off by default. |
+| `acl` | Pass POSIX ACLs through, which implies `xattr`. Off by default. |
+
+**On the cluster, first.** Proxmox shares a folder, it doesn't create one. With the module's own
+mapping, make the folder on the node before `terraform apply`:
+
+```sh
+ssh root@pve mkdir -p /srv/isoloom/<environment>/<volume>
+```
+
+Creating the mapping needs the `Mapping.Modify` privilege on `/mapping/dir` (root, or a token
+given it). With `mapping`, create it yourself instead: Datacenter, Resource Mappings, Directory
+mappings, an id and the folder on each node (or `pvesh create /cluster/mapping/dir --id
+lab-media --map node=pve,path=/srv/media`). The VMs need `Mapping.Use` on it.
+
+Each VM mounts the folder by its tag (the mapping's id) from `/etc/fstab`, at boot too; a
+`subpath` mounts the whole folder under `/var/lib/isoloom/volumes/` and binds its own folder at
+the path. Refused: an LXC container mounting it (a container would take a bind mount, which
+comes later), a Windows VM (its virtio-fs driver and WinFsp aren't installed), and more than
+8 such folders on one VM. Not run on a real host.
+
 ## Memory-backed mounts
 
 A `tmpfs` entry is a path, or a path with a size and a mode:

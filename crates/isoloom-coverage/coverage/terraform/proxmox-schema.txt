@@ -41,6 +41,12 @@ resource proxmox_download_file overwrite_unmanaged
 resource proxmox_download_file upload_timeout
 resource proxmox_download_file url
 resource proxmox_download_file verify
+resource proxmox_hardware_mapping_dir
+resource proxmox_hardware_mapping_dir comment
+resource proxmox_hardware_mapping_dir map
+resource proxmox_hardware_mapping_dir map.node
+resource proxmox_hardware_mapping_dir map.path
+resource proxmox_hardware_mapping_dir name
 resource proxmox_oci_image
 resource proxmox_oci_image datastore_id
 resource proxmox_oci_image file_name

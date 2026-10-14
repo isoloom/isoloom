@@ -19,6 +19,7 @@ mod secrets;
 mod shared;
 mod storage;
 mod target;
+mod virtiofs;
 
 pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
 pub(crate) use checks::is_yaml_file;
@@ -37,6 +38,7 @@ pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, is_driv
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, TOOL_RECIPES, Tool, ULIMITS, Ulimit};
 pub use storage::{Disk, Filesystem, Mount, MountPart, Tmpfs, TmpfsMount};
 pub use target::{Shape, Target};
+pub use virtiofs::{MAX_VIRTIOFS, Virtiofs, VirtiofsCache, mapping_id};
 
 use indexmap::IndexMap;
 use schemars::JsonSchema;

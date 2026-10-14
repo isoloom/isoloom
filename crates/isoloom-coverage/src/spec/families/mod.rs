@@ -17,6 +17,7 @@ mod process;
 mod proxmox;
 pub mod shared;
 mod vagrant;
+pub(crate) mod virtiofs;
 
 use super::output::Family;
 use super::status::Status;
