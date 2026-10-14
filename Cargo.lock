@@ -596,7 +596,6 @@ dependencies = [
  "isoloom-render",
  "isoloom-spec",
  "isoloom-terraform",
- "serde_yaml_ng",
 ]
 
 [[package]]
