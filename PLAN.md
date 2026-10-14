@@ -7,8 +7,9 @@ Working document for the local rebuild. It is squashed away with the history at 
 | Product | Role | Contains |
 |---|---|---|
 | **Isoloom** (this repo) | Converter: one spec to every IaC tool, and back | Spec, catalogue, plan, backends, import, `verify`, and the **run manifest** each target outputs. Apache-2.0. No runtime. |
-| **Isothrum** (`isoloom/isothrum`) | Runner: executes what Isoloom generates | One runner engine (crate and CLI) with: lifecycle (up, down, park, resume, re-provision); state and locks; a driver per target; secrets delivery; checks; readiness and recovery; reaper and budgets; snapshots, capture and consoles. Its lab editor (a drawing becomes a spec) stays an authoring tool. |
-| **Cyber CTF launcher** | UI wrapper for CTF labs | Lab catalogue, accounts, attack box and player UX. It uses Isoloom to read and convert labs, and Isothrum to run them. |
+| **Isothrum runner** (crate and CLI in `isoloom/isothrum`) | Runner: executes what Isoloom generates | One engine with: lifecycle (up, down, park, resume, re-provision); state and locks; a driver per target; secrets delivery; checks; readiness and recovery; reaper and budgets; snapshots, capture and consoles. Shared by both apps below. |
+| **Isothrum desktop app** | UI wrapper with **dynamic specs** | The same logic as the launcher, but the spec is drawn or edited live in Isothrum's lab editor (a drawing compiles to a spec) instead of coming from a fixed catalogue. It uses Isoloom to convert and the Isothrum runner to run. |
+| **Cyber CTF launcher** | UI wrapper with **fixed specs** | Curated CTF lab catalogue, accounts, attack box and player UX. It uses Isoloom to read and convert labs, and the Isothrum runner to run them. |
 
 **Contracts:**
 - **Isoloom to Isothrum:** the generated files plus a versioned run manifest, holding:
@@ -17,7 +18,8 @@ Working document for the local rebuild. It is squashed away with the history at 
   - outputs: addresses, host ports, URLs;
   - how to run checks;
   - secret slots: names and destinations, never values.
-- **Isothrum to UIs:** a Rust API plus a JSON event stream, used by the launcher and by Isothrum's desktop app.
+- **Isothrum runner to UIs:** a Rust API plus a JSON event stream, used by both apps.
+- **The two apps share most of their logic:** lab view, machines, consoles, start/stop, logs, checks. A shared app core (Rust plus UI components) can be extracted once both run on the runner, so a feature is built once.
 
 **Runner code comes from three runtimes, merged into one in Isothrum:**
 - **The launcher's** (about 16k lines, the most mature) is the core.
@@ -195,7 +197,7 @@ Then the security review of secrets handling and of every place that writes cred
 3. **Tests:**
    - a fake-tool harness for unit tests;
    - one real-lab job per target family (Docker, kind, and Vagrant on a KVM runner), the Tier 1 proof.
-4. **Isothrum's desktop app** moves onto the engine.
+4. **Isothrum's desktop app** becomes a UI over the editor, Isoloom and the runner, with the same logic as the launcher but dynamic specs.
 
 ### Phase 10: The launcher as a UI
 
@@ -206,7 +208,7 @@ Then the security review of secrets handling and of every place that writes cred
 
 ## 5. Open decisions
 
-0. **Isothrum's lab editor:** it stays in Isothrum next to the runner (a "studio": draw, run, inspect), or it becomes its own tool. Also decide whether the Isothrum runner is open source like Isoloom.
+0. **Isothrum runner licence:** open source like Isoloom, or private. Its editor stays in Isothrum as the source of dynamic specs (decided).
 
 1. **The tool list for 1.0.** "Every other IaC tool": confirm the current families, and whether to add Pulumi, Podman (Compose and Quadlet) or others for 1.0 or 1.x.
 2. **The Terraform provider:** reshape it into a files data source, or drop it.
