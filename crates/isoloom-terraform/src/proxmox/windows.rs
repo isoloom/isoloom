@@ -67,8 +67,9 @@ pub fn boot(mp: &MachinePlan) -> Boot {
     }
 }
 
-/// What Proxmox can't give a Windows machine yet: each reason after "machine `<name>`: ".
-pub fn refusal(env: &Environment) -> Option<String> {
+/// What Proxmox (or ESXi, `platform`, which sets Windows up the same way) can't give a Windows
+/// machine yet: each reason after "machine `<name>`: ".
+pub fn refusal(env: &Environment, platform: &str) -> Option<String> {
     let spec = env.spec();
     vms(env).filter(|(_, mp)| mp.is_windows()).find_map(|(name, mp)| {
         let why = if name.len() > 15 {
@@ -82,7 +83,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
         } else if !mp.volumes.is_empty() {
             "volumes on Windows come later"
         } else if !mp.inputs.is_empty() {
-            "inputs on a Windows machine on Proxmox come later"
+            return Some(format!("machine `{name}`: inputs on a Windows machine on {platform} come later"));
         } else {
             return None;
         };

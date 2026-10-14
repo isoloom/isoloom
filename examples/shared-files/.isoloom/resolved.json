@@ -120,11 +120,10 @@
       "kubernetes",
       "vagrant",
       "proxmox",
+      "esxi",
       "cloud-vm"
     ],
-    "refused": {
-      "esxi": "machine `writer` has data disks (`disks`), which this target can't attach"
-    },
+    "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "needs `external:` on writer, reader",

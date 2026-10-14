@@ -34,10 +34,10 @@ mod lxc;
 mod machine;
 pub(crate) mod module;
 pub(crate) mod outputs;
-mod outside;
+pub(crate) mod outside;
 pub(crate) mod router;
 mod virtiofs;
-mod windows;
+pub(crate) mod windows;
 
 pub use crate::vm::res;
 
@@ -95,7 +95,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
                 (!is_windows(os) && image_url(os).is_none() && !image::has_own(mp))
                     .then(|| format!("machine `{name}`: no Proxmox image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)"))
             })
-            .or_else(|| windows::refusal(env))
+            .or_else(|| windows::refusal(env, "Proxmox"))
             .or_else(|| image::refusal(env))
             .or_else(|| boot::refusal(env))
             .or_else(|| arch::refusal(env))

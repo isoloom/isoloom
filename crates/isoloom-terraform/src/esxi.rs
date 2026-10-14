@@ -2,7 +2,10 @@
 //! standalone ESXi host (no vCenter), rendered from the plan through the VM core.
 //!
 //! - Each network gets its own vSwitch, with no uplink, and one port group on it: networks
-//!   never share a layer 2 segment, and nothing leaves the host but through the router.
+//!   never share a layer 2 segment, and nothing leaves the host but through the router. A
+//!   network's `mtu` is its vSwitch's, and each guest interface's on it. Outside networks are
+//!   an existing port group (`external`) or a port group on the host's LAN (`bridged`, see
+//!   `outside`).
 //! - A router VM sits on the host's own port group (`uplink_port_group`, DHCP) and on every
 //!   network at its router address, as on Proxmox: it forwards between networks with the
 //!   `reach` rules (nftables), forwards the published ports, and gives the machines the
@@ -10,7 +13,11 @@
 //! - Each machine is a VM deployed from an OVA (`images`, Ubuntu's cloud OVAs by default). Its
 //!   addresses (matched by MAC) and its `isoloom` user come from cloud-init's VMware data
 //!   source (`guestinfo`). Terraform then sets it up over SSH through the router: the core's
-//!   Linux transport (`remote-exec`), the project uploaded, then its steps from the plan.
+//!   Linux transport (`remote-exec`), the project uploaded, then its steps from the plan. Its
+//!   firmware is its own when `vm.boot.firmware` says so (`boot_firmware`), and its data disks
+//!   are an `esxi_virtual_disk` each, attached by SCSI slot and formatted by its `Disks` step.
+//! - A Windows machine is a VM from the OVA given for its OS, with its guest OS type
+//!   (`guestos`), set up by cloudbase-init at its first boot as on Proxmox (see `windows`).
 //! - The controller, when the environment has playbooks, is the core's controller over SSH
 //!   through the router, with the same inventory as Proxmox.
 //! - The host, its datastore, the uplink port group and a `slot` (unique per environment on
@@ -19,10 +26,14 @@
 //!   output gives their addresses, and `isoloom test esxi` pipes the check runners in
 //!   `.isoloom/esxi/checks/<position>.sh` to them.
 
+mod boot;
+mod disks;
 mod guest;
 mod machines;
 mod module;
+mod outside;
 mod router;
+mod windows;
 
 pub use crate::vm::res;
 
@@ -80,26 +91,37 @@ const LINUX: [&str; 8] = [
 ];
 
 /// Why ESXi can't run this environment, if it can't: its limits, then a machine whose OS has
-/// no OVA here (Windows among them), then more networks than a VM has interfaces for.
+/// no OVA here, then what a Windows machine can't have yet, a boot of its own ESXi has no
+/// setting for, more data disks than slots, and more networks than a VM has interfaces for.
 pub fn refusal(env: &Environment) -> Option<String> {
     LIMITS
         .refusal(env)
         .or_else(|| {
             vms(env).find_map(|(name, mp)| {
                 let os = os(mp).unwrap_or_default();
-                (is_windows(os) || !LINUX.contains(&os)).then(|| {
-                    format!("machine `{name}`: no ESXi image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools)")
+                (!is_windows(os) && !LINUX.contains(&os)).then(|| {
+                    format!("machine `{name}`: no ESXi image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)")
                 })
             })
         })
-        .or_else(|| {
-            (env.networks.len() >= MAX_NICS).then(|| {
-                format!(
-                    "{} networks: an ESXi VM has at most {MAX_NICS} network interfaces, and the router needs one per network and its uplink",
-                    env.networks.len()
-                )
-            })
-        })
+        .or_else(|| windows::refusal(env))
+        .or_else(|| boot::refusal(env))
+        .or_else(|| disks::refusal(env))
+        .or_else(|| interfaces(env))
+}
+
+/// Why a VM would have more interfaces than ESXi gives it, if one would: the router needs one
+/// per network and its uplink, a machine one per network it joins, outside ones included.
+fn interfaces(env: &Environment) -> Option<String> {
+    if env.networks.len() >= MAX_NICS {
+        return Some(format!(
+            "{} networks: an ESXi VM has at most {MAX_NICS} network interfaces, and the router needs one per network and its uplink",
+            env.networks.len()
+        ));
+    }
+    vms(env)
+        .find(|(_, mp)| mp.addresses.len() + mp.outside.len() > MAX_NICS)
+        .map(|(name, _)| format!("machine `{name}`: an ESXi VM has at most {MAX_NICS} network interfaces"))
 }
 
 /// The `esxi` backend.
@@ -111,10 +133,9 @@ impl Backend for EsxiBackend {
         Target::Esxi
     }
 
-    /// What the router, the controller and the machines' own steps give: the rest (IPv6,
-    /// secrets, outside networks, own images and boots, TPM, GPUs, nesting, MTUs, rate limits,
-    /// data disks, which would need an `esxi_virtual_disk` each and a guest that attaches it)
-    /// is refused.
+    /// What the router, the controller, the machines' own steps and the provider give: the
+    /// rest (own images, TPM, GPUs, nesting, rate limits, which the provider has no setting
+    /// for) is refused.
     fn capabilities(&self) -> Capabilities {
         Capabilities::of([
             Feature::EnvironmentProvisioning,
@@ -130,6 +151,22 @@ impl Backend for EsxiBackend {
             // No DNS on a standalone host: each VM's hosts file carries the names under the
             // zone's domain, its search domain.
             Feature::PrivateDns,
+            // The router's address on each IPv6 network, the machines' from their steps.
+            Feature::Ipv6,
+            // An existing port group (`external`), or the host's LAN (`bridged`).
+            Feature::ExternalNetworks,
+            Feature::BridgedNetworks,
+            // Delivered by `isoloom run` over SSH through the router (WinRM on Windows).
+            Feature::Secrets,
+            Feature::SecretOwners,
+            // A machine's firmware (`boot_firmware`); its own `refusal` says what ESXi can't boot.
+            Feature::OwnBoot,
+            // The vSwitch's MTU, and each guest interface's on it.
+            Feature::NetworkMtu,
+            // An `esxi_virtual_disk` each, attached by SCSI slot.
+            Feature::DataDisks,
+            Feature::RawDisks,
+            Feature::TmpfsModes,
         ])
     }
 

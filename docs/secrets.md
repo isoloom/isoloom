@@ -85,10 +85,9 @@ Two secrets of one machine can't share a path. A Linux path can't hold `..`, `:`
 | `docker`, `hosted` | Compose's own secrets: the Compose file declares each one from the variable `ISOLOOM_SECRET_<NAME>` (the name upper-cased, `-` as `_`), and `isoloom run` sets those variables for `docker compose up` only. To run the file by hand, set them yourself; its header says so. |
 | `kubernetes` | `isoloom run` creates the Secret `isoloom-secrets` in the environment's namespace (`kubectl apply --server-side` from standard input, so no annotation keeps a copy). Each pod mounts its secrets from it, read-only. A Secret volume's files belong to root, so `uid` and `gid` are refused. |
 | Helm chart, Kustomize | The same objects, but nothing in them creates `isoloom-secrets`: `environment.yaml` carries the `kubectl create secret generic` command to run first. |
-| `vagrant`, `hybrid`, `proxmox`, `cloud-vm`, `external` (Linux) | Over the machine's own SSH (`vagrant ssh`, SSH through the Proxmox router, SSH to the address a cloud VM's set-up announces, SSH to an existing host). See below. |
-| Windows machines on those targets | Over WinRM, or over OpenSSH when the image says so (`vm.image.winssh`, and always on an existing host). See below. |
+| `vagrant`, `hybrid`, `proxmox`, `esxi`, `cloud-vm`, `external` (Linux) | Over the machine's own SSH (`vagrant ssh`, SSH through the Proxmox router, SSH through the ESXi router to the address the machine's set-up announces, SSH to the address a cloud VM's set-up announces, SSH to an existing host). See below. |
+| Windows machines on those targets | Over WinRM (through an SSH tunnel by the router on Proxmox and ESXi), or over OpenSSH when the image says so (`vm.image.winssh`, and always on an existing host). See below. |
 | `docker-vm`, `cloud-docker`, hybrid's Docker host | The Docker host receives its containers' secrets over SSH like a VM, then hands them to `docker compose up` as `ISOLOOM_SECRET_<NAME>`. |
-| `esxi` | Refused: no machine there is one `isoloom run` can hand them to yet. |
 | A Proxmox LXC container (`docker.lxc`) | Refused: nothing delivers them into it. |
 | `cloud-services` | No machines, so no secrets. |
 
@@ -107,10 +106,11 @@ The set-up of a VM runs inside the target's own tool (Vagrant, Terraform, cloud-
    machine's set-up goes on.
 
 When delivery happens depends on the target: while the tool runs, retried every few seconds
-(Vagrant, the clouds, the Docker hosts); after Terraform is done on Proxmox, whose cloud-init
-runs later; before provisioning on an existing host. A cloud VM's Terraform set-up writes its
-address to `.isoloom-reach/<machine>` first, since the module's outputs only come once every
-set-up is done.
+(Vagrant, the clouds, the Docker hosts, ESXi's Linux machines); after Terraform is done on
+Proxmox, whose cloud-init runs later, and for an ESXi Windows machine, which cloudbase-init sets
+up; before provisioning on an existing host. A cloud VM's or an ESXi Linux machine's Terraform
+set-up writes its address to `.isoloom-reach/<machine>` first (on ESXi with the router to jump
+through), since the module's outputs only come once every set-up is done.
 
 `/run` is emptied at every boot, so a boot service puts the files back from the kept copies
 before the machine's `before` steps and command run. Running `isoloom run` again refreshes
@@ -127,7 +127,7 @@ standard input.
   operation carries the input (`vagrant winrm -c` and Terraform feed no input to a remote
   command). `isoloom run` checks for `pywinrm` before the tool starts. The endpoint is
   `vagrant winrm-config`'s, the address a cloud's set-up announces with the password from
-  Terraform's state, or on Proxmox an SSH tunnel through the router.
+  Terraform's state, or on Proxmox and ESXi an SSH tunnel through the router.
 
 The values are kept in `C:\ProgramData\isoloom\secrets`, and each file is written with an access
 list of SYSTEM and Administrators only. A startup task (`isoloom-apply-secrets`) puts them back

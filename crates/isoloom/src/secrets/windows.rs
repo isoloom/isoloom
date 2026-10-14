@@ -158,7 +158,7 @@ fn state_password(module: &Path) -> Result<String, String> {
         .ok_or_else(|| "its password isn't known yet".into())
 }
 
-/// A Proxmox Windows machine's endpoint: WinRM at `host`, reached through an SSH tunnel by the
+/// A Proxmox or ESXi Windows machine's endpoint: WinRM at `host`, reached through an SSH tunnel by the
 /// router (`isoloom@<router>`), as `isoloom` with the module's password.
 pub fn through_router(module: &Path, router: &str, host: &str) -> Result<(Endpoint, Tunnel), String> {
     let password = state_password(module)?;

@@ -174,10 +174,6 @@ pub const PUBLIC_IPV6: Support = NotPortable {
 pub const PROXMOX_IPV6: Support = Equivalent {
     via: "networks.*.ipv6: a set-up step gives each VM its IPv6 address, the same on every VM target (not run on a real host)",
 };
-/// Data disks where the generator doesn't attach them yet (the `esxi` target refuses `disks`).
-pub const DISKS: Support = Planned {
-    note: "machines.*.disks on ESXi: an esxi_virtual_disk each, attached by slot (the target refuses data disks until then)",
-};
 /// Nested virtualization: the cloud's switch, or the block holding it.
 pub const NESTED: Support = Emitted {
     from: "machines.*.nested_virtualization",
@@ -223,8 +219,6 @@ pub const NAT: Support = Equivalent {
 pub const ROUTER: Support = Planned {
     note: "with `networks.*.gateway`: a network routed through one of its machines",
 };
-/// A network's MTU.
-pub const MTU: Support = Planned { note: "a network's MTU" };
 /// VLAN tags on a cloud VM's interface.
 pub const CLOUD_VLANS: Support = NotPortable {
     why: "a cloud carries no 802.1Q tags between VMs (Google Cloud's VLAN interfaces and Oracle Cloud's VLANs end at its own virtual switch): Isoloom gives each VLAN a subnet of its own, and a machine on several an interface on each",

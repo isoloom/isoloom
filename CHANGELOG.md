@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### ESXi: Windows, data disks, firmware, MTU, outside networks, IPv6 and secrets
+- `esxi` hosts Windows machines: a VM from the OVA given in `images` (VMware Tools and cloudbase-init), with its guest OS type (`guestos`), set up by cloudbase-init from `guestinfo` with Proxmox's script; the controller waits for its WinRM ready marker before the playbooks. Proxmox's Windows limits apply (`proxmox::windows::refusal` takes the platform's name).
+- A machine's `disks` are an `esxi_virtual_disk` each (thin, on `disk_store`), attached by SCSI slot (`virtual_disks`, 14 at most) and formatted by its `Disks` step; `vm.boot.firmware` is `boot_firmware` (`bios`, `efi`), the rest of `vm.boot` refused with why; a network's `mtu` is its vSwitch's and each guest interface's.
+- `external` networks join an existing port group; `bridged` ones are a port group on the host's vSwitch (`uplink_vswitch`), or on a vSwitch of their own on the NIC they name (`uplink`), tagged with their `vlan`. IPv6 networks give the router its IPv6 address. Secrets are delivered: a Linux machine's set-up announces itself with the router to jump through (`via`), a Windows one is reached over WinRM through the router once Terraform is done.
+- Coverage: Terraform: ESXi is at 100%; the spec table's `esxi` column flips IPv6, MTU, `external`, `bridged`, secrets, disks and firmware. Not run on a real host.
+- New (library): `vm::controller::provisioner_waiting`.
+
 ### Shared volumes as folders of the Proxmox server (virtiofs)
 - Spec: a top-level volume takes `virtiofs: { mapping, cache, direct_io, xattr, acl }` (`virtiofs: {}` for the defaults). On Proxmox the volume is then a folder of the server shared into each VM that mounts it, instead of NFS from its owner; every other target ignores it. `validate` checks the mapping id, and names the missing virtio-fs driver and WinFsp for a Windows VM.
 - Proxmox: a `virtiofs` device on each VM that mounts the volume (`mapping`, `cache` (`auto` by default), `direct_io`, `expose_xattr`, `expose_acl`), and a `proxmox_hardware_mapping_dir` per volume that names no mapping, for `<virtiofs_root>/<environment>/<volume>` on the node (new variable `virtiofs_root`, `/srv/isoloom` by default; make the folder before `apply`). Each VM mounts the folder by its tag from `/etc/fstab`; a `subpath` binds its folder from the whole one. Refused: an LXC container mounting one, a Windows VM, more than 8 on a VM. Validated with `terraform validate`; not run on a real host.

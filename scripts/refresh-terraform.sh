@@ -132,7 +132,7 @@ extract oci oracle/oci 9.8.0 \
   data:oci_core_images data:oci_identity_availability_domains data:oci_core_vcn_dns_resolver_association \
   resource:oci_core_vnic_attachment resource:oci_core_route_table_attachment data:oci_core_vnic data:oci_core_private_ips
 extract esxi josenk/esxi 1.10.3 \
-  resource:esxi_guest resource:esxi_portgroup resource:esxi_vswitch
+  resource:esxi_guest resource:esxi_portgroup resource:esxi_virtual_disk resource:esxi_vswitch
 # The utility providers the modules use beside each platform's (keys, passwords, files, waits),
 # and the ones a module may need next (cloud-init documents, HTTP checks, triggers): all of them.
 extract terraform terraform.io/builtin/terraform built-in all

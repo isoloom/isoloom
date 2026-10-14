@@ -275,8 +275,8 @@ An IPv6 /64 block, unique local (`fd00:20::/64`) or global. A machine at octet 1
 
 - **Type:** string
 - **Example:** `networks: { lan: { ipv6: { cidr: 'fd00:20::/64' } } }`
-- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `proxmox`, `cloud-vm` (azure), `cloud-vm` (oci), `cloud-docker`, `external`
-- **Refused by:** `hybrid`, `esxi`: network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `proxmox`, `esxi`, `cloud-vm` (azure), `cloud-vm` (oci), `cloud-docker`, `external`
+- **Refused by:** `hybrid`: network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet
 - **Refused by:** `cloud-vm` (aws): network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks
 - **Refused by:** `cloud-vm` (gcp): network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept
 - **Refused by:** `cloud-vm` (digitalocean): network `lan` is IPv6: DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one)
@@ -293,8 +293,8 @@ How machines get their IPv6 address: `static` (default), the one derived from th
   - `auto`: Handed out by the target.
 - **Example:** `networks: { lan: { ipv6: { cidr: 'fd00:20::/64', addresses: auto } } }`
 - **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-vm` (oci), `cloud-docker`, `external`
-- **Refused by:** `vagrant`, `proxmox`: network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`
-- **Refused by:** `hybrid`, `esxi`: network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet
+- **Refused by:** `vagrant`, `proxmox`, `esxi`: network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`
+- **Refused by:** `hybrid`: network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet
 - **Refused by:** `cloud-vm` (aws): network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks
 - **Refused by:** `cloud-vm` (azure): network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`): Isoloom gives each Azure interface the address derived from the machine's octet, so use `static`
 - **Refused by:** `cloud-vm` (gcp): network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept
@@ -309,18 +309,18 @@ IPv6 only: the network carries no IPv4. Its `cidr` still numbers the machines (t
 - **Type:** boolean
 - **Example:** `networks: { lan: { internet: false, ipv6: { cidr: 'fd00:20::/64', only: true } } }`
 - **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`
-- **Refused by:** `vagrant`, `proxmox`, `cloud-vm` (every cloud), `external`: network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport)
-- **Refused by:** `hybrid`, `esxi`: network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet
+- **Refused by:** `vagrant`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `external`: network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport)
+- **Refused by:** `hybrid`: network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet
 - **Not used by:** `cloud-services`
 
 ### `networks.*.external`
 
-An existing network, by its name on the target (a Docker network, a Proxmox bridge): the machines join it, and Isoloom never creates or deletes it. `cidr` is its block, and the machines keep fixed addresses in it.
+An existing network, by its name on the target (a Docker network, a Proxmox bridge, an ESXi port group): the machines join it, and Isoloom never creates or deletes it. `cidr` is its block, and the machines keep fixed addresses in it.
 
 - **Type:** string
 - **Example:** `networks: { corp: { cidr: 10.77.0.0/24, external: corp-net } }`
-- **Rendered by:** `docker`, `hosted`, `proxmox`
-- **Refused by:** `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`: network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones)
+- **Rendered by:** `docker`, `hosted`, `proxmox`, `esxi`
+- **Refused by:** `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `cloud-vm` (every cloud), `cloud-docker`: network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones)
 - **Not used by:** `cloud-services`, `external`
 
 ### `networks.*.bridged`
@@ -331,12 +331,12 @@ Bridged to an interface of the host, so the machines sit on the host's own LAN (
 
 ### `networks.*.bridged.interface`
 
-The host interface, as the target names it (VirtualBox: `en0: Wi-Fi`; Proxmox: a bridge like `vmbr0`). Without it, Vagrant asks when several interfaces could do, and Proxmox uses its uplink bridge.
+The host interface, as the target names it (VirtualBox: `en0: Wi-Fi`; Proxmox: a bridge like `vmbr0`; ESXi: a physical NIC like `vmnic1` that no vSwitch holds, which gets a vSwitch of its own). Without it, Vagrant asks when several interfaces could do, Proxmox uses its uplink bridge, and ESXi its LAN vSwitch (`uplink_vswitch`).
 
 - **Type:** string
 - **Example:** `networks: { home: { cidr: 192.168.1.0/24, bridged: { interface: en0 } } }`
-- **Rendered by:** `vagrant`, `proxmox`
-- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
+- **Rendered by:** `vagrant`, `proxmox`, `esxi`
+- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `cloud-vm` (every cloud), `cloud-docker`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
 - **Not used by:** `cloud-services`, `external`
 
 ### `networks.*.bridged.dhcp`
@@ -345,8 +345,8 @@ The machines take their address from the LAN's DHCP server instead of a fixed on
 
 - **Type:** boolean
 - **Example:** `networks: { home: { cidr: 192.168.1.0/24, bridged: { dhcp: true } } }`
-- **Rendered by:** `vagrant`, `proxmox`
-- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
+- **Rendered by:** `vagrant`, `proxmox`, `esxi`
+- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `cloud-vm` (every cloud), `cloud-docker`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
 - **Not used by:** `cloud-services`, `external`
 
 ### `networks.*.bridged.default_route`
@@ -355,19 +355,19 @@ With `dhcp`: the machines' default route goes through the LAN's own router (the 
 
 - **Type:** boolean
 - **Example:** `networks: { home: { cidr: 192.168.1.0/24, bridged: { dhcp: true, default_route: true } } }`
-- **Rendered by:** `vagrant`, `proxmox`
-- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
+- **Rendered by:** `vagrant`, `proxmox`, `esxi`
+- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `cloud-vm` (every cloud), `cloud-docker`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
 - **Not used by:** `cloud-services`, `external`
 
 ### `networks.*.bridged.vlan`
 
-The VLAN tag on the bridge (1-4094), where the target tags a VM's interface (Proxmox).
+The VLAN tag on the bridge (1-4094), where the target tags a VM's interface (Proxmox; on ESXi, the port group's).
 
 - **Type:** integer
 - **Limits:** from 1 to 4094
 - **Example:** `networks: { home: { cidr: 192.168.1.0/24, bridged: { vlan: 20 } } }`
-- **Rendered by:** `proxmox`
-- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
+- **Rendered by:** `proxmox`, `esxi`
+- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `hybrid`, `cloud-vm` (every cloud), `cloud-docker`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
 - **Refused by:** `vagrant`: network `home`: Vagrant's bridged networks take no VLAN tag (Proxmox does)
 - **Not used by:** `cloud-services`, `external`
 
@@ -377,8 +377,8 @@ The largest packet the network carries, in bytes (576 to 9216): smaller to mimic
 
 - **Type:** integer
 - **Example:** `networks: { lan: { mtu: 1400 } }`
-- **Rendered by:** `proxmox`
-- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `esxi`, `cloud-docker`, `external`: network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does)
+- **Rendered by:** `proxmox`, `esxi`
+- **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `cloud-docker`, `external`: network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does)
 - **Refused by:** `cloud-vm` (aws): network `lan` sets its `mtu`: AWS has no setting for a network's MTU
 - **Refused by:** `cloud-vm` (azure): network `lan` sets its `mtu`: Azure has no setting for a network's MTU
 - **Refused by:** `cloud-vm` (digitalocean): network `lan` sets its `mtu`: DigitalOcean has no setting for a network's MTU
@@ -464,8 +464,7 @@ Secrets, by kebab-case name: where `isoloom run` reads each value on the runner 
 
 - **Type:** map of name to mapping
 - **Example:** `secrets: { token: { env: TOKEN } }`
-- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `cloud-vm` (every cloud), `cloud-docker`, `external`
-- **Refused by:** `esxi`: machine `a` gets `secrets`, and this target has no machine `isoloom run` can hand them to
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `external`
 - **Not used by:** `cloud-services`
 
 ### `secrets.*.env`
@@ -944,9 +943,8 @@ The secrets this machine gets, as files (never environment variables): a name fr
 
 - **Type:** list of strings or mappings
 - **Example:** `machines: { a: { secrets: [token, { source: token, target: /etc/app/token, mode: '0400' }] } }`
-- **Rendered by:** `docker`, `hosted`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `cloud-vm` (every cloud), `cloud-docker`, `external`
+- **Rendered by:** `docker`, `hosted`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `external`
 - **Partly rendered by:** `kubernetes`, `helm`, `kustomize` (not yet: `uid` and `gid` are refused: a Secret volume's files belong to root)
-- **Refused by:** `esxi`: machine `a` gets `secrets`, and this target has no machine `isoloom run` can hand them to
 - **Not used by:** `cloud-services`
 
 ### `machines.*.secrets[].source`
@@ -1260,9 +1258,9 @@ Its size in GB (1 to 16384).
 
 - **Type:** integer
 - **Example:** `machines: { a: { disks: { data: { size_gb: 50, mount: /data } } } }`
-- **Rendered by:** `kubernetes`, `helm`, `kustomize`, `proxmox`, `cloud-vm` (every cloud)
+- **Rendered by:** `kubernetes`, `helm`, `kustomize`, `proxmox`, `esxi`, `cloud-vm` (every cloud)
 - **Partly rendered by:** `vagrant`, `hybrid` (not yet: QEMU, Parallels and UTM attach none (refused there))
-- **Refused by:** `esxi`, `external`: machine `a` has data disks (`disks`), which this target can't attach
+- **Refused by:** `external`: machine `a` has data disks (`disks`), which this target can't attach
 - **Not used by:** `docker`, `hosted`, `docker-vm`, `cloud-docker`, `cloud-services`
 
 ### `machines.*.disks.*.fs`
@@ -1276,9 +1274,9 @@ Its filesystem: `ext4` (the default on Linux), `xfs`, `ntfs` (the default on Win
   - `ntfs`: Windows' filesystem.
   - `raw`: No filesystem: a block device the machine formats or uses itself.
 - **Example:** `machines: { a: { disks: { data: { size_gb: 50, fs: xfs, mount: /data } } } }`
-- **Rendered by:** `vagrant`, `hybrid`, `proxmox`, `cloud-vm` (every cloud)
+- **Rendered by:** `vagrant`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud)
 - **Partly rendered by:** `kubernetes`, `helm`, `kustomize` (not yet: the filesystem's type: the storage class picks it)
-- **Refused by:** `esxi`, `external`: machine `a` has data disks (`disks`), which this target can't attach
+- **Refused by:** `external`: machine `a` has data disks (`disks`), which this target can't attach
 - **Not used by:** `docker`, `hosted`, `docker-vm`, `cloud-docker`, `cloud-services`
 
 ### `machines.*.disks.*.mount`
@@ -1287,8 +1285,8 @@ Where it is mounted: an absolute path on Linux and in containers, a drive letter
 
 - **Type:** string
 - **Example:** `machines: { a: { disks: { data: { size_gb: 50, mount: /data } } } }`
-- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `cloud-vm` (every cloud), `cloud-docker`
-- **Refused by:** `esxi`, `external`: machine `a` has data disks (`disks`), which this target can't attach
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`
+- **Refused by:** `external`: machine `a` has data disks (`disks`), which this target can't attach
 - **Not used by:** `cloud-services`
 
 ### `machines.*.access`
@@ -1623,8 +1621,9 @@ A kernel to boot directly, instead of the image's boot loader.
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { kernel: /boot/vmlinuz } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.kernel`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.initrd`
@@ -1634,8 +1633,9 @@ The initial RAM disk booted with `kernel`.
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { kernel: /boot/vmlinuz, initrd: /boot/initrd.img } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.kernel`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.cmdline`
@@ -1645,8 +1645,9 @@ The command line passed to `kernel` (`console=ttyS0 root=/dev/vda1`).
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { kernel: /boot/vmlinuz, cmdline: console=ttyS0 } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.kernel`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.dtb`
@@ -1656,8 +1657,9 @@ A device tree blob for `kernel` (ARM boards).
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { kernel: /boot/vmlinuz, dtb: /boot/board.dtb } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.kernel`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.firmware`
@@ -1669,9 +1671,9 @@ The firmware the VM boots through: `bios`, or `uefi` (on libvirt, with its file 
   - `bios`: A legacy BIOS (SeaBIOS).
   - `uefi`: UEFI (OVMF).
 - **Example:** `machines: { a: { vm: { boot: { firmware: uefi } } } }`
-- **Rendered by:** `proxmox`
+- **Rendered by:** `proxmox`, `esxi`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is, and `bios` on QEMU)
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.loader`
@@ -1681,8 +1683,9 @@ A UEFI firmware file the VM boots through (OVMF's `OVMF_CODE.fd`).
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { loader: /usr/share/OVMF/OVMF_CODE.fd } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.loader`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.loader`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.nvram`
@@ -1692,8 +1695,9 @@ The file that keeps the firmware's variables between boots (with `loader`).
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { loader: /usr/share/OVMF/OVMF_CODE.fd, nvram: /var/lib/a_VARS.fd } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.loader`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.loader`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.firmware_format`
@@ -1707,7 +1711,8 @@ The format of the UEFI firmware files the hypervisor loads: `raw` (QEMU's own, a
 - **Example:** `machines: { a: { vm: { boot: { firmware: uefi, firmware_format: raw } } } }`
 - **Rendered by:** `proxmox`
 - **Partly rendered by:** `vagrant` (not yet: libvirt reads the format from the file; the other providers refuse it)
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.firmware_format`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.order`
@@ -1718,7 +1723,8 @@ The devices to boot from, in order (`[network, hd]` tries a network boot first).
 - **Example:** `machines: { a: { vm: { boot: { order: [hd, network] } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
 - **Partly rendered by:** `proxmox` (not yet: `cdrom` (refused: the VM has no CD-ROM drive))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.order`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.network`
@@ -1734,8 +1740,9 @@ The folder the network's TFTP server serves, on the hypervisor's host.
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { order: [network, hd], network: { tftp_root: /srv/tftp } } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.network`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.order`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.network.file`
@@ -1745,8 +1752,9 @@ The boot file DHCP hands out (`pxelinux.0`), from the TFTP folder.
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { order: [network, hd], network: { file: pxelinux.0 } } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.network`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.order`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ### `machines.*.vm.boot.network.server`
@@ -1756,8 +1764,9 @@ The address of the TFTP server holding `file`, when it isn't the host's own.
 - **Type:** string
 - **Example:** `machines: { a: { vm: { boot: { order: [network, hd], network: { file: pxelinux.0, server: 10.20.0.5 } } } } }`
 - **Partly rendered by:** `vagrant` (not yet: refused on the providers that boot the box as it is (VirtualBox, VMware, Parallels, UTM, Hyper-V, ESXi, QEMU))
-- **Refused by:** `hybrid`, `esxi`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- **Refused by:** `hybrid`, `cloud-vm` (every cloud): machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 - **Refused by:** `proxmox`: machine `a` sets `vm.boot.network`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- **Refused by:** `esxi`: machine `a` sets `vm.boot.order`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
 - **Not used by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `docker-vm`, `cloud-docker`, `cloud-services`, `external`
 
 ## `machines.*.external`

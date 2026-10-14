@@ -3,12 +3,13 @@
 //! internet (the same ruleset). VMware Tools reports its uplink address: the published ports
 //! are reached there, and Terraform reaches the machines through it.
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, ipv6};
 use isoloom_render::hcl_builder::{Block, Module, reference, string};
 use isoloom_render::router;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::validate::{Cidr, IPV6_PREFIX};
 
 use super::guest::{Guest, Nic};
+use super::machines;
 use super::{DIR, SERVICE_OS};
 use crate::proxmox::outputs::behind_router;
 use crate::proxmox::router::{forwarding, ruleset};
@@ -37,18 +38,14 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     ]
     .map(String::from)
     .to_vec();
-    let mut nics = vec![Nic {
-        port_group: reference("var.uplink_port_group"),
-        address: None,
-        gateway: None,
-    }];
+    let mut nics = vec![Nic::at(reference("var.uplink_port_group"), None)];
     nics.extend(env.networks.iter().map(|(net, plan)| {
         let len = Cidr::parse(&plan.cidr).map_or(32, |c| c.len);
-        Nic {
-            port_group: reference(&format!("esxi_portgroup.{}.name", res(net))),
-            address: Some(format!("{}/{len}", router::address(env.spec(), net))),
-            gateway: None,
-        }
+        let mut nic = machines::nic(env, net, format!("{}/{len}", router::address(env.spec(), net)), false);
+        // An IPv6 network's router address too: the machines' IPv6 routes go through it.
+        nic.addresses
+            .extend(ipv6::router_address(env.spec(), net).map(|a| format!("{a}/{IPV6_PREFIX}")));
+        nic
     }));
     let guest = Guest {
         id: "isoloom_router".into(),
@@ -61,6 +58,10 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         user_data: config.document(),
         wait_for_address: Some(ADDRESS_WAIT_SECS),
         depends_on: env.networks.keys().map(|n| reference(&format!("esxi_portgroup.{}", res(n)))).collect(),
+        firmware: None,
+        guestos: None,
+        disks: Vec::new(),
+        windows: false,
     };
     m.commented(
         "The router: forwards between networks with the reach rules, and to the internet. VMware Tools reports its uplink address.",

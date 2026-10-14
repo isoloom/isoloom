@@ -54,9 +54,9 @@ pub struct Network {
     /// target) and routes to the other IPv6 blocks the `reach` rules open.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ipv6: Option<Ipv6>,
-    /// An existing network, by its name on the target (a Docker network, a Proxmox bridge):
-    /// the machines join it, and Isoloom never creates or deletes it. `cidr` is its block, and
-    /// the machines keep fixed addresses in it.
+    /// An existing network, by its name on the target (a Docker network, a Proxmox bridge, an
+    /// ESXi port group): the machines join it, and Isoloom never creates or deletes it. `cidr`
+    /// is its block, and the machines keep fixed addresses in it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external: Option<String>,
     /// Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed
