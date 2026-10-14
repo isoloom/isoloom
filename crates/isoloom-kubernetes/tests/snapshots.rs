@@ -143,7 +143,7 @@ fn the_chart_templates_the_images_and_keeps_braces_as_they_are() {
     assert!(env.contains("image: '{{ index .Values.images \"web\" }}'\n"), "{env}");
     assert!(env.contains("image: '{{ index .Values.images \"db\" }}'\n"), "{env}");
     assert!(env.contains("image: registry.corp/hub/library/alpine:3.20\n"), "the waits are Isoloom's");
-    assert!(env.contains("value: hi {{ \"{{\" }} there }}"), "{env}");
+    assert!(env.contains("value: hi {{ `{{` }} there }}"), "{env}");
     let values: serde_yaml_ng::Value = serde_yaml_ng::from_str(file(&files, "chart/values.yaml")).unwrap();
     assert_eq!(values["images"]["web"].as_str(), Some("registry.corp/hub/library/nginx"));
     assert_eq!(values["images"]["db"].as_str(), Some("isoloom/shop-db"));
@@ -153,6 +153,14 @@ fn the_chart_templates_the_images_and_keeps_braces_as_they_are() {
             serde_yaml_ng::from_str::<serde_yaml_ng::Value>(doc).unwrap_or_else(|e| panic!("{}: {e}", f.path));
         }
     }
+}
+
+#[test]
+fn braces_survive_a_double_quoted_string() {
+    let spec = MIRRORED.replace("'hi {{ there }}'", "\"x\\t{{ y }}\"");
+    let files = isoloom_kubernetes::render(&parsed(&spec)).unwrap();
+    let env = file(&files, "chart/templates/environment.yaml");
+    assert!(env.contains("value: \"x\\t{{ `{{` }} y }}\""), "{env}");
 }
 
 #[test]

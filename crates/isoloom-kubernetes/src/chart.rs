@@ -182,8 +182,10 @@ fn notes(env: &Environment) -> String {
 }
 
 /// Helm's template engine reads `{{` as an action: one already in the text is printed as it is.
+/// The escape is a Go raw string, with no character a YAML scalar of any style escapes (a
+/// double-quoted one would turn `"{{"` into `\"{{\"`, which Helm can't parse).
 fn literal(text: &str) -> String {
-    text.replace("{{", "{{ \"{{\" }}")
+    text.replace("{{", "{{ `{{` }}")
 }
 
 /// Chart templates, one file: every string as it is, but the Helm expressions.
