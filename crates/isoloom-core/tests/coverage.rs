@@ -76,6 +76,17 @@ fn every_field_of_the_format_has_a_row_and_every_row_is_a_field() {
 }
 
 #[test]
+fn every_proxmox_overlay_path_is_a_row() {
+    let rows: BTreeSet<&str> = table().iter().map(|r| r.path).collect();
+    let unknown: Vec<_> = isoloom_core::coverage::spec::PROXMOX
+        .iter()
+        .map(|(p, _)| *p)
+        .filter(|p| !rows.contains(p))
+        .collect();
+    assert!(unknown.is_empty(), "Proxmox overlay entries for fields with no row: {unknown:?}");
+}
+
+#[test]
 fn every_claim_is_exercised_by_an_example() {
     for row in table() {
         for o in Output::ALL {
