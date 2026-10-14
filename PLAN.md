@@ -11,6 +11,22 @@ Working document for the local rebuild. It is squashed away with the history at 
 | **Isothrum desktop app** | UI wrapper with **dynamic specs** | The same logic as the launcher, but the spec is drawn or edited live in Isothrum's lab editor (a drawing compiles to a spec) instead of coming from a fixed catalogue. It uses Isoloom to convert and the Isothrum runner to run. |
 | **Cyber CTF launcher** | UI wrapper with **fixed specs** | Curated CTF lab catalogue, accounts, attack box and player UX. It uses Isoloom to read and convert labs, and the Isothrum runner to run them. |
 
+**Repositories:**
+
+| Repository | Licence | Contains | Used by |
+|---|---|---|---|
+| `isoloom/isoloom` | MIT OR Apache-2.0 | Converter crates and CLI | everything below |
+| `isoloom/isothrum` | MIT OR Apache-2.0 | Libraries only: the runner, the lab-model compiler (drawing to spec, today's `isothrum-core`) and its WASM build | desktop app, website (WASM), launcher (runner) |
+| `isoloom/isothrum-desktop` (new) | MIT OR Apache-2.0 | The Tauri app: brings Isoloom, the runner, the compiler and the UI together, with dynamic specs | users |
+| `isoloom/isothrum-ui` (new, optional) | MIT OR Apache-2.0 | Shared front-end components: editor canvas, lab view, machines, consoles | desktop app, website, possibly the launcher |
+| `isoloom/isothrum-website` | Proprietary, private | Site, accounts, project store, MCP; uses the UI package and the WASM engine | — |
+| `Cyber-Courses/Cyber-CTF-Launcher` | MIT OR Apache-2.0 | CTF UI with fixed specs; uses Isoloom and the runner | players |
+
+**Packages, not pinned git commits:**
+- **Rust:** Isoloom and Isothrum crates are published to crates.io.
+- **JavaScript:** the UI and WASM packages go to npm.
+- **Why:** consumers depend on versions, so the Isoloom history squash can't break them, and each one upgrades on its own schedule.
+
 **Contracts:**
 - **Isoloom to Isothrum:** the generated files plus a versioned run manifest, holding:
   - native commands and their order;
@@ -252,6 +268,7 @@ Then the security review of secrets handling and of every place that writes cred
 2. Rewrite the website from them.
 3. **Squash the history into one commit.** This is a force-push, and needs the maintainer's confirmation at that moment. Then re-enable CI.
 4. Sign the release, with an SBOM, provenance and a pinned toolchain, and tag 1.0.0.
+5. Publish the Isoloom crates to crates.io at 1.0.0, so the runner and the apps depend on versions.
 
 ### Phase 9: The Isothrum runner
 
@@ -264,9 +281,15 @@ Then the security review of secrets handling and of every place that writes cred
    - one real-lab job per target family (Docker, kind, and Vagrant on a KVM runner), the Tier 1 proof.
 4. **Isothrum's desktop app** becomes a UI over the editor, Isoloom and the runner, with the same logic as the launcher but dynamic specs.
 
+### Phase 9b: Isothrum desktop and shared UI
+
+1. **Create `isoloom/isothrum-desktop`.** Move `apps/desktop` out of `isoloom/isothrum`, so that repository holds only libraries. Rebuild the app as a UI over Isoloom, the runner and the compiler, with dynamic specs.
+2. **Optionally create `isoloom/isothrum-ui`:** the editor canvas, lab view, machines and consoles, published to npm and used by the desktop app and the private website. Decide whether the launcher uses it too.
+3. **Publish** the Isothrum crates to crates.io and the WASM build to npm.
+
 ### Phase 10: The launcher as a UI
 
-1. **Replace the launcher's runtime module** with the Isothrum runner, and its spec handling with the Isoloom crates.
+1. **Replace the launcher's runtime module** with the Isothrum runner, and its spec handling with the Isoloom crates. Depend on published versions, not git commits.
 2. **Keep only CTF-specific code:** lab catalogue, accounts, attack box UX, player flows.
 3. **Move the labs** with `isoloom migrate`.
 4. **Order matters:** the rev the launcher pins today stops resolving after the Isoloom squash, so this phase follows right after.
@@ -277,6 +300,7 @@ Then the security review of secrets handling and of every place that writes cred
 
 1. **CTF lab content and courses licence:** proprietary, or a content licence such as Creative Commons. Separate from the code.
 2. **Pulumi and Podman:** revisit after 1.0.
+3. **Does the launcher use `isothrum-ui`?** Recommended: yes, since the lab view, machines and consoles are the same in both apps.
 
 ## 6. Salvage branches (local, not pushed)
 
