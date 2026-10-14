@@ -48,3 +48,15 @@ fn external_blocks_are_checked_and_optional() {
     assert!(!derive(&spec).contains(&Target::External));
     assert_eq!(isoloom_core::targets::missing(&spec, isoloom_core::Shape::External), ["b"]);
 }
+
+#[test]
+fn existing_hosts_behind_a_gateway_machine_are_still_generated() {
+    let spec = parse(
+        "version: 1\nname: gw\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { wan: 2, lan: 1 }\n    vm: { os: debian-12, provision: [fw.sh] }\n    external: { address: 192.168.1.2 }\n  pc:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [pc.sh] }\n    external: { address: 192.168.1.10 }\n",
+    )
+    .unwrap();
+    assert_eq!(validate(&spec), vec![]);
+    assert!(derive(&spec).contains(&Target::External));
+    assert_eq!(isoloom_core::refusal(&spec, Target::External), None);
+    assert!(generate(&spec, Target::External).is_ok());
+}
