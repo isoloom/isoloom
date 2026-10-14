@@ -129,7 +129,7 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
 /// would have no container to run in. At most one of them: the first, as a container output
 /// reports it.
 pub fn container_checks(spec: &Spec) -> Option<Requirement> {
-    if spec.checks.iter().any(|c| c.is_playbook()) {
+    if spec.checks.iter().any(isoloom_spec::Check::is_playbook) {
         return Some(Requirement::PlaybookChecks);
     }
     checks::plan(spec)

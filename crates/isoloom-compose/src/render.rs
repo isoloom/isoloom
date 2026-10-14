@@ -131,7 +131,7 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
         networks: sidecars::attachments(env, name, mp),
         extra_hosts: sidecars::extra_hosts(env, name),
         environment: environment(env, mp),
-        ports: mp.ports.iter().map(port).collect(),
+        ports: mp.ports.iter().copied().map(port).collect(),
         volumes: mp.volumes.iter().map(|v| format!("{}:{}", v.key, v.path)).collect(),
         restart: Some("unless-stopped".into()),
         ..Service::default()
@@ -164,6 +164,7 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
 }
 
 /// A network attachment with a fixed MAC address (a trunk's end, found by it).
+#[allow(clippy::unnecessary_wraps)] // the value of a service's `networks` map, as `Attachment::at`.
 pub(crate) fn mac(mac: &str) -> Option<Attachment> {
     Some(Attachment {
         mac_address: Some(mac.to_string()),
@@ -178,7 +179,7 @@ fn ulimit(soft: u64, hard: u64) -> Ulimit {
 /// A published port: on the host's loopback, on an ephemeral host port by default (no
 /// collisions); ISOLOOM_PUBLISH_FIXED pins it to `publish` inside the docker-vm/cloud VMs that
 /// forward it. `<port>/udp` for a UDP service (Compose's default is TCP).
-fn port(p: &PublishedPort) -> String {
+fn port(p: PublishedPort) -> String {
     let proto = if p.protocol.is_tcp() { "" } else { "/udp" };
     let (publish, port) = (p.publish, p.port);
     if p.fixed {
@@ -221,6 +222,7 @@ pub(crate) fn environment(env: &Environment, mp: &MachinePlan) -> Option<IndexMa
 }
 
 /// A network appliance: its files, its start, its interfaces in the order it expects.
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct (Wave 2).
 fn appliance(env: &Environment, name: &str, m: &Machine, kind: isoloom_spec::model::Appliance, svc: &mut Service, files: &mut Vec<GeneratedFile>) {
     let spec = env.spec();
     let d = m.docker.as_ref().expect("an appliance is a container");
@@ -299,6 +301,7 @@ fn pull_from(env: &Environment, dockerfile: &str) -> String {
 }
 
 /// The probe healthcheck and what the machine waits for before it starts.
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct (Wave 2).
 fn readiness(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, svc: &mut Service, archs: &mut Vec<Arch>) {
     let spec = env.spec();
     if !m.ready_ports().is_empty() {

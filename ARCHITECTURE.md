@@ -16,37 +16,41 @@ isoloom.yml -> spec -> plan -> render -> backends -> .isoloom/<target>/...
    and `-s key=value` overrides merge in, an instance number shifts names and addresses, and the
    defaults and image table resolve. `validate` returns every `Problem` with its field path
    (`machines.web.depends_on`) and a reason. Generators assume a validated spec.
-2. **Plan** (`isoloom-plan`): what every target must produce, independent of any target.
-   Today it holds the checks: the spec's own and the derived ones (services, reach rules),
-   resolved to positions and probes.
+2. **Plan** (`isoloom-plan`): what every target must produce, independent of any target: the
+   `Environment` (networks, machines with their addresses, routes, volumes and set-up steps,
+   `lifecycle::Step`), the checks resolved to positions and probes, and the `requirements` a
+   backend must meet to render it.
 3. **Render** (`isoloom-render`): the pieces every backend shares: addresses and names, the
-   generated files' header, the controller's Ansible runs, HCL and shell quoting, the project
-   copy, the hosts' setup, the router, VLAN trunks, image constraints and `.isoloomignore`.
+   generated files' header, the controller's Ansible runs, HCL, Ruby and PowerShell quoting,
+   the project copy, the hosts' setup, each set-up step's Linux and Windows script (`steps`),
+   the router, VLAN trunks, image constraints and `.isoloomignore`. `backend` defines the
+   `Backend` trait: a target, its capabilities, and `render(&Environment)`.
 4. **Backends** (`isoloom-compose`, `-kubernetes`, `-vagrant`, `-terraform`, `-external`):
-   each turns the spec into its target's files. Every generator is a pure function of the
+   each turns the plan (Compose, through typed structs in `file`) or, until it migrates, the
+   spec into its target's files. Every generator is a pure function of the
    spec: no file system access, so `isoloom check` can regenerate in memory and compare with
    what is committed.
-5. **Targets** (`isoloom-targets`): dispatch from a `Target` to its backend, the refusals
-   (why a spec can't run on a target), `generate_all`, and the resolved snapshot
+5. **Targets** (`isoloom-targets`): the registry of backends (`BACKENDS`; generators not on
+   the plan yet run through `LegacyBackend`), the refusals (requirements minus capabilities), `generate_all`, and the resolved snapshot
    (`resolved.json`) written beside every target's files.
 
 ### Where it is heading
 
-Wave 1 unit 6 introduces a typed plan IR ([ADR 0002](docs/adr/0002-plan-ir.md)): an
+Wave 1 unit 6 introduced the typed plan IR ([ADR 0002](docs/adr/0002-plan-ir.md)): an
 `Environment` (networks, machines, start order, checks, controller, constraints,
 requirements), a `MachineLifecycle` made of `Step`s with one Linux and one Windows rendering
 each, and a `Backend` trait (`capabilities()` plus `render(&Environment)`). Refusal then becomes
 "requirements minus capabilities" instead of each generator deciding on its own. Until every
-backend moves to the plan (Wave 2), a legacy adapter keeps the current generators running
-unchanged.
+backend moves to the plan (Wave 2), `LegacyBackend` keeps the other generators running
+unchanged; Compose is the first on the plan.
 
 ## Crate map
 
 | Crate | Holds |
 |---|---|
 | `isoloom-spec` | The model, parsing and loading, the JSON schema, normalization (groups, clones, VLANs, profiles, instances, defaults, the image table), validation, shell quoting |
-| `isoloom-plan` | The target-neutral plan: the checks, resolved to positions and probes |
-| `isoloom-render` | Shared rendering pieces: addresses, header, Ansible runs, HCL and shell quoting, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
+| `isoloom-plan` | The target-neutral plan: `Environment`, addressing, routing, images, the lifecycle steps, checks, requirements and refusal |
+| `isoloom-render` | The `Backend` trait and shared rendering pieces: addresses, header, Ansible runs, HCL, Ruby and PowerShell quoting, step scripts, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
 | `isoloom-compose` | The Docker Compose backend (`docker`, `hosted`, and the Compose file Docker-on-a-VM targets carry), with the network appliances |
 | `isoloom-kubernetes` | The Kubernetes backend: manifests, Kustomize, the Helm chart |
 | `isoloom-vagrant` | The Vagrant backends: `vagrant` (every provider), `docker-vm`, `hybrid` |
@@ -125,9 +129,10 @@ Enforced now (`deny`, so `cargo clippy --workspace --all-targets -- -D warnings`
   `missing_errors_doc`, `missing_panics_doc`, `doc_markdown`, `similar_names`); `unwrap_used`,
   `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic: `clippy.toml`);
   `print_stdout` (the command line allows it at its root: printing is its interface);
-  `too_many_arguments` above 5 (seven functions carry a targeted, commented `#[allow]`:
+  `too_many_arguments` above 5 (nine functions carry a targeted, commented `#[allow]`:
   `linux_setup_cmds` and `windows_machine` in `cloud_vm.rs`, `inbound`, `nic`, `provision` and
-  `windows_machine` in `cloud_vm_others/azure.rs`, `providers` in `vagrant.rs`).
+  `windows_machine` in `cloud_vm_others/azure.rs`, `providers` in `vagrant.rs`, `appliance` and
+  `readiness` in isoloom-compose's `render.rs`).
 
 Tracked (`allow` today, denied by the end of Wave 2, issue #106): `missing_docs` for library
 crates; `expect_used`; `too_many_lines` (60) and `cognitive_complexity` (15), whose thresholds

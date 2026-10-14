@@ -18,6 +18,7 @@ pub struct ComposeFile {
     pub volumes: IndexMap<String, Labelled>,
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference.
 fn no(b: &bool) -> bool {
     !*b
 }
@@ -137,6 +138,7 @@ pub struct Attachment {
 
 impl Attachment {
     /// At a fixed address.
+    #[allow(clippy::needless_pass_by_value)] // takes an address or its text alike.
     pub fn at(address: impl ToString) -> Option<Attachment> {
         Some(Attachment {
             ipv4_address: Some(address.to_string()),
