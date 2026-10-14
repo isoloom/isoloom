@@ -1,6 +1,8 @@
 //! Environment-level `provision:` on Proxmox: a controller VM runs the playbooks, as on Vagrant
 //! and the clouds. Before this, Proxmox refused such labs outright.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::PathBuf;
 
 use isoloom_core::{Target, generate, load};

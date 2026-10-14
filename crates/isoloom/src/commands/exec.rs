@@ -82,7 +82,7 @@ fn on_each(env: &Env, names: &[String], cmd: &str) -> Res<ExitCode> {
             }
         };
         c.stdout(Stdio::piped()).stderr(Stdio::piped());
-        let o = c.output().map_err(|e| process::tool_error(&c, e))?;
+        let o = c.output().map_err(|e| process::tool_error(&c, &e))?;
         for line in String::from_utf8_lossy(&o.stdout).lines().chain(String::from_utf8_lossy(&o.stderr).lines()) {
             println!("{name}: {line}");
         }

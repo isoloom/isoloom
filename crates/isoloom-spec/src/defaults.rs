@@ -146,14 +146,14 @@ pub fn load_profiled(project: &Path, images_file: Option<&Path>, profile: Option
             value: at_path(k, scalar(v)),
         });
     }
-    resolve(layers)
+    resolve(&layers)
 }
 
 /// Merges layers in order; later ones win leaf by leaf.
-pub fn resolve(layers: Vec<Layer>) -> Result<Resolved, String> {
+pub fn resolve(layers: &[Layer]) -> Result<Resolved, String> {
     let mut merged = Value::Mapping(Mapping::new());
     let mut sources: Vec<(String, String)> = Vec::new();
-    for layer in &layers {
+    for layer in layers {
         merge(&mut merged, &layer.value);
         for leaf in leaves(&layer.value, "") {
             sources.retain(|(k, _)| *k != leaf);
@@ -187,7 +187,7 @@ pub fn parse_set(s: &str) -> Result<(&str, &str), String> {
     let (k, v) = s
         .split_once('=')
         .ok_or_else(|| format!("`-s {s}`: expected key=value, like -s machines.web.vm.os=ubuntu-24.04"))?;
-    if k.is_empty() || k.split('.').any(|p| p.is_empty()) {
+    if k.is_empty() || k.split('.').any(str::is_empty) {
         return Err(format!("`-s {s}`: the key is a dotted path, like cloud.aws.region"));
     }
     Ok((k, v))

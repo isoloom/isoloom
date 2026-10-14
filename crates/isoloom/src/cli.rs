@@ -39,7 +39,7 @@ pub enum Command {
     /// Fail when the generated files under .isoloom/ don't match the spec (for CI).
     Check(check::Args),
     /// The defaults in effect here (built in, your file, the project's, the environment) and
-    /// where each comes from. See https://www.isoloom.com/en/docs/defaults
+    /// where each comes from. See <https://www.isoloom.com/en/docs/defaults>
     Defaults(defaults::Args),
     /// Generate a target's files, then bring the environment up with the right tool
     /// (docker compose, vagrant, kubectl, or terraform).

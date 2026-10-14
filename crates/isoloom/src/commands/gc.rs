@@ -30,6 +30,7 @@ impl Leftovers {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)] // every command returns `Res`: the dispatch in main treats them alike.
 pub fn run(a: &Args) -> Res<ExitCode> {
     let managed = format!("label={}=true", core::generate::MANAGED_LABEL);
     let alive = live_projects();
@@ -58,7 +59,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
         );
         return Ok(ExitCode::SUCCESS);
     }
-    remove(&left)
+    Ok(remove(&left))
 }
 
 /// `docker <args>`, its stdout lines (empty when Docker isn't there or fails).
@@ -116,7 +117,7 @@ fn unused_images(managed: &str) -> Vec<(String, String)> {
         let mut args = vec!["inspect", "-f", "{{.Image}}"];
         args.extend(ids.iter().map(String::as_str));
         if ids.is_empty() {
-            Default::default()
+            std::collections::BTreeSet::default()
         } else {
             docker_lines(&args).into_iter().collect()
         }
@@ -131,7 +132,7 @@ fn unused_images(managed: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-fn remove(left: &Leftovers) -> Res<ExitCode> {
+fn remove(left: &Leftovers) -> ExitCode {
     let mut failed = 0;
     let mut rm = |args: &[&str]| {
         if !Command::new("docker").args(args).stdout(Stdio::null()).status().is_ok_and(|s| s.success()) {
@@ -149,8 +150,8 @@ fn remove(left: &Leftovers) -> Res<ExitCode> {
     }
     if failed > 0 {
         eprintln!("✗ {failed} could not be removed (in use?)");
-        return Ok(ExitCode::from(1));
+        return ExitCode::from(1);
     }
     println!("removed");
-    Ok(ExitCode::SUCCESS)
+    ExitCode::SUCCESS
 }

@@ -103,6 +103,7 @@ mod tests {
 
     #[test]
     fn published_ports_come_from_compose_ps() {
+        use isoloom_core::model::Protocol;
         let items: Vec<serde_json::Value> = serde_json::from_str(
             r#"[{"Service":"web","Publishers":[{"URL":"127.0.0.1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"},{"URL":"::1","TargetPort":80,"PublishedPort":32772,"Protocol":"tcp"}]},
                 {"Service":"dns","Publishers":[{"URL":"127.0.0.1","TargetPort":53,"PublishedPort":32780,"Protocol":"udp"},{"URL":"127.0.0.1","TargetPort":53,"PublishedPort":32781,"Protocol":"tcp"}]},
@@ -110,7 +111,6 @@ mod tests {
                 {"Service":"isoloom-check"}]"#,
         )
         .unwrap();
-        use isoloom_core::model::Protocol;
         assert_eq!(
             published_of(&items),
             [

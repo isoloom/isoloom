@@ -3,24 +3,20 @@
 //! author (human or AI) can fix it without reading the generators.
 
 use std::collections::{BTreeSet, HashMap};
-use std::fmt;
 use std::net::Ipv4Addr;
 use std::path::Path;
 
 use crate::model::{KNOWN_OS, Shape, Spec};
 use crate::targets::{derive, missing};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One thing wrong with a spec: the field's path and what to do about it.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{at}: {message}")]
 pub struct Problem {
     /// Where in the file, e.g. `machines.web.depends_on`.
     pub at: String,
+    /// The reason, and the fix when there is one.
     pub message: String,
-}
-
-impl fmt::Display for Problem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.at, self.message)
-    }
 }
 
 /// An IPv4 block, parsed from `a.b.c.d/len`.
@@ -530,13 +526,13 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
             };
             let is_gateway = spec.networks[net].gateway.as_deref() == Some(name.as_str());
             if is_gateway {
-                if *octet != c.gateway_octet() {
+                if *octet == c.gateway_octet() {
+                    taken.insert((net.clone(), *octet), name.clone());
+                } else {
                     add(
                         &nat,
                         format!("`{name}` is this network's gateway, so it takes the gateway address: use {}", c.gateway_octet()),
                     );
-                } else {
-                    taken.insert((net.clone(), *octet), name.clone());
                 }
             } else if c.host(*octet).is_none() {
                 add(
@@ -925,7 +921,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
                 }
                 Some(j) => {
                     let path = rest[i + 2..i + 2 + j].trim();
-                    if path.is_empty() || path.split('.').any(|p| p.is_empty()) {
+                    if path.is_empty() || path.split('.').any(str::is_empty) {
                         add("message", format!("`{{{{ {path} }}}}` isn't a path like machines.web.addresses.front"));
                     }
                     rest = &rest[i + 2 + j + 2..];
@@ -996,7 +992,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
 fn dependency_cycle(spec: &Spec) -> Option<Vec<String>> {
     fn visit<'a>(spec: &'a Spec, n: &'a str, stack: &mut Vec<&'a str>, done: &mut BTreeSet<&'a str>) -> Option<Vec<String>> {
         if let Some(pos) = stack.iter().position(|s| *s == n) {
-            let mut c: Vec<String> = stack[pos..].iter().map(|s| s.to_string()).collect();
+            let mut c: Vec<String> = stack[pos..].iter().map(std::string::ToString::to_string).collect();
             c.push(n.to_string());
             return Some(c);
         }

@@ -35,7 +35,7 @@ fn proxies(c: &Constraints) -> Option<(Option<&str>, Option<&str>)> {
 /// What is reached without the proxy: localhost, the environment's machine names and network
 /// blocks (as written, and Docker's), then the spec's own list.
 pub fn no_proxy(spec: &Spec) -> Vec<String> {
-    let mut out: Vec<String> = ["localhost", "127.0.0.1", "::1"].iter().map(|s| s.to_string()).collect();
+    let mut out: Vec<String> = ["localhost", "127.0.0.1", "::1"].iter().map(std::string::ToString::to_string).collect();
     for (name, m) in &spec.machines {
         out.push(name.clone());
         out.extend(m.aliases.iter().cloned());
@@ -294,11 +294,11 @@ pub fn linux_prelude(spec: &Spec) -> Option<String> {
 /// `bootcmd` (before cloud-init installs packages, at every boot: it's idempotent), the clouds'
 /// first `remote-exec` runs it with sudo once cloud-init is done, before anything else.
 pub fn terraform_prelude(spec: &Spec, files: &mut [GeneratedFile]) {
-    let Some(sh) = linux_prelude(spec) else { return };
     const CLOUD_CONFIG: &str = "data = \"#cloud-config\\n${yamlencode({\n";
     const FIRST_STEP: &str = "inline = [\"cloud-init status --wait >/dev/null 2>&1 || true\", ";
     // The same first step, one command a line (the cloud-docker modules, then their auto-stop).
     const FIRST_STEP_LINES: &str = "      \"cloud-init status --wait >/dev/null 2>&1 || true\",\n      var.auto_stop_minutes > 0";
+    let Some(sh) = linux_prelude(spec) else { return };
     // A blank line after: `terraform fmt` aligns only consecutive attributes.
     let boot = format!("      bootcmd = [[\"sh\", \"-c\", {}]]\n\n", super::hcl(&sh));
     let first = format!("{}, ", super::hcl(&format!("sudo sh -c {}", quote(&sh))));

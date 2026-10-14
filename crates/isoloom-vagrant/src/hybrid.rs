@@ -26,9 +26,7 @@ const HOST: &str = "isoloom-docker";
 /// The bridge network of the containers with published ports.
 const PUBLISH_NET: &str = "isoloom-publish";
 
-fn rb(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace("#{", "\\#{"))
-}
+use isoloom_render::rb;
 
 /// The Docker network a container network is on the host: named after the environment.
 fn docker_net(spec: &Spec, net: &str) -> String {

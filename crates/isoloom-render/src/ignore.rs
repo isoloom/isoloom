@@ -195,19 +195,19 @@ fn ends(tokens: &[Token], s: &[char], at: usize) -> Vec<usize> {
     match first {
         Token::Char(ch) => {
             if s.get(at) == Some(ch) {
-                then(at + 1)
+                then(at + 1);
             }
         }
         Token::Any => {
             if s.get(at).is_some_and(|c| *c != '/') {
-                then(at + 1)
+                then(at + 1);
             }
         }
         Token::Set { negated, ranges } => {
             if let Some(c) = s.get(at)
                 && ranges.iter().any(|(a, b)| a <= c && c <= b) != *negated
             {
-                then(at + 1)
+                then(at + 1);
             }
         }
         Token::Star => {
@@ -250,7 +250,7 @@ pub fn entries(root: &Path, rules: &Rules) -> std::io::Result<Vec<String>> {
 
 fn walk(root: &Path, dir: &str, rules: &Rules, out: &mut Vec<String>) -> std::io::Result<()> {
     let mut names: Vec<String> = std::fs::read_dir(root.join(dir))?
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
     names.sort();

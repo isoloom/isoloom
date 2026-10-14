@@ -1,6 +1,8 @@
 //! `networks.*.tc`: link impairment on Isoloom's router and on the machines' own interfaces,
 //! validated and generated.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Target, generate, load, parse, refusal, validate};

@@ -1,6 +1,8 @@
 //! `resources.disk_gb` on the Vagrant providers: the VM's disk sized (a minimum), the root
 //! filesystem grown into it before the machine's steps.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use isoloom_core::{Target, generate, parse};
 
 fn vagrantfile(disk: &str) -> String {

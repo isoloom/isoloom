@@ -1,6 +1,8 @@
 //! `validate` and `validate_files` against specs with one mistake each: every problem names its
 //! field and says what is wrong, so an author can fix it without reading the generators.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::{Path, PathBuf};
 
 use isoloom_core::{parse, validate, validate_files};

@@ -1,7 +1,7 @@
 //! Pictures and tables of an environment, from the resolved snapshot: `isoloom graph` draws
 //! the networks, machines, reach rules and gateways (D2 or Graphviz; SVG/PNG when the renderer
 //! is installed); `isoloom report` prints addressing, services, wiring and resources as text or
-//! Markdown. Both read what [`crate::resolved::resolve`] worked out, so they can't disagree
+//! Markdown. Both read what `resolved::resolve` (in isoloom-targets) worked out, so they can't disagree
 //! with the generated files.
 
 use std::fmt::Write;
@@ -22,7 +22,7 @@ pub fn graph_d2(r: &Value) -> String {
     }
     out.push('\n');
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
-        let mut label = m.to_string();
+        let mut label = m.clone();
         let services: Vec<String> = v["services"]
             .as_array()
             .into_iter()
@@ -80,7 +80,7 @@ pub fn graph_dot(r: &Value) -> String {
         );
     }
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
-        let mut label = m.to_string();
+        let mut label = m.clone();
         let services: Vec<String> = v["services"].as_array().into_iter().flatten().map(port_text).collect();
         if !services.is_empty() {
             label.push_str(&format!("\\n:{}", services.join(" :")));
@@ -176,17 +176,17 @@ pub const REPORTS: &[(&str, &str)] = &[
 ];
 
 /// One report, as text (aligned columns) or Markdown.
-pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String, String> {
+pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String, crate::ReportError> {
     let (head, rows) = match name {
         "addressing" => addressing(r),
         "services" => services(r),
         "wiring" => wiring(r),
         "resources" => resources(r),
         other => {
-            return Err(format!(
-                "no report named `{other}`; one of: {}",
-                REPORTS.iter().map(|(n, _)| *n).collect::<Vec<_>>().join(", ")
-            ));
+            return Err(crate::ReportError::Unknown {
+                name: other.to_string(),
+                known: REPORTS.iter().map(|(n, _)| *n).collect::<Vec<_>>().join(", "),
+            });
         }
     };
     Ok(table(&head, &rows, markdown))
@@ -225,7 +225,7 @@ fn port_text(s: &Value) -> String {
 fn services(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     let head = ["machine", "port", "name", "http", "published", "reachable from"]
         .iter()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
     let mut rows = Vec::new();
     let nets: Vec<String> = r["networks"].as_object().into_iter().flatten().map(|(n, _)| n.clone()).collect();
@@ -273,7 +273,7 @@ fn wiring(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
         "internet",
     ]
     .iter()
-    .map(|s| s.to_string())
+    .map(std::string::ToString::to_string)
     .collect();
     let rows = r["networks"]
         .as_object()
@@ -301,7 +301,7 @@ fn wiring(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
 fn resources(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     let head = ["machine", "cpus", "memory (MB)", "disk (GB)", "os", "shapes"]
         .iter()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
     let mut rows = Vec::new();
     let (mut c, mut m, mut d) = (0u64, 0u64, 0u64);

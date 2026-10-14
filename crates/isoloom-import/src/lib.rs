@@ -10,9 +10,12 @@ use isoloom_coverage as coverage;
 use isoloom_spec::{images, model, schema, validate};
 
 pub mod compose;
+mod error;
 pub mod terraform;
 pub mod vagrant;
 mod yaml;
+
+pub use error::ImportError;
 
 /// A drafted `isoloom.yml` and the notes on it.
 #[derive(Debug, Clone)]

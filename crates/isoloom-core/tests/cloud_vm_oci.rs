@@ -1,9 +1,11 @@
 //! The Oracle Cloud (OCI) driver of the cloud-vm target: a single-network, multi-VM Linux lab
 //! is accepted and keeps each machine's fixed private IP; multi-network labs are refused.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use isoloom_core::{Target, generate, parse};
 
-const LAB: &str = r#"version: 1
+const LAB: &str = r"version: 1
 name: oci-test
 networks:
   lab: { cidr: 10.60.0.0/24 }
@@ -16,9 +18,9 @@ machines:
     networks: { lab: 11 }
     services: [{ port: 5432, name: postgres }]
     vm: { os: ubuntu-24.04, provision: [p.sh] }
-"#;
+";
 
-const MULTI_NET: &str = r#"version: 1
+const MULTI_NET: &str = r"version: 1
 name: oci-multi
 networks:
   front: { cidr: 10.61.10.0/24 }
@@ -28,7 +30,7 @@ machines:
     networks: { front: 10, back: 10 }
     services: [{ port: 80 }]
     vm: { os: ubuntu-24.04, provision: [p.sh] }
-"#;
+";
 
 fn oci_tf(yaml: &str) -> String {
     let spec = parse(yaml).expect("parses");

@@ -143,7 +143,7 @@ pub fn windows(m: &Machine) -> Option<String> {
     if m.environment.is_empty() {
         return None;
     }
-    let ps = |s: &str| format!("'{}'", s.replace('\'', "''"));
+    let ps = crate::ps;
     Some(
         m.environment
             .iter()

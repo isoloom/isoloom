@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::RegistryError;
 use crate::model::Target;
 pub use isoloom_spec::home::home;
 
@@ -72,61 +73,79 @@ pub fn path() -> PathBuf {
 }
 
 /// Reads the registry; a missing file is an empty registry.
-pub fn load() -> Result<Registry, String> {
-    let p = path();
-    match std::fs::read_to_string(&p) {
-        Ok(text) => serde_yaml_ng::from_str(&text).map_err(|e| format!("{}: {e}", p.display())),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Registry::default()),
-        Err(e) => Err(format!("can't read {}: {e}", p.display())),
-    }
+pub fn load() -> Result<Registry, RegistryError> {
+    load_in(&home())
 }
 
 /// Writes the registry (creating the folder).
-pub fn save(r: &Registry) -> Result<(), String> {
-    let p = path();
-    if let Some(parent) = p.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("can't create {}: {e}", parent.display()))?;
-    }
-    let text = render(r)?;
-    // Whole or not at all: a reader never sees a half-written file.
-    let tmp = p.with_extension(format!("yml.{}.tmp", std::process::id()));
-    std::fs::write(&tmp, text).map_err(|e| format!("can't write {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, &p).map_err(|e| format!("can't write {}: {e}", p.display()))
-}
-
-/// The file's text: a comment, then the registry with `version:` set to [`VERSION`].
-fn render(r: &Registry) -> Result<String, String> {
-    let current = Registry {
-        version: VERSION,
-        environments: r.environments.clone(),
-    };
-    Ok(format!(
-        "# Environments `isoloom run` brought up on this host. Written by `isoloom run` and `isoloom down`;\n# `isoloom status` reads it.\n{}",
-        serde_yaml_ng::to_string(&current).map_err(|e| e.to_string())?
-    ))
+pub fn save(r: &Registry) -> Result<(), RegistryError> {
+    save_in(&home(), r)
 }
 
 /// Reads, changes and writes the registry as one step: `run`, `down` and tools embedding
 /// Isoloom (and their background workers) write it at the same time, and a plain
 /// load-then-save lets one of two writers drop the other's entry. Held by a lock file beside
 /// it; one left by a process that died is taken over after 30 seconds.
-pub fn update(f: impl FnOnce(&mut Registry)) -> Result<(), String> {
-    let lock = home().join("status.lock");
-    if let Some(parent) = lock.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("can't create {}: {e}", parent.display()))?;
+pub fn update(f: impl FnOnce(&mut Registry)) -> Result<(), RegistryError> {
+    update_in(&home(), f)
+}
+
+/// [`load`], from the registry in `home`.
+pub(crate) fn load_in(home: &Path) -> Result<Registry, RegistryError> {
+    let path = home.join("status.yml");
+    match std::fs::read_to_string(&path) {
+        Ok(text) => serde_yaml_ng::from_str(&text).map_err(|source| RegistryError::Parse { path, source }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Registry::default()),
+        Err(source) => Err(RegistryError::Read { path, source }),
     }
+}
+
+/// [`save`], to the registry in `home`.
+pub(crate) fn save_in(home: &Path, r: &Registry) -> Result<(), RegistryError> {
+    let p = home.join("status.yml");
+    create_dir(home)?;
+    let text = render(r)?;
+    // Whole or not at all: a reader never sees a half-written file.
+    let tmp = p.with_extension(format!("yml.{}.tmp", std::process::id()));
+    std::fs::write(&tmp, text).map_err(|source| RegistryError::Write { path: tmp.clone(), source })?;
+    std::fs::rename(&tmp, &p).map_err(|source| RegistryError::Write { path: p, source })
+}
+
+/// [`update`], on the registry in `home`.
+pub(crate) fn update_in(home: &Path, f: impl FnOnce(&mut Registry)) -> Result<(), RegistryError> {
+    let lock = home.join("status.lock");
+    create_dir(home)?;
+    take_lock(&lock)?;
+    let result = load_in(home).and_then(|mut reg| {
+        f(&mut reg);
+        save_in(home, &reg)
+    });
+    let _ = std::fs::remove_file(&lock);
+    result
+}
+
+fn create_dir(dir: &Path) -> Result<(), RegistryError> {
+    std::fs::create_dir_all(dir).map_err(|source| RegistryError::Create {
+        path: dir.to_path_buf(),
+        source,
+    })
+}
+
+/// Creates the lock file, waiting while another writer holds it: one older than 30 seconds,
+/// or still held after 10, is taken over.
+fn take_lock(lock: &Path) -> Result<(), RegistryError> {
     let started = std::time::Instant::now();
     loop {
-        match std::fs::OpenOptions::new().write(true).create_new(true).open(&lock) {
-            Ok(_) => break,
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(lock) {
+            Ok(_) => return Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let stale = std::fs::metadata(&lock)
+                let stale = std::fs::metadata(lock)
                     .and_then(|m| m.modified())
                     .ok()
                     .and_then(|t| t.elapsed().ok())
                     .is_some_and(|age| age > std::time::Duration::from_secs(30));
                 if stale || started.elapsed() > std::time::Duration::from_secs(10) {
-                    let _ = std::fs::remove_file(&lock);
+                    let _ = std::fs::remove_file(lock);
                     continue;
                 }
                 std::thread::sleep(std::time::Duration::from_millis(25));
@@ -136,15 +155,26 @@ pub fn update(f: impl FnOnce(&mut Registry)) -> Result<(), String> {
             Err(e) if cfg!(windows) && e.kind() == std::io::ErrorKind::PermissionDenied && started.elapsed() < std::time::Duration::from_secs(10) => {
                 std::thread::sleep(std::time::Duration::from_millis(25));
             }
-            Err(e) => return Err(format!("can't lock {}: {e}", lock.display())),
+            Err(source) => {
+                return Err(RegistryError::Lock {
+                    path: lock.to_path_buf(),
+                    source,
+                });
+            }
         }
     }
-    let result = load().and_then(|mut reg| {
-        f(&mut reg);
-        save(&reg)
-    });
-    let _ = std::fs::remove_file(&lock);
-    result
+}
+
+/// The file's text: a comment, then the registry with `version:` set to [`VERSION`].
+fn render(r: &Registry) -> Result<String, RegistryError> {
+    let current = Registry {
+        version: VERSION,
+        environments: r.environments.clone(),
+    };
+    Ok(format!(
+        "# Environments `isoloom run` brought up on this host. Written by `isoloom run` and `isoloom down`;\n# `isoloom status` reads it.\n{}",
+        serde_yaml_ng::to_string(&current)?
+    ))
 }
 
 impl Registry {
@@ -178,12 +208,14 @@ pub fn now() -> String {
 }
 
 /// Unix seconds as `YYYY-MM-DDTHH:MM:SSZ`.
+// The short names are the published algorithm's own (`z`, `y`, `m`, `d`): easier to check against it.
+#[allow(clippy::many_single_char_names)]
 pub(crate) fn rfc3339(secs: u64) -> String {
     let days = secs / 86_400;
     let rem = secs % 86_400;
     let (h, m, s) = (rem / 3600, (rem % 3600) / 60, rem % 60);
     // Days since 1970-01-01 to a civil date (Howard Hinnant's algorithm).
-    let z = days as i64 + 719_468;
+    let z = days.cast_signed() + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);
     let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
@@ -231,12 +263,11 @@ mod tests {
     #[test]
     fn concurrent_updates_keep_every_entry() {
         let home = std::env::temp_dir().join(format!("isoloom-reg-{}", std::process::id()));
-        // SAFETY: the only test touching ISOLOOM_HOME.
-        unsafe { std::env::set_var("ISOLOOM_HOME", &home) };
         let threads: Vec<_> = (0..16)
             .map(|i| {
+                let home = home.clone();
                 std::thread::spawn(move || {
-                    update(|r| {
+                    update_in(&home, |r| {
                         r.upsert(Entry {
                             name: format!("e{i}"),
                             dir: PathBuf::from(format!("/p{i}")),
@@ -246,18 +277,17 @@ mod tests {
                             project: None,
                             profile: None,
                             started: rfc3339(0),
-                        })
+                        });
                     })
-                    .unwrap()
+                    .unwrap();
                 })
             })
             .collect();
         for t in threads {
             t.join().unwrap();
         }
-        assert_eq!(load().unwrap().environments.len(), 16);
+        assert_eq!(load_in(&home).unwrap().environments.len(), 16);
         assert!(!home.join("status.lock").exists());
-        unsafe { std::env::remove_var("ISOLOOM_HOME") };
         std::fs::remove_dir_all(home).unwrap();
     }
 

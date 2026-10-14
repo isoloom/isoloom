@@ -77,7 +77,7 @@ fn unsupported(spec: &Spec) -> Option<String> {
     if spec.networks.values().any(|n| n.gateway.is_some()) {
         return Some("networks with a `gateway` machine in the cloud come later".into());
     }
-    if spec.checks.iter().any(|c| c.is_playbook()) {
+    if spec.checks.iter().any(isoloom_spec::Check::is_playbook) {
         return Some("Ansible checks (.yml) in the cloud come later".into());
     }
     if spec.networks.values().any(|n| n.tc.is_some()) {
@@ -575,6 +575,7 @@ pub fn windows_udp_redirect(spec: &Spec) -> Option<String> {
 /// its volumes, its dependency waits, its provision steps, published-port redirects, the offline
 /// egress rule, and the ready marker. `mac_expr(nid)` is the Terraform expression for the MAC of
 /// the interface on network `nid` (the resource-safe network id).
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct when this moves onto the plan IR (Wave 2).
 pub fn linux_setup_cmds(
     spec: &Spec,
     name: &str,
@@ -807,6 +808,7 @@ fn controller(spec: &Spec, tf: &mut String, lab: &str) {
 /// the generated password, WinRM over HTTP, its name; then over WinRM (from `allowed_cidr`): the
 /// other machines' names, its `.ps1` steps, its firewall openings, published ports, the ready
 /// marker.
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct when this moves onto the plan IR (Wave 2).
 fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32, published_out: &mut Vec<(String, String)>) {
     let m = &spec.machines[name];
     let vm = m.vm.as_ref().expect("a VM machine");

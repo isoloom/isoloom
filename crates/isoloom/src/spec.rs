@@ -24,6 +24,9 @@ pub fn profile_name() -> Option<String> {
 
 /// The profile asked for, read from `dir`. The first time, its inputs become environment
 /// variables (those not already set), so every target's tool sees them as it sees the user's.
+// The workspace's only `unsafe`: `set_var` before any thread starts (see SAFETY below). Tracked:
+// pass the inputs to each child process with `Command::env` instead (Wave 2, #106).
+#[allow(unsafe_code)]
 pub fn profile_for(dir: &Path) -> Res<Option<core::profile::Profile>> {
     static INPUTS: std::sync::Once = std::sync::Once::new();
     let Some(name) = PROFILE.get().and_then(Option::as_deref) else {

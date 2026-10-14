@@ -1,6 +1,8 @@
 //! The format against its three examples: they parse, validate, and get exactly the
 //! targets their shapes allow.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Target, derive, effective, load, parse, totals, validate};
@@ -222,7 +224,7 @@ fn the_size_floor_is_a_vms() {
             "version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  svc:\n    networks: {{ lan: 10 }}\n    resources: {{ cpus: 1, memory_mb: 64 }}\n{impls}"
         )
     };
-    assert!(problems(&spec("    docker: { image: nginx }\n")).is_empty());
+    assert_eq!(problems(&spec("    docker: { image: nginx }\n")), [] as [std::string::String; 0]);
     let both = problems(&spec("    docker: { image: nginx }\n    vm: { os: debian-12, provision: [x.sh] }\n"));
     assert!(both.iter().any(|p| p.contains("too small for a VM")), "{both:?}");
     let tiny = problems(&spec("    docker: { image: nginx }\n").replace("memory_mb: 64", "memory_mb: 8"));

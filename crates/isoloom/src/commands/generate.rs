@@ -15,7 +15,7 @@ pub struct Args {
     #[arg(long)]
     target: Option<String>,
     /// Your own image table (YAML): OS images, and the access machine when the spec leaves
-    /// it to the runner. See https://www.isoloom.com/en/docs/images
+    /// it to the runner. See <https://www.isoloom.com/en/docs/images>
     #[arg(long, value_name = "FILE")]
     images: Option<PathBuf>,
     /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,

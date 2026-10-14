@@ -2,6 +2,8 @@
 //! an example that uses the field and generates for that output, and docs/COVERAGE.md is
 //! what `isoloom coverage --markdown` prints.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -90,9 +92,8 @@ fn every_proxmox_overlay_path_is_a_row() {
 fn every_claim_is_exercised_by_an_example() {
     for row in table() {
         for o in Output::ALL {
-            let proof = match row.status(o) {
-                Status::Done { proof, .. } | Status::Partial { proof, .. } => proof,
-                _ => continue,
+            let (Status::Done { proof, .. } | Status::Partial { proof, .. }) = row.status(o) else {
+                continue;
             };
             let dir = examples().join(proof);
             let raw: serde_yaml_ng::Value = serde_yaml_ng::from_str(&std::fs::read_to_string(dir.join("isoloom.yml")).unwrap()).unwrap();
@@ -167,7 +168,7 @@ fn compose_rows_are_exactly_the_schema_keys() {
     for (prefix, def) in [("services.*.", "service"), ("networks.*.", "network"), ("volumes.*.", "volume")] {
         expected.extend(schema_keys(defs, &defs[def]).into_iter().map(|k| format!("{prefix}{k}")));
     }
-    let rows: BTreeSet<String> = compose::format().rows.iter().map(|(k, _)| k.to_string()).collect();
+    let rows: BTreeSet<String> = compose::format().rows.iter().map(|(k, _)| k.clone()).collect();
     let missing: Vec<_> = expected.difference(&rows).collect();
     let extra: Vec<_> = rows.difference(&expected).collect();
     assert!(missing.is_empty(), "Compose keys with no coverage row: {missing:?}");
@@ -176,8 +177,8 @@ fn compose_rows_are_exactly_the_schema_keys() {
 
 /// Checks a format's rows against what the generator really writes: every key written has a
 /// row marked as written, and every row marked as written is written by some example.
-fn written_matches(rows: &[(String, Support)], written: BTreeSet<String>, format: &str) {
-    for key in &written {
+fn written_matches(rows: &[(String, Support)], written: &BTreeSet<String>, format: &str) {
+    for key in written {
         let row = rows.iter().find(|(k, _)| k == key);
         assert!(row.is_some(), "{format}: Isoloom writes `{key}`, which has no coverage row");
         assert!(
@@ -210,7 +211,7 @@ fn compose_written_keys_match_the_generated_files() {
             }
         }
     }
-    written_matches(&compose::format().rows, written, "Compose");
+    written_matches(&compose::format().rows, &written, "Compose");
 }
 
 #[test]
@@ -256,7 +257,7 @@ fn vagrant_written_settings_match_the_generated_files() {
         }
     }
     let rows: Vec<(String, Support)> = vagrant::formats().into_iter().flat_map(|f| f.rows).collect();
-    written_matches(&rows, written, "Vagrant");
+    written_matches(&rows, &written, "Vagrant");
 }
 
 /// Which committed Terraform files each provider table describes.
@@ -312,7 +313,7 @@ fn terraform_written_resources_match_the_generated_files() {
                 }
             }
         }
-        written_matches(&format.rows, written, name);
+        written_matches(&format.rows, &written, name);
     }
     // A table that claims written resources must be checked against some output.
     for f in formats.iter().filter(|f| f.name.starts_with("Terraform: ")) {

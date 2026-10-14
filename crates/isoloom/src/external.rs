@@ -77,7 +77,7 @@ fn run(program: &str, args: &[String], stdin: Option<Stdio>) -> Res<()> {
     if let Some(i) = stdin {
         c.stdin(i);
     }
-    let st = c.status().map_err(|e| tool_error(&c, e))?;
+    let st = c.status().map_err(|e| tool_error(&c, &e))?;
     if st.success() {
         Ok(())
     } else {
@@ -156,7 +156,7 @@ fn reboot_external(name: &str, ssh: &[String]) -> Res<()> {
     // The connection may drop before ssh returns: its status says nothing.
     let mut c = Command::new("ssh");
     c.args(ssh).arg("sudo sh -c 'systemctl --no-block reboot 2>/dev/null || reboot'");
-    let _ = c.status().map_err(|e| tool_error(&c, e))?;
+    let _ = c.status().map_err(|e| tool_error(&c, &e))?;
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
     while std::time::Instant::now() < deadline {
         std::thread::sleep(std::time::Duration::from_secs(5));

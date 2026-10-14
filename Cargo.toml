@@ -30,4 +30,46 @@ indexmap = { version = "2", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 schemars = { version = "1", features = ["indexmap2"] }
 hcl-rs = "0.19"
+thiserror = "2"
 insta = { version = "1", features = ["yaml"] }
+proptest = { version = "1", default-features = false, features = ["std"] }
+
+# Every crate inherits these (`[lints] workspace = true`); see CONTRIBUTING.md. A lint the code
+# base doesn't pass yet is listed as "allow" under "Tracked" with the plan to deny it: CI runs
+# clippy with `-D warnings`, so a lint at "warn" would fail it the same as "deny".
+[workspace.lints.rust]
+# The command line has the only exception: one `#[allow]` on its `set_var` (crates/isoloom/src/spec.rs).
+unsafe_code = "deny"
+# Tracked: denied for library crates once every public item is documented (Wave 2, #106).
+missing_docs = "allow"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+bare_urls = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+# Pedantic lints left out on purpose:
+must_use_candidate = "allow"         # nearly every getter qualifies; `#[must_use]` goes where ignoring is a bug.
+missing_errors_doc = "allow"         # errors are typed enums whose variants document themselves.
+missing_panics_doc = "allow"         # panics are denied outside tests (`expect_used`, `panic`).
+doc_markdown = "allow"               # prose names products (Docker, VirtualBox, OpenTofu) and keys, not code.
+similar_names = "allow"              # `src`/`dst`, `cidr`/`cidrs` read fine.
+# Tracked: still hit in code being moved onto the plan IR (Wave 2), denied when it lands.
+case_sensitive_file_extension_comparisons = "allow"
+cast_possible_truncation = "allow"
+format_collect = "allow"
+format_push_string = "allow"
+map_unwrap_or = "allow"
+match_wildcard_for_single_variants = "allow"
+stable_sort_primitive = "allow"
+too_many_lines = "allow"             # threshold 60 in clippy.toml
+cognitive_complexity = "allow"       # threshold 15 in clippy.toml
+expect_used = "allow"
+# Restriction lints, denied now (tests may unwrap, expect and panic: see clippy.toml).
+unwrap_used = "deny"
+panic = "deny"
+dbg_macro = "deny"
+todo = "deny"
+print_stdout = "deny"                # libraries; the command line allows it (its output is its interface).
+too_many_arguments = "deny"          # threshold 5 in clippy.toml

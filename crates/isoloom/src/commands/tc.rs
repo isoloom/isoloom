@@ -85,7 +85,7 @@ pub fn run(a: Args) -> Res<ExitCode> {
             c.args(["ssh", &p.host, "-c", &format!("sudo sh -c {}", shell::quote(&command))]);
             c
         };
-        ok &= c.status().map_err(|e| tool_error(&c, e))?.success();
+        ok &= c.status().map_err(|e| tool_error(&c, &e))?.success();
     }
     Ok(output::exit_code(ok))
 }

@@ -38,9 +38,9 @@ pub fn write_draft(draft: &core::import::Draft, folder: PathBuf, dest: &Dest) ->
     }
     let report = report(draft)?;
     if dest.stdout {
-        eprint!("{report}")
+        eprint!("{report}");
     } else {
-        print!("{report}")
+        print!("{report}");
     }
     Ok(ExitCode::SUCCESS)
 }

@@ -2,6 +2,8 @@
 //! are exactly what `generate` produces (what `isoloom check` enforces in CI), and specs
 //! a generator can't handle yet are refused with the reason.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -18,7 +20,7 @@ fn examples_with_outputs() -> Vec<String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
     let mut names: Vec<String> = std::fs::read_dir(root)
         .expect("examples folder")
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|e| e.path().join(".isoloom").is_dir())
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
@@ -90,7 +92,7 @@ fn an_example_without_outputs_is_refused_with_reasons() {
     let (_, spec) = example("corp-ad-basics");
     let (files, skipped) = generate_all(&spec);
     assert!(files.is_empty(), "{:?}", files.iter().map(|f| &f.path).collect::<Vec<_>>());
-    assert!(!skipped.is_empty());
+    assert_ne!(skipped, [] as [isoloom_core::GenerateError; 0]);
 }
 
 #[test]
@@ -770,7 +772,7 @@ fn host_vars_name_machines_and_variables() {
         "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      ghost: { x: 1 }\n      a: { \"bad name\": 1, 2go: 1, ok_1: 1 }\n",
     )
     .unwrap();
-    let problems: Vec<String> = isoloom_core::validate(&spec).iter().map(|p| p.to_string()).collect();
+    let problems: Vec<String> = isoloom_core::validate(&spec).iter().map(std::string::ToString::to_string).collect();
     assert_eq!(problems.len(), 3, "{problems:?}");
     assert!(
         problems
@@ -824,7 +826,10 @@ machines:
     );
     let (_, hello) = example("hello-stack");
     let compose = &generate(&hello, Target::Docker).unwrap()[0].contents;
-    assert_eq!(isoloom_core::generate::start_plan(compose).unwrap(), Default::default());
+    assert_eq!(
+        isoloom_core::generate::start_plan(compose).unwrap(),
+        isoloom_core::generate::StartPlan::default()
+    );
 }
 
 /// The check runners run with --no-deps: `compose run` would run completed init jobs again,
@@ -888,7 +893,7 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
     // Depending on a machine whose services are all dormant waits for nothing: refused.
     let mut bad = spec.clone();
     bad.machines.get_mut("app").unwrap().depends_on = vec!["shell".into()];
-    let problems: Vec<String> = isoloom_core::validate(&bad).iter().map(|p| p.to_string()).collect();
+    let problems: Vec<String> = isoloom_core::validate(&bad).iter().map(std::string::ToString::to_string).collect();
     assert_eq!(
         problems,
         ["machines.app.depends_on[0]: `shell`'s services are all dormant (they answer later), so there's nothing to wait for"]
@@ -974,7 +979,7 @@ fn a_udp_service_is_published_and_opened_as_udp_and_never_waited_for() {
     // Depending on a machine with only UDP services waits for nothing: refused.
     let mut bad = spec.clone();
     bad.machines.get_mut("app").unwrap().depends_on = vec!["syslog".into()];
-    let problems: Vec<String> = isoloom_core::validate(&bad).iter().map(|p| p.to_string()).collect();
+    let problems: Vec<String> = isoloom_core::validate(&bad).iter().map(std::string::ToString::to_string).collect();
     assert_eq!(
         problems,
         ["machines.app.depends_on[0]: `syslog`'s services are all UDP (no handshake to wait for), so there's nothing to wait for"]
@@ -987,7 +992,7 @@ fn a_udp_service_is_validated() {
     let problems = |svcs: &str| -> Vec<String> {
         isoloom_core::validate(&parse(&format!("{base}{svcs} }}\n")).unwrap())
             .iter()
-            .map(|p| p.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     };
     // One port over both protocols is two services; the same one twice isn't.

@@ -36,7 +36,7 @@ fn run(program: &str, args: &[&str], wd: &Path) -> Result<String, String> {
     if let Some(c) = cwd {
         let _ = std::env::set_current_dir(c);
     }
-    out?.ok_or_else(|| format!("{program} failed"))
+    out.map_err(|e| e.to_string())?.ok_or_else(|| format!("{program} failed"))
 }
 
 fn counted(running: usize, total: usize) -> String {

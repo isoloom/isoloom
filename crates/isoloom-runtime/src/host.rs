@@ -47,7 +47,7 @@ pub struct Host<'a> {
 
 /// Runs a tool and returns its stdout when it succeeds, giving up (and killing it) after
 /// `secs`: a wedged hypervisor service must not hang `status` or `doctor`.
-pub fn run_limited(program: &str, args: &[&str], secs: u64) -> Result<Option<String>, String> {
+pub fn run_limited(program: &str, args: &[&str], secs: u64) -> Result<Option<String>, crate::HostError> {
     use std::process::Stdio;
     let mut cmd = Command::new(program);
     cmd.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
@@ -61,8 +61,8 @@ pub fn run_limited(program: &str, args: &[&str], secs: u64) -> Result<Option<Str
     }
     let mut child = match cmd.spawn() {
         Ok(c) => c,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(format!("{program} not installed")),
-        Err(e) => return Err(e.to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(crate::HostError::NotInstalled(program.to_string())),
+        Err(e) => return Err(e.into()),
     };
     let mut stdout = child.stdout.take();
     let reader = std::thread::spawn(move || {
@@ -84,9 +84,12 @@ pub fn run_limited(program: &str, args: &[&str], secs: u64) -> Result<Option<Str
             Ok(None) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(format!("{program} didn't answer within {secs}s"));
+                return Err(crate::HostError::Timeout {
+                    program: program.to_string(),
+                    secs,
+                });
             }
-            Err(e) => return Err(e.to_string()),
+            Err(e) => return Err(e.into()),
         }
     }
 }
@@ -183,12 +186,11 @@ impl Notes {
 
     /// Notes what was found, or (marked with `!`) what is missing and makes the target not ready.
     fn need(&mut self, found: Option<String>, missing: &str) {
-        match found {
-            Some(f) => self.lines.push(f),
-            None => {
-                self.lines.push(format!("! {missing}"));
-                self.ok = false;
-            }
+        if let Some(f) = found {
+            self.lines.push(f);
+        } else {
+            self.lines.push(format!("! {missing}"));
+            self.ok = false;
         }
     }
 }

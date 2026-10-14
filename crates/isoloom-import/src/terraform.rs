@@ -151,19 +151,18 @@ fn expansions(b: &Block, ctx: &Context, at: &str, notes: &mut Notes) -> Option<V
             }
         }
     } else if let Some(c) = attr("count") {
-        match c.evaluate(ctx) {
-            Ok(Value::Number(n)) => Some(
+        if let Ok(Value::Number(n)) = c.evaluate(ctx) {
+            Some(
                 (0..n.as_u64().unwrap_or(0))
                     .map(|i| {
                         let count: hcl::Map<String, Value> = [("index".to_string(), Value::from(i))].into_iter().collect();
                         (Some(i.to_string()), Some(("count", Value::Object(count))))
                     })
                     .collect(),
-            ),
-            _ => {
-                notes.add(at, NoteKind::Changed, "its `count` couldn't be read without running Terraform");
-                None
-            }
+            )
+        } else {
+            notes.add(at, NoteKind::Changed, "its `count` couldn't be read without running Terraform");
+            None
         }
     } else {
         Some(vec![(None, None)])
@@ -227,6 +226,8 @@ struct Machine {
 }
 
 /// CPUs and memory of common cloud sizes (the rest: a note).
+// A lookup table: sizes with the same shape stay on their own cloud's line, not merged.
+#[allow(clippy::match_same_arms)]
 fn size(instance_type: &str) -> Option<(u32, u32)> {
     Some(match instance_type {
         "t2.micro" | "t3.micro" | "t3a.micro" => (2, 1024),
@@ -261,17 +262,17 @@ fn os_from(hint: &str) -> &'static str {
 }
 
 /// Drafts a spec from the `.tf` files of a folder (`files`: name and text).
-pub fn draft(files: &[(String, String)], fallback_name: &str, source: &str) -> Result<Draft, String> {
+pub fn draft(files: &[(String, String)], fallback_name: &str, source: &str) -> Result<Draft, crate::ImportError> {
     let mut notes = Notes::default();
     let mut bodies = Vec::new();
     for (name, text) in files {
-        bodies.push(hcl::parse(text).map_err(|e| format!("{name}: not valid Terraform: {e}"))?);
+        bodies.push(hcl::parse(text).map_err(|source| crate::ImportError::Hcl { file: name.clone(), source })?);
     }
     let all = instances(&bodies, &mut notes);
     let nets = subnets(&all, &mut notes);
     let machines: Vec<Machine> = all.iter().filter_map(|i| machine(i, &all, &mut notes)).collect();
     if machines.is_empty() {
-        return Err("no VM resource found (aws_instance, azurerm_*_virtual_machine, google_compute_instance, proxmox_virtual_environment_vm)".into());
+        return Err(crate::ImportError::NoTerraformVm);
     }
     other_resources(&all, &mut notes);
     let placement = Placement::new(&machines, &nets);
@@ -279,14 +280,15 @@ pub fn draft(files: &[(String, String)], fallback_name: &str, source: &str) -> R
 }
 
 /// The block a subnet resource declares, for the resource types whose subnets become networks.
+// Outer `None`: not a subnet resource; inner `None`: a subnet whose block isn't a literal.
+#[allow(clippy::option_option)]
 fn subnet_block(i: &Instance) -> Option<Option<String>> {
     Some(match i.kind.as_str() {
-        "aws_subnet" => i.str(&["cidr_block"]),
+        "aws_subnet" | "oci_core_subnet" => i.str(&["cidr_block"]),
         "azurerm_subnet" => i.str(&["address_prefixes"]),
         "google_compute_subnetwork" => i.str(&["ip_cidr_range"]),
         "digitalocean_vpc" => i.str(&["ip_range"]),
         "linode_vpc_subnet" => i.str(&["ipv4"]),
-        "oci_core_subnet" => i.str(&["cidr_block"]),
         _ => return None,
     })
 }
@@ -539,12 +541,11 @@ impl Placement {
         if !self.placed.iter().any(Vec::is_empty) {
             return;
         }
-        let key = match self.used.keys().next() {
-            Some(k) => k.clone(),
-            None => {
-                self.used.insert(FALLBACK_NETWORK.into(), "lab".into());
-                FALLBACK_NETWORK.into()
-            }
+        let key = if let Some(k) = self.used.keys().next() {
+            k.clone()
+        } else {
+            self.used.insert(FALLBACK_NETWORK.into(), "lab".into());
+            FALLBACK_NETWORK.into()
         };
         let mut taken: Vec<u8> = self.placed.iter().flatten().filter(|(k, _)| *k == key).map(|(_, o)| *o).collect();
         let mut next = 10u8;

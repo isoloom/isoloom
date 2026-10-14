@@ -1,6 +1,8 @@
 //! The Helm chart beside the Kubernetes manifests: the same environment, images and inputs as
 //! values, checks as `helm test`, the project's scripts copied in.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{GeneratedFile, Target, generate, load, parse, project_copies};

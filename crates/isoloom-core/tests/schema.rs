@@ -1,6 +1,8 @@
 //! The JSON Schema editors use agrees with the parser: every example is valid, typos are
 //! caught, and the examples point editors to it.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::schema::{MODELINE, schema};

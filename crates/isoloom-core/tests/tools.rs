@@ -1,5 +1,7 @@
 //! `tools:`: observers beside the environment, outside its contract.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Target, checks, generate, load, parse, resolved, validate};

@@ -60,7 +60,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 fn check(dir: &Path, name: &str) -> Checked {
     let profile = core::profile::load(dir, name);
     let (target, description) = match &profile {
-        Ok(p) => (p.target.map(|t| t.id()), p.description.clone()),
+        Ok(p) => (p.target.map(isoloom_core::Target::id), p.description.clone()),
         Err(_) => (None, None),
     };
     let problems = match profile {

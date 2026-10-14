@@ -1,6 +1,8 @@
 //! Defaults: layers merge leaf by leaf, the last one winning; `-s` overrides the spec or the
 //! defaults; the clouds' built-in regions are what the generators write.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::defaults::{self, BUILTIN_REGIONS, Layer, apply_to_files, from_env, override_spec, resolve, set_region};
@@ -12,7 +14,7 @@ fn yaml(text: &str) -> serde_yaml_ng::Value {
 
 #[test]
 fn later_layers_win_leaf_by_leaf() {
-    let r = resolve(vec![
+    let r = resolve(&[
         Layer {
             source: "user".into(),
             value: yaml("cloud: { aws: { region: eu-west-1 }, azure: { region: westeurope } }\nvagrant: { provider: libvirt }\n"),
@@ -29,7 +31,7 @@ fn later_layers_win_leaf_by_leaf() {
     assert!(r.sources.contains(&("cloud.aws.region".into(), "project".into())));
     assert!(r.sources.contains(&("cloud.azure.region".into(), "user".into())));
     // A typo is an error that names the layer.
-    let bad = resolve(vec![Layer {
+    let bad = resolve(&[Layer {
         source: "user".into(),
         value: yaml("vagrant: { provder: libvirt }\n"),
     }]);
@@ -94,7 +96,7 @@ fn builtin_regions_are_what_the_generators_write_and_can_be_replaced() {
             .unwrap_or_default();
         assert!(block.contains(&format!("\"{region}\"")), "{cloud}: {block}");
     }
-    let r = resolve(vec![Layer {
+    let r = resolve(&[Layer {
         source: "t".into(),
         value: yaml("cloud: { aws: { region: eu-west-1 } }\n"),
     }])

@@ -14,7 +14,7 @@ use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
 
 pub use super::label;
-use super::{Draft, NoteKind, Notes};
+use super::{Draft, ImportError, NoteKind, Notes};
 use crate::coverage::{Support, compose};
 use lenient::{Duplicate, lenient_yaml};
 use networks::Networks;
@@ -50,10 +50,9 @@ fn verdict(path: &str) -> Option<(NoteKind, String)> {
         Support::Partial { gap, .. } => return Some((NoteKind::NotYet, gap.to_string())),
         Support::Equivalent { .. } => NoteKind::Equivalent,
         Support::InImage { .. } => NoteKind::InImage,
-        Support::Planned { .. } => NoteKind::NotYet,
         Support::NotPortable { .. } => NoteKind::ByDesign,
         Support::Tooling { .. } => NoteKind::Tooling,
-        Support::Unclassified => NoteKind::NotYet,
+        Support::Planned { .. } | Support::Unclassified => NoteKind::NotYet,
     };
     Some((kind, s.note()))
 }
@@ -82,14 +81,14 @@ struct Import<'a> {
 
 /// Drafts a spec from Compose YAML. `fallback_name` names the environment when the file
 /// doesn't (usually its folder); `source` is how the file is named in the draft's header.
-pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Draft, String> {
-    let (doc, dups) = lenient_yaml(compose_yaml).map_err(|e| format!("not a Compose file: {e}"))?;
-    let root = doc.as_mapping().ok_or("not a Compose file: expected a mapping")?;
+pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Draft, ImportError> {
+    let (doc, dups) = lenient_yaml(compose_yaml)?;
+    let root = doc.as_mapping().ok_or(ImportError::ComposeNotMapping)?;
     let services = root
         .get("services")
         .and_then(Value::as_mapping)
         .filter(|s| !s.is_empty())
-        .ok_or("the Compose file has no services")?;
+        .ok_or(ImportError::NoServices)?;
     let mut notes = Notes::default();
     note_duplicates(&mut notes, dups);
     let name = root.get("name").and_then(str_of).map(|n| label(&n)).unwrap_or_else(|| label(fallback_name));
@@ -208,7 +207,7 @@ impl<'a> Import<'a> {
     }
 
     /// A service as a machine, or none when it's left out.
-    fn service(&mut self, name: &str, svc: &Value) -> Result<Option<Machine>, String> {
+    fn service(&mut self, name: &str, svc: &Value) -> Result<Option<Machine>, ImportError> {
         let svc = Service {
             name,
             at: format!("services.{name}"),
@@ -225,7 +224,7 @@ impl<'a> Import<'a> {
             self.note_rename(&svc, &m.name);
         }
         for (n, ip) in self.wanted_networks(&svc) {
-            self.join(&svc, &mut m, &n, ip)?;
+            self.join(&svc, &mut m, &n, ip.as_deref())?;
         }
         for (k, v) in &svc.keys {
             self.key(&svc, k.as_str().unwrap_or_default(), v, &mut m);
@@ -308,14 +307,15 @@ impl<'a> Import<'a> {
     }
 
     /// Puts the machine on network `n`, at the address it asked for when that's usable.
-    fn join(&mut self, svc: &Service, m: &mut Machine, n: &str, ip: Option<String>) -> Result<(), String> {
+    fn join(&mut self, svc: &Service, m: &mut Machine, n: &str, ip: Option<&str>) -> Result<(), ImportError> {
         let net = self.nets.get(n, &mut self.notes)?;
-        let asked = ip.as_deref().and_then(|ip| ip.parse::<std::net::Ipv4Addr>().ok()).map(|ip| ip.octets()[3]);
-        let (octet, moved) = net
-            .take(asked)
-            .ok_or_else(|| format!("network `{n}` has no free address left for `{}`", m.name))?;
+        let asked = ip.and_then(|ip| ip.parse::<std::net::Ipv4Addr>().ok()).map(|ip| ip.octets()[3]);
+        let (octet, moved) = net.take(asked).ok_or_else(|| ImportError::NetworkFull {
+            network: n.to_string(),
+            machine: m.name.clone(),
+        })?;
         m.networks.push((net.name.clone(), octet));
-        if moved && let Some(ip) = &ip {
+        if moved && let Some(ip) = ip {
             self.notes.add(
                 format!("{}.networks.{n}.ipv4_address", svc.at),
                 NoteKind::Changed,

@@ -5,6 +5,9 @@
 //! use (`target`), the files written for it (`generated`, `prepare`), the tools each target runs
 //! with (`tools`), and a running environment's machines (`machine`, `external`).
 
+// The command line prints its results: that is its interface, not stray debugging output.
+#![allow(clippy::print_stdout)]
+
 use std::process::ExitCode;
 
 use clap::Parser;

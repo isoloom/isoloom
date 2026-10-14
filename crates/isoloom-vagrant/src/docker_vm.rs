@@ -20,10 +20,7 @@ use crate::model::Spec;
 
 const DIR: &str = "docker-vm";
 
-/// Ruby double-quoted string.
-fn rb(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace("#{", "\\#{"))
-}
+use isoloom_render::rb;
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     // Sized for every machine at once, plus Docker: at least 2 CPUs and 2 GB.

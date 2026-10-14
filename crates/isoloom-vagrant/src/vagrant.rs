@@ -56,9 +56,7 @@ pub fn constraints_step(spec: &Spec, indent: &str, var: &str) -> String {
     }
 }
 
-fn rb(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace("#{", "\\#{"))
-}
+use isoloom_render::rb;
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     common_unsupported(spec, Target::Vagrant)?;
@@ -691,6 +689,7 @@ fn qemu_arch(a: Arch) -> &'static str {
 /// (router, controller, tool shell), so a provider added here reaches all of them: `label` is
 /// its display name, `guest` its ESXi guest name, `nets` the networks it is on, `libvirt_box`
 /// the box libvirt uses instead of the VirtualBox one (if any), `qemu` how QEMU runs it.
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct when this moves onto the plan IR (Wave 2).
 fn providers(out: &mut String, label: &str, guest: &str, size: Size, nets: &[&str], libvirt_box: Option<&str>, qemu: &Qemu) {
     let Size { cpus, mem, disk } = size;
     let label = rb(label);
@@ -890,11 +889,11 @@ fn qemu_links(spec: &Spec, with_controller: bool) -> IndexMap<String, Link> {
                 [] => Link::None,
                 [net] => {
                     let on = members(net);
-                    if on.len() != 2 {
-                        Link::Refused(format!("network `{net}` has {} VMs, and QEMU links exactly two without root", on.len()))
-                    } else {
+                    if on.len() == 2 {
                         let side = if on[0] == name { "listen" } else { "connect" };
                         Link::Socket(format!("{side}=127.0.0.1:{}", qemu_port(&spec.name, net)))
+                    } else {
+                        Link::Refused(format!("network `{net}` has {} VMs, and QEMU links exactly two without root", on.len()))
                     }
                 }
                 more => Link::Refused(format!("`{name}` is on {} networks, and QEMU gives a VM one", more.len())),
@@ -1196,9 +1195,9 @@ fn inventory(spec: &Spec) -> String {
                 crate::model::Winrm::Ssl => " ansible_port=5986 ansible_winrm_scheme=https ansible_winrm_transport=ntlm",
                 crate::model::Winrm::Plaintext => " ansible_port=5985 ansible_winrm_scheme=http ansible_winrm_transport=basic",
             });
-            windows.push(line + &vars)
+            windows.push(line + &vars);
         } else {
-            linux.push(line + &vars)
+            linux.push(line + &vars);
         }
     }
     let mut inv = String::new();
@@ -1253,6 +1252,7 @@ pub fn forwarded_protocol(p: crate::model::Protocol) -> &'static str {
 
 // The retry helpers run on the Linux controller VM; the test drives them with a POSIX `sh`.
 #[cfg(all(test, unix))]
+#[allow(clippy::unwrap_used)] // test helpers: a failing test is the report.
 mod retry_tests {
     use isoloom_render::RETRIES;
 

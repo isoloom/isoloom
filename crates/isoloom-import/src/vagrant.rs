@@ -67,6 +67,8 @@ fn os_for_box(b: &str) -> (&'static str, bool) {
 }
 
 /// Memory like `4096`, `"4G"`, `"2048M"` in MB.
+// A float-to-int cast saturates: a negative size becomes 0, never a wrapped value.
+#[allow(clippy::cast_sign_loss)]
 fn memory_mb(v: Option<&Value>) -> Option<u32> {
     let s = text(v)?;
     let s = s.trim().to_ascii_uppercase();
@@ -129,7 +131,7 @@ struct Import<'a> {
 }
 
 /// Drafts a spec from a recorded Vagrantfile (`recorded` is the recorder's JSON).
-pub fn draft(recorded: &Value, fallback_name: &str, source: &str) -> Result<Draft, String> {
+pub fn draft(recorded: &Value, fallback_name: &str, source: &str) -> Result<Draft, crate::ImportError> {
     let mut import = Import {
         global: &recorded["children"]["vm"],
         notes: Notes::default(),
@@ -141,7 +143,7 @@ pub fn draft(recorded: &Value, fallback_name: &str, source: &str) -> Result<Draf
         .filter_map(|(raw_name, node)| import.machine(raw_name, node))
         .collect();
     if machines.is_empty() {
-        return Err("the Vagrantfile defines no machine".into());
+        return Err(crate::ImportError::NoVagrantMachine);
     }
     if !import.env_playbooks.is_empty() {
         import.notes.add(
@@ -287,7 +289,7 @@ impl<'a> Import<'a> {
         match (number(c.opt("guest")), number(c.opt("host"))) {
             (Some(g), Some(h)) => {
                 let udp = text(c.opt("protocol")).is_some_and(|p| p.eq_ignore_ascii_case("udp"));
-                m.publish.push((g as u16, h as u16, udp))
+                m.publish.push((g as u16, h as u16, udp));
             }
             _ => self.notes.add(
                 format!("{at}.vm.network"),

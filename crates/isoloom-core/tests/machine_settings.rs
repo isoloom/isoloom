@@ -1,6 +1,8 @@
 //! A machine's `environment`, `sysctls` and `ulimits`: from the container runtime on the
 //! container targets, from the VM's own configuration (one set-up script) on the VM targets.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Spec, Target, generate, load, parse, refusal, validate};

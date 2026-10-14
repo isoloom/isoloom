@@ -10,3 +10,6 @@ publish.workspace = true
 [dependencies]
 isoloom-spec.workspace = true
 indexmap.workspace = true
+
+[lints]
+workspace = true
