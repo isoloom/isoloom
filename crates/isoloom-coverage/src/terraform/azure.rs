@@ -3,7 +3,7 @@
 
 use super::support::{
     ACCOUNT, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CREDENTIALS, IMAGES, MANAGED, NAT, OTHER_RECORDS,
-    PLACEMENT, PRIVATE_DNS_IPV6, PROTECT, PUBLIC_DNS, PUBLIC_IPV6, REVERSE_DNS, ROUTER, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
+    PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IPV6, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -11,6 +11,11 @@ use crate::Support::{self, Equivalent};
 /// Rule resources whose effect the security groups' inline rules give.
 const INLINE: Support = Equivalent {
     via: "the `security_rule` blocks of azurerm_network_security_group, which carry the reach rules",
+};
+
+/// A route table's inline routes, which Isoloom writes as resources of their own.
+const ROUTES_INLINE: Support = Equivalent {
+    via: "the azurerm_route resources of each network's route table, one per network it reaches through a gateway",
 };
 
 /// Resources that wire up what Isoloom writes inline.
@@ -43,7 +48,6 @@ pub const TABLE: Table = Table {
 const TYPES: Rules = &[
     (WIRED, "ssh_public_key subnet_network_security_group_association"),
     (NAT, "nat_gateway nat_gateway_public_ip_association subnet_nat_gateway_association"),
-    (ROUTER, "route_table route subnet_route_table_association"),
     (CLOUD_RESOLVER, "virtual_network_dns_servers"),
     (
         INLINE,
@@ -52,8 +56,6 @@ const TYPES: Rules = &[
     (IMAGES, "image shared_image shared_image_gallery shared_image_version"),
     (ALIAS_RECORDS, "private_dns_cname_record"),
     (OTHER_RECORDS, "private_dns_mx_record private_dns_srv_record private_dns_txt_record"),
-    (REVERSE_DNS, "private_dns_ptr_record"),
-    (PRIVATE_DNS_IPV6, "private_dns_aaaa_record"),
     (PUBLIC_DNS, "dns_* public_ip_prefix nat_gateway_public_ip_prefix_association"),
     (
         PLACEMENT,
@@ -110,9 +112,9 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
         "azurerm_managed_disk azurerm_virtual_machine_data_disk_attachment azurerm_linux_virtual_machine azurerm_network_interface azurerm_network_interface_security_group_association
-        azurerm_network_security_group azurerm_private_dns_a_record azurerm_private_dns_zone
-        azurerm_private_dns_zone_virtual_network_link azurerm_public_ip azurerm_resource_group azurerm_subnet azurerm_virtual_network
-        azurerm_windows_virtual_machine",
+        azurerm_network_security_group azurerm_private_dns_a_record azurerm_private_dns_aaaa_record azurerm_private_dns_ptr_record
+        azurerm_private_dns_zone azurerm_private_dns_zone_virtual_network_link azurerm_public_ip azurerm_resource_group azurerm_route
+        azurerm_route_table azurerm_subnet azurerm_subnet_route_table_association azurerm_virtual_network azurerm_windows_virtual_machine",
     ),
     ("provider", "features subscription_id"),
     (
@@ -139,6 +141,14 @@ const WRITTEN: &[(&str, &str)] = &[
         security_rule.priority security_rule.protocol security_rule.source_address_prefix security_rule.source_port_range tags",
     ),
     ("azurerm_private_dns_a_record", "name private_dns_zone_id records tags ttl"),
+    ("azurerm_private_dns_aaaa_record", "name private_dns_zone_id records tags ttl"),
+    ("azurerm_private_dns_ptr_record", "name private_dns_zone_id records tags ttl"),
+    (
+        "azurerm_route",
+        "address_prefix name next_hop_in_ip_address next_hop_type resource_group_name route_table_name",
+    ),
+    ("azurerm_route_table", "location name resource_group_name tags"),
+    ("azurerm_subnet_route_table_association", "route_table_id subnet_id"),
     ("azurerm_private_dns_zone", "name resource_group_name tags"),
     (
         "azurerm_private_dns_zone_virtual_network_link",
@@ -175,6 +185,10 @@ const SETTINGS: Rules = &[(
 /// The arguments Isoloom leaves out, per resource type or data source.
 const ARGUMENTS: &[(&str, Rules)] = &[
     ("azurerm_private_dns_zone", &[(ZONE_SETTINGS, "soa_record.*")]),
+    (
+        "azurerm_route_table",
+        &[(ROUTES_INLINE, "route route.*"), (CLOUD_NETWORK, "bgp_route_propagation_enabled")],
+    ),
     (
         "azurerm_private_dns_zone_virtual_network_link",
         &[(CLOUD_NAMES, "registration_enabled"), (ZONE_SETTINGS, "resolution_policy")],

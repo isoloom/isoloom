@@ -15,24 +15,46 @@ pub fn routed(env: &Environment) -> Vec<(&str, &str)> {
     env.networks.iter().filter_map(|(n, p)| p.gateway.as_deref().map(|g| (n.as_str(), g))).collect()
 }
 
+/// The networks `net` reaches through a machine, each with that machine: every other one
+/// through its own gateway when a machine routes it, else each routed network through its
+/// gateway.
+pub fn through<'a>(env: &'a Environment, net: &str) -> Vec<(&'a str, &'a str)> {
+    let gateways = routed(env);
+    let own = gateways.iter().find(|(n, _)| *n == net).map(|(_, g)| *g);
+    env.networks
+        .keys()
+        .filter(|n| n.as_str() != net)
+        .filter_map(|other| {
+            let gateway = own.or_else(|| gateways.iter().find(|(n, _)| *n == other.as_str()).map(|(_, g)| *g))?;
+            Some((other.as_str(), gateway))
+        })
+        .collect()
+}
+
 /// Whether the octet is the machine's gateway address on `network` (validation gives the
 /// gateway machine that one address, which a cloud keeps for its router).
 pub fn is_gateway_address(env: &Environment, machine: &str, network: &str) -> bool {
     env.networks.get(network).and_then(|p| p.gateway.as_deref()) == Some(machine)
 }
 
-/// Each gateway address moved to the router's: (gateway address, the address it moves to).
-fn moves(env: &Environment) -> Vec<(Ipv4Addr, Ipv4Addr)> {
+/// Each gateway address moved to the address `to` gives on its network (`None`: it stays).
+fn moves(env: &Environment, to: &dyn Fn(&Environment, &str, Cidr) -> Option<Ipv4Addr>) -> Vec<(Ipv4Addr, Ipv4Addr)> {
     routed(env)
         .into_iter()
-        .filter_map(|(n, _)| Cidr::parse(&env.networks[n].cidr).map(|c| (c.gateway(), c.router())))
+        .filter_map(|(n, _)| Cidr::parse(&env.networks[n].cidr).and_then(|c| Some((c.gateway(), to(env, n, c)?))))
         .collect()
 }
 
 /// The environment with each gateway machine at its network's router address instead of the
-/// gateway address: in its own addresses and in every machine's hosts file.
+/// gateway address: in its own addresses, in every machine's hosts file and in the private zone.
 pub fn relocated(env: &Environment) -> Cow<'_, Environment> {
-    let moves = moves(env);
+    relocated_with(env, &|_, _, c| Some(c.router()))
+}
+
+/// The same, each gateway machine at the address `to` gives on its network, for a cloud that
+/// keeps the router's address too.
+pub fn relocated_with<'a>(env: &'a Environment, to: &dyn Fn(&Environment, &str, Cidr) -> Option<Ipv4Addr>) -> Cow<'a, Environment> {
+    let moves = moves(env, to);
     if moves.is_empty() {
         return Cow::Borrowed(env);
     }
@@ -50,7 +72,21 @@ pub fn relocated(env: &Environment) -> Cow<'_, Environment> {
             }
         }
     }
+    if let Some(zone) = &mut env.private_dns {
+        for r in &mut zone.records {
+            r.address = moved(r.address);
+        }
+    }
     Cow::Owned(env)
+}
+
+/// The highest address of network `net` no machine, tool or controller takes: where a gateway
+/// machine goes on a cloud that keeps both the gateway's and the router's addresses.
+pub fn free_address(env: &Environment, net: &str, c: Cidr) -> Option<Ipv4Addr> {
+    let tools = u32::try_from(env.spec().tools.len()).unwrap_or(u32::MAX);
+    let top = u32::from(c.controller()).checked_sub(1)?.checked_sub(tools)?;
+    let taken: Vec<Ipv4Addr> = env.machines.values().filter_map(|m| m.addresses.get(net).copied()).collect();
+    (c.base + 2..=top).rev().map(Ipv4Addr::from).find(|a| !taken.contains(a))
 }
 
 /// A gateway forwards between its networks (its own provisioning sets the rules): forwarding

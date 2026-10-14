@@ -2,8 +2,8 @@
 //! the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CPUS, CREDENTIALS, GCP_IPV6,
-    GPU_SCHEDULING, IMAGES, LOCATION, MANAGED, MONITORING, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
+    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CPUS, CREDENTIALS, GCP_IPV6, IMAGES,
+    LOCATION, MANAGED, MONITORING, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -48,7 +48,6 @@ pub const TABLE: Table = Table {
 const TYPES: Rules = &[
     (ADDRESS, "compute_address"),
     (NAT, "compute_router compute_router_nat compute_router_nat_address"),
-    (ROUTER, "compute_route"),
     (ATTACHED_INLINE, "compute_attached_disk"),
     (
         INLINE,
@@ -115,8 +114,8 @@ const TYPES: Rules = &[
 const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
-        "google_compute_disk google_compute_firewall google_compute_instance google_compute_network google_compute_subnetwork google_dns_managed_zone
-        google_dns_record_set google_project google_project_service",
+        "google_compute_disk google_compute_firewall google_compute_instance google_compute_network google_compute_network_peering
+        google_compute_route google_compute_subnetwork google_dns_managed_zone google_dns_record_set google_project google_project_service",
     ),
     ("provider", "region"),
     (
@@ -125,12 +124,17 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     (
         "google_compute_instance",
-        "attached_disk attached_disk.device_name attached_disk.source boot_disk boot_disk.initialize_params boot_disk.initialize_params.image boot_disk.initialize_params.size labels machine_type
+        "attached_disk attached_disk.device_name attached_disk.source boot_disk boot_disk.initialize_params boot_disk.initialize_params.image boot_disk.initialize_params.size can_ip_forward labels machine_type
         metadata metadata_startup_script name network_interface network_interface.access_config network_interface.network_ip
-        network_interface.subnetwork project shielded_instance_config shielded_instance_config.enable_secure_boot
-        shielded_instance_config.enable_vtpm tags zone",
+        network_interface.subnetwork project scheduling scheduling.on_host_maintenance shielded_instance_config
+        shielded_instance_config.enable_secure_boot shielded_instance_config.enable_vtpm tags zone",
     ),
     ("google_compute_network", "auto_create_subnetworks mtu name project"),
+    (
+        "google_compute_network_peering",
+        "export_custom_routes import_custom_routes name network peer_network",
+    ),
+    ("google_compute_route", "dest_range name network next_hop_ip project"),
     ("google_compute_subnetwork", "ip_cidr_range name network project region"),
     (
         "google_dns_managed_zone",
@@ -218,13 +222,17 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 confidential_instance_config.* instance_encryption_key instance_encryption_key.* network_interface.igmp_query
                 network_interface.nic_type network_interface.queue_count network_interface.network_attachment
                 network_interface.access_config.network_tier network_interface.alias_ip_range network_interface.alias_ip_range.*
-                network_performance_config network_performance_config.* params params.* scheduling.* service_account service_account.*
+                network_performance_config network_performance_config.* params params.* scheduling.automatic_restart
+                scheduling.host_error_timeout_seconds scheduling.local_ssd_recovery_timeout scheduling.local_ssd_recovery_timeout.*
+                scheduling.max_run_duration scheduling.max_run_duration.* scheduling.on_instance_stop_action
+                scheduling.on_instance_stop_action.* service_account service_account.*
                 shielded_instance_config.enable_integrity_monitoring workload_identity_config workload_identity_config.*",
             ),
-            (ROUTER, "can_ip_forward"),
             (
                 PLACEMENT,
-                "reservation_affinity reservation_affinity.* boot_disk.initialize_params.replica_zones",
+                "reservation_affinity reservation_affinity.* boot_disk.initialize_params.replica_zones scheduling.preemptible
+                scheduling.provisioning_model scheduling.instance_termination_action scheduling.termination_time
+                scheduling.availability_domain scheduling.min_node_cpus scheduling.node_affinities scheduling.node_affinities.*",
             ),
             (
                 ALIAS,
@@ -236,7 +244,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (NESTED, "advanced_machine_features advanced_machine_features.enable_nested_virtualization"),
             (CLOUD, "attached_disk.force_attach attached_disk.mode scratch_disk scratch_disk.*"),
             (ACCELERATORS, "guest_accelerator guest_accelerator.*"),
-            (GPU_SCHEDULING, "scheduling scheduling.on_host_maintenance"),
             (
                 GCP_IPV6,
                 "network_interface.internal_ipv6_prefix_length network_interface.ipv6_address network_interface.stack_type
@@ -275,6 +282,23 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (GCP_IPV6, "external_ipv6_prefix internal_ipv6_prefix ipv6_access_type stack_type"),
             (MONITORING, "log_config log_config.*"),
             (ADDRESSES, "secondary_ip_range secondary_ip_range.*"),
+        ],
+    ),
+    (
+        "google_compute_network_peering",
+        &[
+            (PROTECT, "deletion_policy update_strategy"),
+            (ALIAS, "export_subnet_routes_with_public_ip import_subnet_routes_with_public_ip"),
+            (GCP_IPV6, "stack_type"),
+        ],
+    ),
+    (
+        "google_compute_route",
+        &[
+            (PROTECT, "deletion_policy"),
+            (ALIAS, "priority next_hop_instance next_hop_instance_zone next_hop_gateway"),
+            (CLOUD, "tags params params.*"),
+            (CLOUD_NETWORK, "next_hop_ilb next_hop_vpn_tunnel"),
         ],
     ),
     ("google_project", &[(LOCATION, "folder_id")]),

@@ -49,7 +49,7 @@ pub const VAGRANT: &[(&str, Status)] = &[
 pub const CLOUD_VM: &[(&str, Status)] = &[
     // A claim is proved on AWS, the target's first cloud, which has no setting for it.
     mtu(
-        "Google Cloud sets it on its VPC (1300 to 8896, one for every network); AWS, Azure, DigitalOcean, Linode and Oracle Cloud have no setting for it and refuse it",
+        "Google Cloud sets it on each network's VPC network (1300 to 8896); AWS, Azure, DigitalOcean, Linode and Oracle Cloud have no setting for it and refuse it",
     ),
     rate("a VM's bandwidth cap inside it (tc) comes later"),
     NOT_LXC,

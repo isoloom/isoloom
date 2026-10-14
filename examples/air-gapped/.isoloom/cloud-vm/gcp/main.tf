@@ -97,10 +97,10 @@ locals {
   zone    = "${var.region}-a"
 }
 
-# The environment's networks: one VPC, a subnetwork per network with its exact range.
-resource "google_compute_network" "env" {
+# The environment's networks: a VPC network each, holding a subnetwork with its exact range.
+resource "google_compute_network" "lab" {
   project                 = local.project
-  name                    = local.name
+  name                    = "${local.name}-lab"
   auto_create_subnetworks = false
   mtu                     = 1500
 }
@@ -108,16 +108,16 @@ resource "google_compute_network" "env" {
 resource "google_compute_subnetwork" "lab" {
   project       = local.project
   name          = "${local.name}-lab"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.lab.id
   ip_cidr_range = "192.168.62.0/24"
   region        = var.region
 }
 
 # Machine `store`: what may reach it.
-resource "google_compute_firewall" "store_net" {
+resource "google_compute_firewall" "store_net_lab" {
   project       = local.project
-  name          = "${local.name}-store-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-store-net-lab"
+  network       = google_compute_network.lab.id
   direction     = "INGRESS"
   source_ranges = ["192.168.62.0/24"]
   target_tags   = ["${local.name}-store"]
@@ -129,7 +129,7 @@ resource "google_compute_firewall" "store_net" {
 resource "google_compute_firewall" "store_ssh" {
   project       = local.project
   name          = "${local.name}-store-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.lab.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-store"]
@@ -196,10 +196,10 @@ resource "terraform_data" "store" {
 }
 
 # Machine `app`: what may reach it.
-resource "google_compute_firewall" "app_net" {
+resource "google_compute_firewall" "app_net_lab" {
   project       = local.project
-  name          = "${local.name}-app-net"
-  network       = google_compute_network.env.id
+  name          = "${local.name}-app-net-lab"
+  network       = google_compute_network.lab.id
   direction     = "INGRESS"
   source_ranges = ["192.168.62.0/24"]
   target_tags   = ["${local.name}-app"]
@@ -211,7 +211,7 @@ resource "google_compute_firewall" "app_net" {
 resource "google_compute_firewall" "app_ssh" {
   project       = local.project
   name          = "${local.name}-app-ssh"
-  network       = google_compute_network.env.id
+  network       = google_compute_network.lab.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
   target_tags   = ["${local.name}-app"]

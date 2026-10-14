@@ -49,6 +49,23 @@ fn each_cloud_with_a_dns_writes_the_zone_and_a_record_per_name() {
 }
 
 #[test]
+fn azure_writes_aaaa_records_on_ipv6_and_reverse_names() {
+    let v6 = SPEC.replace("10.84.0.0/24 }", "10.84.0.0/24, ipv6: { cidr: \"fd00:84::/64\" } }");
+    let tf = module("azure", &v6);
+    assert!(tf.contains("resource \"azurerm_private_dns_aaaa_record\" \"www_corp_internal\""), "{tf}");
+    assert!(tf.contains("records             = [\"fd00:84::10\"]"), "{tf}");
+    // The reverse zone of the network's /24, linked to the virtual network; one PTR per machine,
+    // naming the machine (not its aliases).
+    assert!(tf.contains("name                = \"0.84.10.in-addr.arpa\""), "{tf}");
+    assert!(tf.contains("resource \"azurerm_private_dns_zone_virtual_network_link\" \"reverse_0_84_10\""));
+    assert!(tf.contains("resource \"azurerm_private_dns_ptr_record\" \"web_corp_internal\""));
+    assert!(tf.contains("records             = [\"web.corp.internal\"]"));
+    assert!(!tf.contains("azurerm_private_dns_ptr_record\" \"www_corp_internal\""));
+    // IPv4 only: no AAAA record.
+    assert!(!module("azure", SPEC).contains("azurerm_private_dns_aaaa_record"));
+}
+
+#[test]
 fn off_no_zone_is_written() {
     let off = SPEC.replace("dns: { private: true, domain: corp.internal }\n", "");
     for cloud in ["aws", "azure", "gcp", "oci"] {

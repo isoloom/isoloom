@@ -28,8 +28,8 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Terraform: Proxmox](#terraform-proxmox) | 100% | 189 | 189 | 0 | 0 |
 | [Terraform: ESXi](#terraform-esxi) | 100% | 40 | 40 | 0 | 0 |
 | [Terraform: AWS](#terraform-aws) | 97% | 135 | 131 | 0 | 4 |
-| [Terraform: Azure](#terraform-azure) | 96% | 156 | 151 | 0 | 5 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 94% | 117 | 109 | 2 | 6 |
+| [Terraform: Azure](#terraform-azure) | 100% | 183 | 183 | 0 | 0 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 96% | 128 | 124 | 0 | 4 |
 | [Terraform: DigitalOcean](#terraform-digitalocean) | 100% | 35 | 35 | 0 | 0 |
 | [Terraform: Linode](#terraform-linode) | 100% | 54 | 54 | 0 | 0 |
 | [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 99% | 193 | 192 | 0 | 1 |
@@ -3473,7 +3473,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: Azure
 
-96% of 156 portable features (151 done, 0 partly, 5 to do; 1658 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+100% of 183 portable features (183 done, 0 partly, 0 to do; 1715 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3603,9 +3603,9 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_portal_dashboard` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_portal_tenant_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_private_dns_a_record` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_private_dns_aaaa_record` | Yes | Not yet | AAAA records in the private zone, with IPv6 networks on cloud-vm |
+| `azurerm_private_dns_aaaa_record` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_private_dns_cname_record` | Yes | Another way | Via dns.private: every alias is an A record of its own, at its machine's address |
-| `azurerm_private_dns_ptr_record` | Yes | Not yet | Reverse names: PTR records in a reverse zone per network, beside the private zone (`dns.private`) |
+| `azurerm_private_dns_ptr_record` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_private_dns_zone` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_private_dns_zone_virtual_network_link` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_proximity_placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -3629,8 +3629,8 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_role_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_role_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_role_management_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_route` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
-| `azurerm_route_table` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `azurerm_route` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `azurerm_route_table` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_security_center_assessment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_security_center_assessment_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_security_center_automation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3663,7 +3663,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_subnet_nat_gateway_association` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `azurerm_subnet_network_security_group_association` | Yes | Another way | Via the `admin_ssh_key` block of the virtual machine, and each NIC's azurerm_network_interface_security_group_association, which puts the same rules on every interface of the subnet |
-| `azurerm_subnet_route_table_association` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `azurerm_subnet_route_table_association` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_subscription_cost_management_export` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_subscription_cost_management_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -4031,6 +4031,38 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
 
+### azurerm_private_dns_aaaa_record
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `private_dns_zone_id` | Yes | Yes | Written by the generator |
+| `records` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `ttl` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_private_dns_ptr_record
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `private_dns_zone_id` | Yes | Yes | Written by the generator |
+| `records` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `ttl` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
 ### azurerm_private_dns_zone
 
 | Key | Every target | Implemented | Notes |
@@ -4114,6 +4146,44 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
 
+### azurerm_route
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `address_prefix` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `next_hop_in_ip_address` | Yes | Yes | Written by the generator |
+| `next_hop_type` | Yes | Yes | Written by the generator |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `route_table_name` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_route_table
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `bgp_route_propagation_enabled` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `location` | Yes | Yes | Written by the generator |
+| `name` | Yes | Yes | Written by the generator |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `route` | Yes | Another way | Via the azurerm_route resources of each network's route table, one per network it reaches through a gateway |
+| `route.address_prefix` | Yes | Another way | Via the azurerm_route resources of each network's route table, one per network it reaches through a gateway |
+| `route.name` | Yes | Another way | Via the azurerm_route resources of each network's route table, one per network it reaches through a gateway |
+| `route.next_hop_in_ip_address` | Yes | Another way | Via the azurerm_route resources of each network's route table, one per network it reaches through a gateway |
+| `route.next_hop_type` | Yes | Another way | Via the azurerm_route resources of each network's route table, one per network it reaches through a gateway |
+| `tags` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
 ### azurerm_subnet
 
 | Key | Every target | Implemented | Notes |
@@ -4148,6 +4218,18 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_subnet_route_table_association
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `route_table_id` | Yes | Yes | Written by the generator |
+| `subnet_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
 
 ### azurerm_virtual_machine_data_disk_attachment
 
@@ -4320,7 +4402,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 
 ## Terraform: Google Cloud
 
-94% of 117 portable features (109 done, 2 partly, 6 to do; 2002 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+96% of 128 portable features (124 done, 0 partly, 4 to do; 2037 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4418,6 +4500,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `google_compute_network_firewall_policy_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_network_firewall_policy_rule` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
 | `google_compute_network_firewall_policy_with_rules` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_network_peering` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `google_compute_node_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_node_template` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_organization_security_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -4456,7 +4539,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `google_compute_resource_policy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_resource_policy_attachment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_rollout_plan` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `google_compute_route` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `google_compute_route` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `google_compute_router` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `google_compute_router_nat` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
 | `google_compute_router_nat_address` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
@@ -4919,7 +5002,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `allow_stopping_for_update` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
-| `can_ip_forward` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `can_ip_forward` | Yes | Yes | Written by the generator |
 | `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `deletion_protection` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -5034,26 +5117,26 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `reservation_affinity.specific_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `reservation_affinity.specific_reservation.key` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `reservation_affinity.specific_reservation.values` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `scheduling` | Yes | Partly | From `machines.*.gpus.count` (`on_host_maintenance = TERMINATE`); not yet: the other scheduling options: the cloud's own |
+| `scheduling` | Yes | Yes | Written by the generator |
 | `scheduling.automatic_restart` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.availability_domain` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.availability_domain` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `scheduling.host_error_timeout_seconds` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.instance_termination_action` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.min_node_cpus` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.on_host_maintenance` | Yes | Partly | From `machines.*.gpus.count` (`on_host_maintenance = TERMINATE`); not yet: the other scheduling options: the cloud's own |
-| `scheduling.preemptible` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.provisioning_model` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.termination_time` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.instance_termination_action` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `scheduling.min_node_cpus` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `scheduling.on_host_maintenance` | Yes | Yes | Written by the generator |
+| `scheduling.preemptible` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `scheduling.provisioning_model` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `scheduling.termination_time` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `scheduling.local_ssd_recovery_timeout` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.local_ssd_recovery_timeout.nanos` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.local_ssd_recovery_timeout.seconds` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.max_run_duration` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.max_run_duration.nanos` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.max_run_duration.seconds` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.node_affinities` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.node_affinities.key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.node_affinities.operator` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scheduling.node_affinities.values` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.node_affinities` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `scheduling.node_affinities.key` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `scheduling.node_affinities.operator` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `scheduling.node_affinities.values` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `scheduling.on_instance_stop_action` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.on_instance_stop_action.discard_local_ssd` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scratch_disk` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -5102,6 +5185,51 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### google_compute_network_peering
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `export_custom_routes` | Yes | Yes | Written by the generator |
+| `export_subnet_routes_with_public_ip` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `import_custom_routes` | Yes | Yes | Written by the generator |
+| `import_subnet_routes_with_public_ip` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `network` | Yes | Yes | Written by the generator |
+| `peer_network` | Yes | Yes | Written by the generator |
+| `stack_type` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
+| `update_strategy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### google_compute_route
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `dest_range` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `network` | Yes | Yes | Written by the generator |
+| `next_hop_gateway` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `next_hop_ilb` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `next_hop_instance` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `next_hop_instance_zone` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `next_hop_ip` | Yes | Yes | Written by the generator |
+| `next_hop_vpn_tunnel` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `priority` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `project` | Yes | Yes | Written by the generator |
+| `tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `params` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `params.resource_manager_tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
 
 ### google_compute_subnetwork
 
@@ -5292,7 +5420,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
 
-And 1087 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+And 1086 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: DigitalOcean
 
@@ -8157,7 +8285,7 @@ is marked ✗, with its reason below.
 | `networks.*.switch` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `networks.*.vlans.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `networks.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
-| `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ◐ | ✗ | ✗ | ✗ | ✗ | ◐ | ✓ | n/a | n/a |
+| `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ◐ | ◐ | ◐ | ✗ | ✗ | ◐ | ✓ | n/a | n/a |
 | `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | n/a | ✓ |
 | `networks.*.ipv6.only` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✗ |
@@ -8341,8 +8469,8 @@ is marked ✗, with its reason below.
 | proxmox | 82% of 126 | 103 | 2 | 3 | 18 |
 | esxi | 76% of 120 | 91 | 1 | 3 | 25 |
 | aws | 62% of 126 | 71 | 16 | 6 | 33 |
-| azure | 62% of 126 | 72 | 14 | 6 | 34 |
-| gcp | 62% of 126 | 71 | 15 | 7 | 33 |
+| azure | 63% of 126 | 72 | 15 | 6 | 33 |
+| gcp | 62% of 126 | 71 | 16 | 7 | 32 |
 | digitalocean | 49% of 126 | 58 | 9 | 6 | 53 |
 | linode | 56% of 126 | 65 | 12 | 6 | 43 |
 | oci | 58% of 126 | 67 | 13 | 6 | 40 |
@@ -8370,8 +8498,6 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **hybrid**: Networks with a `gateway` machine in hybrid environments come later (`networks.*.gateway`)
 - **proxmox**: Networks with a `gateway` machine on Proxmox come later (`networks.*.gateway`)
 - **esxi**: Networks with a `gateway` machine on ESXi come later (`networks.*.gateway`)
-- **azure**: Networks with a `gateway` machine in the cloud come later (`networks.*.gateway`)
-- **gcp**: A Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network (`networks.*.gateway`)
 - **linode**: Machine `a` is on several networks: a Linode instance has one VPC interface (`networks.*.gateway`)
 - **hybrid**: Network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`, `networks.*.ipv6.only`)
 - **aws**: Network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`)

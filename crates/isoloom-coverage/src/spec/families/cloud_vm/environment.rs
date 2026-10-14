@@ -83,7 +83,7 @@ pub const CELLS: &[(&str, Status)] = &[
     (
         "networks.*.gateway",
         Partial {
-            how: "the gateway VM at the network's router address (the cloud keeps .1), forwarding, its source/destination checks off, and route tables sending traffic between the network and the others through it both ways",
+            how: "the gateway VM at the network's router address (the cloud keeps .1; Google Cloud, which keeps that one too, at the highest free one), forwarding on (source/destination checks off, IP forwarding on its interfaces), and route tables sending traffic between the network and the others through it both ways (on Google Cloud, routes between VPC networks, one per network)",
             gap: "the network's machines reach the internet at their own public addresses, not through the gateway",
             proof: "edge-firewall",
         },

@@ -70,8 +70,8 @@ machine's first address.
 | Cloud | What the module writes |
 | --- | --- |
 | AWS | `aws_route53_zone` (private, its `vpc` the environment's), `aws_route53_record` per name; the VPC's `enable_dns_support` and `enable_dns_hostnames` |
-| Azure | `azurerm_private_dns_zone`, `azurerm_private_dns_zone_virtual_network_link`, `azurerm_private_dns_a_record` per name |
-| Google Cloud | `google_project_service` (`dns.googleapis.com`, in a project of its own), `google_dns_managed_zone` (private, on the VPC network), `google_dns_record_set` per name |
+| Azure | `azurerm_private_dns_zone`, `azurerm_private_dns_zone_virtual_network_link`, `azurerm_private_dns_a_record` per name and `azurerm_private_dns_aaaa_record` when the machine's first network is IPv6; reverse names: a reverse zone per /24 holding a machine (`10.84.0.0/24` is `0.84.10.in-addr.arpa`), linked the same way, with an `azurerm_private_dns_ptr_record` per machine naming it |
+| Google Cloud | `google_project_service` (`dns.googleapis.com`, in a project of its own), `google_dns_managed_zone` (private, on every network's VPC network), `google_dns_record_set` per name |
 | Oracle Cloud | `oci_dns_view`, `oci_dns_zone` and `oci_dns_rrset` per name in it, the view attached to the VCN's resolver (`oci_dns_resolver`) |
 | DigitalOcean, Linode | Nothing: they have no private DNS |
 
@@ -85,8 +85,8 @@ Every cloud keeps each network's exact range and each machine's address on it. W
 | Cloud | Networks | A machine on several | `reach` | `gateway:` |
 |---|---|---|---|---|
 | AWS | a subnet each, in one VPC | an interface each | security groups, inbound | yes: every network inside one /16 |
-| Azure | a subnet each, in one virtual network | an interface each | network security groups, inbound | not yet |
-| Google Cloud | a subnetwork each, in one VPC | not yet (an interface needs a VPC of its own) | firewall rules, inbound | refused: a route can't send traffic between subnetworks of one VPC through a machine |
+| Azure | a subnet each, in one virtual network | an interface each | network security groups, inbound | yes |
+| Google Cloud | a VPC network each, holding its subnetwork; the networks no machine routes peered with each other | an interface each (8 at most, and no more than the machine type's vCPUs: a bigger E2 type when needed) | firewall rules, inbound, in the VPC of the network opened | yes |
 | DigitalOcean | one network, one machine | no | firewall | no |
 | Linode | a VPC subnet each | no (an instance has one VPC interface) | a firewall per machine, inbound and outbound | refused: a VPC has no route tables |
 | Oracle Cloud | a subnet each, in one VCN (5 networks at most) | a VNIC each | a security list per network, inbound and outbound | yes |
@@ -107,15 +107,40 @@ block the spec picks.
 
 On a network a machine routes (`gateway:`), the cloud keeps the subnet's first address for its
 own router, so the gateway machine sits at the network's router address (its last usable address,
-unused on such a network), and the hosts files say so. It forwards, its source and
-destination checks are off, and each network's route table sends traffic between the routed
-network and the others through it, both ways. The routed network's machines keep their own
-public addresses, so their internet traffic leaves directly rather than through the gateway.
+unused on such a network), and the hosts files and the private zone say so. Google Cloud keeps
+the second to last address too, so there the gateway takes the highest address no machine, tool or
+controller uses (`.252` in a /24, usually). It forwards, its source and destination checks are
+off (IP forwarding on its interfaces on Azure and Google Cloud), and each network's route table
+sends traffic between the routed network and the others through it, both ways. The routed
+network's machines keep their own public addresses, so their internet traffic leaves directly
+rather than through the gateway.
+
+On Google Cloud a route can't be as specific as a subnetwork of its own VPC, so each network is a
+VPC network of its own: the routed network's VPC sends every other network to the gateway's
+address there, each other VPC the gateway is on sends the routed network to its address in that
+one, and a network the gateway isn't on reaches it through a peered network that is (the
+peerings exchange these routes). A routed network is peered with none, so its traffic crosses the
+gateway.
 
 A network with `internet: false` is closed in the machines once they are set up, on every cloud;
 on Azure its subnet also has no default way out (`default_outbound_access_enabled = false`) for
 an interface without a public address. Google Cloud networks have Ethernet's MTU (1500), as on
-every other target.
+every other target, or their own `mtu` (1300 to 8896): each is a VPC network of its own.
+
+### Upgrading an existing Google Cloud environment
+
+1.0's Google Cloud module replaces 0.x's single VPC network (`google_compute_network.env`) with
+one VPC network per network (`google_compute_network.<network>`), and each machine's firewall
+rule `<machine>_net` with one per network (`<machine>_net_<network>`). An instance can't move its
+interface to another VPC network in place, so `terraform apply` with 1.0's module on an
+environment 0.x applied would try to replace the network under running instances and fail.
+
+Destroy an applied 0.x environment with its old module first (`terraform -chdir=.isoloom/cloud-vm/gcp
+destroy`, before regenerating), then generate and apply 1.0's. Where an environment must be kept,
+`terraform state mv` can carry over what keeps its shape (the project, the subnetworks, the
+disks, and on a single-network environment the VPC network itself, from `google_compute_network.env`
+to `google_compute_network.<network>`), but the instances of a machine on several networks are
+rebuilt either way.
 
 ### Data disks (`disks`)
 

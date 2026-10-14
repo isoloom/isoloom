@@ -275,11 +275,11 @@
       "cloud-vm": {
         "generated": [
           "aws",
+          "azure",
+          "gcp",
           "oci"
         ],
         "refused": {
-          "azure": "networks with a `gateway` machine in the cloud come later",
-          "gcp": "a Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network",
           "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
           "linode": "machine `fw` is on several networks: a Linode instance has one VPC interface"
         }

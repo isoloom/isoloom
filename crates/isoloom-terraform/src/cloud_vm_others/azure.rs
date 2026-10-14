@@ -10,6 +10,8 @@
 //!   (Azure creates the administrator; it reserves `admin`) through the core's `remote-exec`
 //!   transport. A machine on several networks gets an interface on each (forwarding on, so
 //!   replies leave from the right one), brought up by MAC at every boot.
+//! - A network a machine routes (`gateway:`): a route table per network sends it through that
+//!   machine's address (`routing`), the machine at the router's address (Azure keeps .1).
 //! - Windows (Azure's Server images): the `isoloom` administrator with a generated password,
 //!   its computer name and a WinRM listener set at creation, then the core's WinRM set-up
 //!   (NTLM); the auto-stop is a scheduled task, as Azure runs no user data on Windows.
@@ -17,6 +19,7 @@
 
 mod machines;
 mod network;
+mod routing;
 
 use isoloom_plan::{Capabilities, Environment, Step};
 use isoloom_render::backend::{Backend, Files, RenderError};
@@ -30,7 +33,7 @@ use crate::vm::gpus::{self, GpuSizes};
 use crate::vm::limits::Limits;
 use crate::vm::module::{Provider, Variable, project_lists, terraform};
 use crate::vm::versions;
-use crate::vm::{controller, is_windows, res, vms};
+use crate::vm::{controller, gateways, is_windows, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
 const SUB: &str = "azure";
@@ -41,7 +44,7 @@ const USER: &str = "isoloom";
 /// What Azure can't host yet.
 pub const LIMITS: Limits = Limits {
     arm64: Some("arm64 on Azure comes later (Arm-based sizes and arm64 images)"),
-    gateways: Some("networks with a `gateway` machine in the cloud come later"),
+    gateways: None,
     playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none"),
     ipv6: None,
@@ -137,7 +140,8 @@ pub fn refusal(env: &Environment) -> Option<String> {
         if let Some(why) = cloud::windows_refusal(name, m) {
             return Some(why);
         }
-        if let Some((net, _)) = m.networks.iter().find(|(_, o)| **o <= 3) {
+        // A gateway machine's gateway address moves to the router's (`vm::gateways`).
+        if let Some((net, _)) = m.networks.iter().find(|(n, o)| **o <= 3 && !gateways::is_gateway_address(env, name, n)) {
             return Some(format!("machine `{name}`: Azure keeps the first addresses of a subnet (.1 to .3) on `{net}`"));
         }
     }
@@ -151,11 +155,13 @@ fn vnet_does(step: &Step) -> bool {
 
 /// The module.
 pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
+    let env = &*gateways::relocated(env);
     let mut m = Module::new(format!("{}{USAGE}", header("#")));
     m.block(terraform(&providers(env)));
     m.blocks(variables(env));
     m.blocks(base(env));
     network::blocks(env, &mut m);
+    routing::blocks(env, &mut m);
     crate::vm::private_dns::azure(env, &mut m);
     if vms(env).any(|(_, mp)| is_windows(mp)) {
         m.commented(

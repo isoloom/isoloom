@@ -132,13 +132,11 @@ A machine of the environment that routes this network (an edge firewall): it tak
 - **Type:** string
 - **Example:** `networks: { dmz: { cidr: 10.20.1.0/24, gateway: a } }`
 - **Rendered by:** `docker`, `hosted`, `vagrant`, `docker-vm`, `cloud-docker`
-- **Partly rendered by:** `cloud-vm` (aws), `cloud-vm` (oci) (not yet: the network's machines reach the internet at their own public addresses, not through the gateway)
+- **Partly rendered by:** `cloud-vm` (aws), `cloud-vm` (azure), `cloud-vm` (gcp), `cloud-vm` (oci) (not yet: the network's machines reach the internet at their own public addresses, not through the gateway)
 - **Refused by:** `kubernetes`, `helm`, `kustomize`: networks with a `gateway` machine on Kubernetes come later
 - **Refused by:** `hybrid`: networks with a `gateway` machine in hybrid environments come later
 - **Refused by:** `proxmox`: networks with a `gateway` machine on Proxmox come later
 - **Refused by:** `esxi`: networks with a `gateway` machine on ESXi come later
-- **Refused by:** `cloud-vm` (azure): networks with a `gateway` machine in the cloud come later
-- **Refused by:** `cloud-vm` (gcp): a Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network
 - **Refused by:** `cloud-vm` (digitalocean): DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 - **Refused by:** `cloud-vm` (linode): machine `a` is on several networks: a Linode instance has one VPC interface
 - **Not used by:** `cloud-services`, `external`
