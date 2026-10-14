@@ -159,7 +159,8 @@ fn commands(env: &Environment, auto_stop_here: bool) -> Vec<Expression> {
     } else {
         format!("set -a; . {}; set +a; ", steps::INPUTS_FILE)
     };
-    let up = format!("cd {} && {inputs}{}", steps::PROJECT_DIR, start(env));
+    let files = isoloom_compose::render::files::host_environment(env);
+    let up = format!("cd {} && {inputs}{files}{}", steps::PROJECT_DIR, start(env));
     // The containers' secrets are root's on the host: read, then Compose started, as root.
     let secrets = isoloom_render::secrets::of_containers(env);
     if secrets.is_empty() {

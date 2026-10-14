@@ -374,8 +374,9 @@ pub struct Volume {
     pub labels: IndexMap<String, String>,
 }
 
-/// A config: a file of the project (`file`, mounted as it is) or text (`content`, copied in with
-/// the owner and mode its mount gives).
+/// A config: a file of the project (`file`, mounted as it is), text (`content`) or a variable of
+/// Compose's own environment (`environment`), the last two copied in with the owner and mode
+/// its mount gives.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Config {
     /// A file, from the Compose file's folder.
@@ -384,6 +385,10 @@ pub struct Config {
     /// The text (`$` written `$$`: no interpolation).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
+    /// The variable of Compose's environment holding the text: a project file, read into it by
+    /// whoever starts Compose.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
 }
 
 /// Where a service has a config, its owner and its mode.

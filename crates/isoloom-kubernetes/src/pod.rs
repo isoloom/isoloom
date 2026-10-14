@@ -193,6 +193,7 @@ fn init_containers(m: &Machine) -> Vec<Container> {
         out.push(c);
     }
     out.extend(files::init_container(m, "scripts"));
+    out.extend(crate::secrets::init_container(m));
     let held = m.plan.volumes.iter().filter(|v| m.holds(&v.kind));
     out.extend(held.map(|v| seed_container(m, &v.name, &v.path)));
     out.extend(m.plan.depends_on.iter().filter_map(|dep| wait_for(m, dep)));
@@ -289,7 +290,7 @@ fn volumes(m: &Machine) -> Vec<Volume> {
     if let Some(shm) = &m.spec.shm_size {
         out.push(volume("dshm".into(), memory(Some(shm))));
     }
-    out.extend(crate::secrets::volume(m));
+    out.extend(crate::secrets::volumes(m));
     out
 }
 

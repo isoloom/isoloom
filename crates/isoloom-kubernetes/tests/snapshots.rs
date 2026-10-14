@@ -258,6 +258,7 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
             Feature::Ipv6Only,
             Feature::Ipv6Auto,
             Feature::Secrets,
+            Feature::SecretOwners,
             Feature::OwnedProjectFiles,
             Feature::MachineProcess,
             Feature::ContainerGpus,
@@ -266,5 +267,32 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
             Feature::DataDisks,
             Feature::RawDisks,
         ])
+    );
+}
+
+/// A secret with an owner is copied out of the Secret volume by an init container, into a
+/// memory-backed emptyDir, and mounted from there; one without stays on the Secret's volume.
+#[test]
+fn a_secret_with_an_owner_is_copied_into_memory_with_it() {
+    let env = parsed(
+        "version: 1\nname: s\nsecrets: { db-password: { env: DB_PASSWORD }, api-key: { env: API_KEY } }\nnetworks: { lan: { cidr: 10.20.0.0/24 } }\nmachines:\n  db:\n    networks: { lan: 10 }\n    docker: { image: postgres }\n    secrets:\n      - { source: db-password, target: /run/secrets/pw, uid: 999, gid: 998, mode: '0400' }\n      - api-key\n",
+    );
+    let files = isoloom_kubernetes::render(&env).unwrap();
+    let manifests = file(&files, "kubernetes/environment.yaml");
+    assert!(
+        manifests.contains("cp /isoloom-secrets/in/db-password /isoloom-secrets/out/db-password && chown 999:998 /isoloom-secrets/out/db-password && chmod 0400 /isoloom-secrets/out/db-password"),
+        "{manifests}"
+    );
+    assert!(
+        manifests.contains("- name: isoloom-secrets-owned\n        emptyDir:\n          medium: Memory\n"),
+        "{manifests}"
+    );
+    assert!(
+        manifests.contains("- name: isoloom-secrets-owned\n          mountPath: /run/secrets/pw\n          readOnly: true\n          subPath: db-password\n"),
+        "{manifests}"
+    );
+    assert!(
+        manifests.contains("- name: isoloom-secrets\n          mountPath: /run/secrets/api-key\n"),
+        "{manifests}"
     );
 }

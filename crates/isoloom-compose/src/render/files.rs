@@ -1,11 +1,18 @@
 //! A machine's `files` as Compose configs: one top-level config per file, named
 //! `<machine>-file-<n>` (its index in the spec), and the service's mount of it. Text is a
-//! `content` config, copied into the container with the owner and mode the mount gives; a
-//! project file is a `file` config, mounted as it is (the plan refuses an owner or mode for it,
-//! which Compose would ignore).
+//! `content` config, copied into the container with the owner and mode the mount gives. A
+//! project file is a `file` config, mounted as it is, unless the spec gives it an owner or a
+//! mode: outside Swarm, Compose ignores both for a `file` config (it bind-mounts the file), so
+//! that one is an `environment` config instead, copied in like text. Whoever starts Compose
+//! reads the file from the project into the variable first ([`project_variables`]): the
+//! generated file never holds the project's contents, and an edit takes effect at the next run.
+
+use std::fmt::Write as _;
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
+use isoloom_spec::model::MachineFile;
+use isoloom_spec::shell::quote;
 
 use crate::docker::ROOT;
 use crate::file::{Config, ConfigMount};
@@ -13,6 +20,61 @@ use crate::file::{Config, ConfigMount};
 /// The name of machine `machine`'s `n`th file's config.
 fn name(machine: &str, n: usize) -> String {
     format!("{machine}-file-{n}")
+}
+
+/// The variable of Compose's own environment holding machine `machine`'s `n`th file, when it
+/// is a project file with an owner or a mode (`ISOLOOM_FILE_WEB_1`). Machine names are
+/// kebab-case, so two files never share one.
+pub fn variable(machine: &str, n: usize) -> String {
+    format!("ISOLOOM_FILE_{}_{n}", machine.to_ascii_uppercase().replace('-', "_"))
+}
+
+/// Whether file `f` is copied in from Compose's environment: a project file the spec gives an
+/// owner or a mode.
+fn copied_from_project(f: &MachineFile) -> bool {
+    f.source.is_some() && f.sets_owner_or_mode()
+}
+
+/// The project files Compose reads from its own environment, as (variable, path in the
+/// project): what whoever starts Compose sets first (`isoloom run`, or a Docker host's start
+/// script).
+pub fn project_variables(env: &Environment) -> Vec<(String, String)> {
+    env.machines
+        .iter()
+        .filter(|(_, mp)| mp.shape == MachineShape::Container)
+        .flat_map(|(machine, mp)| {
+            mp.files
+                .iter()
+                .enumerate()
+                .filter(|(_, f)| copied_from_project(f))
+                .filter_map(move |(n, f)| Some((variable(machine, n), f.source.clone()?)))
+        })
+        .collect()
+}
+
+/// On a Docker host, in the project's folder before `docker compose up`: each project file with
+/// an owner or a mode read into its variable, its last line breaks kept, as commands joined by
+/// `&&` (ending with one). Nothing when there are none.
+pub fn host_environment(env: &Environment) -> String {
+    let mut out = String::new();
+    for (var, path) in project_variables(env) {
+        let _ = write!(out, "{var}=\"$(cat {}; printf x)\" && {var}=\"${{{var}%x}}\" && export {var} && ", quote(&path));
+    }
+    out
+}
+
+/// The usage line saying where the project files with an owner or a mode come from, when the
+/// file has any.
+pub(super) fn usage(env: &Environment) -> String {
+    let vars = project_variables(env);
+    if vars.is_empty() {
+        return String::new();
+    }
+    let each: Vec<String> = vars.iter().map(|(var, path)| format!("{var} to {path}'s contents")).collect();
+    format!(
+        "# Project files with an owner or a mode: `isoloom run` reads them into Compose's environment; by hand, set {} for `up`.\n",
+        each.join(", ")
+    )
 }
 
 /// Every container machine's files, as top-level configs.
@@ -23,13 +85,17 @@ pub(super) fn configs(env: &Environment) -> IndexMap<String, Config> {
         .flat_map(|(machine, mp)| {
             mp.files.iter().enumerate().map(move |(n, f)| {
                 let config = match (&f.source, &f.content) {
+                    (Some(_), _) if copied_from_project(f) => Config {
+                        environment: Some(variable(machine, n)),
+                        ..Config::default()
+                    },
                     (Some(source), _) => Config {
                         file: Some(format!("{ROOT}/{source}")),
-                        content: None,
+                        ..Config::default()
                     },
                     (None, content) => Config {
-                        file: None,
                         content: Some(content.as_deref().unwrap_or_default().replace('$', "$$")),
+                        ..Config::default()
                     },
                 };
                 (name(machine, n), config)
@@ -38,14 +104,15 @@ pub(super) fn configs(env: &Environment) -> IndexMap<String, Config> {
         .collect()
 }
 
-/// Where machine `machine`'s service has its files: a text with its owner (when the spec sets
-/// one) and its mode, a project file as it is.
+/// Where machine `machine`'s service has its files: a text, or a project file with an owner or
+/// a mode, with its owner (when the spec sets one) and its mode; any other project file as it
+/// is.
 pub(super) fn mounts(machine: &str, mp: &MachinePlan) -> Vec<ConfigMount> {
     mp.files
         .iter()
         .enumerate()
         .map(|(n, f)| {
-            let text = f.source.is_none();
+            let text = f.source.is_none() || copied_from_project(f);
             ConfigMount {
                 source: name(machine, n),
                 target: f.path.clone(),
@@ -74,6 +141,7 @@ machines:
     files:
       - { path: /etc/app.ini, content: \"home=$HOME\\n\", uid: 101, gid: 102, mode: '0600' }
       - { path: /etc/nginx/conf.d/site.conf, source: conf/site.conf }
+      - { path: /etc/app/key.pem, source: conf/key.pem, uid: 101, mode: '0400' }
 ";
 
     #[test]
@@ -89,5 +157,30 @@ machines:
             (Some("101"), Some("102"), Some("0600"))
         );
         assert_eq!((mounts[1].target.as_str(), mounts[1].mode.as_deref()), ("/etc/nginx/conf.d/site.conf", None));
+    }
+
+    #[test]
+    fn an_owned_project_file_is_copied_in_from_compose_s_environment() {
+        let spec = isoloom_spec::parse(SPEC).expect("parses");
+        let env = Environment::build(&spec, Target::Docker, None);
+        let configs = super::configs(&env);
+        assert_eq!(configs["web-file-2"].environment.as_deref(), Some("ISOLOOM_FILE_WEB_2"));
+        assert_eq!((configs["web-file-2"].file.as_ref(), configs["web-file-2"].content.as_ref()), (None, None));
+        let mounts = super::mounts("web", &env.machines["web"]);
+        assert_eq!(
+            (mounts[2].uid.as_deref(), mounts[2].gid.as_deref(), mounts[2].mode.as_deref()),
+            (Some("101"), None, Some("0400"))
+        );
+        assert_eq!(super::project_variables(&env), [("ISOLOOM_FILE_WEB_2".to_string(), "conf/key.pem".to_string())]);
+        assert_eq!(super::variable("db-main", 0), "ISOLOOM_FILE_DB_MAIN_0");
+        assert_eq!(
+            super::host_environment(&env),
+            "ISOLOOM_FILE_WEB_2=\"$(cat 'conf/key.pem'; printf x)\" && ISOLOOM_FILE_WEB_2=\"${ISOLOOM_FILE_WEB_2%x}\" && export ISOLOOM_FILE_WEB_2 && "
+        );
+        assert!(
+            super::usage(&env).contains("set ISOLOOM_FILE_WEB_2 to conf/key.pem's contents"),
+            "{}",
+            super::usage(&env)
+        );
     }
 }

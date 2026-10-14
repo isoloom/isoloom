@@ -205,7 +205,8 @@ networks: { lan: { cidr: 10.9.0.0/24 }, corp: { cidr: 10.77.0.0/24, external: co
 machines:
   web: { networks: { lan: 10, corp: 10 }, docker: { image: nginx:alpine } }
 ",
-    // A machine's files: `configs`, as text with an owner and mode, and as a project file.
+    // A machine's files: `configs`, as text with an owner and mode, as a project file, and as
+    // a project file with an owner and mode (`configs.*.environment`).
     r#"
 version: 1
 name: machine-files
@@ -217,6 +218,7 @@ machines:
     files:
       - { path: /etc/app/app.ini, content: "mode=lab\n", uid: 101, gid: 101, mode: "0640" }
       - { path: /etc/nginx/conf.d/site.conf, source: conf/site.conf }
+      - { path: /etc/app/key.pem, source: conf/key.pem, uid: 101, mode: "0400" }
 "#,
     // A machine's own process: `command`, `working_dir`, `healthcheck.test` (`before` in the
     // entrypoint).

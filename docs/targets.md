@@ -69,6 +69,15 @@ published ports on the host's loopback, and a `check` profile with the check run
 
 By hand: `docker compose -f .isoloom/docker/compose.yml up -d --wait`.
 
+**Files.** A machine's `files` are Compose configs. Text is copied in with its owner and mode,
+and a project file is mounted as it is. Outside Swarm, Compose ignores the owner and mode of a
+mounted file, so a project file with a `uid`, `gid` or `mode` is copied in too: the Compose file
+reads it from the variable `ISOLOOM_FILE_<MACHINE>_<N>` (`N` is the file's place in the list),
+and `isoloom run` fills that variable from the project for `up`. The generated file never holds
+the project's contents. To run the file by hand, set those variables yourself; its header names
+them. A Docker host VM (`docker-vm`, `cloud-docker`, hybrid's) fills them from the project it
+unpacked. Such a file must be text (UTF-8), and Compose skips an empty one.
+
 **Limits.** Refused: a network's `mtu` or `bridged`, a machine's `rate_limit` or
 `nested_virtualization`, and environment-level `provision:` (it runs on the VM targets). A
 Windows machine has no `docker:`, so an environment with one never gets this target.
@@ -118,10 +127,16 @@ chart.
 **Limits.** Refused: link impairment (`tc`) and networks with a `gateway` machine (Kubernetes
 has no router in the path), a network's `mtu`, `bridged` or `external`, a machine's
 `rate_limit`, `nested_virtualization` or `devices`, `gpus.ids` (give a count) and
-`gpus.options`, environment-level `provision:`, a secret's `uid` or `gid`, and `dns.private`
-(a cluster names Services under its own domain). A network's `cidr` and a machine's address
+`gpus.options`, environment-level `provision:`, and `dns.private` (a cluster names Services
+under its own domain). A network's `cidr` and a machine's address
 on it are kept as intent only: Kubernetes picks pod addresses. The manifests, the chart and the
 overlay refuse the same things.
+
+A secret with a `uid` or `gid` is copied out of the Secret by an init container into a
+memory-backed emptyDir, with its owner and mode, and mounted from there. The Secret volume's own
+owner fields are alpha and gated, so Isoloom doesn't use them. A pod's full name is
+`<machine>.<subdomain>.<namespace>.svc.<cluster domain>`, where the subdomain is `dns.domain` as
+one label: the kubelet sets that suffix, so `<machine>.<dns.domain>` doesn't resolve there.
 
 **Storage.** Volumes are claims (`persistent` ones kept by `down`, `external` ones existing
 claims in the namespace). A data disk is a claim of its size, a `raw` one in block mode. A

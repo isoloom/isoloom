@@ -2,7 +2,7 @@
 //! its table here.
 
 use crate::spec::status::PROBE;
-use crate::spec::status::Status::{self, Done, Partial, Planned};
+use crate::spec::status::Status::{self, Done, Planned};
 
 /// The Compose file's (`docker`, `hosted`, `docker-vm`, `cloud-docker`, the containers of
 /// `hybrid`).
@@ -33,10 +33,10 @@ pub const COMPOSE: &[(&str, Status)] = &[
     ("machines.*.files[].mode", COMPOSE_OWNER),
 ];
 
-/// A file's owner and mode on Compose.
-const COMPOSE_OWNER: Status = Partial {
-    how: "the config's owner and mode, for a file's `content`",
-    gap: "a project file is mounted as it is: an owner or mode for it is refused",
+/// A file's owner and mode on Compose: given to a config Compose copies in, a project file's
+/// read into Compose's environment as it starts.
+const COMPOSE_OWNER: Status = Done {
+    how: "the config's owner and mode: a file's `content`, or its `source` as an `environment` config `isoloom run` reads it into",
     proof: PROBE,
 };
 

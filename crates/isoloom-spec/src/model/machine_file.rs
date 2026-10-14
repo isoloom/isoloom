@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_FILE_MODE: &str = "0644";
 
 /// A file placed on the machine before its workload runs: a container gets it from its runtime
-/// (a Compose config, a Kubernetes ConfigMap), a VM from its set-up.
+/// (a Compose config, a Kubernetes ConfigMap), a VM from its set-up. On Compose, a project file
+/// with an owner or a mode is read into Compose's environment by `isoloom run` and copied in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MachineFile {

@@ -941,8 +941,7 @@ The secrets this machine gets, as files (never environment variables): a name fr
 
 - **Type:** list of strings or mappings
 - **Example:** `machines: { a: { secrets: [token, { source: token, target: /etc/app/token, mode: '0400' }] } }`
-- **Rendered by:** `docker`, `hosted`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `external`
-- **Partly rendered by:** `kubernetes`, `helm`, `kustomize` (not yet: `uid` and `gid` are refused: a Secret volume's files belong to root)
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`, `external`
 - **Not used by:** `cloud-services`
 
 ### `machines.*.secrets[].source`
@@ -1217,8 +1216,7 @@ The user id that owns the file (default 0, root). Linux machines only.
 
 - **Type:** integer
 - **Example:** `machines: { a: { files: [{ path: /etc/app.ini, content: x, uid: 1000 }] } }`
-- **Rendered by:** `kubernetes`, `helm`, `kustomize`, `vagrant`, `proxmox`, `esxi`, `cloud-vm` (every cloud)
-- **Partly rendered by:** `docker`, `hosted`, `docker-vm`, `hybrid`, `cloud-docker` (not yet: a project file is mounted as it is: an owner or mode for it is refused)
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`
 - **Refused by:** `external`: machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook
 - **Not used by:** `cloud-services`
 
@@ -1228,8 +1226,7 @@ The group id that owns the file (default 0, root). Linux machines only.
 
 - **Type:** integer
 - **Example:** `machines: { a: { files: [{ path: /etc/app.ini, content: x, gid: 1000 }] } }`
-- **Rendered by:** `kubernetes`, `helm`, `kustomize`, `vagrant`, `proxmox`, `esxi`, `cloud-vm` (every cloud)
-- **Partly rendered by:** `docker`, `hosted`, `docker-vm`, `hybrid`, `cloud-docker` (not yet: a project file is mounted as it is: an owner or mode for it is refused)
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`
 - **Refused by:** `external`: machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook
 - **Not used by:** `cloud-services`
 
@@ -1239,8 +1236,7 @@ The file's permissions, in octal (`0600`, `0755`; default `0644`), quoted or not
 
 - **Type:** string or number or boolean
 - **Example:** `machines: { a: { files: [{ path: /etc/app.ini, content: x, mode: '0600' }] } }`
-- **Rendered by:** `kubernetes`, `helm`, `kustomize`, `vagrant`, `proxmox`, `esxi`, `cloud-vm` (every cloud)
-- **Partly rendered by:** `docker`, `hosted`, `docker-vm`, `hybrid`, `cloud-docker` (not yet: a project file is mounted as it is: an owner or mode for it is refused)
+- **Rendered by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-vm` (every cloud), `cloud-docker`
 - **Refused by:** `external`: machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook
 - **Not used by:** `cloud-services`
 

@@ -71,22 +71,24 @@ pub const CHART: &str = "chart";
 /// Where the chart's copies of the project's scripts go, under the chart.
 pub const CHART_PROJECT_FILES: &str = "files/project";
 
-/// What Kubernetes can render: a machine's own process, IPv6 networks of every kind (the cluster picks pod addresses,
-/// so a network's IPv6 side sets the Services' IP families), secrets (a Secret `isoloom run`
-/// creates) and a project file with its own owner and mode (copied into place by an init
+/// What Kubernetes can render: a machine's own process, IPv6 networks of every kind (the
+/// cluster picks pod addresses, so a network's IPv6 side sets the Services' IP families),
+/// secrets (a Secret `isoloom run` creates; one with an owner copied into place by an init
+/// container) and a project file with its own owner and mode (copied into place by an init
 /// container). No controller (no `provision:`, no Ansible checks), `exec` checks run inside a
 /// container, no network appliances, Service names have no dots, no gateway machine routes a
 /// network, containers have no ulimits, with no router in the path there is nothing to impair
-/// links with, a Secret volume's files belong to root, and no host devices (a pod reaches a
-/// node's devices only through a device plugin). GPUs are the device plugin's resource
-/// (`nvidia.com/gpu`). Volumes can be kept past `down` or exist already (claims), and data disks
-/// are claims (raw ones block devices); a tmpfs has no mode (a memory emptyDir has none).
+/// links with, and no host devices (a pod reaches a node's devices only through a device
+/// plugin). GPUs are the device plugin's resource (`nvidia.com/gpu`). Volumes can be kept past
+/// `down` or exist already (claims), and data disks are claims (raw ones block devices); a
+/// tmpfs has no mode (a memory emptyDir has none).
 pub fn capabilities() -> Capabilities {
     Capabilities::of([
         Feature::Ipv6,
         Feature::Ipv6Only,
         Feature::Ipv6Auto,
         Feature::Secrets,
+        Feature::SecretOwners,
         Feature::OwnedProjectFiles,
         Feature::MachineProcess,
         Feature::ContainerGpus,

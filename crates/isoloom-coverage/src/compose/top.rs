@@ -155,8 +155,8 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
     ),
     (
         "configs.*.environment",
-        Equivalent {
-            via: "machines.*.files[].content (the text in the spec; a value given at run time is an input)",
+        Emitted {
+            from: "machines.*.files[].source with an owner or mode (`isoloom run` reads the project file into it)",
         },
     ),
     (

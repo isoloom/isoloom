@@ -3,7 +3,7 @@
 use super::{HOST_TUNING, RESOURCES, TOOLING, USER_SETUP};
 use crate::{
     Support,
-    Support::{Emitted, Equivalent, Planned, Tooling},
+    Support::{Emitted, Equivalent, NotPortable, Tooling},
 };
 
 pub(super) fn classify(s: &str) -> Option<Support> {
@@ -27,8 +27,8 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         "tap_device" | "socket_vmnet_client" | "socket_vmnet_socket" => Equivalent {
             via: "socket_opts to the network's hub: the same network between the VMs, without root (a TAP device and the socket_vmnet daemon need it)",
         },
-        "vmnet_interface" => Planned {
-            note: "with `public_network` (a network bridged to the outside); vmnet-bridged needs root on the Mac",
+        "vmnet_interface" => NotPortable {
+            why: "vagrant-qemu 0.6.3 gives a VM one advanced NIC, for its first `private_network`, and vmnet_interface bridges only that one; a machine's first network is one of the environment's own (the spec requires it), so the NIC is the lab's and none is left for a bridged network (see ADR 0006)",
         },
         "extra_netdev_args" => Tooling {
             note: "options of the NAT adapter Vagrant reaches the VM through (user-mode networking), not of the lab's networks",

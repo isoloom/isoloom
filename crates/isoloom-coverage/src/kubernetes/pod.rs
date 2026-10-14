@@ -1,6 +1,6 @@
 //! The pod and its containers: what a machine is on Kubernetes.
 
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Tooling};
 
 /// Kubernetes' own handling of pods: where they run, how they are restarted or stopped.
 const SCHEDULING: Support = Tooling {
@@ -108,9 +108,8 @@ fn pod_names(field: &str) -> Option<Support> {
         "hostAliases" => NotPortable {
             why: "it points names at fixed addresses, and a pod has none: the spec's `aliases` name a machine, which Kubernetes reaches only by its Service's name (no dots), so Kubernetes refuses `aliases`",
         },
-        "subdomain" => Partial {
-            from: "machines.*.dns.domain, as one label (`corp.local` is `corp-local`)",
-            gap: "the pod's full name is `<machine>.<subdomain>.<namespace>.svc.<cluster domain>`: Kubernetes names pods under the cluster's domain, not `dns.domain`",
+        "subdomain" => Emitted {
+            from: "machines.*.dns.domain, as one label (`corp.local` is `corp-local`): the kubelet puts the pod under `<subdomain>.<namespace>.svc.<cluster domain>`, whatever the label (see ADR 0006)",
         },
         "setHostnameAsFQDN" => Equivalent {
             via: "`subdomain`: the pod's full name is in its hosts file (`hostname -f`), and its hostname stays the short name, as on every other target",

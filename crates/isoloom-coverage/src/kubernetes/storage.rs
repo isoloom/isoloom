@@ -1,6 +1,6 @@
 //! Volumes: what a pod mounts, and the claims Isoloom's volumes are.
 
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Tooling};
 
 const PLUGIN: Support = NotPortable {
     why: "one storage system's plugin: no other target has it",
@@ -134,8 +134,8 @@ fn secret(definition: &str, field: &str) -> Option<Support> {
             from: "machines.*.secrets[].mode (default 0444)",
         },
         ("SecretVolumeSource", "defaultMode") => Equivalent { via: "each key's `mode`" },
-        ("SecretVolumeSource", "defaultUser") | ("KeyToPath", "user") => Planned {
-            note: "a secret's `uid` on Kubernetes, once the clusters Isoloom targets all have it",
+        ("SecretVolumeSource", "defaultUser") | ("KeyToPath", "user") => NotPortable {
+            why: "alpha in Kubernetes 1.37, behind the AtomicWriteVolumeUserFields feature gate that managed clusters don't open (an API server without it drops the field). A secret's `uid` and `gid` are copied into a memory emptyDir by an init container instead",
         },
         ("SecretVolumeSource", "optional") => Tooling {
             note: "`isoloom run` creates the Secret before the pods start: a missing secret stops the run instead",

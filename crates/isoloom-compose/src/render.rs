@@ -2,7 +2,7 @@
 //! `init:` jobs and network sidecar), Isoloom's router, VLAN switches, probes, check runners and
 //! tools, then the networks and volumes; every resource labelled as the environment's.
 
-mod files;
+pub mod files;
 mod hardware;
 mod machine;
 mod process;
@@ -27,7 +27,8 @@ use machine::machine;
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,
 /// gateway machines, ulimits, `tc` (in a sidecar), IPv6 networks of every kind, secrets
-/// (Compose's own, owners included), existing Docker networks, and the host's GPUs and devices
+/// (Compose's own, owners included), project files with their owner and mode (copied in from
+/// Compose's environment), existing Docker networks, and the host's GPUs and devices
 /// (the containers run on the user's own Docker host, which has them). No controller: no
 /// `provision:`, no Ansible checks; `exec` checks run inside a container. No bridged
 /// networks: a container reaches the host's LAN through a macvlan network made beforehand
@@ -45,6 +46,7 @@ pub fn capabilities() -> isoloom_plan::Capabilities {
         Feature::Ipv6Auto,
         Feature::Secrets,
         Feature::SecretOwners,
+        Feature::OwnedProjectFiles,
         Feature::ExternalNetworks,
         Feature::MachineProcess,
         Feature::ContainerGpus,
@@ -77,6 +79,7 @@ pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
         Feature::Ipv6Auto,
         Feature::Secrets,
         Feature::SecretOwners,
+        Feature::OwnedProjectFiles,
         Feature::MachineProcess,
         Feature::PrivateDns,
     ])
@@ -108,7 +111,7 @@ pub fn render(target: Target, env: &Environment) -> Result<Files, RenderError> {
     let yaml = to_yaml(target, &file)?;
     let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
-        contents: format!("{}{USAGE}{}{}\n{yaml}", header("#"), secrets::usage(&file), moved(env)),
+        contents: format!("{}{USAGE}{}{}{}\n{yaml}", header("#"), secrets::usage(&file), files::usage(env), moved(env)),
     }];
     files.extend(mounted);
     Ok(files)
