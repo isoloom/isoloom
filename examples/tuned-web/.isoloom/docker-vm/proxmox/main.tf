@@ -8,7 +8,8 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    proxmox = { source = "bpg/proxmox", version = "~> 0.84" }
+    proxmox = { source = "bpg/proxmox", version = "~> 0.115.0" }
+    local   = { source = "hashicorp/local", version = "~> 2.9.1" }
   }
 }
 

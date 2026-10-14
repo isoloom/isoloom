@@ -7,11 +7,12 @@ use isoloom_spec::model::Protocol;
 use super::host::{self, Reach, Sizing, published};
 use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
+use crate::vm::versions;
 
 /// The module, from the plan.
 pub fn module(env: &Environment) -> Module {
     let mut m = Module::new(host::preamble(super::DIR, "linode", "-var allowed_cidr=<your IP>/32 "));
-    m.block(terraform(&[("linode", "linode/linode", "~> 4.0")]));
+    m.block(terraform(&[versions::LINODE, versions::LOCAL]));
     let size = Sizing::of(env).pick(["g6-standard-2", "g6-standard-4", "g6-standard-6"]);
     m.blocks([
         Variable::new("region", "string").default(string("fr-par")).block(),

@@ -8,7 +8,10 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 6.0" }
+    aws    = { source = "hashicorp/aws", version = "~> 6.67.0" }
+    local  = { source = "hashicorp/local", version = "~> 2.9.1" }
+    random = { source = "hashicorp/random", version = "~> 3.9.1" }
+    time   = { source = "hashicorp/time", version = "~> 0.14.2" }
   }
 }
 

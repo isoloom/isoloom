@@ -58,6 +58,35 @@ pinned source, so a new upstream key is a failing test until it is classified.
 | `services.*.devices` | Not portable | Planned | Passed through where the target has the device, refused elsewhere. |
 | `models`, `services.*.models` | Tooling | Not portable | They change what the machine can call, but only Docker's model runner serves them. |
 
+## Terraform: families of resource types and arguments
+
+A provider has hundreds of resource types and each type dozens of arguments, so a Terraform
+table classifies by family: a rule names a type or argument exactly, by prefix (`rds_*`, which
+also names `rds`), as a block and everything inside it (`launch_template.*`) or by suffix
+(`*_custom_endpoint`). The exact name wins, then the longest pattern. A family is a reviewed
+decision under the questions above, never a default: a type or argument no rule names is
+unclassified and fails the tests, and a rule naming nothing in the pinned schema fails them too.
+The utility providers (random, tls, local, time, null, cloudinit, http, Terraform's built-in) are
+the one exception: they act on Terraform's side only, so what Isoloom doesn't write of them is
+`Tooling` as a whole.
+
+| Family | Class | Why |
+| --- | --- | --- |
+| What one VM per machine on its own networks needs (VMs, networks, routes, NAT, addresses, rules, keys, disks) | Planned | Every VM target builds these. |
+| Custom cloud images (`aws_ami`, `azurerm_image`, `google_compute_image`, `oci_core_image`...) | Planned | A machine's own image, as on the local targets. |
+| Private DNS (`aws_route53_zone`, `azurerm_private_dns_*`, `google_dns_managed_zone`, `oci_dns_*`...) | Planned | The environment's names served by the platform: local targets serve them too. |
+| Rule resources whose effect the written inline rules give (`aws_security_group_rule`, `azurerm_network_security_rule`...) | Equivalent | The same rules on the same interfaces. |
+| Managed services, the cloud's network services (VPN, peering, load balancers, CDN), public DNS, agents run in the VMs | Not portable | No other VM target has them. |
+| The account (identities, billing, quotas, auditing, monitoring), placement and billing of VMs (templates, scaling groups, reservations, spot), backups, image pipelines, the default network | Tooling | No change in how the environment behaves. |
+| Arguments: IPv6, data disks, nested virtualization, device and GPU passthrough, TPM, VLANs, MTU, several addresses, egress and ICMP rules, routing through a machine | Planned | Features every VM target can have. |
+| Arguments: names, tags, timeouts, locations, credentials, how Terraform creates or deletes, another spelling of what Isoloom sets | Tooling | No change in how the environment behaves. |
+| Arguments: a cloud's agents, metadata service, encryption keys, performance tiers; Proxmox's hardware tuning | Not portable | Cloud VMs or local targets have no counterpart. |
+
+Re-decided rows: custom cloud images and private DNS were swept into "not portable" with every
+managed service; they are Planned. Azure `azurerm_windows_virtual_machine`, Google Cloud
+`google_project` and `google_project_service`, and Linode `linode_vpc` and `linode_vpc_subnet`
+are written and now checked against every module that writes them.
+
 ## The spec table's cells
 
 The spec table runs the other way: a row per field of an Isoloom spec, a column per output (each

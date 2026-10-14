@@ -28,6 +28,7 @@ use isoloom_spec::validate::Cidr;
 use crate::vm::cloud::{self, Reach};
 use crate::vm::limits::Limits;
 use crate::vm::module::{Provider, Variable, project_lists, terraform};
+use crate::vm::versions;
 use crate::vm::{controller, is_windows, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -171,14 +172,15 @@ fn public_ip(id: &str) -> isoloom_render::hcl_builder::Expression {
     reference(&format!("azurerm_public_ip.{id}.ip_address"))
 }
 
-/// Azure; TLS for the controller's key; random for the Windows password.
+/// Azure and local (the archive's file list); TLS for the controller's key; random for the
+/// Windows password.
 fn providers(env: &Environment) -> Vec<Provider> {
-    let mut p = vec![("azurerm", "hashicorp/azurerm", "~> 5.0")];
+    let mut p = vec![versions::AZURERM, versions::LOCAL];
     if controller::needed(env) {
-        p.push(("tls", "hashicorp/tls", "~> 4.0"));
+        p.push(versions::TLS);
     }
     if vms(env).any(|(_, mp)| is_windows(mp)) {
-        p.push(("random", "hashicorp/random", "~> 3.0"));
+        p.push(versions::RANDOM);
     }
     p
 }

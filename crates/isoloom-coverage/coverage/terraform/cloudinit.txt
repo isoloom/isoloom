@@ -1,0 +1,2 @@
+# Resource types of registry.terraform.io/hashicorp/cloudinit 2.4.1
+cloudinit_config

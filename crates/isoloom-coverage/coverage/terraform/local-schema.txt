@@ -1,0 +1,26 @@
+# Settings, and arguments and nested blocks of what Isoloom writes, of registry.terraform.io/hashicorp/local 2.9.1
+resource local_file
+resource local_file content
+resource local_file content_base64
+resource local_file directory_permission
+resource local_file file_permission
+resource local_file filename
+resource local_file sensitive_content
+resource local_file source
+resource local_sensitive_file
+resource local_sensitive_file content
+resource local_sensitive_file content_base64
+resource local_sensitive_file directory_permission
+resource local_sensitive_file file_permission
+resource local_sensitive_file filename
+resource local_sensitive_file source
+data local_command
+data local_command allow_non_zero_exit_code
+data local_command arguments
+data local_command command
+data local_command stdin
+data local_command working_directory
+data local_file
+data local_file filename
+data local_sensitive_file
+data local_sensitive_file filename

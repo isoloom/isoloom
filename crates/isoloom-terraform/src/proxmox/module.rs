@@ -8,11 +8,12 @@ use isoloom_render::hcl_builder::{
 
 use super::image_url;
 use crate::vm::module::{Variable, inputs_variable, terraform};
+use crate::vm::versions;
 use crate::vm::{controller, os, res, vms};
 
 /// Everything before the router.
 pub fn blocks(env: &Environment, m: &mut Module) {
-    m.block(terraform(&[("proxmox", "bpg/proxmox", "~> 0.115"), ("tls", "hashicorp/tls", "~> 4.0")]));
+    m.block(terraform(&[versions::PROXMOX, versions::TLS]));
     m.blocks(variables());
     if !env.spec().inputs.is_empty() {
         m.block(inputs_variable());

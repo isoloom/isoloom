@@ -5,7 +5,7 @@
 use std::process::ExitCode;
 
 use isoloom_coverage::spec::{Output, score, table};
-use isoloom_coverage::{Format, Support, anchor, capitalize, formats, markdown, section};
+use isoloom_coverage::{Format, anchor, capitalize, formats, markdown, section};
 
 use crate::{Res, output};
 
@@ -82,7 +82,7 @@ fn format_json(f: &Format) -> serde_json::Value {
     let mut sections: Vec<serde_json::Value> = Vec::new();
     let mut collapsed = 0;
     for (key, s) in &f.rows {
-        if f.collapse_not_portable && matches!(s, Support::NotPortable { .. }) {
+        if f.collapsed(key, *s) {
             collapsed += 1;
             continue;
         }

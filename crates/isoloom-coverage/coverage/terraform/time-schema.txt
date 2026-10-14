@@ -1,0 +1,26 @@
+# Settings, and arguments and nested blocks of what Isoloom writes, of registry.terraform.io/hashicorp/time 0.14.2
+resource time_offset
+resource time_offset base_rfc3339
+resource time_offset offset_days
+resource time_offset offset_hours
+resource time_offset offset_minutes
+resource time_offset offset_months
+resource time_offset offset_seconds
+resource time_offset offset_years
+resource time_offset triggers
+resource time_rotating
+resource time_rotating rfc3339
+resource time_rotating rotation_days
+resource time_rotating rotation_hours
+resource time_rotating rotation_minutes
+resource time_rotating rotation_months
+resource time_rotating rotation_rfc3339
+resource time_rotating rotation_years
+resource time_rotating triggers
+resource time_sleep
+resource time_sleep create_duration
+resource time_sleep destroy_duration
+resource time_sleep triggers
+resource time_static
+resource time_static rfc3339
+resource time_static triggers

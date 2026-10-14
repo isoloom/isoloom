@@ -26,7 +26,7 @@ fn azure(spec: &Spec) -> String {
 fn azure_uses_azurerm_with_static_addresses() {
     let tf = azure(&example("hello-stack"));
     // The azurerm provider and an Azure VM, not an AWS instance.
-    assert!(tf.contains("azurerm = { source = \"hashicorp/azurerm\", version = \"~> 5.0\" }"), "{tf}");
+    assert!(tf.contains("azurerm = { source = \"hashicorp/azurerm\", version = \"~> 5.8.0\" }"), "{tf}");
     assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"web\""));
     // The module interface (docs/cloud-modules.md): a `region` var and ARM_SUBSCRIPTION_ID from the environment.
     assert!(tf.contains("variable \"region\""), "{tf}");

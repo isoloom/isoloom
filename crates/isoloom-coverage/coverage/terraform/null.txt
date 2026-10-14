@@ -1,0 +1,2 @@
+# Resource types of registry.terraform.io/hashicorp/null 3.3.2
+null_resource

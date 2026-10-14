@@ -7,11 +7,12 @@ use isoloom_spec::model::Protocol;
 use super::host::{self, Reach, Sizing, published};
 use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
+use crate::vm::versions;
 
 /// The module, from the plan.
 pub fn module(env: &Environment) -> Module {
     let mut m = Module::new(host::preamble(super::DIR, "digitalocean", "-var allowed_cidr=<your IP>/32 "));
-    m.block(terraform(&[("digitalocean", "digitalocean/digitalocean", "~> 2.0")]));
+    m.block(terraform(&[versions::DIGITALOCEAN, versions::LOCAL]));
     let size = Sizing::of(env).pick(["s-2vcpu-4gb", "s-4vcpu-8gb", "s-8vcpu-16gb"]);
     m.blocks([
         Variable::new("region", "string").default(string("fra1")).block(),

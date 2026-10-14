@@ -19,7 +19,7 @@ fn gcp(name: &str) -> Option<String> {
 fn gcp_uses_the_google_provider_and_static_internal_ips() {
     let tf = gcp("hello-stack").expect("hello-stack has a gcp file");
     assert!(
-        tf.contains("google = { source = \"hashicorp/google\", version = \"~> 8.0\" }"),
+        tf.contains("google = { source = \"hashicorp/google\", version = \"~> 8.5.0\" }"),
         "google provider"
     );
     assert!(tf.contains("resource \"google_compute_network\" \"env\""));

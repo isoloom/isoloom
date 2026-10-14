@@ -14,3 +14,10 @@ provder = "provder"
 targt = "targt"
 # Puppet's fact tool, a Vagrant provisioner option.
 facter = "facter"
+# Cloud services as the providers name their resource types (Linode Kubernetes Engine, Oracle's
+# Web Application Acceleration and Security and Content Management, Azure HDInsight and AKS).
+lke = "lke"
+waas = "waas"
+hdinsight = "hdinsight"
+oce = "oce"
+aks = "aks"

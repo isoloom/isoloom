@@ -18,6 +18,7 @@ use super::single_network::{self, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, name_with, shutdown_script};
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
+use crate::vm::versions;
 use crate::vm::{os, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -87,7 +88,7 @@ const USAGE: &str = "# Start:  terraform -chdir=.isoloom/cloud-vm/oci init && te
 /// The module: the images, the VCN, its security list and subnet, each machine, the outputs.
 fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
     let mut m = Module::new(format!("{}{USAGE}", header("#")));
-    m.block(terraform(&[("oci", "oracle/oci", "~> 6.0")]));
+    m.block(terraform(&[versions::OCI, versions::LOCAL]));
     m.block(
         Variable::new("compartment_id", "string")
             .describe("The compartment the environment goes in")

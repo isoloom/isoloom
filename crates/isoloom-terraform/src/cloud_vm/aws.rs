@@ -27,6 +27,7 @@ use isoloom_spec::validate::Cidr;
 use crate::vm::cloud;
 use crate::vm::limits::Limits;
 use crate::vm::module::{Variable, project_lists, terraform};
+use crate::vm::versions;
 use crate::vm::{controller, is_windows, os, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -154,11 +155,15 @@ pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_bu
 
 const USAGE: &str = "# Start:  terraform -chdir=.isoloom/cloud-vm/aws init && terraform -chdir=.isoloom/cloud-vm/aws apply \\\n#           -var allowed_cidr=<your IP>/32 -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519\n# Stop:   terraform -chdir=.isoloom/cloud-vm/aws destroy (same variables)\n";
 
-/// AWS, and TLS for the controller's key.
+/// AWS and local (the archive's file list); TLS for the controller's key; random and time for
+/// the Windows machines.
 fn providers(env: &Environment) -> Vec<crate::vm::module::Provider> {
-    let mut p = vec![("aws", "hashicorp/aws", "~> 6.0")];
+    let mut p = vec![versions::AWS, versions::LOCAL];
     if controller::needed(env) {
-        p.push(("tls", "hashicorp/tls", "~> 4.0"));
+        p.push(versions::TLS);
+    }
+    if vms(env).any(|(_, mp)| is_windows(mp)) {
+        p.extend([versions::RANDOM, versions::TIME]);
     }
     p
 }

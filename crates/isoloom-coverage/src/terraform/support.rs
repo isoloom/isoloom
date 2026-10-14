@@ -1,0 +1,190 @@
+//! The verdicts the Terraform tables share, one per family of resource types or arguments,
+//! decided by the questions of docs/adr/0006-coverage-classification.md. A family is a reviewed
+//! decision; a resource or argument no family names stays unclassified and fails the tests.
+
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
+
+/// A resource type, data source, argument or block Isoloom writes.
+pub const WRITTEN: Support = Emitted {
+    from: "(written by the generator)",
+};
+/// The resource types the cloud generators write.
+pub const CLOUD_WRITTEN: Support = Emitted {
+    from: "(written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file)",
+};
+
+// Resource types.
+
+/// What one VM per machine on its own networks needs, not written yet.
+pub const ENVIRONMENT: Support = Planned {
+    note: "with the cloud generator (one VM per machine on its own networks)",
+};
+/// A machine's own image.
+pub const IMAGES: Support = Planned {
+    note: "custom cloud images: a machine's own image, as on the local targets",
+};
+/// The environment's names served by the platform.
+pub const PRIVATE_DNS: Support = Planned {
+    note: "private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS",
+};
+/// Public names.
+pub const PUBLIC_DNS: Support = NotPortable {
+    why: "public DNS and domains: local targets have no public names",
+};
+/// The account's ready-made network.
+pub const DEFAULTS: Support = Tooling {
+    note: "the account's default network: Isoloom builds its own",
+};
+/// Ways to place, scale or bill VMs.
+pub const PLACEMENT: Support = Tooling {
+    note: "how the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves",
+};
+/// Image pipelines.
+pub const IMAGE_BUILD: Support = Tooling {
+    note: "builds machine images: how an image is made, not what the environment runs",
+};
+/// Backups, snapshots and copies.
+pub const BACKUP: Support = Tooling {
+    note: "backs up, copies or restores disks: no change in how the environment behaves",
+};
+/// The account itself.
+pub const ACCOUNT: Support = Tooling {
+    note: "administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves",
+};
+/// Software run in the VMs by the cloud.
+pub const VM_AGENT: Support = NotPortable {
+    why: "runs software in the VMs through this cloud's own agent (extensions, run commands, patching): no other VM target has one",
+};
+/// Managed services.
+pub const MANAGED: Support = NotPortable {
+    why: "one of this cloud's managed services (databases, queues, functions, clusters, storage...): no other VM target has it",
+};
+/// The cloud's network services.
+pub const CLOUD_NETWORK: Support = NotPortable {
+    why: "one of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it",
+};
+/// A resource type kept under an older name.
+pub const OLDER_NAME: Support = Tooling {
+    note: "an older name of a resource type the provider still has: no change in behavior",
+};
+
+// Arguments and settings.
+
+/// The provider block's settings.
+pub const CREDENTIALS: Support = Tooling {
+    note: "how Terraform reaches and authenticates to the API: no change in behavior",
+};
+/// The identifier the provider sets.
+pub const ID: Support = Tooling {
+    note: "the identifier the provider sets: no change in behavior",
+};
+/// Terraform's waits.
+pub const TIMEOUTS: Support = Tooling {
+    note: "how long Terraform waits: no change in behavior",
+};
+/// Names, labels and descriptions.
+pub const TAGS: Support = Tooling {
+    note: "names, labels and descriptions in the account: no change in behavior",
+};
+/// Where a resource lives in the account.
+pub const LOCATION: Support = Tooling {
+    note: "where in the account or region the resource lives: no change in behavior",
+};
+/// How Terraform changes the resource.
+pub const PROTECT: Support = Tooling {
+    note: "how Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior",
+};
+/// Another spelling of what Isoloom sets.
+pub const ALIAS: Support = Tooling {
+    note: "another way to write what Isoloom already sets, or a default it keeps: no change in behavior",
+};
+/// Source ports in firewall rules.
+pub const SOURCE_PORTS: Support = Tooling {
+    note: "a source port filter: reach rules name destination ports, from any source port",
+};
+/// The cloud's logs and metrics.
+pub const MONITORING: Support = Tooling {
+    note: "the cloud's own logging and monitoring: no change in behavior",
+};
+/// A cloud-only option.
+pub const CLOUD: Support = NotPortable {
+    why: "an option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it",
+};
+/// The Proxmox server's own tuning.
+pub const SERVER: Support = NotPortable {
+    why: "tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it",
+};
+/// IPv6.
+pub const IPV6: Support = Planned { note: "with IPv6 networks" };
+/// Data disks.
+pub const DISKS: Support = Planned {
+    note: "with data disks: persistent volumes on VMs",
+};
+/// Nested virtualization.
+pub const NESTED: Support = Planned {
+    note: "with nested virtualization",
+};
+/// GPUs and other devices.
+pub const DEVICES: Support = Planned {
+    note: "with GPU and device passthrough",
+};
+/// TPM and secure boot.
+pub const TPM: Support = Planned {
+    note: "with Windows 11's TPM and secure boot",
+};
+/// Several addresses on one network.
+pub const ADDRESSES: Support = Planned {
+    note: "with several addresses on one network",
+};
+/// CPU topology.
+pub const CPUS: Support = Equivalent {
+    via: "`resources.cpus`, through the machine type Isoloom picks",
+};
+/// NAT for private networks.
+pub const NAT: Support = Planned {
+    note: "private networks reaching the internet through NAT",
+};
+/// Routes through a machine.
+pub const ROUTER: Support = Planned {
+    note: "with `networks.*.gateway`: a network routed through one of its machines",
+};
+/// VLANs and trunks.
+pub const VLANS: Support = Planned {
+    note: "with VLANs and trunks (`networks.*.vlans`)",
+};
+/// A network's MTU.
+pub const MTU: Support = Planned { note: "a network's MTU" };
+/// Rules on outbound traffic.
+pub const EGRESS_RULES: Support = Planned {
+    note: "outbound rules: reach enforced on traffic leaving a machine too",
+};
+/// ICMP in rules.
+pub const ICMP: Support = Planned { note: "ICMP in reach rules" };
+/// No internet on a network.
+pub const OFFLINE: Support = Planned {
+    note: "`networks.*.internet: false` enforced by the cloud",
+};
+/// Firmware and boot.
+pub const FIRMWARE: Support = Planned {
+    note: "with custom images and boot (firmware, machine type, boot order)",
+};
+/// Another CPU architecture.
+pub const ARCH: Support = Planned {
+    note: "with `machines.*.arch`: another CPU architecture",
+};
+/// Shared folders.
+pub const SHARED: Support = Planned {
+    note: "shared volumes (`volumes`) as host folders",
+};
+/// The Proxmox firewall.
+pub const FIREWALL: Support = Planned {
+    note: "the Proxmox firewall: reach rules enforced outside the VMs, besides the router",
+};
+/// Start order on a server restart.
+pub const ORDER: Support = Tooling {
+    note: "the start order when the server restarts: `depends_on` orders the first start",
+};
+/// A machine's own rate limit: `networks.*.tc` shapes a whole network on the router instead.
+pub const TC: Support = Planned {
+    note: "a rate limit per machine, beside `networks.*.tc` (a whole network, on its router)",
+};

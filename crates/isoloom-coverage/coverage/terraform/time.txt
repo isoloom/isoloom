@@ -1,0 +1,5 @@
+# Resource types of registry.terraform.io/hashicorp/time 0.14.2
+time_offset
+time_rotating
+time_sleep
+time_static

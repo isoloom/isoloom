@@ -1,0 +1,19 @@
+# Settings, and arguments and nested blocks of what Isoloom writes, of registry.terraform.io/hashicorp/cloudinit 2.4.1
+resource cloudinit_config
+resource cloudinit_config base64_encode
+resource cloudinit_config boundary
+resource cloudinit_config gzip
+resource cloudinit_config part
+resource cloudinit_config part.content
+resource cloudinit_config part.content_type
+resource cloudinit_config part.filename
+resource cloudinit_config part.merge_type
+data cloudinit_config
+data cloudinit_config base64_encode
+data cloudinit_config boundary
+data cloudinit_config gzip
+data cloudinit_config part
+data cloudinit_config part.content
+data cloudinit_config part.content_type
+data cloudinit_config part.filename
+data cloudinit_config part.merge_type

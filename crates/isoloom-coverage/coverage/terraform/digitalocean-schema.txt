@@ -1,0 +1,76 @@
+# Settings, and arguments and nested blocks of what Isoloom writes, of registry.terraform.io/digitalocean/digitalocean 2.103.0
+provider api_endpoint
+provider http_retry_max
+provider http_retry_wait_max
+provider http_retry_wait_min
+provider requests_per_second
+provider spaces_access_id
+provider spaces_endpoint
+provider spaces_secret_key
+provider token
+resource digitalocean_droplet
+resource digitalocean_droplet backups
+resource digitalocean_droplet droplet_agent
+resource digitalocean_droplet gpu_partition_mode
+resource digitalocean_droplet graceful_shutdown
+resource digitalocean_droplet id
+resource digitalocean_droplet image
+resource digitalocean_droplet ipv6
+resource digitalocean_droplet ipv6_address
+resource digitalocean_droplet monitoring
+resource digitalocean_droplet name
+resource digitalocean_droplet private_networking
+resource digitalocean_droplet public_networking
+resource digitalocean_droplet region
+resource digitalocean_droplet resize_disk
+resource digitalocean_droplet size
+resource digitalocean_droplet ssh_keys
+resource digitalocean_droplet tags
+resource digitalocean_droplet user_data
+resource digitalocean_droplet volume_ids
+resource digitalocean_droplet vpc_uuid
+resource digitalocean_droplet backup_policy
+resource digitalocean_droplet backup_policy.hour
+resource digitalocean_droplet backup_policy.plan
+resource digitalocean_droplet backup_policy.weekday
+resource digitalocean_droplet timeouts
+resource digitalocean_droplet timeouts.create
+resource digitalocean_droplet timeouts.delete
+resource digitalocean_droplet timeouts.update
+resource digitalocean_firewall
+resource digitalocean_firewall droplet_ids
+resource digitalocean_firewall id
+resource digitalocean_firewall name
+resource digitalocean_firewall tags
+resource digitalocean_firewall inbound_rule
+resource digitalocean_firewall inbound_rule.action
+resource digitalocean_firewall inbound_rule.port_range
+resource digitalocean_firewall inbound_rule.protocol
+resource digitalocean_firewall inbound_rule.source_addresses
+resource digitalocean_firewall inbound_rule.source_droplet_ids
+resource digitalocean_firewall inbound_rule.source_kubernetes_ids
+resource digitalocean_firewall inbound_rule.source_load_balancer_uids
+resource digitalocean_firewall inbound_rule.source_tags
+resource digitalocean_firewall outbound_rule
+resource digitalocean_firewall outbound_rule.action
+resource digitalocean_firewall outbound_rule.destination_addresses
+resource digitalocean_firewall outbound_rule.destination_droplet_ids
+resource digitalocean_firewall outbound_rule.destination_kubernetes_ids
+resource digitalocean_firewall outbound_rule.destination_load_balancer_uids
+resource digitalocean_firewall outbound_rule.destination_tags
+resource digitalocean_firewall outbound_rule.port_range
+resource digitalocean_firewall outbound_rule.protocol
+resource digitalocean_ssh_key
+resource digitalocean_ssh_key id
+resource digitalocean_ssh_key name
+resource digitalocean_ssh_key public_key
+resource digitalocean_ssh_key timeouts
+resource digitalocean_ssh_key timeouts.create
+resource digitalocean_vpc
+resource digitalocean_vpc description
+resource digitalocean_vpc id
+resource digitalocean_vpc ip_range
+resource digitalocean_vpc name
+resource digitalocean_vpc region
+resource digitalocean_vpc timeouts
+resource digitalocean_vpc timeouts.delete

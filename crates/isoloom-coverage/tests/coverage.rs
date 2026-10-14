@@ -33,23 +33,6 @@ use isoloom_spec::model::Target;
 #[path = "support/vagrantfile.rs"]
 mod vagrantfile;
 
-/// Every committed output of a generator, across the examples: each file must exist in at
-/// least one example, so a renamed output can't silently leave the check with nothing to read.
-fn outputs(files: &[&str]) -> Vec<String> {
-    let mut found = Vec::new();
-    for file in files {
-        let before = found.len();
-        for entry in std::fs::read_dir(examples()).unwrap() {
-            let p = entry.unwrap().path().join(file);
-            if let Ok(text) = std::fs::read_to_string(p) {
-                found.push(text);
-            }
-        }
-        assert!(found.len() > before, "no example has {file}");
-    }
-    found
-}
-
 /// Checks a format's rows against what the generator really writes: every key written has a
 /// row marked as written, and every row marked as written is written by some example.
 fn written_matches(rows: &[(String, Support)], written: &BTreeSet<String>, format: &str) {
@@ -150,74 +133,6 @@ end
     ];
     assert_eq!(got, want);
 }
-
-/// Which committed Terraform files each provider table describes.
-const TERRAFORM_OUTPUTS: &[(&str, &[&str])] = &[
-    ("Terraform: Proxmox", &[".isoloom/proxmox/main.tf", ".isoloom/docker-vm/proxmox/main.tf"]),
-    ("Terraform: AWS", &[".isoloom/cloud-vm/aws/main.tf", ".isoloom/cloud-docker/aws/main.tf"]),
-    ("Terraform: Azure", &[".isoloom/cloud-vm/azure/main.tf", ".isoloom/cloud-docker/azure/main.tf"]),
-    (
-        "Terraform: Google Cloud",
-        &[".isoloom/cloud-vm/gcp/main.tf", ".isoloom/cloud-docker/gcp/main.tf"],
-    ),
-    (
-        "Terraform: DigitalOcean",
-        &[".isoloom/cloud-vm/digitalocean/main.tf", ".isoloom/cloud-docker/digitalocean/main.tf"],
-    ),
-    (
-        "Terraform: Linode",
-        &[".isoloom/cloud-vm/linode/main.tf", ".isoloom/cloud-docker/linode/main.tf"],
-    ),
-    (
-        "Terraform: Oracle Cloud",
-        &[".isoloom/cloud-vm/oci/main.tf", ".isoloom/cloud-docker/oci/main.tf"],
-    ),
-];
-
-/// Resource types of the small utility providers (keys, passwords, files, waits) the
-/// generators use beside each platform's own: they have no coverage table.
-const UTILITY_RESOURCES: &[&str] = &["local_", "random_", "terraform_data", "time_", "tls_", "null_"];
-
-#[test]
-fn terraform_written_resources_match_the_generated_files() {
-    let formats = formats();
-    for (name, files) in TERRAFORM_OUTPUTS {
-        let format = formats
-            .iter()
-            .find(|f| f.name == *name)
-            .unwrap_or_else(|| panic!("no coverage table named {name}"));
-        let mut written = BTreeSet::new();
-        for text in outputs(files) {
-            for line in text.lines() {
-                let Some(rest) = line.trim_start().strip_prefix("resource \"") else {
-                    continue;
-                };
-                let kind = rest.split('"').next().unwrap();
-                let key = format!("resource {kind}");
-                if format.rows.iter().any(|(k, _)| *k == key) {
-                    written.insert(key);
-                } else {
-                    assert!(
-                        UTILITY_RESOURCES.iter().any(|p| kind.starts_with(p)),
-                        "{name}: Isoloom writes `{kind}`, which is neither one of the provider's resource types nor a utility one"
-                    );
-                }
-            }
-        }
-        written_matches(&format.rows, &written, name);
-    }
-    // A table that claims written resources must be checked against some output.
-    for f in formats.iter().filter(|f| f.name.starts_with("Terraform: ")) {
-        if f.rows.iter().any(|(_, s)| s.written()) {
-            assert!(
-                TERRAFORM_OUTPUTS.iter().any(|(n, _)| *n == f.name),
-                "{}: marks resources as written, but no generated output is checked against it",
-                f.name
-            );
-        }
-    }
-}
-
 #[test]
 fn every_feature_is_classified() {
     for f in formats() {
@@ -226,22 +141,6 @@ fn every_feature_is_classified() {
         let mut keys = BTreeSet::new();
         for (k, _) in &f.rows {
             assert!(keys.insert(k), "{}: `{k}` is listed twice", f.name);
-        }
-    }
-}
-
-#[test]
-fn every_cloud_resource_named_exists_in_its_provider() {
-    for c in isoloom_coverage::terraform::CLOUDS {
-        let all = vagrant::names(c.list);
-        for r in c
-            .environment
-            .iter()
-            .chain(c.windows)
-            .chain(c.generated)
-            .chain(c.equivalent.iter().map(|(r, _)| r))
-        {
-            assert!(all.contains(r), "{}: `{r}` isn't a resource type of {}", c.name, c.source);
         }
     }
 }

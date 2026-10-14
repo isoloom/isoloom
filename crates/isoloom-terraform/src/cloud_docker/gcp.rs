@@ -11,11 +11,12 @@ use isoloom_spec::model::Protocol;
 use super::host::{self, Reach, Sizing, port_strings, published};
 use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
+use crate::vm::versions;
 
 /// The module, from the plan.
 pub fn module(env: &Environment) -> Module {
     let mut m = Module::new(host::preamble(super::DIR, "gcp", "-var allowed_cidr=<your IP>/32 "));
-    m.block(terraform(&[("google", "hashicorp/google", "~> 8.0")]));
+    m.block(terraform(&[versions::GOOGLE, versions::LOCAL]));
     m.blocks(variables(env));
     m.blocks(host::variables(env, true));
     m.block(

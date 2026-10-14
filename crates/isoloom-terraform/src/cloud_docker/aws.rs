@@ -9,11 +9,12 @@ use super::host::{self, Reach, Sizing, published};
 use crate::cloud_vm::aws::instance_type;
 use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
+use crate::vm::versions;
 
 /// The module, from the plan.
 pub fn module(env: &Environment) -> Module {
     let mut m = Module::new(host::preamble(super::DIR, "aws", "-var allowed_cidr=<your IP>/32 "));
-    m.block(terraform(&[("aws", "hashicorp/aws", "~> 6.0")]));
+    m.block(terraform(&[versions::AWS, versions::LOCAL]));
     m.block(Variable::new("region", "string").default(string("eu-west-3")).block());
     // Free Tier eligible sizes where they fit (the AWS Free plan refuses other types).
     let size = Sizing::of(env);

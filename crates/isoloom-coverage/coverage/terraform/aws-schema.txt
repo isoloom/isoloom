@@ -1,0 +1,723 @@
+# Settings, and arguments and nested blocks of what Isoloom writes, of registry.terraform.io/hashicorp/aws 6.67.0
+provider access_key
+provider allowed_account_ids
+provider custom_ca_bundle
+provider ec2_metadata_service_endpoint
+provider ec2_metadata_service_endpoint_mode
+provider forbidden_account_ids
+provider http_proxy
+provider https_proxy
+provider insecure
+provider max_retries
+provider no_proxy
+provider profile
+provider region
+provider retry_mode
+provider s3_us_east_1_regional_endpoint
+provider s3_use_path_style
+provider secret_key
+provider shared_config_files
+provider shared_credentials_files
+provider skip_credentials_validation
+provider skip_metadata_api_check
+provider skip_region_validation
+provider skip_requesting_account_id
+provider sts_region
+provider tag_policy_compliance
+provider token
+provider token_bucket_rate_limiter_capacity
+provider use_dualstack_endpoint
+provider use_fips_endpoint
+provider user_agent
+provider assume_role
+provider assume_role.duration
+provider assume_role.external_id
+provider assume_role.policy
+provider assume_role.policy_arns
+provider assume_role.role_arn
+provider assume_role.session_name
+provider assume_role.source_identity
+provider assume_role.tags
+provider assume_role.transitive_tag_keys
+provider assume_role_with_web_identity
+provider assume_role_with_web_identity.duration
+provider assume_role_with_web_identity.policy
+provider assume_role_with_web_identity.policy_arns
+provider assume_role_with_web_identity.role_arn
+provider assume_role_with_web_identity.session_name
+provider assume_role_with_web_identity.web_identity_token
+provider assume_role_with_web_identity.web_identity_token_file
+provider default_tags
+provider default_tags.tags
+provider endpoints
+provider endpoints.accessanalyzer
+provider endpoints.account
+provider endpoints.accountaccess
+provider endpoints.acm
+provider endpoints.acmpca
+provider endpoints.agentregistry
+provider endpoints.amg
+provider endpoints.amp
+provider endpoints.amplify
+provider endpoints.apigateway
+provider endpoints.apigatewayv2
+provider endpoints.appautoscaling
+provider endpoints.appconfig
+provider endpoints.appfabric
+provider endpoints.appflow
+provider endpoints.appintegrations
+provider endpoints.appintegrationsservice
+provider endpoints.applicationautoscaling
+provider endpoints.applicationinsights
+provider endpoints.applicationsignals
+provider endpoints.appmesh
+provider endpoints.appregistry
+provider endpoints.apprunner
+provider endpoints.appstream
+provider endpoints.appsync
+provider endpoints.arcregionswitch
+provider endpoints.arczonalshift
+provider endpoints.athena
+provider endpoints.auditmanager
+provider endpoints.autoscaling
+provider endpoints.autoscalingplans
+provider endpoints.backup
+provider endpoints.batch
+provider endpoints.bcmdataexports
+provider endpoints.beanstalk
+provider endpoints.bedrock
+provider endpoints.bedrockagent
+provider endpoints.bedrockagentcore
+provider endpoints.bedrockruntime
+provider endpoints.billing
+provider endpoints.budgets
+provider endpoints.ce
+provider endpoints.chatbot
+provider endpoints.chime
+provider endpoints.chimesdkmediapipelines
+provider endpoints.chimesdkvoice
+provider endpoints.cleanrooms
+provider endpoints.cloud9
+provider endpoints.cloudcontrol
+provider endpoints.cloudcontrolapi
+provider endpoints.cloudformation
+provider endpoints.cloudfront
+provider endpoints.cloudfrontkeyvaluestore
+provider endpoints.cloudhsm
+provider endpoints.cloudhsmv2
+provider endpoints.cloudsearch
+provider endpoints.cloudtrail
+provider endpoints.cloudwatch
+provider endpoints.cloudwatchevents
+provider endpoints.cloudwatchevidently
+provider endpoints.cloudwatchlog
+provider endpoints.cloudwatchlogs
+provider endpoints.cloudwatchobservabilityaccessmanager
+provider endpoints.cloudwatchrum
+provider endpoints.codeartifact
+provider endpoints.codebuild
+provider endpoints.codecatalyst
+provider endpoints.codecommit
+provider endpoints.codeconnections
+provider endpoints.codedeploy
+provider endpoints.codeguruprofiler
+provider endpoints.codegurureviewer
+provider endpoints.codepipeline
+provider endpoints.codestarconnections
+provider endpoints.codestarnotifications
+provider endpoints.cognitoidentity
+provider endpoints.cognitoidentityprovider
+provider endpoints.cognitoidp
+provider endpoints.comprehend
+provider endpoints.computeoptimizer
+provider endpoints.config
+provider endpoints.configservice
+provider endpoints.connect
+provider endpoints.connectcases
+provider endpoints.controltower
+provider endpoints.costandusagereportservice
+provider endpoints.costexplorer
+provider endpoints.costoptimizationhub
+provider endpoints.cur
+provider endpoints.customerprofiles
+provider endpoints.databasemigration
+provider endpoints.databasemigrationservice
+provider endpoints.databrew
+provider endpoints.dataexchange
+provider endpoints.datapipeline
+provider endpoints.datasync
+provider endpoints.datazone
+provider endpoints.dax
+provider endpoints.deploy
+provider endpoints.detective
+provider endpoints.devicefarm
+provider endpoints.devopsagent
+provider endpoints.devopsguru
+provider endpoints.directconnect
+provider endpoints.directoryservice
+provider endpoints.directoryservicedata
+provider endpoints.dlm
+provider endpoints.dms
+provider endpoints.docdb
+provider endpoints.docdbelastic
+provider endpoints.drs
+provider endpoints.ds
+provider endpoints.dsql
+provider endpoints.dynamodb
+provider endpoints.ec2
+provider endpoints.ecr
+provider endpoints.ecrpublic
+provider endpoints.ecs
+provider endpoints.efs
+provider endpoints.eks
+provider endpoints.elasticache
+provider endpoints.elasticbeanstalk
+provider endpoints.elasticloadbalancing
+provider endpoints.elasticloadbalancingv2
+provider endpoints.elasticsearch
+provider endpoints.elasticsearchservice
+provider endpoints.elastictranscoder
+provider endpoints.elb
+provider endpoints.elbv2
+provider endpoints.emr
+provider endpoints.emrcontainers
+provider endpoints.emrserverless
+provider endpoints.es
+provider endpoints.eventbridge
+provider endpoints.events
+provider endpoints.evidently
+provider endpoints.evs
+provider endpoints.finspace
+provider endpoints.firehose
+provider endpoints.fis
+provider endpoints.fms
+provider endpoints.fsx
+provider endpoints.gamelift
+provider endpoints.glacier
+provider endpoints.globalaccelerator
+provider endpoints.glue
+provider endpoints.gluedatabrew
+provider endpoints.grafana
+provider endpoints.greengrass
+provider endpoints.groundstation
+provider endpoints.guardduty
+provider endpoints.healthlake
+provider endpoints.iam
+provider endpoints.identitystore
+provider endpoints.imagebuilder
+provider endpoints.inspector
+provider endpoints.inspector2
+provider endpoints.inspectorv2
+provider endpoints.interconnect
+provider endpoints.internetmonitor
+provider endpoints.invoicing
+provider endpoints.iot
+provider endpoints.ivs
+provider endpoints.ivschat
+provider endpoints.kafka
+provider endpoints.kafkaconnect
+provider endpoints.kendra
+provider endpoints.keyspaces
+provider endpoints.kinesis
+provider endpoints.kinesisanalytics
+provider endpoints.kinesisanalyticsv2
+provider endpoints.kinesisvideo
+provider endpoints.kms
+provider endpoints.lakeformation
+provider endpoints.lambda
+provider endpoints.lambdacore
+provider endpoints.lambdamicrovms
+provider endpoints.launchwizard
+provider endpoints.lex
+provider endpoints.lexmodelbuilding
+provider endpoints.lexmodelbuildingservice
+provider endpoints.lexmodels
+provider endpoints.lexmodelsv2
+provider endpoints.lexv2models
+provider endpoints.licensemanager
+provider endpoints.lightsail
+provider endpoints.location
+provider endpoints.locationservice
+provider endpoints.logs
+provider endpoints.m2
+provider endpoints.macie2
+provider endpoints.mailmanager
+provider endpoints.managedgrafana
+provider endpoints.mediaconnect
+provider endpoints.mediaconvert
+provider endpoints.medialive
+provider endpoints.mediapackage
+provider endpoints.mediapackagev2
+provider endpoints.mediapackagevod
+provider endpoints.mediastore
+provider endpoints.memorydb
+provider endpoints.mgn
+provider endpoints.mpa
+provider endpoints.mq
+provider endpoints.msk
+provider endpoints.mwaa
+provider endpoints.mwaaserverless
+provider endpoints.neptune
+provider endpoints.neptunegraph
+provider endpoints.networkfirewall
+provider endpoints.networkflowmonitor
+provider endpoints.networkmanager
+provider endpoints.networkmonitor
+provider endpoints.notifications
+provider endpoints.notificationscontacts
+provider endpoints.oam
+provider endpoints.observabilityadmin
+provider endpoints.odb
+provider endpoints.opensearch
+provider endpoints.opensearchingestion
+provider endpoints.opensearchserverless
+provider endpoints.opensearchservice
+provider endpoints.organizations
+provider endpoints.osis
+provider endpoints.outposts
+provider endpoints.paymentcryptography
+provider endpoints.pcaconnectorad
+provider endpoints.pcs
+provider endpoints.pinpoint
+provider endpoints.pinpointsmsvoicev2
+provider endpoints.pipes
+provider endpoints.polly
+provider endpoints.pricing
+provider endpoints.prometheus
+provider endpoints.prometheusservice
+provider endpoints.qbusiness
+provider endpoints.qldb
+provider endpoints.quicksight
+provider endpoints.ram
+provider endpoints.rbin
+provider endpoints.rds
+provider endpoints.rdsdata
+provider endpoints.rdsdataservice
+provider endpoints.recyclebin
+provider endpoints.redshift
+provider endpoints.redshiftdata
+provider endpoints.redshiftdataapiservice
+provider endpoints.redshiftserverless
+provider endpoints.rekognition
+provider endpoints.resiliencehub
+provider endpoints.resiliencehubv2
+provider endpoints.resourceexplorer2
+provider endpoints.resourcegroups
+provider endpoints.resourcegroupstagging
+provider endpoints.resourcegroupstaggingapi
+provider endpoints.rolesanywhere
+provider endpoints.route53
+provider endpoints.route53domains
+provider endpoints.route53profiles
+provider endpoints.route53recoverycontrolconfig
+provider endpoints.route53recoveryreadiness
+provider endpoints.route53resolver
+provider endpoints.rum
+provider endpoints.s3
+provider endpoints.s3api
+provider endpoints.s3control
+provider endpoints.s3files
+provider endpoints.s3outposts
+provider endpoints.s3tables
+provider endpoints.s3vectors
+provider endpoints.sagemaker
+provider endpoints.savingsplans
+provider endpoints.scheduler
+provider endpoints.schemas
+provider endpoints.secretsmanager
+provider endpoints.securityhub
+provider endpoints.securitylake
+provider endpoints.serverlessapplicationrepository
+provider endpoints.serverlessapprepo
+provider endpoints.serverlessrepo
+provider endpoints.servicecatalog
+provider endpoints.servicecatalogappregistry
+provider endpoints.servicediscovery
+provider endpoints.servicequotas
+provider endpoints.ses
+provider endpoints.sesv2
+provider endpoints.sfn
+provider endpoints.shield
+provider endpoints.signer
+provider endpoints.sns
+provider endpoints.sqs
+provider endpoints.ssm
+provider endpoints.ssmcontacts
+provider endpoints.ssmincidents
+provider endpoints.ssmquicksetup
+provider endpoints.ssmsap
+provider endpoints.sso
+provider endpoints.ssoadmin
+provider endpoints.stepfunctions
+provider endpoints.storagegateway
+provider endpoints.sts
+provider endpoints.swf
+provider endpoints.synthetics
+provider endpoints.taxsettings
+provider endpoints.timestreaminfluxdb
+provider endpoints.timestreamquery
+provider endpoints.timestreamwrite
+provider endpoints.transcribe
+provider endpoints.transcribeservice
+provider endpoints.transfer
+provider endpoints.uxc
+provider endpoints.verifiedpermissions
+provider endpoints.vpclattice
+provider endpoints.waf
+provider endpoints.wafregional
+provider endpoints.wafv2
+provider endpoints.wellarchitected
+provider endpoints.workmail
+provider endpoints.workspaces
+provider endpoints.workspacesweb
+provider endpoints.xray
+provider ignore_tags
+provider ignore_tags.key_prefixes
+provider ignore_tags.keys
+resource aws_eip
+resource aws_eip address
+resource aws_eip associate_with_private_ip
+resource aws_eip customer_owned_ipv4_pool
+resource aws_eip domain
+resource aws_eip id
+resource aws_eip instance
+resource aws_eip ipam_pool_id
+resource aws_eip network_border_group
+resource aws_eip network_interface
+resource aws_eip public_ipv4_pool
+resource aws_eip region
+resource aws_eip tags
+resource aws_eip tags_all
+resource aws_eip timeouts
+resource aws_eip timeouts.delete
+resource aws_eip timeouts.read
+resource aws_eip timeouts.update
+resource aws_instance
+resource aws_instance ami
+resource aws_instance associate_public_ip_address
+resource aws_instance availability_zone
+resource aws_instance disable_api_stop
+resource aws_instance disable_api_termination
+resource aws_instance ebs_optimized
+resource aws_instance enable_primary_ipv6
+resource aws_instance force_destroy
+resource aws_instance get_password_data
+resource aws_instance hibernation
+resource aws_instance host_id
+resource aws_instance host_resource_group_arn
+resource aws_instance iam_instance_profile
+resource aws_instance id
+resource aws_instance instance_initiated_shutdown_behavior
+resource aws_instance instance_type
+resource aws_instance ipv6_address_count
+resource aws_instance ipv6_addresses
+resource aws_instance key_name
+resource aws_instance monitoring
+resource aws_instance placement_group
+resource aws_instance placement_group_id
+resource aws_instance placement_partition_number
+resource aws_instance private_ip
+resource aws_instance region
+resource aws_instance secondary_private_ips
+resource aws_instance security_groups
+resource aws_instance source_dest_check
+resource aws_instance subnet_id
+resource aws_instance tags
+resource aws_instance tags_all
+resource aws_instance tenancy
+resource aws_instance user_data
+resource aws_instance user_data_base64
+resource aws_instance user_data_replace_on_change
+resource aws_instance volume_tags
+resource aws_instance vpc_security_group_ids
+resource aws_instance capacity_reservation_specification
+resource aws_instance capacity_reservation_specification.capacity_reservation_preference
+resource aws_instance capacity_reservation_specification.capacity_reservation_target
+resource aws_instance capacity_reservation_specification.capacity_reservation_target.capacity_reservation_id
+resource aws_instance capacity_reservation_specification.capacity_reservation_target.capacity_reservation_resource_group_arn
+resource aws_instance cpu_options
+resource aws_instance cpu_options.amd_sev_snp
+resource aws_instance cpu_options.core_count
+resource aws_instance cpu_options.nested_virtualization
+resource aws_instance cpu_options.threads_per_core
+resource aws_instance credit_specification
+resource aws_instance credit_specification.cpu_credits
+resource aws_instance ebs_block_device
+resource aws_instance ebs_block_device.delete_on_termination
+resource aws_instance ebs_block_device.device_name
+resource aws_instance ebs_block_device.encrypted
+resource aws_instance ebs_block_device.iops
+resource aws_instance ebs_block_device.kms_key_id
+resource aws_instance ebs_block_device.snapshot_id
+resource aws_instance ebs_block_device.tags
+resource aws_instance ebs_block_device.tags_all
+resource aws_instance ebs_block_device.throughput
+resource aws_instance ebs_block_device.volume_size
+resource aws_instance ebs_block_device.volume_type
+resource aws_instance enclave_options
+resource aws_instance enclave_options.enabled
+resource aws_instance ephemeral_block_device
+resource aws_instance ephemeral_block_device.device_name
+resource aws_instance ephemeral_block_device.no_device
+resource aws_instance ephemeral_block_device.virtual_name
+resource aws_instance instance_market_options
+resource aws_instance instance_market_options.market_type
+resource aws_instance instance_market_options.spot_options
+resource aws_instance instance_market_options.spot_options.instance_interruption_behavior
+resource aws_instance instance_market_options.spot_options.max_price
+resource aws_instance instance_market_options.spot_options.spot_instance_type
+resource aws_instance instance_market_options.spot_options.valid_until
+resource aws_instance launch_template
+resource aws_instance launch_template.id
+resource aws_instance launch_template.name
+resource aws_instance launch_template.version
+resource aws_instance maintenance_options
+resource aws_instance maintenance_options.auto_recovery
+resource aws_instance metadata_options
+resource aws_instance metadata_options.http_endpoint
+resource aws_instance metadata_options.http_protocol_ipv6
+resource aws_instance metadata_options.http_put_response_hop_limit
+resource aws_instance metadata_options.http_tokens
+resource aws_instance metadata_options.instance_metadata_tags
+resource aws_instance network_interface
+resource aws_instance network_interface.delete_on_termination
+resource aws_instance network_interface.device_index
+resource aws_instance network_interface.network_card_index
+resource aws_instance network_interface.network_interface_id
+resource aws_instance primary_network_interface
+resource aws_instance primary_network_interface.network_interface_id
+resource aws_instance private_dns_name_options
+resource aws_instance private_dns_name_options.enable_resource_name_dns_a_record
+resource aws_instance private_dns_name_options.enable_resource_name_dns_aaaa_record
+resource aws_instance private_dns_name_options.hostname_type
+resource aws_instance root_block_device
+resource aws_instance root_block_device.delete_on_termination
+resource aws_instance root_block_device.encrypted
+resource aws_instance root_block_device.iops
+resource aws_instance root_block_device.kms_key_id
+resource aws_instance root_block_device.tags
+resource aws_instance root_block_device.tags_all
+resource aws_instance root_block_device.throughput
+resource aws_instance root_block_device.volume_size
+resource aws_instance root_block_device.volume_type
+resource aws_instance secondary_network_interface
+resource aws_instance secondary_network_interface.delete_on_termination
+resource aws_instance secondary_network_interface.device_index
+resource aws_instance secondary_network_interface.interface_type
+resource aws_instance secondary_network_interface.network_card_index
+resource aws_instance secondary_network_interface.private_ip_address_count
+resource aws_instance secondary_network_interface.secondary_subnet_id
+resource aws_instance timeouts
+resource aws_instance timeouts.create
+resource aws_instance timeouts.delete
+resource aws_instance timeouts.read
+resource aws_instance timeouts.update
+resource aws_internet_gateway
+resource aws_internet_gateway id
+resource aws_internet_gateway region
+resource aws_internet_gateway tags
+resource aws_internet_gateway tags_all
+resource aws_internet_gateway vpc_id
+resource aws_internet_gateway timeouts
+resource aws_internet_gateway timeouts.create
+resource aws_internet_gateway timeouts.delete
+resource aws_internet_gateway timeouts.update
+resource aws_key_pair
+resource aws_key_pair id
+resource aws_key_pair key_name
+resource aws_key_pair key_name_prefix
+resource aws_key_pair public_key
+resource aws_key_pair region
+resource aws_key_pair tags
+resource aws_key_pair tags_all
+resource aws_network_interface
+resource aws_network_interface description
+resource aws_network_interface enable_primary_ipv6
+resource aws_network_interface id
+resource aws_network_interface interface_type
+resource aws_network_interface ipv4_prefix_count
+resource aws_network_interface ipv4_prefixes
+resource aws_network_interface ipv6_address_count
+resource aws_network_interface ipv6_address_list
+resource aws_network_interface ipv6_address_list_enabled
+resource aws_network_interface ipv6_addresses
+resource aws_network_interface ipv6_prefix_count
+resource aws_network_interface ipv6_prefixes
+resource aws_network_interface private_ip
+resource aws_network_interface private_ip_list
+resource aws_network_interface private_ip_list_enabled
+resource aws_network_interface private_ips
+resource aws_network_interface private_ips_count
+resource aws_network_interface region
+resource aws_network_interface security_groups
+resource aws_network_interface source_dest_check
+resource aws_network_interface subnet_id
+resource aws_network_interface tags
+resource aws_network_interface tags_all
+resource aws_network_interface attachment
+resource aws_network_interface attachment.device_index
+resource aws_network_interface attachment.instance
+resource aws_network_interface attachment.network_card_index
+resource aws_network_interface ena_srd_specification
+resource aws_network_interface ena_srd_specification.ena_srd_enabled
+resource aws_network_interface ena_srd_specification.ena_srd_udp_specification
+resource aws_network_interface ena_srd_specification.ena_srd_udp_specification.ena_srd_udp_enabled
+resource aws_network_interface_attachment
+resource aws_network_interface_attachment device_index
+resource aws_network_interface_attachment id
+resource aws_network_interface_attachment instance_id
+resource aws_network_interface_attachment network_card_index
+resource aws_network_interface_attachment network_interface_id
+resource aws_network_interface_attachment region
+resource aws_route_table
+resource aws_route_table id
+resource aws_route_table propagating_vgws
+resource aws_route_table region
+resource aws_route_table route
+resource aws_route_table route.carrier_gateway_id
+resource aws_route_table route.cidr_block
+resource aws_route_table route.core_network_arn
+resource aws_route_table route.destination_prefix_list_id
+resource aws_route_table route.egress_only_gateway_id
+resource aws_route_table route.gateway_id
+resource aws_route_table route.ipv6_cidr_block
+resource aws_route_table route.local_gateway_id
+resource aws_route_table route.nat_gateway_id
+resource aws_route_table route.network_interface_id
+resource aws_route_table route.odb_network_arn
+resource aws_route_table route.transit_gateway_id
+resource aws_route_table route.vpc_endpoint_id
+resource aws_route_table route.vpc_peering_connection_id
+resource aws_route_table tags
+resource aws_route_table tags_all
+resource aws_route_table vpc_id
+resource aws_route_table timeouts
+resource aws_route_table timeouts.create
+resource aws_route_table timeouts.delete
+resource aws_route_table timeouts.update
+resource aws_route_table_association
+resource aws_route_table_association gateway_id
+resource aws_route_table_association id
+resource aws_route_table_association region
+resource aws_route_table_association route_table_id
+resource aws_route_table_association subnet_id
+resource aws_route_table_association timeouts
+resource aws_route_table_association timeouts.create
+resource aws_route_table_association timeouts.delete
+resource aws_route_table_association timeouts.update
+resource aws_security_group
+resource aws_security_group description
+resource aws_security_group egress
+resource aws_security_group egress.cidr_blocks
+resource aws_security_group egress.description
+resource aws_security_group egress.from_port
+resource aws_security_group egress.ipv6_cidr_blocks
+resource aws_security_group egress.prefix_list_ids
+resource aws_security_group egress.protocol
+resource aws_security_group egress.security_groups
+resource aws_security_group egress.self
+resource aws_security_group egress.to_port
+resource aws_security_group id
+resource aws_security_group ingress
+resource aws_security_group ingress.cidr_blocks
+resource aws_security_group ingress.description
+resource aws_security_group ingress.from_port
+resource aws_security_group ingress.ipv6_cidr_blocks
+resource aws_security_group ingress.prefix_list_ids
+resource aws_security_group ingress.protocol
+resource aws_security_group ingress.security_groups
+resource aws_security_group ingress.self
+resource aws_security_group ingress.to_port
+resource aws_security_group name
+resource aws_security_group name_prefix
+resource aws_security_group region
+resource aws_security_group revoke_rules_on_delete
+resource aws_security_group tags
+resource aws_security_group tags_all
+resource aws_security_group vpc_id
+resource aws_security_group timeouts
+resource aws_security_group timeouts.create
+resource aws_security_group timeouts.delete
+resource aws_subnet
+resource aws_subnet assign_ipv6_address_on_creation
+resource aws_subnet availability_zone
+resource aws_subnet availability_zone_id
+resource aws_subnet cidr_block
+resource aws_subnet customer_owned_ipv4_pool
+resource aws_subnet enable_dns64
+resource aws_subnet enable_lni_at_device_index
+resource aws_subnet enable_resource_name_dns_a_record_on_launch
+resource aws_subnet enable_resource_name_dns_aaaa_record_on_launch
+resource aws_subnet id
+resource aws_subnet ipv4_ipam_pool_id
+resource aws_subnet ipv4_netmask_length
+resource aws_subnet ipv6_cidr_block
+resource aws_subnet ipv6_ipam_pool_id
+resource aws_subnet ipv6_native
+resource aws_subnet ipv6_netmask_length
+resource aws_subnet map_customer_owned_ip_on_launch
+resource aws_subnet map_public_ip_on_launch
+resource aws_subnet outpost_arn
+resource aws_subnet private_dns_hostname_type_on_launch
+resource aws_subnet region
+resource aws_subnet tags
+resource aws_subnet tags_all
+resource aws_subnet vpc_id
+resource aws_subnet timeouts
+resource aws_subnet timeouts.create
+resource aws_subnet timeouts.delete
+resource aws_vpc
+resource aws_vpc assign_generated_ipv6_cidr_block
+resource aws_vpc cidr_block
+resource aws_vpc enable_dns_hostnames
+resource aws_vpc enable_dns_support
+resource aws_vpc enable_network_address_usage_metrics
+resource aws_vpc id
+resource aws_vpc instance_tenancy
+resource aws_vpc ipv4_ipam_pool_id
+resource aws_vpc ipv4_netmask_length
+resource aws_vpc ipv6_cidr_block
+resource aws_vpc ipv6_cidr_block_network_border_group
+resource aws_vpc ipv6_ipam_pool_id
+resource aws_vpc ipv6_netmask_length
+resource aws_vpc region
+resource aws_vpc tags
+resource aws_vpc tags_all
+resource aws_vpc_ipv4_cidr_block_association
+resource aws_vpc_ipv4_cidr_block_association cidr_block
+resource aws_vpc_ipv4_cidr_block_association id
+resource aws_vpc_ipv4_cidr_block_association ipv4_ipam_pool_id
+resource aws_vpc_ipv4_cidr_block_association ipv4_netmask_length
+resource aws_vpc_ipv4_cidr_block_association region
+resource aws_vpc_ipv4_cidr_block_association vpc_id
+resource aws_vpc_ipv4_cidr_block_association timeouts
+resource aws_vpc_ipv4_cidr_block_association timeouts.create
+resource aws_vpc_ipv4_cidr_block_association timeouts.delete
+data aws_ami
+data aws_ami allow_unsafe_filter
+data aws_ami executable_users
+data aws_ami id
+data aws_ami include_deprecated
+data aws_ami most_recent
+data aws_ami name_regex
+data aws_ami owners
+data aws_ami region
+data aws_ami tags
+data aws_ami uefi_data
+data aws_ami filter
+data aws_ami filter.name
+data aws_ami filter.values
+data aws_ami timeouts
+data aws_ami timeouts.read
+data aws_availability_zones
+data aws_availability_zones all_availability_zones
+data aws_availability_zones exclude_names
+data aws_availability_zones exclude_zone_ids
+data aws_availability_zones id
+data aws_availability_zones region
+data aws_availability_zones state
+data aws_availability_zones filter
+data aws_availability_zones filter.name
+data aws_availability_zones filter.values
+data aws_availability_zones timeouts
+data aws_availability_zones timeouts.read

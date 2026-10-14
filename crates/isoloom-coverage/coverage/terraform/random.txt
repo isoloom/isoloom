@@ -1,0 +1,11 @@
+# Resource types of registry.terraform.io/hashicorp/random 3.9.1
+random_bytes
+random_id
+random_integer
+random_password
+random_pet
+random_shuffle
+random_string
+random_uuid
+random_uuid4
+random_uuid7

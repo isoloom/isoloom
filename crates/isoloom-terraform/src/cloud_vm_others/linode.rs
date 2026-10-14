@@ -15,6 +15,7 @@ use super::single_network::{self, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, name_with, shutdown_script, tag_list};
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
+use crate::vm::versions;
 use crate::vm::{os, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -86,7 +87,7 @@ const SUDO: &str = "command -v sudo >/dev/null || (apt-get update -qq && apt-get
 /// The module: the VPC and its subnet, the firewall, each machine, the outputs.
 fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
     let mut m = Module::new(format!("{}{USAGE}", header("#")));
-    m.block(terraform(&[("linode", "linode/linode", "~> 2.0"), ("random", "hashicorp/random", "~> 3.0")]));
+    m.block(terraform(&[versions::LINODE, versions::RANDOM, versions::LOCAL]));
     m.block(Variable::new("region", "string").default(string("fr-par")).block());
     m.blocks(cloud::variables(env));
     m.block(Block::builder("provider").add_label("linode").build());
