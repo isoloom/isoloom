@@ -103,6 +103,7 @@ one in [Targets](docs/targets.md).
 - [Real targets in CI](docs/real-targets.md): the workflows that run the VM and cloud targets.
 - [Architecture](ARCHITECTURE.md), [Contributing](CONTRIBUTING.md), the
   [decision records](docs/adr/) and the [changelog](CHANGELOG.md).
+- [Stability](docs/stability.md), [comparisons with other tools](docs/comparisons/README.md), [RFCs](rfcs/README.md), the [code of conduct](CODE_OF_CONDUCT.md) and the [security policy](SECURITY.md).
 
 ## Using the library
 

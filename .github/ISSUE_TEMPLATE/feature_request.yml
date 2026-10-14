@@ -1,0 +1,33 @@
+name: Feature request
+description: Something Isoloom should do that it doesn't yet.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A change to the spec's syntax, a new target or a breaking change needs an RFC
+        (rfcs/README.md); this issue is a good place to start the conversation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and where Isoloom gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: How it could look in isoloom.yml or on the command line.
+    validations:
+      required: true
+  - type: textarea
+    id: targets
+    attributes:
+      label: Targets
+      description: Which targets it concerns, and how each could produce it (or should refuse it).
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What you do today instead, and other designs you considered.
