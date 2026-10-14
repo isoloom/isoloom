@@ -1,6 +1,7 @@
-//! The registry of backends, one per generated target. Compose and external render the plan; the targets
-//! not migrated yet go through [`LegacyBackend`], which runs today's generator on the spec the
-//! plan was built from, with the text post-passes it still needs, so their output is unchanged.
+//! The registry of backends, one per generated target. Compose, external, docker-vm and hybrid
+//! render the plan; the targets not migrated yet go through [`LegacyBackend`], which runs today's
+//! generator on the spec the plan was built from, with the text post-passes it still needs, so
+//! their output is unchanged.
 
 use isoloom_compose::ComposeBackend;
 use isoloom_external::ExternalBackend;
@@ -10,7 +11,7 @@ use isoloom_render::backend::{Backend, Files, RenderError};
 use isoloom_render::{GenerateError, constraints, project};
 use isoloom_spec::model::{Spec, Target};
 use isoloom_terraform::{cloud_docker, cloud_services, cloud_vm, proxmox};
-use isoloom_vagrant::{docker_vm, hybrid, vagrant};
+use isoloom_vagrant::{DockerVmBackend, HybridBackend, vagrant};
 
 /// A generator that predates the plan: a pure function of the spec.
 type Generator = fn(&Spec) -> Result<Files, GenerateError>;
@@ -25,7 +26,7 @@ pub struct LegacyBackend {
 impl LegacyBackend {
     /// Whether the target runs Docker's networks, so it can wire network appliances.
     fn docker_family(&self) -> bool {
-        matches!(self.target, Target::DockerVm | Target::CloudDocker)
+        self.target == Target::CloudDocker
     }
 }
 
@@ -36,7 +37,14 @@ impl Backend for LegacyBackend {
 
     /// Everything but appliances off Docker: the generator itself refuses what it can't do.
     fn capabilities(&self) -> Capabilities {
-        let all = [Feature::EnvironmentProvisioning, Feature::PlaybookChecks, Feature::ExecWithoutContainer];
+        let all = [
+            Feature::EnvironmentProvisioning,
+            Feature::PlaybookChecks,
+            Feature::ExecWithoutContainer,
+            Feature::Gateways,
+            Feature::VolumesAcrossShapes,
+            Feature::VmAfterContainer,
+        ];
         let appliances = self.docker_family().then_some(Feature::NetworkAppliances);
         Capabilities::of(all.into_iter().chain(appliances))
     }
@@ -71,12 +79,6 @@ fn compose_of(spec: &Spec) -> Result<Files, GenerateError> {
     isoloom_compose::render(Target::Docker, &env).map_err(GenerateError::from)
 }
 
-fn docker_vm_files(spec: &Spec) -> Result<Files, GenerateError> {
-    let mut files = compose_of(spec)?;
-    files.extend(docker_vm::generate(spec)?);
-    Ok(files)
-}
-
 fn cloud_docker_files(spec: &Spec) -> Result<Files, GenerateError> {
     let mut files = compose_of(spec)?;
     files.extend(cloud_docker::generate(spec)?);
@@ -89,10 +91,10 @@ const fn legacy(target: Target, generate: Generator) -> LegacyBackend {
 
 static DOCKER: ComposeBackend = ComposeBackend(Target::Docker);
 static HOSTED: ComposeBackend = ComposeBackend(Target::Hosted);
-static DOCKER_VM: LegacyBackend = legacy(Target::DockerVm, docker_vm_files);
+static DOCKER_VM: DockerVmBackend = DockerVmBackend;
 static CLOUD_DOCKER: LegacyBackend = legacy(Target::CloudDocker, cloud_docker_files);
 static KUBERNETES: LegacyBackend = legacy(Target::Kubernetes, kubernetes::generate);
-static HYBRID: LegacyBackend = legacy(Target::Hybrid, hybrid::generate);
+static HYBRID: HybridBackend = HybridBackend;
 static VAGRANT: LegacyBackend = legacy(Target::Vagrant, vagrant::generate);
 static PROXMOX: LegacyBackend = legacy(Target::Proxmox, proxmox::generate);
 static CLOUD_VM: LegacyBackend = legacy(Target::CloudVm, cloud_vm::generate);

@@ -16,5 +16,8 @@ isoloom-terraform.workspace = true
 serde_yaml_ng.workspace = true
 indexmap.workspace = true
 
+[dev-dependencies]
+insta.workspace = true
+
 [lints]
 workspace = true

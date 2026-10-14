@@ -59,6 +59,22 @@ pub fn constraints_step(spec: &Spec, indent: &str, var: &str) -> String {
 use isoloom_render::rb;
 
 pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
+    generate_in(spec, &Layout { dir: DIR, extra: "" })
+}
+
+/// Where a Vagrantfile goes and what it carries besides the spec's VMs: `hybrid` writes its
+/// VMs to `.isoloom/hybrid/`, with its Docker host as one more `config.vm.define` block.
+#[derive(Debug, Clone, Copy)]
+pub struct Layout<'a> {
+    /// The folder under `.isoloom/`.
+    pub dir: &'a str,
+    /// Ruby added at the end of the `configure` block (complete statements, indented for it).
+    pub extra: &'a str,
+}
+
+/// [`generate`], into `layout`.
+pub fn generate_in(spec: &Spec, layout: &Layout) -> Result<Vec<GeneratedFile>, GenerateError> {
+    let dir = layout.dir;
     common_unsupported(spec, Target::Vagrant)?;
     let unsupported = |what: String| GenerateError::Unsupported { target: Target::Vagrant, what };
     for (name, m) in &spec.machines {
@@ -83,7 +99,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     }
 
     let mut out = header("#");
-    out.push_str("# Start:  cd .isoloom/vagrant && vagrant up\n# Stop:   cd .isoloom/vagrant && vagrant destroy -f\n\n");
+    let _ = write!(
+        out,
+        "# Start:  cd .isoloom/{dir} && vagrant up\n# Stop:   cd .isoloom/{dir} && vagrant destroy -f\n\n"
+    );
     // Machines start one after the other, in dependency order: a machine's services are up
     // before the ones depending on it boot, the controller comes last, and on QEMU the VM that
     // listens on a network's link is up before the one that connects. QEMU and libvirt declare
@@ -399,7 +418,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
         // runner script next to the Vagrantfile, uploaded and run here, where the machine stands.
         if let Some(group) = groups.iter().find(|(p, _)| *p == checks::Position::Machine(name.to_string())).map(|(_, g)| g) {
             check_files.push(GeneratedFile {
-                path: format!("{OUTPUT_DIR}/{DIR}/checks/{name}.sh"),
+                path: format!("{OUTPUT_DIR}/{dir}/checks/{name}.sh"),
                 contents: checks::script(&checks::Position::Machine(name.to_string()), group, &render),
             });
             let _ = writeln!(out, "{}", checks_provisioner(&format!("checks/{name}.sh"), group));
@@ -420,16 +439,17 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     if !spec.provision.is_empty() || !on_controller.is_empty() {
         if !on_controller.is_empty() {
             check_files.push(GeneratedFile {
-                path: format!("{OUTPUT_DIR}/{DIR}/checks/controller.sh"),
+                path: format!("{OUTPUT_DIR}/{dir}/checks/controller.sh"),
                 contents: checks::script(&checks::Position::Networks, &on_controller, &render),
             });
         }
         controller_vm(spec, &mut out, &on_controller, &links);
     }
+    out.push_str(layout.extra);
     out.push_str("end\n");
 
     let mut files = vec![GeneratedFile {
-        path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
+        path: format!("{OUTPUT_DIR}/{dir}/Vagrantfile"),
         contents: out,
     }];
     files.extend(check_files);

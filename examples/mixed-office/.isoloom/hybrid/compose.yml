@@ -14,6 +14,8 @@ services:
         ipv4_address: 192.168.58.20
         gw_priority: 1
       isoloom-publish: null
+    extra_hosts:
+    - files01:192.168.58.10
     ports:
     - 8083:80
     volumes:
@@ -37,8 +39,6 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: mixed-office
     restart: unless-stopped
-    extra_hosts:
-    - files01:192.168.58.10
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -54,7 +54,7 @@ services:
       isoloom.environment: mixed-office
     restart: no
 networks:
-  isoloom-publish: null
+  isoloom-publish: {}
   office:
     external: true
     name: isoloom-mixed-office-office
