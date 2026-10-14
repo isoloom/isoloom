@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Compose coverage table v2
+- The Compose table lists every nested key path of the pinned compose-spec schema (347 rows, from 118): `deploy.*`, `healthcheck.*`, `build.*`, long-form `ports` and `volumes`, `services.*.networks.*`, `ipam.config[]`, and the items of `configs`, `secrets` and `models`. Jobs and `pre_start` hooks stay one row each (they are whole service definitions). Split by section under `isoloom-coverage/src/compose/`.
+- Its written-features test reads every Compose file Isoloom writes (`docker`, `hosted`, `docker-vm`, `cloud-docker`, `hybrid`) for every example and a fixture, through the schema.
+- `scripts/refresh-compose-schema.sh` refreshes the schema at its pin and writes `coverage/compose-keys.txt`; `ISOLOOM_REFRESH=latest` reads upstream's main.
+- Rows re-decided under the new classification ADR (`docs/adr/0006-coverage-classification.md`): `configs`, `working_dir`, `dns_opt`, `secrets`, `gpus` and `devices` are Planned; `command` and `healthcheck` are Partial; `models` is Not portable. Compose coverage is 68% of 148 portable features (was 95% of 59).
+
 ### Per-cloud refusals surfaced
 - `resolved.json`'s `targets` gains `clouds`: for a generated `cloud-vm`, the clouds whose module is written (`generated`) and each refused cloud with its reason (`refused`), from `cloud_vm::cloud_refusals`. The snapshot stays at version 1 (a new field). Every example's `resolved.json` is regenerated.
 - `isoloom targets` lists the refused clouds under `cloud-vm`, one indented line each (``✗ gcp (machine `web01`: Windows on GCP comes later)``).

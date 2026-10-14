@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 95% | 59 | 56 | 1 | 2 |
+| [Docker Compose](#docker-compose) | 68% | 148 | 99 | 4 | 45 |
 | [Vagrant](#vagrant) | 88% | 36 | 32 | 0 | 4 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 7 | 7 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
@@ -41,7 +41,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-95% of 59 portable features (56 done, 1 partly, 2 to do; 118 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+68% of 148 portable features (99 done, 4 partly, 45 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -50,12 +50,15 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `version` | n/a | No | Obsolete in Compose |
 | `name` | Yes | Yes | From `name` |
 | `include` | n/a | No | Compose tooling, not the environment's behavior |
+| `include[].path` | n/a | No | Compose tooling, not the environment's behavior |
+| `include[].env_file` | n/a | No | Compose tooling, not the environment's behavior |
+| `include[].project_directory` | n/a | No | Compose tooling, not the environment's behavior |
 | `services` | Yes | Yes | From `machines` |
+| `models` | No | No | Served by Docker's model runner: VMs and the cloud have none |
 | `networks` | Yes | Yes | From `networks` |
 | `volumes` | Yes | Yes | From `machines.*.volumes` |
-| `secrets` | Yes | Another way | Via inputs (values given at launch, never baked into images) |
-| `configs` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
-| `models` | n/a | No | Compose tooling, not the environment's behavior |
+| `secrets` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `configs` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
 | `jobs` | Yes | Another way | Via docker.init (one-shot jobs) |
 
 ### Services
@@ -65,13 +68,66 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `annotations` | n/a | No | Compose tooling, not the environment's behavior |
 | `attach` | n/a | No | Compose tooling, not the environment's behavior |
 | `blkio_config` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_read_bps` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_read_bps[].path` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_read_bps[].rate` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_read_iops` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_read_iops[].path` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_read_iops[].rate` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_write_bps` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_write_bps[].path` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_write_bps[].rate` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_write_iops` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_write_iops[].path` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.device_write_iops[].rate` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.weight` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.weight_device` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.weight_device[].path` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `blkio_config.weight_device[].weight` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `build` | Yes | Yes | From `machines.*.docker.build` |
+| `build.context` | Yes | Yes | From `machines.*.docker.build` |
+| `build.dockerfile` | Yes | Yes | From `machines.*.docker.dockerfile` |
+| `build.dockerfile_inline` | Yes | Another way | Via machines.*.docker.dockerfile (a file beside the spec) |
+| `build.entitlements` | n/a | No | How the image is built, not the machine it produces |
+| `build.args` | Yes | Yes | From `machines.*.docker.args` |
+| `build.ssh` | n/a | No | How the image is built, not the machine it produces |
+| `build.labels` | Yes | Yes | The environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc` |
+| `build.cache_from` | n/a | No | How the image is built, not the machine it produces |
+| `build.cache_to` | n/a | No | How the image is built, not the machine it produces |
+| `build.no_cache` | n/a | No | How the image is built, not the machine it produces |
+| `build.no_cache_filter` | n/a | No | How the image is built, not the machine it produces |
+| `build.additional_contexts` | n/a | No | How the image is built, not the machine it produces |
+| `build.network` | n/a | No | How the image is built, not the machine it produces |
+| `build.provenance` | n/a | No | How the image is built, not the machine it produces |
+| `build.sbom` | n/a | No | How the image is built, not the machine it produces |
+| `build.pull` | n/a | No | How the image is built, not the machine it produces |
+| `build.target` | Yes | Not yet | A build stage, beside machines.*.docker.dockerfile |
+| `build.shm_size` | n/a | No | How the image is built, not the machine it produces |
+| `build.extra_hosts` | n/a | No | How the image is built, not the machine it produces |
+| `build.isolation` | n/a | No | How the image is built, not the machine it produces |
+| `build.privileged` | n/a | No | How the image is built, not the machine it produces |
+| `build.secrets` | n/a | No | How the image is built, not the machine it produces |
+| `build.secrets[].source` | n/a | No | How the image is built, not the machine it produces |
+| `build.secrets[].target` | n/a | No | How the image is built, not the machine it produces |
+| `build.secrets[].uid` | n/a | No | How the image is built, not the machine it produces |
+| `build.secrets[].gid` | n/a | No | How the image is built, not the machine it produces |
+| `build.secrets[].mode` | n/a | No | How the image is built, not the machine it produces |
+| `build.tags` | n/a | No | How the image is built, not the machine it produces |
+| `build.ulimits` | n/a | No | How the image is built, not the machine it produces |
+| `build.ulimits.*.hard` | n/a | No | How the image is built, not the machine it produces |
+| `build.ulimits.*.soft` | n/a | No | How the image is built, not the machine it produces |
+| `build.platforms` | Yes | Another way | Via platform (from machines.*.arch) |
 | `cap_add` | Yes | Yes | From `networks.*.gateway` (capabilities only exist for containers: root on a VM has them all) |
 | `cap_drop` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `cgroup` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `cgroup_parent` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `command` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
-| `configs` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
+| `command` | Yes | Partly | Isoloom's tools: tools.*.command; not yet: a machine's own command |
+| `configs` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `configs[].source` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `configs[].target` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `configs[].uid` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `configs[].gid` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `configs[].mode` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
 | `container_name` | Yes | Another way | Via the machine's name |
 | `cpu_count` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `cpu_percent` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
@@ -83,25 +139,110 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `cpus` | Yes | Another way | Via machines.*.resources.cpus, written as deploy.resources.limits |
 | `cpuset` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `credential_spec` | No | No | Windows containers only |
+| `credential_spec.config` | No | No | Windows containers only |
+| `credential_spec.file` | No | No | Windows containers only |
+| `credential_spec.registry` | No | No | Windows containers only |
 | `depends_on` | Yes | Yes | From `machines.*.depends_on` |
+| `depends_on.*.restart` | n/a | No | Compose's restart of dependents on `docker compose restart` |
+| `depends_on.*.required` | n/a | No | Lets Compose start without a dependency: Isoloom's are always required |
+| `depends_on.*.condition` | Yes | Yes | From `machines.*.depends_on` (healthy, or an init job completed) |
 | `deploy` | Yes | Yes | From `machines.*.resources` (replicas: see `scale`) |
+| `deploy.mode` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.endpoint_mode` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.replicas` | Yes | Another way | Via machines.*.count (identical machines, each with its own name and address) |
+| `deploy.labels` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.rollback_config` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.rollback_config.parallelism` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.rollback_config.delay` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.rollback_config.failure_action` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.rollback_config.monitor` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.rollback_config.max_failure_ratio` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.rollback_config.order` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.update_config` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.update_config.parallelism` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.update_config.delay` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.update_config.failure_action` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.update_config.monitor` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.update_config.max_failure_ratio` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.update_config.order` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.resources` | Yes | Yes | From `machines.*.resources` |
+| `deploy.resources.limits` | Yes | Yes | From `machines.*.resources` |
+| `deploy.resources.limits.cpus` | Yes | Yes | From `machines.*.resources.cpus` |
+| `deploy.resources.limits.memory` | Yes | Yes | From `machines.*.resources.memory_mb` |
+| `deploy.resources.limits.pids` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
+| `deploy.resources.reservations` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `deploy.resources.reservations.cpus` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `deploy.resources.reservations.memory` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
+| `deploy.resources.reservations.generic_resources` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.resources.reservations.generic_resources[].discrete_resource_spec` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.resources.reservations.generic_resources[].discrete_resource_spec.kind` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.resources.reservations.generic_resources[].discrete_resource_spec.value` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.resources.reservations.devices` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `deploy.resources.reservations.devices[].capabilities` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `deploy.resources.reservations.devices[].count` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `deploy.resources.reservations.devices[].device_ids` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `deploy.resources.reservations.devices[].driver` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `deploy.resources.reservations.devices[].options` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `deploy.restart_policy` | Yes | Another way | Via restart (always unless-stopped: machines stay up like VMs) |
+| `deploy.restart_policy.condition` | Yes | Another way | Via restart (always unless-stopped: machines stay up like VMs) |
+| `deploy.restart_policy.delay` | Yes | Another way | Via restart (always unless-stopped: machines stay up like VMs) |
+| `deploy.restart_policy.max_attempts` | Yes | Another way | Via restart (always unless-stopped: machines stay up like VMs) |
+| `deploy.restart_policy.window` | Yes | Another way | Via restart (always unless-stopped: machines stay up like VMs) |
+| `deploy.placement` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.placement.constraints` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.placement.preferences` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.placement.preferences[].spread` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `deploy.placement.max_replicas_per_node` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
 | `develop` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].ignore` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].include` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].path` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].action` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].target` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].exec` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].exec.command` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].exec.user` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].exec.privileged` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].exec.working_dir` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].exec.environment` | n/a | No | Compose tooling, not the environment's behavior |
+| `develop.watch[].initial_sync` | n/a | No | Compose tooling, not the environment's behavior |
 | `device_cgroup_rules` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `devices` | No | No | Host devices: hosting services and cloud VMs have none to pass |
+| `devices` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
+| `devices[].source` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
+| `devices[].target` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
+| `devices[].permissions` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
 | `dns` | Yes | Yes | From `machines.*.dns.servers` (and the Kubernetes dnsConfig) |
-| `dns_opt` | Yes | In the image | Resolver options (resolv.conf) belong to the machine's provisioning |
+| `dns_opt` | Yes | Not yet | Resolver options, beside machines.*.dns |
 | `dns_search` | Yes | Yes | From `machines.*.dns.search` (and the Kubernetes dnsConfig) |
 | `domainname` | Yes | Yes | From `machines.*.dns.domain` |
 | `entrypoint` | Yes | Yes | Isoloom's own containers and init jobs; a machine's own is its image's |
 | `env_file` | Yes | Another way | Via inputs |
+| `env_file[].path` | Yes | Another way | Via inputs |
+| `env_file[].format` | Yes | Another way | Via inputs |
+| `env_file[].required` | Yes | Another way | Via inputs |
 | `environment` | Yes | Yes | From `machines.*.environment and machines.*.inputs` |
 | `expose` | Yes | Another way | Via machines.*.services (every port is reachable on the machine's networks) |
 | `extends` | n/a | No | Compose tooling, not the environment's behavior |
+| `extends.service` | n/a | No | Compose tooling, not the environment's behavior |
+| `extends.file` | n/a | No | Compose tooling, not the environment's behavior |
 | `external_links` | n/a | No | Legacy; replaced by networks |
 | `extra_hosts` | Yes | Yes | From `machines.*.networks` (names of machines on other networks) |
-| `gpus` | No | No | Local VMs can't use the host's GPU |
+| `gpus` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `gpus[].capabilities` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `gpus[].count` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `gpus[].device_ids` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `gpus[].driver` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
+| `gpus[].options` | Yes | Not yet | GPU passthrough where the target has a GPU, refused where it has none |
 | `group_add` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
-| `healthcheck` | Yes | Yes | From `machines.*.services` (a probe of every port) |
+| `healthcheck` | Yes | Partly | From `machines.*.services` (a probe of every port); not yet: a custom healthcheck command |
+| `healthcheck.disable` | n/a | No | Turns off the image's own check: Isoloom's readiness is its own probe |
+| `healthcheck.interval` | Yes | Yes | Isoloom's probe pace |
+| `healthcheck.retries` | Yes | Yes | Isoloom's probe pace |
+| `healthcheck.test` | Yes | Partly | From `machines.*.services` (a probe of every port); not yet: a custom healthcheck command |
+| `healthcheck.timeout` | Yes | Yes | Isoloom's probe pace |
+| `healthcheck.start_period` | Yes | Yes | A grace period for slow starters: appliances and built images |
+| `healthcheck.start_interval` | Yes | Another way | Via interval (Isoloom probes at one pace) |
 | `hostname` | Yes | Yes | From the machine's name |
 | `image` | Yes | Yes | From `machines.*.docker.image` |
 | `init` | n/a | No | Container mechanics: a VM always runs its own init |
@@ -111,33 +252,70 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `labels` | Yes | Yes | From `machines.*.services` (isoloom.service.<name>, for tools reading the containers); isoloom.managed and isoloom.environment on every service, for `isoloom gc` |
 | `links` | n/a | No | Legacy; replaced by networks |
 | `logging` | n/a | No | Where the runner collects logs |
+| `logging.driver` | n/a | No | Where the runner collects logs |
+| `logging.options` | n/a | No | Where the runner collects logs |
 | `mac_address` | No | No | Cloud VMs get their MAC address from the provider |
 | `mem_limit` | Yes | Another way | Via machines.*.resources.memory_mb, written as deploy.resources.limits |
 | `mem_reservation` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `mem_swappiness` | No | No | Cloud VMs only choose a size: no CPU or memory scheduling knobs |
 | `memswap_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `models` | n/a | No | Compose tooling, not the environment's behavior |
+| `models` | No | No | Served by Docker's model runner: VMs and the cloud have none |
+| `models.*.endpoint_var` | No | No | Served by Docker's model runner: VMs and the cloud have none |
+| `models.*.model_var` | No | No | Served by Docker's model runner: VMs and the cloud have none |
 | `network_mode` | Yes | Yes | Isoloom's own sidecars and check runner; sharing another machine's network isn't possible between VMs |
 | `networks` | Yes | Yes | From `machines.*.networks` (fixed addresses) |
+| `networks.*.aliases` | Yes | Yes | From `machines.*.aliases` |
+| `networks.*.interface_name` | Yes | Yes | Network appliances: each network on the interface the image expects |
+| `networks.*.ipv4_address` | Yes | Yes | From `machines.*.networks` (fixed addresses) |
+| `networks.*.ipv6_address` | Yes | Not yet | IPv6 networks |
+| `networks.*.link_local_ips` | No | No | Link-local addresses on a container's interface: cloud VMs get theirs from the provider |
+| `networks.*.mac_address` | Yes | Yes | VLAN trunks: each end found by its fixed MAC address |
+| `networks.*.driver_opts` | No | No | Docker network driver options |
+| `networks.*.priority` | Yes | Yes | Network appliances: the order their interfaces come up in |
+| `networks.*.gw_priority` | Yes | Yes | The hybrid target: the default route through the network shared with the VMs |
 | `oom_kill_disable` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `oom_score_adj` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `pid` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `pids_limit` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `platform` | Yes | Yes | From `machines.*.arch` (pinned on every container, so the machine runs the same on an x86-64 or an ARM host) |
 | `ports` | Yes | Yes | From `machines.*.services[].publish` (on the host's loopback; `/udp` with `protocol: udp`) |
+| `ports[].name` | n/a | No | Names the port for tools |
+| `ports[].mode` | n/a | No | Swarm's scheduling across hosts: an environment's containers share one |
+| `ports[].host_ip` | Yes | Another way | Via the short form Isoloom writes (`host_ip:published:target/protocol`) |
+| `ports[].target` | Yes | Another way | Via the short form Isoloom writes (`host_ip:published:target/protocol`) |
+| `ports[].published` | Yes | Another way | Via the short form Isoloom writes (`host_ip:published:target/protocol`) |
+| `ports[].protocol` | Yes | Another way | Via the short form Isoloom writes (`host_ip:published:target/protocol`) |
+| `ports[].app_protocol` | n/a | No | Names the port's protocol for tools |
 | `post_start` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
+| `post_start[].command` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
+| `post_start[].user` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
+| `post_start[].privileged` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
+| `post_start[].working_dir` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
+| `post_start[].environment` | Yes | Another way | Via machines.*.docker.init (runs once the machine answers) |
 | `pre_start` | Yes | Another way | Via machines.*.depends_on and docker.init |
 | `pre_stop` | n/a | No | Compose tooling, not the environment's behavior |
+| `pre_stop[].command` | n/a | No | Compose tooling, not the environment's behavior |
+| `pre_stop[].user` | n/a | No | Compose tooling, not the environment's behavior |
+| `pre_stop[].privileged` | n/a | No | Compose tooling, not the environment's behavior |
+| `pre_stop[].working_dir` | n/a | No | Compose tooling, not the environment's behavior |
+| `pre_stop[].environment` | n/a | No | Compose tooling, not the environment's behavior |
 | `privileged` | Yes | Yes | From `machines.*.privileged` (the container runs privileged; a VM already has it, its workload is root) |
 | `profiles` | Yes | Yes | From `checks` (a `check` profile) |
 | `provider` | n/a | No | Compose tooling, not the environment's behavior |
+| `provider.type` | n/a | No | Compose tooling, not the environment's behavior |
+| `provider.options` | n/a | No | Compose tooling, not the environment's behavior |
 | `pull_policy` | n/a | No | Compose tooling, not the environment's behavior |
 | `pull_refresh_after` | n/a | No | Compose tooling, not the environment's behavior |
 | `read_only` | Yes | Yes | From `machines.*.read_only` (a read-only root filesystem; `volumes` stay writable) |
 | `restart` | Yes | Yes | Always unless-stopped: machines stay up like VMs |
 | `runtime` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `scale` | Yes | Another way | Via machines.*.count (identical machines, each with its own name and address) |
-| `secrets` | Yes | Another way | Via machines.*.inputs |
+| `secrets` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `secrets[].source` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `secrets[].target` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `secrets[].uid` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `secrets[].gid` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `secrets[].mode` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
 | `security_opt` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `shm_size` | Yes | Yes | From `machines.*.shm_size` (and a Memory emptyDir on Kubernetes) |
 | `stdin_open` | n/a | No | Compose tooling, not the environment's behavior |
@@ -148,38 +326,104 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `tmpfs` | Yes | Yes | From `machines.*.tmpfs` (and Memory emptyDirs on Kubernetes) |
 | `tty` | n/a | No | Compose tooling, not the environment's behavior |
 | `ulimits` | Yes | Yes | From `machines.*.ulimits` |
+| `ulimits.*.hard` | Yes | Yes | From `machines.*.ulimits` |
+| `ulimits.*.soft` | Yes | Yes | From `machines.*.ulimits` |
 | `use_api_socket` | No | No | Hands the host's Docker to a machine: VMs and the cloud have none |
 | `user` | Yes | Yes | Isoloom's check runner, as root to drop its default route on offline networks; a machine's own user is its image's |
 | `userns_mode` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `uts` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `volumes` | Yes | Yes | From `machines.*.volumes and volumes` (shared between machines; seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts) |
+| `volumes[].type` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
+| `volumes[].source` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
+| `volumes[].target` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
+| `volumes[].read_only` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
+| `volumes[].consistency` | n/a | No | Docker Desktop's file sharing tuning |
+| `volumes[].bind` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
+| `volumes[].bind.propagation` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
+| `volumes[].bind.create_host_path` | n/a | No | How Docker treats a missing host folder |
+| `volumes[].bind.recursive` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
+| `volumes[].bind.selinux` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
+| `volumes[].volume` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
+| `volumes[].volume.labels` | n/a | No | Labels on a volume Compose creates on the fly: Isoloom declares its volumes |
+| `volumes[].volume.nocopy` | n/a | No | Skips seeding the volume with the image's files: Isoloom always seeds |
+| `volumes[].volume.subpath` | Yes | Not yet | Mounting one folder of a shared volume |
+| `volumes[].tmpfs` | Yes | Another way | Via tmpfs (from machines.*.tmpfs) |
+| `volumes[].tmpfs.size` | Yes | Not yet | A size for machines.*.tmpfs |
+| `volumes[].tmpfs.mode` | Yes | Not yet | A mode for machines.*.tmpfs |
+| `volumes[].image` | No | No | Mounts another container image's files: VMs have no images to mount |
+| `volumes[].image.subpath` | No | No | Mounts another container image's files: VMs have no images to mount |
 | `volumes_from` | Yes | Another way | Via volumes (a volume shared between machines, each mounting it at its own path) |
-| `working_dir` | Yes | In the image | Set it in the image (`docker.build`) or the VM's provisioning |
+| `working_dir` | Yes | Not yet | A machine's working directory, with its command |
 
 ### Networks
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `attachable` | n/a | No | Compose tooling, not the environment's behavior |
+| `name` | Yes | Yes | The hybrid target: the Docker network its host VM created for each network; elsewhere Compose scopes names to the environment |
 | `driver` | No | No | Docker network drivers (overlay, macvlan) have no VM equivalent |
 | `driver_opts` | No | No | Docker network driver options |
+| `ipam` | Yes | Yes | From `networks.*.cidr` |
+| `ipam.driver` | No | No | Docker IPAM drivers have no VM equivalent |
+| `ipam.config` | Yes | Yes | From `networks.*.cidr` |
+| `ipam.config[].subnet` | Yes | Yes | From `networks.*.cidr` |
+| `ipam.config[].ip_range` | n/a | No | Docker's pool for addresses it picks: every machine has a fixed one |
+| `ipam.config[].gateway` | Yes | Yes | The address Docker takes, when the first one is a machine's or the router's |
+| `ipam.config[].aux_addresses` | n/a | No | Addresses Docker must not hand out: every machine has a fixed one |
+| `ipam.options` | No | No | Docker IPAM driver options |
+| `external` | Yes | Partly | The hybrid target: its containers join the macvlan networks the Docker host VM creates, shared with the VMs; not yet: joining a network outside the environment (a Docker network, a host bridge, a VPC) |
+| `external.name` | n/a | No | Legacy spelling of `name` |
+| `internal` | Yes | Yes | From `networks.*.internet: false` (when nothing routes) |
 | `enable_ipv4` | n/a | No | Networks are IPv4 (the default) |
 | `enable_ipv6` | Yes | Not yet | IPv6 networks |
-| `external` | Yes | Partly | The hybrid target: its containers join the macvlan networks the Docker host VM creates, shared with the VMs; not yet: joining a network outside the environment (a Docker network, a host bridge, a VPC) |
-| `internal` | Yes | Yes | From `networks.*.internet: false` (when nothing routes) |
-| `ipam` | Yes | Yes | From `networks.*.cidr` |
-| `labels` | Yes | Yes | From `the environment: isoloom.managed and isoloom.environment, for `isoloom gc`` |
-| `name` | Yes | Yes | The hybrid target: the Docker network its host VM created for each network; elsewhere Compose scopes names to the environment |
+| `attachable` | n/a | No | Compose tooling, not the environment's behavior |
+| `labels` | Yes | Yes | The environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc` |
 
 ### Volumes
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
+| `name` | n/a | No | Compose scopes names to the environment |
 | `driver` | No | No | Docker volume drivers have no VM equivalent |
 | `driver_opts` | No | No | Docker volume driver options |
 | `external` | Yes | Not yet | With volumes (data that outlives the environment) |
-| `labels` | Yes | Yes | From `the environment: isoloom.managed and isoloom.environment, for `isoloom gc`` |
+| `external.name` | n/a | No | Legacy spelling of `name` |
+| `labels` | Yes | Yes | The environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc` |
+
+### Configs
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
 | `name` | n/a | No | Compose scopes names to the environment |
+| `content` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `environment` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `file` | Yes | Not yet | Machine files: content placed at a path on the machine, on every target |
+| `external` | n/a | No | A config created outside Compose |
+| `external.name` | n/a | No | Legacy spelling of `name` |
+| `labels` | n/a | No | Compose tooling, not the environment's behavior |
+| `template_driver` | n/a | No | Swarm's templating of configs |
+
+### Secrets
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `name` | n/a | No | Compose scopes names to the environment |
+| `environment` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `file` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `external` | Yes | Not yet | Real secrets (#147): files from a secret store, never environment values |
+| `external.name` | n/a | No | Legacy spelling of `name` |
+| `labels` | n/a | No | Compose tooling, not the environment's behavior |
+| `driver` | No | No | Docker secret drivers have no VM equivalent |
+| `driver_opts` | No | No | Docker secret driver options |
+| `template_driver` | n/a | No | Swarm's templating of secrets |
+
+### Models
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `name` | No | No | Served by Docker's model runner: VMs and the cloud have none |
+| `model` | No | No | Served by Docker's model runner: VMs and the cloud have none |
+| `context_size` | No | No | Served by Docker's model runner: VMs and the cloud have none |
+| `runtime_flags` | No | No | Served by Docker's model runner: VMs and the cloud have none |
 
 ## Vagrant
 
