@@ -93,7 +93,7 @@ Isoloom exists for the Cyber CTF launcher. Its three modes must work in 1.0, on 
 | Compatibility | Fresh start: no aliases or deprecations carried into 1.0 (`services:`, old OS names, `qemu_refusal`...). The new format is **`version: 2`**, because 0.x specs already say `version: 1`, so `isoloom migrate` can tell them apart without guessing. |
 | Workflow | Local development on `main` in each repository. No PRs, no releases. The three repositories sit side by side with **path dependencies** (no git revs) until the 1.0 publish. One script runs every repository's checks. At the first satisfying version: squash, re-enable CI, publish. |
 | Docs | Written at the end, inside the repo. The website is rewritten from them. |
-| Launcher | **Proposed change, needs the maintainer's OK:** integrate it from the walking skeleton (Phase 2) on, instead of after 1.0. It is the reason 1.0 exists, and only it can validate the run manifest. Launcher, runner and Isoloom ship 1.0 together. |
+| Launcher | **Decided:** integrate it from the walking skeleton (Phase 2) on, instead of after 1.0. It is the reason 1.0 exists, and only it can validate the run manifest. Launcher, runner and Isoloom ship 1.0 together. |
 | GitHub | Done: PRs and issues closed, releases and tags deleted, workflows disabled. |
 
 ## 3. Target architecture
@@ -183,7 +183,7 @@ Sizes: S is about a day of focused work, M a few days, L about a week. There are
    - **Reuse:** salvage the generate-everything pipeline from `v1/security-scanning`.
    - **Baseline:** failures found now become a baseline of existing problems, fixed in later phases rather than ignored.
 4. **Local multi-repository setup.** Clone `isoloom`, `isothrum` and the launcher side by side, with `[patch]` path dependencies. One `check-all` script runs every repository's checks.
-5. **Cross-platform check (proposed, needs the maintainer's OK).** A manual-only GitHub workflow that runs `check-all` on macOS, Windows and Linux on demand. No PRs and no automatic runs. Without it, Windows and Linux bugs surface only after the squash.
+5. **Cross-platform check (decided).** A manual-only GitHub workflow that runs `check-all` on macOS, Windows and Linux on demand. No PRs and no automatic runs. Without it, Windows and Linux bugs surface only after the squash.
 
 **Exit:** snapshots, corpus and `verify` are all green or baselined, and `check-all` passes.
 
@@ -267,11 +267,16 @@ Kubernetes, Helm, Kustomize, hybrid, hosted, external and Terraform ESXi, onto `
 
 ## 5. Open decisions
 
-1. **Integrate the launcher from Phase 2** instead of after 1.0. Recommended: it's the only consumer that can validate the contract, and it avoids a late big-bang switch.
-2. **The manual cross-platform workflow** (Phase 0.5). Recommended: no PRs, no automatic runs, only `check-all` on demand on macOS, Windows and Linux.
-3. **Track C:** which real infrastructure you can provide, and when.
-4. **CTF lab content and courses licence.**
-5. **Does the launcher use `isothrum-ui` (1.x)?** Recommended: yes.
+1. **CTF lab content and courses licence.**
+2. **Does the launcher use `isothrum-ui` (1.x)?** Recommended: yes.
+
+Decided on 2026-10-15:
+- The launcher is integrated from Phase 2.
+- There is a manual-only cross-platform workflow.
+- Track C infrastructure:
+  - Proxmox and ESXi run as VMs inside VMware on the Mac, as done before (nested virtualization).
+  - A Windows host is reachable over SSH at `10.0.0.40` for Windows host proof.
+  - Cloud accounts come later.
 
 ## 6. Salvage branches (local, not pushed)
 
