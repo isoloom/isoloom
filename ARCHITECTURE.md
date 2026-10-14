@@ -23,7 +23,8 @@ isoloom.yml -> spec -> plan -> render -> backends -> .isoloom/<target>/...
 3. **Render** (`isoloom-render`): the pieces every backend shares: addresses and names, the
    generated files' header, the controller's Ansible runs, HCL, Ruby and PowerShell quoting,
    the project copy, the hosts' setup, each set-up step's Linux and Windows script (`steps`),
-   the router, VLAN trunks, image constraints and `.isoloomignore`. `backend` defines the
+   the router, VLAN trunks, image constraints and `.isoloomignore`; `boot` keeps a step's
+   effect across restarts (a boot-time service). `backend` defines the
    `Backend` trait: a target, its capabilities, and `render(&Environment)`.
 4. **Backends** (`isoloom-compose`, `-kubernetes`, `-vagrant`, `-terraform`, `-external`):
    each turns the plan (Compose, through typed structs in `file`; external) or, until it migrates, the
@@ -42,8 +43,9 @@ requirements), a `MachineLifecycle` made of `Step`s with one Linux and one Windo
 each, and a `Backend` trait (`capabilities()` plus `render(&Environment)`). Refusal then becomes
 "requirements minus capabilities" instead of each generator deciding on its own. Until every
 backend moves to the plan (Wave 2), `LegacyBackend` keeps the other generators running
-unchanged; Compose, external, docker-vm and hybrid are on the plan, docker-vm and hybrid
-with the one Ruby builder (`isoloom_vagrant::ruby`) every Vagrantfile is meant to be written with.
+unchanged; Compose, external, docker-vm, hybrid and Vagrant are on the plan, the Vagrant ones
+with the one Ruby builder (`isoloom_vagrant::ruby`) every Vagrantfile is meant to be written with;
+Vagrant's `transport` runs each planned step as a Vagrant provisioner.
 
 ### The Ansible inventory
 
@@ -158,9 +160,9 @@ Enforced now (`deny`, so `cargo clippy --workspace --all-targets -- -D warnings`
   `missing_errors_doc`, `missing_panics_doc`, `doc_markdown`, `similar_names`); `unwrap_used`,
   `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic: `clippy.toml`);
   `print_stdout` (the command line allows it at its root: printing is its interface);
-  `too_many_arguments` above 5 (seven functions carry a targeted, commented `#[allow]`:
+  `too_many_arguments` above 5 (six functions carry a targeted, commented `#[allow]`:
   `inbound`, `nic`, `provision` and
-  `windows_machine` in `cloud_vm_others/azure.rs`, `providers` in `vagrant.rs`, `appliance` and
+  `windows_machine` in `cloud_vm_others/azure.rs`, `appliance` and
   `readiness` in isoloom-compose's `render.rs`).
 
 Tracked (`allow` today, denied by the end of Wave 2, issue #106): `missing_docs` for library

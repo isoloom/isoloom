@@ -241,11 +241,11 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `shell` | Yes | Yes | From `machines.*.vm.provision` (.sh, `reboot`), and Isoloom's own steps |
+| `shell` | Yes | Yes | From `machines.*.vm.provision` (.sh, .yml, .yaml, `reboot`), and Isoloom's own steps |
 | `file` | Yes | Another way | Via `isoloom_project` (below) copies the project; a file provisioner follows symlinks and lists files when the Vagrantfile loads |
 | `isoloom_project` | Yes | Yes | Isoloom's own provisioner, defined in the Vagrantfile: the project into each VM as a tar.gz built when the step runs, symlinks kept as links |
-| `ansible_local` | Yes | Yes | From `machines.*.vm.provision` (.yml, .yaml) |
-| `ansible` | Yes | Another way | Via ansible_local: the same playbooks, run inside the VM |
+| `ansible_local` | Yes | Another way | Via a shell provisioner running the playbook with `ansible-playbook -c local` inside the VM, the machine as its inventory (as on every VM target) |
+| `ansible` | Yes | Another way | Via the same playbooks, run inside the VM by a shell provisioner |
 | `chef` | Yes | Another way | Via a `.sh` provisioning step can run any tool |
 | `puppet` | Yes | Another way | Via a `.sh` provisioning step can run any tool |
 | `salt` | Yes | Another way | Via a `.sh` provisioning step can run any tool |

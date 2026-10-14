@@ -1,0 +1,197 @@
+//! Isoloom's own VMs: the router (when `reach` rules need one), the `shell` tool, and the
+//! controller that runs the environment's playbooks and the checks standing on every network.
+//! Their set-up goes through the same step renderings and transport as the lab's machines.
+
+use std::net::Ipv4Addr;
+
+use isoloom_plan::Environment;
+use isoloom_plan::checks::Position;
+use isoloom_plan::lifecycle::Step;
+use isoloom_render::inventory::{self, Access};
+use isoloom_render::{CONTROLLER_BOX, GeneratedFile, ansible_runs, boot, controller_box, controller_size};
+use isoloom_spec::validate::Cidr;
+
+use super::machine::{define, private_network};
+use super::providers::{self, Guest, Qemu, Size};
+use super::qemu::Link;
+use super::transport::{Os, shell, step_provisioners};
+use super::{CONTROLLER, Ctx, TOOL_SHELL, checks};
+use crate::router;
+use crate::ruby::{Ruby, Value};
+
+/// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
+const HELPER_BOX: &str = "bento/debian-12";
+/// The libvirt box of Isoloom's own Debian VMs (router, controller, tool shell).
+const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
+
+/// The provisioners of planned steps on one of Isoloom's own (Linux) VMs.
+fn steps_of(r: &mut Ruby, env: &Environment, vm: &str, steps: &[Step]) {
+    for s in steps {
+        step_provisioners(r, env, vm, s, Os::Linux);
+    }
+}
+
+/// Every machine by name, at its address on its first network (Isoloom's own VMs are on all).
+fn every_machine(env: &Environment) -> Step {
+    let entries = env
+        .machines
+        .values()
+        .filter_map(|mp| mp.addresses.first().map(|(_, ip)| (*ip, mp.names.clone())))
+        .collect();
+    Step::Hosts { entries }
+}
+
+/// One of Isoloom's own VMs, as its providers see it.
+fn helper<'a>(env: &Environment, what: &str, size: Size, nets: Vec<&'a str>, link: &'a Link) -> Guest<'a> {
+    Guest {
+        label: format!("{} · {what}", env.name),
+        esxi_name: format!("{}-{}", env.name, what.replace(' ', "-")),
+        size,
+        nets,
+        libvirt_box: Some(HELPER_LIBVIRT_BOX),
+        qemu: Qemu::helper(link),
+    }
+}
+
+/// Each network at the VM's address on it (`at`), as private networks.
+fn networks(r: &mut Ruby, env: &Environment, at: impl Fn(Cidr) -> Ipv4Addr) {
+    for (net, n) in &env.networks {
+        if let Some(c) = Cidr::parse(&n.cidr) {
+            private_network(r, env, net, at(c));
+        }
+    }
+}
+
+/// The router VM: on every network it routes, at its last address, forwarding with the
+/// `reach` rules (and impairing links with `tc`).
+pub fn router_vm(r: &mut Ruby, ctx: &Ctx) {
+    let env = ctx.env;
+    let Some(routed) = &env.router else { return };
+    let link = ctx.links.get(router::NAME).unwrap_or(&Link::None);
+    let spec = env.spec();
+    let tc = router::tc_script(spec)
+        .map(|t| boot::at_boot("tc", "Link impairment (networks.*.tc) on the isoloom router's interfaces", &t, false, &[]))
+        .unwrap_or_default();
+    let script = format!(
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{tc}",
+        router::nftables(spec),
+    );
+    define(r, router::NAME, |r| {
+        r.assign("m.vm.box", Value::str(HELPER_BOX));
+        r.assign("m.vm.hostname", Value::str(router::NAME));
+        for (net, ip) in routed {
+            private_network(r, env, net, *ip);
+        }
+        providers::blocks(r, &helper(env, "router", Size::HELPER, routed.keys().map(String::as_str).collect(), link));
+        steps_of(r, env, router::NAME, &[Step::Prelude]);
+        shell(r, "router", &script);
+    });
+}
+
+/// The tools: `shell` is a Debian VM on every network at the tool's address, with the usual
+/// observation tools, outside the environment's contract; the others have no VM form.
+pub fn tools(r: &mut Ruby, ctx: &Ctx) {
+    for (i, (name, tool)) in ctx.env.spec().tools.iter().enumerate() {
+        r.blank();
+        if name == "shell" {
+            r.comment("Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).");
+            tool_shell(r, ctx, i);
+        } else {
+            r.comment(&format!(
+                "Tool `{name}` ({}) runs on the container targets; no VM form.",
+                tool.image.as_deref().unwrap_or("image")
+            ));
+        }
+    }
+}
+
+fn tool_shell(r: &mut Ruby, ctx: &Ctx, index: usize) {
+    let env = ctx.env;
+    let link = ctx.links.get(TOOL_SHELL).unwrap_or(&Link::None);
+    let define = crate::ruby::Call::new("config.vm.define").arg(Value::str(TOOL_SHELL));
+    r.block(define, "m", |r| {
+        r.assign("m.vm.box", Value::str(HELPER_BOX));
+        r.assign("m.vm.hostname", Value::str("shell"));
+        networks(r, env, |c| c.tool(index));
+        let all = env.networks.keys().map(String::as_str).collect();
+        providers::blocks(r, &helper(env, "tool shell", Size::HELPER, all, link));
+        steps_of(r, env, TOOL_SHELL, &[Step::Prelude, every_machine(env)]);
+        shell(
+            r,
+            "toolbox",
+            "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq tcpdump nmap curl dnsutils netcat-openbsd iproute2 >/dev/null",
+        );
+    });
+}
+
+/// What the controller installs before Ansible: Python's venv, sshpass (password SSH), curl and
+/// netcat (checks). Alpine's packages (the default box), or Debian's (a `controller.image`).
+const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add -q --no-cache python3 sshpass curl netcat-openbsd\nelse\n  export DEBIAN_FRONTEND=noninteractive\n  apt-get update -qq\n  apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\nfi\n";
+
+/// The controller: a small VM (Alpine by default) on every network at its controller address,
+/// started after every machine. It writes the inventory, runs the environment's playbooks, then
+/// halts unless the spec keeps it running; it runs the checks standing on every network on
+/// demand (their runner is returned).
+pub fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
+    let env = ctx.env;
+    let (bx, version) = controller_box(env.spec());
+    let (cpus, mem, disk) = controller_size(env.spec());
+    let size = Size { cpus, mem, disk };
+    let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
+    let mut guest = helper(env, "controller", size, env.networks.keys().map(String::as_str).collect(), link);
+    // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other
+    // providers gets Debian's instead.
+    guest.libvirt_box = (bx == CONTROLLER_BOX).then_some(CONTROLLER_BOX);
+    let mut steps = vec![Step::Prelude];
+    steps.extend(size.disk.map(|_| Step::DiskGrow));
+    steps.extend([every_machine(env), Step::Project]);
+    let on_controller = &ctx.checks.controller;
+    define(r, CONTROLLER, |r| {
+        controller_box_line(r, bx, version);
+        r.assign("m.vm.hostname", Value::str(CONTROLLER));
+        networks(r, env, Cidr::controller);
+        providers::blocks(r, &guest);
+        steps_of(r, env, CONTROLLER, &steps);
+        controller_steps(r, env, !on_controller.is_empty());
+        if !on_controller.is_empty() {
+            checks::provisioner(r, "controller", on_controller);
+        }
+    });
+    (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, "controller", &Position::Networks, on_controller))
+}
+
+/// The default box (Alpine) unless the spec picks one; Debian's on an arm64 host.
+fn controller_box_line(r: &mut Ruby, bx: &str, version: Option<&str>) {
+    if bx == CONTROLLER_BOX && version.is_none() {
+        let debian = Value::str(HELPER_BOX);
+        r.assign("m.vm.box", Value::raw(format!("{} ? {debian} : {}", super::ARM_HOST, Value::str(bx))));
+    } else {
+        r.assign("m.vm.box", Value::str(bx));
+    }
+    if let Some(v) = version {
+        r.assign("m.vm.box_version", Value::str(v));
+    }
+}
+
+/// Ansible and the inventory, the environment's playbooks, going offline, halting.
+fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
+    let spec = env.spec();
+    let setup = format!(
+        "set -e\n{CONTROLLER_PACKAGES}[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
+        inventory::render(env, &Access::vagrant())
+    );
+    shell(r, "controller", &setup);
+    if !spec.provision.is_empty() {
+        shell(r, "ansible", &ansible_runs(spec, &[]));
+    }
+    // Standing in for a user on offline networks, the controller goes offline too once it's
+    // done installing (its checks would otherwise see its own NAT internet).
+    if with_checks && !env.networks.values().any(|n| n.internet) {
+        step_provisioners(r, env, CONTROLLER, &Step::Egress, Os::Linux);
+    }
+    // Done: it halts (its disk kept) unless the spec keeps it running. Detached, so that the
+    // provisioner returns before the VM goes; `isoloom test` boots it again for the checks.
+    if !spec.controller.as_ref().is_some_and(|c| c.keep_running) {
+        shell(r, "halt", "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &");
+    }
+}

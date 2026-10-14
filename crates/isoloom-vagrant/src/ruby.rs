@@ -270,6 +270,27 @@ impl Ruby {
         self.line(tag)
     }
 
+    /// `call` with a last keyword argument `key:` holding `script`: a quoted string when it is
+    /// one line, else a [`heredoc`](Ruby::heredoc) tagged `SH` (`ISOLOOM_SH` when the script has
+    /// a line `SH` of its own, which would end it early).
+    pub fn script(&mut self, call: Call, key: &str, script: &str) -> &mut Ruby {
+        let body = script.trim_end_matches('\n');
+        if !body.contains('\n') {
+            return self.call(call.kw(key, Value::str(body)));
+        }
+        let tag = if body.lines().any(|l| l.trim() == "SH") { "ISOLOOM_SH" } else { "SH" };
+        self.heredoc(call, key, tag, body)
+    }
+
+    /// `if condition`, `body` one level deeper, then `end`.
+    pub fn if_block(&mut self, condition: impl fmt::Display, body: impl FnOnce(&mut Ruby)) -> &mut Ruby {
+        self.line(format_args!("if {condition}"));
+        self.depth += 1;
+        body(self);
+        self.depth -= 1;
+        self.line("end")
+    }
+
     /// `target = {`, one `key => value,` a line, `}`.
     pub fn hash(&mut self, target: &str, entries: impl IntoIterator<Item = (Value, Value)>) -> &mut Ruby {
         self.line(format_args!("{target} = {{"));
@@ -342,6 +363,28 @@ mod tests {
             r.finish(),
             "    m.vm.provision \"shell\", inline: <<~'SH'\n      set -e\n\n      echo hi\n    SH\n"
         );
+    }
+
+    #[test]
+    fn a_script_is_a_string_on_one_line_and_a_heredoc_on_more() {
+        let mut r = Ruby::at_depth(1);
+        let p = || Call::new("p").arg(Value::str("shell"));
+        r.script(p(), "inline", "echo \"hi\"\n");
+        r.script(p(), "inline", "a\nb\n");
+        r.script(p(), "inline", "cat <<SH\nx\nSH\n");
+        assert_eq!(
+            r.finish(),
+            "  p \"shell\", inline: \"echo \\\"hi\\\"\"\n  p \"shell\", inline: <<~'SH'\n    a\n    b\n  SH\n  p \"shell\", inline: <<~'ISOLOOM_SH'\n    cat <<SH\n    x\n    SH\n  ISOLOOM_SH\n"
+        );
+    }
+
+    #[test]
+    fn an_if_block_nests() {
+        let mut r = Ruby::new();
+        r.if_block("a != b", |r| {
+            r.assign("x", 1u32);
+        });
+        assert_eq!(r.finish(), "if a != b\n  x = 1\nend\n");
     }
 
     #[test]

@@ -5,9 +5,9 @@ isoloom-external 79.0
 isoloom-import 74.3
 isoloom-kubernetes 97.7
 isoloom-plan 95.9
-isoloom-render 83.0
+isoloom-render 89.4
 isoloom-runtime 76.4
 isoloom-spec 92.8
 isoloom-targets 96.0
 isoloom-terraform 95.9
-isoloom-vagrant 95.5
+isoloom-vagrant 96.8
