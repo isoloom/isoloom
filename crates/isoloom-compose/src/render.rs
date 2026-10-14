@@ -16,10 +16,11 @@ use crate::docker::{
 use crate::file::{Attachment, Build, ComposeFile, Deploy, Healthcheck, Ipam, Labelled, Limits, Network, Resources, Service, Subnet, Ulimit};
 use crate::sidecars;
 
-/// What Compose can render: network appliances (wired the way Docker attaches networks). No
-/// controller: no `provision:`, no Ansible checks; `exec` checks run inside a container.
+/// What Compose can render: network appliances (wired the way Docker attaches networks) and
+/// gateway machines. No controller: no `provision:`, no Ansible checks; `exec` checks run inside
+/// a container.
 pub fn capabilities() -> isoloom_plan::Capabilities {
-    isoloom_plan::Capabilities::of([Feature::NetworkAppliances])
+    isoloom_plan::Capabilities::of([Feature::NetworkAppliances, Feature::Gateways])
 }
 
 /// The Compose backend of the `docker` and `hosted` targets (a hosting service runs the same
@@ -44,6 +45,29 @@ impl Backend for ComposeBackend {
 /// The Compose file of `env` and the files it mounts (check runners, appliance configurations),
 /// refused as `target` when `env` needs what Compose can't do.
 pub fn render(target: Target, env: &Environment) -> Result<Files, RenderError> {
+    let Rendered { file, files: mounted } = compose_file(target, env)?;
+    let yaml = to_yaml(target, &file)?;
+    let mut files = vec![GeneratedFile {
+        path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
+        contents: format!("{}{USAGE}{}\n{yaml}", header("#"), moved(env)),
+    }];
+    files.extend(mounted);
+    Ok(files)
+}
+
+/// A Compose file before it is written, and the files it mounts.
+#[derive(Debug, Clone)]
+pub struct Rendered {
+    /// The Compose file.
+    pub file: ComposeFile,
+    /// The files next to it: check runners, appliance configurations, Dockerfiles.
+    pub files: Files,
+}
+
+/// The typed Compose file of `env` and the files it mounts, for a target that adapts it before
+/// writing it (`hybrid` plugs it into its Docker host's networks). Refused as `target` when
+/// `env` needs what Compose can't do.
+pub fn compose_file(target: Target, env: &Environment) -> Result<Rendered, RenderError> {
     backend::check(target, env, &capabilities())?;
     let mut out = Out::default();
     let ts = trunks::trunks(env.spec());
@@ -64,15 +88,14 @@ pub fn render(target: Target, env: &Environment) -> Result<Files, RenderError> {
     probes(env, &out.probe_archs, &mut out.services);
     file.services = out.services;
     label(env, &mut file);
-    let yaml =
-        serde_yaml_ng::to_string(&file).map_err(|e| RenderError::Generate(isoloom_render::GenerateError::Unsupported { target, what: e.to_string() }))?;
-    let mut files = vec![GeneratedFile {
-        path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
-        contents: format!("{}{USAGE}{}\n{yaml}", header("#"), moved(env)),
-    }];
-    files.extend(runners);
+    let mut files = runners;
     files.extend(out.files);
-    Ok(files)
+    Ok(Rendered { file, files })
+}
+
+/// `file` as YAML, a failure reported as `target`'s.
+pub fn to_yaml(target: Target, file: &ComposeFile) -> Result<String, RenderError> {
+    serde_yaml_ng::to_string(file).map_err(|e| RenderError::Generate(isoloom_render::GenerateError::Unsupported { target, what: e.to_string() }))
 }
 
 const USAGE: &str = "# Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait\n# Checks: isoloom test docker (or: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check, and isoloom-check-<machine>)\n# Stop:   docker compose -f .isoloom/docker/compose.yml down -v\n";
@@ -445,7 +468,7 @@ fn networks(env: &Environment, ts: &[trunks::Trunk]) -> IndexMap<String, Network
             let net = Network {
                 ipam: Some(Ipam { config: vec![subnet] }),
                 internal: sidecars::internal(env, name),
-                labels: IndexMap::new(),
+                ..Network::default()
             };
             (name.clone(), net)
         })

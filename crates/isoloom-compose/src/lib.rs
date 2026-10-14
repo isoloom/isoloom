@@ -11,4 +11,4 @@ mod sidecars;
 pub use docker::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, start_commands, start_plan};
 use isoloom_render::trunks;
 use isoloom_spec::{model, validate, vlans};
-pub use render::{ComposeBackend, render};
+pub use render::{ComposeBackend, Rendered, compose_file, render, to_yaml};
