@@ -149,6 +149,7 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
         libvirt_box: image.libvirt.as_deref(),
         qemu: Qemu {
             boxed: image.qemu.as_deref(),
+            main: &image.name,
             arch: Some(mp.arch),
             link,
             windows_address,

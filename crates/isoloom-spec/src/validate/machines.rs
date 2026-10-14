@@ -201,9 +201,20 @@ fn docker(at: &str, d: &DockerImpl, p: &mut Problems) {
         (None, None) => p.add(format!("{at}.docker"), "set `image` (a published image) or `build` (a folder in the project)"),
         _ => {}
     }
-    if d.build.is_none() && (d.dockerfile.is_some() || !d.args.is_empty()) {
-        p.add(format!("{at}.docker"), "`dockerfile` and `args` go with `build` (the context)");
+    if d.build.is_none() && (d.dockerfile.is_some() || d.target.is_some() || !d.args.is_empty()) {
+        p.add(format!("{at}.docker"), "`dockerfile`, `target` and `args` go with `build` (the context)");
     }
+    if let Some(t) = d.target.as_deref().filter(|t| !stage_name(t)) {
+        p.add(
+            format!("{at}.docker.target"),
+            format!("`{t}` isn't a Dockerfile stage name (`FROM ... AS <name>`: letters, digits, `-`, `_` and `.`, starting with a letter)"),
+        );
+    }
+}
+
+/// A Dockerfile stage name, as `FROM ... AS <name>` takes it.
+fn stage_name(t: &str) -> bool {
+    t.starts_with(|c: char| c.is_ascii_alphabetic()) && t.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 /// The `vm:` implementation: a known OS, Linux-only steps on Linux, and steps to run.

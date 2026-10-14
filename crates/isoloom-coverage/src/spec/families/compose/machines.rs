@@ -1,7 +1,7 @@
 //! The Docker Compose output's cells for the machines' fields and the shared volumes.
 
 use crate::spec::status::Status::{Done, NotApplicable};
-use crate::spec::status::{NOT_A_VM, Status};
+use crate::spec::status::{NOT_A_VM, PROBE, Status};
 
 /// The cells of this section.
 pub const CELLS: &[(&str, Status)] = &[
@@ -139,6 +139,13 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.dns.options",
+        Done {
+            how: "`dns_opt` on the container (and the Kubernetes dnsConfig options)",
+            proof: PROBE,
+        },
+    ),
+    (
         "machines.*.resources.cpus",
         Done {
             how: "a CPU limit",
@@ -205,6 +212,13 @@ pub const CELLS: &[(&str, Status)] = &[
         Done {
             how: "the build's `dockerfile`, relative to its context",
             proof: "slow-link",
+        },
+    ),
+    (
+        "machines.*.docker.target",
+        Done {
+            how: "the build's `target`",
+            proof: PROBE,
         },
     ),
     (

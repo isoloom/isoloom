@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     Support,
-    Support::{Emitted, Equivalent, Partial, Tooling},
+    Support::{Emitted, Equivalent, Tooling},
 };
 
 pub(super) fn virtualbox(s: &str) -> Option<Support> {
@@ -30,9 +30,8 @@ pub(super) fn virtualbox(s: &str) -> Option<Support> {
 
 pub(super) fn vmware(s: &str) -> Option<Support> {
     Some(match s {
-        "vmx" => Partial {
-            from: "machines.*.resources",
-            gap: "only displayName, numvcpus and memsize",
+        "vmx" => Emitted {
+            from: "machines.*.resources and machines.*.privileged: displayName, numvcpus, memsize, and vhv.enable (nested virtualization)",
         },
         "cpus" | "memory" => Equivalent {
             via: "machines.*.resources, written in `vmx`",

@@ -7,7 +7,7 @@
 //! the inputs as values.
 
 use crate::Format;
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Tooling};
 use crate::kubernetes::schema::{self, Schema};
 
 const SOURCE: &str = include_str!("../coverage/kubernetes/chart.txt");
@@ -122,8 +122,8 @@ fn file(path: &str) -> Option<Support> {
         ".Files" => Emitted {
             from: "checks and the project's scripts (read into ConfigMaps)",
         },
-        "values.schema.json" => Planned {
-            note: "the values' schema (`images`, `inputs`), so `helm install` rejects a mistyped value",
+        "values.schema.json" => Emitted {
+            from: "machines (each one's image, required, non-empty) and inputs (scalars): `helm install` rejects any other value",
         },
         "templates/_helpers.tpl" => Tooling {
             note: "named templates shared by a chart's templates: Isoloom writes each object whole",

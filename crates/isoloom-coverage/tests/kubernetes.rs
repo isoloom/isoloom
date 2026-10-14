@@ -17,7 +17,8 @@ use serde_yaml_ng::Value;
 
 const CHART: &str = ".isoloom/kubernetes/chart/";
 
-/// What no example sets but the generator writes: a machine's environment and sysctls.
+/// What no example sets but the generator writes: a machine's environment, sysctls and resolver
+/// options.
 const FIXTURE: &str = r#"
 version: 1
 name: kubernetes-fixture
@@ -28,6 +29,7 @@ machines:
     docker: { image: "alpine:3.20" }
     environment: { MODE: lab }
     sysctls: { net.ipv4.ip_unprivileged_port_start: "0" }
+    dns: { options: ["ndots:2"] }
 "#;
 
 /// Every example's Kubernetes files, as `(path, contents)`, from the examples Kubernetes takes,

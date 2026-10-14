@@ -92,6 +92,9 @@ impl<'a> Machine<'a> {
         if let Some(f) = &b.dockerfile {
             let _ = write!(cmd, " -f {f}");
         }
+        if let Some(t) = &b.target {
+            let _ = write!(cmd, " --target {t}");
+        }
         for (k, v) in &b.args {
             let _ = write!(cmd, " --build-arg {}", shell::quote(&format!("{k}={v}")));
         }

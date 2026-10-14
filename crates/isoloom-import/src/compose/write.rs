@@ -72,6 +72,9 @@ fn docker(y: &mut DraftYaml, m: &Machine) {
             if let Some(f) = &m.dockerfile {
                 y.line(format!("      dockerfile: {}", yaml_str(f)));
             }
+            if let Some(t) = &m.target {
+                y.line(format!("      target: {}", yaml_str(t)));
+            }
             if !m.args.is_empty() {
                 let args = m.args.iter().map(|(k, v)| format!("{k}: {}", yaml_str(v))).collect::<Vec<_>>().join(", ");
                 y.line(format!("      args: {{ {args} }}"));

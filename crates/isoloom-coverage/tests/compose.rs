@@ -169,6 +169,17 @@ machines:
   web: { networks: { lan: 10 }, docker: { image: nginx:alpine } }
 tools: { viewer: { image: python:3-alpine, command: [python3, -m, http.server, "8000"], port: 8000, publish: 9000 } }
 "#,
+    // Resolver options and a build stage: `services.*.dns_opt`, `services.*.build.target`.
+    r#"
+version: 1
+name: dns-and-stage
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    dns: { options: ["ndots:2", "timeout:1"] }
+    docker: { build: app, target: lab }
+"#,
 ];
 
 /// Every Compose file Isoloom writes for `spec`, on every target that writes one.

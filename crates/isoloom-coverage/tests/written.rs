@@ -16,8 +16,9 @@ use isoloom_spec::model::Target;
 use isoloom_spec::{Spec, load, parse, validate};
 use isoloom_targets::{GENERATED_TARGETS, GeneratedFile, generate};
 
-/// Fixtures for what no example exercises: a network's constraints (the cloud-init prelude) and
-/// an existing Windows host (reached over SSH with PowerShell).
+/// Fixtures for what no example exercises: a network's constraints (the cloud-init prelude), an
+/// existing Windows host (reached over SSH with PowerShell) and a VM with a domain (its full
+/// name).
 const CONSTRAINTS: &str = "
 constraints:
   proxy: { http: \"http://proxy.corp:3128\" }
@@ -35,6 +36,16 @@ machines:
     external: { address: 192.168.1.10, user: admin }
 provision: [{ ansible: site.yml }]
 ";
+const DOMAIN: &str = "
+version: 1
+name: domain
+networks: { lab: { cidr: 10.9.0.0/24 } }
+machines:
+  web:
+    networks: { lab: 10 }
+    dns: { domain: corp.lab }
+    vm: { os: debian-12, provision: [setup.sh] }
+";
 
 fn examples_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
@@ -46,7 +57,8 @@ fn specs() -> Vec<(String, Spec)> {
     let segmented = std::fs::read_to_string(examples_dir().join("segmented/isoloom.yml")).unwrap();
     out.push(("segmented with constraints".into(), parse(&format!("{segmented}{CONSTRAINTS}")).unwrap()));
     out.push(("windows-external".into(), parse(WINDOWS_EXTERNAL).unwrap()));
-    for (name, spec) in &out[out.len() - 2..] {
+    out.push(("domain".into(), parse(DOMAIN).unwrap()));
+    for (name, spec) in &out[out.len() - 3..] {
         assert_eq!(validate(spec), vec![], "fixture {name}");
     }
     out

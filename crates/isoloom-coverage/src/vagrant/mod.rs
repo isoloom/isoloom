@@ -138,11 +138,12 @@ pub fn formats() -> Vec<Format> {
 
 fn utm() -> Format {
     let mut f = provider("Vagrant: UTM", "utm", UTM, providers::utm);
-    // Every Isoloom network is a private network; UTM's plugin doesn't say it supports them.
+    // Every Isoloom network is a private network; UTM's plugin sets up none (its actions forward
+    // ports to the VM's shared network, and nothing reads `config.vm.network private_network`).
     f.rows.push((
         "provider utm: private_network".to_string(),
-        Planned {
-            note: "not verified: vagrant_utm doesn't document `config.vm.network private_network`",
+        NotPortable {
+            why: "vagrant_utm 0.1.6 has no private networks (it only forwards ports): `refusal_on` with `utm` refuses a spec whose VMs are on a network",
         },
     ));
     f

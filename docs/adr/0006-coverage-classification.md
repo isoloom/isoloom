@@ -58,6 +58,18 @@ pinned source, so a new upstream key is a failing test until it is classified.
 | `services.*.devices` | Not portable | Planned | Passed through where the target has the device, refused elsewhere. |
 | `models`, `services.*.models` | Tooling | Not portable | They change what the machine can call, but only Docker's model runner serves them. |
 
+## Re-decided rows (Kubernetes and the Vagrant providers)
+
+| Row | Was | Now | Why |
+| --- | --- | --- | --- |
+| Kubernetes `PodSpec: hostAliases` | Planned | Not portable | It points names at fixed addresses, and a pod has none. The spec's `aliases` name a machine, which Kubernetes reaches only by its Service's name (no dots), so Kubernetes refuses `aliases` instead. |
+| Kubernetes `PodSpec: setHostnameAsFQDN` | Planned | Equivalent | `subdomain` puts the pod's full name in its hosts file (`hostname -f`); its hostname stays the short name, as on every other target. |
+| QEMU `mcast_addr`, `tap_device`, `socket_vmnet_*` | Planned | Equivalent | A hub (a QEMU process with no machine) links any number of VMs without root, on a Mac too: multicast doesn't send there, a TAP device and the socket_vmnet daemon need root. |
+| QEMU `extra_netdev_args` | Planned | Tooling | Options of the NAT adapter Vagrant reaches the VM through, not of the lab's networks. |
+| QEMU `vmnet_interface` | Planned | Planned | Bridged to the host's LAN: it comes with `public_network`. |
+| ESXi `numvcpus`, `memsize`, `vmname`, `virtual_network`, `*name_prefix` | Planned | Equivalent | The plugin's older names for what Isoloom writes; the prefix only names a VM Isoloom leaves unnamed, and it names them all. |
+| UTM `private_network` | Planned | Not portable | vagrant_utm 0.1.6 sets up no private network (it only forwards ports): `refusal_on` with `utm` refuses a spec whose VMs are on one. |
+
 ## Terraform: families of resource types and arguments
 
 A provider has hundreds of resource types and each type dozens of arguments, so a Terraform

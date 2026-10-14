@@ -10,20 +10,20 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 70% | 150 | 103 | 4 | 43 |
+| [Docker Compose](#docker-compose) | 71% | 150 | 105 | 4 | 41 |
 | [Vagrant](#vagrant) | 90% | 42 | 38 | 0 | 4 |
 | [Vagrant: networks](#vagrant-networks) | 81% | 38 | 31 | 0 | 7 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
 | [Vagrant: provisioners](#vagrant-provisioners) | 94% | 57 | 54 | 0 | 3 |
 | [Vagrant: communicators](#vagrant-communicators) | 100% | 8 | 8 | 0 | 0 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 7 | 7 | 0 | 0 |
-| [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 90% | 5 | 4 | 1 | 0 |
+| [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 100% | 5 | 5 | 0 | 0 |
 | [Vagrant: Parallels](#vagrant-parallels) | 100% | 6 | 6 | 0 | 0 |
 | [Vagrant: libvirt](#vagrant-libvirt) | 35% | 20 | 7 | 0 | 13 |
 | [Vagrant: Hyper-V](#vagrant-hyper-v) | 100% | 6 | 6 | 0 | 0 |
-| [Vagrant: UTM](#vagrant-utm) | 75% | 4 | 3 | 0 | 1 |
-| [Vagrant: QEMU](#vagrant-qemu) | 36% | 15 | 4 | 3 | 8 |
-| [Vagrant: ESXi](#vagrant-esxi) | 57% | 19 | 11 | 0 | 8 |
+| [Vagrant: UTM](#vagrant-utm) | 100% | 3 | 3 | 0 | 0 |
+| [Vagrant: QEMU](#vagrant-qemu) | 85% | 14 | 12 | 0 | 2 |
+| [Vagrant: ESXi](#vagrant-esxi) | 89% | 19 | 17 | 0 | 2 |
 | [Vagrant: Docker](#vagrant-docker) | 92% | 13 | 12 | 0 | 1 |
 | [Terraform: Proxmox](#terraform-proxmox) | 57% | 124 | 71 | 0 | 53 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
@@ -34,12 +34,12 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Terraform: Linode](#terraform-linode) | 59% | 59 | 35 | 0 | 24 |
 | [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 45% | 150 | 68 | 0 | 82 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
-| [cloud-init](#cloud-init) | 95% | 80 | 76 | 0 | 4 |
+| [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
 | [Ansible inventory](#ansible-inventory) | 95% | 31 | 28 | 3 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 89% | 192 | 172 | 1 | 19 |
+| [Kubernetes](#kubernetes) | 91% | 193 | 176 | 2 | 15 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
-| [Helm](#helm) | 94% | 19 | 18 | 0 | 1 |
+| [Helm](#helm) | 100% | 19 | 19 | 0 | 0 |
 
 Done includes features produced another way, or set in the image. The lists come from the
 formats themselves (every key of the Compose schema, every setting of Vagrant and each provider
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-70% of 150 portable features (103 done, 4 partly, 43 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+71% of 150 portable features (105 done, 4 partly, 41 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -110,7 +110,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `build.provenance` | n/a | No | How the image is built, not the machine it produces |
 | `build.sbom` | n/a | No | How the image is built, not the machine it produces |
 | `build.pull` | n/a | No | How the image is built, not the machine it produces |
-| `build.target` | Yes | Not yet | A build stage, beside machines.*.docker.dockerfile |
+| `build.target` | Yes | Yes | From `machines.*.docker.target` (a stage of the Dockerfile) |
 | `build.shm_size` | n/a | No | How the image is built, not the machine it produces |
 | `build.extra_hosts` | n/a | No | How the image is built, not the machine it produces |
 | `build.isolation` | n/a | No | How the image is built, not the machine it produces |
@@ -222,7 +222,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `devices[].target` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
 | `devices[].permissions` | Yes | Not yet | Device passthrough where the target has the device, refused where it has none |
 | `dns` | Yes | Yes | From `machines.*.dns.servers` (and the Kubernetes dnsConfig) |
-| `dns_opt` | Yes | Not yet | Resolver options, beside machines.*.dns |
+| `dns_opt` | Yes | Yes | From `machines.*.dns.options` (and the Kubernetes dnsConfig) |
 | `dns_search` | Yes | Yes | From `machines.*.dns.search` (and the Kubernetes dnsConfig) |
 | `domainname` | Yes | Yes | From `machines.*.dns.domain` |
 | `entrypoint` | Yes | Yes | Isoloom's own containers and init jobs; a machine's own is its image's |
@@ -1117,7 +1117,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: VMware Desktop
 
-90% of 5 portable features (4 done, 1 partly, 0 to do; 24 features in all). From vagrant-vmware-desktop 3.0.5 (its config class).
+100% of 5 portable features (5 done, 0 partly, 0 to do; 24 features in all). From vagrant-vmware-desktop 3.0.5 (its config class).
 
 ### Settings
 
@@ -1145,7 +1145,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `utility_host` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `utility_port` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `verify_vmnet` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `vmx` | Yes | Partly | From `machines.*.resources`; not yet: only displayName, numvcpus and memsize |
+| `vmx` | Yes | Yes | From `machines.*.resources and machines.*.privileged: displayName, numvcpus, memsize, and vhv.enable` (nested virtualization) |
 | `whitelist_verified` | n/a | No | Vagrant tooling, not the environment's behavior |
 
 ## Vagrant: Parallels
@@ -1354,7 +1354,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: UTM
 
-75% of 4 portable features (3 done, 0 partly, 1 to do; 12 features in all). From vagrant_utm 0.1.6 (its config class), for Apple Silicon Macs.
+100% of 3 portable features (3 done, 0 partly, 0 to do; 12 features in all). From vagrant_utm 0.1.6 (its config class), for Apple Silicon Macs.
 
 ### Settings
 
@@ -1371,54 +1371,54 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `name` | Yes | Yes | The environment and machine names, as the VM's display name |
 | `notes` | n/a | No | How UTM shows the VM |
 | `wait_time` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `private_network` | Yes | Not yet | Not verified: vagrant_utm doesn't document `config.vm.network private_network` |
+| `private_network` | No | No | Vagrant_utm 0.1.6 has no private networks (it only forwards ports): `refusal_on` with `utm` refuses a spec whose VMs are on a network |
 
 ## Vagrant: QEMU
 
-36% of 15 portable features (4 done, 3 partly, 8 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
+85% of 14 portable features (12 done, 0 partly, 2 to do; 34 features in all). From vagrant-qemu 0.6.3 (its config class), for Apple Silicon Macs.
 
 ### Settings
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `advanced_network` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit) |
+| `advanced_network` | Yes | Yes | From `machines.*.networks: two VMs as a listen/connect pair, any other number through a hub` (a QEMU process with no machine), no root; a VM is on one network (`refusal_on` with `qemu` refuses one on more) |
 | `arch` | Yes | Yes | From `machines.*.arch` (emulated when the host's CPU is another) |
 | `control_port` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `cpu` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `debug_port` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `default_qemu_dir` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
-| `disk_resize` | Yes | Not yet | Machines.*.resources.disk_gb, once the box's own size is known: the plugin makes the disk an overlay of that size, and one below the box's truncates it |
+| `disk_resize` | Yes | Yes | From `machines.*.resources.disk_gb, above the box's own size only` (read from the box with qemu-img): the disk is an overlay of the box's, and a smaller one would cut it |
 | `drive_interface` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `extra_drive_args` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `extra_image_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `extra_netdev_args` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
+| `extra_netdev_args` | n/a | No | Options of the NAT adapter Vagrant reaches the VM through (user-mode networking), not of the lab's networks |
 | `extra_qemu_args` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `firmware_format` | Yes | Not yet | Custom images with their own kernel and boot (makes an environment VM-only) |
 | `graceful_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `homebrew_prefix` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `image_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `machine` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `mcast_addr` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
+| `mcast_addr` | Yes | Another way | Via socket_opts to the network's hub: any number of VMs without root, on a Mac too, where multicast doesn't send |
 | `memory` | Yes | Yes | From `machines.*.resources` |
 | `net_device` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `net_mode` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit) |
+| `net_mode` | Yes | Yes | From `machines.*.networks: two VMs as a listen/connect pair, any other number through a hub` (a QEMU process with no machine), no root; a VM is on one network (`refusal_on` with `qemu` refuses one on more) |
 | `no_daemonize` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `other_default` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `qemu_bin` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `qemu_dir` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `smp` | Yes | Yes | From `machines.*.resources.cpus` |
-| `socket_opts` | Yes | Partly | From `machines.*.networks`; not yet: without root, QEMU links exactly two VMs per network, each VM on one network (`refusal_on` with `qemu` says when a spec doesn't fit) |
-| `socket_vmnet_client` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
-| `socket_vmnet_socket` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
+| `socket_opts` | Yes | Yes | From `machines.*.networks: two VMs as a listen/connect pair, any other number through a hub` (a QEMU process with no machine), no root; a VM is on one network (`refusal_on` with `qemu` refuses one on more) |
+| `socket_vmnet_client` | Yes | Another way | Via socket_opts to the network's hub: the same network between the VMs, without root (a TAP device and the socket_vmnet daemon need it) |
+| `socket_vmnet_socket` | Yes | Another way | Via socket_opts to the network's hub: the same network between the VMs, without root (a TAP device and the socket_vmnet daemon need it) |
 | `ssh_auto_correct` | Yes | Yes | Always: each VM forwards SSH from its own host port |
 | `ssh_host` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `ssh_port` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `tap_device` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
-| `vmnet_interface` | Yes | Not yet | More than two VMs on a QEMU network (vmnet or socket_vmnet, which need root on the Mac) |
+| `tap_device` | Yes | Another way | Via socket_opts to the network's hub: the same network between the VMs, without root (a TAP device and the socket_vmnet daemon need it) |
+| `vmnet_interface` | Yes | Not yet | With `public_network` (a network bridged to the outside); vmnet-bridged needs root on the Mac |
 
 ## Vagrant: ESXi
 
-57% of 19 portable features (11 done, 0 partly, 8 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
+89% of 19 portable features (17 done, 0 partly, 2 to do; 53 features in all). From vagrant-vmware-esxi 2.5.2 (its config class), for standalone ESXi hosts.
 
 ### Settings
 
@@ -1445,7 +1445,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `guest_mac_address` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `guest_memsize` | Yes | Yes | From `machines.*.resources` |
 | `guest_name` | Yes | Yes | From the environment and machine names |
-| `guest_name_prefix` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
+| `guest_name_prefix` | Yes | Another way | Via guest_name: every VM is named (`<env>-<machine>`), so the plugin never makes up a name with a prefix |
 | `guest_nic_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guest_numvcpus` | Yes | Yes | From `machines.*.resources` |
 | `guest_snapshot_includememory` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -1461,9 +1461,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `local_private_keys` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `local_use_ip_cache` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `mac_address` | No | No | Cloud VMs get their MAC and addresses from the provider |
-| `memsize` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
+| `memsize` | Yes | Another way | Via guest_memsize (the plugin's newer name for it) |
 | `nic_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `numvcpus` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
+| `numvcpus` | Yes | Another way | Via guest_numvcpus (the plugin's newer name for it) |
 | `resource_pool` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `saved_ipaddress` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `ssh_username` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -1471,12 +1471,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `supported_guest_guestos` | n/a | No | The plugin's own list of accepted values |
 | `supported_guest_nic_types` | n/a | No | The plugin's own list of accepted values |
 | `supported_guest_virtualhw_versions` | n/a | No | The plugin's own list of accepted values |
-| `virtual_network` | Yes | Not yet | The plugin's older name for esxi_virtual_network |
+| `virtual_network` | Yes | Another way | Via esxi_virtual_network (the plugin's newer name for it) |
 | `virtualhw_version` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `vm_disk_store` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `vm_disk_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `vmname` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
-| `vmname_prefix` | Yes | Not yet | With the ESXi provider block (not verified on an ESXi host yet) |
+| `vmname` | Yes | Another way | Via guest_name (the plugin's newer name for it) |
+| `vmname_prefix` | Yes | Another way | Via guest_name: every VM is named (`<env>-<machine>`), so the plugin never makes up a name with a prefix |
 
 ## Vagrant: Docker
 
@@ -6365,7 +6365,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## cloud-init
 
-95% of 80 portable features (76 done, 0 partly, 4 to do; 149 features in all). From cloud-init 26.2's schema-cloud-config-v1.json (crates/isoloom-coverage/coverage/cloud-init.txt).
+96% of 80 portable features (77 done, 0 partly, 3 to do; 149 features in all). From cloud-init 26.2's schema-cloud-config-v1.json (crates/isoloom-coverage/coverage/cloud-init.txt).
 
 ### Top level
 
@@ -6399,7 +6399,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `drivers` | No | No | NVIDIA drivers: most targets have no GPU to pass through |
 | `fan` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
 | `final_message` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
-| `fqdn` | Yes | Not yet | A machine's full name, from its name and `dns.domain` |
+| `fqdn` | Yes | Yes | From `machines.*.dns.domain` (the machine's name with its domain; the host name stays the short one) |
 | `fs_setup` | Yes | Not yet | Data disks, partitioned and formatted (Wave 3: persistent volumes and data disks) |
 | `groups` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
 | `growpart` | Yes | Another way | Via machines.*.resources.disk_gb (the disk-grow step) |
@@ -6748,7 +6748,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-89% of 192 portable features (172 done, 1 partly, 19 to do; 358 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+91% of 193 portable features (176 done, 2 partly, 15 to do; 360 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -6817,7 +6817,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `PodSpec: enableServiceLinks` | n/a | No | Access to the Kubernetes API: machines don't call it |
 | `PodSpec: ephemeralContainers` | n/a | No | Debugging containers added to a running pod |
 | `PodSpec: evictionResponders` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
-| `PodSpec: hostAliases` | Yes | Not yet | The spec's `aliases`: Kubernetes gives no fixed pod address to point them at |
+| `PodSpec: hostAliases` | No | No | It points names at fixed addresses, and a pod has none: the spec's `aliases` name a machine, which Kubernetes reaches only by its Service's name (no dots), so Kubernetes refuses `aliases` |
 | `PodSpec: hostIPC` | No | No | Shares the node's own namespaces: cloud VMs have no host to share |
 | `PodSpec: hostNetwork` | No | No | Shares the node's own namespaces: cloud VMs have no host to share |
 | `PodSpec: hostPID` | No | No | Shares the node's own namespaces: cloud VMs have no host to share |
@@ -6844,9 +6844,9 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `PodSpec: securityContext` | Yes | Yes | From `machines.*.sysctls` |
 | `PodSpec: serviceAccount` | n/a | No | Access to the Kubernetes API: machines don't call it |
 | `PodSpec: serviceAccountName` | n/a | No | Access to the Kubernetes API: machines don't call it |
-| `PodSpec: setHostnameAsFQDN` | Yes | Not yet | The machine's `dns.domain` as its fully qualified name |
+| `PodSpec: setHostnameAsFQDN` | Yes | Another way | Via `subdomain`: the pod's full name is in its hosts file (`hostname -f`), and its hostname stays the short name, as on every other target |
 | `PodSpec: shareProcessNamespace` | n/a | No | Container mechanics (users, profiles, namespaces): not a machine feature |
-| `PodSpec: subdomain` | Yes | Not yet | The machine's `dns.domain` as its fully qualified name |
+| `PodSpec: subdomain` | Yes | Partly | From `machines.*.dns.domain, as one label` (`corp.local` is `corp-local`); not yet: the pod's full name is `<machine>.<subdomain>.<namespace>.svc.<cluster domain>`: Kubernetes names pods under the cluster's domain, not `dns.domain` |
 | `PodSpec: terminationGracePeriodSeconds` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: tolerations` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `PodSpec: topologySpreadConstraints` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
@@ -6934,8 +6934,10 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `Sysctl: name` | Yes | Yes | From `machines.*.sysctls` |
 | `Sysctl: value` | Yes | Yes | From `machines.*.sysctls` |
 | `PodDNSConfig: nameservers` | Yes | Yes | From `machines.*.dns.servers` |
-| `PodDNSConfig: options` | Yes | Not yet | Resolver options (`ndots`, `timeout`), which every machine's resolver has |
+| `PodDNSConfig: options` | Yes | Yes | From `machines.*.dns.options` (with the cluster's resolver unless the machine has servers of its own) |
 | `PodDNSConfig: searches` | Yes | Yes | From `machines.*.dns.search` |
+| `PodDNSConfigOption: name` | Yes | Yes | From `machines.*.dns.options` (`name` or `name:value`) |
+| `PodDNSConfigOption: value` | Yes | Yes | From `machines.*.dns.options` (`name` or `name:value`) |
 | `Affinity: nodeAffinity` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Affinity: podAffinity` | Yes | Yes | From `volumes` (a machine sharing a volume runs on its owner's node) |
 | `Affinity: podAntiAffinity` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
@@ -7170,7 +7172,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Helm
 
-94% of 19 portable features (18 done, 0 partly, 1 to do; 52 features in all). From SchemaStore's chart.json (pinned) and Helm 3.16's chart documentation.
+100% of 19 portable features (19 done, 0 partly, 0 to do; 52 features in all). From SchemaStore's chart.json (pinned) and Helm 3.16's chart documentation.
 
 ### Instructions
 
@@ -7204,7 +7206,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `ChartMaintainers: url` | n/a | No | How the chart is listed in a repository: no effect on the environment |
 | `Chart files: Chart.yaml` | Yes | Yes | The chart itself |
 | `Chart files: values.yaml` | Yes | Yes | From `machines` (each one's image) and inputs |
-| `Chart files: values.schema.json` | Yes | Not yet | The values' schema (`images`, `inputs`), so `helm install` rejects a mistyped value |
+| `Chart files: values.schema.json` | Yes | Yes | From `machines` (each one's image, required, non-empty) and inputs (scalars): `helm install` rejects any other value |
 | `Chart files: templates/` | Yes | Yes | The environment's objects, its scripts and its inputs |
 | `Chart files: templates/NOTES.txt` | Yes | Yes | From `checks` (how to run them after an install) |
 | `Chart files: templates/_helpers.tpl` | n/a | No | Named templates shared by a chart's templates: Isoloom writes each object whole |
@@ -7291,8 +7293,9 @@ is marked ✗, with its reason below.
 | `machines.*.tmpfs` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.shm_size` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.dns.servers` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
-| `machines.*.dns.search` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
-| `machines.*.dns.domain` | ✓ | ✓ | planned | planned | planned | n/a | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.dns.search` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.dns.domain` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
+| `machines.*.dns.options` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
 | `machines.*.resources.cpus` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
 | `machines.*.resources.memory_mb` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a |
 | `machines.*.resources.disk_gb` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | n/a |
@@ -7303,6 +7306,7 @@ is marked ✗, with its reason below.
 | `machines.*.docker.image` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.build` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.dockerfile` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.target` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.args` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.init` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.appliance` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
@@ -7351,22 +7355,22 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 90% of 76 | 69 | 0 | 0 | 7 |
-| hosted | 90% of 76 | 69 | 0 | 0 | 7 |
-| kubernetes | 74% of 68 | 46 | 9 | 2 | 11 |
-| helm | 74% of 68 | 46 | 9 | 2 | 11 |
-| kustomize | 74% of 68 | 46 | 9 | 2 | 11 |
+| docker | 91% of 78 | 71 | 0 | 0 | 7 |
+| hosted | 91% of 78 | 71 | 0 | 0 | 7 |
+| kubernetes | 75% of 70 | 48 | 10 | 1 | 11 |
+| helm | 75% of 70 | 48 | 10 | 1 | 11 |
+| kustomize | 75% of 70 | 48 | 10 | 1 | 11 |
 | vagrant | 94% of 68 | 63 | 3 | 0 | 2 |
-| docker-vm | 90% of 76 | 69 | 0 | 0 | 7 |
-| hybrid | 79% of 85 | 66 | 3 | 7 | 9 |
-| proxmox | 90% of 65 | 58 | 1 | 2 | 4 |
-| aws | 70% of 65 | 40 | 11 | 5 | 9 |
-| azure | 70% of 65 | 40 | 11 | 6 | 8 |
-| gcp | 70% of 65 | 40 | 11 | 5 | 9 |
-| digitalocean | 50% of 65 | 29 | 7 | 5 | 24 |
-| linode | 53% of 65 | 31 | 8 | 5 | 21 |
-| oci | 53% of 65 | 31 | 8 | 5 | 21 |
-| cloud-docker | 89% of 76 | 68 | 0 | 0 | 8 |
+| docker-vm | 91% of 78 | 71 | 0 | 0 | 7 |
+| hybrid | 79% of 87 | 68 | 3 | 7 | 9 |
+| proxmox | 88% of 66 | 58 | 1 | 3 | 4 |
+| aws | 68% of 66 | 40 | 11 | 6 | 9 |
+| azure | 68% of 66 | 40 | 11 | 7 | 8 |
+| gcp | 68% of 66 | 40 | 11 | 6 | 9 |
+| digitalocean | 49% of 66 | 29 | 7 | 6 | 24 |
+| linode | 53% of 66 | 31 | 8 | 6 | 21 |
+| oci | 53% of 66 | 31 | 8 | 6 | 21 |
+| cloud-docker | 89% of 78 | 70 | 0 | 0 | 8 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
 | external | 65% of 56 | 32 | 9 | 14 | 1 |
 

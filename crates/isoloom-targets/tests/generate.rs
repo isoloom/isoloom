@@ -1106,27 +1106,6 @@ fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
     assert!(!provider_block(vf, "dc01", "virtualbox").contains("socket"));
 }
 
-#[test]
-fn qemu_refuses_more_than_two_vms_on_a_network() {
-    let three = parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian-12, provision: [p.sh] }\n  c:\n    networks: { lab: 12 }\n    vm: { os: debian-12, provision: [p.sh] }\n",
-    )
-    .unwrap();
-    let why = isoloom_targets::refusal_on(&three, Target::Vagrant, Some("qemu")).expect("three VMs on one network");
-    assert!(why.contains("network `lab` has 3 VMs"), "{why}");
-    // Only QEMU: Vagrant on another provider, or whatever the provider, runs it.
-    assert_eq!(isoloom_targets::refusal_on(&three, Target::Vagrant, Some("virtualbox")), None);
-    assert_eq!(isoloom_targets::refusal_on(&three, Target::Vagrant, None), None);
-    assert_eq!(isoloom_targets::refusal(&three, Target::Vagrant), None);
-    // The deprecated question still answers the same, for the tools that ask it.
-    #[allow(deprecated)]
-    let old = isoloom_targets::qemu_refusal(&three);
-    assert_eq!(old.as_deref(), Some(why.as_str()));
-    let vf = &generate(&three, Target::Vagrant).unwrap()[0].contents;
-    // Still generated (for every other provider); the QEMU block says why it has no network.
-    assert!(provider_block(vf, "a", "qemu").contains("# No private network on QEMU: network `lab` has 3 VMs"));
-}
-
 /// The block `config.vm.define "<name>"` of a Vagrantfile, up to its `end`.
 fn define_block<'a>(vf: &'a str, name: &str) -> &'a str {
     let start = &vf[vf.find(&format!("config.vm.define \"{name}\"")).unwrap()..];

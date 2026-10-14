@@ -119,6 +119,12 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.dns.options",
+        NotApplicable {
+            why: "an existing host keeps its resolver",
+        },
+    ),
+    (
         "machines.*.resources.cpus",
         NotApplicable {
             why: "an existing host has its own size",
@@ -166,6 +172,7 @@ pub const CELLS: &[(&str, Status)] = &[
     ("machines.*.docker.image", EXISTING_HOST),
     ("machines.*.docker.build", EXISTING_HOST),
     ("machines.*.docker.dockerfile", EXISTING_HOST),
+    ("machines.*.docker.target", EXISTING_HOST),
     ("machines.*.docker.args", EXISTING_HOST),
     ("machines.*.docker.init", EXISTING_HOST),
     ("machines.*.docker.appliance", EXISTING_HOST),

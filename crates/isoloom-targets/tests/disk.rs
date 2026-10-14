@@ -33,7 +33,8 @@ fn each_provider_sizes_the_disk_and_the_root_grows_before_the_steps() {
     assert!(vf.contains("m.vm.disk :disk, size: \"80GB\", primary: true"), "VirtualBox, VMware, Hyper-V");
     assert!(vf.contains("v.machine_virtual_size = 80"), "libvirt");
     assert!(vf.contains("v.guest_boot_disk_size = 80"), "ESXi");
-    assert!(!vf.contains("disk_resize"), "QEMU would truncate a disk below the box's");
+    // QEMU: only above the box's own size (a smaller overlay would truncate it).
+    assert!(vf.contains("v.disk_resize = IsoloomQemu.disk(\"cloud-image/debian-12\", 80)"), "QEMU");
     let grow = vf.find("name: \"disk\"").expect("the grow step");
     let steps = vf.find("name: \"setup.sh\"").unwrap();
     assert!(grow < steps, "the root is grown before the machine's steps");

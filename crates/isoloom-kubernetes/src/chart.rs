@@ -1,6 +1,6 @@
 //! The environment as a Helm chart in `.isoloom/kubernetes/chart/`, written from the same
 //! objects as the plain manifests: the namespace is the release's, each machine's image a value
-//! (`images.<machine>`), the inputs a Secret from `inputs.<NAME>`, the checks `helm test` Pods
+//! (`images.<machine>`, typed by `values.schema.json`), the inputs a Secret from `inputs.<NAME>`, the checks `helm test` Pods
 //! (the `exec` ones, run inside a machine, stay with `isoloom test`), and the project's scripts
 //! read from `files/project/` (see [`crate::project_copies`]).
 //!
@@ -53,6 +53,7 @@ pub(crate) fn files(env: &Environment, r: &Rendered) -> Result<Vec<GeneratedFile
     let mut out = vec![
         file("Chart.yaml", chart_file(env)?),
         file("values.yaml", values(env, inputs)?),
+        file("values.schema.json", crate::values_schema::schema(env, inputs)?),
         file("templates/environment.yaml", environment(r)?),
     ];
     if !r.scripts.is_empty() {

@@ -251,6 +251,8 @@ pub struct Build {
     pub context: String,
     /// The Dockerfile, from the project folder, when not the context's own.
     pub dockerfile: Option<String>,
+    /// The Dockerfile's stage to build, when not its last.
+    pub target: Option<String>,
     /// The spec's build arguments.
     pub args: IndexMap<String, String>,
 }
@@ -454,6 +456,7 @@ fn image(spec: &Spec, shape: MachineShape, name: &str, m: &Machine) -> Option<Im
                 build: d.build.as_ref().map(|context| Build {
                     context: context.clone(),
                     dockerfile: d.dockerfile.clone(),
+                    target: d.target.clone(),
                     args: d.args.clone(),
                 }),
             })

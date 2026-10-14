@@ -1,6 +1,6 @@
 //! The Kubernetes output's cells for the machines' fields and the shared volumes.
 
-use crate::spec::status::Status::{Done, NotApplicable, Partial, Planned};
+use crate::spec::status::Status::{Done, NotApplicable, Partial};
 use crate::spec::status::{NOT_A_VM, PROBE, Status};
 
 /// The cells of this section.
@@ -126,16 +126,24 @@ pub const CELLS: &[(&str, Status)] = &[
     ),
     (
         "machines.*.dns.search",
-        Partial {
-            how: "dnsConfig searches (dnsPolicy `None`)",
-            gap: "without `servers`, the pod has no nameserver",
+        Done {
+            how: "dnsConfig searches (added to the cluster's resolver unless the machine has servers of its own)",
             proof: "arm-lab",
         },
     ),
     (
         "machines.*.dns.domain",
-        Planned {
-            note: "pods have no domain name of their own; a headless Service's subdomain is the nearest",
+        Partial {
+            how: "the pod's `subdomain` (the domain as one label): its full name in its hosts file",
+            gap: "Kubernetes names pods under the cluster's domain: `<machine>.<subdomain>.<namespace>.svc.<cluster domain>`, not `dns.domain`",
+            proof: "arm-lab",
+        },
+    ),
+    (
+        "machines.*.dns.options",
+        Done {
+            how: "dnsConfig options (with the cluster's resolver unless the machine has servers of its own)",
+            proof: PROBE,
         },
     ),
     (
@@ -206,6 +214,14 @@ pub const CELLS: &[(&str, Status)] = &[
         "machines.*.docker.dockerfile",
         Partial {
             how: "`-f` in the `docker build` line of the comment",
+            gap: "the build itself",
+            proof: PROBE,
+        },
+    ),
+    (
+        "machines.*.docker.target",
+        Partial {
+            how: "`--target` in the `docker build` line of the comment",
             gap: "the build itself",
             proof: PROBE,
         },

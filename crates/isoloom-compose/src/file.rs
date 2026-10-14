@@ -62,6 +62,9 @@ pub struct Service {
     /// The resolvers the container uses.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub dns: Vec<String>,
+    /// The container resolver's options (`ndots:2`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dns_opt: Vec<String>,
     /// The search domains the container's resolver appends.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub dns_search: Vec<String>,
@@ -135,6 +138,9 @@ pub struct Build {
     /// The Dockerfile, when not `Dockerfile` in the context.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dockerfile: Option<String>,
+    /// The stage of a multi-stage Dockerfile to build, when not its last.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
     /// Build arguments.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
     pub args: IndexMap<String, String>,

@@ -135,6 +135,12 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.dns.options",
+        Planned {
+            note: "the resolver options in the cloud-init user data",
+        },
+    ),
+    (
         "machines.*.resources.cpus",
         Planned {
             note: "the instance type follows memory only today",
@@ -187,6 +193,7 @@ pub const CELLS: &[(&str, Status)] = &[
     ("machines.*.docker.image", NOT_A_CONTAINER),
     ("machines.*.docker.build", NOT_A_CONTAINER),
     ("machines.*.docker.dockerfile", NOT_A_CONTAINER),
+    ("machines.*.docker.target", NOT_A_CONTAINER),
     ("machines.*.docker.args", NOT_A_CONTAINER),
     ("machines.*.docker.init", NOT_A_CONTAINER),
     ("machines.*.docker.appliance", NOT_A_CONTAINER),

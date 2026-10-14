@@ -114,8 +114,8 @@ const ROWS: &[(&str, Support)] = &[
     ("final_message", TOOLING),
     (
         "fqdn",
-        Planned {
-            note: "a machine's full name, from its name and `dns.domain`",
+        Emitted {
+            from: "machines.*.dns.domain (the machine's name with its domain; the host name stays the short one)",
         },
     ),
     ("fs_setup", DATA_DISKS),

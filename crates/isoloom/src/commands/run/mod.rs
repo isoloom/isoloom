@@ -178,8 +178,8 @@ fn ready_here(p: &Prepared, cloud: Option<&str>) -> Res<()> {
     if t == Target::CloudServices {
         module_requirements(p)?;
     }
-    // The provider in the defaults can refuse what the target alone runs (QEMU's two-VM links,
-    // a machine with no Hyper-V box).
+    // The provider in the defaults can refuse what the target alone runs (QEMU's one network a
+    // VM, UTM's none, a machine with no Hyper-V box).
     if t == Target::Vagrant
         && let Some(provider) = &p.defaults.vagrant.provider
         && let Some(why) = isoloom_targets::refusal_on(&p.spec, t, Some(provider))
