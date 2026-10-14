@@ -7,8 +7,11 @@
 //! machine features: Isoloom sets them itself. 100% coverage means every portable feature is
 //! produced.
 //!
-//! The source of truth for `isoloom coverage`, docs/COVERAGE.md and the website; the tests
-//! keep the tables in step with the formats' own definitions and with the generators. The
+//! The source of truth for `isoloom coverage`, docs/COVERAGE.md and the website. The tests
+//! keep the tables in step with the formats' own definitions (every key, setting and resource
+//! type has a row) and with what the generators write for the committed examples (every key or
+//! resource type in an example's output is marked as written, and every row marked as written
+//! appears in one). A feature no example exercises is not checked against a generator. The
 //! spec's side ([`spec`]: every field of a spec and what each output does with it) keeps the
 //! generators' claims honest.
 
@@ -230,7 +233,7 @@ pub fn markdown() -> String {
             s.to_do
         );
     }
-    md.push_str("\nDone includes features produced another way, or set in the image. The lists come from the\nformats themselves (every key of the Compose schema, every setting of Vagrant and each provider\nplugin, every resource type of each Terraform provider); tests fail on an unclassified entry, or\nwhen a table disagrees with what Isoloom really generates.\n");
+    md.push_str("\nDone includes features produced another way, or set in the image. The lists come from the\nformats themselves (every key of the Compose schema, every setting of Vagrant and each provider\nplugin, every resource type of each Terraform provider); tests fail on an unclassified entry, when\nan example's generated file (Compose, Vagrantfile, Terraform) writes a key or resource type its\ntable doesn't mark as written, or when one marked as written appears in no example's output.\nOnly what the examples generate is checked: a feature no example uses can still be misclassified.\n");
     for f in &formats {
         let _ = write!(md, "\n## {}\n\n{}. From {}.\n", f.name, capitalize(&f.summary()), f.source);
         let mut current = "";

@@ -295,7 +295,11 @@ fn virtualbox(s: &str) -> Option<Support> {
         "cpus" | "memory" => RESOURCES,
         "name" => VM_NAME,
         "linked_clone" => LINKED_CLONE_ON,
-        "customize" | "customizations" => PROVIDER_SPECIFIC,
+        // Raw `modifyvm` stays out of the format, but the hybrid target writes one itself.
+        "customize" => Emitted {
+            from: "(the hybrid target's Docker host only: its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks; no spec field writes raw commands)",
+        },
+        "customizations" => PROVIDER_SPECIFIC,
         "network_adapter" | "network_adapters" => PRIVATE_NETWORKS,
         "auto_nat_dns_proxy" | "default_nic_type" => HOST_TUNING,
         "functional_vboxsf" => NO_SHARED_FOLDERS,
