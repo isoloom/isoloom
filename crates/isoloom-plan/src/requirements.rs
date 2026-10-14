@@ -75,6 +75,10 @@ pub enum Feature {
     VmDevices,
     /// VMs inside a VM (`nested_virtualization`).
     NestedVirtualization,
+    /// A network's own MTU (`mtu`).
+    NetworkMtu,
+    /// A bandwidth cap on a machine's links (`rate_limit`).
+    RateLimit,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -197,6 +201,16 @@ pub enum Requirement {
         /// What it asks for, in its shape on the target.
         need: Need,
     },
+    /// A network sets its `mtu`.
+    NetworkMtu {
+        /// The first such network.
+        network: String,
+    },
+    /// A machine sets a `rate_limit`.
+    RateLimit {
+        /// The first such machine.
+        machine: String,
+    },
 }
 
 impl Requirement {
@@ -227,6 +241,8 @@ impl Requirement {
             Requirement::MachineProcess { .. } => Feature::MachineProcess,
             Requirement::OwnBoot { .. } => Feature::OwnBoot,
             Requirement::Hardware { need, .. } => need.feature(),
+            Requirement::NetworkMtu { .. } => Feature::NetworkMtu,
+            Requirement::RateLimit { .. } => Feature::RateLimit,
         }
     }
 }
@@ -293,6 +309,8 @@ impl fmt::Display for Requirement {
             Requirement::MachineProcess { machine } => write!(f, "machine `{machine}` {OWN_PROCESS}"),
             Requirement::OwnBoot { machine } => crate::boot::no_own_boot(f, machine),
             Requirement::Hardware { machine, need } => need.reason(machine, f),
+            Requirement::NetworkMtu { network } => crate::links::no_mtu(f, network),
+            Requirement::RateLimit { machine } => crate::links::no_rate_limit(f, machine),
         }
     }
 }
@@ -386,6 +404,7 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
     );
     out.extend(limits(spec));
     out.extend(crate::ipv6::requirements(spec));
+    out.extend(crate::links::requirements(spec));
     out
 }
 

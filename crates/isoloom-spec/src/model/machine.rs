@@ -59,6 +59,11 @@ pub struct Machine {
     /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
     #[serde(default)]
     pub arch: Arch,
+    /// A bandwidth cap on each of the machine's network links, in both directions, as `tc`
+    /// writes a rate (`10mbit`, `512kbit`): a machine on a slow line, while `networks.*.tc`
+    /// slows a whole network down on its router.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit: Option<String>,
     /// The machine needs kernel-level access (nested containers, loading kernel modules, raw
     /// devices). A container runs privileged; a VM already has it (its workload is root). VMs
     /// inside a VM need `nested_virtualization`.

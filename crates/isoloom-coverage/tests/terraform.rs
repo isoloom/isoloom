@@ -178,6 +178,27 @@ fn own_image_modules() -> Vec<String> {
     out
 }
 
+/// Whole environments with what no example needs, on Proxmox (not run on a real host): a
+/// network's MTU and a machine's rate limit, and machines run as LXC containers.
+const PROXMOX_FIXTURES: &[&str] = &[
+    "version: 1\nname: links\nnetworks:\n  lan: { cidr: 10.30.0.0/24, mtu: 1400 }\nmachines:\n  web: { networks: { lan: 10 }, rate_limit: 10mbit, vm: { os: debian-12, provision: [s.sh] } }\n",
+    "version: 1\nname: lxc\nnetworks:\n  lan: { cidr: 10.30.0.0/24, mtu: 1400 }\n  office: { cidr: 10.31.0.0/16, vlans: { 10: { cidr: 10.31.10.0/24 } } }\nmachines:\n  web: { networks: { lan: 10, office.vlan10: 10 }, rate_limit: 10mbit, environment: { MODE: lab }, docker: { image: 'nginx:1.27', idle: true, lxc: true } }\n",
+];
+
+/// The modules generated for [`PROXMOX_FIXTURES`].
+fn proxmox_fixture_modules() -> Vec<String> {
+    PROXMOX_FIXTURES
+        .iter()
+        .flat_map(|text| {
+            let spec = isoloom_spec::parse(text).unwrap();
+            assert_eq!(isoloom_spec::validate(&spec), vec![], "{text}");
+            isoloom_targets::generate(&spec, Target::Proxmox).unwrap()
+        })
+        .filter(|f| Path::new(&f.path).extension().is_some_and(|x| x == "tf"))
+        .map(|f| f.contents)
+        .collect()
+}
+
 /// Every key written by any module (the examples', then the [`OWN_IMAGES`] fixtures'), grouped
 /// by the table it belongs to.
 fn written_by_table(tables: &[Format]) -> BTreeMap<&'static str, BTreeSet<String>> {
@@ -185,7 +206,10 @@ fn written_by_table(tables: &[Format]) -> BTreeMap<&'static str, BTreeSet<String
     let examples = MODULES
         .iter()
         .flat_map(|m| module_files(m).into_iter().map(move |t| (format!(".isoloom/{m}"), t)));
-    let fixtures = own_image_modules().into_iter().map(|t| ("the fixtures".to_string(), t));
+    let fixtures = own_image_modules()
+        .into_iter()
+        .chain(proxmox_fixture_modules())
+        .map(|t| ("the fixtures".to_string(), t));
     for (module, text) in examples.chain(fixtures) {
         for key in written_keys(&text) {
             let table = owner(tables, &key).unwrap_or_else(|| panic!("{module}: writes `{key}`, which no Terraform table lists"));

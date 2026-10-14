@@ -21,10 +21,14 @@
 //!   in `.isoloom/proxmox/checks/<position>.sh` are piped to them by `isoloom test proxmox`
 //!   (the `checks` output says which runs where).
 
+mod arch;
 mod boot;
 mod controller;
+mod firewall;
 mod gpus;
 mod image;
+mod links;
+mod lxc;
 mod machine;
 pub(crate) mod module;
 mod outputs;
@@ -50,7 +54,8 @@ const DIR: &str = "proxmox";
 
 /// What Proxmox can't host yet.
 pub const LIMITS: Limits = Limits {
-    arm64: Some("arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts)"),
+    // Emulated by QEMU (see `arch`), with an arm64 cloud image.
+    arm64: None,
     gateways: Some("networks with a `gateway` machine on Proxmox come later"),
     playbook_checks: None,
     tc: None,
@@ -90,6 +95,8 @@ pub fn refusal(env: &Environment) -> Option<String> {
             .or_else(|| windows::refusal(env))
             .or_else(|| image::refusal(env))
             .or_else(|| boot::refusal(env))
+            .or_else(|| arch::refusal(env))
+            .or_else(|| lxc::refusal(env))
     })
 }
 
@@ -129,10 +136,16 @@ impl Backend for ProxmoxBackend {
             Feature::VmGpus,
             // The VMs take the server's CPU (`cpu.type = host`).
             Feature::NestedVirtualization,
+            // On every device: the network's MTU, the machine's rate limit.
+            Feature::NetworkMtu,
+            Feature::RateLimit,
+            // A VM may wait for an LXC container (`docker.lxc`) as for a VM.
+            Feature::VmAfterContainer,
         ])
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
+        let env = &*lxc::checked(env);
         backend::check(Target::Proxmox, env, &self.capabilities())?;
         if let Some(what) = refusal(env) {
             return Err(unsupported(what));
@@ -167,6 +180,7 @@ fn main(env: &Environment) -> Result<String, isoloom_render::hcl_builder::Error>
     for (name, _) in vms(env) {
         machine::blocks(env, name, &mut m);
     }
+    lxc::blocks(env, &mut m);
     if core_controller::needed(env) {
         controller::blocks(env, &mut m);
     }

@@ -135,6 +135,12 @@ locals {
   users         = var.ssh_public_key == "" ? [] : [{ name = "isoloom", sudo = "ALL=(ALL) NOPASSWD:ALL", shell = "/bin/bash", ssh_authorized_keys = [var.ssh_public_key] }]
 }
 
+# The environment's VMs and containers, together in a pool of their own.
+resource "proxmox_virtual_environment_pool" "env" {
+  pool_id = local.zone
+  comment = "Isoloom: supplier-portal-api"
+}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
   id    = local.zone
@@ -159,6 +165,15 @@ resource "proxmox_download_file" "debian_12" {
   url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+}
+
+# Network `lab`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "lab" {
+  name    = "iso${var.slot}n0"
+  comment = "supplier-portal-api: network lab"
+  cidr {
+    name = "10.20.0.0/24"
+  }
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
@@ -211,6 +226,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "supplier-portal-api"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   agent {
     enabled = true
@@ -287,6 +303,7 @@ resource "proxmox_virtual_environment_vm" "database" {
   name      = "iso${var.slot}-database"
   node_name = var.node
   tags      = ["isoloom", "supplier-portal-api"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -302,7 +319,8 @@ resource "proxmox_virtual_environment_vm" "database" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.lab.id
+    bridge   = proxmox_sdn_vnet.lab.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -322,6 +340,26 @@ resource "proxmox_virtual_environment_vm" "database" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `database`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "database" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.database.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "database" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.database.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network lab"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.lab.name}"
+  }
 }
 
 # Machine `web`.
@@ -350,6 +388,7 @@ resource "proxmox_virtual_environment_vm" "web" {
   name      = "iso${var.slot}-web"
   node_name = var.node
   tags      = ["isoloom", "supplier-portal-api"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -365,7 +404,8 @@ resource "proxmox_virtual_environment_vm" "web" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.lab.id
+    bridge   = proxmox_sdn_vnet.lab.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -385,6 +425,33 @@ resource "proxmox_virtual_environment_vm" "web" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.database]
+}
+
+# Machine `web`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "web" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.web.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "web" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.web.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network lab"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.lab.name}"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "published"
+    proto   = "tcp"
+    dport   = "3206"
+  }
 }
 
 locals {

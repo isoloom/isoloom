@@ -100,7 +100,10 @@ extract() { # name source version (kind:type ... | all)
 }
 extract proxmox bpg/proxmox 0.115.0 \
   resource:proxmox_virtual_environment_vm resource:proxmox_virtual_environment_file resource:proxmox_download_file \
-  resource:proxmox_sdn_zone_simple resource:proxmox_sdn_vnet resource:proxmox_sdn_applier
+  resource:proxmox_sdn_zone_simple resource:proxmox_sdn_vnet resource:proxmox_sdn_applier \
+  resource:proxmox_virtual_environment_pool resource:proxmox_virtual_environment_firewall_options \
+  resource:proxmox_virtual_environment_firewall_rules resource:proxmox_virtual_environment_firewall_ipset \
+  resource:proxmox_virtual_environment_container resource:proxmox_oci_image
 extract aws hashicorp/aws 6.67.0 \
   resource:aws_instance resource:aws_vpc resource:aws_vpc_ipv4_cidr_block_association resource:aws_subnet \
   resource:aws_internet_gateway resource:aws_route_table resource:aws_route_table_association \

@@ -168,11 +168,14 @@ pub(super) fn tc(spec: &Spec, p: &mut Problems) {
 }
 
 /// A number followed by one of `units`, like `50ms` or `10mbit`.
-fn measure(v: &str, units: &[&str]) -> bool {
+pub(super) fn measure(v: &str, units: &[&str]) -> bool {
     let digits = v.trim_end_matches(|c: char| c.is_ascii_alphabetic());
     let unit = &v[digits.len()..];
     !digits.is_empty() && digits.parse::<f64>().is_ok() && units.contains(&unit)
 }
+
+/// The units of a rate, as `tc` reads them.
+pub(super) const RATES: &[&str] = &["bit", "kbit", "mbit", "gbit", "bps", "kbps", "mbps", "gbps"];
 
 /// Each impairment value: times, a percentage, a rate.
 fn tc_values(at: &str, tc: &Tc, p: &mut Problems) {
@@ -196,7 +199,7 @@ fn tc_values(at: &str, tc: &Tc, p: &mut Problems) {
         p.add(format!("{at}.loss"), "a percentage, 0 to 100");
     }
     if let Some(r) = &tc.rate
-        && !measure(r, &["bit", "kbit", "mbit", "gbit", "bps", "kbps", "mbps", "gbps"])
+        && !measure(r, RATES)
     {
         p.add(format!("{at}.rate"), format!("`{r}` isn't a rate like 10mbit or 512kbit"));
     }

@@ -211,23 +211,11 @@ pub const ICMP: Support = Planned { note: "ICMP in reach rules" };
 pub const OFFLINE: Support = Planned {
     note: "`networks.*.internet: false` enforced by the cloud",
 };
-/// Another CPU architecture.
-pub const ARCH: Support = Planned {
-    note: "with `machines.*.arch`: another CPU architecture",
-};
 /// Shared folders.
 pub const SHARED: Support = Planned {
     note: "shared volumes (`volumes`) as host folders",
 };
-/// The Proxmox firewall.
-pub const FIREWALL: Support = Planned {
-    note: "the Proxmox firewall: reach rules enforced outside the VMs, besides the router",
-};
 /// Start order on a server restart.
 pub const ORDER: Support = Tooling {
     note: "the start order when the server restarts: `depends_on` orders the first start",
-};
-/// A machine's own rate limit: `networks.*.tc` shapes a whole network on the router instead.
-pub const TC: Support = Planned {
-    note: "a rate limit per machine, beside `networks.*.tc` (a whole network, on its router)",
 };

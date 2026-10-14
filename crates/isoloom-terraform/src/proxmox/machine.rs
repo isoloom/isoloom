@@ -11,7 +11,7 @@ use isoloom_spec::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::windows;
 use crate::vm::cloud_init::{self, CloudConfig};
-use crate::vm::{is_windows, os, res};
+use crate::vm::{is_windows, res};
 
 /// A machine's snippet and VM: a cloud-init document on a cloud image, or on Windows a
 /// cloudbase-init script on a clone of the OS's template (see `windows`).
@@ -33,9 +33,10 @@ pub fn blocks(env: &Environment, name: &str, m: &mut Module) {
         }
         cloud_init::machine(env, name, &mut config);
         m.commented(&format!("Machine `{name}`."), snippet(&res(name), name, config.document()));
-        super::image::boot(name, mp).unwrap_or_else(|| Boot::Image(res(os(mp).unwrap_or_default())))
+        super::image::boot(name, mp).unwrap_or_else(|| Boot::Image(super::arch::image_res(mp)))
     };
     m.block(vm(env, name, boot).block(env));
+    super::firewall::guest(env, name, super::firewall::Guest::Vm, m);
 }
 
 /// The VM of machine `name`, booting from `boot`: an interface and an address per network, the
@@ -47,7 +48,7 @@ fn vm(env: &Environment, name: &str, boot: Boot) -> Vm {
     // The default route is the router's on the first network, unless the LAN's DHCP gives it.
     let routed = !super::outside::lan_default_route(env, mp);
     for (i, (net, addr)) in mp.addresses.iter().enumerate() {
-        nics.push(nic(&format!("proxmox_sdn_vnet.{}.id", res(net)), None));
+        nics.push(super::links::device(env, net, None, Some(mp)));
         let len = Cidr::parse(&env.networks[net].cidr).map_or(32, |c| c.len);
         let gateway = (i == 0 && routed).then(|| router::address(env.spec(), net).to_string());
         ips.push(ip_config(&format!("{addr}/{len}"), gateway));
@@ -56,13 +57,6 @@ fn vm(env: &Environment, name: &str, boot: Boot) -> Vm {
         nics.push(device);
         ips.push(ip);
     }
-    let mut depends_on = vec![reference("proxmox_virtual_environment_vm.isoloom_router")];
-    depends_on.extend(
-        mp.depends_on
-            .iter()
-            .filter(|d| env.machines.get(*d).is_some_and(|dp| dp.shape == isoloom_plan::MachineShape::Vm))
-            .map(|d| reference(&format!("proxmox_virtual_environment_vm.{}", res(d)))),
-    );
     Vm {
         id: res(name),
         snippet: res(name),
@@ -75,13 +69,28 @@ fn vm(env: &Environment, name: &str, boot: Boot) -> Vm {
         boot,
         tpm: mp.tpm.is_some(),
         own_boot: mp.boot.clone(),
+        arm: super::arch::is_arm(mp),
         agent: false,
         nics,
         pci: super::gpus::hostpci(mp.hardware.gpus.as_ref()),
         dns: Some(dns(env, name)),
         ips,
-        depends_on,
+        depends_on: depends_on(env, mp),
     }
+}
+
+/// What a machine waits for: the router, then the machines it depends on (VMs and containers).
+pub fn depends_on(env: &Environment, mp: &isoloom_plan::MachinePlan) -> Vec<Expression> {
+    let mut out = vec![reference("proxmox_virtual_environment_vm.isoloom_router")];
+    out.extend(mp.depends_on.iter().filter_map(|d| {
+        let kind = match env.machines.get(d)?.shape {
+            isoloom_plan::MachineShape::Vm => "vm",
+            isoloom_plan::MachineShape::Container => "container",
+            _ => return None,
+        };
+        Some(reference(&format!("proxmox_virtual_environment_{kind}.{}", res(d))))
+    }));
+    out
 }
 
 /// Whether the machine gets the project: its steps read it, or a check runner runs a script there.
@@ -190,6 +199,8 @@ pub struct Vm {
     pub tpm: bool,
     /// Its own firmware and boot order (`vm.boot`).
     pub own_boot: Option<isoloom_spec::model::Boot>,
+    /// Whether it is an aarch64 VM, emulated (`arch: arm64`).
+    pub arm: bool,
     /// Whether the guest agent reports its addresses.
     pub agent: bool,
     /// Its network devices.
@@ -206,7 +217,7 @@ pub struct Vm {
 
 impl Vm {
     /// The `proxmox_virtual_environment_vm` block.
-    pub fn block(self, env: &Environment) -> Block {
+    pub fn block(mut self, env: &Environment) -> Block {
         let (cores, memory, _) = self.size;
         let mut b = Block::builder("resource")
             .add_label("proxmox_virtual_environment_vm")
@@ -220,11 +231,14 @@ impl Vm {
             ))
             .add_attribute(("node_name", reference("var.node")))
             .add_attribute(("tags", list([string("isoloom"), string(env.name.as_str())])))
+            .add_attribute(("pool_id", reference(super::module::POOL)))
             .add_attribute(("on_boot", boolean(false)));
         let template = matches!(self.boot, Boot::Template { .. });
         if template {
             // Windows 11 and its TPM need UEFI on a Q35 machine; the template is made so.
             b = b.add_attribute(("bios", string("ovmf")));
+        } else if self.arm {
+            b = super::arch::arm(b);
         }
         if template || !self.pci.is_empty() {
             // Q35 also gives a passed-through device its PCIe slot (i440fx has none).
@@ -235,35 +249,38 @@ impl Vm {
             b = b.add_block(Block::builder("agent").add_attribute(("enabled", boolean(true))).build());
         }
         b = b
-            .add_block(
-                Block::builder("cpu")
-                    .add_attribute(("cores", number(cores.into())))
-                    .add_attribute(("type", string("host")))
-                    .build(),
-            )
+            .add_block(super::arch::cpu(cores, self.arm))
             .add_block(Block::builder("memory").add_attribute(("dedicated", number(memory.into()))).build())
             .add_blocks(self.disks())
-            .add_blocks(self.nics)
-            .add_blocks(self.pci);
-        let mut init = Block::builder("initialization").add_attribute(("datastore_id", reference("var.datastore")));
-        if let Boot::Template { .. } = self.boot {
-            // cloudbase-init reads an OpenStack configuration drive.
-            init = init.add_attribute(("type", string("configdrive2")));
-        }
-        init = init.add_attribute(("user_data_file_id", reference(&format!("proxmox_virtual_environment_file.{}.id", self.snippet))));
-        if let Some(d) = self.dns {
-            init = init.add_block(d);
-        }
-        b = b.add_block(init.add_blocks(self.ips).build());
+            .add_blocks(std::mem::take(&mut self.nics))
+            .add_blocks(std::mem::take(&mut self.pci))
+            .add_block(self.initialization());
         let ostype = match self.boot {
             Boot::Image(_) | Boot::Clone(_) => "l26",
             Boot::Template { ostype, .. } => ostype,
         };
         b = b.add_block(Block::builder("operating_system").add_attribute(("type", string(ostype))).build());
-        if !matches!(self.boot, Boot::Template { .. }) {
+        if !template {
             b = b.add_block(Block::builder("serial_device").build());
         }
         b.add_attribute(("depends_on", list(self.depends_on))).build()
+    }
+
+    /// Its cloud-init drive: the snippet, the resolver, an address per device.
+    fn initialization(&mut self) -> Block {
+        let mut init = Block::builder("initialization").add_attribute(("datastore_id", reference("var.datastore")));
+        if let Boot::Template { .. } = self.boot {
+            // cloudbase-init reads an OpenStack configuration drive.
+            init = init.add_attribute(("type", string("configdrive2")));
+        }
+        if self.arm {
+            init = init.add_attribute(("interface", string("scsi1")));
+        }
+        init = init.add_attribute(("user_data_file_id", reference(&format!("proxmox_virtual_environment_file.{}.id", self.snippet))));
+        if let Some(d) = self.dns.take() {
+            init = init.add_block(d);
+        }
+        init.add_blocks(std::mem::take(&mut self.ips)).build()
     }
 
     /// Its disks: a cloud image's, or a template's clone (with its EFI variables), then its TPM.
@@ -281,7 +298,10 @@ impl Vm {
         };
         let mut out = Vec::new();
         match &self.boot {
-            Boot::Image(image) => out.push(disk(Some(reference(&format!("proxmox_download_file.{image}.id"))), self.size.2)),
+            Boot::Image(image) => {
+                out.push(disk(Some(reference(&format!("proxmox_download_file.{image}.id"))), self.size.2));
+                out.extend(self.arm.then(super::arch::efi_disk));
+            }
             Boot::Clone(id) => {
                 out.push(super::image::clone(number((*id).into())));
                 out.push(disk(None, self.size.2));
@@ -294,12 +314,7 @@ impl Vm {
                         .build(),
                 );
                 out.extend(size.map(|gb| disk(None, gb)));
-                out.push(
-                    Block::builder("efi_disk")
-                        .add_attribute(("datastore_id", datastore()))
-                        .add_attribute(("type", string("4m")))
-                        .build(),
-                );
+                out.push(super::arch::efi_disk());
             }
         }
         if self.tpm {

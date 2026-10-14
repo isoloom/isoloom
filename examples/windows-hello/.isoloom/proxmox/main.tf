@@ -141,6 +141,12 @@ locals {
   ]
 }
 
+# The environment's VMs and containers, together in a pool of their own.
+resource "proxmox_virtual_environment_pool" "env" {
+  pool_id = local.zone
+  comment = "Isoloom: windows-hello"
+}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
   id    = local.zone
@@ -179,6 +185,15 @@ resource "proxmox_download_file" "debian_12" {
   url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+}
+
+# Network `lab`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "lab" {
+  name    = "iso${var.slot}n0"
+  comment = "windows-hello: network lab"
+  cidr {
+    name = "192.168.57.0/24"
+  }
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
@@ -231,6 +246,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "windows-hello"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   agent {
     enabled = true
@@ -287,6 +303,7 @@ resource "proxmox_virtual_environment_vm" "web01" {
   name      = "iso${var.slot}-web01"
   node_name = var.node
   tags      = ["isoloom", "windows-hello"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   bios      = "ovmf"
   machine   = "q35"
@@ -306,7 +323,8 @@ resource "proxmox_virtual_environment_vm" "web01" {
     type         = "4m"
   }
   network_device {
-    bridge = proxmox_sdn_vnet.lab.id
+    bridge   = proxmox_sdn_vnet.lab.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -326,6 +344,33 @@ resource "proxmox_virtual_environment_vm" "web01" {
     type = "win10"
   }
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `web01`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "web01" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.web01.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "web01" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.web01.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network lab"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.lab.name}"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "published"
+    proto   = "tcp"
+    dport   = "80"
+  }
 }
 
 # The controller: runs the environment's playbooks once every machine is up.
@@ -366,6 +411,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_controller" {
   name      = "iso${var.slot}-controller"
   node_name = var.node
   tags      = ["isoloom", "windows-hello"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1

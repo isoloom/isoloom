@@ -56,7 +56,7 @@ pub const CELLS: &[(&str, Status)] = &[
     (
         "networks.*.vlans.*.cidr",
         Done {
-            how: "an SDN VNet per VLAN; a VM on several VLANs of the LAN gets an 802.1Q trunk inside it (`<lan>.<id>`)",
+            how: "a VLAN-aware SDN VNet per LAN, each VLAN a tag on the devices (`vlan_id`, not run on a real host); a VM on several VLANs of the LAN gets an 802.1Q trunk inside it (`<lan>.<id>`)",
             proof: "vlan-office",
         },
     ),

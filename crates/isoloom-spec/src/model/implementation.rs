@@ -48,6 +48,12 @@ pub struct DockerImpl {
     /// router. Isoloom builds the emulator's container itself, so no `image` then.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub firmware: Option<String>,
+    /// On Proxmox, a machine with no `vm:` may run as an LXC container from its `image` (an
+    /// OCI image, Proxmox VE 9.1 or later) instead of ruling the `proxmox` target out. Opt-in:
+    /// an LXC container is no Docker container (no Docker runtime, no healthcheck, no named
+    /// volumes), so the author says the image runs as one. Ignored by every other target.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub lxc: bool,
 }
 
 /// A network appliance image (see [`DockerImpl::appliance`]). The images aren't Isoloom's to

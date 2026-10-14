@@ -85,6 +85,8 @@ pub struct NetworkPlan {
     pub vlan: Option<(String, u16)>,
     /// Its IPv6 side, when it is dual-stack or IPv6-only.
     pub ipv6: Option<Ipv6Plan>,
+    /// The largest packet it carries, when the spec sets one (`mtu`).
+    pub mtu: Option<u16>,
 }
 
 /// How a machine is produced on the target.
@@ -137,6 +139,8 @@ pub struct MachinePlan {
     pub size: Size,
     /// Its CPU architecture.
     pub arch: Arch,
+    /// The bandwidth cap on each of its links (`rate_limit`, a `tc` rate such as `10mbit`).
+    pub rate_limit: Option<String>,
     /// What it runs from, on this target.
     pub image: Option<Image>,
     /// The VM's own image per target (`vm.image`: a box URL, a Proxmox or cloud image), when
@@ -391,6 +395,7 @@ fn network(spec: &Spec, declared: &str, name: &str) -> NetworkPlan {
         tc: n.tc.clone(),
         vlan: n.vlan.clone(),
         ipv6: ipv6::network(spec, name),
+        mtu: n.mtu,
     }
 }
 
@@ -401,6 +406,8 @@ fn shape(target: Target, m: &Machine) -> MachineShape {
     let container = match target {
         Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes => true,
         Target::Hybrid => m.docker.is_some(),
+        // Proxmox runs a machine with no `vm:` as an LXC container when it opts in.
+        Target::Proxmox => m.vm.is_none() && m.docker.as_ref().is_some_and(|d| d.lxc),
         _ => false,
     };
     match (container, m.docker.is_some(), m.vm.is_some()) {
@@ -441,6 +448,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
             })
             .unwrap_or_default(),
         arch: m.arch,
+        rate_limit: m.rate_limit.clone(),
         image: image(spec, shape, name, m),
         vm_image: m.vm.as_ref().and_then(|v| v.image.clone()),
         boot: m.vm.as_ref().and_then(|v| v.boot.clone()),

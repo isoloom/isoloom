@@ -25,7 +25,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: QEMU](#vagrant-qemu) | 92% | 14 | 13 | 0 | 1 |
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 20 | 20 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
-| [Terraform: Proxmox](#terraform-proxmox) | 76% | 119 | 91 | 0 | 28 |
+| [Terraform: Proxmox](#terraform-proxmox) | 93% | 181 | 170 | 0 | 11 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
 | [Terraform: AWS](#terraform-aws) | 78% | 130 | 102 | 0 | 28 |
 | [Terraform: Azure](#terraform-azure) | 83% | 135 | 113 | 0 | 22 |
@@ -1517,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-76% of 119 portable features (91 done, 0 partly, 28 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
+93% of 181 portable features (170 done, 0 partly, 11 to do; 558 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1548,8 +1548,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `proxmox_node_config` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_node_disk_zfs` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_node_firewall` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_oci_image` | Yes | Not yet | LXC containers: a way to run `docker:` machines on Proxmox |
-| `proxmox_pool_membership` | Yes | Not yet | With the Proxmox generator |
+| `proxmox_oci_image` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
+| `proxmox_pool_membership` | n/a | No | Another way to put a VM or a container in a pool: Isoloom sets each one's `pool_id` |
 | `proxmox_realm_ldap` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_realm_openid` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_realm_sync` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
@@ -1586,14 +1586,14 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `proxmox_virtual_environment_cluster_firewall` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_cluster_firewall_security_group` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_cluster_options` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
-| `proxmox_virtual_environment_container` | Yes | Not yet | LXC containers: a way to run `docker:` machines on Proxmox |
+| `proxmox_virtual_environment_container` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_virtual_environment_dns` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_download_file` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_file` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
-| `proxmox_virtual_environment_firewall_alias` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
-| `proxmox_virtual_environment_firewall_ipset` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
-| `proxmox_virtual_environment_firewall_options` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
-| `proxmox_virtual_environment_firewall_rules` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
+| `proxmox_virtual_environment_firewall_alias` | n/a | No | A name for an address: the firewall rules name each network's IP set instead |
+| `proxmox_virtual_environment_firewall_ipset` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
+| `proxmox_virtual_environment_firewall_options` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
+| `proxmox_virtual_environment_firewall_rules` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_virtual_environment_group` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_hagroup` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_hardware_mapping_dir` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
@@ -1607,7 +1607,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `proxmox_virtual_environment_network_linux_vlan` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_node_firewall` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_oci_image` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
-| `proxmox_virtual_environment_pool` | Yes | Not yet | With the Proxmox generator |
+| `proxmox_virtual_environment_pool` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_virtual_environment_pool_membership` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_realm_ldap` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_realm_openid` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
@@ -1691,6 +1691,18 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `url` | Yes | Yes | Written by the generator |
 | `verify` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 
+### proxmox_oci_image
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `datastore_id` | Yes | Yes | Written by the generator |
+| `file_name` | Yes | Yes | Written by the generator |
+| `node_name` | Yes | Yes | Written by the generator |
+| `overwrite` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `overwrite_unmanaged` | Yes | Yes | Written by the generator |
+| `reference` | Yes | Yes | Written by the generator |
+| `upload_timeout` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+
 ### proxmox_sdn_applier
 
 | Key | Every target | Implemented | Notes |
@@ -1705,8 +1717,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `alias` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `id` | Yes | Yes | Written by the generator |
 | `isolate_ports` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `tag` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
-| `vlan_aware` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `tag` | Yes | Another way | Via `network_device.vlan_id` on the LAN's VLAN-aware VNet (`vlan_aware`): a VNet's own tag needs a VLAN zone, the environment's is a simple one |
+| `vlan_aware` | Yes | Yes | Written by the generator |
 | `zone` | Yes | Yes | Written by the generator |
 
 ### proxmox_sdn_zone_simple
@@ -1718,9 +1730,123 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `dns_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `id` | Yes | Yes | Written by the generator |
 | `ipam` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `mtu` | Yes | Not yet | A network's MTU |
+| `mtu` | Yes | Yes | Written by the generator |
 | `nodes` | Yes | Yes | Written by the generator |
 | `reverse_dns` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+
+### proxmox_virtual_environment_container
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `delete_unreferenced_disks_on_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `environment_variables` | Yes | Yes | Written by the generator |
+| `hook_script_file_id` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `node_name` | Yes | Yes | Written by the generator |
+| `pool_id` | Yes | Yes | Written by the generator |
+| `protection` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `purge_on_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `start_on_boot` | Yes | Yes | Written by the generator |
+| `started` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `tags` | Yes | Yes | Written by the generator |
+| `template` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_clone` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_create` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_delete` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_start` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_update` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `unprivileged` | Yes | Yes | Written by the generator |
+| `vm_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.datastore_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.full` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.node_name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.vm_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `console` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `console.enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `console.tty_count` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `console.type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `cpu` | Yes | Yes | Written by the generator |
+| `cpu.architecture` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `cpu.cores` | Yes | Yes | Written by the generator |
+| `cpu.limit` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `cpu.units` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `device_passthrough` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `device_passthrough.deny_write` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `device_passthrough.gid` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `device_passthrough.mode` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `device_passthrough.path` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `device_passthrough.uid` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `disk` | Yes | Yes | Written by the generator |
+| `disk.acl` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.datastore_id` | Yes | Yes | Written by the generator |
+| `disk.mount_options` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.quota` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.replicate` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.size` | Yes | Yes | Written by the generator |
+| `features` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `features.fuse` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `features.keyctl` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `features.mknod` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `features.mount` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `features.nesting` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `idmap` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `idmap.container_id` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `idmap.host_id` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `idmap.size` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `idmap.type` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `initialization` | Yes | Yes | Written by the generator |
+| `initialization.entrypoint` | Yes | Yes | Written by the generator |
+| `initialization.hostname` | Yes | Yes | Written by the generator |
+| `initialization.dns` | Yes | Yes | Written by the generator |
+| `initialization.dns.domain` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `initialization.dns.server` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.dns.servers` | Yes | Yes | Written by the generator |
+| `initialization.ip_config` | Yes | Yes | Written by the generator |
+| `initialization.ip_config.ipv4` | Yes | Yes | Written by the generator |
+| `initialization.ip_config.ipv4.address` | Yes | Yes | Written by the generator |
+| `initialization.ip_config.ipv4.gateway` | Yes | Yes | Written by the generator |
+| `initialization.ip_config.ipv6` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `initialization.ip_config.ipv6.address` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `initialization.ip_config.ipv6.gateway` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `initialization.user_account` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.user_account.keys` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.user_account.password` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `memory` | Yes | Yes | Written by the generator |
+| `memory.dedicated` | Yes | Yes | Written by the generator |
+| `memory.swap` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `mount_point` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.acl` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.backup` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.mount_options` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.path` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.quota` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.read_only` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.replicate` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.shared` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.size` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `mount_point.volume` | No | No | What an LXC container can't carry the way Docker does (mount points, devices, its own user mapping): a `docker.lxc` machine that asks for it is refused, so give it a `vm:` |
+| `network_interface` | Yes | Yes | Written by the generator |
+| `network_interface.bridge` | Yes | Yes | Written by the generator |
+| `network_interface.enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.firewall` | Yes | Yes | Written by the generator |
+| `network_interface.host_managed` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `network_interface.mac_address` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.mtu` | Yes | Yes | Written by the generator |
+| `network_interface.name` | Yes | Yes | Written by the generator |
+| `network_interface.rate_limit` | Yes | Yes | Written by the generator |
+| `network_interface.vlan_id` | Yes | Yes | Written by the generator |
+| `operating_system` | Yes | Yes | Written by the generator |
+| `operating_system.template_file_id` | Yes | Yes | Written by the generator |
+| `operating_system.type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `startup` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
+| `startup.down_delay` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
+| `startup.order` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
+| `startup.up_delay` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
+| `wait_for_ip` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `wait_for_ip.ipv4` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `wait_for_ip.ipv6` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 
 ### proxmox_virtual_environment_file
 
@@ -1746,6 +1872,71 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `source_raw.file_name` | Yes | Yes | Written by the generator |
 | `source_raw.resize` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 
+### proxmox_virtual_environment_firewall_ipset
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `comment` | Yes | Yes | Written by the generator |
+| `container_id` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `node_name` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `vm_id` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `cidr` | Yes | Yes | Written by the generator |
+| `cidr.comment` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `cidr.name` | Yes | Yes | Written by the generator |
+| `cidr.nomatch` | n/a | No | Another way to write a rule (an interface, a security group, logging, disabled rules): Isoloom names networks by IP set |
+
+### proxmox_virtual_environment_firewall_options
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `container_id` | Yes | Yes | Written by the generator |
+| `dhcp` | n/a | No | A firewall setting left at Proxmox's default (logging, DHCP, MAC and IP filters, NDP, router advertisements): no change in what the reach rules allow |
+| `enabled` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `input_policy` | Yes | Yes | Written by the generator |
+| `ipfilter` | n/a | No | A firewall setting left at Proxmox's default (logging, DHCP, MAC and IP filters, NDP, router advertisements): no change in what the reach rules allow |
+| `log_level_in` | n/a | No | A firewall setting left at Proxmox's default (logging, DHCP, MAC and IP filters, NDP, router advertisements): no change in what the reach rules allow |
+| `log_level_out` | n/a | No | A firewall setting left at Proxmox's default (logging, DHCP, MAC and IP filters, NDP, router advertisements): no change in what the reach rules allow |
+| `macfilter` | n/a | No | A firewall setting left at Proxmox's default (logging, DHCP, MAC and IP filters, NDP, router advertisements): no change in what the reach rules allow |
+| `ndp` | n/a | No | A firewall setting left at Proxmox's default (logging, DHCP, MAC and IP filters, NDP, router advertisements): no change in what the reach rules allow |
+| `node_name` | Yes | Yes | Written by the generator |
+| `output_policy` | Yes | Yes | Written by the generator |
+| `radv` | n/a | No | A firewall setting left at Proxmox's default (logging, DHCP, MAC and IP filters, NDP, router advertisements): no change in what the reach rules allow |
+| `vm_id` | Yes | Yes | Written by the generator |
+
+### proxmox_virtual_environment_firewall_rules
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `container_id` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `node_name` | Yes | Yes | Written by the generator |
+| `vm_id` | Yes | Yes | Written by the generator |
+| `rule` | Yes | Yes | Written by the generator |
+| `rule.action` | Yes | Yes | Written by the generator |
+| `rule.comment` | Yes | Yes | Written by the generator |
+| `rule.dest` | Yes | Yes | Written by the generator |
+| `rule.dport` | Yes | Yes | Written by the generator |
+| `rule.enabled` | n/a | No | Another way to write a rule (an interface, a security group, logging, disabled rules): Isoloom names networks by IP set |
+| `rule.iface` | n/a | No | Another way to write a rule (an interface, a security group, logging, disabled rules): Isoloom names networks by IP set |
+| `rule.log` | n/a | No | Another way to write a rule (an interface, a security group, logging, disabled rules): Isoloom names networks by IP set |
+| `rule.macro` | Yes | Yes | Written by the generator |
+| `rule.proto` | Yes | Yes | Written by the generator |
+| `rule.security_group` | n/a | No | Another way to write a rule (an interface, a security group, logging, disabled rules): Isoloom names networks by IP set |
+| `rule.source` | Yes | Yes | Written by the generator |
+| `rule.sport` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `rule.type` | Yes | Yes | Written by the generator |
+
+### proxmox_virtual_environment_pool
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `comment` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `pool_id` | Yes | Yes | Written by the generator |
+
 ### proxmox_virtual_environment_vm
 
 | Key | Every target | Implemented | Notes |
@@ -1768,17 +1959,17 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `network_device.bridge` | Yes | Yes | Written by the generator |
 | `network_device.disconnected` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `network_device.enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `network_device.firewall` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
+| `network_device.firewall` | Yes | Yes | Written by the generator |
 | `network_device.mac_address` | Yes | Yes | Written by the generator |
 | `network_device.model` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `network_device.mtu` | Yes | Not yet | A network's MTU |
+| `network_device.mtu` | Yes | Yes | Written by the generator |
 | `network_device.queues` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `network_device.rate_limit` | Yes | Not yet | A rate limit per machine, beside `networks.*.tc` (a whole network, on its router) |
-| `network_device.trunks` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
-| `network_device.vlan_id` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `network_device.rate_limit` | Yes | Yes | Written by the generator |
+| `network_device.trunks` | Yes | Another way | Via a tagged device per VLAN (`network_device.vlan_id`), the VM's trunk built inside it (a veth, `<lan>.<id>`) as on the other VM targets |
+| `network_device.vlan_id` | Yes | Yes | Written by the generator |
 | `node_name` | Yes | Yes | Written by the generator |
 | `on_boot` | Yes | Yes | Written by the generator |
-| `pool_id` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `pool_id` | Yes | Yes | Written by the generator |
 | `protection` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `purge_on_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `reboot` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
@@ -1829,9 +2020,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `clone.vm_id` | Yes | Yes | Written by the generator |
 | `cpu` | Yes | Yes | Written by the generator |
 | `cpu.affinity` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `cpu.architecture` | Yes | Not yet | With `machines.*.arch`: another CPU architecture |
+| `cpu.architecture` | Yes | Yes | Written by the generator |
 | `cpu.cores` | Yes | Yes | Written by the generator |
-| `cpu.flags` | Yes | Not yet | With `machines.*.arch`: another CPU architecture |
+| `cpu.flags` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `cpu.hotplugged` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `cpu.limit` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `cpu.numa` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
@@ -1881,7 +2072,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `initialization` | Yes | Yes | Written by the generator |
 | `initialization.datastore_id` | Yes | Yes | Written by the generator |
 | `initialization.file_format` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `initialization.interface` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.interface` | Yes | Yes | Written by the generator |
 | `initialization.meta_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.network_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.type` | Yes | Yes | Written by the generator |
@@ -1941,10 +2132,10 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `usb.host` | No | No | A host's USB device for a VM: `devices` reach containers only (a VM has its own virtual devices), and cloud VMs have none |
 | `usb.mapping` | No | No | A host's USB device for a VM: `devices` reach containers only (a VM has its own virtual devices), and cloud VMs have none |
 | `usb.usb3` | No | No | A host's USB device for a VM: `devices` reach containers only (a VM has its own virtual devices), and cloud VMs have none |
-| `vga` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `vga` | Yes | Yes | Written by the generator |
 | `vga.clipboard` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `vga.memory` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `vga.type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `vga.type` | Yes | Yes | Written by the generator |
 | `virtiofs` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
 | `virtiofs.cache` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
 | `virtiofs.direct_io` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
@@ -7303,6 +7494,7 @@ is marked ✗, with its reason below.
 | `networks.*.tc.jitter` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
 | `networks.*.tc.loss` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
 | `networks.*.tc.rate` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
+| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `networks.*.docker.cidr` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `networks.*.vlans.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
 | `networks.*.switch` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
@@ -7346,7 +7538,8 @@ is marked ✗, with its reason below.
 | `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.aliases` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
-| `machines.*.arch` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.arch` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
+| `machines.*.rate_limit` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `machines.*.privileged` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.nested_virtualization` | ✗ | ✗ | ✗ | ✗ | ✗ | ◐ | ✗ | ✗ | ✓ | ◐ | ✗ | ◐ | ✗ | ✗ | ◐ | ✗ | n/a | n/a |
 | `machines.*.gpus.count` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ◐ | ◐ | ◐ | ◐ | ◐ | ✗ | ✗ | n/a | n/a |
@@ -7397,6 +7590,7 @@ is marked ✗, with its reason below.
 | `machines.*.docker.firmware` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.config` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.idle` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.docker.lxc` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.os` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | n/a | n/a | ◐ |
 | `machines.*.vm.image.vagrant` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.vm.image.vagrant_version` | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
@@ -7462,24 +7656,24 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 87% of 110 | 95 | 3 | 0 | 12 |
-| hosted | 87% of 110 | 95 | 3 | 0 | 12 |
-| kubernetes | 71% of 102 | 67 | 12 | 1 | 22 |
-| helm | 71% of 102 | 67 | 12 | 1 | 22 |
-| kustomize | 71% of 102 | 67 | 12 | 1 | 22 |
-| vagrant | 82% of 115 | 86 | 17 | 0 | 12 |
-| docker-vm | 79% of 110 | 86 | 3 | 0 | 21 |
-| hybrid | 66% of 135 | 86 | 7 | 7 | 35 |
-| proxmox | 79% of 109 | 85 | 4 | 3 | 17 |
-| aws | 61% of 115 | 62 | 17 | 6 | 30 |
-| azure | 60% of 115 | 62 | 16 | 7 | 30 |
-| gcp | 61% of 115 | 62 | 17 | 6 | 30 |
-| digitalocean | 49% of 115 | 51 | 11 | 6 | 47 |
-| linode | 51% of 115 | 53 | 12 | 6 | 44 |
-| oci | 51% of 115 | 53 | 12 | 6 | 44 |
-| cloud-docker | 78% of 110 | 85 | 3 | 0 | 22 |
+| docker | 86% of 112 | 95 | 3 | 0 | 14 |
+| hosted | 86% of 112 | 95 | 3 | 0 | 14 |
+| kubernetes | 70% of 104 | 67 | 12 | 1 | 24 |
+| helm | 70% of 104 | 67 | 12 | 1 | 24 |
+| kustomize | 70% of 104 | 67 | 12 | 1 | 24 |
+| vagrant | 80% of 117 | 86 | 17 | 0 | 14 |
+| docker-vm | 78% of 112 | 86 | 3 | 0 | 23 |
+| hybrid | 65% of 137 | 86 | 7 | 7 | 37 |
+| proxmox | 81% of 112 | 89 | 4 | 3 | 16 |
+| aws | 60% of 117 | 62 | 17 | 6 | 32 |
+| azure | 59% of 117 | 62 | 16 | 7 | 32 |
+| gcp | 60% of 117 | 62 | 17 | 6 | 32 |
+| digitalocean | 48% of 117 | 51 | 11 | 6 | 49 |
+| linode | 50% of 117 | 53 | 12 | 6 | 46 |
+| oci | 50% of 117 | 53 | 12 | 6 | 46 |
+| cloud-docker | 77% of 112 | 85 | 3 | 0 | 24 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 50% of 74 | 32 | 11 | 14 | 17 |
+| external | 49% of 76 | 32 | 11 | 14 | 19 |
 
 ### Refusals
 
@@ -7489,6 +7683,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **aws, azure**: Link impairment (`tc`) needs a router in the path; the cloud's security groups have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
 - **gcp**: Link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
 - **digitalocean, linode, oci**: Link impairment (`tc`) needs a router in the path; the cloud's firewalls have none (`networks.*.tc.delay`, `networks.*.tc.jitter`, `networks.*.tc.loss`, `networks.*.tc.rate`)
+- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does) (`networks.*.mtu`)
 - **digitalocean**: DigitalOcean cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
 - **linode**: Linode cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
 - **oci**: Oracle Cloud cloud-vm takes single-network labs so far (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`)
@@ -7508,7 +7703,6 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)
 - **vagrant**: Network `home`: Vagrant's bridged networks take no VLAN tag (Proxmox does) (`networks.*.bridged.vlan`)
-- **proxmox**: Machine `a`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts) (`machines.*.arch`)
 - **aws**: Machine `a`: arm64 on AWS comes later (Graviton instances and arm64 AMIs) (`machines.*.arch`)
 - **azure**: Machine `a`: arm64 on Azure comes later (Arm-based sizes and arm64 images) (`machines.*.arch`)
 - **gcp**: Machine `a`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images) (`machines.*.arch`)
@@ -7516,6 +7710,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **linode**: Machine `a`: arm64 on Linode comes later (it has no arm64 plans) (`machines.*.arch`)
 - **oci**: Machine `a`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images) (`machines.*.arch`)
 - **cloud-docker**: Machine `a`: arm64 on a cloud VM comes later (Graviton instances and arm64 images) (`machines.*.arch`)
+- **docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Machine `a` sets a `rate_limit`, which this target doesn't apply yet (the proxmox target does, on its network devices) (`machines.*.rate_limit`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, cloud-docker**: Machine `a` runs VMs inside (`nested_virtualization`), which a container can't: it runs as a VM on the VM targets (`machines.*.nested_virtualization`)
 - **azure**: Machine `a`: nested virtualization (`nested_virtualization`) on Azure comes later (AWS, Google Cloud and Oracle Cloud have it) (`machines.*.nested_virtualization`)
 - **digitalocean**: Machine `a`: nested virtualization (`nested_virtualization`) on DigitalOcean comes later (AWS, Google Cloud and Oracle Cloud have it) (`machines.*.nested_virtualization`)

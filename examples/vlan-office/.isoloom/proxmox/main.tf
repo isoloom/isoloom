@@ -128,22 +128,16 @@ locals {
   users         = var.ssh_public_key == "" ? [] : [{ name = "isoloom", sudo = "ALL=(ALL) NOPASSWD:ALL", shell = "/bin/bash", ssh_authorized_keys = [var.ssh_public_key] }]
 }
 
+# The environment's VMs and containers, together in a pool of their own.
+resource "proxmox_virtual_environment_pool" "env" {
+  pool_id = local.zone
+  comment = "Isoloom: vlan-office"
+}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
   id    = local.zone
   nodes = [var.node]
-}
-
-# Network `office-vlan10`: 10.70.10.0/24
-resource "proxmox_sdn_vnet" "office_vlan10" {
-  id   = "i${var.slot}n0"
-  zone = proxmox_sdn_zone_simple.env.id
-}
-
-# Network `office-vlan20`: 10.70.20.0/24
-resource "proxmox_sdn_vnet" "office_vlan20" {
-  id   = "i${var.slot}n1"
-  zone = proxmox_sdn_zone_simple.env.id
 }
 
 # Network `servers`: 10.70.99.0/24
@@ -152,8 +146,15 @@ resource "proxmox_sdn_vnet" "servers" {
   zone = proxmox_sdn_zone_simple.env.id
 }
 
+# LAN `office`: its VLANs are tags on one VNet
+resource "proxmox_sdn_vnet" "office" {
+  id         = "i${var.slot}l0"
+  zone       = proxmox_sdn_zone_simple.env.id
+  vlan_aware = true
+}
+
 resource "proxmox_sdn_applier" "env" {
-  depends_on = [proxmox_sdn_vnet.office_vlan10, proxmox_sdn_vnet.office_vlan20, proxmox_sdn_vnet.servers]
+  depends_on = [proxmox_sdn_vnet.servers, proxmox_sdn_vnet.office]
 }
 
 # The `debian-12` cloud image, per environment: a shared file would go with whichever environment is destroyed first.
@@ -164,6 +165,33 @@ resource "proxmox_download_file" "debian_12" {
   url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+}
+
+# Network `office-vlan10`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "office_vlan10" {
+  name    = "iso${var.slot}n0"
+  comment = "vlan-office: network office-vlan10"
+  cidr {
+    name = "10.70.10.0/24"
+  }
+}
+
+# Network `office-vlan20`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "office_vlan20" {
+  name    = "iso${var.slot}n1"
+  comment = "vlan-office: network office-vlan20"
+  cidr {
+    name = "10.70.20.0/24"
+  }
+}
+
+# Network `servers`, for the machines' firewall rules.
+resource "proxmox_virtual_environment_firewall_ipset" "servers" {
+  name    = "iso${var.slot}n2"
+  comment = "vlan-office: network servers"
+  cidr {
+    name = "10.70.99.0/24"
+  }
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
@@ -238,6 +266,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   name      = "iso${var.slot}-router"
   node_name = var.node
   tags      = ["isoloom", "vlan-office"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   agent {
     enabled = true
@@ -260,11 +289,13 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
     mac_address = upper(format("02:15:%02x:00:00:00", var.slot))
   }
   network_device {
-    bridge      = proxmox_sdn_vnet.office_vlan10.id
+    bridge      = proxmox_sdn_vnet.office.id
+    vlan_id     = 10
     mac_address = upper(format("02:15:%02x:01:%02x:00", var.slot, 0))
   }
   network_device {
-    bridge      = proxmox_sdn_vnet.office_vlan20.id
+    bridge      = proxmox_sdn_vnet.office.id
+    vlan_id     = 20
     mac_address = upper(format("02:15:%02x:01:%02x:00", var.slot, 1))
   }
   network_device {
@@ -314,6 +345,7 @@ resource "proxmox_virtual_environment_vm" "intranet" {
   name      = "iso${var.slot}-intranet"
   node_name = var.node
   tags      = ["isoloom", "vlan-office"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -329,7 +361,8 @@ resource "proxmox_virtual_environment_vm" "intranet" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.servers.id
+    bridge   = proxmox_sdn_vnet.servers.id
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -349,6 +382,52 @@ resource "proxmox_virtual_environment_vm" "intranet" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `intranet`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "intranet" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.intranet.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "intranet" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.intranet.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network servers"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.servers.name}"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach office-vlan10 to servers"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office_vlan10.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.servers.name}"
+    proto   = "tcp"
+    dport   = "80"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach office-vlan10 to servers"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office_vlan10.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.servers.name}"
+    proto   = "udp"
+    dport   = "80"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "reach office-vlan10 to servers"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office_vlan10.name}"
+    dest    = "+${proxmox_virtual_environment_firewall_ipset.servers.name}"
+    macro   = "Ping"
+  }
 }
 
 # Machine `staff`.
@@ -377,6 +456,7 @@ resource "proxmox_virtual_environment_vm" "staff" {
   name      = "iso${var.slot}-staff"
   node_name = var.node
   tags      = ["isoloom", "vlan-office"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -392,7 +472,9 @@ resource "proxmox_virtual_environment_vm" "staff" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.office_vlan10.id
+    bridge   = proxmox_sdn_vnet.office.id
+    vlan_id  = 10
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -412,6 +494,26 @@ resource "proxmox_virtual_environment_vm" "staff" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `staff`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "staff" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.staff.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "staff" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.staff.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network office-vlan10"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office_vlan10.name}"
+  }
 }
 
 # Machine `guest`.
@@ -440,6 +542,7 @@ resource "proxmox_virtual_environment_vm" "guest" {
   name      = "iso${var.slot}-guest"
   node_name = var.node
   tags      = ["isoloom", "vlan-office"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -455,7 +558,9 @@ resource "proxmox_virtual_environment_vm" "guest" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.office_vlan20.id
+    bridge   = proxmox_sdn_vnet.office.id
+    vlan_id  = 20
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -475,6 +580,26 @@ resource "proxmox_virtual_environment_vm" "guest" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `guest`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "guest" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.guest.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "guest" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.guest.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network office-vlan20"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office_vlan20.name}"
+  }
 }
 
 # Machine `admin`.
@@ -504,6 +629,7 @@ resource "proxmox_virtual_environment_vm" "admin" {
   name      = "iso${var.slot}-admin"
   node_name = var.node
   tags      = ["isoloom", "vlan-office"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
   on_boot   = false
   cpu {
     cores = 1
@@ -519,10 +645,14 @@ resource "proxmox_virtual_environment_vm" "admin" {
     size         = 20
   }
   network_device {
-    bridge = proxmox_sdn_vnet.office_vlan10.id
+    bridge   = proxmox_sdn_vnet.office.id
+    vlan_id  = 10
+    firewall = true
   }
   network_device {
-    bridge = proxmox_sdn_vnet.office_vlan20.id
+    bridge   = proxmox_sdn_vnet.office.id
+    vlan_id  = 20
+    firewall = true
   }
   initialization {
     datastore_id      = var.datastore
@@ -547,6 +677,32 @@ resource "proxmox_virtual_environment_vm" "admin" {
   }
   serial_device {}
   depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `admin`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "admin" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.admin.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "admin" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.admin.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network office-vlan10"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office_vlan10.name}"
+  }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network office-vlan20"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.office_vlan20.name}"
+  }
 }
 
 locals {

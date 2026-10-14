@@ -72,6 +72,7 @@ impl Table {
                     appliance: None,
                     config: None,
                     firmware: None,
+                    lxc: false,
                 });
                 m.supplied = true;
             }

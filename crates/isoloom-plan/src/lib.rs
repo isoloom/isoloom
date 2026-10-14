@@ -11,6 +11,7 @@ pub mod hardware;
 pub mod images;
 pub mod ipv6;
 pub mod lifecycle;
+pub mod links;
 pub mod machine_files;
 pub mod outside;
 pub mod process;
