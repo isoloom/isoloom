@@ -15,10 +15,6 @@ pub const CLOUD_WRITTEN: Support = Emitted {
 
 // Resource types.
 
-/// What one VM per machine on its own networks needs, not written yet.
-pub const ENVIRONMENT: Support = Planned {
-    note: "with the cloud generator (one VM per machine on its own networks)",
-};
 /// Making or sharing a machine image: a machine boots one made beforehand, by its id.
 pub const IMAGES: Support = Equivalent {
     via: "machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id",
@@ -223,29 +219,19 @@ pub const ADDRESSES: Support = Planned {
 pub const CPUS: Support = Equivalent {
     via: "`resources.cpus`, through the machine type Isoloom picks",
 };
-/// NAT for private networks.
-pub const NAT: Support = Planned {
-    note: "private networks reaching the internet through NAT",
+/// NAT for private networks: every cloud machine has its own public address.
+pub const NAT: Support = Equivalent {
+    via: "each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out",
 };
 /// Routes through a machine.
 pub const ROUTER: Support = Planned {
     note: "with `networks.*.gateway`: a network routed through one of its machines",
 };
-/// VLANs and trunks.
-pub const VLANS: Support = Planned {
-    note: "with VLANs and trunks (`networks.*.vlans`)",
-};
 /// A network's MTU.
 pub const MTU: Support = Planned { note: "a network's MTU" };
-/// Rules on outbound traffic.
-pub const EGRESS_RULES: Support = Planned {
-    note: "outbound rules: reach enforced on traffic leaving a machine too",
-};
-/// ICMP in rules.
-pub const ICMP: Support = Planned { note: "ICMP in reach rules" };
-/// No internet on a network.
-pub const OFFLINE: Support = Planned {
-    note: "`networks.*.internet: false` enforced by the cloud",
+/// VLAN tags on a cloud VM's interface.
+pub const CLOUD_VLANS: Support = NotPortable {
+    why: "a cloud carries no 802.1Q tags between VMs (Google Cloud's VLAN interfaces and Oracle Cloud's VLANs end at its own virtual switch): Isoloom gives each VLAN a subnet of its own, and a machine on several an interface on each",
 };
 /// Shared folders.
 pub const SHARED: Support = Planned {

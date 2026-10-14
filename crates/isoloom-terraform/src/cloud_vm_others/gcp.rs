@@ -37,7 +37,11 @@ const SUB: &str = "gcp";
 /// What Google Cloud can't host yet.
 pub const LIMITS: Limits = Limits {
     arm64: Some("arm64 on Google Cloud comes later (Arm-based machine types and arm64 images)"),
-    gateways: Some("networks with a `gateway` machine in the cloud come later"),
+    // A route can't be as specific as a subnetwork's, so within one VPC nothing goes through a
+    // machine; a VPC per network comes with multi-NIC machines.
+    gateways: Some(
+        "a Google Cloud route can't send traffic between subnetworks of one VPC through a machine (it can't be as specific as a subnetwork's own), so networks with a `gateway` machine come with a VPC per network",
+    ),
     playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none"),
     ipv6: Some("Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept"),
@@ -112,6 +116,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
         .refusal(env)
         .or_else(|| gpus::refusal(env, &GPUS))
         .or_else(|| crate::vm::nested::refusal(env, "Google Cloud", true))
+        .or_else(|| mtu_refusal(env))
     {
         return Some(why);
     }
@@ -139,6 +144,26 @@ pub fn refusal(env: &Environment) -> Option<String> {
     }
     // The controller sits on every network; with more than one it is itself multi-NIC.
     (controller::needed(env) && env.networks.len() > 1).then(|| "the Ansible controller spans several networks: GCP multi-NIC comes later".to_string())
+}
+
+/// The MTUs a Google Cloud VPC takes.
+const MTUS: std::ops::RangeInclusive<u16> = 1300..=8896;
+
+/// The VPC's MTU: the one the networks set (one VPC holds them all, so they share it), else
+/// Ethernet's 1500, as on every other target (Google's default is 1460).
+fn mtu(env: &Environment) -> u16 {
+    env.networks.values().find_map(|n| n.mtu).unwrap_or(1500)
+}
+
+/// Why the networks' MTUs can't be the VPC's, if they can't.
+fn mtu_refusal(env: &Environment) -> Option<String> {
+    let mut set = env.networks.iter().filter_map(|(name, n)| n.mtu.map(|m| (name, m)));
+    let (first, value) = set.next()?;
+    if !MTUS.contains(&value) {
+        return Some(format!("network `{first}`'s `mtu` ({value}): a Google Cloud VPC takes 1300 to 8896"));
+    }
+    set.find(|(_, m)| *m != value)
+        .map(|(other, m)| format!("networks `{first}` ({value}) and `{other}` ({m}) set different MTUs: on Google Cloud they share one VPC, so one MTU"))
 }
 
 /// The steps the VPC does itself: it routes between subnetworks.
@@ -263,6 +288,7 @@ fn network(env: &Environment, m: &mut Module) {
             .add_attribute(("project", reference("local.project")))
             .add_attribute(("name", reference("local.name")))
             .add_attribute(("auto_create_subnetworks", boolean(false)))
+            .add_attribute(("mtu", number(u64::from(mtu(env)))))
             .build(),
     );
     for (net, p) in &env.networks {

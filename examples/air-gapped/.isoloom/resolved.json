@@ -151,7 +151,7 @@
           "oci"
         ],
         "refused": {
-          "digitalocean": "DigitalOcean cloud-vm takes single-machine labs so far (it can't pin private addresses)"
+          "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address"
         }
       }
     }

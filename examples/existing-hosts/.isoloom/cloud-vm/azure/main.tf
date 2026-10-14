@@ -89,10 +89,11 @@ resource "azurerm_virtual_network" "env" {
 }
 
 resource "azurerm_subnet" "lab" {
-  name                 = "lab"
-  resource_group_name  = azurerm_resource_group.env.name
-  virtual_network_name = azurerm_virtual_network.env.name
-  address_prefixes     = ["192.168.1.0/24"]
+  name                            = "lab"
+  resource_group_name             = azurerm_resource_group.env.name
+  virtual_network_name            = azurerm_virtual_network.env.name
+  address_prefixes                = ["192.168.1.0/24"]
+  default_outbound_access_enabled = true
 }
 
 # Machine `web`: what may reach it.

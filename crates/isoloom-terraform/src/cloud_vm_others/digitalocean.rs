@@ -11,7 +11,7 @@ use isoloom_render::{GeneratedFile, header};
 use isoloom_spec::DEFAULT_MEMORY_MB;
 use isoloom_spec::model::Target;
 
-use super::single_network::{self, Rules};
+use super::shared::{self, Networks, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, shutdown_script, tag_list};
 use crate::vm::gpus::GpuSizes;
 use crate::vm::linux;
@@ -25,10 +25,11 @@ const SUB: &str = "digitalocean";
 /// What DigitalOcean takes.
 const RULES: Rules = Rules {
     cloud: "DigitalOcean",
-    single_machine: true,
-    limits: single_network::limits(
+    networks: Networks::OneVm,
+    limits: shared::limits(
         "arm64 on DigitalOcean comes later (it has no arm64 droplets)",
         "DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one)",
+        Some("a DigitalOcean VPC has no route tables, so no traffic can be sent through a machine"),
     ),
     has_image: |os| image(os).is_some(),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
@@ -54,17 +55,17 @@ impl Backend for DigitalOceanBackend {
     }
 
     fn capabilities(&self) -> Capabilities {
-        single_network::capabilities()
+        shared::capabilities()
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        single_network::render(env, &RULES, module)
+        shared::render(env, &RULES, module)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
         isoloom_plan::refusal(&env.requirements, &self.capabilities())
             .map(|r| r.to_string())
-            .or_else(|| single_network::refusal(env, &RULES))
+            .or_else(|| shared::refusal(env, &RULES))
     }
 }
 
@@ -114,7 +115,7 @@ fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builde
     cloud::outputs(env, &reach, &mut m);
     m.fragment(&project_lists(true));
     Ok(GeneratedFile {
-        path: single_network::path(SUB),
+        path: shared::path(SUB),
         contents: m.render()?,
     })
 }
@@ -169,7 +170,7 @@ fn droplet(env: &Environment, name: &str, m: &mut Module) {
     );
     m.commented(
         "What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.",
-        firewall(env, &id),
+        firewall(mp, &id),
     );
     let machine = linux::Machine {
         env,
@@ -177,7 +178,7 @@ fn droplet(env: &Environment, name: &str, m: &mut Module) {
         replace_on: reference(&format!("digitalocean_droplet.{id}.id")),
         host: public_ip(name),
         user: USER.into(),
-        hooks: single_network::hooks(mp, Vec::new()),
+        hooks: shared::hooks(mp, Vec::new()),
     };
     m.block(linux::provisioner(machine).block());
 }
@@ -196,8 +197,8 @@ fn rule(kind: &str, protocol: &str, ports: Option<&str>, addresses: Expression) 
     b.add_attribute((key, addresses)).build()
 }
 
-/// SSH and the published ports from `allowed_cidr`, everything from the VPC, everything out.
-fn firewall(env: &Environment, id: &str) -> Block {
+/// SSH and the droplet's own published ports from `allowed_cidr`, everything from the VPC, everything out.
+fn firewall(mp: &isoloom_plan::MachinePlan, id: &str) -> Block {
     let allowed = || list([reference("var.allowed_cidr")]);
     let vpc = || list([reference("digitalocean_vpc.env.ip_range")]);
     let anywhere = || list([string("0.0.0.0/0"), string("::/0")]);
@@ -205,7 +206,7 @@ fn firewall(env: &Environment, id: &str) -> Block {
         .add_attribute(("name", reference("local.name")))
         .add_attribute(("droplet_ids", list([reference(&format!("digitalocean_droplet.{id}.id"))])))
         .add_block(rule("inbound", "tcp", Some("22"), allowed()));
-    for (protocol, port) in single_network::published_ports(env) {
+    for (protocol, port) in shared::published_ports(mp) {
         b = b.add_block(rule("inbound", protocol.id(), Some(&port.to_string()), allowed()));
     }
     for (protocol, ports) in [("tcp", Some("1-65535")), ("udp", Some("1-65535")), ("icmp", None)] {

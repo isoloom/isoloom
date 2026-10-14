@@ -1,6 +1,7 @@
 //! Every output's cells for a network's `mtu`, a machine's `rate_limit` and `docker.lxc`, in one
-//! place: only the Proxmox module sets the first two (on its network devices) and runs the
-//! third; every other output's backend refuses a spec with `mtu` or `rate_limit`.
+//! place: the Proxmox module sets the first two (on its network devices) and runs the third,
+//! Google Cloud sets a network's MTU on its VPC; every other output's backend refuses a spec with
+//! `mtu` or `rate_limit`.
 
 use crate::spec::status::PROBE;
 use crate::spec::status::Status::{self, Done, NotApplicable, Planned};
@@ -46,7 +47,10 @@ pub const VAGRANT: &[(&str, Status)] = &[
 
 /// The cloud VM core's.
 pub const CLOUD_VM: &[(&str, Status)] = &[
-    mtu("the cloud's network sets its own MTU"),
+    // A claim is proved on AWS, the target's first cloud, which has no setting for it.
+    mtu(
+        "Google Cloud sets it on its VPC (1300 to 8896, one for every network); AWS, Azure, DigitalOcean, Linode and Oracle Cloud have no setting for it and refuse it",
+    ),
     rate("a VM's bandwidth cap inside it (tc) comes later"),
     NOT_LXC,
 ];

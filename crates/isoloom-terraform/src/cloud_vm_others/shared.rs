@@ -1,6 +1,6 @@
-//! What DigitalOcean, Linode and Oracle Cloud share: they take single-network Linux labs, so
-//! their refusals, capabilities, set-up hooks and published ports are the same, read from the
-//! plan.
+//! What DigitalOcean, Linode and Oracle Cloud share: Linux labs on the networks each cloud can
+//! model ([`Networks`]), so their refusals, capabilities, set-up hooks and published ports are
+//! the same, read from the plan.
 
 use isoloom_plan::{Capabilities, Environment, MachinePlan, Step};
 use isoloom_render::backend::{self, Files, RenderError};
@@ -14,13 +14,25 @@ use crate::vm::limits::Limits;
 use crate::vm::linux::Hooks;
 use crate::vm::{controller, is_windows, os, own_image, vms};
 
-/// What a single-network cloud takes, and how it says it doesn't.
+/// The networks a cloud can model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Networks {
+    /// One network and one VM (DigitalOcean: a droplet joins one VPC, at an address the cloud
+    /// picks, so the lab's fixed addressing holds only alone).
+    OneVm,
+    /// Several networks, each machine on one (Linode: an instance has one VPC interface).
+    OnePerMachine,
+    /// Several networks, a machine on several (Oracle Cloud: a VNIC per network).
+    Several,
+}
+
+/// What one of these clouds takes, and how it says it doesn't.
 #[derive(Debug, Clone, Copy)]
 pub struct Rules {
     /// The cloud's name, as its refusals start (`DigitalOcean`).
     pub cloud: &'static str,
-    /// Whether it takes one VM only (it can't pin private addresses).
-    pub single_machine: bool,
+    /// The networks it can model.
+    pub networks: Networks,
     /// The features it lacks.
     pub limits: Limits,
     /// Whether it has an image for an OS.
@@ -37,14 +49,29 @@ pub struct Rules {
     pub nests: bool,
 }
 
-/// The features every cloud lacks for now, `arm64` and `ipv6` the cloud's own.
-pub const fn limits(arm64: &'static str, ipv6: &'static str) -> Limits {
+/// The features every cloud lacks for now, `arm64`, `ipv6` and `gateways` (`None`: it has them)
+/// the cloud's own.
+pub const fn limits(arm64: &'static str, ipv6: &'static str, gateways: Option<&'static str>) -> Limits {
     Limits {
         arm64: Some(arm64),
-        gateways: Some("networks with a `gateway` machine in the cloud come later"),
+        gateways,
         playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
         tc: Some("link impairment (`tc`) needs a router in the path; the cloud's firewalls have none"),
         ipv6: Some(ipv6),
+    }
+}
+
+/// Why the cloud's networks can't model the environment's, if they can't.
+fn networks_refusal(env: &Environment, rules: &Rules) -> Option<String> {
+    let cloud = rules.cloud;
+    match rules.networks {
+        Networks::OneVm if env.networks.len() != 1 || vms(env).count() > 1 => Some(format!(
+            "{cloud} cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address {cloud} picks, so other machines couldn't reach it at its spec address"
+        )),
+        Networks::OnePerMachine => vms(env)
+            .find(|(_, mp)| mp.addresses.len() > 1)
+            .map(|(name, _)| format!("machine `{name}` is on several networks: a {cloud} instance has one VPC interface")),
+        _ => None,
     }
 }
 
@@ -54,12 +81,12 @@ pub fn capabilities() -> Capabilities {
     crate::cloud_vm::capabilities()
 }
 
-/// Why the cloud can't run this environment, if it can't: one network, Linux only, no
-/// controller, one VM when it says so, its limits, its images.
+/// Why the cloud can't run this environment, if it can't: its networks, Linux only, no
+/// controller, its limits, its images.
 pub fn refusal(env: &Environment, rules: &Rules) -> Option<String> {
     let cloud = rules.cloud;
-    if env.networks.len() != 1 {
-        return Some(format!("{cloud} cloud-vm takes single-network labs so far"));
+    if let Some(why) = networks_refusal(env, rules) {
+        return Some(why);
     }
     if vms(env).any(|(_, mp)| is_windows(mp)) {
         return Some(format!("{cloud} cloud-vm is Linux only so far"));
@@ -67,14 +94,12 @@ pub fn refusal(env: &Environment, rules: &Rules) -> Option<String> {
     if controller::needed(env) {
         return Some(format!("{cloud} cloud-vm has no Ansible controller yet"));
     }
-    if rules.single_machine && vms(env).count() > 1 {
-        return Some(format!("{cloud} cloud-vm takes single-machine labs so far (it can't pin private addresses)"));
-    }
     if let Some(why) = rules
         .limits
         .refusal(env)
         .or_else(|| gpus::refusal(env, &rules.gpus))
         .or_else(|| crate::vm::nested::refusal(env, rules.cloud, rules.nests))
+        .or_else(|| crate::vm::limits::fixed_mtu(env, rules.cloud))
     {
         return Some(why);
     }
@@ -125,11 +150,10 @@ pub fn hooks(mp: &MachinePlan, at_boot: Vec<Template>) -> Hooks {
     }
 }
 
-/// The ports the VMs publish, as (protocol, port), TCP first, each once.
-pub fn published_ports(env: &Environment) -> Vec<(Protocol, u16)> {
-    let mut ports: Vec<(bool, u16, Protocol)> = vms(env)
-        .flat_map(|(_, mp)| mp.ports.iter().map(|p| (!p.protocol.is_tcp(), p.publish, p.protocol)))
-        .collect();
+/// The ports one machine publishes, as (protocol, port), TCP first, each once: a firewall opens
+/// them on that machine only, never on its neighbors.
+pub fn published_ports(mp: &MachinePlan) -> Vec<(Protocol, u16)> {
+    let mut ports: Vec<(bool, u16, Protocol)> = mp.ports.iter().map(|p| (!p.protocol.is_tcp(), p.publish, p.protocol)).collect();
     ports.sort_unstable_by_key(|(udp, port, _)| (*udp, *port));
     ports.dedup_by_key(|(udp, port, _)| (*udp, *port));
     ports.into_iter().map(|(_, port, protocol)| (protocol, port)).collect()

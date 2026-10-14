@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DISKS, EGRESS_RULES, IMAGES, LINODE_IPV6, MANAGED, PLACEMENT, PROTECT,
-    PUBLIC_DNS, PUBLIC_IP, PUBLIC_IPV6, VM_AGENT,
+    ACCOUNT, ALIAS, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, DISKS, IMAGES, LINODE_IPV6, MANAGED, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP,
+    PUBLIC_IPV6, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -66,7 +66,8 @@ const WRITTEN: &[(&str, &str)] = &[
     ("types", "linode_firewall linode_instance linode_vpc linode_vpc_subnet"),
     (
         "linode_firewall",
-        "inbound inbound.action inbound.ipv4 inbound.label inbound.ports inbound.protocol inbound_policy label linodes outbound_policy",
+        "inbound inbound.action inbound.ipv4 inbound.label inbound.ports inbound.protocol inbound_policy label linodes outbound outbound.action
+        outbound.ipv4 outbound.label outbound.ports outbound.protocol outbound_policy",
     ),
     (
         "linode_instance",
@@ -94,10 +95,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (ALIAS, "interfaces"),
             (CLOUD, "nodebalancers"),
             (LINODE_IPV6, "inbound.ipv6 outbound.ipv6"),
-            (
-                EGRESS_RULES,
-                "outbound outbound.action outbound.description outbound.ipv4 outbound.label outbound.ports outbound.protocol",
-            ),
         ],
     ),
     (
@@ -115,7 +112,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 firewall_id config config.* disk disk.* linode_interfaces linode_interfaces.* interface.label interface.primary
                 interface.ipam_address interface.ip_ranges interface.ipv4.nat_1_1",
             ),
-            (ADDRESSES, "private_ip"),
+            (DEFAULTS, "private_ip"),
             (LINODE_IPV6, "interface.ipv6 interface.ipv6.*"),
         ],
     ),

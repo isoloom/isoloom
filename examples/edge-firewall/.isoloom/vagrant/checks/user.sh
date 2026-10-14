@@ -78,7 +78,7 @@ if _retry 0 sh -c 'cd /opt/isoloom && sh checks/web-through-firewall.sh'; then p
 if _retry 30 _http_is 'http://www.edge.test/' 200; then pass 'the web server answers by its other name'; else fail 'the web server answers by its other name' "expected HTTP 200 from http://www.edge.test/, got $(_http 'http://www.edge.test/')"; fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _http_any 'http://10.70.0.2:8080/'; then pass 'fw:8080 on outside from user'; else fail 'fw:8080 on outside from user' "nothing answers at http://10.70.0.2:8080/"; fi
+if _retry 30 _http_any 'http://10.70.0.5:8080/'; then pass 'fw:8080 on outside from user'; else fail 'fw:8080 on outside from user' "nothing answers at http://10.70.0.5:8080/"; fi
 fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then

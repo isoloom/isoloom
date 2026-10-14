@@ -50,10 +50,10 @@ fn single_network_linux_lab_builds_oci_instances_at_fixed_addresses() {
     assert!(tf.contains("resource \"oci_core_instance\" \"web\""));
     assert!(tf.contains("resource \"oci_core_instance\" \"db\""));
     // Each keeps its spec address, pinned on the VNIC.
-    assert!(tf.contains("private_ip       = \"10.60.0.10\""));
-    assert!(tf.contains("private_ip       = \"10.60.0.11\""));
-    // The VCN's security list, with the published port opened.
-    assert!(tf.contains("resource \"oci_core_security_list\" \"env\""));
+    assert!(tf.contains("= \"10.60.0.10\""));
+    assert!(tf.contains("= \"10.60.0.11\""));
+    // The network's security list, and the published port opened on its machine's own group.
+    assert!(tf.contains("resource \"oci_core_security_list\" \"lab\""), "{tf}");
     assert!(tf.contains("min = 8080"));
     // The module outputs (docs/cloud-modules.md), the same shape the AWS driver gives.
     assert!(tf.contains("output \"ip\""));
@@ -61,12 +61,15 @@ fn single_network_linux_lab_builds_oci_instances_at_fixed_addresses() {
 }
 
 #[test]
-fn multi_network_lab_produces_no_oci_file() {
-    // Multi-network is still valid cloud-vm (AWS handles it), but OCI refuses it: no oci file.
-    let spec = parse(MULTI_NET).expect("parses");
-    let files = generate(&spec, Target::CloudVm).expect("cloud-vm generates");
-    assert!(
-        files.iter().all(|f| !f.path.ends_with("cloud-vm/oci/main.tf")),
-        "OCI should refuse a multi-network lab"
-    );
+fn a_machine_on_two_networks_gets_a_vnic_on_each() {
+    let tf = oci_tf(MULTI_NET);
+    // A subnet and a security list per network.
+    for net in ["front", "back"] {
+        assert!(tf.contains(&format!("resource \"oci_core_subnet\" \"{net}\"")), "{tf}");
+        assert!(tf.contains(&format!("resource \"oci_core_security_list\" \"{net}\"")));
+    }
+    // The first network on the instance, the second on an attached VNIC found by MAC at boot.
+    assert!(tf.contains("resource \"oci_core_vnic_attachment\" \"web_back\""));
+    assert!(tf.contains("data.oci_core_vnic.web_back.mac_address"));
+    assert!(tf.contains("skip_source_dest_check = true"));
 }

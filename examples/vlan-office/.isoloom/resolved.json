@@ -272,13 +272,13 @@
       "cloud-vm": {
         "generated": [
           "aws",
-          "azure"
+          "azure",
+          "oci"
         ],
         "refused": {
           "gcp": "machine `admin`: GCP multi-NIC comes later (each interface needs its own VPC network)",
-          "digitalocean": "DigitalOcean cloud-vm takes single-network labs so far",
-          "linode": "Linode cloud-vm takes single-network labs so far",
-          "oci": "Oracle Cloud cloud-vm takes single-network labs so far"
+          "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
+          "linode": "machine `admin` is on several networks: a Linode instance has one VPC interface"
         }
       }
     }

@@ -288,7 +288,7 @@
     "refused": {
       "proxmox": "machine `user`: no Proxmox image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)",
       "esxi": "machine `user`: no ESXi image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools)",
-      "cloud-vm": "no cloud can run it (aws: machine `user`: no AWS image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); azure: machine `user`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); gcp: machine `gateway`: GCP multi-NIC comes later (each interface needs its own VPC network); digitalocean: DigitalOcean cloud-vm takes single-network labs so far; linode: Linode cloud-vm takes single-network labs so far; oci: Oracle Cloud cloud-vm takes single-network labs so far)"
+      "cloud-vm": "no cloud can run it (aws: machine `user`: no AWS image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); azure: machine `user`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); gcp: machine `gateway`: GCP multi-NIC comes later (each interface needs its own VPC network); digitalocean: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode: machine `gateway` is on several networks: a Linode instance has one VPC interface; oci: machine `user`: no Oracle Cloud image for `kali` yet (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04))"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",

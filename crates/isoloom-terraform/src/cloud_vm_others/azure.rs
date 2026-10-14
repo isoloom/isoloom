@@ -117,6 +117,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
         .refusal(env)
         .or_else(|| gpus::refusal(env, &GPUS))
         .or_else(|| crate::vm::nested::refusal(env, "Azure", false))
+        .or_else(|| crate::vm::limits::fixed_mtu(env, "Azure"))
     {
         return Some(why);
     }

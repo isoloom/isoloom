@@ -189,9 +189,9 @@
         "refused": {
           "aws": "network `front` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks",
           "gcp": "network `front` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept",
-          "digitalocean": "DigitalOcean cloud-vm takes single-network labs so far",
-          "linode": "Linode cloud-vm takes single-network labs so far",
-          "oci": "Oracle Cloud cloud-vm takes single-network labs so far"
+          "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
+          "linode": "network `front` is IPv6: a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept",
+          "oci": "network `front` is IPv6: dual-stack virtual cloud networks on Oracle Cloud come later"
         }
       }
     }

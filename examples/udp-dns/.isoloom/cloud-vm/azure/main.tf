@@ -89,17 +89,19 @@ resource "azurerm_virtual_network" "env" {
 }
 
 resource "azurerm_subnet" "servers" {
-  name                 = "servers"
-  resource_group_name  = azurerm_resource_group.env.name
-  virtual_network_name = azurerm_virtual_network.env.name
-  address_prefixes     = ["10.66.10.0/24"]
+  name                            = "servers"
+  resource_group_name             = azurerm_resource_group.env.name
+  virtual_network_name            = azurerm_virtual_network.env.name
+  address_prefixes                = ["10.66.10.0/24"]
+  default_outbound_access_enabled = false
 }
 
 resource "azurerm_subnet" "users" {
-  name                 = "users"
-  resource_group_name  = azurerm_resource_group.env.name
-  virtual_network_name = azurerm_virtual_network.env.name
-  address_prefixes     = ["10.66.20.0/24"]
+  name                            = "users"
+  resource_group_name             = azurerm_resource_group.env.name
+  virtual_network_name            = azurerm_virtual_network.env.name
+  address_prefixes                = ["10.66.20.0/24"]
+  default_outbound_access_enabled = false
 }
 
 # Machine `dns`: what may reach it.

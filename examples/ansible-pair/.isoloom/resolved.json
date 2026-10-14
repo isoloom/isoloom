@@ -145,7 +145,7 @@
           "gcp"
         ],
         "refused": {
-          "digitalocean": "DigitalOcean cloud-vm has no Ansible controller yet",
+          "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
           "linode": "Linode cloud-vm has no Ansible controller yet",
           "oci": "Oracle Cloud cloud-vm has no Ansible controller yet"
         }

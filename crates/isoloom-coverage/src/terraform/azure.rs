@@ -2,7 +2,7 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CREDENTIALS, DISKS, IMAGES, MANAGED, NAT, OFFLINE,
+    ACCOUNT, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CREDENTIALS, DISKS, IMAGES, MANAGED, NAT,
     OTHER_RECORDS, PLACEMENT, PRIVATE_DNS_IPV6, PROTECT, PUBLIC_DNS, PUBLIC_IPV6, REVERSE_DNS, ROUTER, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
@@ -147,7 +147,10 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     ("azurerm_public_ip", "allocation_method location name resource_group_name sku tags"),
     ("azurerm_resource_group", "location name tags"),
-    ("azurerm_subnet", "address_prefixes name resource_group_name virtual_network_name"),
+    (
+        "azurerm_subnet",
+        "address_prefixes default_outbound_access_enabled name resource_group_name virtual_network_name",
+    ),
     ("azurerm_virtual_network", "address_space location name resource_group_name tags"),
     (
         "azurerm_windows_virtual_machine",
@@ -275,7 +278,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 ALIAS,
                 "network_security_group_id_wo network_security_group_id_wo_version route_table_id_wo route_table_id_wo_version",
             ),
-            (OFFLINE, "default_outbound_access_enabled"),
         ],
     ),
     (

@@ -60,23 +60,22 @@ locals {
   root = abspath("${path.module}/../../..")
 }
 
-# The environment's one network: a VPC with a subnet at its exact range, so every machine keeps
-# its address (192.168.1.0/24).
+# The environment's networks: a VPC with a subnet per network at its exact range, so every
+# machine keeps its address.
 resource "linode_vpc" "env" {
   label  = local.name
   region = var.region
 }
 
-resource "linode_vpc_subnet" "env" {
+resource "linode_vpc_subnet" "lab" {
   vpc_id = linode_vpc.env.id
   label  = "lab"
   ipv4   = "192.168.1.0/24"
 }
 
-# Who may reach the machines: SSH and the published ports from allowed_cidr, everything from
-# the subnet, the rest dropped. One firewall for every instance.
-resource "linode_firewall" "env" {
-  label           = local.name
+# Machine `web` on `lab`: what may reach it, and where it may not go.
+resource "linode_firewall" "web" {
+  label           = "${local.name}-web"
   inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
   inbound {
@@ -106,7 +105,42 @@ resource "linode_firewall" "env" {
     protocol = "ICMP"
     ipv4     = ["192.168.1.0/24"]
   }
-  linodes = [linode_instance.web.id, linode_instance.cache.id]
+  linodes = [linode_instance.web.id]
+}
+
+# Machine `cache` on `lab`: what may reach it, and where it may not go.
+resource "linode_firewall" "cache" {
+  label           = "${local.name}-cache"
+  inbound_policy  = "DROP"
+  outbound_policy = "ACCEPT"
+  inbound {
+    label    = "ssh"
+    action   = "ACCEPT"
+    protocol = "TCP"
+    ports    = "22"
+    ipv4     = [var.allowed_cidr]
+  }
+  inbound {
+    label    = "vpc-tcp"
+    action   = "ACCEPT"
+    protocol = "TCP"
+    ports    = "1-65535"
+    ipv4     = ["192.168.1.0/24"]
+  }
+  inbound {
+    label    = "vpc-udp"
+    action   = "ACCEPT"
+    protocol = "UDP"
+    ports    = "1-65535"
+    ipv4     = ["192.168.1.0/24"]
+  }
+  inbound {
+    label    = "vpc-icmp"
+    action   = "ACCEPT"
+    protocol = "ICMP"
+    ipv4     = ["192.168.1.0/24"]
+  }
+  linodes = [linode_instance.cache.id]
 }
 
 resource "random_password" "web" {
@@ -134,7 +168,7 @@ resource "linode_instance" "web" {
   }
   interface {
     purpose   = "vpc"
-    subnet_id = linode_vpc_subnet.env.id
+    subnet_id = linode_vpc_subnet.lab.id
     ipv4 {
       vpc = "192.168.1.20"
     }
@@ -168,7 +202,7 @@ resource "terraform_data" "web" {
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
-  depends_on = [linode_firewall.env]
+  depends_on = [linode_firewall.web]
 }
 
 resource "random_password" "cache" {
@@ -196,7 +230,7 @@ resource "linode_instance" "cache" {
   }
   interface {
     purpose   = "vpc"
-    subnet_id = linode_vpc_subnet.env.id
+    subnet_id = linode_vpc_subnet.lab.id
     ipv4 {
       vpc = "192.168.1.21"
     }
@@ -249,7 +283,7 @@ resource "terraform_data" "cache" {
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
-  depends_on = [linode_firewall.env]
+  depends_on = [linode_firewall.cache]
 }
 
 output "machines" {

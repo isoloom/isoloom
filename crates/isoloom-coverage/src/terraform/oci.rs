@@ -2,16 +2,16 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, DISKS,
-    EGRESS_RULES, ENVIRONMENT, ICMP, IMAGES, LOCATION, MANAGED, NAT, NESTED, OCI_IPV6, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, ROUTER, SOURCE_PORTS, TAGS,
-    TPM, VLANS, VM_AGENT, ZONE_SETTINGS,
+    ACCOUNT, ADDRESSES, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS,
+    DISKS, IMAGES, LOCATION, MANAGED, NAT, NESTED, OCI_IPV6, PLACEMENT, PROTECT, PUBLIC_DNS, PUBLIC_IP, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
 
-/// A resource that wires up what Isoloom writes inline.
-const WIRED: Support = Equivalent {
-    via: "`route_table_id` of oci_core_subnet",
+/// What a network security group's rule could carry beyond the published ports Isoloom opens
+/// with it.
+const IN_LIST: Support = Equivalent {
+    via: "the network's security list, which carries its egress and ICMP rules (oci_core_security_list)",
 };
 
 /// Oracle Cloud: every resource type, and what the generators write.
@@ -37,13 +37,11 @@ pub const TABLE: Table = Table {
 
 /// Every resource type by family (names without the provider's prefix).
 const TYPES: Rules = &[
-    (ENVIRONMENT, "core_vnic_attachment"),
-    (WIRED, "core_route_table_attachment"),
     (NAT, "core_nat_gateway"),
     (PUBLIC_IP, "core_public_ip"),
     (ADDRESSES, "core_private_ip"),
     (OCI_IPV6, "core_ipv6"),
-    (VLANS, "core_vlan"),
+    (CLOUD_VLANS, "core_vlan"),
     (BACKUP, "core_boot_volume"),
     (DISKS, "core_volume core_volume_attachment"),
     (CLOUD_RESOLVER, "core_dhcp_options"),
@@ -99,16 +97,19 @@ const TYPES: Rules = &[
 const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
-        "data.oci_core_images data.oci_core_vcn_dns_resolver_association data.oci_identity_availability_domains oci_core_instance
-        oci_core_internet_gateway oci_core_network_security_group oci_core_network_security_group_security_rule oci_core_route_table
-        oci_core_security_list oci_core_subnet oci_core_vcn oci_dns_resolver oci_dns_rrset oci_dns_view oci_dns_zone",
+        "data.oci_core_images data.oci_core_private_ips data.oci_core_vcn_dns_resolver_association data.oci_core_vnic
+        data.oci_identity_availability_domains oci_core_instance oci_core_internet_gateway oci_core_network_security_group
+        oci_core_network_security_group_security_rule oci_core_route_table oci_core_route_table_attachment oci_core_security_list
+        oci_core_subnet oci_core_vcn oci_core_vnic_attachment oci_dns_resolver oci_dns_rrset oci_dns_view oci_dns_zone",
     ),
     ("provider", "region"),
     (
         "data.oci_core_images",
         "compartment_id operating_system operating_system_version shape sort_by sort_order",
     ),
+    ("data.oci_core_private_ips", "ip_address subnet_id"),
     ("data.oci_core_vcn_dns_resolver_association", "vcn_id"),
+    ("data.oci_core_vnic", "vnic_id"),
     ("data.oci_identity_availability_domains", "compartment_id"),
     ("oci_dns_resolver", "attached_views attached_views.view_id resolver_id scope"),
     (
@@ -120,7 +121,8 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "oci_core_instance",
         "availability_domain compartment_id create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.hostname_label
-        create_vnic_details.nsg_ids create_vnic_details.private_ip create_vnic_details.subnet_id display_name metadata shape shape_config shape_config.memory_in_gbs
+        create_vnic_details.nsg_ids create_vnic_details.private_ip create_vnic_details.skip_source_dest_check create_vnic_details.subnet_id
+        display_name metadata shape shape_config shape_config.memory_in_gbs
         platform_config platform_config.is_measured_boot_enabled platform_config.is_secure_boot_enabled
         platform_config.is_trusted_platform_module_enabled platform_config.type shape_config.ocpus source_details
         source_details.boot_volume_size_in_gbs source_details.source_id source_details.source_type",
@@ -139,16 +141,26 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     (
         "oci_core_security_list",
-        "compartment_id display_name egress_security_rules egress_security_rules.destination egress_security_rules.protocol
-        ingress_security_rules ingress_security_rules.description ingress_security_rules.protocol ingress_security_rules.source
+        "compartment_id display_name egress_security_rules egress_security_rules.description egress_security_rules.destination
+        egress_security_rules.icmp_options egress_security_rules.icmp_options.code egress_security_rules.icmp_options.type
+        egress_security_rules.protocol egress_security_rules.tcp_options egress_security_rules.tcp_options.max
+        egress_security_rules.tcp_options.min egress_security_rules.udp_options egress_security_rules.udp_options.max
+        egress_security_rules.udp_options.min ingress_security_rules ingress_security_rules.icmp_options ingress_security_rules.icmp_options.code
+        ingress_security_rules.icmp_options.type ingress_security_rules.description ingress_security_rules.protocol ingress_security_rules.source
         ingress_security_rules.tcp_options ingress_security_rules.tcp_options.max ingress_security_rules.tcp_options.min
         ingress_security_rules.udp_options ingress_security_rules.udp_options.max ingress_security_rules.udp_options.min vcn_id",
     ),
+    ("oci_core_route_table_attachment", "route_table_id subnet_id"),
     (
         "oci_core_subnet",
         "cidr_block compartment_id display_name route_table_id security_list_ids vcn_id",
     ),
     ("oci_core_vcn", "cidr_block cidr_blocks compartment_id display_name"),
+    (
+        "oci_core_vnic_attachment",
+        "create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.private_ip create_vnic_details.skip_source_dest_check
+        create_vnic_details.subnet_id display_name instance_id",
+    ),
 ];
 
 /// The provider block's settings.
@@ -193,7 +205,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 shape_config.baseline_ocpu_utilization shape_config.local_volume_size_in_gbs shape_config.nvmes shape_config.resource_management
                 source_details.boot_volume_vpus_per_gb source_details.kms_key_id create_vnic_details.security_attributes",
             ),
-            (ROUTER, "create_vnic_details.skip_source_dest_check"),
             (
                 TPM,
                 "platform_config.is_secure_boot_enabled platform_config.is_trusted_platform_module_enabled platform_config.is_measured_boot_enabled",
@@ -210,7 +221,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.*",
             ),
             (CLOUD_NAMES, "create_vnic_details.assign_private_dns_record"),
-            (VLANS, "create_vnic_details.vlan_id"),
+            (CLOUD_VLANS, "create_vnic_details.vlan_id"),
             (DISKS, "launch_volume_attachments launch_volume_attachments.*"),
         ],
     ),
@@ -219,8 +230,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         "oci_core_network_security_group_security_rule",
         &[
             (CLOUD, "stateless"),
-            (EGRESS_RULES, "destination destination_type"),
-            (ICMP, "icmp_options icmp_options.*"),
+            (IN_LIST, "destination destination_type icmp_options icmp_options.*"),
             (
                 SOURCE_PORTS,
                 "tcp_options.source_port_range tcp_options.source_port_range.* udp_options.source_port_range udp_options.source_port_range.*",
@@ -237,19 +247,14 @@ const ARGUMENTS: &[(&str, Rules)] = &[
     (
         "oci_core_security_list",
         &[
-            (TAGS, "egress_security_rules.description"),
             (ALIAS, "egress_security_rules.destination_type ingress_security_rules.source_type"),
             (CLOUD, "egress_security_rules.stateless ingress_security_rules.stateless"),
             (
-                EGRESS_RULES,
-                "egress_security_rules.tcp_options egress_security_rules.tcp_options.* egress_security_rules.udp_options
-                egress_security_rules.udp_options.* egress_security_rules.icmp_options egress_security_rules.icmp_options.*",
-            ),
-            (ICMP, "ingress_security_rules.icmp_options ingress_security_rules.icmp_options.*"),
-            (
                 SOURCE_PORTS,
                 "ingress_security_rules.tcp_options.source_port_range ingress_security_rules.tcp_options.source_port_range.*
-                ingress_security_rules.udp_options.source_port_range ingress_security_rules.udp_options.source_port_range.*",
+                ingress_security_rules.udp_options.source_port_range ingress_security_rules.udp_options.source_port_range.*
+                egress_security_rules.tcp_options.source_port_range egress_security_rules.tcp_options.source_port_range.*
+                egress_security_rules.udp_options.source_port_range egress_security_rules.udp_options.source_port_range.*",
             ),
         ],
     ),
@@ -259,7 +264,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (LOCATION, "availability_domain"),
             (CLOUD_NAMES, "dns_label"),
             (CLOUD_RESOLVER, "dhcp_options_id"),
-            (ADDRESSES, "ipv4cidr_blocks"),
+            (ALIAS, "ipv4cidr_blocks"),
             (OCI_IPV6, "ipv6cidr_block ipv6cidr_blocks"),
             (ALIAS, "prohibit_internet_ingress prohibit_public_ip_on_vnic"),
         ],
@@ -275,6 +280,25 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (CLOUD, "security_attributes"),
         ],
     ),
+    (
+        "oci_core_vnic_attachment",
+        &[
+            (CLOUD, "nic_index create_vnic_details.security_attributes"),
+            (
+                ALIAS,
+                "create_vnic_details.hostname_label create_vnic_details.nsg_ids create_vnic_details.private_ip_id
+                create_vnic_details.subnet_cidr create_vnic_details.route_table_id",
+            ),
+            (CLOUD_NAMES, "create_vnic_details.assign_private_dns_record"),
+            (CLOUD_VLANS, "create_vnic_details.vlan_id"),
+            (
+                OCI_IPV6,
+                "create_vnic_details.assign_ipv6ip create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details
+                create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.*",
+            ),
+        ],
+    ),
+    ("data.oci_core_private_ips", &[(ALIAS, "ip_state lifetime vlan_id vnic_id filter filter.*")]),
     ("data.oci_core_images", &[(ALIAS, "state filter filter.*")]),
     ("data.oci_identity_availability_domains", &[(LOCATION, "filter filter.*")]),
 ];

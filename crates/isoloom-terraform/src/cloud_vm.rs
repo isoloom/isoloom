@@ -74,6 +74,9 @@ pub fn capabilities() -> Capabilities {
         // The cloud's private zone (AWS, Azure, Google Cloud, Oracle Cloud), and every VM's
         // hosts file (on DigitalOcean and Linode, which have no private DNS, the hosts file only).
         Feature::PrivateDns,
+        // A network's MTU: Google Cloud sets it on its VPC; the other clouds refuse it on their
+        // own (they have no setting for it).
+        Feature::NetworkMtu,
     ])
 }
 

@@ -40,3 +40,9 @@ impl Limits {
         self.ipv6.zip(v6).map(|(why, (name, _))| format!("network `{name}` is IPv6: {why}"))
     }
 }
+
+/// A cloud that fixes its networks' MTU: why it refuses a network's `mtu`, if one sets it.
+pub fn fixed_mtu(env: &Environment, cloud: &str) -> Option<String> {
+    let (name, _) = env.networks.iter().find(|(_, n)| n.mtu.is_some())?;
+    Some(format!("network `{name}` sets its `mtu`: {cloud} has no setting for a network's MTU"))
+}

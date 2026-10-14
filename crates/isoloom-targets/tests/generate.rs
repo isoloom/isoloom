@@ -326,7 +326,7 @@ fn a_gateway_routes_its_networks_instead_of_the_router() {
     assert!(compose.contains("net.ipv4.ip_forward: '1'"));
     // Machines behind it send everything through it, once it answers.
     assert!(compose.contains("ip route replace default via 10.70.10.1"));
-    assert!(compose.contains("ip route replace 10.70.10.0/24 via 10.70.0.2"));
+    assert!(compose.contains("ip route replace 10.70.10.0/24 via 10.70.0.5"));
     let web_routes = compose.split("\n  web-routes:").nth(1).unwrap().split("\n  cache:").next().unwrap();
     assert!(web_routes.contains("fw:\n        condition: service_healthy"));
     // Its own rules decide: no Docker-internal network, no route deletion.

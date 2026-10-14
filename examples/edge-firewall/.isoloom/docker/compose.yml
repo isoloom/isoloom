@@ -19,7 +19,7 @@ services:
     hostname: fw
     networks:
       outside:
-        ipv4_address: 10.70.0.2
+        ipv4_address: 10.70.0.5
       dmz:
         ipv4_address: 10.70.10.1
       lan:
@@ -215,7 +215,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - ip route replace 10.70.10.0/24 via 10.70.0.2 && ip route replace 10.70.20.0/24 via 10.70.0.2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    - ip route replace 10.70.10.0/24 via 10.70.0.5 && ip route replace 10.70.20.0/24 via 10.70.0.5 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
     network_mode: service:isoloom-access
     cap_add:
     - NET_ADMIN
