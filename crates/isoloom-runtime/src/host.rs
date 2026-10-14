@@ -406,7 +406,7 @@ mod tests {
     fn libvirt_counts_only_with_a_usable_kvm() {
         let run = |p: &str, a: &[&str]| match (p, a.first().copied()) {
             ("vagrant", Some("plugin")) => Some("vagrant-libvirt (0.12.2, global)".to_string()),
-            ("vagrant", _) | ("virsh", _) => Some(format!("{p} 1.0")),
+            ("vagrant" | "virsh", _) => Some(format!("{p} 1.0")),
             _ => None,
         };
         let env = |_: &str| None;
