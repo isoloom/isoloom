@@ -125,7 +125,8 @@ pub struct Tool {
     /// A port the tool serves (its web UI), reachable from every network.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
-    /// Publish that port on the host's loopback.
+    /// The port on the host's loopback (`127.0.0.1`) that forwards to the tool's `port`, so a
+    /// browser on the host can open its web UI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub publish: Option<u16>,
 }

@@ -4,8 +4,8 @@
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    capture, chart, check, connect, coverage, defaults, doctor, down, exec, gc, generate, graph, import, inspect, message, profiles, provision, report, reset,
-    resources, run, schema, status, targets, tc, test, validate,
+    capture, chart, check, connect, coverage, defaults, docs, doctor, down, exec, gc, generate, graph, import, inspect, message, profiles, provision, report,
+    reset, resources, run, schema, status, targets, tc, test, validate,
 };
 
 #[derive(Parser)]
@@ -105,6 +105,8 @@ pub enum Command {
     Import(import::Import),
     /// Show which features of each output format (Compose, Vagrant) a spec can produce.
     Coverage(coverage::Args),
+    /// Print a reference page generated from the code: `--spec` for docs/spec.md.
+    Docs(docs::Args),
 }
 
 impl Command {

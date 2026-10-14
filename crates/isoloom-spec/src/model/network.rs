@@ -12,7 +12,8 @@ pub use super::bridged::Bridged;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
-    /// An IPv4 block inside 10.0.0.0/8, e.g. 10.20.0.0/24.
+    /// The network's private IPv4 block (inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16),
+    /// a /24 to a /29, e.g. `10.20.0.0/24`. A LAN split into `vlans` may be larger, from /8.
     pub cidr: String,
     /// Whether machines on it may reach the internet (default true).
     #[serde(default = "yes")]
@@ -50,7 +51,7 @@ pub struct Network {
     pub tc: Option<Tc>,
     /// The network's IPv6 block: dual-stack beside `cidr`, or IPv6-only (`only: true`).
     /// Machines get an IPv6 address on it (derived from their octet, or handed out by the
-    /// target) and routes to the other IPv6 blocks the `reach` rules open. See [`Ipv6`].
+    /// target) and routes to the other IPv6 blocks the `reach` rules open.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ipv6: Option<Ipv6>,
     /// An existing network, by its name on the target (a Docker network, a Proxmox bridge):
@@ -86,16 +87,18 @@ impl Network {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tc {
-    /// One-way delay added, e.g. `50ms`, `1s`.
+    /// The one-way delay added to every packet entering the network, e.g. `50ms`, `1s`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delay: Option<String>,
     /// Random variation of the delay, e.g. `5ms` (needs `delay`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jitter: Option<String>,
-    /// Packets dropped, in percent (`0.5` = 0.5%).
+    /// The share of packets entering the network that are dropped at random, in percent
+    /// (`0.5` = 0.5%).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loss: Option<f64>,
-    /// Bandwidth cap, e.g. `10mbit`, `512kbit`.
+    /// The bandwidth cap on traffic entering the network, as `tc` writes a rate, e.g. `10mbit`,
+    /// `512kbit`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate: Option<String>,
 }
@@ -150,11 +153,11 @@ fn yes() -> bool {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Reach {
-    /// The network the connections start from.
+    /// The network the connections start from: its machines may open them.
     pub from: String,
-    /// The network they may reach.
+    /// The network those connections may reach: its machines accept them, on `ports`.
     pub to: String,
-    /// Empty = every port.
+    /// The destination ports allowed. Empty (the default): every port.
     #[serde(default)]
     pub ports: Vec<u16>,
 }

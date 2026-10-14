@@ -20,10 +20,12 @@ pub struct Constraints {
     /// pulled, so they stay as they are (their `FROM` lines are the Dockerfile's business).
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub registries: IndexMap<String, String>,
-    /// Package mirrors.
+    /// Package mirrors the machines install from instead of the public archives: apt's for
+    /// Debian and Ubuntu VMs, and a Python package index.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mirrors: Option<Mirrors>,
-    /// Time servers (names or addresses), for the Linux VMs.
+    /// The time servers (names or addresses) the Linux VMs synchronise their clocks with,
+    /// where the place forbids the public pools.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ntp: Vec<String>,
 }

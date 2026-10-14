@@ -125,7 +125,7 @@ pub struct Machine {
     /// checked.
     #[serde(default)]
     pub services: Vec<Service>,
-    /// The spec inputs this machine receives (only these).
+    /// The spec's `inputs` this machine receives, by name: only these reach it.
     #[serde(default)]
     pub inputs: Vec<String>,
     /// The secrets this machine gets, as files (never environment variables): a name from the
@@ -179,7 +179,8 @@ pub struct Machine {
     /// The machine the user lands on. It may have no implementation: the runner supplies it.
     #[serde(default)]
     pub access: bool,
-    /// How a container produces this machine.
+    /// How a container produces this machine: an image or a build, and what only a container
+    /// has (init jobs, appliances). A machine with `docker:` can run on the container targets.
     #[serde(default)]
     pub docker: Option<DockerImpl>,
     /// How a VM produces this machine (services installed natively, no Docker inside).
@@ -201,7 +202,8 @@ pub struct Machine {
 #[serde(deny_unknown_fields)]
 #[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
 pub struct Service {
-    /// The port, inside the machine.
+    /// The port the service listens on inside the machine (what the other machines and the
+    /// checks connect to).
     pub port: u16,
     /// A name for the service (`web`, `api`): how outputs and messages refer to it. Default:
     /// its port.

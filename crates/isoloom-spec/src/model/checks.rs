@@ -106,7 +106,9 @@ pub struct Declared {
     /// the behavior holds.
     #[serde(default)]
     pub script: Option<String>,
-    /// What counts as passing: see `http`, `tcp` and `exec`.
+    /// What counts as passing, in the check's own terms: a status code, `any` or `blocked`
+    /// for `http`; `open` or `blocked` for `tcp`; text the output contains for `exec`. Each
+    /// kind's field says its default.
     #[serde(default)]
     pub expect: Option<Expect>,
     /// Seconds to keep retrying until the check passes: default 30 for `http` and `tcp`
