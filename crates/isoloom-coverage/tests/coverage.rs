@@ -1,114 +1,18 @@
-//! The coverage table stays honest: every field of the format has a row, every ✓ or ◐ names
-//! an example that uses the field and generates for that output, and docs/COVERAGE.md is
-//! what `isoloom coverage --markdown` prints.
+//! The formats' tables stay honest: every key, setting and resource type of a format has a row,
+//! what the examples' generated files write is marked as written, and docs/COVERAGE.md is what
+//! `isoloom coverage --markdown` prints. The spec's side has its own tests (spec_table.rs).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use isoloom_coverage::{Output, Status, markdown, paths, table};
-use isoloom_spec::{load, parse};
+use isoloom_coverage::markdown;
+use isoloom_spec::load;
 use isoloom_targets::generate;
 
 fn examples() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
-}
-
-/// A spec with every field set. Serialized back, unset fields appear too (as null), so a field
-/// added to the model shows up here without editing this text.
-const EVERY_FIELD: &str = r#"
-version: 1
-name: every-field
-networks:
-  out: { cidr: 10.1.0.0/24, internet: true, docker: { cidr: 10.1.0.0/24 } }
-  dmz: { cidr: 10.1.1.0/24, internet: false, gateway: fw, docker: { cidr: 10.1.1.0/24 } }
-  far: { cidr: 10.1.2.0/24, tc: { delay: 50ms, jitter: 5ms, loss: 0.5, rate: 10mbit } }
-  office: { cidr: 10.2.0.0/16, docker: { cidr: 10.2.0.0/16 }, switch: fw, vlans: { 10: { cidr: 10.2.10.0/24, internet: false } } }
-reach: [{ from: out, to: dmz, ports: [80] }]
-inputs: [TOKEN]
-volumes: { data: { owner: fw } }
-machines:
-  fw:
-    networks: { out: 2, dmz: 1 }
-    services: [{ port: 80, name: web, http: true, tls: true, publish: 8080, fixed: true }, { port: 4444, dormant: true }, { port: 53, protocol: udp }]
-    inputs: [TOKEN]
-    arch: amd64
-    privileged: true
-    read_only: true
-    tmpfs: [/tmp, /run]
-    shm_size: 256m
-    dns: { servers: [10.0.0.1], search: [lab.local], domain: lab.local }
-    environment: { MODE: x }
-    sysctls: { net.core.somaxconn: 1024 }
-    ulimits: { nofile: 1024 }
-    resources: { cpus: 1, memory_mb: 512, disk_gb: 10 }
-    depends_on: []
-    volumes: { data: /data }
-    access: false
-    aliases: [api.example.test]
-    docker: { image: a, init: [x.sh], idle: true, appliance: cisco-iol, config: r.cfg, firmware: f.bin }
-    vm: { os: debian-12, provision: [x.sh], image: { vagrant: x/y, vagrant_version: "1", qemu: x/z, hyperv: x/h, winrm: ssl } }
-    external: { address: 192.168.1.2, user: admin, port: 2222, key: ~/.ssh/lab }
-  h:
-    count: 2
-    networks: { out: 10 }
-    docker: { build: h, dockerfile: h.Dockerfile, args: { A: b } }
-provision: [{ ansible: site.yml, inventory: [inv.ini], groups: { dc: [fw] }, vars: { a: b }, host_vars: { fw: { a: b } }, requirements: req.yml }]
-controller: { image: { vagrant: x/y }, resources: { cpus: 1, memory_mb: 512 } }
-common: { resources: { cpus: 1 } }
-groups: { g: { members: [fw], arch: amd64 } }
-checks: [c.sh, { name: n, from: fw, http: "http://x/", method: POST, headers: { A: b }, body: x, contains: y, follow: true, send: z, tcp: "x:1", exec: e, script: s.sh, expect: 200, wait: 1 }]
-targets: [docker]
-message: hello
-cloud: { provider: aws, terraform: tf, vars: { region: us-east-1 }, outputs: { site: url }, hourly_usd: 0.1, before: [k.sh], env: { AWS_REGION: us-east-1 }, apply_retries: 1, requires: [jq] }
-tools: { shell: {}, viewer: { image: x, command: [serve], port: 80, publish: 9000 } }
-"#;
-
-#[test]
-fn every_field_of_the_format_has_a_row_and_every_row_is_a_field() {
-    parse(EVERY_FIELD).expect("parses");
-    // The document as written: `count`, `common`, `groups` and `vlans` are folded away by parsing.
-    let raw: serde_yaml_ng::Value = serde_yaml_ng::from_str(EVERY_FIELD).unwrap();
-    let fields: BTreeSet<String> = paths(&raw).into_iter().collect();
-    let rows: BTreeSet<String> = table().iter().map(|r| r.path.to_string()).collect();
-    let missing: Vec<_> = fields.difference(&rows).collect();
-    let stale: Vec<_> = rows.difference(&fields).collect();
-    assert!(missing.is_empty(), "fields with no coverage row: {missing:?}");
-    assert!(stale.is_empty(), "coverage rows for fields that don't exist: {stale:?}");
-}
-
-#[test]
-fn every_proxmox_overlay_path_is_a_row() {
-    let rows: BTreeSet<&str> = table().iter().map(|r| r.path).collect();
-    let unknown: Vec<_> = isoloom_coverage::spec::PROXMOX.iter().map(|(p, _)| *p).filter(|p| !rows.contains(p)).collect();
-    assert!(unknown.is_empty(), "Proxmox overlay entries for fields with no row: {unknown:?}");
-}
-
-#[test]
-fn every_claim_is_exercised_by_an_example() {
-    for row in table() {
-        for o in Output::ALL {
-            let (Status::Done { proof, .. } | Status::Partial { proof, .. }) = row.status(o) else {
-                continue;
-            };
-            let dir = examples().join(proof);
-            let raw: serde_yaml_ng::Value = serde_yaml_ng::from_str(&std::fs::read_to_string(dir.join("isoloom.yml")).unwrap()).unwrap();
-            assert!(
-                paths(&raw).iter().any(|p| p == row.path),
-                "{} on {}: example `{proof}` doesn't use the field",
-                row.path,
-                o.label()
-            );
-            let spec = load(&dir).unwrap();
-            assert!(
-                generate(&spec, o.target()).is_ok(),
-                "{} on {}: example `{proof}` doesn't generate for it",
-                row.path,
-                o.label()
-            );
-        }
-    }
 }
 
 #[test]

@@ -28,9 +28,7 @@ pub mod vagrant;
 
 use std::fmt::Write;
 
-use isoloom_spec::model;
-
-pub use spec::{Output, Row, Status, paths, score, table};
+pub use spec::{Cell, Output, Row, Status, paths, table};
 
 /// What Isoloom does with a feature of an output format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -344,6 +342,7 @@ pub fn markdown() -> String {
             );
         }
     }
+    md.push_str(&spec::section(&spec::table()));
     md
 }
 

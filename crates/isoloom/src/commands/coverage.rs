@@ -1,8 +1,10 @@
-//! `isoloom coverage`: which features of each output format (Compose, Vagrant) a spec can
-//! produce, as a summary, every row, Markdown, or JSON for the website.
+//! `isoloom coverage`: which features of each output format (Compose, Vagrant, Terraform) a spec
+//! can produce, and which fields of a spec each output handles (the spec table), as a summary,
+//! every row, Markdown, or JSON for the website.
 
 use std::process::ExitCode;
 
+use isoloom_coverage::spec::{Output, score, table};
 use isoloom_coverage::{Format, Support, anchor, capitalize, formats, markdown, section};
 
 use crate::{Res, output};
@@ -40,10 +42,38 @@ pub fn run(a: &Args) -> Res<ExitCode> {
             println!();
         }
     }
+    spec_table(a.all);
     if !a.all {
         println!("\nEvery feature, with how or why not: isoloom coverage --all · as Markdown: --markdown");
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// The spec's side: for each output, how many of the spec's fields it handles, and with
+/// `all`, each field it doesn't handle yet and why.
+fn spec_table(all: bool) {
+    let rows = table();
+    println!("\nSpec fields handled, per output:");
+    for o in Output::all() {
+        let s = score(&rows, o);
+        println!(
+            "  {:<14} {:>3}% of {} ({} done, {} partly, {} planned, {} refused)",
+            o.label(),
+            s.percent(),
+            s.applicable(),
+            s.done,
+            s.partial,
+            s.planned,
+            s.refused
+        );
+        if all {
+            for (path, cell) in rows.iter().filter_map(|r| r.cell(o).map(|c| (r.path, c))) {
+                if matches!(cell.symbol(), "◐" | "planned" | "✗") {
+                    println!("      {path}: {}", cell.note());
+                }
+            }
+        }
+    }
 }
 
 /// One format for the website: its score and its rows by section.

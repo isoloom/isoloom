@@ -9,13 +9,14 @@ publish.workspace = true
 
 [dependencies]
 isoloom-spec.workspace = true
+isoloom-targets.workspace = true
+isoloom-terraform.workspace = true
 serde_yaml_ng.workspace = true
 
 [dev-dependencies]
 hcl-rs.workspace = true
 isoloom-plan.workspace = true
 isoloom-render.workspace = true
-isoloom-targets.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

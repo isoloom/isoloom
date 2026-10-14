@@ -1,0 +1,44 @@
+# Upstream drift: every week, the refresh scripts (scripts/refresh-*) run against the newest
+# upstream releases; features they add are listed in one open issue (label coverage-drift), so a
+# new Compose key, Vagrant setting or Terraform resource is classified instead of going unseen.
+name: Coverage drift
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the issue in the log instead of opening or updating it
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: coverage-drift
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # The refresh scripts read provider schemas with Terraform; Python, curl and jq come with
+      # the runner.
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_wrapper: false
+      - name: Refresh every source and report what upstream added
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            scripts/coverage-drift.sh --dry-run
+          else
+            scripts/coverage-drift.sh
+          fi
