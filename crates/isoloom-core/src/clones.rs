@@ -34,7 +34,7 @@ type Clones = IndexMap<String, Vec<String>>;
 
 /// Expands every machine with a `count` into its clones, in place, and rewrites the places
 /// that name the base machine. Returns base name -> clone names.
-pub fn expand(doc: &mut Value) -> Result<IndexMap<String, Vec<String>>, String> {
+pub fn expand(doc: &mut Value) -> Result<Clones, String> {
     let Value::Mapping(top) = doc else { return Ok(Clones::new()) };
     let Some(Value::Mapping(machines)) = top.get(key("machines")).cloned() else {
         return Ok(Clones::new());

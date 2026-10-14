@@ -363,7 +363,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
             // A UDP service has no handshake: nothing tells "answers" from "blocked" without
             // speaking its protocol, so only the author's checks probe it.
             for svc in mb.services.iter().filter(|s| s.protocol.is_tcp()) {
-                out.extend(service_from(spec, (a, ma), (b, mb), svc));
+                out.extend(service_from(spec, &position, (a, ma), (b, mb), svc));
             }
         }
         if !ma.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.internet)) {
@@ -380,10 +380,8 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
 
 /// The derived checks of machine `b`'s TCP service `svc` from machine `a`: it answers on every
 /// path that is open, or is blocked on all of them when none is.
-fn service_from(spec: &Spec, (a, ma): (&str, &Machine), (b, mb): (&str, &Machine), svc: &Service) -> Vec<Resolved> {
-    let position = Position::Machine(a.to_string());
+fn service_from(spec: &Spec, position: &Position, (a, ma): (&str, &Machine), (b, mb): (&str, &Machine), svc: &Service) -> Vec<Resolved> {
     let paths: Vec<(&String, bool)> = mb.networks.keys().map(|n| (n, allowed(spec, ma, n, svc.port))).collect();
-    let on = |n: &str| on_network(mb, n);
     if paths.iter().all(|(_, ok)| !ok) {
         return paths
             .iter()
@@ -397,7 +395,7 @@ fn service_from(spec: &Spec, (a, ma): (&str, &Machine), (b, mb): (&str, &Machine
                     expect: TcpExpect::Blocked,
                     exchange: TcpExchange::default(),
                 };
-                derived_check(format!("{b}:{}{} blocked from {a}", svc.port, on(n)), position.clone(), probe, 0)
+                derived_check(format!("{b}:{}{} blocked from {a}", svc.port, on_network(mb, n)), position.clone(), probe, 0)
             })
             .collect();
     }
@@ -409,7 +407,14 @@ fn service_from(spec: &Spec, (a, ma): (&str, &Machine), (b, mb): (&str, &Machine
     paths
         .iter()
         .filter(|(_, ok)| *ok)
-        .map(|(n, _)| derived_check(format!("{b}:{}{} from {a}", svc.port, on(n)), position.clone(), answers(b, n, svc), 30))
+        .map(|(n, _)| {
+            derived_check(
+                format!("{b}:{}{} from {a}", svc.port, on_network(mb, n)),
+                position.clone(),
+                answers(b, n, svc),
+                30,
+            )
+        })
         .collect()
 }
 
@@ -554,13 +559,7 @@ fn check_lines(c: &Resolved, position: &Position, r: &Render) -> String {
             port,
             expect: TcpExpect::Open,
             exchange: TcpExchange { send, contains: Some(want) },
-        } => format!(
-            "if _retry {w} _tcp_read {h} {port} {snd} {t}; then pass {n}; else fail {n} \"$out\"; fi\n",
-            w = c.wait,
-            h = sq(&host(h)),
-            snd = sq(send.as_deref().unwrap_or("")),
-            t = sq(want),
-        ),
+        } => tcp_read_lines(&n, c.wait, &host(h), *port, (send.as_deref(), want)),
         Probe::Tcp { host: h, port, expect, .. } => tcp_lines(&n, c.wait, &host(h), *port, *expect),
         Probe::Exec { command, expect } => format!(
             "if _retry {w} _exec {cmd} {want}; then pass {n}; else fail {n} \"$(printf '%s' \"$out\" | tail -n 1)\"; fi\n",
@@ -636,6 +635,16 @@ fn http_lines(n: &str, wait: u32, url: &str, expect: HttpExpect, follow: bool) -
             format!("c=$(_http {u}); if [ \"$c\" = 000 ]; then pass {n}; else fail {n} \"{ut} answered (HTTP $c); it should be blocked\"; fi\n")
         }
     }
+}
+
+/// A TCP check that writes a line (if any) and looks for text in what comes back: `_tcp_read`.
+fn tcp_read_lines(n: &str, wait: u32, host: &str, port: u16, (send, want): (Option<&str>, &str)) -> String {
+    format!(
+        "if _retry {wait} _tcp_read {h} {port} {snd} {t}; then pass {n}; else fail {n} \"$out\"; fi\n",
+        h = sq(host),
+        snd = sq(send.unwrap_or("")),
+        t = sq(want),
+    )
 }
 
 /// A bare TCP check: something listens, or nothing does.

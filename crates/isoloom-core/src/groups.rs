@@ -104,7 +104,7 @@ pub fn expand(doc: &mut Value) -> Result<(), String> {
     let mut expanded = Mapping::new();
     for (k, v) in &machines {
         let merged = match (k.as_str(), v) {
-            (Some(name), Value::Mapping(own)) => merged(own, &common, &nesting.groups_of(&groups, name), &groups),
+            (Some(name), Value::Mapping(own)) => merged(own, &common, &nesting.layers_for(name), &groups),
             _ => v.clone(),
         };
         expanded.insert(k.clone(), merged);
@@ -142,6 +142,7 @@ fn groups_of(top: &Mapping) -> Result<Groups, String> {
 
 /// How the groups hold machines and each other.
 struct Nesting<'a> {
+    groups: &'a Groups,
     /// Each group's machines (globs and nested groups resolved).
     machines_of: IndexMap<&'a str, Vec<String>>,
     /// The groups each one is (transitively) a member of: its ancestors.
@@ -167,13 +168,18 @@ impl<'a> Nesting<'a> {
                 .collect();
             nested_in.insert(g.as_str(), ancestors);
         }
-        Nesting { machines_of, nested_in }
+        Nesting {
+            groups,
+            machines_of,
+            nested_in,
+        }
     }
 
     /// The groups machine `name` is in, least specific first: ancestors before their members,
     /// declaration order otherwise.
-    fn groups_of(&self, groups: &'a Groups, name: &str) -> Vec<&'a str> {
-        let mut mine: Vec<&str> = groups
+    fn layers_for(&self, name: &str) -> Vec<&'a str> {
+        let mut mine: Vec<&str> = self
+            .groups
             .keys()
             .map(String::as_str)
             .filter(|g| self.machines_of[*g].iter().any(|m| m == name))

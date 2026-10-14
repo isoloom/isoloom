@@ -43,20 +43,21 @@ pub fn resolve(spec: &Spec) -> Value {
 /// The snapshot of an instance (`None`: the spec as written).
 pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
     let docker = on_docker(spec);
+    let routed = router::needed(spec);
     let mut out = json!({
         "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
         "resolved_version": RESOLVED_VERSION,
         "name": spec.name,
         "instance": instance,
         "inputs": spec.inputs,
-        "networks": networks(spec),
+        "networks": networks(spec, routed),
         "reach": spec.reach.iter().map(|r| json!({ "from": r.from, "to": r.to, "ports": r.ports })).collect::<Vec<_>>(),
         "machines": machines(spec, &docker),
         "start_order": start_order(spec),
         "clones": spec.clones,
         "tools": tools(spec, &docker),
         "groups": spec.groups.keys().map(|g| (g.clone(), json!(crate::groups::members(spec, g)))).collect::<Map<_, _>>(),
-        "router": router_value(spec),
+        "router": router_value(spec, routed),
         "controller": controller(spec),
         "published": published(spec),
         "targets": targets(spec),
@@ -86,13 +87,13 @@ fn per_network(spec: &Spec, at: impl Fn(&str) -> String) -> Map<String, Value> {
     spec.networks.keys().map(|n| (n.clone(), json!(at(n)))).collect()
 }
 
-/// Each network with its blocks and the addresses Isoloom gives its infrastructure.
-fn networks(spec: &Spec) -> Map<String, Value> {
+/// Each network with its blocks and the addresses Isoloom gives its infrastructure (`routed`:
+/// the spec needs the router).
+fn networks(spec: &Spec, routed: bool) -> Map<String, Value> {
     let docker_blocks: Map<String, Value> = docker_cidrs(spec)
         .into_iter()
         .map(|(n, c)| (n, json!(format!("{}/{}", std::net::Ipv4Addr::from(c.base), c.len))))
         .collect();
-    let routed = router::needed(spec);
     let mut networks = Map::new();
     for (name, n) in &spec.networks {
         let c = cidr(spec, name);
@@ -200,8 +201,8 @@ fn tools(spec: &Spec, docker: &Spec) -> Map<String, Value> {
 }
 
 /// The router, when the spec needs one: its networks and its address on each.
-fn router_value(spec: &Spec) -> Option<Value> {
-    router::needed(spec).then(|| {
+fn router_value(spec: &Spec, routed: bool) -> Option<Value> {
+    routed.then(|| {
         let nets: Vec<&String> = router::networks(spec).collect();
         json!({
             "networks": nets,

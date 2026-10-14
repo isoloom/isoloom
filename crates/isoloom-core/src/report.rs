@@ -36,7 +36,11 @@ pub fn graph_d2(r: &Value) -> String {
             label.push_str("\\n");
             label.push_str(&services.join(", "));
         }
-        let shape = machine_shape(v, ["person", "diamond", "rectangle"]);
+        let shape = match MachineKind::of(v) {
+            MachineKind::Access => "person",
+            MachineKind::Gateway => "diamond",
+            MachineKind::Other => "rectangle",
+        };
         let _ = writeln!(out, "m_{}: \"{label}\" {{ shape: {shape} }}", id(m));
         for (net, octet) in octets(v) {
             let _ = writeln!(out, "m_{} -- net_{}: \".{octet}\"", id(m), id(net));
@@ -81,7 +85,11 @@ pub fn graph_dot(r: &Value) -> String {
         if !services.is_empty() {
             label.push_str(&format!("\\n:{}", services.join(" :")));
         }
-        let shape = machine_shape(v, ["egg", "diamond", "box"]);
+        let shape = match MachineKind::of(v) {
+            MachineKind::Access => "egg",
+            MachineKind::Gateway => "diamond",
+            MachineKind::Other => "box",
+        };
         let _ = writeln!(out, "  m_{} [label=\"{label}\", shape={shape}];", id(m));
         for (net, octet) in octets(v) {
             let _ = writeln!(out, "  m_{} -> net_{} [label=\".{octet}\", dir=none];", id(m), id(net));
@@ -115,14 +123,22 @@ fn network_label(net: &str, n: &Value) -> String {
     label
 }
 
-/// A machine's shape, from `[access machine, gateway, any other]`.
-fn machine_shape(v: &Value, [access, gateway, other]: [&'static str; 3]) -> &'static str {
-    if v["access"].as_bool() == Some(true) {
-        access
-    } else if v["gateway_of"].as_array().is_some_and(|g| !g.is_empty()) {
-        gateway
-    } else {
-        other
+/// What a machine is drawn as: each format has its own shape for each.
+enum MachineKind {
+    Access,
+    Gateway,
+    Other,
+}
+
+impl MachineKind {
+    fn of(v: &Value) -> MachineKind {
+        if v["access"].as_bool() == Some(true) {
+            MachineKind::Access
+        } else if v["gateway_of"].as_array().is_some_and(|g| !g.is_empty()) {
+            MachineKind::Gateway
+        } else {
+            MachineKind::Other
+        }
     }
 }
 
