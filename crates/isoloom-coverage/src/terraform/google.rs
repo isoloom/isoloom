@@ -2,8 +2,8 @@
 //! the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CPUS, CREDENTIALS, GCP_IPV6, IMAGES,
-    LOCATION, MANAGED, MONITORING, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
+    ACCELERATORS, ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_VLANS, CLOUD_WRITTEN, CPUS, CREDENTIALS, GCP_IPV6, IMAGES, LOCATION,
+    MANAGED, MONITORING, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -21,6 +21,11 @@ const ADDRESS: Support = Equivalent {
 /// An attachment the instance's `attached_disk` blocks make.
 const ATTACHED_INLINE: crate::Support = crate::Support::Equivalent {
     via: "machines.*.disks: the `attached_disk` blocks of google_compute_instance",
+};
+
+/// A subnet's secondary ranges, for alias addresses outside its primary range.
+const SECONDARY_RANGE: Support = Equivalent {
+    via: "machines.*.networks as a list (`lan: [10, 11]`): each further address is an `alias_ip_range` of the instance from the subnet's primary range, the network's own block (a secondary range may not overlap the primary one, and the spec's addresses are all in it)",
 };
 
 /// Google Cloud: every resource type, and what the generators write.
@@ -125,7 +130,8 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "google_compute_instance",
         "attached_disk attached_disk.device_name attached_disk.source boot_disk boot_disk.initialize_params boot_disk.initialize_params.image boot_disk.initialize_params.size can_ip_forward labels machine_type
-        metadata metadata_startup_script name network_interface network_interface.access_config network_interface.network_ip
+        metadata metadata_startup_script name network_interface network_interface.access_config network_interface.alias_ip_range
+        network_interface.alias_ip_range.ip_cidr_range network_interface.network_ip
         network_interface.subnetwork project scheduling scheduling.on_host_maintenance shielded_instance_config
         shielded_instance_config.enable_secure_boot shielded_instance_config.enable_vtpm tags zone",
     ),
@@ -221,7 +227,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 boot_disk.initialize_params.resource_policies boot_disk.initialize_params.resource_manager_tags confidential_instance_config
                 confidential_instance_config.* instance_encryption_key instance_encryption_key.* network_interface.igmp_query
                 network_interface.nic_type network_interface.queue_count network_interface.network_attachment
-                network_interface.access_config.network_tier network_interface.alias_ip_range network_interface.alias_ip_range.*
+                network_interface.access_config.network_tier network_interface.alias_ip_range.subnetwork_range_name
                 network_performance_config network_performance_config.* params params.* scheduling.automatic_restart
                 scheduling.host_error_timeout_seconds scheduling.local_ssd_recovery_timeout scheduling.local_ssd_recovery_timeout.*
                 scheduling.max_run_duration scheduling.max_run_duration.* scheduling.on_instance_stop_action
@@ -281,7 +287,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (GCP_IPV6, "external_ipv6_prefix internal_ipv6_prefix ipv6_access_type stack_type"),
             (MONITORING, "log_config log_config.*"),
-            (ADDRESSES, "secondary_ip_range secondary_ip_range.*"),
+            (SECONDARY_RANGE, "secondary_ip_range secondary_ip_range.*"),
         ],
     ),
     (

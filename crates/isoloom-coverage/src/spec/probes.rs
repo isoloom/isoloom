@@ -147,6 +147,7 @@ fn provision(path: &str) -> String {
 /// The first machine with the field `path` names set, as a flow mapping.
 fn machine(path: &str) -> Option<&'static str> {
     Some(match path.strip_prefix("machines.*.")? {
+        "networks[]" => "{ networks: { lan: [10, 20] } }",
         "services[].publish" => "{ services: [{ port: 80, publish: 8080 }] }",
         "services[].fixed" => "{ services: [{ port: 80, publish: 8080, fixed: true }] }",
         "services[].dormant" => "{ services: [{ port: 80 }, { port: 4444, dormant: true }] }",

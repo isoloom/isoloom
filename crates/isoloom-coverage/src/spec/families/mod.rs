@@ -10,6 +10,7 @@ mod ipv6;
 mod kubernetes;
 pub(crate) mod links;
 mod machine_files;
+mod more_addresses;
 mod outside;
 pub mod own_image;
 mod private_dns;

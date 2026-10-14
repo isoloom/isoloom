@@ -504,9 +504,9 @@ The environment's machines, by name, started in the order written (after their `
 
 ### `machines.*.networks`
 
-Network name -> last octet of the machine's address on it. Every machine has one, but a LAN's `switch`, whose ports the LAN gives it.
+Network name -> last octet of the machine's address on it. Every machine has one, but a LAN's `switch`, whose ports the LAN gives it. A list (`lan: [10, 11, 12]`) gives the machine several addresses on the network: the first is its primary one, the one its name resolves to, and the others are on the same interface.
 
-- **Type:** map of name to integer
+- **Type:** map of name to integer or list of integers
 - **Rendered by:** `docker`, `hosted`, `vagrant`, `docker-vm`, `hybrid`, `proxmox`, `esxi`, `cloud-docker`, `external`
 - **Partly rendered by:** `kubernetes`, `helm`, `kustomize` (not yet: the fixed address: Kubernetes picks pod addresses)
 - **Partly rendered by:** `cloud-vm` (every cloud) (not yet: Windows on several networks)

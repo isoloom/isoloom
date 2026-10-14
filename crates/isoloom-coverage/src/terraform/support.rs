@@ -190,10 +190,6 @@ pub const ACCELERATORS: Support = Equivalent {
 pub const TPM: Support = Planned {
     note: "with Windows 11's TPM and secure boot",
 };
-/// Several addresses on one network.
-pub const ADDRESSES: Support = Planned {
-    note: "with several addresses on one network",
-};
 /// CPU topology.
 pub const CPUS: Support = Equivalent {
     via: "`resources.cpus`, through the machine type Isoloom picks",

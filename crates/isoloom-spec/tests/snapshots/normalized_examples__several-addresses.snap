@@ -1,0 +1,133 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: several-addresses
+networks:
+  office:
+    cidr: 10.86.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  web:
+    networks:
+      office: 10
+    more_addresses:
+      office:
+        - 11
+        - 12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 80
+        name: ~
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+  decoy:
+    networks:
+      office: 40
+    more_addresses:
+      office:
+        - 48
+        - 49
+        - 50
+        - 51
+        - 52
+        - 53
+        - 54
+        - 55
+        - 56
+        - 57
+        - 58
+        - 59
+        - 60
+        - 61
+        - 62
+        - 63
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: debian-12
+      provision:
+        - provision/decoy.sh
+      image: ~
+  client:
+    networks:
+      office: 20
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: debian-12
+      provision:
+        - provision/client.sh
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the second site answers at its own address
+    from: client
+    http: "http://10.86.0.12/"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: ~
+    wait: ~
+  - name: "the hosts file names the web server's further address"
+    from: client
+    http: ~
+    tcp: ~
+    exec: getent hosts 10.86.0.11
+    script: ~
+    expect: web
+    wait: ~
+  - name: the decoy answers on its /28
+    from: client
+    http: ~
+    tcp: ~
+    exec: ping -c 1 -W 2 10.86.0.57
+    script: ~
+    expect: ~
+    wait: ~
+targets: ~

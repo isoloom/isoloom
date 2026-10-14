@@ -30,6 +30,7 @@ use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
 use crate::vm::{gateways, os, own_image, res, vms};
 
+mod addresses;
 mod ipv6;
 mod network;
 mod published;
@@ -253,6 +254,7 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
             .build(),
     );
     vnics(env, name, m);
+    addresses::blocks(env, name, m);
     let mac = |n: &str| call("lower", [reference(&format!("data.oci_core_vnic.{id}_{}.mac_address", res(n)))]);
     let mut at_boot = cloud::interfaces(env, &mp.addresses, &mac);
     at_boot.extend(ipv6::at_boot(env, name, mp));

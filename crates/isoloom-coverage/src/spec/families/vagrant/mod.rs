@@ -14,6 +14,7 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     machines::CELLS,
     super::ipv6::VAGRANT,
     super::private_dns::VAGRANT,
+    super::more_addresses::VAGRANT,
     super::outside::VAGRANT,
     super::machine_files::VM,
     super::process::VM,

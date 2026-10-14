@@ -112,6 +112,9 @@ pub struct MachinePlan {
     pub shape: MachineShape,
     /// Its address on each of its networks, in its order (the first is its primary network).
     pub addresses: IndexMap<String, Ipv4Addr>,
+    /// Its addresses after the primary one on each network where it has several (`lan: [10,
+    /// 11]`), in its networks' order.
+    pub more_addresses: IndexMap<String, Vec<Ipv4Addr>>,
     /// Its IPv6 address on each IPv6 network that derives them (not on `addresses: auto` ones).
     pub addresses6: IndexMap<String, Ipv6Addr>,
     /// Its names: its own, then its aliases, then (with `dns.private`) each of them under the
@@ -329,6 +332,7 @@ impl Environment {
         requirements.extend(requirements::tpm(&machines));
         requirements.extend(crate::boot::requirements(&machines));
         requirements.extend(hardware::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
+        requirements.extend(crate::more_addresses::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
         Environment {
             name: spec.name.clone(),
             target,
@@ -432,6 +436,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
     MachinePlan {
         shape,
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
+        more_addresses: crate::more_addresses::of(spec, m),
         addresses6: ipv6::addresses(spec, m),
         names: crate::private_dns::with_domain(
             spec,

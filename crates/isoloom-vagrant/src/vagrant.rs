@@ -91,6 +91,8 @@ pub fn capabilities() -> Capabilities {
         Feature::NestedVirtualization,
         // No DNS of its own: each VM's hosts file carries the names under the zone's domain.
         Feature::PrivateDns,
+        // Each VM's set-up adds them on the interface of its primary address, on every provider.
+        Feature::VmMoreAddresses,
         Feature::DataDisks,
         Feature::RawDisks,
         Feature::TmpfsModes,

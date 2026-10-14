@@ -65,6 +65,7 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
         };
         name_and_networks(&s, p);
         addresses(&s, blocks, &mut taken, p);
+        more_addresses(&s, blocks, &mut taken, p);
         super::volumes::of_machine(&s, p);
         super::services::of_machine(&s, &mut published, p);
         for (i, input) in m.inputs.iter().enumerate() {
@@ -135,6 +136,40 @@ fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), Str
             );
         } else if let Some(other) = taken.insert((net.clone(), *octet), name.to_string()) {
             p.add(nat, format!("address .{octet} is already used by `{other}`"));
+        }
+    }
+}
+
+/// The machine's further addresses on a network (`lan: [10, 11]`): each usable in the
+/// network's block, written once, and not another machine's. Only on the environment's own
+/// networks: an outside network's addresses are its own LAN's or its DHCP server's.
+fn more_addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), String>, p: &mut Problems) {
+    for (net, octets) in &s.m.more_addresses {
+        let nat = format!("{}.networks.{net}", s.at);
+        let Some(c) = block(blocks, net) else { continue };
+        if s.spec.networks.get(net).is_some_and(crate::model::Network::is_outside) {
+            p.add(
+                nat,
+                "several addresses only on the environment's own networks: an outside network's addresses are its LAN's",
+            );
+            continue;
+        }
+        let mut seen = vec![s.m.networks.get(net).copied().unwrap_or_default()];
+        for octet in octets {
+            if seen.contains(octet) {
+                p.add(&nat, format!("address .{octet} is written twice"));
+            } else if c.host(*octet).is_none() {
+                p.add(
+                    &nat,
+                    format!(
+                        "{octet} isn't a usable address in {} (reserved: .0, .1 for the gateway, the two last addresses for the controller and the router, and the broadcast address)",
+                        s.spec.networks[net].cidr
+                    ),
+                );
+            } else if let Some(other) = taken.insert((net.clone(), *octet), s.name.to_string()) {
+                p.add(&nat, format!("address .{octet} is already used by `{other}`"));
+            }
+            seen.push(*octet);
         }
     }
 }

@@ -133,7 +133,8 @@ extract oci oracle/oci 9.8.0 \
   resource:oci_core_network_security_group resource:oci_core_network_security_group_security_rule \
   resource:oci_dns_view resource:oci_dns_zone resource:oci_dns_rrset resource:oci_dns_resolver \
   data:oci_core_images data:oci_identity_availability_domains data:oci_core_vcn_dns_resolver_association \
-  resource:oci_core_vnic_attachment resource:oci_core_route_table_attachment data:oci_core_vnic data:oci_core_private_ips
+  resource:oci_core_vnic_attachment resource:oci_core_route_table_attachment data:oci_core_vnic data:oci_core_private_ips \
+  resource:oci_core_private_ip
 extract esxi josenk/esxi 1.10.3 \
   resource:esxi_guest resource:esxi_portgroup resource:esxi_virtual_disk resource:esxi_vswitch
 # The utility providers the modules use beside each platform's (keys, passwords, files, waits),

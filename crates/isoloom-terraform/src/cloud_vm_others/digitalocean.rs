@@ -60,6 +60,12 @@ impl Backend for DigitalOceanBackend {
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
+        if let Some(what) = several_addresses(env) {
+            return Err(RenderError::Generate(isoloom_render::GenerateError::Unsupported {
+                target: Target::CloudVm,
+                what,
+            }));
+        }
         shared::render(env, &RULES, module)
     }
 
@@ -67,7 +73,19 @@ impl Backend for DigitalOceanBackend {
         isoloom_plan::refusal(&env.requirements, &self.capabilities())
             .map(|r| r.to_string())
             .or_else(|| shared::refusal(env, &RULES))
+            .or_else(|| several_addresses(env))
     }
+}
+
+/// A machine with several addresses on one network (`lan: [10, 11]`): a Droplet has one address
+/// on its VPC, which DigitalOcean assigns, and no secondary private address to add (a reserved
+/// IP is a public address), so the VPC would never deliver the others.
+fn several_addresses(env: &Environment) -> Option<String> {
+    let (name, mp) = env.machines.iter().find(|(_, mp)| !mp.more_addresses.is_empty())?;
+    let net = mp.more_addresses.keys().next()?;
+    Some(format!(
+        "machine `{name}` has several addresses on `{net}`: a Droplet has one address on its VPC (DigitalOcean has no secondary private address; a reserved IP is public)"
+    ))
 }
 
 /// The droplet image slug for an OS (DigitalOcean's images log in as root).

@@ -110,6 +110,19 @@ are written and now checked against every module that writes them.
 | Google `google_compute_route`, `can_ip_forward` | Planned | Written | With a VPC network per network, a route in one to another's range goes through a machine. Google refuses a route as specific as a subnetwork of its own VPC, which is why one VPC couldn't. |
 | Azure `azurerm_route_table` `route`, `route.*` | (new) | Equivalent | The same routes as `azurerm_route` resources of their own. |
 
+## Re-decided rows (several addresses on one network)
+
+A machine written `lan: [10, 11, 12]` has addresses the spec fixes, all inside the network's
+block. The clouds' rows for several addresses were Planned; they are now written, or equivalent
+where the provider's own rules leave only one way to give fixed addresses.
+
+| Row | Was | Now | Why |
+| --- | --- | --- | --- |
+| AWS `aws_instance.secondary_private_ips`, `aws_network_interface.ipv4_prefixes` | Planned | Emitted | The spec's further addresses, and a whole aligned /28 of them as one prefix. |
+| AWS `aws_network_interface.private_ips_count`, `ipv4_prefix_count` | Planned | Equivalent | The count form of `private_ip_list` and `ipv4_prefixes`: AWS picks the addresses ("the number of secondary private IPv4 addresses to assign", hashicorp/aws `network_interface`), which no spec address could then name, so Isoloom writes the addresses themselves. |
+| Google Cloud `google_compute_subnetwork.secondary_ip_range` and its `ip_cidr_range`, `range_name`, `reserved_internal_range` | Planned | Equivalent | A secondary range must not overlap the subnet's primary range (Google Cloud's VPC documentation, "Subnet ranges": a subnet's primary and secondary IPv4 ranges can't overlap), and the spec's further addresses are inside the network's block, the primary range. Each is an `alias_ip_range` of the instance from the primary range, which Isoloom writes. |
+| Oracle Cloud `oci_core_private_ip` | Planned | Emitted | A secondary private IP per further address, on the machine's VNIC. |
+
 ## Re-decided rows (Windows guests)
 
 | Row | Was | Now | Why |

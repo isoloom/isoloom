@@ -58,6 +58,8 @@ impl Backend for HybridBackend {
             Feature::NestedVirtualization,
             // Docker's DNS for the containers, each VM's hosts file for the VMs.
             Feature::PrivateDns,
+            // A VM's set-up adds them; a container has one address per network (refused).
+            Feature::VmMoreAddresses,
             Feature::DataDisks,
             Feature::TmpfsModes,
         ])

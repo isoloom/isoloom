@@ -70,7 +70,7 @@ const WRITTEN: &[(&str, &str)] = &[
     ),
     (
         "linode_instance",
-        "authorized_keys booted image interface interface.ipv4 interface.ipv4.vpc interface.purpose interface.subnet_id label metadata
+        "authorized_keys booted image interface interface.ip_ranges interface.ipv4 interface.ipv4.vpc interface.purpose interface.subnet_id label metadata
         metadata.user_data region root_pass tags type",
     ),
     ("linode_vpc", "label region"),
@@ -111,7 +111,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 ALIAS,
                 "authorized_users boot_config_label boot_size stackscript_data stackscript_id swap_size interface_generation ipv4 shared_ipv4
                 firewall_id config config.* disk disk.* linode_interfaces linode_interfaces.* interface.label interface.primary
-                interface.ipam_address interface.ip_ranges interface.ipv4.nat_1_1",
+                interface.ipam_address interface.ipv4.nat_1_1",
             ),
             (DEFAULTS, "private_ip"),
             (LINODE_IPV6, "interface.ipv6 interface.ipv6.*"),

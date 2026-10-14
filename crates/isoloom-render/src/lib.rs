@@ -12,6 +12,7 @@ pub mod inventory;
 pub mod ipv6;
 pub mod machine_files;
 pub mod machine_setup;
+pub mod more_addresses;
 pub mod playbooks;
 pub mod project;
 pub mod router;

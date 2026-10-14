@@ -14,6 +14,7 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     machines::CELLS,
     super::ipv6::KUBERNETES,
     super::private_dns::KUBERNETES,
+    super::more_addresses::KUBERNETES,
     super::outside::KUBERNETES,
     super::machine_files::KUBERNETES,
     super::process::KUBERNETES,

@@ -46,6 +46,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
             lines_or_none(&lines)
         }
         Step::Ipv6 { addresses, routes } => Some(crate::ipv6::linux(addresses, routes)),
+        Step::MoreAddresses { addresses } => Some(crate::more_addresses::linux(addresses)),
         Step::Trunks => trunk_commands(env, machine),
         Step::Volumes { paths } => (!paths.is_empty()).then(|| format!("mkdir -p {}\n", paths.iter().map(|p| quote(p)).collect::<Vec<_>>().join(" "))),
         Step::SharedVolume { volume, path, role } => Some(shared_volume(volume, path, role)),
@@ -95,6 +96,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
                 .join("; "),
         ),
         Step::Ipv6 { addresses, routes } => Some(crate::ipv6::windows(addresses, routes)),
+        Step::MoreAddresses { addresses } => Some(crate::more_addresses::windows(addresses)),
         Step::Project => Some(format!(
             "$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n{}",
             crate::UNTAR_PS1

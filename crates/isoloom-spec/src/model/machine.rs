@@ -44,9 +44,17 @@ impl Arch {
 #[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
 pub struct Machine {
     /// Network name -> last octet of the machine's address on it. Every machine has one, but a
-    /// LAN's `switch`, whose ports the LAN gives it.
+    /// LAN's `switch`, whose ports the LAN gives it. A list (`lan: [10, 11, 12]`) gives the
+    /// machine several addresses on the network: the first is its primary one, the one its name
+    /// resolves to, and the others are on the same interface.
     #[serde(default)]
+    #[schemars(with = "IndexMap<String, super::Octets>")]
     pub networks: IndexMap<String, u8>,
+    /// The addresses after the first of each network written as a list, split from `networks`
+    /// when the spec is parsed ([`crate::addresses`]): not a field a spec writes.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[schemars(skip)]
+    pub more_addresses: IndexMap<String, Vec<u8>>,
     /// How many of this machine (2 to 99): clones named `<name>-01`, `<name>-02`, ..., each one
     /// address further along on every network. Where the spec names this machine, it means
     /// every clone. Expanded before anything else reads the spec.
@@ -306,6 +314,17 @@ pub struct Resources {
     /// Disk in GB, for a VM (default 20).
     #[serde(default)]
     pub disk_gb: Option<u32>,
+}
+
+/// A machine's address on a network, as written: one last octet, or several (the first the
+/// primary one).
+#[derive(JsonSchema)]
+#[serde(untagged)]
+pub enum Octets {
+    /// The last octet of its address.
+    One(u8),
+    /// Several addresses on the network, the first its primary one.
+    Several(Vec<u8>),
 }
 
 /// A text, a number or a boolean, read as text (environment values, sysctl values).

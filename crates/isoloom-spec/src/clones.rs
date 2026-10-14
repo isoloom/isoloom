@@ -98,9 +98,16 @@ fn clone_of(m: &Mapping, i: u8) -> Mapping {
     let mut clone = m.clone();
     clone.remove(key("count"));
     if let Some(Value::Mapping(nets)) = clone.get_mut(key("networks")) {
-        for (_, octet) in nets.iter_mut() {
+        let shift = |octet: &mut Value| {
             if let Some(o) = octet.as_u64() {
                 *octet = Value::Number((o + u64::from(i) - 1).into());
+            }
+        };
+        for (_, octets) in nets.iter_mut() {
+            // Several addresses on the network (`[10, 11]`) all move along.
+            match octets {
+                Value::Sequence(list) => list.iter_mut().for_each(&shift),
+                one => shift(one),
             }
         }
     }

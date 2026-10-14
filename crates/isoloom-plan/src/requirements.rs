@@ -89,6 +89,10 @@ pub enum Feature {
     RawDisks,
     /// A mode on a memory-backed mount (`tmpfs[].mode`).
     TmpfsModes,
+    /// Several addresses on one network for a VM (`lan: [10, 11]`), added by its set-up.
+    VmMoreAddresses,
+    /// Several addresses on one network for a container or an existing host: no backend has it.
+    ContainerMoreAddresses,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -246,6 +250,15 @@ pub enum Requirement {
         /// The first machine that does.
         machine: String,
     },
+    /// A machine has several addresses on one network (`lan: [10, 11]`).
+    MoreAddresses {
+        /// The first machine that does.
+        machine: String,
+        /// Its first network with several.
+        network: String,
+        /// How the target produces it.
+        shape: MachineShape,
+    },
 }
 
 impl Requirement {
@@ -283,6 +296,8 @@ impl Requirement {
             Requirement::DataDisks { .. } => Feature::DataDisks,
             Requirement::RawDisks { .. } => Feature::RawDisks,
             Requirement::TmpfsModes { .. } => Feature::TmpfsModes,
+            Requirement::MoreAddresses { shape: MachineShape::Vm, .. } => Feature::VmMoreAddresses,
+            Requirement::MoreAddresses { .. } => Feature::ContainerMoreAddresses,
         }
     }
 }
@@ -357,6 +372,7 @@ impl fmt::Display for Requirement {
                 f,
                 "the names are served under a private zone (`dns.private`, `{domain}`), and this target has no DNS or hosts file Isoloom sets: a cluster names Services under its own domain, an existing host keeps its own resolver"
             ),
+            Requirement::MoreAddresses { machine, network, shape } => crate::more_addresses::refused(f, machine, network, *shape),
             storage => crate::storage::why(storage, f),
         }
     }

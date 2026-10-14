@@ -88,8 +88,18 @@ fn machines(s: &mut Value) {
         s,
         &["$defs", "Machine", "properties", "networks"],
         "additionalProperties",
-        // 0: an address from the LAN's DHCP server, on a `bridged: { dhcp: true }` network.
-        json!({ "type": "integer", "minimum": 0, "maximum": 254 }),
+        // 0: an address from the LAN's DHCP server, on a `bridged: { dhcp: true }` network. A
+        // list: several addresses on the network, the first the primary one.
+        json!({ "anyOf": [
+            { "type": "integer", "minimum": 0, "maximum": 254, "description": "The last octet of the machine's address on the network." },
+            {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 1, "maximum": 254 },
+                "minItems": 1,
+                "uniqueItems": true,
+                "description": "Several addresses on the network, by last octet: the first is the machine's primary address (its name resolves to it), the others are on the same interface."
+            }
+        ] }),
     );
     set(
         s,
