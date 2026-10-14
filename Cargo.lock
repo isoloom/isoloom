@@ -457,6 +457,9 @@ dependencies = [
 name = "isoloom-coverage"
 version = "0.10.1"
 dependencies = [
+ "hcl-rs",
+ "isoloom-plan",
+ "isoloom-render",
  "isoloom-spec",
  "isoloom-targets",
  "serde_json",

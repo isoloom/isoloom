@@ -15,7 +15,10 @@
 //! spec's side ([`spec`]: every field of a spec and what each output does with it) keeps the
 //! generators' claims honest.
 
+pub mod cloud_init;
 pub mod compose;
+pub mod dockerfile;
+pub mod inventory;
 pub mod spec;
 pub mod terraform;
 pub mod vagrant;
@@ -217,13 +220,43 @@ pub fn formats() -> Vec<Format> {
     let mut all = vec![compose::format()];
     all.extend(vagrant::formats());
     all.extend(terraform::formats());
+    all.extend([cloud_init::format(), inventory::format(), dockerfile::format()]);
     all
+}
+
+/// The problems with a format's claims, given the keys a generator really writes: a key written
+/// with no row, or with a row that doesn't say it is written; a row that says written with no
+/// output writing it. Empty when the table tells the truth.
+pub fn written_problems(f: &Format, written: &std::collections::BTreeSet<String>) -> Vec<String> {
+    let mut problems = Vec::new();
+    for key in written {
+        match f.rows.iter().find(|(k, _)| k == key) {
+            None => problems.push(format!("{}: Isoloom writes `{key}`, which has no coverage row", f.name)),
+            Some((_, s)) if !s.written() => problems.push(format!("{}: Isoloom writes `{key}`, but its row says {}", f.name, s.kind())),
+            Some(_) => {}
+        }
+    }
+    for (key, s) in &f.rows {
+        if s.written() && !written.contains(key) {
+            problems.push(format!("{}: `{key}` is marked as written, but no output has it", f.name));
+        }
+    }
+    problems
 }
 
 /// A feature's section in the reference table, and its name within it.
 pub fn section(key: &str) -> (&'static str, &str) {
     if let Some(rest) = key.strip_prefix("resource ") {
         return ("Resource types", rest);
+    }
+    if key.starts_with("ansible_") {
+        return ("Parameters", key);
+    }
+    if let Some(rest) = key.strip_prefix("directive ") {
+        return ("Parser directives", rest);
+    }
+    if key.starts_with(|c: char| c.is_ascii_uppercase()) {
+        return ("Instructions", key);
     }
     if let Some(rest) = key.strip_prefix("provider ") {
         return ("Settings", rest.split_once(": ").map_or(rest, |(_, s)| s));
@@ -236,6 +269,9 @@ pub fn section(key: &str) -> (&'static str, &str) {
         ("config.vm.provision ", "Provisioners"),
         ("config.vm.", "Machine settings (config.vm)"),
         ("config.", "Other settings"),
+        ("users.*.", "Users (users.*)"),
+        ("write_files.*.", "Files (write_files.*)"),
+        ("power_state.", "Restart (power_state)"),
     ] {
         if let Some(rest) = key.strip_prefix(prefix) {
             return (title, if title == "Other settings" { key } else { rest });
