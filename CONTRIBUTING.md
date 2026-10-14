@@ -2,6 +2,7 @@
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) first: it explains how a spec becomes files and where
 a change belongs. The decisions behind the layout are in [docs/adr/](docs/adr/).
+A spec syntax change, a new target or a breaking change starts as an [RFC](rfcs/README.md); everyone follows the [code of conduct](CODE_OF_CONDUCT.md), and a vulnerability is reported as [SECURITY.md](SECURITY.md) says.
 
 ## Gates
 

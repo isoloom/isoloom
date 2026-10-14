@@ -12,10 +12,19 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// The README, the contributor guides and every page under docs/.
+/// The README, the contributor and community guides, the pull request template, and every page
+/// under docs/ and rfcs/.
 fn pages() -> Vec<PathBuf> {
-    let mut out: Vec<PathBuf> = ["README.md", "ARCHITECTURE.md", "CONTRIBUTING.md"].iter().map(|p| root().join(p)).collect();
-    let mut dirs = vec![root().join("docs")];
+    let top = [
+        "README.md",
+        "ARCHITECTURE.md",
+        "CONTRIBUTING.md",
+        "CODE_OF_CONDUCT.md",
+        "SECURITY.md",
+        ".github/pull_request_template.md",
+    ];
+    let mut out: Vec<PathBuf> = top.iter().map(|p| root().join(p)).collect();
+    let mut dirs = vec![root().join("docs"), root().join("rfcs")];
     while let Some(dir) = dirs.pop() {
         for entry in std::fs::read_dir(&dir).unwrap() {
             let path = entry.unwrap().path();
@@ -139,6 +148,20 @@ fn links_between_the_docs_resolve() {
         }
     }
     assert!(broken.is_empty(), "{}", broken.join("\n"));
+}
+
+#[test]
+fn the_community_pages_are_checked() {
+    let checked = pages();
+    for page in [
+        "SECURITY.md",
+        "CODE_OF_CONDUCT.md",
+        "rfcs/README.md",
+        "docs/stability.md",
+        "docs/comparisons/README.md",
+    ] {
+        assert!(checked.iter().any(|p| p.ends_with(page)), "{page} isn't among the checked pages");
+    }
 }
 
 #[test]
