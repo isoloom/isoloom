@@ -276,7 +276,8 @@ Decided on 2026-10-15:
 - There is a manual-only cross-platform workflow.
 - Track C infrastructure:
   - Proxmox and ESXi run as VMs inside VMware on the Mac, as done before (nested virtualization).
-  - A Windows host is reachable over SSH at `10.0.0.40` for Windows host proof.
+  - **Windows host:** `florianamette@10.0.0.40` (`karen`) over SSH key, with Windows 11, 16 GB RAM, Hyper-V, Rust MSVC, Node 24 and Docker. It gives the Windows host proof and Hyper-V.
+  - **Linux host:** `florianamette@10.0.0.10` (`jarvis`) over SSH key, with Debian 13, 46 GB RAM, KVM, libvirt, Docker and Vagrant. It gives the Linux host proof, and real Vagrant runs on libvirt and QEMU.
   - Cloud accounts come later.
 
 ## 6. Salvage branches (local, not pushed)
