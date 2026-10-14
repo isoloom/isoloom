@@ -90,7 +90,7 @@ Isoloom exists for the Cyber CTF launcher. Its three modes must work in 1.0, on 
 | Secrets | A conversion layer per tool: the spec names secrets and where they come from, and each output gets that tool's native mechanism. Values never land in a generated file. On clouds that means the cloud's own store: AWS Secrets Manager or SSM, Azure Key Vault, Google Secret Manager, OCI Vault. Where a cloud has none (DigitalOcean, Linode), a documented fallback is used. |
 | Terraform provider | Only the provider plugin is dropped for 1.0 (recommended; the maintainer had no preference). Terraform output (Proxmox, the clouds, cloud-docker, cloud-services) is core to 1.0. In a converter, Terraform users point a `module` at the generated folder or use the published registry modules. Revisit later as an Isothrum provider that runs labs. |
 | Licences (everything open source, least constraints) | **Isoloom, Isothrum (runner, desktop app, editor) and the Cyber CTF launcher:** Apache-2.0. It is permissive, with a patent grant and patent retaliation, explicit contribution terms, and no trademark rights granted, so forks can't use the Isoloom or Isothrum names. No CLA, only a DCO sign-off. Register the names as trademarks if branding matters. Anyone may build anything on them, closed products included. Official Ansible collections (GPL-3.0) are referenced, never embedded in a binary. The Isothrum website (accounts, project store, MCP) stays private and proprietary. The CTF lab content and courses are a separate decision. |
-| Compatibility | Fresh start: no aliases or deprecations carried into 1.0 (`services:`, old OS names, `qemu_refusal`...). The new format is **`version: 2`**, because 0.x specs already say `version: 1`, so `isoloom migrate` can tell them apart without guessing. |
+| Compatibility | **None.** The project isn't even in beta, so 1.0 supports only the new format: no aliases, no deprecations, no `isoloom migrate`, no tests on old specs. Old specs fail validation with an error naming the unknown field. The spec stays at `version: 1`, the first stable format. Examples are rewritten by hand. The CTF lab files are rewritten by hand at the end, before the launcher's release. |
 | Workflow | Local development on `main` in each repository. No PRs, no releases. The three repositories sit side by side with **path dependencies** (no git revs) until the 1.0 publish. One script runs every repository's checks. At the first satisfying version: squash, re-enable CI, publish. |
 | Docs | Written at the end, inside the repo. The website is rewritten from them. |
 | Launcher | **Decided:** integrate it from the walking skeleton (Phase 2) on, instead of after 1.0. It is the reason 1.0 exists, and only it can validate the run manifest. Launcher, runner and Isoloom ship 1.0 together. |
@@ -125,7 +125,7 @@ Parity between the container and VM forms holds by construction, and the parity 
 isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ──► native files
  (one form)     (model,          (resolve os +     (compose,      (Compose, K8s, Helm,
                  validate,        service through   kubernetes,    Kustomize, Vagrant,
-                 migrate)         the catalogue,    vagrant,       Terraform, cloud-init,
+                 validate)        the catalogue,    vagrant,       Terraform, cloud-init,
                                   the environment)  terraform,     Ansible)
                                                     ansible)
                 isoloom-catalogue                   isoloom-render (builders: HCL, Ruby, YAML,
@@ -134,10 +134,10 @@ isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ─
                 isoloom-import (native files ──► spec)
                 isoloom-verify (official validators on the generated files)
                 isoloom-targets (registry, capabilities, the matrix, tiers)
-                isoloom (CLI: generate, validate, import, verify, matrix, migrate)
+                isoloom (CLI: generate, validate, import, verify, matrix)
 ```
 
-- **Lowering, not rewriting:** the `version: 2` spec is a front end. It resolves `os` + `service`/`app` and lowers each machine into today's plan IR (`Environment`), which already carries the container and VM forms. The backends keep working, and their 800+ tests keep guarding them. Internals are reshaped only where a feature needs it.
+- **Lowering, not rewriting:** the new spec is a front end. It resolves `os` + `service`/`app` and lowers each machine into today's plan IR (`Environment`), which already carries the container and VM forms. The backends keep working, and their 800+ tests keep guarding them. Internals are reshaped only where a feature needs it.
 - **Removed:** `isoloom-runtime`, `isoloom-coverage`, and the runtime parts of the CLI.
 - **New:** `isoloom-catalogue` and `isoloom-verify`.
 - **Changed:** `isoloom-external` becomes the Ansible output (existing hosts are an inventory plus playbooks).
@@ -145,7 +145,7 @@ isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ─
 ## 4. Work, in order
 
 **Principles:**
-- **The safety net comes before the surgery.** Every change is measured against characterization snapshots, the real-lab corpus and the official validators.
+- **The safety net comes before the surgery.** Every change is measured against characterization snapshots of the generated output and against the official validators.
 - **Vertical first, then wide.** One real lab goes end to end through the new path before any breadth.
 - **Lower, don't rewrite.** The new syntax lowers into the existing plan IR.
 - **The launcher's needs decide what is in 1.0.** Everything else is 1.x.
@@ -162,12 +162,12 @@ Sizes: S is about a day of focused work, M a few days, L about a week. There are
   Without them, server and cloud mode ship validated but not proven.
 - **Reserve names:** the crates.io names `isoloom`, `isoloom-*` and `isothrum*`, and the npm scope.
 - **Trademark filing** for Isoloom and Isothrum, if branding matters.
-- **The CTF lab corpus:** every lab spec from the Cyber-Courses repositories, copied locally as test input.
+- **The CTF lab specs:** every lab spec from the Cyber-Courses and CyberCTF repositories, copied locally (private) as reference material only, with a report of which features the labs use. It tells the new syntax what to express first; the files are rewritten at the end.
 
 ### Phase 0: The safety net (M)
 
 1. **Characterization snapshots.** Generate every example on every target from today's `main`, and snapshot the output with `insta`. Any later change that alters output must be deliberate and reviewed.
-2. **The real-lab corpus** (Track C) runs through `validate` and `generate` in a test, so the CTF labs are the regression suite.
+2. **(Dropped.)** Old specs are not a regression suite, because the old format isn't supported.
 3. **`verify`, the seed version.**
    - **One pinned toolchain image** with every official validator:
      - `docker compose config`;
@@ -185,7 +185,7 @@ Sizes: S is about a day of focused work, M a few days, L about a week. There are
 4. **Local multi-repository setup.** Clone `isoloom`, `isothrum` and the launcher side by side, with `[patch]` path dependencies. One `check-all` script runs every repository's checks.
 5. **Cross-platform check (decided).** A manual-only GitHub workflow that runs `check-all` on macOS, Windows and Linux on demand. No PRs and no automatic runs. Without it, Windows and Linux bugs surface only after the squash.
 
-**Exit:** snapshots, corpus and `verify` are all green or baselined, and `check-all` passes.
+**Exit:** snapshots and `verify` are green or baselined, and `check-all` passes.
 
 ### Phase 1: Subtract (S–M)
 
@@ -199,19 +199,19 @@ Now safe, because the net is in place.
 
 ### Phase 2: The walking skeleton (M–L)
 
-One real lab, end to end: `version: 2` spec, Isoloom, run manifest, runner, launcher.
-1. **The `version: 2` spec front end:**
+One real lab, end to end: the new spec, Isoloom, run manifest, runner, launcher.
+1. **The new spec front end:**
    - a machine has `os`, plus `app:` (a custom image or build recipe; CTF labs need this first) or `service:`;
    - the shared fields;
    - `overrides:`.
 
    It lowers into today's plan IR.
-2. **`isoloom migrate` for the corpus.** It turns `docker:`/`vm:` into `app:`. A machine with both forms becomes one `app:` whose recipe both forms derive from. Any lab that can't migrate cleanly is listed, with the reason.
+2. **Rewrite by hand** the examples and that one lab (invoice-portal-api) in the new syntax. Old `docker:`/`vm:` blocks become `app:`, with one recipe both forms derive from.
 3. **Run manifest v0 for the `docker` target:** commands, readiness, outputs and check runners. Its JSON schema and fixtures live in Isoloom, and both repositories test against them.
 4. **The runner skeleton** in `isoloom/isothrum`: the manifest executor and the Docker driver, extracted from the launcher's runtime (its most proven code).
-5. **The launcher** runs one real lab (invoice-portal-api) through Isoloom v2 and the runner, behind a switch. Its real-lab test passes.
+5. **The launcher** runs one real lab (invoice-portal-api) through Isoloom and the runner, behind a switch. Its real-lab test passes.
 
-**Exit:** that lab passes end to end through the new path, and the corpus migrates. The contract is validated by its real consumer.
+**Exit:** that lab passes end to end through the new path. The contract is validated by its real consumer.
 
 ### Phase 3: The launcher's modes, wide (L, parallel per target)
 
@@ -226,7 +226,7 @@ Each step means: lowered generation passes the snapshots and `verify`, then a ma
    - checks as native artefacts.
 5. **Port the rest of the launcher's runtime into the runner,** driver by driver: locks, park and resume, recovery, reaper, budgets, remote servers, Isoloom's secrets delivery.
 
-**Exit:** every launcher mode runs its labs through Isoloom v2 and the runner. Local is proven on macOS, plus Windows and Linux through the cross-platform check. Server and cloud are proven where the Track C infrastructure exists.
+**Exit:** every launcher mode runs its test labs (rewritten in the new syntax) through Isoloom and the runner. Local is proven on macOS, plus Windows and Linux through the cross-platform check. Server and cloud are proven where the Track C infrastructure exists.
 
 ### Phase 4: The catalogue and the CM model (L)
 
@@ -235,25 +235,26 @@ Each step means: lowered generation passes the snapshots and `verify`, then a ma
 3. **The catalogue engine,** salvaging from `v1/catalogue-engine`. GPL Ansible collections are referenced, never embedded.
 4. **Entries, CTF-relevant first:** openssh, nginx, apache, php-fpm, mysql/mariadb, postgres, dvwa, juice-shop. Then the rest: wordpress, mongodb, redis, rabbitmq, iis, ad-ds.
 
-**Exit:** each entry passes its parity contract for real, in both forms, on Docker and one VM provider. Corpus labs that can use catalogue services are migrated to them.
+**Exit:** each entry passes its parity contract for real, in both forms, on Docker and one VM provider.
 
 ### Phase 5: The other targets (M, parallel)
 
-Kubernetes, Helm, Kustomize, hybrid, hosted, external and Terraform ESXi, onto `version: 2` through lowering. They are Tier 2: snapshots plus `verify`.
+Kubernetes, Helm, Kustomize, hybrid, hosted, external and Terraform ESXi, onto the new spec through lowering. They are Tier 2: snapshots plus `verify`.
 
 ### Phase 6: Hardening (M)
 
-1. **Combinations:** property-based random `version: 2` specs; every target's output must pass `verify`.
+1. **Combinations:** property-based random specs; every target's output must pass `verify`.
 2. **Cloud logic without clouds:** `terraform test` with mock providers for routing, gateways, firewalls and per-machine ports.
 3. **Tiers from evidence,** and `isoloom matrix` generated from the backends' capabilities.
 4. **Security review** of secrets and of everything that handles credentials, in Isoloom, the runner and the launcher.
 
 ### Phase 7: Release 1.0, together (M)
 
-1. **Minimal docs** in each repository: getting started, the generated spec reference, targets, secrets, migration.
+1. **Minimal docs** in each repository: getting started, the generated spec reference, targets, secrets.
 2. **Squash each repository's history,** with the maintainer's confirmation at that moment, and re-enable CI.
 3. **Publish to crates.io:** the Isoloom crates, then the Isothrum runner.
-4. **Switch the launcher from path dependencies to the published versions,** and release the launcher.
+4. **Rewrite every CTF lab file in the new syntax** (by hand, with each lab's real run as proof).
+5. **Switch the launcher from path dependencies to the published versions,** and release the launcher.
 
 **Exit:** the launcher runs its full catalogue in local, server and cloud mode on published Isoloom 1.0 and the runner.
 
