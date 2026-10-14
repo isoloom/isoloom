@@ -3,11 +3,14 @@
 //! IP, so every machine keeps its spec address. Single-network Linux labs only: the backend
 //! refuses several networks, Windows and a controller.
 //!
+//! Each machine's published ports open on its own VNIC only, through a network security group
+//! of its own; the subnet's security list holds what every machine shares (the VCN, SSH).
+//!
 //! The image is looked up, not given: a `data "oci_core_images"` finds the newest Canonical
 //! Ubuntu for the shape, as the cloud-docker driver does. Oracle Cloud ships no Debian platform
 //! image, so Debian labs run on Ubuntu too; the SSH login is `ubuntu` either way.
 
-use isoloom_plan::{Capabilities, Environment};
+use isoloom_plan::{Capabilities, Environment, MachinePlan};
 use isoloom_render::backend::{Backend, Files, RenderError};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, index, list, number, object, reference, string};
 use isoloom_render::{GeneratedFile, header};
@@ -207,8 +210,8 @@ fn network(env: &Environment, m: &mut Module) {
         .build();
     m.block(in_vcn(resource("oci_core_route_table", "env")).add_block(route).build());
     m.commented(
-        "What may reach the machines: everything inside the VCN, SSH and the published ports from\nallowed_cidr; egress open.",
-        security_list(env, in_vcn(resource("oci_core_security_list", "env")), cidr),
+        "What may reach every machine: everything inside the VCN, and SSH from allowed_cidr; egress\nopen. A machine's published ports are its own security group's.",
+        security_list(in_vcn(resource("oci_core_security_list", "env")), cidr),
     );
     m.block(
         named(resource("oci_core_subnet", "env"))
@@ -238,22 +241,59 @@ fn ingress(description: &str, source: Expression, protocol: &str, port: Option<u
     b.build()
 }
 
-/// Everything out, everything from the VCN, SSH and the published ports from `allowed_cidr`.
-fn security_list(env: &Environment, b: BlockBuilder, cidr: &str) -> Block {
+/// Everything out, everything from the VCN, SSH from `allowed_cidr`.
+fn security_list(b: BlockBuilder, cidr: &str) -> Block {
     let egress = Block::builder("egress_security_rules")
         .add_attribute(("destination", string("0.0.0.0/0")))
         .add_attribute(("protocol", string("all")))
         .build();
     let allowed = || reference("var.allowed_cidr");
-    let mut b = b
-        .add_block(egress)
+    b.add_block(egress)
         .add_block(ingress("the VCN itself", string(cidr), "all", None))
-        .add_block(ingress("SSH from allowed_cidr", allowed(), "6", Some(22)));
-    for (protocol, port) in single_network::published_ports(env) {
-        let number = if protocol.is_tcp() { "6" } else { "17" };
-        b = b.add_block(ingress("published", allowed(), number, Some(port)));
+        .add_block(ingress("SSH from allowed_cidr", allowed(), "6", Some(22)))
+        .build()
+}
+
+/// A machine's own network security group, with a rule per port it publishes, so a port opens
+/// on the machine that publishes it and no other. Returns the group's id, or `None` when the
+/// machine publishes nothing.
+fn published(name: &str, mp: &MachinePlan, m: &mut Module) -> Option<Expression> {
+    if mp.ports.is_empty() {
+        return None;
     }
-    b.build()
+    let id = res(name);
+    m.commented(
+        &format!("The ports `{name}` publishes, from allowed_cidr: on its VNIC only."),
+        named(resource("oci_core_network_security_group", &id))
+            .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
+            .add_attribute(("display_name", name_with(&format!("-{name}"))))
+            .build(),
+    );
+    let mut ports: Vec<(bool, u16)> = mp.ports.iter().map(|p| (p.protocol.is_tcp(), p.publish)).collect();
+    ports.sort_unstable_by_key(|&(tcp, port)| (!tcp, port));
+    ports.dedup();
+    for (tcp, port) in ports {
+        m.block(published_rule(&id, tcp, port));
+    }
+    Some(reference(&format!("oci_core_network_security_group.{id}.id")))
+}
+
+/// The rule opening one published port (TCP is 6, UDP 17) of group `id`.
+fn published_rule(id: &str, tcp: bool, port: u16) -> Block {
+    let (protocol, options, label) = if tcp { ("6", "tcp_options", "tcp") } else { ("17", "udp_options", "udp") };
+    let range = Block::builder("destination_port_range")
+        .add_attribute(("min", number(u64::from(port))))
+        .add_attribute(("max", number(u64::from(port))))
+        .build();
+    resource("oci_core_network_security_group_security_rule", &format!("{id}_{label}_{port}"))
+        .add_attribute(("network_security_group_id", reference(&format!("oci_core_network_security_group.{id}.id"))))
+        .add_attribute(("description", string("published")))
+        .add_attribute(("direction", string("INGRESS")))
+        .add_attribute(("protocol", string(protocol)))
+        .add_attribute(("source", reference("var.allowed_cidr")))
+        .add_attribute(("source_type", string("CIDR_BLOCK")))
+        .add_block(Block::builder(options).add_block(range).build())
+        .build()
 }
 
 /// A machine's instance at its fixed address, and its set-up over SSH.
@@ -277,12 +317,15 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
         ))
         .add_attribute(("boot_volume_size_in_gbs", number(u64::from(boot))))
         .build();
-    let vnic = Block::builder("create_vnic_details")
+    let mut vnic = Block::builder("create_vnic_details")
         .add_attribute(("subnet_id", reference("oci_core_subnet.env.id")))
         .add_attribute(("private_ip", string(address.as_str())))
         .add_attribute(("assign_public_ip", boolean(true)))
-        .add_attribute(("hostname_label", string(name)))
-        .build();
+        .add_attribute(("hostname_label", string(name)));
+    if let Some(group) = published(name, mp, m) {
+        vnic = vnic.add_attribute(("nsg_ids", list([group])));
+    }
+    let vnic = vnic.build();
     let script = shutdown_script();
     let metadata = object([
         ("ssh_authorized_keys", reference("var.ssh_public_key")),

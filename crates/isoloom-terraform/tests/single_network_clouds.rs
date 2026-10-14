@@ -53,6 +53,18 @@ fn oci_hello_stack() {
 }
 
 #[test]
+fn oci_opens_a_published_port_on_its_machine_only() {
+    let m = module(&OciBackend, "hello-stack");
+    let list = m.split("resource \"oci_core_security_list\"").nth(1).unwrap();
+    let list = list.split("resource \"oci_core_subnet\"").next().unwrap();
+    assert!(!list.contains("8080"), "the shared security list opens no published port");
+    assert!(m.contains("resource \"oci_core_network_security_group\" \"web\""));
+    assert!(!m.contains("resource \"oci_core_network_security_group\" \"cache\""), "cache publishes nothing");
+    assert!(m.contains("nsg_ids          = [oci_core_network_security_group.web.id]"));
+    assert!(m.contains("resource \"oci_core_network_security_group_security_rule\" \"web_tcp_8080\""));
+}
+
+#[test]
 fn rendering_twice_gives_the_same_files() {
     for example in ["solo-web", "hello-stack", "existing-hosts", "supplier-portal-api"] {
         let e = env(example);

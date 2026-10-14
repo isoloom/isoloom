@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, EGRESS_RULES, ENVIRONMENT, IMAGES, LINODE_IPV6, MANAGED, PLACEMENT, PROTECT,
-    PUBLIC_DNS, VM_AGENT,
+    ACCOUNT, ADDRESSES, ALIAS, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DISKS, EGRESS_RULES, IMAGES, LINODE_IPV6, MANAGED, PLACEMENT, PROTECT,
+    PUBLIC_DNS, PUBLIC_IP, PUBLIC_IPV6, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -11,6 +11,11 @@ use crate::Support::{self, Equivalent};
 /// Keys stored in the account.
 const SSH_KEY: Support = Equivalent {
     via: "each instance's own `authorized_keys`, which installs the environment's key without storing it in the account",
+};
+
+/// Resources that set up what linode_instance and linode_firewall write inline.
+const WIRED: Support = Equivalent {
+    via: "what linode_instance and linode_firewall write inline: `linodes` of the firewall, the instance's `interface` blocks (its configuration profile) and the boot disk it makes from `image`",
 };
 
 /// Linode: every resource type, and what the generators write.
@@ -36,11 +41,13 @@ pub const TABLE: Table = Table {
 
 /// Every resource type by family (names without the provider's prefix).
 const TYPES: Rules = &[
+    (WIRED, "firewall_device instance_config instance_disk interface"),
     (
-        ENVIRONMENT,
-        "instance_config instance_disk instance_ip firewall_device volume interface reserved_ip reserved_ip_assignment networking_ip
-        networking_ip_assignment ipv6_range instance_shared_ips",
+        PUBLIC_IP,
+        "instance_ip instance_shared_ips networking_ip networking_ip_assignment reserved_ip reserved_ip_assignment",
     ),
+    (PUBLIC_IPV6, "ipv6_range"),
+    (DISKS, "volume"),
     (
         IMAGES,
         "image consumer_image_share_group_token producer_image_share_group producer_image_share_group_member",

@@ -2,8 +2,8 @@
 //! the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DISKS, ENVIRONMENT, GCP_IPV6, GPU_SCHEDULING,
-    IMAGES, LOCATION, MANAGED, MONITORING, MTU, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT,
+    ACCELERATORS, ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DISKS, GCP_IPV6, GPU_SCHEDULING, IMAGES, LOCATION,
+    MANAGED, MONITORING, MTU, NAT, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -11,6 +11,11 @@ use crate::Support::{self, Equivalent};
 /// Firewall and key resources whose effect the firewall rules and instance metadata give.
 const INLINE: Support = Equivalent {
     via: "google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys",
+};
+
+/// A reserved address.
+const ADDRESS: Support = Equivalent {
+    via: "`network_interface.network_ip` of google_compute_instance, which fixes each machine's spec address (its public one is Isoloom's way in, as on every cloud)",
 };
 
 /// Google Cloud: every resource type, and what the generators write.
@@ -36,10 +41,10 @@ pub const TABLE: Table = Table {
 
 /// Every resource type by family (names without the provider's prefix).
 const TYPES: Rules = &[
-    (
-        ENVIRONMENT,
-        "compute_address compute_route compute_router compute_router_nat compute_router_nat_address compute_disk compute_attached_disk",
-    ),
+    (ADDRESS, "compute_address"),
+    (NAT, "compute_router compute_router_nat compute_router_nat_address"),
+    (ROUTER, "compute_route"),
+    (DISKS, "compute_disk compute_attached_disk"),
     (
         INLINE,
         "compute_network_firewall_policy* compute_region_network_firewall_policy* os_login_ssh_public_key",

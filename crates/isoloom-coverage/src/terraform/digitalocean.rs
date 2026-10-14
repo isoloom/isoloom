@@ -2,8 +2,8 @@
 //! what the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DIGITALOCEAN_IPV6, DISKS, ENVIRONMENT, IMAGES, MANAGED, OLDER_NAME, PLACEMENT,
-    PROTECT, PUBLIC_DNS,
+    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DIGITALOCEAN_IPV6, DISKS, IMAGES, MANAGED, NAT, OLDER_NAME, PLACEMENT, PROTECT,
+    PUBLIC_DNS, PUBLIC_IP, PUBLIC_IPV6,
 };
 use super::table::{Provider, Rules, Table};
 
@@ -30,10 +30,10 @@ pub const TABLE: Table = Table {
 
 /// Every resource type by family (names without the provider's prefix).
 const TYPES: Rules = &[
-    (
-        ENVIRONMENT,
-        "reserved_ip reserved_ip_assignment volume volume_attachment vpc_nat_gateway reserved_ipv6 reserved_ipv6_assignment",
-    ),
+    (PUBLIC_IP, "reserved_ip reserved_ip_assignment"),
+    (PUBLIC_IPV6, "reserved_ipv6 reserved_ipv6_assignment"),
+    (NAT, "vpc_nat_gateway"),
+    (DISKS, "volume volume_attachment"),
     (OLDER_NAME, "floating_ip floating_ip_assignment"),
     (IMAGES, "custom_image"),
     (PUBLIC_DNS, "domain record"),

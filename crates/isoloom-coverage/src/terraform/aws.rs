@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, DISKS, ENVIRONMENT, IMAGE_BUILD, IMAGES,
-    LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER,
+    ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, DISKS, IMAGE_BUILD, IMAGES, LOCATION,
+    MANAGED, NAT, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -11,6 +11,11 @@ use crate::Support::{self, Equivalent};
 /// Rule resources whose effect the security groups' inline rules give.
 const INLINE: Support = Equivalent {
     via: "the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules",
+};
+
+/// Resources that wire up what Isoloom writes inline.
+const WIRED: Support = Equivalent {
+    via: "the arguments that wire the same things inline: `vpc_id` of aws_internet_gateway, `network_interface` of aws_eip, an aws_route_table_association for every subnet (the main route table serves none), `security_groups` of aws_network_interface and the `route` blocks of aws_route_table",
 };
 
 /// AWS: every resource type, and what the generators write.
@@ -37,11 +42,13 @@ pub const TABLE: Table = Table {
 /// Every resource type by family (names without the provider's prefix).
 const TYPES: Rules = &[
     (
-        ENVIRONMENT,
-        "internet_gateway_attachment nat_gateway nat_gateway_eip_association eip_association main_route_table_association route
-        vpc_ipv6_cidr_block_association egress_only_internet_gateway network_interface_sg_attachment ebs_volume volume_attachment
-        vpc_dhcp_options vpc_dhcp_options_association",
+        WIRED,
+        "internet_gateway_attachment eip_association main_route_table_association network_interface_sg_attachment route",
     ),
+    (NAT, "nat_gateway nat_gateway_eip_association"),
+    (AWS_IPV6, "vpc_ipv6_cidr_block_association egress_only_internet_gateway"),
+    (DISKS, "ebs_volume volume_attachment"),
+    (PRIVATE_DNS, "vpc_dhcp_options vpc_dhcp_options_association"),
     (
         INLINE,
         "security_group_rule vpc_security_group_ingress_rule vpc_security_group_egress_rule network_acl network_acl_association
