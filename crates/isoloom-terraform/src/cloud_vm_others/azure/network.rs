@@ -1,0 +1,147 @@
+//! The resource group, the virtual network and its subnets; each machine's network security
+//! group, public IP and interfaces.
+
+use std::net::Ipv4Addr;
+
+use isoloom_plan::Environment;
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, number, reference, string};
+
+use crate::vm::cloud::{name_with, resource};
+use crate::vm::res;
+
+/// The resource group and the networks: one virtual network, a subnet per network with its
+/// exact range.
+pub fn blocks(env: &Environment, m: &mut Module) {
+    m.block(
+        resource("azurerm_resource_group", "env")
+            .add_attribute(("name", reference("local.name")))
+            .add_attribute(("location", reference("var.region")))
+            .add_attribute(("tags", reference("local.tags")))
+            .build(),
+    );
+    let spaces = env.networks.values().map(|n| string(n.cidr.as_str()));
+    m.commented(
+        "The environment's networks: one virtual network, a subnet per network with its exact range.",
+        placed("azurerm_virtual_network", "env", reference("local.name"))
+            .add_attribute(("address_space", list(spaces)))
+            .build(),
+    );
+    for (net, p) in &env.networks {
+        m.block(
+            resource("azurerm_subnet", &res(net))
+                .add_attribute(("name", string(net.as_str())))
+                .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))
+                .add_attribute(("virtual_network_name", reference("azurerm_virtual_network.env.name")))
+                .add_attribute(("address_prefixes", list([string(p.cidr.as_str())])))
+                .build(),
+        );
+    }
+}
+
+/// A resource in the environment's resource group and region, tagged.
+pub fn placed(kind: &str, name: &str, cloud_name: Expression) -> BlockBuilder {
+    resource(kind, name)
+        .add_attribute(("name", cloud_name))
+        .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))
+        .add_attribute(("location", reference("var.region")))
+        .add_attribute(("tags", reference("local.tags")))
+}
+
+/// A network security group: inbound rules numbered from 100 in the order given, then
+/// everything out.
+pub struct Nsg {
+    block: BlockBuilder,
+    priority: u64,
+}
+
+impl Nsg {
+    /// The group `id` (its name in the cloud: `<env>-<who>`).
+    pub fn new(id: &str, who: &str) -> Nsg {
+        Nsg {
+            block: placed("azurerm_network_security_group", id, name_with(&format!("-{who}"))),
+            priority: 100,
+        }
+    }
+
+    /// An inbound allow rule (`protocol`: `*`, `Tcp` or `Udp`; `port`: a port or `*`).
+    #[must_use]
+    pub fn allow(mut self, name: &str, protocol: &str, port: &str, from: Expression) -> Nsg {
+        self.block = self.block.add_block(rule(name, self.priority, ("Inbound", protocol, port), from));
+        self.priority += 10;
+        self
+    }
+
+    /// The group, everything out allowed (Azure's default, made explicit as on AWS).
+    pub fn build(self) -> Block {
+        self.block.add_block(rule("outbound", 100, ("Outbound", "*", "*"), string("*"))).build()
+    }
+}
+
+/// One allow rule: (direction, protocol, port).
+fn rule(name: &str, priority: u64, (direction, protocol, port): (&str, &str, &str), from: Expression) -> Block {
+    Block::builder("security_rule")
+        .add_attribute(("name", string(name)))
+        .add_attribute(("priority", number(priority)))
+        .add_attribute(("direction", string(direction)))
+        .add_attribute(("access", string("Allow")))
+        .add_attribute(("protocol", string(protocol)))
+        .add_attribute(("source_port_range", string("*")))
+        .add_attribute(("destination_port_range", string(port)))
+        .add_attribute(("source_address_prefix", from))
+        .add_attribute(("destination_address_prefix", string("*")))
+        .build()
+}
+
+/// A machine's public IP (static, so the address `ip` gives holds across a stop).
+pub fn public_ip(id: &str, who: &str) -> Block {
+    placed("azurerm_public_ip", id, name_with(&format!("-{who}")))
+        .add_attribute(("allocation_method", string("Static")))
+        .add_attribute(("sku", string("Standard")))
+        .build()
+}
+
+/// A machine's interface on one network.
+pub struct Nic<'a> {
+    /// The machine's resource name (`isoloom_controller` for the controller).
+    pub id: &'a str,
+    /// Its name in the cloud (`<env>-<who>-<network>`).
+    pub who: &'a str,
+    /// The network.
+    pub net: &'a str,
+    /// Its address there.
+    pub address: Ipv4Addr,
+    /// The first interface carries the public IP.
+    pub primary: bool,
+    /// Forwarding on: the machine is on several networks.
+    pub forwarding: bool,
+}
+
+/// The interface's resource name.
+pub fn nic_id(id: &str, net: &str) -> String {
+    format!("{id}_{}", res(net))
+}
+
+/// The interface at its address (with the public IP when it's the primary one) and its
+/// association with the machine's security group.
+pub fn nic(n: &Nic) -> [Block; 2] {
+    let nid = nic_id(n.id, n.net);
+    let mut config = Block::builder("ip_configuration")
+        .add_attribute(("name", string("primary")))
+        .add_attribute(("subnet_id", reference(&format!("azurerm_subnet.{}.id", res(n.net)))))
+        .add_attribute(("private_ip_address_allocation", string("Static")))
+        .add_attribute(("private_ip_address", string(n.address.to_string())));
+    if n.primary {
+        config = config.add_attribute(("public_ip_address_id", reference(&format!("azurerm_public_ip.{}.id", n.id))));
+    }
+    let mut b = placed("azurerm_network_interface", &nid, name_with(&format!("-{}-{}", n.who, n.net)));
+    if n.forwarding {
+        b = b.add_attribute(("ip_forwarding_enabled", boolean(true)));
+    }
+    [
+        b.add_block(config.build()).build(),
+        resource("azurerm_network_interface_security_group_association", &nid)
+            .add_attribute(("network_interface_id", reference(&format!("azurerm_network_interface.{nid}.id"))))
+            .add_attribute(("network_security_group_id", reference(&format!("azurerm_network_security_group.{}.id", n.id))))
+            .build(),
+    ]
+}

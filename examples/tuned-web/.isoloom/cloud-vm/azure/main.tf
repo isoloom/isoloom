@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 5.0"
-    }
+    azurerm = { source = "hashicorp/azurerm", version = "~> 5.0" }
   }
 }
 
@@ -20,21 +17,26 @@ variable "subscription_id" {
   default     = null
   description = "Default: ARM_SUBSCRIPTION_ID from the environment"
 }
+
 variable "region" {
   type    = string
   default = "swedencentral"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -62,7 +64,12 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-tuned-web-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "tuned-web", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+  tags = {
+    isoloom-environment = "tuned-web"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "azurerm_resource_group" "env" {
@@ -76,8 +83,8 @@ resource "azurerm_virtual_network" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
-  address_space       = ["10.83.0.0/24"]
   tags                = local.tags
+  address_space       = ["10.83.0.0/24"]
 }
 
 resource "azurerm_subnet" "app" {
@@ -132,9 +139,9 @@ resource "azurerm_public_ip" "web" {
   name                = "${local.name}-web"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
+  tags                = local.tags
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = local.tags
 }
 
 resource "azurerm_network_interface" "web_app" {
@@ -160,6 +167,7 @@ resource "azurerm_linux_virtual_machine" "web" {
   name                  = "${local.name}-web"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
+  tags                  = local.tags
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.web_app.id]
@@ -179,7 +187,6 @@ resource "azurerm_linux_virtual_machine" "web" {
     sku       = "12-gen2"
     version   = "latest"
   }
-  tags = local.tags
 }
 
 resource "terraform_data" "web" {
@@ -190,9 +197,6 @@ resource "terraform_data" "web" {
     user        = "isoloom"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
-  }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom"]
   }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
@@ -205,24 +209,20 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(APP_MODE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''APP_MODE=production\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"APP_MODE=production\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nprintf %s '\\''net.core.somaxconn = 4096\n'\\'' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\nmkdir -p /etc/security/limits.d && printf %s '\\''* soft nofile 8192\n* hard nofile 16384\nroot soft nofile 8192\nroot hard nofile 16384\n'\\'' > /etc/security/limits.d/90-isoloom.conf\nprintf %s '\\''[Manager]\nDefaultLimitNOFILE=8192:16384\n'\\'' > /etc/systemd/system.conf.d/90-isoloom-limits.conf\nsystemctl daemon-reexec 2>/dev/null || true\n'",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(APP_MODE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''APP_MODE=production\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"APP_MODE=production\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nprintf %s '\\''net.core.somaxconn = 4096\n'\\'' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\nmkdir -p /etc/security/limits.d && printf %s '\\''* soft nofile 8192\n* hard nofile 16384\nroot soft nofile 8192\nroot hard nofile 16384\n'\\'' > /etc/security/limits.d/90-isoloom.conf\nprintf %s '\\''[Manager]\nDefaultLimitNOFILE=8192:16384\n'\\'' > /etc/systemd/system.conf.d/90-isoloom-limits.conf\nsystemctl daemon-reexec 2>/dev/null || true'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
 
 output "machines" {
-  value = {
-    web = azurerm_public_ip.web.ip_address
-  }
+  value = { web = azurerm_public_ip.web.ip_address }
 }
 
 output "ssh_users" {
-  value = {
-    web = "isoloom"
-  }
+  value = { web = "isoloom" }
 }
 
 output "ip" {
@@ -236,7 +236,13 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "web", machine = "web", host = azurerm_public_ip.web.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" }
+    {
+      position = "web"
+      machine  = "web"
+      host     = azurerm_public_ip.web.ip_address
+      user     = "isoloom"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh"
+    }
   ]
 }
 

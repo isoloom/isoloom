@@ -1,15 +1,15 @@
 //! Each machine's instance (its interfaces and Elastic IP on several networks) and its set-up
 //! through the VM core; the Windows machines' and the controller's.
 
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, object, reference, string};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
-use super::network::{controller_group, name_tag, resource, security_group};
-use super::{auto_stop, image_user, instance_type, linux_user_data, r, vpc_does};
+use super::network::{controller_group, name_with, resource, security_group};
+use super::{image_user, instance_type, linux_user_data, r, vpc_does};
 use crate::vm::linux::{self, Hooks};
-use crate::vm::{controller, os, res, windows};
+use crate::vm::{cloud, controller, os, res, windows};
 
 /// The address Terraform reaches a machine at: its instance's own public address on one
 /// network, its Elastic IP on several (AWS doesn't auto-assign one then).
@@ -38,12 +38,9 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         m.block(one_network(env, name, instance));
     }
     let hooks = Hooks {
-        at_boot: interfaces(env, &mp.addresses, &|n| format!("aws_network_interface.{id}_{}", res(n))),
-        after_reboot: vec![Template::new().with_expr(auto_stop(
-            Template::text("sudo shutdown -h +").with_expr(r("var.auto_stop_minutes")).into_expression(),
-            string("true"),
-        ))],
-        before_egress: redirects(mp),
+        at_boot: cloud::interfaces(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", res(n)))),
+        after_reboot: vec![cloud::reschedule_auto_stop()],
+        before_egress: cloud::redirects(mp),
         skip: vpc_does,
     };
     let machine = linux::Machine {
@@ -70,7 +67,7 @@ fn one_network(env: &Environment, name: &str, instance: BlockBuilder) -> Block {
         .add_attribute(("vpc_security_group_ids", list([r(&format!("aws_security_group.{id}.id"))])))
         .add_attribute(("user_data", linux_user_data()))
         .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)))
-        .add_attribute(("tags", object([("Name", name_tag(&format!("-{name}")))])))
+        .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
         .build()
 }
 
@@ -86,7 +83,7 @@ fn several_networks(env: &Environment, name: &str, instance: BlockBuilder) -> Ve
         .iter()
         .map(|(n, a)| {
             interface(&format!("{id}_{}", res(n)), n, &a.to_string(), group.clone())
-                .add_attribute(("tags", object([("Name", name_tag(&format!("-{name}-{n}")))])))
+                .add_attribute(("tags", object([("Name", name_with(&format!("-{name}-{n}")))])))
                 .build()
         })
         .collect();
@@ -97,7 +94,7 @@ fn several_networks(env: &Environment, name: &str, instance: BlockBuilder) -> Ve
             .add_attribute(("user_data", linux_user_data()))
             .add_block(primary(&first))
             .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)))
-            .add_attribute(("tags", object([("Name", name_tag(&format!("-{name}")))])))
+            .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
             .build(),
     );
     out.extend(attachments(&id, mp.addresses.keys().map(|n| format!("{id}_{}", res(n)))));
@@ -148,41 +145,9 @@ fn eip(id: &str, interface: &str) -> Block {
         .build()
 }
 
-/// The commands bringing up the interfaces after the first (found by MAC, `nic(network)` the
-/// interface resource) at their addresses: at every boot, as the SSH user.
-fn interfaces(env: &Environment, addresses: &indexmap::IndexMap<String, std::net::Ipv4Addr>, nic: &dyn Fn(&str) -> String) -> Vec<Template> {
-    addresses
-        .iter()
-        .skip(1)
-        .map(|(n, a)| {
-            let len = Cidr::parse(&env.networks[n].cidr).map_or(32, |c| c.len);
-            Template::text("IF=$(ip -o link | grep -i \"")
-                .with_expr(call("lower", [r(&format!("{}.mac_address", nic(n)))]))
-                .with_text(format!(
-                    "\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")"
-                ))
-        })
-        .collect()
-}
-
-/// A published port that differs from the service's own, redirected to it inside the machine.
-fn redirects(mp: &MachinePlan) -> Vec<Template> {
-    let moved: Vec<_> = mp.ports.iter().filter(|p| p.publish != p.port).collect();
-    if moved.is_empty() {
-        return Vec::new();
-    }
-    let mut out = vec![Template::text(
-        "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
-    )];
-    out.extend(moved.into_iter().map(|p| {
-        Template::text(format!(
-            "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting {{ type nat hook prerouting priority -100; }}' && sudo nft add rule ip isoloom-publish prerouting {} dport {} redirect to :{}",
-            p.protocol.id(),
-            p.publish,
-            p.port
-        ))
-    }));
-    out
+/// The MAC address of an AWS interface, as `ip link` writes it.
+fn mac(nic: &str) -> Expression {
+    call("lower", [r(&format!("{nic}.mac_address"))])
 }
 
 /// A Windows machine: its security group, its instance (the administrator and WinRM at first
@@ -203,7 +168,7 @@ pub fn windows(env: &Environment, name: &str, m: &mut Module) {
         .add_attribute(("vpc_security_group_ids", list([r(&format!("aws_security_group.{id}.id"))])))
         .add_attribute(("user_data", windows_user_data()))
         .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50)))
-        .add_attribute(("tags", object([("Name", name_tag(&format!("-{name}")))])))
+        .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
         .build();
     m.commented(
         "No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.",
@@ -214,8 +179,9 @@ pub fn windows(env: &Environment, name: &str, m: &mut Module) {
         name,
         replace_on: r(&format!("aws_instance.{id}.id")),
         host: r(&format!("aws_instance.{id}.public_ip")),
-        password: r("random_password.windows.result"),
+        password: r(cloud::WINDOWS_PASSWORD),
         skip: vpc_does,
+        platform: windows::Platform::default(),
     }));
 }
 
@@ -228,7 +194,7 @@ fn windows_user_data() -> Expression {
     Template::text("<powershell>\n$p = ConvertTo-SecureString '")
         .with_expr(r("random_password.windows.result"))
         .with_text("' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n")
-        .with_expr(auto_stop(stop.into_expression(), string("")))
+        .with_expr(cloud::auto_stop(stop.into_expression(), string("")))
         .with_text("\n</powershell>\n")
         .into_expression()
 }
@@ -254,7 +220,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
             .add_attribute(("key_name", r("aws_key_pair.env.key_name")))
             .add_attribute(("user_data", linux_user_data()))
             .add_block(primary(&first))
-            .add_attribute(("tags", object([("Name", name_tag("-controller"))])))
+            .add_attribute(("tags", object([("Name", name_with("-controller"))])))
             .build(),
     );
     m.block(eip("isoloom_controller", &first));
@@ -269,7 +235,8 @@ pub fn controller(env: &Environment, m: &mut Module) {
         env,
         replace_on: r("aws_instance.isoloom_controller.id"),
         host: r("aws_eip.isoloom_controller.public_ip"),
-        at_boot: interfaces(env, &addresses, &|n| format!("aws_network_interface.{}", nic(n))),
+        user: "admin".into(),
+        at_boot: cloud::interfaces(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n)))),
         inventory,
     };
     m.block(controller::provisioner(ssh).block());

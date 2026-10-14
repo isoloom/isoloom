@@ -60,7 +60,7 @@ windows_password)`, `Access::external()`. A backend never writes inventory lines
 
 ### The Terraform VM core
 
-Proxmox and AWS (the `cloud-vm` target's reference cloud) render from the plan through
+Proxmox, and AWS, Azure and Google Cloud on the `cloud-vm` target, render from the plan through
 `isoloom_terraform::vm`, written with the HCL builder (`isoloom_render::hcl_builder`: `hcl-rs`
 structures, values escaped by the builder, written in the layout `terraform fmt` keeps). The core
 holds what every VM-per-machine Terraform target shares: a machine's set-up as a `remote-exec`
@@ -69,10 +69,12 @@ between two provisioners) or a cloud-init transport (the `Prelude` step as `boot
 as `runcmd`, a unit for what follows a reboot), Windows over WinRM, the controller and its
 inventory, the check runners and the `checks` output, and each target's limits (refusals read
 from the plan). A target adds its resources and hooks (interfaces found by MAC, the auto-stop,
-published-port redirects) and leaves out the steps its platform does itself. DigitalOcean,
-Linode and Oracle Cloud render through the core too, each a backend of its own
-(`cloud_vm::CLOUDS`) whose refusal drops only its module; Azure and Google Cloud still read the
-spec through `cloud_vm::legacy` until they move onto the core.
+published-port redirects) and leaves out the steps its platform does itself; `vm::cloud` holds
+what every cloud module repeats (the operator's variables, the auto-stop, interfaces found by
+MAC, the Windows password, the outputs). On `cloud-vm`, every cloud (AWS, Azure, Google Cloud,
+DigitalOcean, Linode, Oracle Cloud) is a `Backend` of its own (`cloud_vm::CLOUDS`, AWS first):
+AWS's refusal refuses the target, another cloud's refusal drops only its module, and
+`cloud_vm::cloud_refusals` says which cloud refuses and why.
 
 ## Crate map
 
@@ -162,10 +164,8 @@ Enforced now (`deny`, so `cargo clippy --workspace --all-targets -- -D warnings`
   `missing_errors_doc`, `missing_panics_doc`, `doc_markdown`, `similar_names`); `unwrap_used`,
   `panic`, `dbg_macro`, `todo` (tests may unwrap, expect and panic: `clippy.toml`);
   `print_stdout` (the command line allows it at its root: printing is its interface);
-  `too_many_arguments` above 5 (six functions carry a targeted, commented `#[allow]`:
-  `inbound`, `nic`, `provision` and
-  `windows_machine` in `cloud_vm_others/azure.rs`, `appliance` and
-  `readiness` in isoloom-compose's `render.rs`).
+  `too_many_arguments` above 5 (two functions carry a targeted, commented `#[allow]`:
+  `appliance` and `readiness` in isoloom-compose's `render.rs`).
 
 Tracked (`allow` today, denied by the end of Wave 2, issue #106): `missing_docs` for library
 crates; `expect_used`; `too_many_lines` (60) and `cognitive_complexity` (15), whose thresholds

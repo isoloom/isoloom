@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 5.0"
-    }
+    azurerm = { source = "hashicorp/azurerm", version = "~> 5.0" }
   }
 }
 
@@ -20,21 +17,26 @@ variable "subscription_id" {
   default     = null
   description = "Default: ARM_SUBSCRIPTION_ID from the environment"
 }
+
 variable "region" {
   type    = string
   default = "swedencentral"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -46,6 +48,7 @@ variable "expires_at" {
   default     = ""
   description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
 }
+
 variable "inputs" {
   type        = map(string)
   default     = {}
@@ -68,7 +71,12 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-supplier-portal-api-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
-  tags = { "isoloom-environment" = "supplier-portal-api", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+  tags = {
+    isoloom-environment = "supplier-portal-api"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "azurerm_resource_group" "env" {
@@ -82,8 +90,8 @@ resource "azurerm_virtual_network" "env" {
   name                = local.name
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
-  address_space       = ["10.20.0.0/24"]
   tags                = local.tags
+  address_space       = ["10.20.0.0/24"]
 }
 
 resource "azurerm_subnet" "lab" {
@@ -138,9 +146,9 @@ resource "azurerm_public_ip" "database" {
   name                = "${local.name}-database"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
+  tags                = local.tags
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = local.tags
 }
 
 resource "azurerm_network_interface" "database_lab" {
@@ -166,6 +174,7 @@ resource "azurerm_linux_virtual_machine" "database" {
   name                  = "${local.name}-database"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
+  tags                  = local.tags
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.database_lab.id]
@@ -185,7 +194,6 @@ resource "azurerm_linux_virtual_machine" "database" {
     sku       = "12-gen2"
     version   = "latest"
   }
-  tags = local.tags
 }
 
 resource "terraform_data" "database" {
@@ -197,9 +205,6 @@ resource "terraform_data" "database" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-database.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -208,17 +213,20 @@ resource "terraform_data" "database" {
     destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "file" {
-    content     = join("\n", ["API_URL=${jsonencode(lookup(var.inputs, "API_URL", ""))}", "LAUNCH_TOKEN=${jsonencode(lookup(var.inputs, "LAUNCH_TOKEN", ""))}"])
+    content = join("\n", [
+      "API_URL='${replace(lookup(var.inputs, "API_URL", ""), "'", "'\\''")}'",
+      "LAUNCH_TOKEN='${replace(lookup(var.inputs, "LAUNCH_TOKEN", ""), "'", "'\\''")}'"
+    ])
     destination = "/tmp/isoloom-inputs.env"
   }
   provisioner "remote-exec" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.20.0.31 web' | sudo tee -a /etc/hosts >/dev/null",
-      "cd /opt/isoloom && sudo -E sh -c 'set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.20.0.31 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -279,9 +287,9 @@ resource "azurerm_public_ip" "web" {
   name                = "${local.name}-web"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
+  tags                = local.tags
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = local.tags
 }
 
 resource "azurerm_network_interface" "web_lab" {
@@ -307,6 +315,7 @@ resource "azurerm_linux_virtual_machine" "web" {
   name                  = "${local.name}-web"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
+  tags                  = local.tags
   size                  = "Standard_B1s"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.web_lab.id]
@@ -326,7 +335,6 @@ resource "azurerm_linux_virtual_machine" "web" {
     sku       = "12-gen2"
     version   = "latest"
   }
-  tags = local.tags
 }
 
 resource "terraform_data" "web" {
@@ -337,9 +345,6 @@ resource "terraform_data" "web" {
     user        = "isoloom"
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
-  }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom"]
   }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
@@ -352,28 +357,22 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '10.20.0.32 database' | sudo tee -a /etc/hosts >/dev/null",
-      "sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''10.20.0.32 database'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
   depends_on = [terraform_data.database]
 }
 
 output "machines" {
-  value = {
-    database = azurerm_public_ip.database.ip_address
-    web      = azurerm_public_ip.web.ip_address
-  }
+  value = { database = azurerm_public_ip.database.ip_address, web = azurerm_public_ip.web.ip_address }
 }
 
 output "ssh_users" {
-  value = {
-    database = "isoloom"
-    web      = "isoloom"
-  }
+  value = { database = "isoloom", web = "isoloom" }
 }
 
 output "ip" {
@@ -387,15 +386,25 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "database", machine = "database", host = azurerm_public_ip.database.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/database.sh" },
-    { position = "web", machine = "web", host = azurerm_public_ip.web.ip_address, user = "isoloom", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" }
+    {
+      position = "database"
+      machine  = "database"
+      host     = azurerm_public_ip.database.ip_address
+      user     = "isoloom"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/database.sh"
+    },
+    {
+      position = "web"
+      machine  = "web"
+      host     = azurerm_public_ip.web.ip_address
+      user     = "isoloom"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh"
+    }
   ]
 }
 
 output "published" {
-  value = {
-    "web/portal" = "${azurerm_public_ip.web.ip_address}:3206"
-  }
+  value = { "web/portal" = "${azurerm_public_ip.web.ip_address}:3206" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

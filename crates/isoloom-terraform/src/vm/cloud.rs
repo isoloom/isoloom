@@ -1,17 +1,94 @@
-//! What every cloud module repeats around its own resources: the auto-stop, published-port
-//! redirects, the common variables, the environment's id and names, and the outputs (every
-//! machine's public address and SSH user, where to stand, the ready marker, the checks, the
-//! published services).
+//! What every cloud module repeats around its own resources: the auto-stop, extra interfaces
+//! brought up by MAC, published-port redirects, the common variables, the environment's id,
+//! names and tags, the Windows password and the Windows rules every cloud shares, and the
+//! outputs (every machine's public address and SSH user, where to stand, the ready marker, the
+//! checks, the published services).
 
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, Expression, Module, Template, binary, call, conditional, list, null, number, object, reference, string,
+    BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, conditional, list, null, number, object, reference, string,
 };
+use isoloom_spec::model::Machine;
+use isoloom_spec::validate::Cidr;
 
 use super::checks::{Invocation, Runner, output_block};
 use super::module::{Variable, inputs_variable, output};
 use super::{controller, is_windows, vms};
+
+/// The Terraform expression of the Windows machines' password.
+pub const WINDOWS_PASSWORD: &str = "random_password.windows.result";
+
+/// A `resource` block, started.
+pub fn resource(kind: &str, name: &str) -> BlockBuilder {
+    Block::builder("resource").add_label(kind).add_label(name)
+}
+
+/// The labels on every resource: the environment, who manages it, its instance and its expiry
+/// (what a reaper reads).
+pub fn tags(env: &Environment) -> Expression {
+    object([
+        ("isoloom-environment", string(env.name.as_str())),
+        ("managed-by", string("isoloom")),
+        ("isoloom-instance", reference("local.name")),
+        ("isoloom-expires-at", reference("var.expires_at")),
+    ])
+}
+
+/// The Windows machines' administrator password (user `isoloom`), for WinRM.
+pub fn windows_password() -> Block {
+    resource("random_password", "windows")
+        .add_attribute(("length", number(24)))
+        .add_attribute(("special", boolean(false)))
+        .add_attribute(("min_upper", number(2)))
+        .add_attribute(("min_lower", number(2)))
+        .add_attribute(("min_numeric", number(2)))
+        .build()
+}
+
+/// The commands bringing up the interfaces after the first (found by MAC, `mac(network)` the
+/// expression of its interface's MAC address, lowercase and colon-separated as `ip link`
+/// writes it) at their addresses: at every boot, as the SSH user.
+pub fn interfaces(env: &Environment, addresses: &indexmap::IndexMap<String, std::net::Ipv4Addr>, mac: &dyn Fn(&str) -> Expression) -> Vec<Template> {
+    addresses
+        .iter()
+        .skip(1)
+        .map(|(n, a)| {
+            let len = Cidr::parse(&env.networks[n].cidr).map_or(32, |c| c.len);
+            Template::text("IF=$(ip -o link | grep -i \"").with_expr(mac(n)).with_text(format!(
+                "\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")"
+            ))
+        })
+        .collect()
+}
+
+/// What no cloud does yet for a Windows machine: several networks, steps other than `.ps1`.
+pub fn windows_refusal(name: &str, m: &Machine) -> Option<String> {
+    let vm = m.vm.as_ref().filter(|v| isoloom_spec::images::is_windows(&v.os))?;
+    if m.networks.len() > 1 {
+        return Some(format!("machine `{name}`: Windows machines on several networks in the cloud come later"));
+    }
+    vm.provision
+        .iter()
+        .any(|p| !p.ends_with(".ps1"))
+        .then(|| format!("machine `{name}`: Windows steps are .ps1 scripts"))
+}
+
+/// A Windows machine's UDP service published on another port: Windows' port proxy (`netsh
+/// interface portproxy`) forwards TCP only.
+pub fn windows_udp_redirect(spec: &isoloom_spec::model::Spec) -> Option<String> {
+    spec.machines.iter().find_map(|(name, m)| {
+        let windows = m.vm.as_ref().is_some_and(|v| isoloom_spec::images::is_windows(&v.os));
+        let s = m.services.iter().find(|s| !s.protocol.is_tcp() && s.publish.is_some_and(|h| h != s.port))?;
+        windows.then(|| {
+            format!(
+                "machine `{name}`: UDP port {} published as {} on a Windows VM in the cloud (its port proxy is TCP only): publish it on its own port",
+                s.port,
+                s.publish.unwrap_or_default()
+            )
+        })
+    })
+}
 
 /// `var.auto_stop_minutes > 0 ? <yes> : <no>`.
 pub fn auto_stop(yes: Expression, no: Expression) -> Expression {
@@ -133,8 +210,8 @@ pub struct Reach<'a> {
     pub public_ip: &'a dyn Fn(&str) -> Expression,
     /// A machine's SSH user.
     pub user: &'a dyn Fn(&MachinePlan) -> String,
-    /// The controller's public address, when there is one.
-    pub controller: Option<Expression>,
+    /// The controller's public address and SSH user, when there is one.
+    pub controller: Option<(Expression, &'a str)>,
 }
 
 /// The outputs every cloud module gives: `machines`, `ssh_users`, `ip`, `ready_file`, `checks`
@@ -174,7 +251,7 @@ fn stand_at(env: &Environment, reach: &Reach) -> Expression {
     let access = linux.iter().rev().find(|n| env.spec().machines[**n].access).or(linux.first());
     match (access, &reach.controller) {
         (Some(n), _) => (reach.public_ip)(n),
-        (None, Some(c)) if controller::needed(env) => c.clone(),
+        (None, Some((c, _))) if controller::needed(env) => c.clone(),
         _ => null(),
     }
 }
@@ -192,10 +269,10 @@ fn runner(env: &Environment, reach: &Reach, p: &Position) -> Option<Runner> {
             host: (reach.public_ip)(n),
             user: string((reach.user)(mp)),
         }),
-        None => reach.controller.clone().filter(|_| controller::needed(env)).map(|host| Runner {
+        None => reach.controller.clone().filter(|_| controller::needed(env)).map(|(host, user)| Runner {
             machine: "controller".into(),
             host,
-            user: string("admin"),
+            user: string(user),
         }),
     }
 }

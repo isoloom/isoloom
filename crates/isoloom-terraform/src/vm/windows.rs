@@ -31,6 +31,20 @@ pub struct Machine<'a> {
     pub password: Expression,
     /// The steps the platform does itself, left out.
     pub skip: fn(&Step) -> bool,
+    /// What the platform does its own way.
+    pub platform: Platform,
+}
+
+/// How a platform's Windows machines differ from the default (renamed by Terraform, WinRM with
+/// Basic authentication, the auto-stop in the user data).
+#[derive(Debug, Clone, Default)]
+pub struct Platform {
+    /// The platform names the machine when it creates it: no rename, no restart.
+    pub named: bool,
+    /// WinRM authenticates with NTLM.
+    pub ntlm: bool,
+    /// Commands run before the set-up script (what the platform's user data can't do).
+    pub before: Vec<Expression>,
 }
 
 /// Its Windows name: NetBIOS keeps 15 characters.
@@ -38,15 +52,53 @@ fn computer_name(name: &str) -> String {
     name.chars().take(15).collect()
 }
 
-/// The machine's resources: its renaming (`terraform_data.<id>_name`), the pause while it
-/// restarts (`time_sleep.<id>_restart`), then its set-up (`terraform_data.<id>`).
+/// The machine's resources: its renaming (`terraform_data.<id>_name`) and the pause while it
+/// restarts (`time_sleep.<id>_restart`) unless the platform names it, then its set-up
+/// (`terraform_data.<id>`).
 pub fn blocks(w: Machine) -> Vec<Block> {
     let id = res(w.name);
-    let host = computer_name(w.name);
     let connection = Connection::WinRm {
         host: w.host.clone(),
         password: w.password.clone(),
+        ntlm: w.platform.ntlm,
     };
+    let mut out = Vec::new();
+    let mut depends_on = Vec::new();
+    if !w.platform.named {
+        out.extend(rename(&w, &connection));
+        depends_on.push(reference(&format!("time_sleep.{id}_restart")));
+    }
+    let mut uploads = Vec::new();
+    if has_runs(&w) {
+        uploads.push(Upload::Project {
+            id: id.clone(),
+            destination: ARCHIVE,
+        });
+    }
+    uploads.push(Upload::Content {
+        content: string(setup_script(&w)),
+        destination: SETUP.into(),
+    });
+    depends_on.extend(linux::depends_on(w.env, w.name));
+    let mut commands = w.platform.before.clone();
+    commands.push(string(format!("powershell -NoProfile -ExecutionPolicy Bypass -File {SETUP}")));
+    let setup = Provisioner {
+        name: id,
+        replace_on: w.replace_on,
+        connection,
+        uploads,
+        parts: vec![commands],
+        depends_on,
+    };
+    out.push(setup.block());
+    out
+}
+
+/// Its renaming (`terraform_data.<id>_name`) and the pause while it restarts
+/// (`time_sleep.<id>_restart`).
+fn rename(w: &Machine, connection: &Connection) -> [Block; 2] {
+    let id = res(w.name);
+    let host = computer_name(w.name);
     let rename = Provisioner {
         name: format!("{id}_name"),
         replace_on: w.replace_on.clone(),
@@ -64,28 +116,7 @@ pub fn blocks(w: Machine) -> Vec<Block> {
         .add_attribute(("create_duration", string("90s")))
         .add_attribute(("depends_on", list([reference(&format!("terraform_data.{id}_name"))])))
         .build();
-    let mut uploads = Vec::new();
-    if has_runs(&w) {
-        uploads.push(Upload::Project {
-            id: id.clone(),
-            destination: ARCHIVE,
-        });
-    }
-    uploads.push(Upload::Content {
-        content: string(setup_script(&w)),
-        destination: SETUP.into(),
-    });
-    let mut depends_on = vec![reference(&format!("time_sleep.{id}_restart"))];
-    depends_on.extend(linux::depends_on(w.env, w.name));
-    let setup = Provisioner {
-        name: id,
-        replace_on: w.replace_on,
-        connection,
-        uploads,
-        parts: vec![vec![string(format!("powershell -NoProfile -ExecutionPolicy Bypass -File {SETUP}"))]],
-        depends_on,
-    };
-    vec![rename.block(), pause, setup.block()]
+    [rename.block(), pause]
 }
 
 /// Whether it runs steps of its own (it gets the project then).

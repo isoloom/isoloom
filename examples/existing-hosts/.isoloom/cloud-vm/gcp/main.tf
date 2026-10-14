@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 8.0"
-    }
+    google = { source = "hashicorp/google", version = "~> 8.0" }
   }
 }
 
@@ -20,30 +17,37 @@ variable "project" {
   default     = ""
   description = "An existing project; or leave empty and give billing_account for a project of its own"
 }
+
 variable "billing_account" {
   type        = string
   default     = ""
   description = "With no project: create one for this environment, billed here, deleted with it"
 }
+
 variable "org_id" {
   type    = string
   default = ""
 }
+
 variable "region" {
   type    = string
   default = "europe-west9"
 }
+
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
+
 variable "ssh_public_key" {
   type = string
 }
+
 variable "ssh_private_key_file" {
   type        = string
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
@@ -150,15 +154,13 @@ resource "google_compute_instance" "web" {
     network_ip = "192.168.1.20"
     access_config {}
   }
-  metadata = {
-    ssh-keys = "admin:${var.ssh_public_key}"
-  }
+  metadata                = { ssh-keys = "admin:${var.ssh_public_key}" }
   metadata_startup_script = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
   labels = {
-    "isoloom-environment" = "existing-hosts"
-    "managed-by"          = "isoloom"
-    "isoloom-instance"   = local.name
-    "isoloom-expires-at" = var.expires_at
+    isoloom-environment = "existing-hosts"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
   }
 }
 
@@ -171,9 +173,6 @@ resource "terraform_data" "web" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -185,10 +184,10 @@ resource "terraform_data" "web" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '192.168.1.21 cache' | sudo tee -a /etc/hosts >/dev/null",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/web.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''192.168.1.21 cache'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -236,15 +235,13 @@ resource "google_compute_instance" "cache" {
     network_ip = "192.168.1.21"
     access_config {}
   }
-  metadata = {
-    ssh-keys = "admin:${var.ssh_public_key}"
-  }
+  metadata                = { ssh-keys = "admin:${var.ssh_public_key}" }
   metadata_startup_script = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
   labels = {
-    "isoloom-environment" = "existing-hosts"
-    "managed-by"          = "isoloom"
-    "isoloom-instance"   = local.name
-    "isoloom-expires-at" = var.expires_at
+    isoloom-environment = "existing-hosts"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
   }
 }
 
@@ -257,9 +254,6 @@ resource "terraform_data" "cache" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
   provisioner "local-exec" {
     command = "tar -czf \"${path.module}/.isoloom-project-cache.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
@@ -271,24 +265,28 @@ resource "terraform_data" "cache" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "printf '%s\\n' '192.168.1.20 web' | sudo tee -a /etc/hosts >/dev/null",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/cache-boot.sh'",
-      "sudo mkdir -p /var/lib/isoloom && sudo cp /proc/sys/kernel/random/boot_id /var/lib/isoloom/boot-id"
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'for l in '\\''192.168.1.20 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache-boot.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && cp /proc/sys/kernel/random/boot_id /var/lib/isoloom/boot-id'"
     ]
   }
-  # The reboot step: the connection drops as the machine goes down.
   provisioner "remote-exec" {
-    inline     = ["sudo touch /run/nologin", "sudo systemctl stop ssh.socket ssh.service sshd.service 2>/dev/null || true", "sudo systemctl --no-block reboot", "sleep 600"]
+    inline = [
+      "sudo touch /run/nologin",
+      "sudo systemctl stop ssh.socket ssh.service sshd.service 2>/dev/null || true",
+      "sudo systemctl --no-block reboot",
+      "sleep 600"
+    ]
     on_failure = continue
   }
   provisioner "remote-exec" {
     inline = [
       "set -e",
-      "if [ \"$(cat /proc/sys/kernel/random/boot_id)\" = \"$(cat /var/lib/isoloom/boot-id)\" ]; then echo 'the reboot step: the machine did not restart' >&2; exit 1; fi",
+      "sudo sh -c 'if [ \"$(cat /proc/sys/kernel/random/boot_id)\" = \"$(cat /var/lib/isoloom/boot-id)\" ]; then echo '\\''the reboot step: the machine did not restart'\\'' >&2; exit 1; fi'",
       "${var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes}" : "true"}",
-      "cd /opt/isoloom && sudo -E sh -c 'sh provision/cache.sh'",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null"
+      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache.sh'\\'''",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -301,10 +299,7 @@ output "machines" {
 }
 
 output "ssh_users" {
-  value = {
-    web   = "admin"
-    cache = "admin"
-  }
+  value = { web = "admin", cache = "admin" }
 }
 
 output "ip" {
@@ -318,8 +313,20 @@ output "ready_file" {
 # The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isoloom test cloud-vm`.
 output "checks" {
   value = [
-    { position = "web", machine = "web", host = google_compute_instance.web.network_interface[0].access_config[0].nat_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh" },
-    { position = "cache", machine = "cache", host = google_compute_instance.cache.network_interface[0].access_config[0].nat_ip, user = "admin", command = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh" }
+    {
+      position = "web"
+      machine  = "web"
+      host     = google_compute_instance.web.network_interface[0].access_config[0].nat_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/web.sh"
+    },
+    {
+      position = "cache"
+      machine  = "cache"
+      host     = google_compute_instance.cache.network_interface[0].access_config[0].nat_ip
+      user     = "admin"
+      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/cache.sh"
+    }
   ]
 }
 

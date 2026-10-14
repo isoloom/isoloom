@@ -113,17 +113,16 @@ fn every_linux_vm_runs_the_preamble_first() {
         "every cloud-config"
     );
 
-    let aws = file(&spec, Target::CloudVm, "cloud-vm/aws/main.tf");
-    // On AWS, the `Prelude` step comes first, right after cloud-init is done, on every VM.
-    assert_eq!(
-        aws.matches("\"cloud-init status --wait >/dev/null 2>&1 || true\",\n      \"sudo sh -c 'set -e\\n# The proxy")
-            .count(),
-        aws.matches("cloud-init status --wait").count(),
-        "{aws}"
-    );
-    for cloud in ["azure", "gcp"] {
+    // On the clouds from the plan, the `Prelude` step comes first, right after cloud-init is
+    // done, on every VM.
+    for cloud in ["aws", "azure", "gcp"] {
         let tf = file(&spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"));
-        assert!(tf.contains("\"cloud-init status --wait >/dev/null 2>&1 || true\", \"sudo sh -c "), "{cloud}");
+        assert_eq!(
+            tf.matches("\"cloud-init status --wait >/dev/null 2>&1 || true\",\n      \"sudo sh -c 'set -e\\n# The proxy")
+                .count(),
+            tf.matches("cloud-init status --wait").count(),
+            "{cloud}: {tf}"
+        );
     }
     for cloud in ["aws", "azure", "gcp", "digitalocean", "linode", "oci"] {
         let tf = file(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"));

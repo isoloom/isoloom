@@ -20,14 +20,13 @@ mod network;
 mod outputs;
 
 use isoloom_plan::{Environment, Step};
-use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, Expression, Module, Template, binary, call, conditional, index, list, null, number, object, reference, string,
-};
+use isoloom_render::hcl_builder::{Block, Expression, Module, index, list, null, reference, string};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 use isoloom_spec::validate::Cidr;
 
+use crate::vm::cloud;
 use crate::vm::limits::Limits;
-use crate::vm::module::{Variable, inputs_variable, project_lists, terraform};
+use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::{controller, is_windows, os, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -92,21 +91,7 @@ fn networks_refusal(env: &Environment) -> Option<String> {
     windows_udp_redirect(env.spec())
 }
 
-/// A Windows machine's UDP service published on another port: Windows' port proxy (`netsh
-/// interface portproxy`) forwards TCP only.
-pub fn windows_udp_redirect(spec: &isoloom_spec::model::Spec) -> Option<String> {
-    spec.machines.iter().find_map(|(name, m)| {
-        let windows = m.vm.as_ref().is_some_and(|v| isoloom_spec::images::is_windows(&v.os));
-        let s = m.services.iter().find(|s| !s.protocol.is_tcp() && s.publish.is_some_and(|h| h != s.port))?;
-        windows.then(|| {
-            format!(
-                "machine `{name}`: UDP port {} published as {} on a Windows VM in the cloud (its port proxy is TCP only): publish it on its own port",
-                s.port,
-                s.publish.unwrap_or_default()
-            )
-        })
-    })
-}
+pub use crate::vm::cloud::windows_udp_redirect;
 
 fn machines_refusal(env: &Environment) -> Option<String> {
     for (name, m) in &env.spec().machines {
@@ -117,12 +102,8 @@ fn machines_refusal(env: &Environment) -> Option<String> {
                 vm.os
             ));
         }
-        let windows = isoloom_spec::images::is_windows(&vm.os);
-        if windows && m.networks.len() > 1 {
-            return Some(format!("machine `{name}`: Windows machines on several networks in the cloud come later"));
-        }
-        if windows && vm.provision.iter().any(|p| !p.ends_with(".ps1")) {
-            return Some(format!("machine `{name}`: Windows steps are .ps1 scripts"));
+        if let Some(why) = cloud::windows_refusal(name, m) {
+            return Some(why);
         }
         if let Some((net, _)) = m.networks.iter().find(|(_, o)| **o <= 3) {
             return Some(format!("machine `{name}`: AWS keeps the first addresses of a subnet (.1 to .3) on `{net}`"));
@@ -144,7 +125,10 @@ pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_bu
     m.blocks(base(env));
     network::blocks(env, &mut m);
     if vms(env).any(|(_, mp)| is_windows(mp)) {
-        m.commented("The Windows machines' administrator password (user isoloom), for WinRM.", windows_password());
+        m.commented(
+            "The Windows machines' administrator password (user isoloom), for WinRM.",
+            cloud::windows_password(),
+        );
     }
     if controller::needed(env) {
         m.commented("The controller's own key: it runs the playbooks over SSH on every machine.", controller::key());
@@ -180,89 +164,31 @@ fn providers(env: &Environment) -> Vec<crate::vm::module::Provider> {
 }
 
 fn variables(env: &Environment) -> Vec<Block> {
-    let mut v = vec![
-        Variable::new("region", "string").default(string("eu-west-3")).block(),
-        Variable::new("allowed_cidr", "string")
-            .describe("Who may reach the machines (SSH and the published ports), e.g. your IP/32")
-            .block(),
-        Variable::new("ssh_public_key", "string").block(),
-        Variable::new("ssh_private_key_file", "string")
-            .describe("The private key of ssh_public_key: Terraform sets the machines up over SSH")
-            .block(),
-        Variable::new("auto_stop_minutes", "number")
-            .default(number(0))
-            .describe("Shut the machines down after this many minutes (0: never)")
-            .block(),
-        Variable::new("expires_at", "string")
-            .default(string(""))
-            .describe("When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy")
-            .block(),
-    ];
-    if !env.spec().inputs.is_empty() {
-        v.push(inputs_variable());
-    }
+    let mut v = vec![Variable::new("region", "string").default(string("eu-west-3")).block()];
+    v.extend(cloud::variables(env));
     v
 }
 
 /// The provider (every resource tagged as the environment's), the environment's random id, the
 /// names and the zones.
 fn base(env: &Environment) -> Vec<Block> {
-    let tags = object([
-        ("isoloom-environment", string(env.name.as_str())),
-        ("managed-by", string("isoloom")),
-        ("isoloom-instance", reference("local.name")),
-        ("isoloom-expires-at", reference("var.expires_at")),
-    ]);
-    let id = call("substr", [call("replace", [call("uuid", []), string("-"), string("")]), number(0), number(8)]);
-    vec![
+    let tags = cloud::tags(env);
+    let mut blocks = vec![
         Block::builder("provider")
             .add_label("aws")
             .add_attribute(("region", reference("var.region")))
             .add_block(Block::builder("default_tags").add_attribute(("tags", tags)).build())
             .build(),
-        Block::builder("resource")
-            .add_label("terraform_data")
-            .add_label("id")
-            .add_attribute(("input", id))
-            .add_block(
-                Block::builder("lifecycle")
-                    .add_attribute(("ignore_changes", list([reference("input")])))
-                    .build(),
-            )
-            .build(),
-        Block::builder("locals")
-            .add_attribute((
-                "name",
-                Template::text(format!("isoloom-{}-", env.name))
-                    .with_expr(reference("terraform_data.id.output"))
-                    .into_expression(),
-            ))
-            .add_attribute((
-                "root",
-                call(
-                    "abspath",
-                    [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],
-                ),
-            ))
-            .build(),
+    ];
+    blocks.extend(cloud::id_and_locals(env, Vec::new()));
+    blocks.push(
         Block::builder("data")
             .add_label("aws_availability_zones")
             .add_label("available")
             .add_attribute(("state", string("available")))
             .build(),
-    ]
-}
-
-fn windows_password() -> Block {
-    Block::builder("resource")
-        .add_label("random_password")
-        .add_label("windows")
-        .add_attribute(("length", number(24)))
-        .add_attribute(("special", isoloom_render::hcl_builder::boolean(false)))
-        .add_attribute(("min_upper", number(2)))
-        .add_attribute(("min_lower", number(2)))
-        .add_attribute(("min_numeric", number(2)))
-        .build()
+    );
+    blocks
 }
 
 /// An AMI lookup per OS (the controller's among them).
@@ -294,17 +220,9 @@ fn amis(env: &Environment) -> Vec<Block> {
         .collect()
 }
 
-/// `var.auto_stop_minutes > 0 ? <yes> : <no>`.
-fn auto_stop(yes: Expression, no: Expression) -> Expression {
-    conditional(binary(reference("var.auto_stop_minutes"), BinaryOperator::Greater, number(0)), yes, no)
-}
-
 /// An instance's user data on Linux: the auto-stop, scheduled at first boot.
 fn linux_user_data() -> Expression {
-    let shutdown = Template::text("#!/bin/sh\nshutdown -h +")
-        .with_expr(reference("var.auto_stop_minutes"))
-        .with_text("\n");
-    auto_stop(shutdown.into_expression(), null())
+    cloud::auto_stop(cloud::shutdown_script(), null())
 }
 
 /// `<resource>.<name>[.<attr>]`, as a reference.

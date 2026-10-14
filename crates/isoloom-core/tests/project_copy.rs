@@ -226,13 +226,8 @@ fn windows_machines_get_the_project_before_their_steps() {
         assert!(!tf.contains("destination = \"C:/isoloom/"), "{path}: a step uploaded on its own");
         assert!(tf.contains("-File C:/ProgramData/isoloom/setup.ps1"), "{path}");
         let unpack = tf.find("$dest = 'C:\\\\isoloom'; $strip = 1").expect("the project unpacked");
-        // AWS runs the plan's `Run` step (from C:\\isoloom), Azure its own line.
-        let step_text = if path.contains("aws") {
-            "-File 'provision/iis.ps1'"
-        } else {
-            "-File 'C:\\\\isoloom\\\\provision\\\\iis.ps1'"
-        };
-        let step = tf.find(step_text).expect("the step");
+        // The plan's `Run` step, from C:\\isoloom.
+        let step = tf.find("-File 'provision/iis.ps1'").expect("the step");
         assert!(unpack < step, "{path}");
     }
 }
