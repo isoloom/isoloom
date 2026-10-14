@@ -58,6 +58,28 @@ pinned source, so a new upstream key is a failing test until it is classified.
 | `services.*.devices` | Not portable | Planned | Passed through where the target has the device, refused elsewhere. |
 | `models`, `services.*.models` | Tooling | Not portable | They change what the machine can call, but only Docker's model runner serves them. |
 
+## The spec table's cells
+
+The spec table runs the other way: a row per field of an Isoloom spec, a column per output (each
+cloud of `cloud-vm` its own). A cell is classified the same way, with its own classes:
+
+1. **Does the output's backend refuse a spec using the field?** Refused, with the backend's own
+   reason. This is never written by hand. Each field has a probe spec (the smallest spec that
+   uses it), and every backend is asked to render it. So a column follows the backend's
+   capabilities and limits, and a refusal lifted in a backend shows up without editing a table.
+2. **Does the output produce it?** Done, or Partial with the gap named. The claim names an
+   example that uses the field and generates for the output. When no example does, it names the
+   field's probe, which must then render. A claim is made once per rendering (the Compose file,
+   the cloud VM core) and inherited by every output that shares it. An inherited claim still has
+   to generate on that output, through its probe or an example.
+3. **Could it, and doesn't yet?** Planned.
+4. **Does it mean nothing for the output** (a `vm:` field in a Compose file, a VM's size on an
+   existing host)? Not applicable. A field Isoloom reads itself is "core", and a field only
+   people and runners read is "info".
+
+A refusal outranks a claim: a backend that refuses what its own rendering claims fails the
+tests.
+
 ## Consequences
 
 - The Compose table lists nested keys (`deploy.*`, `healthcheck.*`, `build.*`, long-form
@@ -66,3 +88,5 @@ pinned source, so a new upstream key is a failing test until it is classified.
 - Several rows become features to build (files, a machine's command, secrets, GPUs, devices,
   a custom healthcheck), tracked as `Planned` until they land.
 - The other tables follow the same questions when they are rebuilt.
+- The spec table's Proxmox column lost its stale "planned" rows (`tc`, `aliases`, `dns.servers`,
+  `dns.domain` and `access` are generated; `gateway` is refused by the backend).

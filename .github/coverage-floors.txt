@@ -1,6 +1,6 @@
 isoloom 15.4
 isoloom-compose 98.3
-isoloom-coverage 94.3
+isoloom-coverage 96.0
 isoloom-external 79.0
 isoloom-import 74.3
 isoloom-kubernetes 97.7

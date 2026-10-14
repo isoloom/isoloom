@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### The spec table for every output, and the weekly drift job
+- The spec table (`isoloom_coverage::spec`) has a column per output: docker, hosted, kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, proxmox, each cloud of cloud-vm (aws, azure, gcp, digitalocean, linode, oci), cloud-docker, cloud-services and external. It is rendered in `isoloom coverage` (per-output scores; `--all` lists what each output doesn't handle yet) and in docs/COVERAGE.md ("From the spec's side", with the backends' refusals).
+- A cell starts from what its rendering states (the Compose file's for the four Compose targets, the cloud VM core's for every cloud) and is turned into a refusal when the output's backend refuses the field's probe spec: the columns follow the backends' capabilities and limits instead of a hand-kept list. Stale Proxmox rows fixed (`tc`, `aliases`, `dns.servers`, `dns.domain`, `access` are generated; `gateway` is refused).
+- Tests: every rendering states every field, every claim names an example (or the field's probe) that generates for the output, an inherited claim generates on its output, and every probe is a valid spec using its field.
+- `.github/workflows/coverage-drift.yml`: weekly (and on demand) it runs every `scripts/refresh-*` against the newest upstream releases (`ISOLOOM_REFRESH=latest`) and opens or updates one issue (label `coverage-drift`) listing the features they add. `scripts/coverage-drift.sh --dry-run` prints the issue instead.
+- Breaking (library): `isoloom_coverage::spec::{Row, Output}` changed shape (cells per output; `Output::all()`), `spec::score` returns a `Score`, `spec::PROXMOX` is gone.
+
 ### Compose coverage table v2
 - The Compose table lists every nested key path of the pinned compose-spec schema (347 rows, from 118): `deploy.*`, `healthcheck.*`, `build.*`, long-form `ports` and `volumes`, `services.*.networks.*`, `ipam.config[]`, and the items of `configs`, `secrets` and `models`. Jobs and `pre_start` hooks stay one row each (they are whole service definitions). Split by section under `isoloom-coverage/src/compose/`.
 - Its written-features test reads every Compose file Isoloom writes (`docker`, `hosted`, `docker-vm`, `cloud-docker`, `hybrid`) for every example and a fixture, through the schema.
