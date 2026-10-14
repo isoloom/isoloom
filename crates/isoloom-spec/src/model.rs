@@ -13,6 +13,7 @@ mod ipv6;
 mod machine;
 mod machine_file;
 mod network;
+mod private_dns;
 mod process;
 mod secrets;
 mod shared;
@@ -29,6 +30,7 @@ pub use ipv6::{Ipv6, Ipv6Addresses};
 pub use machine::{Arch, Machine, Protocol, Resources, ScalarSchema, Service};
 pub use machine_file::{DEFAULT_FILE_MODE, MachineFile};
 pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
+pub use private_dns::EnvironmentDns;
 pub use process::{CommandLine, Healthcheck, HttpCheck, seconds};
 pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, is_drive_path, secret_variable};
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, TOOL_RECIPES, Tool, ULIMITS, Ulimit};
@@ -52,6 +54,10 @@ pub struct Spec {
     /// Allowed traffic between networks; everything else between networks is blocked.
     #[serde(default)]
     pub reach: Vec<Reach>,
+    /// The environment's names in a private DNS zone: off unless `private: true`. See
+    /// [`EnvironmentDns`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dns: Option<EnvironmentDns>,
     /// Values a runner may provide at launch (e.g. tokens). Never baked into images.
     #[serde(default)]
     pub inputs: Vec<String>,
@@ -119,6 +125,11 @@ pub struct Spec {
 }
 
 impl Spec {
+    /// The private DNS zone's domain, when `dns.private` is on.
+    pub fn private_domain(&self) -> Option<String> {
+        self.dns.as_ref().and_then(|d| d.private_domain(&self.name))
+    }
+
     /// The storage behind machine `machine`'s volume `volume`: the shared volume's own name,
     /// else one of its own (`<machine>-<volume>`).
     pub fn volume_key(&self, machine: &str, volume: &str) -> String {

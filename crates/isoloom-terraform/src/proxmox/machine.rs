@@ -103,7 +103,8 @@ fn needs_project(env: &Environment, name: &str) -> bool {
 }
 
 /// The machine's resolver when it sets one (an AD member points at the domain controller),
-/// else a public one so it can still install software.
+/// else a public one so it can still install software. Its search domain is its own, else the
+/// private zone's (`dns.private`), whose names its hosts file carries.
 fn dns(env: &Environment, name: &str) -> Block {
     let d = env.spec().machines[name].dns.as_ref();
     let servers: Vec<Expression> = match d.filter(|d| !d.servers.is_empty()) {
@@ -111,7 +112,8 @@ fn dns(env: &Environment, name: &str) -> Block {
         None => vec![string("1.1.1.1")],
     };
     let mut b = Block::builder("dns").add_attribute(("servers", list(servers)));
-    if let Some(domain) = d.and_then(|d| d.domain.as_deref()) {
+    let zone = env.private_dns.as_ref().map(|z| z.domain.as_str());
+    if let Some(domain) = d.and_then(|d| d.domain.as_deref()).or(zone) {
         b = b.add_attribute(("domain", string(domain)));
     }
     b.build()

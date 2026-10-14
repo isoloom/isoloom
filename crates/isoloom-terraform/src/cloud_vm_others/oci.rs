@@ -136,6 +136,7 @@ fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builde
     );
     images(env, &mut m);
     network(env, &mut m);
+    crate::vm::private_dns::oci(env, &mut m);
     for (name, _) in vms(env) {
         instance(env, name, &mut m);
     }

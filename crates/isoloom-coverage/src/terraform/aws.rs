@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, DISKS, IMAGE_BUILD, IMAGES, LOCATION,
-    MANAGED, NAT, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER,
+    ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, DISKS,
+    IMAGE_BUILD, IMAGES, LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PROTECT, PUBLIC_DNS, ROUTER, ZONE_BINDING, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -48,17 +48,14 @@ const TYPES: Rules = &[
     (NAT, "nat_gateway nat_gateway_eip_association"),
     (AWS_IPV6, "vpc_ipv6_cidr_block_association egress_only_internet_gateway"),
     (DISKS, "ebs_volume volume_attachment"),
-    (PRIVATE_DNS, "vpc_dhcp_options vpc_dhcp_options_association"),
+    (CLOUD_RESOLVER, "vpc_dhcp_options vpc_dhcp_options_association"),
     (
         INLINE,
         "security_group_rule vpc_security_group_ingress_rule vpc_security_group_egress_rule network_acl network_acl_association
         network_acl_rule",
     ),
     (IMAGES, "ami ami_copy ami_from_instance ebs_snapshot_import"),
-    (
-        PRIVATE_DNS,
-        "route53_zone route53_record route53_zone_association route53_vpc_association_authorization",
-    ),
+    (ZONE_BINDING, "route53_zone_association route53_vpc_association_authorization"),
     (DEFAULTS, "default_*"),
     (
         PUBLIC_DNS,
@@ -124,8 +121,8 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
         "data.aws_ami data.aws_availability_zones aws_eip aws_instance aws_internet_gateway aws_key_pair aws_network_interface
-        aws_network_interface_attachment aws_route_table aws_route_table_association aws_security_group aws_subnet aws_vpc
-        aws_vpc_ipv4_cidr_block_association",
+        aws_network_interface_attachment aws_route53_record aws_route53_zone aws_route_table aws_route_table_association
+        aws_security_group aws_subnet aws_vpc aws_vpc_ipv4_cidr_block_association",
     ),
     ("provider", "default_tags default_tags.tags region"),
     ("aws_eip", "network_interface"),
@@ -140,6 +137,8 @@ const WRITTEN: &[(&str, &str)] = &[
     ("aws_key_pair", "key_name public_key"),
     ("aws_network_interface", "private_ips security_groups source_dest_check subnet_id tags"),
     ("aws_network_interface_attachment", "device_index instance_id network_interface_id"),
+    ("aws_route53_record", "name records ttl type zone_id"),
+    ("aws_route53_zone", "name vpc vpc.vpc_id"),
     ("aws_route_table", "route route.cidr_block route.gateway_id tags vpc_id"),
     ("aws_route_table_association", "route_table_id subnet_id"),
     (
@@ -148,7 +147,7 @@ const WRITTEN: &[(&str, &str)] = &[
         ingress.from_port ingress.protocol ingress.to_port name vpc_id",
     ),
     ("aws_subnet", "availability_zone cidr_block map_public_ip_on_launch tags vpc_id"),
-    ("aws_vpc", "cidr_block tags"),
+    ("aws_vpc", "cidr_block enable_dns_hostnames enable_dns_support tags"),
     ("aws_vpc_ipv4_cidr_block_association", "cidr_block vpc_id"),
     ("data.aws_ami", "filter filter.name filter.values most_recent owners"),
     ("data.aws_availability_zones", "state"),
@@ -167,6 +166,27 @@ const SETTINGS: Rules = &[(
 
 /// The arguments Isoloom leaves out, per resource type or data source.
 const ARGUMENTS: &[(&str, Rules)] = &[
+    (
+        "aws_route53_record",
+        &[
+            (
+                ZONE_SETTINGS,
+                "allow_overwrite health_check_id multivalue_answer_routing_policy set_identifier cidr_routing_policy.*
+                failover_routing_policy.* geolocation_routing_policy.* geoproximity_routing_policy.* latency_routing_policy.*
+                weighted_routing_policy.*",
+            ),
+            (CLOUD_NETWORK, "alias.*"),
+        ],
+    ),
+    (
+        "aws_route53_zone",
+        &[
+            (ZONE_SETTINGS, "delegation_set_id enable_accelerated_recovery"),
+            (PROTECT, "force_destroy"),
+            (ALIAS, "comment"),
+            (LOCATION, "vpc.vpc_region"),
+        ],
+    ),
     (
         "aws_instance",
         &[
@@ -271,7 +291,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 CLOUD,
                 "customer_owned_ipv4_pool map_customer_owned_ip_on_launch enable_lni_at_device_index ipv4_ipam_pool_id ipv4_netmask_length",
             ),
-            (PRIVATE_DNS, "enable_resource_name_dns_a_record_on_launch private_dns_hostname_type_on_launch"),
+            (CLOUD_NAMES, "enable_resource_name_dns_a_record_on_launch private_dns_hostname_type_on_launch"),
         ],
     ),
     (
@@ -284,7 +304,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (CLOUD, "enable_network_address_usage_metrics ipv4_ipam_pool_id ipv4_netmask_length"),
             (PLACEMENT, "instance_tenancy"),
-            (PRIVATE_DNS, "enable_dns_hostnames enable_dns_support"),
         ],
     ),
     (

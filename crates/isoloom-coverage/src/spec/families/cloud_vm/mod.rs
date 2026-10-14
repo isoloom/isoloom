@@ -12,6 +12,7 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     environment::CELLS,
     machines::CELLS,
     super::ipv6::CLOUD_VM,
+    super::private_dns::CLOUD_VM,
     super::outside::CLOUD_VM,
     super::machine_files::VM,
     super::process::VM,

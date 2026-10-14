@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DISKS, IMAGES, MANAGED, NAT, OFFLINE, PLACEMENT, PRIVATE_DNS, PROTECT,
-    PUBLIC_DNS, PUBLIC_IPV6, ROUTER, SOURCE_PORTS, TAGS, TPM, VM_AGENT,
+    ACCOUNT, ALIAS, ALIAS_RECORDS, BACKUP, CLOUD, CLOUD_NAMES, CLOUD_NETWORK, CLOUD_RESOLVER, CLOUD_WRITTEN, CREDENTIALS, DISKS, IMAGES, MANAGED, NAT, OFFLINE,
+    OTHER_RECORDS, PLACEMENT, PRIVATE_DNS_IPV6, PROTECT, PUBLIC_DNS, PUBLIC_IPV6, REVERSE_DNS, ROUTER, SOURCE_PORTS, TAGS, TPM, VM_AGENT, ZONE_SETTINGS,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -45,17 +45,16 @@ const TYPES: Rules = &[
     (NAT, "nat_gateway nat_gateway_public_ip_association subnet_nat_gateway_association"),
     (ROUTER, "route_table route subnet_route_table_association"),
     (DISKS, "managed_disk virtual_machine_data_disk_attachment"),
-    (PRIVATE_DNS, "virtual_network_dns_servers"),
+    (CLOUD_RESOLVER, "virtual_network_dns_servers"),
     (
         INLINE,
         "network_security_rule application_security_group network_interface_application_security_group_association",
     ),
     (IMAGES, "image shared_image shared_image_gallery shared_image_version"),
-    (
-        PRIVATE_DNS,
-        "private_dns_zone private_dns_zone_virtual_network_link private_dns_a_record private_dns_aaaa_record private_dns_cname_record
-        private_dns_mx_record private_dns_ptr_record private_dns_srv_record private_dns_txt_record",
-    ),
+    (ALIAS_RECORDS, "private_dns_cname_record"),
+    (OTHER_RECORDS, "private_dns_mx_record private_dns_srv_record private_dns_txt_record"),
+    (REVERSE_DNS, "private_dns_ptr_record"),
+    (PRIVATE_DNS_IPV6, "private_dns_aaaa_record"),
     (PUBLIC_DNS, "dns_* public_ip_prefix nat_gateway_public_ip_prefix_association"),
     (
         PLACEMENT,
@@ -112,7 +111,8 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
         "azurerm_linux_virtual_machine azurerm_network_interface azurerm_network_interface_security_group_association
-        azurerm_network_security_group azurerm_public_ip azurerm_resource_group azurerm_subnet azurerm_virtual_network
+        azurerm_network_security_group azurerm_private_dns_a_record azurerm_private_dns_zone
+        azurerm_private_dns_zone_virtual_network_link azurerm_public_ip azurerm_resource_group azurerm_subnet azurerm_virtual_network
         azurerm_windows_virtual_machine",
     ),
     ("provider", "features subscription_id"),
@@ -139,6 +139,12 @@ const WRITTEN: &[(&str, &str)] = &[
         security_rule.destination_port_range security_rule.destination_port_ranges security_rule.direction security_rule.name
         security_rule.priority security_rule.protocol security_rule.source_address_prefix security_rule.source_port_range tags",
     ),
+    ("azurerm_private_dns_a_record", "name private_dns_zone_id records tags ttl"),
+    ("azurerm_private_dns_zone", "name resource_group_name tags"),
+    (
+        "azurerm_private_dns_zone_virtual_network_link",
+        "name private_dns_zone_id tags virtual_network_id",
+    ),
     ("azurerm_public_ip", "allocation_method location name resource_group_name sku tags"),
     ("azurerm_resource_group", "location name tags"),
     ("azurerm_subnet", "address_prefixes name resource_group_name virtual_network_name"),
@@ -164,6 +170,11 @@ const SETTINGS: Rules = &[(
 
 /// The arguments Isoloom leaves out, per resource type or data source.
 const ARGUMENTS: &[(&str, Rules)] = &[
+    ("azurerm_private_dns_zone", &[(ZONE_SETTINGS, "soa_record.*")]),
+    (
+        "azurerm_private_dns_zone_virtual_network_link",
+        &[(CLOUD_NAMES, "registration_enabled"), (ZONE_SETTINGS, "resolution_policy")],
+    ),
     (
         "azurerm_linux_virtual_machine",
         &[
@@ -235,7 +246,8 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "accelerated_networking_enabled auxiliary_mode auxiliary_sku edge_zone
                 ip_configuration.gateway_load_balancer_frontend_ip_configuration_id",
             ),
-            (PRIVATE_DNS, "dns_servers internal_dns_name_label"),
+            (CLOUD_RESOLVER, "dns_servers"),
+            (CLOUD_NAMES, "internal_dns_name_label"),
             (ALIAS, "ip_configuration.primary"),
         ],
     ),
@@ -274,7 +286,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "bgp_community edge_zone flow_timeout_in_minutes private_endpoint_vnet_policies ddos_protection_plan ddos_protection_plan.*
                 encryption encryption.* ip_address_pool ip_address_pool.*",
             ),
-            (PRIVATE_DNS, "dns_servers"),
+            (CLOUD_RESOLVER, "dns_servers"),
             (ALIAS, "subnet subnet.*"),
         ],
     ),

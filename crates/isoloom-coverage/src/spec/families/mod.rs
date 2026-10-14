@@ -12,6 +12,7 @@ pub(crate) mod links;
 mod machine_files;
 mod outside;
 pub mod own_image;
+mod private_dns;
 mod process;
 mod proxmox;
 pub mod shared;

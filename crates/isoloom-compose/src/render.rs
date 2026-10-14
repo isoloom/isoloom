@@ -47,6 +47,8 @@ pub fn capabilities() -> isoloom_plan::Capabilities {
         Feature::MachineProcess,
         Feature::ContainerGpus,
         Feature::ContainerDevices,
+        // Docker's DNS answers the names under the private zone's domain (network aliases).
+        Feature::PrivateDns,
     ])
 }
 
@@ -67,6 +69,7 @@ pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
         Feature::Secrets,
         Feature::SecretOwners,
         Feature::MachineProcess,
+        Feature::PrivateDns,
     ])
 }
 

@@ -1,8 +1,25 @@
 //! A machine's resolver options (`dns.options`): each one resolv.conf's `options` line takes,
-//! as `name` or `name:value`, so every target writes it as it is.
+//! as `name` or `name:value`, so every target writes it as it is. And the environment's private
+//! zone (`dns:` at the top level): a domain every platform's DNS accepts.
 
 use super::Problems;
+use super::machines::dns_name;
 use crate::model::Spec;
+
+/// The top-level `dns`: a domain of two labels or more, and only with `private: true`.
+pub(super) fn private(spec: &Spec, p: &mut Problems) {
+    let Some(dns) = &spec.dns else { return };
+    let Some(domain) = &dns.domain else { return };
+    if !dns.private {
+        p.add("dns.domain", "the domain names the private zone: set `dns.private: true`, or drop `domain`");
+    }
+    if !dns_name(domain) || !domain.contains('.') {
+        p.add(
+            "dns.domain",
+            format!("`{domain}` isn't a domain of two labels or more like lab.internal (lowercase, no trailing dot)"),
+        );
+    }
+}
 
 /// Every machine's `dns.options`.
 pub(super) fn options(spec: &Spec, p: &mut Problems) {
@@ -38,6 +55,39 @@ fn option(o: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::option;
+    use crate::model::Spec;
+
+    fn problems(dns: &str) -> Vec<String> {
+        let yaml = format!(
+            "version: 1\nname: lab\n{dns}\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, docker: {{ image: nginx }} }}\n"
+        );
+        let spec: Spec = crate::parse(&yaml).unwrap();
+        crate::validate::validate(&spec).into_iter().map(|p| p.to_string()).collect()
+    }
+
+    #[test]
+    fn the_private_zone_takes_a_domain_of_two_labels_or_more() {
+        assert_eq!(problems("dns: { private: true }"), Vec::<String>::new());
+        assert_eq!(problems("dns: { private: true, domain: lab.internal }"), Vec::<String>::new());
+        let one = problems("dns: { private: true, domain: lab }");
+        assert!(one.iter().any(|p| p.starts_with("dns.domain: `lab` isn't a domain")), "{one:?}");
+        let upper = problems("dns: { private: true, domain: Lab.Internal }");
+        assert!(upper.iter().any(|p| p.contains("lowercase")), "{upper:?}");
+    }
+
+    #[test]
+    fn a_domain_needs_private_dns_on() {
+        let p = problems("dns: { domain: lab.internal }");
+        assert_eq!(p, ["dns.domain: the domain names the private zone: set `dns.private: true`, or drop `domain`"]);
+    }
+
+    #[test]
+    fn the_domain_defaults_to_the_environment_name() {
+        let spec: Spec = serde_yaml_ng::from_str("version: 1\nname: lab\ndns: { private: true }\n").unwrap();
+        assert_eq!(spec.private_domain().as_deref(), Some("lab.internal"));
+        let off: Spec = serde_yaml_ng::from_str("version: 1\nname: lab\n").unwrap();
+        assert_eq!(off.private_domain(), None);
+    }
 
     #[test]
     fn options_are_names_or_name_value_pairs() {

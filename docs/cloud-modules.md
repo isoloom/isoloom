@@ -60,6 +60,24 @@ On AWS, Azure and Google Cloud, every resource that takes tags (labels on Google
 `managed-by = isoloom`, `isoloom-environment = <spec name>`, `isoloom-instance = <unique name of
 this run>` and `isoloom-expires-at = <expires_at>`, so leftovers can be found by tag.
 
+### Private DNS (`dns.private`)
+
+With `dns: { private: true }` in the spec (off by default: a zone is billed), a `cloud-vm`
+module also serves the environment's names under the zone's domain (`dns.domain`, by default
+`<spec name>.internal`): each machine's name and each of its `aliases`, an A record at the
+machine's first address.
+
+| Cloud | What the module writes |
+| --- | --- |
+| AWS | `aws_route53_zone` (private, its `vpc` the environment's), `aws_route53_record` per name; the VPC's `enable_dns_support` and `enable_dns_hostnames` |
+| Azure | `azurerm_private_dns_zone`, `azurerm_private_dns_zone_virtual_network_link`, `azurerm_private_dns_a_record` per name |
+| Google Cloud | `google_project_service` (`dns.googleapis.com`, in a project of its own), `google_dns_managed_zone` (private, on the VPC network), `google_dns_record_set` per name |
+| Oracle Cloud | `oci_dns_view`, `oci_dns_zone` and `oci_dns_rrset` per name in it, the view attached to the VCN's resolver (`oci_dns_resolver`) |
+| DigitalOcean, Linode | Nothing: they have no private DNS |
+
+Every VM's hosts file carries the same names, so they resolve on DigitalOcean and Linode too,
+and before a zone answers.
+
 ### Running a module by hand
 
 ```sh

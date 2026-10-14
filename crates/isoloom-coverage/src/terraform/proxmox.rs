@@ -2,8 +2,8 @@
 //! docker-vm's Proxmox module write.
 
 use super::support::{
-    ALIAS, CREDENTIALS, GPU_PASSTHROUGH, ID, LOCATION, ORDER, PASSTHROUGH_TUNING, PRIVATE_DNS, PROTECT, PROXMOX_IPV6, SERVER, SHARED, SOURCE_PORTS, TAGS, TPM,
-    USB,
+    ALIAS, CREDENTIALS, GPU_PASSTHROUGH, ID, LOCATION, ORDER, PASSTHROUGH_TUNING, PROTECT, PROXMOX_IPV6, ROUTER_DNS, SDN_DNS, SERVER, SHARED, SOURCE_PORTS,
+    TAGS, TPM, USB,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Emitted, Equivalent, NotPortable, Tooling};
@@ -163,7 +163,7 @@ const WRITTEN: &[(&str, &str)] = &[
         "proxmox_virtual_environment_vm",
         "agent agent.enabled bios boot_order clone clone.full clone.vm_id cpu cpu.architecture cpu.cores cpu.type disk disk.datastore_id disk.file_id disk.interface
         disk.size efi_disk efi_disk.datastore_id efi_disk.file_format efi_disk.pre_enrolled_keys efi_disk.type initialization initialization.datastore_id initialization.dns
-        initialization.dns.servers initialization.ip_config initialization.ip_config.ipv4 initialization.ip_config.ipv4.address
+        initialization.dns.domain initialization.dns.servers initialization.ip_config initialization.ip_config.ipv4 initialization.ip_config.ipv4.address
         initialization.ip_config.ipv4.gateway initialization.interface initialization.type initialization.user_data_file_id machine memory memory.dedicated name
         network_device network_device.bridge network_device.firewall network_device.mac_address network_device.mtu
         network_device.rate_limit network_device.vlan_id node_name on_boot operating_system operating_system.type pool_id
@@ -228,7 +228,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 network_interface.host_managed",
             ),
             (ORDER, "startup startup.*"),
-            (PRIVATE_DNS, "initialization.dns.domain"),
+            (ROUTER_DNS, "initialization.dns.domain"),
             (
                 LXC_REFUSED,
                 "cpu.architecture device_passthrough device_passthrough.* idmap idmap.* mount_point mount_point.* initialization.ip_config.ipv6
@@ -237,7 +237,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         ],
     ),
     ("proxmox_sdn_vnet", &[(ALIAS, "alias"), (SERVER, "isolate_ports"), (VNET_TAG, "tag")]),
-    ("proxmox_sdn_zone_simple", &[(SERVER, "dhcp ipam"), (PRIVATE_DNS, "dns dns_zone reverse_dns")]),
+    ("proxmox_sdn_zone_simple", &[(SERVER, "dhcp ipam"), (SDN_DNS, "dns dns_zone reverse_dns")]),
     (
         "proxmox_virtual_environment_file",
         &[(
@@ -276,7 +276,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (USB, "usb usb.*"),
             (ORDER, "startup startup.*"),
             (SHARED, "virtiofs virtiofs.*"),
-            (PRIVATE_DNS, "initialization.dns.domain"),
             (TRUNKS, "network_device.trunks"),
             (SERVER, "network_device.model network_device.queues"),
             (ALIAS, "network_device.disconnected network_device.enabled"),

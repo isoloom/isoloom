@@ -327,6 +327,77 @@ resource oci_core_vcn timeouts
 resource oci_core_vcn timeouts.create
 resource oci_core_vcn timeouts.delete
 resource oci_core_vcn timeouts.update
+resource oci_dns_resolver
+resource oci_dns_resolver compartment_id
+resource oci_dns_resolver defined_tags
+resource oci_dns_resolver display_name
+resource oci_dns_resolver freeform_tags
+resource oci_dns_resolver id
+resource oci_dns_resolver resolver_id
+resource oci_dns_resolver scope
+resource oci_dns_resolver attached_views
+resource oci_dns_resolver attached_views.view_id
+resource oci_dns_resolver rules
+resource oci_dns_resolver rules.action
+resource oci_dns_resolver rules.client_address_conditions
+resource oci_dns_resolver rules.destination_addresses
+resource oci_dns_resolver rules.qname_cover_conditions
+resource oci_dns_resolver rules.source_endpoint_name
+resource oci_dns_resolver timeouts
+resource oci_dns_resolver timeouts.create
+resource oci_dns_resolver timeouts.delete
+resource oci_dns_resolver timeouts.update
+resource oci_dns_rrset
+resource oci_dns_rrset compartment_id
+resource oci_dns_rrset domain
+resource oci_dns_rrset id
+resource oci_dns_rrset rtype
+resource oci_dns_rrset scope
+resource oci_dns_rrset view_id
+resource oci_dns_rrset zone_name_or_id
+resource oci_dns_rrset items
+resource oci_dns_rrset items.domain
+resource oci_dns_rrset items.rdata
+resource oci_dns_rrset items.rtype
+resource oci_dns_rrset items.ttl
+resource oci_dns_rrset timeouts
+resource oci_dns_rrset timeouts.create
+resource oci_dns_rrset timeouts.delete
+resource oci_dns_rrset timeouts.update
+resource oci_dns_view
+resource oci_dns_view compartment_id
+resource oci_dns_view defined_tags
+resource oci_dns_view display_name
+resource oci_dns_view freeform_tags
+resource oci_dns_view id
+resource oci_dns_view scope
+resource oci_dns_view timeouts
+resource oci_dns_view timeouts.create
+resource oci_dns_view timeouts.delete
+resource oci_dns_view timeouts.update
+resource oci_dns_zone
+resource oci_dns_zone compartment_id
+resource oci_dns_zone defined_tags
+resource oci_dns_zone dnssec_state
+resource oci_dns_zone freeform_tags
+resource oci_dns_zone id
+resource oci_dns_zone name
+resource oci_dns_zone resolution_mode
+resource oci_dns_zone scope
+resource oci_dns_zone view_id
+resource oci_dns_zone zone_type
+resource oci_dns_zone external_downstreams
+resource oci_dns_zone external_downstreams.address
+resource oci_dns_zone external_downstreams.port
+resource oci_dns_zone external_downstreams.tsig_key_id
+resource oci_dns_zone external_masters
+resource oci_dns_zone external_masters.address
+resource oci_dns_zone external_masters.port
+resource oci_dns_zone external_masters.tsig_key_id
+resource oci_dns_zone timeouts
+resource oci_dns_zone timeouts.create
+resource oci_dns_zone timeouts.delete
+resource oci_dns_zone timeouts.update
 data oci_core_images
 data oci_core_images compartment_id
 data oci_core_images display_name
@@ -341,6 +412,9 @@ data oci_core_images filter
 data oci_core_images filter.name
 data oci_core_images filter.regex
 data oci_core_images filter.values
+data oci_core_vcn_dns_resolver_association
+data oci_core_vcn_dns_resolver_association id
+data oci_core_vcn_dns_resolver_association vcn_id
 data oci_identity_availability_domains
 data oci_identity_availability_domains compartment_id
 data oci_identity_availability_domains id

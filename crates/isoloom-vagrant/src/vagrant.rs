@@ -89,6 +89,8 @@ pub fn capabilities() -> Capabilities {
         // The libvirt provider boots it; `provider_refusal` says which providers can't.
         Feature::OwnBoot,
         Feature::NestedVirtualization,
+        // No DNS of its own: each VM's hosts file carries the names under the zone's domain.
+        Feature::PrivateDns,
     ])
 }
 

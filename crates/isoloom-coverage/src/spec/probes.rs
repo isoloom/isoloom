@@ -57,6 +57,8 @@ pub fn probe(path: &str) -> Option<String> {
             let b = B.replace("lan: 11", "dmz: 11");
             format!("{{ {DMZ}, machines: {{ {b} }} }}, reach: [{{ from: lan, to: dmz, ports: [80] }}] }}")
         }
+        "dns.private" => "dns: { private: true }".to_string(),
+        "dns.domain" => "dns: { private: true, domain: probe.internal }".to_string(),
         "inputs" => "inputs: [TOKEN]".to_string(),
         "machines.*.inputs" => "{ inputs: [TOKEN], machines: { a: { inputs: [TOKEN] } } }".to_string(),
         "secrets" | "machines.*.secrets" => {

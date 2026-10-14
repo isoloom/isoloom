@@ -244,7 +244,7 @@ Vagrant's ESXi provider), **Docker on one cloud
 VM** and **one cloud VM per machine** (AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle),
 **existing hosts** reached over SSH, and **cloud services** (a Terraform module applied into
 your own cloud account). Routers enforce `reach` between networks; a network can name its own
-`gateway` (an edge firewall); IPv6 networks (dual-stack or IPv6-only); `internet: false`, published ports, volumes, inputs, Windows VMs
+`gateway` (an edge firewall); IPv6 networks (dual-stack or IPv6-only); a private DNS zone for the environment's names (`dns.private`: Route 53, Azure private DNS, Cloud DNS, Oracle Cloud views, Docker's DNS, the hosts file elsewhere); `internet: false`, published ports, volumes, inputs, Windows VMs
 (WinRM, PowerShell steps), environment-level Ansible from a controller, and checks on every
 target. Your own image table (`--images`) sets OS images and supplies the access machine.
 
