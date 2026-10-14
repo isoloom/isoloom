@@ -1,0 +1,26 @@
+version: 1
+name: mini-ad
+networks:
+  lab: { cidr: 10.50.0.0/24 }
+inputs: [CTF_FLAG_MAIN]
+machines:
+  dc01:
+    networks: { lab: 10 }
+    ports: [{ port: 389, name: ldap }, { port: 445, name: smb }]
+    inputs: [CTF_FLAG_MAIN]
+    resources: { cpus: 2, memory_mb: 4096 }
+    vm: { os: windows-server@2019 }
+  ws01:
+    networks: { lab: 20 }
+    depends_on: [dc01]
+    resources: { cpus: 2, memory_mb: 4096 }
+    vm: { os: windows@10 }
+provision:
+  - ansible: ansible/site.yml
+    requirements: ansible/requirements.yml
+    groups:
+      dcs: [dc01]
+      workstations: [ws01]
+checks:
+  - { tcp: "dc01:389", wait: 300 }
+  - { script: checks/kerberoast.sh, wait: 600 }

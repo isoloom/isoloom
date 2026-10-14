@@ -355,11 +355,47 @@ One real lab, end to end: the new spec, Isoloom, run manifest, runner, launcher.
 
 **Exit:** that lab passes end to end through the new path. The contract is validated by its real consumer.
 
+### Phase 2 design, decided (2026-10-15)
+
+The full design is in `plan/phase2/`: `run-manifest-v0.md`, its JSON Schema, `runner-extraction.md`, and two worked manifests. Its open questions are settled as follows.
+
+**Run manifest:**
+- **Format:** one `run.json` per target, holding the native commands; drivers hold only documented actions. Strict (`additionalProperties: false`) until 1.0, then only `x-` extensions.
+- **Run name:** the embedder sets it (`cyberctf-<id>`); the CLI defaults to `lab.name`.
+- **Re-provision:** the embedder passes inputs again; the runner stores no secret values.
+- **Generated files are host-neutral:** `local-exec tar` becomes a `project.archive` with a `tf_var`; `.sh` helpers become module outputs or steps; `cloud.requires` uses a per-OS `host_argv`.
+- **Check timeouts:** Isoloom computes them (waits + 15 s per check + 60 s), so the manifest is self-contained. This fixes the launcher's 5-minute cap that kills long-waiting labs.
+- **Docker park:** stays `stop` (no `pause`, which keeps memory).
+- **Vagrant:** `VAGRANT_DOTFILE_PATH` moves into the run's state in Phase 3.
+- **Vagrant Proxmox provider:** Tier 2, not Tier 1. The launcher runs Proxmox through Terraform only, and the plugin is unmaintained.
+
+**Runner:**
+- **Crates:** `isoloom-manifest` (the types, the generated schema and the fixtures) in Isoloom; `isothrum-runner` (the library) and `isothrum` (the CLI) in Isothrum.
+- **`unsafe`:** safe wrapper crates where they exist (`process-wrap`). The rest (UAC elevation, the Windows console, Ctrl+C) sits in one audited `sys` module, the only place `unsafe` is allowed.
+- **Detached runs:** through the embedder's own executable, via a runner entry point, so there's no second signed binary.
+- **Windows delivery:** Vagrant's own `winrm` and `upload`, plus the cloud secret stores. Python is used only for Proxmox and ESXi Windows machines, until OpenSSH-on-guest or a Rust client removes it. The goal is no host Python by 1.0.
+- **Live cloud labs at the switch:** a one-time import into the runner's records, so players' running labs stay destroyable.
+- **Homes:** separate for the launcher (its app data) and the CLI (`~/.isothrum`); the CLI can attach with `--home`.
+- **Events:** the event stream has its own version.
+- **The launcher's switch:** a hidden developer flag in Phase 2, then a visible setting once Vagrant lands.
+
+**Bugs found in today's code**, fixed by the manifest and runner work (`runner-extraction.md` §6):
+- Launcher and Isoloom names have drifted: the port labels, `address` vs `ip`, the ready file.
+- The Proxmox `slot` is never set.
+- Windows inputs are dropped on Vagrant.
+- `wait_ready` reports OK when SSH never answers.
+- The lab lock fails open.
+- A destroy uses the current region instead of the applied one.
+- There are panics outside tests.
+- The launcher pins `isoloom-core@50147b3`, which is reachable only on GitHub's object store, since the `dev` branch was deleted; its archive is in `~/code/github-archive/`. The path-dependency switch in Phase 2 removes the pin.
+
+**Still the maintainer's call:** the flag construct in the new syntax (see the syntax design).
+
 ### Phase 3: The launcher's modes, wide (L, parallel per target)
 
 Each step means: lowered generation passes the snapshots and `verify`, then a manifest, then a runner driver, then the launcher's lab test.
 1. **Local:** `vagrant` (VirtualBox, Hyper-V, VMware, QEMU/libvirt) and `docker-vm`.
-2. **Server:** `proxmox` (Terraform), plus the Vagrant Proxmox and ESXi providers with the launcher's `connection_env` contract.
+2. **Server:** `proxmox` (Terraform) and the Vagrant ESXi provider, with the launcher's `connection_env` contract. The Vagrant Proxmox provider is Tier 2.
 3. **Cloud:** `cloud-vm`, `cloud-docker` and `cloud-services`, AWS first and then the other clouds.
 4. **Secrets conversion and native checks** for these targets only:
    - Compose secrets;
