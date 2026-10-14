@@ -183,7 +183,7 @@ resource "terraform_data" "database" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' >> /etc/hosts'",
+      "sudo sh -c 'for l in '\\''10.20.0.31 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -245,7 +245,7 @@ resource "terraform_data" "web" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.32 database'\\'' >> /etc/hosts'",
+      "sudo sh -c 'for l in '\\''10.20.0.32 database'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
