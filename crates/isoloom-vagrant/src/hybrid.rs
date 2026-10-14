@@ -95,7 +95,8 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
     }
     ctr.checks.clear();
     ctr.provision.clear();
-    let cfiles = super::docker::generate(&ctr, &ctr).map_err(|e| match e {
+    let env = isoloom_plan::Environment::build(&ctr, crate::model::Target::Hybrid, None);
+    let cfiles = isoloom_compose::render(crate::model::Target::Docker, &env).map_err(|e| match GenerateError::from(e) {
         GenerateError::Unsupported { what, .. } => unsupported(what),
         other => other,
     })?;

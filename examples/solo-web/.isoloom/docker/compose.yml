@@ -20,6 +20,8 @@ services:
         ipv4_address: 10.80.0.10
     ports:
     - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+8080}:80
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -31,8 +33,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -48,11 +48,11 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    networks:
+      app: null
     volumes:
     - ./checks/networks.sh:/isoloom/run.sh:ro
     - ../..:/isoloom/project:ro
-    networks:
-      app: null
     depends_on:
       web:
         condition: service_healthy
@@ -66,13 +66,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: solo-web
+    restart: no
 networks:
   app:
     ipam:

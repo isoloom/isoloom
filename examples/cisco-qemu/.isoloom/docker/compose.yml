@@ -9,6 +9,13 @@ services:
   vios:
     image: vrnetlab/cisco_vios:15.9.3M6
     platform: linux/amd64
+    privileged: true
+    sysctls:
+      net.ipv4.ip_forward: '1'
+    entrypoint:
+    - /bin/sh
+    - -c
+    - cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; exec uv run /launch.py --username admin --password admin --hostname vios --connection-mode tc --trace
     hostname: vios
     networks:
       isoloom-mgmt:
@@ -25,35 +32,28 @@ services:
         priority: 998
     cap_add:
     - NET_ADMIN
-    sysctls:
-      net.ipv4.ip_forward: '1'
     extra_hosts:
     - host-b:10.92.2.10
-    volumes:
-    - ./appliances/vios/base.cfg:/config/base.cfg:ro
-    - ../../configs/vios.cfg:/config/own.cfg:ro
-    entrypoint:
-    - /bin/sh
-    - -c
-    - cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; exec uv run /launch.py --username admin --password admin --hostname vios --connection-mode tc --trace
     environment:
       CLAB_INTFS: '2'
       CONNECTION_MODE: tc
       CLAB_MGMT_PASSTHROUGH: 'true'
-    privileged: true
-    restart: unless-stopped
+    volumes:
+    - ./appliances/vios/base.cfg:/config/base.cfg:ro
+    - ../../configs/vios.cfg:/config/own.cfg:ro
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
+    restart: unless-stopped
   vios-routes:
     image: alpine:3.20
-    network_mode: service:vios
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip addr flush dev eth1 && ip addr flush dev eth2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:vios
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -64,13 +64,20 @@ services:
     depends_on:
       vios:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
+    restart: unless-stopped
   csr:
     image: vrnetlab/cisco_csr1000v:17.03.08
     platform: linux/amd64
+    privileged: true
+    sysctls:
+      net.ipv4.ip_forward: '1'
+    entrypoint:
+    - /bin/sh
+    - -c
+    - cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; exec uv run /launch.py --username admin --password admin --hostname csr --connection-mode tc --trace
     hostname: csr
     networks:
       isoloom-mgmt:
@@ -87,34 +94,27 @@ services:
         priority: 998
     cap_add:
     - NET_ADMIN
-    sysctls:
-      net.ipv4.ip_forward: '1'
     extra_hosts:
     - host-a:10.92.1.10
-    volumes:
-    - ./appliances/csr/base.cfg:/config/base.cfg:ro
-    - ../../configs/csr.cfg:/config/own.cfg:ro
-    entrypoint:
-    - /bin/sh
-    - -c
-    - cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; exec uv run /launch.py --username admin --password admin --hostname csr --connection-mode tc --trace
     environment:
       CLAB_INTFS: '2'
       CONNECTION_MODE: tc
-    privileged: true
-    restart: unless-stopped
+    volumes:
+    - ./appliances/csr/base.cfg:/config/base.cfg:ro
+    - ../../configs/csr.cfg:/config/own.cfg:ro
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
+    restart: unless-stopped
   csr-routes:
     image: alpine:3.20
-    network_mode: service:csr
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip addr flush dev eth1 && ip addr flush dev eth2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:csr
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -125,10 +125,10 @@ services:
     depends_on:
       csr:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
+    restart: unless-stopped
   host-a:
     image: alpine:3.20
     platform: linux/amd64
@@ -142,19 +142,19 @@ services:
     extra_hosts:
     - csr:10.92.2.1
     - host-b:10.92.2.10
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
+    restart: unless-stopped
   host-a-routes:
     image: alpine:3.20
-    network_mode: service:host-a
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace default via 10.92.1.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:host-a
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -167,10 +167,10 @@ services:
         condition: service_started
       vios:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
+    restart: unless-stopped
   host-b:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -181,6 +181,8 @@ services:
     extra_hosts:
     - vios:10.92.1.1
     - host-a:10.92.1.10
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -192,8 +194,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -204,13 +204,13 @@ services:
     restart: unless-stopped
   host-b-routes:
     image: alpine:3.20
-    network_mode: service:host-b
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace default via 10.92.2.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:host-b
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -223,10 +223,10 @@ services:
         condition: service_started
       csr:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
+    restart: unless-stopped
   isoloom-check-host-a:
     image: curlimages/curl:8.11.1
     profiles:
@@ -234,9 +234,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:host-a
     volumes:
     - ./checks/host-a.sh:/isoloom/run.sh:ro
-    network_mode: service:host-a
     depends_on:
       vios-routes:
         condition: service_healthy
@@ -260,13 +260,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
+    restart: no
 networks:
   site-a:
     ipam:

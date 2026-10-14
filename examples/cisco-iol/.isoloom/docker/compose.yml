@@ -9,6 +9,12 @@ services:
   r1:
     image: vrnetlab/cisco_iol:17.12.01
     platform: linux/amd64
+    sysctls:
+      net.ipv4.ip_forward: '1'
+    entrypoint:
+    - /bin/sh
+    - -c
+    - cat /iol/base.txt /iol/own.txt > /iol/config.txt 2>/dev/null; echo end >> /iol/config.txt; exec /entrypoint.sh
     hostname: r1
     networks:
       isoloom-mgmt:
@@ -26,34 +32,28 @@ services:
     cap_add:
     - NET_ADMIN
     - NET_RAW
-    sysctls:
-      net.ipv4.ip_forward: '1'
     extra_hosts:
     - host-b:10.91.2.10
+    environment:
+      IOL_PID: '1'
     volumes:
     - ./appliances/r1/base.txt:/iol/base.txt:ro
     - ./appliances/r1/NETMAP:/iol/NETMAP:ro
     - ./appliances/r1/iouyap.ini:/iol/iouyap.ini:ro
     - ../../configs/r1.cfg:/iol/own.txt:ro
-    entrypoint:
-    - /bin/sh
-    - -c
-    - cat /iol/base.txt /iol/own.txt > /iol/config.txt 2>/dev/null; echo end >> /iol/config.txt; exec /entrypoint.sh
-    environment:
-      IOL_PID: '1'
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
+    restart: unless-stopped
   r1-routes:
     image: alpine:3.20
-    network_mode: service:r1
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip addr flush dev eth1 && ip addr flush dev eth2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:r1
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -64,13 +64,19 @@ services:
     depends_on:
       r1:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
+    restart: unless-stopped
   r2:
     image: vrnetlab/cisco_iol:17.12.01
     platform: linux/amd64
+    sysctls:
+      net.ipv4.ip_forward: '1'
+    entrypoint:
+    - /bin/sh
+    - -c
+    - cat /iol/base.txt /iol/own.txt > /iol/config.txt 2>/dev/null; echo end >> /iol/config.txt; exec /entrypoint.sh
     hostname: r2
     networks:
       isoloom-mgmt:
@@ -88,34 +94,28 @@ services:
     cap_add:
     - NET_ADMIN
     - NET_RAW
-    sysctls:
-      net.ipv4.ip_forward: '1'
     extra_hosts:
     - host-a:10.91.1.10
+    environment:
+      IOL_PID: '2'
     volumes:
     - ./appliances/r2/base.txt:/iol/base.txt:ro
     - ./appliances/r2/NETMAP:/iol/NETMAP:ro
     - ./appliances/r2/iouyap.ini:/iol/iouyap.ini:ro
     - ../../configs/r2.cfg:/iol/own.txt:ro
-    entrypoint:
-    - /bin/sh
-    - -c
-    - cat /iol/base.txt /iol/own.txt > /iol/config.txt 2>/dev/null; echo end >> /iol/config.txt; exec /entrypoint.sh
-    environment:
-      IOL_PID: '2'
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
+    restart: unless-stopped
   r2-routes:
     image: alpine:3.20
-    network_mode: service:r2
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip addr flush dev eth1 && ip addr flush dev eth2 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:r2
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -126,10 +126,10 @@ services:
     depends_on:
       r2:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
+    restart: unless-stopped
   host-a:
     image: alpine:3.20
     platform: linux/amd64
@@ -143,19 +143,19 @@ services:
     extra_hosts:
     - r2:10.91.2.1
     - host-b:10.91.2.10
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
+    restart: unless-stopped
   host-a-routes:
     image: alpine:3.20
-    network_mode: service:host-a
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace default via 10.91.1.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:host-a
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -168,10 +168,10 @@ services:
         condition: service_started
       r1:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
+    restart: unless-stopped
   host-b:
     image: nginx:1.27-alpine
     platform: linux/amd64
@@ -182,6 +182,8 @@ services:
     extra_hosts:
     - r1:10.91.1.1
     - host-a:10.91.1.10
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -193,8 +195,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -205,13 +205,13 @@ services:
     restart: unless-stopped
   host-b-routes:
     image: alpine:3.20
-    network_mode: service:host-b
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace default via 10.91.2.1 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:host-b
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -224,10 +224,10 @@ services:
         condition: service_started
       r2:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
+    restart: unless-stopped
   isoloom-check-host-a:
     image: curlimages/curl:8.11.1
     profiles:
@@ -235,9 +235,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:host-a
     volumes:
     - ./checks/host-a.sh:/isoloom/run.sh:ro
-    network_mode: service:host-a
     depends_on:
       r1-routes:
         condition: service_healthy
@@ -261,13 +261,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
+    restart: no
 networks:
   site-a:
     ipam:

@@ -16,6 +16,8 @@ services:
       isoloom-publish: null
     ports:
     - 8083:80
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -27,8 +29,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -46,13 +46,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: mixed-office
+    restart: no
 networks:
   isoloom-publish: null
   office:

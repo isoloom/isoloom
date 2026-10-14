@@ -37,13 +37,13 @@ services:
     restart: unless-stopped
   cache-routes:
     image: alpine:3.20
-    network_mode: service:cache
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:cache
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -54,28 +54,28 @@ services:
     depends_on:
       cache:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: hello-stack
+    restart: unless-stopped
   cache-init-1:
     image: redis:7-alpine
     entrypoint:
     - /bin/sh
     - /isoloom/init/seed.sh
+    network_mode: service:cache
     volumes:
     - ../../build/cache/seed.sh:/isoloom/init/seed.sh:ro
     - cache-data:/data
-    network_mode: service:cache
     depends_on:
       cache:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: hello-stack
+    restart: no
   web:
     build:
       context: ../../build/web
@@ -90,6 +90,8 @@ services:
         ipv4_address: 10.60.0.10
     ports:
     - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+8080}:80
+    volumes:
+    - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -101,8 +103,6 @@ services:
       timeout: 3s
       retries: 60
       start_period: 10s
-    volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
     depends_on:
       isoloom-probe-amd64:
         condition: service_completed_successfully
@@ -119,13 +119,13 @@ services:
     restart: unless-stopped
   web-routes:
     image: alpine:3.20
-    network_mode: service:web
-    cap_add:
-    - NET_ADMIN
     entrypoint:
     - /bin/sh
     - -c
     - (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:web
+    cap_add:
+    - NET_ADMIN
     healthcheck:
       test:
       - CMD-SHELL
@@ -136,26 +136,26 @@ services:
     depends_on:
       web:
         condition: service_started
-    restart: unless-stopped
     labels:
       isoloom.managed: 'true'
       isoloom.environment: hello-stack
+    restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
     - check
+    user: '0'
     entrypoint:
     - /bin/sh
     - -c
     - ip route del default 2>/dev/null; exec sh /isoloom/run.sh
+    networks:
+      app: null
+    cap_add:
+    - NET_ADMIN
     volumes:
     - ./checks/networks.sh:/isoloom/run.sh:ro
     - ../..:/isoloom/project:ro
-    networks:
-      app: null
-    user: '0'
-    cap_add:
-    - NET_ADMIN
     depends_on:
       cache:
         condition: service_healthy
@@ -177,9 +177,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:cache
     volumes:
     - ./checks/cache.sh:/isoloom/run.sh:ro
-    network_mode: service:cache
     depends_on:
       cache:
         condition: service_healthy
@@ -201,9 +201,9 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
+    network_mode: service:web
     volumes:
     - ./checks/web.sh:/isoloom/run.sh:ro
-    network_mode: service:web
     depends_on:
       cache:
         condition: service_healthy
@@ -225,13 +225,13 @@ services:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
+    network_mode: none
     volumes:
     - isoloom-probe-amd64:/probe
-    network_mode: none
-    restart: no
     labels:
       isoloom.managed: 'true'
       isoloom.environment: hello-stack
+    restart: no
 networks:
   app:
     ipam:
