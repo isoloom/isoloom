@@ -29,7 +29,7 @@ spec:
         - name: isoloom-probe
           mountPath: /probe
       - name: seed-data
-        image: {{ index .Values.images "cache" | quote }}
+        image: '{{ index .Values.images "cache" }}'
         imagePullPolicy: IfNotPresent
         command:
         - /.isoloom-probe/busybox
@@ -47,7 +47,7 @@ spec:
           readOnly: true
       containers:
       - name: cache
-        image: {{ index .Values.images "cache" | quote }}
+        image: '{{ index .Values.images "cache" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 6379
@@ -161,7 +161,7 @@ spec:
         - until nc -z cache 6379; do sleep 2; done
       containers:
       - name: web
-        image: {{ index .Values.images "web" | quote }}
+        image: '{{ index .Values.images "web" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80

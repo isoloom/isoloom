@@ -5,6 +5,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-scripts
-data:
-  build__cache__seed.sh: {{ required "files/project/build__cache__seed.sh is missing: run isoloom generate" (.Files.Get "files/project/build__cache__seed.sh") | quote }}
-  checks__cache-seeded.sh: {{ required "files/project/checks__cache-seeded.sh is missing: run isoloom generate" (.Files.Get "files/project/checks__cache-seeded.sh") | quote }}
+binaryData:
+  build__cache__seed.sh: '{{ required "files/project/build__cache__seed.sh is missing: run isoloom generate" (.Files.Get "files/project/build__cache__seed.sh") | b64enc }}'
+  checks__cache-seeded.sh: '{{ required "files/project/checks__cache-seeded.sh is missing: run isoloom generate" (.Files.Get "files/project/checks__cache-seeded.sh") | b64enc }}'

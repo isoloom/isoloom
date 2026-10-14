@@ -27,6 +27,12 @@ pub enum Feature {
     VolumesAcrossShapes,
     /// A VM that waits for a container (`depends_on`).
     VmAfterContainer,
+    /// Extra names for a machine (`aliases`), dotted ones included.
+    MachineAliases,
+    /// Per-container process limits (`ulimits`).
+    Ulimits,
+    /// Link impairment (`tc`), applied on the path into a network.
+    TrafficControl,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -64,6 +70,15 @@ pub enum Requirement {
         /// The container it waits for.
         container: String,
     },
+    /// A machine has `aliases`.
+    MachineAliases,
+    /// A machine sets `ulimits`.
+    Ulimits {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A network has `tc`.
+    TrafficControl,
 }
 
 impl Requirement {
@@ -77,6 +92,9 @@ impl Requirement {
             Requirement::Gateway { .. } => Feature::Gateways,
             Requirement::VolumeAcrossShapes { .. } => Feature::VolumesAcrossShapes,
             Requirement::VmDependsOnContainer { .. } => Feature::VmAfterContainer,
+            Requirement::MachineAliases => Feature::MachineAliases,
+            Requirement::Ulimits { .. } => Feature::Ulimits,
+            Requirement::TrafficControl => Feature::TrafficControl,
         }
     }
 }
@@ -105,6 +123,12 @@ impl fmt::Display for Requirement {
                     "VM `{vm}` depends on container `{container}`: VMs start first in a hybrid environment, for now"
                 )
             }
+            // Only Kubernetes lacks these today: the messages say so in its terms.
+            Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
+            Requirement::Ulimits { machine } => {
+                write!(f, "machine `{machine}` sets `ulimits`: Kubernetes has no per-container process limits")
+            }
+            Requirement::TrafficControl => f.write_str("link impairment (`tc`) needs a router in the path; Kubernetes has none"),
         }
     }
 }
@@ -160,12 +184,29 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
             .filter(|(_, m)| m.docker.as_ref().is_some_and(|d| d.appliance.is_some()))
             .map(|(name, _)| Requirement::NetworkAppliance { machine: name.clone() }),
     );
+    if spec.machines.values().any(|m| !m.aliases.is_empty()) {
+        out.push(Requirement::MachineAliases);
+    }
     out.extend(
         spec.networks
             .iter()
             .filter(|(_, n)| n.gateway.is_some())
             .map(|(name, _)| Requirement::Gateway { network: name.clone() }),
     );
+    out.extend(limits(spec));
+    out
+}
+
+/// What the containers' limits and the links' impairment ask for: at most one requirement of
+/// each kind, the first machine or network that asks.
+fn limits(spec: &Spec) -> Vec<Requirement> {
+    let mut out = Vec::new();
+    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| !m.ulimits.is_empty()) {
+        out.push(Requirement::Ulimits { machine: name.clone() });
+    }
+    if spec.networks.values().any(|n| n.tc.is_some()) {
+        out.push(Requirement::TrafficControl);
+    }
     out
 }
 

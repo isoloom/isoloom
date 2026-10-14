@@ -30,7 +30,7 @@ spec:
           mountPath: /probe
       containers:
       - name: dns
-        image: {{ index .Values.images "dns" | quote }}
+        image: '{{ index .Values.images "dns" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 53
@@ -144,14 +144,14 @@ spec:
       hostname: client
       initContainers:
       - name: wait-dns
-        image: {{ index .Values.images "client" | quote }}
+        image: alpine:3.20
         command:
         - sh
         - -c
         - until nc -z dns 53; do sleep 2; done
       containers:
       - name: client
-        image: {{ index .Values.images "client" | quote }}
+        image: '{{ index .Values.images "client" }}'
         imagePullPolicy: IfNotPresent
         command:
         - sleep

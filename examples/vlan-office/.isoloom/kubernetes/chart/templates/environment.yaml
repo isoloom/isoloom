@@ -30,7 +30,7 @@ spec:
           mountPath: /probe
       containers:
       - name: intranet
-        image: {{ index .Values.images "intranet" | quote }}
+        image: '{{ index .Values.images "intranet" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
@@ -108,7 +108,7 @@ spec:
       hostname: guest
       containers:
       - name: guest
-        image: {{ index .Values.images "guest" | quote }}
+        image: '{{ index .Values.images "guest" }}'
         imagePullPolicy: IfNotPresent
         command:
         - sleep
@@ -137,7 +137,7 @@ spec:
       hostname: admin
       containers:
       - name: admin
-        image: {{ index .Values.images "admin" | quote }}
+        image: '{{ index .Values.images "admin" }}'
         imagePullPolicy: IfNotPresent
         command:
         - sleep

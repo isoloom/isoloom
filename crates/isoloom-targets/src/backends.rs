@@ -1,11 +1,11 @@
-//! The registry of backends, one per generated target. Compose, external, docker-vm, hybrid,
-//! Vagrant, Proxmox and cloud-vm render the plan; the targets not migrated yet go through
+//! The registry of backends, one per generated target. Compose, Kubernetes, external, docker-vm,
+//! hybrid, Vagrant, Proxmox and cloud-vm render the plan; the targets not migrated yet go through
 //! [`LegacyBackend`], which runs today's generator on the spec the plan was built from, with
 //! the text post-passes it still needs, so their output is unchanged.
 
 use isoloom_compose::ComposeBackend;
 use isoloom_external::ExternalBackend;
-use isoloom_kubernetes::kubernetes;
+use isoloom_kubernetes::KubernetesBackend;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::backend::{Backend, Files, RenderError};
 use isoloom_render::{GenerateError, constraints, project};
@@ -45,6 +45,9 @@ impl Backend for LegacyBackend {
             Feature::PlaybookChecks,
             Feature::ExecWithoutContainer,
             Feature::Gateways,
+            Feature::MachineAliases,
+            Feature::Ulimits,
+            Feature::TrafficControl,
             Feature::VolumesAcrossShapes,
             Feature::VmAfterContainer,
         ];
@@ -96,7 +99,7 @@ static DOCKER: ComposeBackend = ComposeBackend(Target::Docker);
 static HOSTED: ComposeBackend = ComposeBackend(Target::Hosted);
 static DOCKER_VM: DockerVmBackend = DockerVmBackend;
 static CLOUD_DOCKER: LegacyBackend = legacy(Target::CloudDocker, cloud_docker_files);
-static KUBERNETES: LegacyBackend = legacy(Target::Kubernetes, kubernetes::generate);
+static KUBERNETES: KubernetesBackend = KubernetesBackend;
 static HYBRID: HybridBackend = HybridBackend;
 static VAGRANT: VagrantBackend = VagrantBackend;
 static PROXMOX: ProxmoxBackend = ProxmoxBackend;

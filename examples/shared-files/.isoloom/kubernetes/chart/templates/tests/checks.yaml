@@ -6,8 +6,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-check-runners
-data:
-  reader.sh: {{ .Files.Get "files/checks/reader.sh" | quote }}
+binaryData:
+  reader.sh: '{{ .Files.Get "files/checks/reader.sh" | b64enc }}'
 ---
 apiVersion: v1
 kind: Pod

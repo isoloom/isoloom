@@ -47,6 +47,9 @@ impl Backend for CloudVmBackend {
             // Gateway networks are refused by the target's own limit (`LIMITS.gateways`), with
             // its own reason: the plan's requirement names hybrid.
             Feature::Gateways,
+            Feature::MachineAliases,
+            Feature::Ulimits,
+            Feature::TrafficControl,
         ])
     }
 

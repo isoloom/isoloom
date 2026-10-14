@@ -5,5 +5,5 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-scripts
-data:
-  checks__web-answers.sh: {{ required "files/project/checks__web-answers.sh is missing: run isoloom generate" (.Files.Get "files/project/checks__web-answers.sh") | quote }}
+binaryData:
+  checks__web-answers.sh: '{{ required "files/project/checks__web-answers.sh is missing: run isoloom generate" (.Files.Get "files/project/checks__web-answers.sh") | b64enc }}'

@@ -16,11 +16,17 @@ use crate::docker::{
 use crate::file::{Attachment, Build, ComposeFile, Deploy, Healthcheck, Ipam, Labelled, Limits, Network, Resources, Service, Subnet, Ulimit};
 use crate::sidecars;
 
-/// What Compose can render: network appliances (wired the way Docker attaches networks) and
-/// gateway machines. No controller: no `provision:`, no Ansible checks; `exec` checks run inside
-/// a container.
+/// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,
+/// gateway machines, ulimits and `tc` (in a sidecar). No controller: no `provision:`, no Ansible
+/// checks; `exec` checks run inside a container.
 pub fn capabilities() -> isoloom_plan::Capabilities {
-    isoloom_plan::Capabilities::of([Feature::NetworkAppliances, Feature::Gateways])
+    isoloom_plan::Capabilities::of([
+        Feature::NetworkAppliances,
+        Feature::Gateways,
+        Feature::MachineAliases,
+        Feature::Ulimits,
+        Feature::TrafficControl,
+    ])
 }
 
 /// The Compose backend of the `docker` and `hosted` targets (a hosting service runs the same

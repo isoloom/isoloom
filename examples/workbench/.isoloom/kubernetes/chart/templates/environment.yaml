@@ -20,7 +20,7 @@ spec:
       hostname: bench
       containers:
       - name: bench
-        image: {{ index .Values.images "bench" | quote }}
+        image: '{{ index .Values.images "bench" }}'
         imagePullPolicy: IfNotPresent
         command:
         - sleep
@@ -58,7 +58,7 @@ spec:
           mountPath: /probe
       containers:
       - name: web
-        image: {{ index .Values.images "web" | quote }}
+        image: '{{ index .Values.images "web" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80

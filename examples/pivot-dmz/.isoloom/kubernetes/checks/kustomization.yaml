@@ -4,13 +4,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: isoloom-pivot-dmz
 resources:
-  - job.yaml
+- job.yaml
 generatorOptions:
   disableNameSuffixHash: true
 configMapGenerator:
-  - name: isoloom-check-runners
-    files:
-      - user.sh
-      - gateway.sh
-      - app.sh
-      - db.sh
+- name: isoloom-check-runners
+  files:
+  - user.sh
+  - gateway.sh
+  - app.sh
+  - db.sh

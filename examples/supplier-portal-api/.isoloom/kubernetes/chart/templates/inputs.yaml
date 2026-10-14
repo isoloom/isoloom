@@ -5,7 +5,6 @@ kind: Secret
 metadata:
   name: isoloom-inputs
 type: Opaque
-stringData:
-{{- range $name, $value := .Values.inputs }}
-  {{ $name }}: {{ $value | toString | quote }}
-{{- end }}
+data:
+  API_URL: '{{ get .Values.inputs "API_URL" | toString | b64enc }}'
+  LAUNCH_TOKEN: '{{ get .Values.inputs "LAUNCH_TOKEN" | toString | b64enc }}'

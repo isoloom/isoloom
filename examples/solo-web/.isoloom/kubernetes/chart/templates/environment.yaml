@@ -30,7 +30,7 @@ spec:
           mountPath: /probe
       containers:
       - name: web
-        image: {{ index .Values.images "web" | quote }}
+        image: '{{ index .Values.images "web" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80

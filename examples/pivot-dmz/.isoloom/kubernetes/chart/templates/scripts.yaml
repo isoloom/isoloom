@@ -5,6 +5,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-scripts
-data:
-  checks__dmz-reachable.sh: {{ required "files/project/checks__dmz-reachable.sh is missing: run isoloom generate" (.Files.Get "files/project/checks__dmz-reachable.sh") | quote }}
-  checks__internal-not-reachable-from-access.sh: {{ required "files/project/checks__internal-not-reachable-from-access.sh is missing: run isoloom generate" (.Files.Get "files/project/checks__internal-not-reachable-from-access.sh") | quote }}
+binaryData:
+  checks__dmz-reachable.sh: '{{ required "files/project/checks__dmz-reachable.sh is missing: run isoloom generate" (.Files.Get "files/project/checks__dmz-reachable.sh") | b64enc }}'
+  checks__internal-not-reachable-from-access.sh: '{{ required "files/project/checks__internal-not-reachable-from-access.sh is missing: run isoloom generate" (.Files.Get "files/project/checks__internal-not-reachable-from-access.sh") | b64enc }}'

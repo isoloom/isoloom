@@ -30,7 +30,7 @@ spec:
           mountPath: /probe
       containers:
       - name: store
-        image: {{ index .Values.images "store" | quote }}
+        image: '{{ index .Values.images "store" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 6379
@@ -124,7 +124,7 @@ spec:
         - until nc -z store 6379; do sleep 2; done
       containers:
       - name: app
-        image: {{ index .Values.images "app" | quote }}
+        image: '{{ index .Values.images "app" }}'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
