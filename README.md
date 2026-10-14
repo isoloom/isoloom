@@ -51,8 +51,9 @@ checks:                          # plus the checks Isoloom derives from services
   `inputs:`, and `access: true` marks the machine a user lands on.
 - **Secrets stay secret.** `secrets:` names where each value lives (the runner's environment, a
   file, Vault, SOPS); a machine lists the ones it gets, as files. `isoloom run` reads them and
-  hands them to the target's own mechanism (Compose secrets, a Kubernetes Secret): no value is
-  ever in `.isoloom/`, the snapshot or a log.
+  hands them to the target's own mechanism (Compose secrets, a Kubernetes Secret) or, on a VM
+  or a Docker host, writes them over the machine's own SSH while its set-up waits for them: no
+  value is ever in `.isoloom/`, the snapshot, cloud-init, Terraform's state or a log.
 
 ```yaml
 secrets:

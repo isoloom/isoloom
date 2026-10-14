@@ -49,6 +49,9 @@ impl Backend for HybridBackend {
             Feature::Ulimits,
             Feature::TrafficControl,
             Feature::Tpm,
+            // Delivered by `isoloom run` over the machine's SSH, owners included.
+            Feature::Secrets,
+            Feature::SecretOwners,
             Feature::MachineProcess,
             Feature::NestedVirtualization,
         ])

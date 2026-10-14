@@ -2,7 +2,7 @@
 //! the run and says which), then handed to the target's own mechanism, never to a file: Compose
 //! reads each from a variable of its own environment, Kubernetes from a Secret created with
 //! `kubectl apply --server-side` (which, unlike a client-side apply, keeps no copy of the object
-//! in an annotation).
+//! in an annotation), and a VM or a Docker host gets them over its own connection (`vms`).
 
 use std::process::Command;
 
@@ -15,6 +15,8 @@ use crate::failure::Failure;
 use crate::prepare::Prepared;
 use crate::tools::{kubectl, process};
 use crate::{Res, output, spec};
+
+pub mod vms;
 
 /// The secrets' values, by name, in the spec's order.
 pub type Values = Vec<(String, SecretValue)>;
@@ -80,8 +82,10 @@ pub fn deliver(p: &Prepared, values: &Values, cmd: &mut Command) -> Res<()> {
             Ok(())
         }
         Target::Kubernetes => kubernetes(p, values),
-        // The backends of the other targets refuse a spec with secrets.
-        t => Err(Failure::new(ErrorCode::Unsupported, format!("`{}` doesn't deliver secrets", t.id())).into()),
+        // The VM targets: written on each machine over its own connection (`vms`).
+        Target::Vagrant | Target::DockerVm | Target::Hybrid | Target::Proxmox | Target::CloudVm | Target::CloudDocker | Target::External => Ok(()),
+        // Its backend refuses a spec with secrets.
+        Target::CloudServices => Err(Failure::new(ErrorCode::Unsupported, "`cloud-services` doesn't deliver secrets").into()),
     }
 }
 

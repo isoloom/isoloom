@@ -8,7 +8,7 @@
 use super::{PROVISIONERS, pairs, table};
 use crate::{
     Format, Support,
-    Support::{Emitted, Equivalent, Planned, Tooling},
+    Support::{Emitted, Equivalent, Tooling},
 };
 
 /// The "Vagrant: provisioners" table.
@@ -127,8 +127,8 @@ fn ansible(o: &str) -> Option<Support> {
 
 fn ansible_rest(o: &str) -> Option<Support> {
     Some(match o {
-        "vault_password_file" | "ask_vault_pass" => Planned {
-            note: "an Ansible vault's password as a secret, with secrets on the VM targets",
+        "vault_password_file" | "ask_vault_pass" => Equivalent {
+            via: "machines.*.secrets: the vault's password as a secret file, delivered before the machine's playbooks run, named by `vault_password_file` in an `ansible.cfg` beside the playbook",
         },
         "tags" | "skip_tags" | "start_at_task" => Tooling {
             note: "running part of a playbook: a debugging aid",

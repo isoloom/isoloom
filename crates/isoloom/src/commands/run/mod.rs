@@ -2,6 +2,7 @@
 //! generate its files, then bring it up (or tear it down) with the tool that owns that output.
 
 mod bring_up;
+mod deliver;
 mod done;
 
 use std::path::{Path, PathBuf};
@@ -111,6 +112,7 @@ pub fn up_or_down(ask: &Ask, down: bool) -> Res<Brought> {
         output::done(&ready, None);
     }
     if t == Target::External && !down {
+        deliver::before_external(&p, ask, &values)?;
         external::external_up(dir, &p.plan, ask.instance)?;
     }
     // A project name a tool recorded for this environment stays with it.
@@ -158,7 +160,7 @@ fn launch(p: &Prepared, ask: &Ask, down: bool, values: &secrets::Values) -> Res<
         cmd.envs(terraform::aws_session_env());
     }
     secrets::deliver(p, values, &mut cmd)?;
-    let status = process::run_step(&mut cmd, &at)?;
+    let status = deliver::run_tool(p, ask, values, &mut cmd, &at)?;
     if !status.success() {
         return Err(Failure::new(ErrorCode::ToolFailed, format!("{} exited with {status}", tool.program)).into());
     }

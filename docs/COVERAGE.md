@@ -14,7 +14,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant](#vagrant) | 100% | 42 | 42 | 0 | 0 |
 | [Vagrant: networks](#vagrant-networks) | 100% | 38 | 38 | 0 | 0 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
-| [Vagrant: provisioners](#vagrant-provisioners) | 94% | 57 | 54 | 0 | 3 |
+| [Vagrant: provisioners](#vagrant-provisioners) | 100% | 57 | 57 | 0 | 0 |
 | [Vagrant: communicators](#vagrant-communicators) | 100% | 11 | 11 | 0 | 0 |
 | [Vagrant: VirtualBox](#vagrant-virtualbox) | 100% | 7 | 7 | 0 | 0 |
 | [Vagrant: VMware Desktop](#vagrant-vmware-desktop) | 100% | 5 | 5 | 0 | 0 |
@@ -674,7 +674,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: provisioners
 
-94% of 57 portable features (54 done, 0 partly, 3 to do; 315 features in all). From Vagrant 2.4.9 (each provisioner's config class, with the classes it inherits from).
+100% of 57 portable features (57 done, 0 partly, 0 to do; 315 features in all). From Vagrant 2.4.9 (each provisioner's config class, with the classes it inherits from).
 
 ### Provisioners
 
@@ -712,7 +712,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `file: source` | Yes | Another way | Via `isoloom_project` copies the project into each VM |
 | `ansible: ask_become_pass` | n/a | No | How Vagrant installs and runs Ansible |
 | `ansible: ask_sudo_pass` | n/a | No | How Vagrant installs and runs Ansible |
-| `ansible: ask_vault_pass` | Yes | Not yet | An Ansible vault's password as a secret, with secrets on the VM targets |
+| `ansible: ask_vault_pass` | Yes | Another way | Via machines.*.secrets: the vault's password as a secret file, delivered before the machine's playbooks run, named by `vault_password_file` in an `ansible.cfg` beside the playbook |
 | `ansible: become` | Yes | Another way | Via the playbook's own `become` |
 | `ansible: become_user` | Yes | Another way | Via the playbook's own `become` |
 | `ansible: compatibility_mode` | n/a | No | How Vagrant installs and runs Ansible |
@@ -737,7 +737,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ansible: sudo` | Yes | Another way | Via the playbook's own `become` |
 | `ansible: sudo_user` | Yes | Another way | Via the playbook's own `become` |
 | `ansible: tags` | n/a | No | Running part of a playbook: a debugging aid |
-| `ansible: vault_password_file` | Yes | Not yet | An Ansible vault's password as a secret, with secrets on the VM targets |
+| `ansible: vault_password_file` | Yes | Another way | Via machines.*.secrets: the vault's password as a secret file, delivered before the machine's playbooks run, named by `vault_password_file` in an `ansible.cfg` beside the playbook |
 | `ansible: verbose` | n/a | No | How Vagrant installs and runs Ansible |
 | `ansible: version` | n/a | No | How Vagrant installs and runs Ansible |
 | `ansible_local: become` | Yes | Another way | Via the playbook's own `become` |
@@ -767,7 +767,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ansible_local: sudo_user` | Yes | Another way | Via the playbook's own `become` |
 | `ansible_local: tags` | n/a | No | Running part of a playbook: a debugging aid |
 | `ansible_local: tmp_path` | n/a | No | How Vagrant installs and runs Ansible |
-| `ansible_local: vault_password_file` | Yes | Not yet | An Ansible vault's password as a secret, with secrets on the VM targets |
+| `ansible_local: vault_password_file` | Yes | Another way | Via machines.*.secrets: the vault's password as a secret file, delivered before the machine's playbooks run, named by `vault_password_file` in an `ansible.cfg` beside the playbook |
 | `ansible_local: verbose` | n/a | No | How Vagrant installs and runs Ansible |
 | `ansible_local: version` | n/a | No | How Vagrant installs and runs Ansible |
 | `chef_solo: add_recipe` | n/a | No | An option of that tool: a `.sh` step runs it with its own configuration |
@@ -7284,7 +7284,7 @@ is marked ✗, with its reason below.
 | `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | planned |
-| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `secrets` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `machines.*.networks` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ✓ |
 | `machines.*.services[].port` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `cloud.provider` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | ✓ | info |
@@ -7304,7 +7304,7 @@ is marked ✗, with its reason below.
 | `machines.*.services[].tls` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.services[].http` | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info | info |
 | `machines.*.inputs` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
-| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `machines.*.secrets` | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `machines.*.environment` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.sysctls` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
 | `machines.*.ulimits` | ✓ | ✓ | n/a | n/a | n/a | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | planned |
@@ -7430,19 +7430,19 @@ is marked ✗, with its reason below.
 | kubernetes | 71% of 102 | 67 | 12 | 1 | 22 |
 | helm | 71% of 102 | 67 | 12 | 1 | 22 |
 | kustomize | 71% of 102 | 67 | 12 | 1 | 22 |
-| vagrant | 81% of 115 | 86 | 15 | 0 | 14 |
-| docker-vm | 77% of 110 | 84 | 3 | 0 | 23 |
-| hybrid | 65% of 135 | 86 | 5 | 7 | 37 |
-| proxmox | 78% of 109 | 85 | 2 | 3 | 19 |
-| aws | 60% of 115 | 62 | 15 | 6 | 32 |
-| azure | 60% of 115 | 62 | 14 | 7 | 32 |
-| gcp | 60% of 115 | 62 | 15 | 6 | 32 |
-| digitalocean | 48% of 115 | 51 | 9 | 6 | 49 |
-| linode | 50% of 115 | 53 | 10 | 6 | 46 |
-| oci | 50% of 115 | 53 | 10 | 6 | 46 |
-| cloud-docker | 76% of 110 | 83 | 3 | 0 | 24 |
+| vagrant | 82% of 115 | 86 | 17 | 0 | 12 |
+| docker-vm | 79% of 110 | 86 | 3 | 0 | 21 |
+| hybrid | 66% of 135 | 86 | 7 | 7 | 35 |
+| proxmox | 79% of 109 | 85 | 4 | 3 | 17 |
+| aws | 61% of 115 | 62 | 17 | 6 | 30 |
+| azure | 60% of 115 | 62 | 16 | 7 | 30 |
+| gcp | 61% of 115 | 62 | 17 | 6 | 30 |
+| digitalocean | 49% of 115 | 51 | 11 | 6 | 47 |
+| linode | 51% of 115 | 53 | 12 | 6 | 44 |
+| oci | 51% of 115 | 53 | 12 | 6 | 44 |
+| cloud-docker | 78% of 110 | 85 | 3 | 0 | 22 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 49% of 74 | 32 | 9 | 14 | 19 |
+| external | 50% of 74 | 32 | 11 | 14 | 17 |
 
 ### Refusals
 
@@ -7471,7 +7471,6 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **kubernetes, helm, kustomize, vagrant, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `corp` is an existing network (`external: corp-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones) (`networks.*.external`)
 - **docker, hosted, kubernetes, helm, kustomize, docker-vm, hybrid, aws, azure, gcp, digitalocean, linode, oci, cloud-docker**: Network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one) (`networks.*.bridged.interface`, `networks.*.bridged.dhcp`, `networks.*.bridged.default_route`, `networks.*.bridged.vlan`)
 - **vagrant**: Network `home`: Vagrant's bridged networks take no VLAN tag (Proxmox does) (`networks.*.bridged.vlan`)
-- **vagrant, docker-vm, hybrid, proxmox, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Machine `a` gets `secrets`, which `isoloom run` delivers on the Docker and Kubernetes targets for now (`secrets`, `machines.*.secrets`)
 - **proxmox**: Machine `a`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts) (`machines.*.arch`)
 - **aws**: Machine `a`: arm64 on AWS comes later (Graviton instances and arm64 AMIs) (`machines.*.arch`)
 - **azure**: Machine `a`: arm64 on Azure comes later (Arm-based sizes and arm64 images) (`machines.*.arch`)

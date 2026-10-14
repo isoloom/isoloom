@@ -134,12 +134,14 @@ pub fn setup(env: &Environment, reach: &Reach) -> Block {
         uploads,
         parts: vec![commands(env, reach.auto_stop)],
         depends_on: Vec::new(),
+        announce: (!isoloom_render::secrets::of_containers(env).is_empty()).then(|| "environment".to_string()),
     }
     .block()
 }
 
 /// Once cloud-init is done: the auto-stop, the plan's `Prelude` (the constraints) and
-/// `Project` steps, Docker, the Compose file started, then the `Ready` step.
+/// `Project` steps, Docker, the Compose file started (once `isoloom run` delivered the
+/// containers' secrets), then the `Ready` step.
 fn commands(env: &Environment, auto_stop_here: bool) -> Vec<Expression> {
     let mut cmds: Vec<Expression> = vec![string("set -e"), string(CLOUD_INIT_WAIT)];
     if auto_stop_here {
@@ -157,7 +159,14 @@ fn commands(env: &Environment, auto_stop_here: bool) -> Vec<Expression> {
     } else {
         format!("set -a; . {}; set +a; ", steps::INPUTS_FILE)
     };
-    cmds.push(string(format!("cd {} && {inputs}{}", steps::PROJECT_DIR, start(env))));
+    let up = format!("cd {} && {inputs}{}", steps::PROJECT_DIR, start(env));
+    // The containers' secrets are root's on the host: read, then Compose started, as root.
+    let secrets = isoloom_render::secrets::of_containers(env);
+    if secrets.is_empty() {
+        cmds.push(string(up));
+    } else {
+        cmds.push(string(as_root(&format!("{}{up}", isoloom_render::secrets::host_environment(&secrets)), true)));
+    }
     cmds.extend(root(&Step::Ready));
     cmds
 }

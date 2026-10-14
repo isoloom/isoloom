@@ -82,6 +82,20 @@ backend's, each cloud adds its network, firewall and VM, and the Docker host's s
 and `Ready` steps around Docker and `docker compose up --wait`. `cloud-services`
 (`CloudServicesBackend`) writes its scripts from the plan and refuses from its capabilities.
 
+### Secrets on the VMs
+
+A secret's value is never in the plan or a generated file. On a VM target, `isoloom run` writes
+it over the machine's own SSH (`crates/isoloom/src/secrets/vms.rs`), the values on the
+connection's standard input, to a script with none in it (`isoloom_render::secrets::receive`).
+The set-up runs inside the target's tool, so the plan's `Secrets` step (after the machine's
+files, before its `depends_on` waits, `provision` steps, `before` steps and command) is a gate:
+it waits for the delivery mark while `isoloom run` delivers beside the tool, and a boot service
+puts the files back at every boot. A cloud VM's Terraform set-up writes its address to
+`.isoloom-reach/<machine>` first, since the module's outputs come only once every set-up is
+done; Proxmox (cloud-init) is delivered to after Terraform, an existing host before its
+provisioning. A Docker host gets its containers' secrets the same way and hands them to
+`docker compose up` as `ISOLOOM_SECRET_<NAME>`.
+
 ### The controller's playbooks
 
 Every target that runs playbooks (Vagrant, Proxmox, the clouds) runs the same controller script,

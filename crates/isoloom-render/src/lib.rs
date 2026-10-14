@@ -14,6 +14,7 @@ pub mod machine_setup;
 pub mod playbooks;
 pub mod project;
 pub mod router;
+pub mod secrets;
 pub mod steps;
 pub mod trunks;
 

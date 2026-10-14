@@ -89,6 +89,8 @@ pub fn blocks(w: Machine) -> Vec<Block> {
         uploads,
         parts: vec![commands],
         depends_on,
+        // A Windows machine gets no secrets (the plan's `WindowsSecrets`).
+        announce: None,
     };
     out.push(setup.block());
     out
@@ -109,6 +111,7 @@ fn rename(w: &Machine, connection: &Connection) -> [Block; 2] {
             up = host.to_uppercase()
         ))]],
         depends_on: Vec::new(),
+        announce: None,
     };
     let pause = Block::builder("resource")
         .add_label("time_sleep")
