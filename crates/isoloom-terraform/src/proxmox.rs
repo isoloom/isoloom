@@ -45,6 +45,7 @@ pub const LIMITS: Limits = Limits {
     gateways: Some("networks with a `gateway` machine on Proxmox come later"),
     playbook_checks: None,
     tc: None,
+    ipv6: None,
 };
 
 /// Cloud images by OS name (Linux for now).
@@ -99,6 +100,7 @@ impl Backend for ProxmoxBackend {
             Feature::MachineAliases,
             Feature::Ulimits,
             Feature::TrafficControl,
+            Feature::Ipv6,
         ])
     }
 

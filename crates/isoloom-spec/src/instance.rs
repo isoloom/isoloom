@@ -7,8 +7,8 @@
 //! networks), so machines keep the addresses the spec writes.
 
 use crate::model::{NetworkDocker, Spec};
-use crate::validate::Cidr;
 use crate::validate::docker_cidrs;
+use crate::validate::{Cidr, Cidr6};
 
 /// The highest instance number.
 pub const MAX: u8 = 99;
@@ -46,6 +46,7 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec, String> {
             });
         }
     }
+    shift_ipv6(&mut s, n)?;
     // Published host ports: 100 apart per instance (8080 -> 8180 for instance 1).
     for (mname, m) in &mut s.machines {
         for svc in &mut m.services {
@@ -59,6 +60,23 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec, String> {
         }
     }
     Ok(s)
+}
+
+/// IPv6 blocks: the third group moves by n (fd00:20::/64 -> fd00:20:2::/64 for instance 2), on
+/// every target, since Docker refuses two networks on one IPv6 subnet too.
+fn shift_ipv6(s: &mut Spec, n: u8) -> Result<(), String> {
+    for (name, net) in &mut s.networks {
+        let Some(v6) = net.ipv6.as_mut() else { continue };
+        let Some(block) = Cidr6::parse(&v6.cidr) else { continue };
+        let moved = Cidr6 {
+            base: block.base.wrapping_add(u128::from(n) << 80),
+        };
+        if Cidr6::parse(&moved.text()).is_none() {
+            return Err(format!("networks.{name}.ipv6.cidr: {} leaves no room for instance {n}", v6.cidr));
+        }
+        v6.cidr = moved.text();
+    }
+    Ok(())
 }
 
 /// A generated file's path and contents, moved from `.isoloom/` to the instance's folder.

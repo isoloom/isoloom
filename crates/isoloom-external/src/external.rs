@@ -43,6 +43,10 @@ impl Backend for ExternalBackend {
             Feature::MachineAliases,
             Feature::Ulimits,
             Feature::TrafficControl,
+            // The hosts exist with their addresses: an IPv6 network adds nothing to build. An
+            // IPv6-only one would need their IPv6 addresses, which the spec doesn't give.
+            Feature::Ipv6,
+            Feature::Ipv6Auto,
         ])
     }
 

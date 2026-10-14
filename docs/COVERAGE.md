@@ -10,9 +10,9 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 68% | 148 | 99 | 4 | 45 |
+| [Docker Compose](#docker-compose) | 70% | 150 | 103 | 4 | 43 |
 | [Vagrant](#vagrant) | 90% | 42 | 38 | 0 | 4 |
-| [Vagrant: networks](#vagrant-networks) | 73% | 38 | 28 | 0 | 10 |
+| [Vagrant: networks](#vagrant-networks) | 81% | 38 | 31 | 0 | 7 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
 | [Vagrant: provisioners](#vagrant-provisioners) | 94% | 57 | 54 | 0 | 3 |
 | [Vagrant: communicators](#vagrant-communicators) | 100% | 8 | 8 | 0 | 0 |
@@ -25,19 +25,19 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: QEMU](#vagrant-qemu) | 36% | 15 | 4 | 3 | 8 |
 | [Vagrant: ESXi](#vagrant-esxi) | 57% | 19 | 11 | 0 | 8 |
 | [Vagrant: Docker](#vagrant-docker) | 92% | 13 | 12 | 0 | 1 |
-| [Terraform: Proxmox](#terraform-proxmox) | 54% | 124 | 67 | 0 | 57 |
+| [Terraform: Proxmox](#terraform-proxmox) | 57% | 124 | 71 | 0 | 53 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
-| [Terraform: AWS](#terraform-aws) | 58% | 158 | 92 | 0 | 66 |
-| [Terraform: Azure](#terraform-azure) | 73% | 136 | 100 | 0 | 36 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 55% | 110 | 61 | 0 | 49 |
-| [Terraform: DigitalOcean](#terraform-digitalocean) | 71% | 38 | 27 | 0 | 11 |
-| [Terraform: Linode](#terraform-linode) | 48% | 72 | 35 | 0 | 37 |
+| [Terraform: AWS](#terraform-aws) | 69% | 132 | 92 | 0 | 40 |
+| [Terraform: Azure](#terraform-azure) | 74% | 135 | 100 | 0 | 35 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 64% | 95 | 61 | 0 | 34 |
+| [Terraform: DigitalOcean](#terraform-digitalocean) | 75% | 36 | 27 | 0 | 9 |
+| [Terraform: Linode](#terraform-linode) | 59% | 59 | 35 | 0 | 24 |
 | [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 45% | 150 | 68 | 0 | 82 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 95% | 80 | 76 | 0 | 4 |
 | [Ansible inventory](#ansible-inventory) | 95% | 31 | 28 | 3 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 88% | 192 | 170 | 1 | 21 |
+| [Kubernetes](#kubernetes) | 89% | 192 | 172 | 1 | 19 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
 | [Helm](#helm) | 94% | 19 | 18 | 0 | 1 |
 
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-68% of 148 portable features (99 done, 4 partly, 45 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+70% of 150 portable features (103 done, 4 partly, 43 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -276,7 +276,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `networks.*.aliases` | Yes | Yes | From `machines.*.aliases` |
 | `networks.*.interface_name` | Yes | Yes | Network appliances: each network on the interface the image expects |
 | `networks.*.ipv4_address` | Yes | Yes | From `machines.*.networks` (fixed addresses) |
-| `networks.*.ipv6_address` | Yes | Not yet | IPv6 networks |
+| `networks.*.ipv6_address` | Yes | Yes | From `networks.*.ipv6` (each machine's address from its octet; none with `addresses: auto`) |
 | `networks.*.link_local_ips` | No | No | Link-local addresses on a container's interface: cloud VMs get theirs from the provider |
 | `networks.*.mac_address` | Yes | Yes | VLAN trunks: each end found by its fixed MAC address |
 | `networks.*.driver_opts` | No | No | Docker network driver options |
@@ -373,17 +373,17 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `driver_opts` | No | No | Docker network driver options |
 | `ipam` | Yes | Yes | From `networks.*.cidr` |
 | `ipam.driver` | No | No | Docker IPAM drivers have no VM equivalent |
-| `ipam.config` | Yes | Yes | From `networks.*.cidr` |
-| `ipam.config[].subnet` | Yes | Yes | From `networks.*.cidr` |
-| `ipam.config[].ip_range` | n/a | No | Docker's pool for addresses it picks: every machine has a fixed one |
+| `ipam.config` | Yes | Yes | From `networks.*.cidr and networks.*.ipv6.cidr` |
+| `ipam.config[].subnet` | Yes | Yes | From `networks.*.cidr and networks.*.ipv6.cidr` |
+| `ipam.config[].ip_range` | Yes | Yes | From `networks.*.ipv6` (where Docker picks IPv6 addresses, clear of the fixed ones) |
 | `ipam.config[].gateway` | Yes | Yes | The address Docker takes, when the first one is a machine's or the router's |
 | `ipam.config[].aux_addresses` | n/a | No | Addresses Docker must not hand out: every machine has a fixed one |
 | `ipam.options` | No | No | Docker IPAM driver options |
 | `external` | Yes | Partly | The hybrid target: its containers join the macvlan networks the Docker host VM creates, shared with the VMs; not yet: joining a network outside the environment (a Docker network, a host bridge, a VPC) |
 | `external.name` | n/a | No | Legacy spelling of `name` |
 | `internal` | Yes | Yes | From `networks.*.internet: false` (when nothing routes) |
-| `enable_ipv4` | n/a | No | Networks are IPv4 (the default) |
-| `enable_ipv6` | Yes | Not yet | IPv6 networks |
+| `enable_ipv4` | Yes | Yes | From `networks.*.ipv6.only` (off on an IPv6-only network) |
+| `enable_ipv6` | Yes | Yes | From `networks.*.ipv6` |
 | `attachable` | n/a | No | Compose tooling, not the environment's behavior |
 | `labels` | Yes | Yes | The environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc` |
 
@@ -565,7 +565,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Vagrant: networks
 
-73% of 38 portable features (28 done, 0 partly, 10 to do; 58 features in all). From Vagrant 2.4.9 (the networking docs and the providers' network code) and vagrant-libvirt 0.12.2 (its network options).
+81% of 38 portable features (31 done, 0 partly, 7 to do; 58 features in all). From Vagrant 2.4.9 (the networking docs and the providers' network code) and vagrant-libvirt 0.12.2 (its network options).
 
 ### Network types
 
@@ -601,11 +601,11 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `private_network: libvirt__driver_queues` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `private_network: libvirt__forward_device` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `private_network: libvirt__forward_mode` | Yes | Another way | Via networks.*.internet (out through Isoloom's router, the same on every target) |
-| `private_network: libvirt__guest_ipv6` | Yes | Not yet | IPv6 networks |
+| `private_network: libvirt__guest_ipv6` | Yes | Yes | From `networks.*.ipv6` (the libvirt network carries the block; the set-up steps give each VM its address; not run on a real host) |
 | `private_network: libvirt__host_ip` | Yes | Another way | Via `ip` and `netmask`: libvirt derives the network from them |
 | `private_network: libvirt__iface_name` | n/a | No | How vagrant-libvirt names and cleans up its interfaces |
-| `private_network: libvirt__ipv6_address` | Yes | Not yet | IPv6 networks |
-| `private_network: libvirt__ipv6_prefix` | Yes | Not yet | IPv6 networks |
+| `private_network: libvirt__ipv6_address` | Yes | Yes | From `networks.*.ipv6` (the libvirt network carries the block; the set-up steps give each VM its address; not run on a real host) |
+| `private_network: libvirt__ipv6_prefix` | Yes | Yes | From `networks.*.ipv6` (the libvirt network carries the block; the set-up steps give each VM its address; not run on a real host) |
 | `private_network: libvirt__mac` | No | No | Cloud VMs get their MAC and addresses from the provider |
 | `private_network: libvirt__model_type` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `private_network: libvirt__mtu` | No | No | Cloud networks set their own MTU |
@@ -1517,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-54% of 124 portable features (67 done, 0 partly, 57 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
+57% of 124 portable features (71 done, 0 partly, 53 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1806,7 +1806,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `agent.wait_for_ip` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `agent.wait_for_ip.disabled` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `agent.wait_for_ip.ipv4` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
-| `agent.wait_for_ip.ipv6` | Yes | Not yet | With IPv6 networks |
+| `agent.wait_for_ip.ipv6` | Yes | Another way | Via networks.*.ipv6: a set-up step gives each VM its IPv6 address, the same on every VM target (not run on a real host) |
 | `amd_sev` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `amd_sev.allow_smt` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `amd_sev.kernel_hashes` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
@@ -1895,9 +1895,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `initialization.ip_config.ipv4` | Yes | Yes | Written by the generator |
 | `initialization.ip_config.ipv4.address` | Yes | Yes | Written by the generator |
 | `initialization.ip_config.ipv4.gateway` | Yes | Yes | Written by the generator |
-| `initialization.ip_config.ipv6` | Yes | Not yet | With IPv6 networks |
-| `initialization.ip_config.ipv6.address` | Yes | Not yet | With IPv6 networks |
-| `initialization.ip_config.ipv6.gateway` | Yes | Not yet | With IPv6 networks |
+| `initialization.ip_config.ipv6` | Yes | Another way | Via networks.*.ipv6: a set-up step gives each VM its IPv6 address, the same on every VM target (not run on a real host) |
+| `initialization.ip_config.ipv6.address` | Yes | Another way | Via networks.*.ipv6: a set-up step gives each VM its IPv6 address, the same on every VM target (not run on a real host) |
+| `initialization.ip_config.ipv6.gateway` | Yes | Another way | Via networks.*.ipv6: a set-up step gives each VM its IPv6 address, the same on every VM target (not run on a real host) |
 | `initialization.user_account` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.user_account.keys` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `initialization.user_account.password` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -1972,7 +1972,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: AWS
 
-58% of 158 portable features (92 done, 0 partly, 66 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
+69% of 132 portable features (92 done, 0 partly, 40 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -2753,7 +2753,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `disable_api_stop` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `disable_api_termination` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `ebs_optimized` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `enable_primary_ipv6` | Yes | Not yet | With IPv6 networks |
+| `enable_primary_ipv6` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `force_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `get_password_data` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `hibernation` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -2763,8 +2763,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `instance_initiated_shutdown_behavior` | Yes | Yes | Written by the generator |
 | `instance_type` | Yes | Yes | Written by the generator |
-| `ipv6_address_count` | Yes | Not yet | With IPv6 networks |
-| `ipv6_addresses` | Yes | Not yet | With IPv6 networks |
+| `ipv6_address_count` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_addresses` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `key_name` | Yes | Yes | Written by the generator |
 | `monitoring` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -2898,17 +2898,17 @@ Only what the examples generate is checked: a feature no example uses can still 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
-| `enable_primary_ipv6` | Yes | Not yet | With IPv6 networks |
+| `enable_primary_ipv6` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `interface_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `ipv4_prefix_count` | Yes | Not yet | With several addresses on one network |
 | `ipv4_prefixes` | Yes | Not yet | With several addresses on one network |
-| `ipv6_address_count` | Yes | Not yet | With IPv6 networks |
-| `ipv6_address_list` | Yes | Not yet | With IPv6 networks |
-| `ipv6_address_list_enabled` | Yes | Not yet | With IPv6 networks |
-| `ipv6_addresses` | Yes | Not yet | With IPv6 networks |
-| `ipv6_prefix_count` | Yes | Not yet | With IPv6 networks |
-| `ipv6_prefixes` | Yes | Not yet | With IPv6 networks |
+| `ipv6_address_count` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_address_list` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_address_list_enabled` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_addresses` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_prefix_count` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_prefixes` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `private_ip` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `private_ip_list` | Yes | Not yet | With several addresses on one network |
 | `private_ip_list_enabled` | Yes | Not yet | With several addresses on one network |
@@ -2952,9 +2952,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `route.cidr_block` | Yes | Yes | Written by the generator |
 | `route.core_network_arn` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `route.destination_prefix_list_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
-| `route.egress_only_gateway_id` | Yes | Not yet | With IPv6 networks |
+| `route.egress_only_gateway_id` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `route.gateway_id` | Yes | Yes | Written by the generator |
-| `route.ipv6_cidr_block` | Yes | Not yet | With IPv6 networks |
+| `route.ipv6_cidr_block` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `route.local_gateway_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `route.nat_gateway_id` | Yes | Not yet | Private networks reaching the internet through NAT |
 | `route.network_interface_id` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
@@ -2993,7 +2993,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `egress.cidr_blocks` | Yes | Yes | Written by the generator |
 | `egress.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `egress.from_port` | Yes | Yes | Written by the generator |
-| `egress.ipv6_cidr_blocks` | Yes | Not yet | With IPv6 networks |
+| `egress.ipv6_cidr_blocks` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `egress.prefix_list_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `egress.protocol` | Yes | Yes | Written by the generator |
 | `egress.security_groups` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -3004,7 +3004,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ingress.cidr_blocks` | Yes | Yes | Written by the generator |
 | `ingress.description` | Yes | Yes | Written by the generator |
 | `ingress.from_port` | Yes | Yes | Written by the generator |
-| `ingress.ipv6_cidr_blocks` | Yes | Not yet | With IPv6 networks |
+| `ingress.ipv6_cidr_blocks` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `ingress.prefix_list_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `ingress.protocol` | Yes | Yes | Written by the generator |
 | `ingress.security_groups` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -3025,22 +3025,22 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `assign_ipv6_address_on_creation` | Yes | Not yet | With IPv6 networks |
+| `assign_ipv6_address_on_creation` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `availability_zone` | Yes | Yes | Written by the generator |
 | `availability_zone_id` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 | `cidr_block` | Yes | Yes | Written by the generator |
 | `customer_owned_ipv4_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `enable_dns64` | Yes | Not yet | With IPv6 networks |
+| `enable_dns64` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `enable_lni_at_device_index` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `enable_resource_name_dns_a_record_on_launch` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
-| `enable_resource_name_dns_aaaa_record_on_launch` | Yes | Not yet | With IPv6 networks |
+| `enable_resource_name_dns_aaaa_record_on_launch` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `ipv4_ipam_pool_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `ipv4_netmask_length` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `ipv6_cidr_block` | Yes | Not yet | With IPv6 networks |
-| `ipv6_ipam_pool_id` | Yes | Not yet | With IPv6 networks |
-| `ipv6_native` | Yes | Not yet | With IPv6 networks |
-| `ipv6_netmask_length` | Yes | Not yet | With IPv6 networks |
+| `ipv6_cidr_block` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_ipam_pool_id` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_native` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_netmask_length` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `map_customer_owned_ip_on_launch` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `map_public_ip_on_launch` | Yes | Yes | Written by the generator |
 | `outpost_arn` | n/a | No | Where in the account or region the resource lives: no change in behavior |
@@ -3057,7 +3057,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `assign_generated_ipv6_cidr_block` | Yes | Not yet | With IPv6 networks |
+| `assign_generated_ipv6_cidr_block` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `cidr_block` | Yes | Yes | Written by the generator |
 | `enable_dns_hostnames` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `enable_dns_support` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
@@ -3066,10 +3066,10 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `instance_tenancy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `ipv4_ipam_pool_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `ipv4_netmask_length` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `ipv6_cidr_block` | Yes | Not yet | With IPv6 networks |
-| `ipv6_cidr_block_network_border_group` | Yes | Not yet | With IPv6 networks |
-| `ipv6_ipam_pool_id` | Yes | Not yet | With IPv6 networks |
-| `ipv6_netmask_length` | Yes | Not yet | With IPv6 networks |
+| `ipv6_cidr_block` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_cidr_block_network_border_group` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_ipam_pool_id` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
+| `ipv6_netmask_length` | No | No | An AWS VPC's IPv6 block is Amazon's (or one registered with it), never the spec's: Isoloom refuses IPv6 networks on AWS |
 | `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
 | `tags` | Yes | Yes | Written by the generator |
 | `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -3128,7 +3128,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: Azure
 
-73% of 136 portable features (100 done, 0 partly, 36 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+74% of 135 portable features (100 done, 0 partly, 35 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3568,7 +3568,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `ip_configuration.primary` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `ip_configuration.private_ip_address` | Yes | Yes | Written by the generator |
 | `ip_configuration.private_ip_address_allocation` | Yes | Yes | Written by the generator |
-| `ip_configuration.private_ip_address_version` | Yes | Not yet | With IPv6 networks |
+| `ip_configuration.private_ip_address_version` | Yes | Not yet | The cloud takes the spec's unique local block (the Azure module writes it), but cloud-vm generates only when AWS takes the environment, which it refuses with IPv6 |
 | `ip_configuration.public_ip_address_id` | Yes | Yes | Written by the generator |
 | `ip_configuration.subnet_id` | Yes | Yes | Written by the generator |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
@@ -3634,7 +3634,7 @@ And 1373 other resource types that only this cloud has: its managed services, ne
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `idle_timeout_in_minutes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `ip_tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `ip_version` | Yes | Not yet | With IPv6 networks |
+| `ip_version` | No | No | A public IPv6 address: local targets have none, and Isoloom reaches machines over IPv4 |
 | `location` | Yes | Yes | Written by the generator |
 | `name` | Yes | Yes | Written by the generator |
 | `public_ip_prefix_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -3854,7 +3854,7 @@ And 894 other resource types that only this cloud has: its managed services, net
 
 ## Terraform: Google Cloud
 
-55% of 110 portable features (61 done, 0 partly, 49 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+64% of 95 portable features (61 done, 0 partly, 34 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4479,14 +4479,14 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `instance_encryption_key.kms_key_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `network_interface` | Yes | Yes | Written by the generator |
 | `network_interface.igmp_query` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `network_interface.internal_ipv6_prefix_length` | Yes | Not yet | With IPv6 networks |
-| `network_interface.ipv6_address` | Yes | Not yet | With IPv6 networks |
+| `network_interface.internal_ipv6_prefix_length` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
+| `network_interface.ipv6_address` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `network_interface.network` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `network_interface.network_attachment` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `network_interface.network_ip` | Yes | Yes | Written by the generator |
 | `network_interface.nic_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `network_interface.queue_count` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `network_interface.stack_type` | Yes | Not yet | With IPv6 networks |
+| `network_interface.stack_type` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `network_interface.subnetwork` | Yes | Yes | Written by the generator |
 | `network_interface.subnetwork_project` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `network_interface.vlan` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
@@ -4497,12 +4497,12 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `network_interface.alias_ip_range` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `network_interface.alias_ip_range.ip_cidr_range` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `network_interface.alias_ip_range.subnetwork_range_name` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `network_interface.ipv6_access_config` | Yes | Not yet | With IPv6 networks |
-| `network_interface.ipv6_access_config.external_ipv6` | Yes | Not yet | With IPv6 networks |
-| `network_interface.ipv6_access_config.external_ipv6_prefix_length` | Yes | Not yet | With IPv6 networks |
-| `network_interface.ipv6_access_config.name` | Yes | Not yet | With IPv6 networks |
-| `network_interface.ipv6_access_config.network_tier` | Yes | Not yet | With IPv6 networks |
-| `network_interface.ipv6_access_config.public_ptr_domain_name` | Yes | Not yet | With IPv6 networks |
+| `network_interface.ipv6_access_config` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
+| `network_interface.ipv6_access_config.external_ipv6` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
+| `network_interface.ipv6_access_config.external_ipv6_prefix_length` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
+| `network_interface.ipv6_access_config.name` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
+| `network_interface.ipv6_access_config.network_tier` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
+| `network_interface.ipv6_access_config.public_ptr_domain_name` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `network_performance_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `network_performance_config.total_egress_bandwidth_tier` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `params` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -4565,9 +4565,9 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `delete_default_routes_on_create` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
-| `enable_ula_internal_ipv6` | Yes | Not yet | With IPv6 networks |
+| `enable_ula_internal_ipv6` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
-| `internal_ipv6_range` | Yes | Not yet | With IPv6 networks |
+| `internal_ipv6_range` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `mtu` | Yes | Not yet | A network's MTU |
 | `name` | Yes | Yes | Written by the generator |
 | `network_firewall_policy_enforcement_order` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
@@ -4588,12 +4588,12 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `allow_subnet_cidr_routes_overlap` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
-| `external_ipv6_prefix` | Yes | Not yet | With IPv6 networks |
+| `external_ipv6_prefix` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
-| `internal_ipv6_prefix` | Yes | Not yet | With IPv6 networks |
+| `internal_ipv6_prefix` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `ip_cidr_range` | Yes | Yes | Written by the generator |
 | `ip_collection` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
-| `ipv6_access_type` | Yes | Not yet | With IPv6 networks |
+| `ipv6_access_type` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `name` | Yes | Yes | Written by the generator |
 | `network` | Yes | Yes | Written by the generator |
 | `private_ip_google_access` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
@@ -4605,7 +4605,7 @@ And 894 other resource types that only this cloud has: its managed services, net
 | `resolve_subnet_mask` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `role` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
 | `send_secondary_ip_range_if_empty` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
-| `stack_type` | Yes | Not yet | With IPv6 networks |
+| `stack_type` | No | No | Google Cloud picks a VPC's internal IPv6 range itself (inside fd20::/20), never the spec's: Isoloom refuses IPv6 networks on Google Cloud |
 | `log_config` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
 | `log_config.aggregation_interval` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
 | `log_config.filter_expr` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
@@ -4663,7 +4663,7 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: DigitalOcean
 
-71% of 38 portable features (27 done, 0 partly, 11 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
+75% of 36 portable features (27 done, 0 partly, 9 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4718,8 +4718,8 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 | `graceful_shutdown` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `image` | Yes | Yes | Written by the generator |
-| `ipv6` | Yes | Not yet | With IPv6 networks |
-| `ipv6_address` | Yes | Not yet | With IPv6 networks |
+| `ipv6` | No | No | DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one): Isoloom refuses IPv6 networks on DigitalOcean |
+| `ipv6_address` | No | No | DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one): Isoloom refuses IPv6 networks on DigitalOcean |
 | `monitoring` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `name` | Yes | Yes | Written by the generator |
 | `private_networking` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -4794,7 +4794,7 @@ And 55 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Linode
 
-48% of 72 portable features (35 done, 0 partly, 37 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
+59% of 59 portable features (35 done, 0 partly, 24 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4875,7 +4875,7 @@ And 55 other resource types that only this cloud has: its managed services, netw
 | `inbound.action` | Yes | Yes | Written by the generator |
 | `inbound.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `inbound.ipv4` | Yes | Yes | Written by the generator |
-| `inbound.ipv6` | Yes | Not yet | With IPv6 networks |
+| `inbound.ipv6` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
 | `inbound.label` | Yes | Yes | Written by the generator |
 | `inbound.ports` | Yes | Yes | Written by the generator |
 | `inbound.protocol` | Yes | Yes | Written by the generator |
@@ -4883,7 +4883,7 @@ And 55 other resource types that only this cloud has: its managed services, netw
 | `outbound.action` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
 | `outbound.description` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
 | `outbound.ipv4` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
-| `outbound.ipv6` | Yes | Not yet | With IPv6 networks |
+| `outbound.ipv6` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
 | `outbound.label` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
 | `outbound.ports` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
 | `outbound.protocol` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
@@ -5236,12 +5236,12 @@ And 55 other resource types that only this cloud has: its managed services, netw
 | `interface.ipv4` | Yes | Yes | Written by the generator |
 | `interface.ipv4.nat_1_1` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `interface.ipv4.vpc` | Yes | Yes | Written by the generator |
-| `interface.ipv6` | Yes | Not yet | With IPv6 networks |
-| `interface.ipv6.is_public` | Yes | Not yet | With IPv6 networks |
-| `interface.ipv6.range` | Yes | Not yet | With IPv6 networks |
-| `interface.ipv6.range.range` | Yes | Not yet | With IPv6 networks |
-| `interface.ipv6.slaac` | Yes | Not yet | With IPv6 networks |
-| `interface.ipv6.slaac.range` | Yes | Not yet | With IPv6 networks |
+| `interface.ipv6` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
+| `interface.ipv6.is_public` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
+| `interface.ipv6.range` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
+| `interface.ipv6.range.range` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
+| `interface.ipv6.slaac` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
+| `interface.ipv6.slaac.range` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
 | `linode_interfaces` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `linode_interfaces.firewall_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `linode_interfaces.default_route` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -5291,9 +5291,9 @@ And 55 other resource types that only this cloud has: its managed services, netw
 | `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `ipv4.range` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
-| `ipv6` | Yes | Not yet | With IPv6 networks |
-| `ipv6.allocation_class` | Yes | Not yet | With IPv6 networks |
-| `ipv6.range` | Yes | Not yet | With IPv6 networks |
+| `ipv6` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
+| `ipv6.allocation_class` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
+| `ipv6.range` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
 | `label` | Yes | Yes | Written by the generator |
 | `region` | Yes | Yes | Written by the generator |
 | `vpc_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -5303,8 +5303,8 @@ And 55 other resource types that only this cloud has: its managed services, netw
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
 | `ipv4` | Yes | Yes | Written by the generator |
-| `ipv6` | Yes | Not yet | With IPv6 networks |
-| `ipv6.range` | Yes | Not yet | With IPv6 networks |
+| `ipv6` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
+| `ipv6.range` | No | No | Linode assigns a VPC's IPv6 ranges, never the spec's: Isoloom refuses IPv6 networks on Linode |
 | `label` | Yes | Yes | Written by the generator |
 | `vpc_id` | Yes | Yes | Written by the generator |
 
@@ -5687,7 +5687,7 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `availability_config.is_live_migration_preferred` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `availability_config.recovery_action` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `create_vnic_details` | Yes | Yes | Written by the generator |
-| `create_vnic_details.assign_ipv6ip` | Yes | Not yet | With IPv6 networks |
+| `create_vnic_details.assign_ipv6ip` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `create_vnic_details.assign_private_dns_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `create_vnic_details.assign_public_ip` | Yes | Yes | Written by the generator |
 | `create_vnic_details.defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
@@ -5702,10 +5702,10 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `create_vnic_details.subnet_cidr` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `create_vnic_details.subnet_id` | Yes | Yes | Written by the generator |
 | `create_vnic_details.vlan_id` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Not yet | With IPv6 networks |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Not yet | With IPv6 networks |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Not yet | With IPv6 networks |
-| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr` | Yes | Not yet | With IPv6 networks |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `instance_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `instance_options.are_legacy_imds_endpoints_disabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `launch_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -5892,8 +5892,8 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
 | `ipv4cidr_blocks` | Yes | Not yet | With several addresses on one network |
-| `ipv6cidr_block` | Yes | Not yet | With IPv6 networks |
-| `ipv6cidr_blocks` | Yes | Not yet | With IPv6 networks |
+| `ipv6cidr_block` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `ipv6cidr_blocks` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `prohibit_internet_ingress` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `prohibit_public_ip_on_vnic` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `route_table_id` | Yes | Yes | Written by the generator |
@@ -5916,13 +5916,13 @@ And 15 other resource types that only this cloud has: its managed services, netw
 | `dns_label` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `id` | n/a | No | The identifier the provider sets: no change in behavior |
-| `ipv6private_cidr_blocks` | Yes | Not yet | With IPv6 networks |
-| `is_ipv6enabled` | Yes | Not yet | With IPv6 networks |
-| `is_oracle_gua_allocation_enabled` | Yes | Not yet | With IPv6 networks |
+| `ipv6private_cidr_blocks` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `is_ipv6enabled` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `is_oracle_gua_allocation_enabled` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `security_attributes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `byoipv6cidr_details` | Yes | Not yet | With IPv6 networks |
-| `byoipv6cidr_details.byoipv6range_id` | Yes | Not yet | With IPv6 networks |
-| `byoipv6cidr_details.ipv6cidr_block` | Yes | Not yet | With IPv6 networks |
+| `byoipv6cidr_details` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `byoipv6cidr_details.byoipv6range_id` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
+| `byoipv6cidr_details.ipv6cidr_block` | Yes | Not yet | Dual-stack VCNs with the spec's unique local block; Isoloom refuses IPv6 networks on Oracle Cloud until then |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
@@ -6748,7 +6748,7 @@ And 732 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-88% of 192 portable features (170 done, 1 partly, 21 to do; 358 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+89% of 192 portable features (172 done, 1 partly, 19 to do; 358 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -7025,8 +7025,8 @@ And 732 other resource types that only this cloud has: its managed services, net
 | `ServiceSpec: externalTrafficPolicy` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
 | `ServiceSpec: healthCheckNodePort` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
 | `ServiceSpec: internalTrafficPolicy` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
-| `ServiceSpec: ipFamilies` | Yes | Not yet | With IPv6 networks |
-| `ServiceSpec: ipFamilyPolicy` | Yes | Not yet | With IPv6 networks |
+| `ServiceSpec: ipFamilies` | Yes | Yes | From `networks.*.ipv6` (PreferDualStack; SingleStack IPv6 on IPv6-only networks) |
+| `ServiceSpec: ipFamilyPolicy` | Yes | Yes | From `networks.*.ipv6` (PreferDualStack; SingleStack IPv6 on IPv6-only networks) |
 | `ServiceSpec: loadBalancerClass` | n/a | No | How the cluster routes a Service: machines reach each other by name and port |
 | `ServiceSpec: loadBalancerIP` | Yes | Another way | Via `publish`: a LoadBalancer Service on the published port |
 | `ServiceSpec: loadBalancerSourceRanges` | Yes | Another way | Via the published port's NetworkPolicy |
@@ -7255,6 +7255,9 @@ is marked ✗, with its reason below.
 | `networks.*.vlans.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `networks.*.internet` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | ◐ |
 | `networks.*.gateway` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | n/a |
+| `networks.*.ipv6.cidr` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
+| `networks.*.ipv6.addresses` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✓ |
+| `networks.*.ipv6.only` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | ✗ |
 | `reach[].from` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].to` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
 | `reach[].ports` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | n/a | ◐ |
@@ -7348,24 +7351,24 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 90% of 73 | 66 | 0 | 0 | 7 |
-| hosted | 90% of 73 | 66 | 0 | 0 | 7 |
-| kubernetes | 73% of 65 | 43 | 9 | 2 | 11 |
-| helm | 73% of 65 | 43 | 9 | 2 | 11 |
-| kustomize | 73% of 65 | 43 | 9 | 2 | 11 |
-| vagrant | 97% of 65 | 62 | 3 | 0 | 0 |
-| docker-vm | 90% of 73 | 66 | 0 | 0 | 7 |
-| hybrid | 82% of 82 | 66 | 3 | 7 | 6 |
-| proxmox | 92% of 62 | 57 | 1 | 2 | 2 |
-| aws | 73% of 62 | 40 | 11 | 5 | 6 |
-| azure | 73% of 62 | 40 | 11 | 5 | 6 |
-| gcp | 73% of 62 | 40 | 11 | 5 | 6 |
-| digitalocean | 52% of 62 | 29 | 7 | 5 | 21 |
-| linode | 56% of 62 | 31 | 8 | 5 | 18 |
-| oci | 56% of 62 | 31 | 8 | 5 | 18 |
-| cloud-docker | 89% of 73 | 65 | 0 | 0 | 8 |
+| docker | 90% of 76 | 69 | 0 | 0 | 7 |
+| hosted | 90% of 76 | 69 | 0 | 0 | 7 |
+| kubernetes | 74% of 68 | 46 | 9 | 2 | 11 |
+| helm | 74% of 68 | 46 | 9 | 2 | 11 |
+| kustomize | 74% of 68 | 46 | 9 | 2 | 11 |
+| vagrant | 94% of 68 | 63 | 3 | 0 | 2 |
+| docker-vm | 90% of 76 | 69 | 0 | 0 | 7 |
+| hybrid | 79% of 85 | 66 | 3 | 7 | 9 |
+| proxmox | 90% of 65 | 58 | 1 | 2 | 4 |
+| aws | 70% of 65 | 40 | 11 | 5 | 9 |
+| azure | 70% of 65 | 40 | 11 | 6 | 8 |
+| gcp | 70% of 65 | 40 | 11 | 5 | 9 |
+| digitalocean | 50% of 65 | 29 | 7 | 5 | 24 |
+| linode | 53% of 65 | 31 | 8 | 5 | 21 |
+| oci | 53% of 65 | 31 | 8 | 5 | 21 |
+| cloud-docker | 89% of 76 | 68 | 0 | 0 | 8 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 65% of 53 | 30 | 9 | 14 | 0 |
+| external | 65% of 56 | 32 | 9 | 14 | 1 |
 
 ### Refusals
 
@@ -7383,6 +7386,14 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **hybrid**: Networks with a `gateway` machine in hybrid environments come later (`networks.*.gateway`)
 - **proxmox**: Networks with a `gateway` machine on Proxmox come later (`networks.*.gateway`)
 - **aws, azure, gcp**: Networks with a `gateway` machine in the cloud come later (`networks.*.gateway`)
+- **hybrid**: Network `lan` is IPv6 (`ipv6`), which this target's networks don't carry yet (`networks.*.ipv6.cidr`, `networks.*.ipv6.addresses`, `networks.*.ipv6.only`)
+- **aws**: Network `lan` is IPv6: an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks (`networks.*.ipv6.cidr`)
+- **gcp**: Network `lan` is IPv6: Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept (`networks.*.ipv6.cidr`)
+- **digitalocean**: Network `lan` is IPv6: DigitalOcean VPCs are IPv4 only (a droplet's IPv6 address is a public one) (`networks.*.ipv6.cidr`)
+- **linode**: Network `lan` is IPv6: a Linode VPC's IPv6 ranges are Linode's to assign, so the spec's block can't be kept (`networks.*.ipv6.cidr`)
+- **oci**: Network `lan` is IPv6: dual-stack virtual cloud networks on Oracle Cloud come later (`networks.*.ipv6.cidr`)
+- **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci**: Network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static` (`networks.*.ipv6.addresses`)
+- **vagrant, proxmox, aws, azure, gcp, digitalocean, linode, oci, external**: Network `lan` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport) (`networks.*.ipv6.only`)
 - **proxmox**: Machine `a`: arm64 on Proxmox comes later (arm64 is uncommon on Proxmox hosts) (`machines.*.arch`)
 - **aws**: Machine `a`: arm64 on AWS comes later (Graviton instances and arm64 AMIs) (`machines.*.arch`)
 - **azure**: Machine `a`: arm64 on Azure comes later (Arm-based sizes and arm64 images) (`machines.*.arch`)

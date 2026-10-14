@@ -164,6 +164,9 @@ pub struct Attachment {
     /// The fixed address on the network.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipv4_address: Option<String>,
+    /// The fixed IPv6 address on an IPv6 network.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ipv6_address: Option<String>,
     /// Other names the service answers to on the network.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
@@ -262,6 +265,12 @@ pub struct Network {
     /// Its name on the Docker host, when not `<project>_<key>`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// IPv4 off: an IPv6-only network.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_ipv4: Option<bool>,
+    /// IPv6 on: a dual-stack or IPv6-only network.
+    #[serde(skip_serializing_if = "no")]
+    pub enable_ipv6: bool,
     /// Its address blocks.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipam: Option<Ipam>,
@@ -288,6 +297,9 @@ pub struct Subnet {
     /// The address Docker takes on the network, when not the first one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gateway: Option<String>,
+    /// Where Docker picks the addresses it hands out, away from the fixed ones.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ip_range: Option<String>,
 }
 
 /// A named volume: only Isoloom's labels.

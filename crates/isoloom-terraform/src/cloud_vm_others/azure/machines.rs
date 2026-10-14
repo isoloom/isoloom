@@ -18,7 +18,7 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
     let id = res(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), group(env, name, false));
     m.block(public_ip(&id, name));
-    m.blocks(nics(&id, name, mp.addresses.iter().map(|(n, a)| (n.as_str(), *a))));
+    m.blocks(nics(&id, name, mp));
     let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
     let disk = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(30);
     let ids = mp
@@ -51,16 +51,28 @@ fn mac(nic: &str) -> Expression {
 
 /// An interface per network (the first carries the public IP; forwarding on for a machine on
 /// several), each with its association to the machine's security group.
-fn nics<'a>(id: &str, who: &str, addresses: impl ExactSizeIterator<Item = (&'a str, std::net::Ipv4Addr)>) -> Vec<Block> {
+fn nics(id: &str, who: &str, mp: &MachinePlan) -> Vec<Block> {
+    controller_nics(id, who, &mp.addresses, &mp.addresses6)
+}
+
+/// The same from the addresses themselves (each IPv6 one beside its network's IPv4 one).
+fn controller_nics(
+    id: &str,
+    who: &str,
+    addresses: &indexmap::IndexMap<String, std::net::Ipv4Addr>,
+    addresses6: &indexmap::IndexMap<String, std::net::Ipv6Addr>,
+) -> Vec<Block> {
     let forwarding = addresses.len() > 1;
     addresses
+        .iter()
         .enumerate()
         .flat_map(|(i, (net, address))| {
             nic(&Nic {
                 id,
                 who,
                 net,
-                address,
+                address: *address,
+                address6: addresses6.get(net).copied(),
                 primary: i == 0,
                 forwarding,
             })
@@ -116,6 +128,9 @@ fn group(env: &Environment, name: &str, windows: bool) -> Block {
     let mut g = Nsg::new(&res(name), name);
     for n in m.networks.keys() {
         g = g.allow(&format!("net-{n}"), "*", "*", string(env.networks[n].cidr.as_str()));
+        if let Some(v6) = &env.networks[n].ipv6 {
+            g = g.allow(&format!("net-{n}-ipv6"), "*", "*", string(v6.cidr.as_str()));
+        }
     }
     g = if windows {
         g.allow("winrm", "Tcp", "5985", allowed())
@@ -127,14 +142,14 @@ fn group(env: &Environment, name: &str, windows: bool) -> Block {
         .iter()
         .filter(|x| m.networks.contains_key(&x.to) && !m.networks.contains_key(&x.from));
     for (i, reach) in opened.enumerate() {
-        let from = || string(env.networks[&reach.from].cidr.as_str());
-        let rule = format!("reach-{i}-{}", reach.from);
-        if reach.ports.is_empty() {
-            g = g.allow(&rule, "*", "*", from());
-        }
-        for p in &reach.ports {
-            g = g.allow(&format!("{rule}-{p}-tcp"), "Tcp", &p.to_string(), from());
-            g = g.allow(&format!("{rule}-{p}-udp"), "Udp", &p.to_string(), from());
+        // Each block of the network the rule opens from: its IPv4 one, and its IPv6 one when
+        // both ends are IPv6.
+        let from = &env.networks[&reach.from];
+        let both6 = from.ipv6.is_some() && env.networks[&reach.to].ipv6.is_some();
+        let v6 = from.ipv6.as_ref().filter(|_| both6).map(|v| (v.cidr.as_str(), "-ipv6"));
+        for (block, suffix) in std::iter::once((from.cidr.as_str(), "")).chain(v6) {
+            let rule = format!("reach-{i}-{}{suffix}", reach.from);
+            g = reach_rules(g, &rule, &reach.ports, block);
         }
     }
     for p in &env.machines[name].ports {
@@ -155,7 +170,7 @@ pub fn windows(env: &Environment, name: &str, m: &mut Module) {
     let id = res(name);
     m.commented(&format!("Machine `{name}` (Windows): what may reach it."), group(env, name, true));
     m.block(public_ip(&id, name));
-    m.blocks(nics(&id, name, mp.addresses.iter().map(|(n, a)| (n.as_str(), *a))));
+    m.blocks(nics(&id, name, mp));
     m.block(windows_vm(env, name, mp));
     m.blocks(windows::blocks(windows::Machine {
         env,
@@ -202,6 +217,18 @@ fn windows_auto_stop() -> Expression {
     cloud::auto_stop(task.into_expression(), string("cmd /c ver"))
 }
 
+/// The rules a `reach` rule opens from `block`: every port, or each port in TCP and UDP.
+fn reach_rules(mut g: Nsg, rule: &str, ports: &[u16], block: &str) -> Nsg {
+    if ports.is_empty() {
+        return g.allow(rule, "*", "*", string(block));
+    }
+    for p in ports {
+        g = g.allow(&format!("{rule}-{p}-tcp"), "Tcp", &p.to_string(), string(block));
+        g = g.allow(&format!("{rule}-{p}-udp"), "Udp", &p.to_string(), string(block));
+    }
+    g
+}
+
 /// The controller: its security group (every network may reach it, and SSH from
 /// `allowed_cidr`), an interface on every network at the controller address, its VM, its set-up
 /// over SSH once every machine is set up.
@@ -221,7 +248,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
         .iter()
         .map(|(n, p)| (n.clone(), Cidr::parse(&p.cidr).map_or(std::net::Ipv4Addr::UNSPECIFIED, Cidr::controller)))
         .collect();
-    m.blocks(nics(id, "controller", addresses.iter().map(|(n, a)| (n.as_str(), *a))));
+    m.blocks(controller_nics(id, "controller", &addresses, &indexmap::IndexMap::new()));
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, memory, disk) = controller::size(env);
     let disk = disk.unwrap_or(30).max(30);

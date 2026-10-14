@@ -64,7 +64,9 @@ const GPUS: Support = Planned {
 const DEVICES: Support = Planned {
     note: "device passthrough where the target has the device, refused where it has none",
 };
-const IPV6: Support = Planned { note: "IPv6 networks" };
+const IPV6: Support = Support::Emitted {
+    from: "networks.*.ipv6 (each machine's address from its octet; none with `addresses: auto`)",
+};
 const MODEL_RUNNER: Support = NotPortable {
     why: "served by Docker's model runner: VMs and the cloud have none",
 };

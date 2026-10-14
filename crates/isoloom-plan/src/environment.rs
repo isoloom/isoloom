@@ -8,7 +8,7 @@
 //! (appliance wiring, trunk scripts) a backend still reads from [`Environment::spec`], the spec
 //! as laid out for the target.
 
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
 use isoloom_spec::images;
@@ -19,6 +19,7 @@ use crate::addressing::{address, address_for, host_address, start_order};
 use crate::ansible;
 use crate::checks::{self, Resolved};
 use crate::images::{Images, tag_of};
+use crate::ipv6::{self, Ipv6Plan, Route6};
 use crate::lifecycle::{self, MachineLifecycle};
 use crate::requirements::{self, Requirement};
 use crate::routing;
@@ -36,6 +37,8 @@ pub struct Environment {
     pub networks: IndexMap<String, NetworkPlan>,
     /// Isoloom's router, when `reach` rules need one: its address on each network it routes.
     pub router: Option<IndexMap<String, Ipv4Addr>>,
+    /// The router's IPv6 address on each IPv6 network it routes (empty without a router).
+    pub router6: IndexMap<String, Ipv6Addr>,
     /// Its machines, in spec order.
     pub machines: IndexMap<String, MachinePlan>,
     /// Machine names, each after the machines it waits for.
@@ -72,6 +75,8 @@ pub struct NetworkPlan {
     pub tc: Option<Tc>,
     /// The LAN and VLAN id it is, when it is a LAN's VLAN.
     pub vlan: Option<(String, u16)>,
+    /// Its IPv6 side, when it is dual-stack or IPv6-only.
+    pub ipv6: Option<Ipv6Plan>,
 }
 
 /// How a machine is produced on the target.
@@ -94,10 +99,14 @@ pub struct MachinePlan {
     pub shape: MachineShape,
     /// Its address on each of its networks, in its order (the first is its primary network).
     pub addresses: IndexMap<String, Ipv4Addr>,
+    /// Its IPv6 address on each IPv6 network that derives them (not on `addresses: auto` ones).
+    pub addresses6: IndexMap<String, Ipv6Addr>,
     /// Its names: its own, then its aliases.
     pub names: Vec<String>,
     /// Routes to the networks it isn't on.
     pub routes: Vec<Route>,
+    /// IPv6 routes to the IPv6 blocks it isn't on, through the router.
+    pub routes6: Vec<Route6>,
     /// Its default route through a gateway machine, if one routes one of its networks.
     pub default_gateway: Option<Ipv4Addr>,
     /// Whether it is the gateway of one of its networks (it forwards).
@@ -273,6 +282,7 @@ impl Environment {
                 .map(|n| (n.clone(), network(spec, &original.networks[n].cidr, n)))
                 .collect(),
             router,
+            router6: ipv6::router(spec),
             machines,
             start_order: start_order(spec).into_iter().map(String::from).collect(),
             checks: checks::plan(spec),
@@ -293,6 +303,17 @@ impl Environment {
     /// The address `from` reaches `to` at: on a network they share, else `to`'s first.
     pub fn address_for(&self, from: &str, to: &str) -> Ipv4Addr {
         address_for(&self.spec, from, to)
+    }
+
+    /// Where a probe reaches machine `name` on `network`: its IPv4 address, or on an IPv6-only
+    /// network its IPv6 one (its name, which the target's DNS resolves, when the target hands
+    /// addresses out).
+    pub fn probe_address(&self, name: &str, network: &str) -> String {
+        let m = &self.machines[name];
+        if !ipv6::only(&self.spec, network) {
+            return m.addresses[network].to_string();
+        }
+        m.addresses6.get(network).map_or_else(|| name.to_string(), ToString::to_string)
     }
 }
 
@@ -324,6 +345,7 @@ fn network(spec: &Spec, declared: &str, name: &str) -> NetworkPlan {
         internet: n.internet,
         tc: n.tc.clone(),
         vlan: n.vlan.clone(),
+        ipv6: ipv6::network(spec, name),
     }
 }
 
@@ -348,8 +370,10 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
     MachinePlan {
         shape,
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
+        addresses6: ipv6::addresses(spec, m),
         names: std::iter::once(name).chain(m.aliases.iter().map(String::as_str)).map(String::from).collect(),
         routes: routing::routes(spec, name, m).into_iter().map(|(cidr, via)| Route { cidr, via }).collect(),
+        routes6: if target == Target::CloudVm { Vec::new() } else { ipv6::routes(spec, m) },
         default_gateway: routing::default_gateway(spec, name, m),
         is_gateway: routing::is_gateway(spec, name),
         offline: routing::offline(spec, name, m),
@@ -373,7 +397,11 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         image: image(spec, shape, name, m),
         depends_on: m.depends_on.clone(),
         lifecycle: if shape == MachineShape::Vm {
-            lifecycle::of(spec, name, m)
+            let mut steps = lifecycle::of(spec, name, m);
+            if target == Target::CloudVm {
+                ipv6::cloud_routes(&mut steps);
+            }
+            steps
         } else {
             Vec::new()
         },

@@ -3,12 +3,13 @@
 //! PowerShell where Windows has it); a backend only picks the transport (a Vagrant provisioner,
 //! cloud-init, `remote-exec`, WinRM).
 
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use isoloom_spec::model::{Machine, Spec, is_reboot};
 
 use crate::addressing::address_for;
 use crate::environment::Route;
+use crate::ipv6::{self, Route6};
 use crate::routing;
 
 /// A machine's set-up steps, in order.
@@ -34,6 +35,14 @@ pub enum Step {
         routes: Vec<Route>,
         /// The default route's next hop.
         default: Option<Ipv4Addr>,
+    },
+    /// Its IPv6 addresses, each on the interface holding its IPv4 address on that network,
+    /// then its IPv6 routes through the router.
+    Ipv6 {
+        /// One `(IPv4 address, IPv6 address)` per IPv6 network: the IPv4 one finds the interface.
+        addresses: Vec<(Ipv4Addr, Ipv6Addr)>,
+        /// The routes.
+        routes: Vec<Route6>,
     },
     /// 802.1Q interfaces for the VLANs it reaches through a trunk.
     Trunks,
@@ -125,6 +134,7 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
         routes: routing::routes(spec, name, m).into_iter().map(|(cidr, via)| Route { cidr, via }).collect(),
         default: routing::default_gateway(spec, name, m),
     });
+    steps.extend(ipv6_step(spec, m));
     let own: Vec<String> = m
         .volumes
         .iter()
@@ -147,6 +157,17 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
     }
     steps.push(Step::Ready);
     steps
+}
+
+/// Its IPv6 addresses and routes, when it has any.
+fn ipv6_step(spec: &Spec, m: &Machine) -> Option<Step> {
+    let addresses: Vec<(Ipv4Addr, Ipv6Addr)> = m
+        .networks
+        .iter()
+        .filter_map(|(n, o)| Some((crate::addressing::address(spec, n, *o), ipv6::address(spec, n, *o)?)))
+        .collect();
+    let routes = ipv6::routes(spec, m);
+    (!addresses.is_empty() || !routes.is_empty()).then_some(Step::Ipv6 { addresses, routes })
 }
 
 /// The other machines by name. A Linux machine leaves the Windows ones out: in a domain they are

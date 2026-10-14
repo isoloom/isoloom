@@ -72,6 +72,11 @@ fn check_vlans(spec: &Spec) -> Result<(), String> {
                 "networks.{lan}: a LAN split into VLANs can't have a `gateway` (set the gateway machine on each VLAN's network instead)"
             ));
         }
+        if net.ipv6.is_some() {
+            return Err(format!(
+                "networks.{lan}.ipv6: a LAN split into VLANs carries IPv4 only for now (drop `ipv6`, or give it no `vlans`)"
+            ));
+        }
         let outer = Cidr::parse(&net.cidr);
         for (id, vlan) in &net.vlans {
             let at = format!("networks.{lan}.vlans.{id}");
@@ -160,6 +165,7 @@ fn vlan_as_network(lan: &str, net: &Network, id: u16, vlan: &Vlan) -> Network {
         // A VLAN carries no impairment of its own (set it on a network the router is on).
         tc: None,
         vlan: Some((lan.to_string(), id)),
+        ipv6: None,
     }
 }
 

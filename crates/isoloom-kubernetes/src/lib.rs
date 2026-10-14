@@ -42,6 +42,7 @@
 
 pub mod chart;
 mod checks;
+mod ipv6;
 pub mod kustomize;
 mod machine;
 mod network;
@@ -49,7 +50,7 @@ pub mod objects;
 pub mod pod;
 mod render;
 
-use isoloom_plan::{Capabilities, Environment};
+use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::backend::{Backend, Files, RenderError};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::Target;
@@ -63,12 +64,13 @@ pub const CHART: &str = "chart";
 /// Where the chart's copies of the project's scripts go, under the chart.
 pub const CHART_PROJECT_FILES: &str = "files/project";
 
-/// What Kubernetes can render: none of the plan's optional features. No controller (no
-/// `provision:`, no Ansible checks), `exec` checks run inside a container, no network
-/// appliances, Service names have no dots, no gateway machine routes a network, containers
-/// have no ulimits, and with no router in the path there is nothing to impair links with.
+/// What Kubernetes can render: IPv6 networks of every kind (the cluster picks pod addresses,
+/// so a network's IPv6 side sets the Services' IP families). No controller (no `provision:`,
+/// no Ansible checks), `exec` checks run inside a container, no network appliances, Service
+/// names have no dots, no gateway machine routes a network, containers have no ulimits, and
+/// with no router in the path there is nothing to impair links with.
 pub fn capabilities() -> Capabilities {
-    Capabilities::default()
+    Capabilities::of([Feature::Ipv6, Feature::Ipv6Only, Feature::Ipv6Auto])
 }
 
 /// The `kubernetes` target's backend.

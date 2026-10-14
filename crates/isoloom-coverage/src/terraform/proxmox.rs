@@ -1,7 +1,7 @@
 //! Proxmox (bpg/proxmox): its resource types, and the arguments of what the proxmox target and
 //! docker-vm's Proxmox module write.
 
-use super::support::{ALIAS, ARCH, CREDENTIALS, DEVICES, FIREWALL, FIRMWARE, IPV6, MTU, ORDER, PRIVATE_DNS, PROTECT, SERVER, SHARED, TC, TPM, VLANS};
+use super::support::{ALIAS, ARCH, CREDENTIALS, DEVICES, FIREWALL, FIRMWARE, MTU, ORDER, PRIVATE_DNS, PROTECT, PROXMOX_IPV6, SERVER, SHARED, TC, TPM, VLANS};
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
 
@@ -180,7 +180,10 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (MTU, "network_device.mtu"),
             (SERVER, "network_device.model network_device.queues"),
             (ALIAS, "network_device.disconnected network_device.enabled"),
-            (IPV6, "initialization.ip_config.ipv6 initialization.ip_config.ipv6.* agent.wait_for_ip.ipv6"),
+            (
+                PROXMOX_IPV6,
+                "initialization.ip_config.ipv6 initialization.ip_config.ipv6.* agent.wait_for_ip.ipv6",
+            ),
         ],
     ),
 ];

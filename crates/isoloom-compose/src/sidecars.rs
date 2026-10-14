@@ -49,8 +49,11 @@ fn router_service(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>) -> 
         image: Some(env.images.pull(UTILITY_IMAGE)),
         hostname: Some(router::NAME.into()),
         cap_add: vec!["NET_ADMIN".into()],
-        sysctls: IndexMap::from([("net.ipv4.ip_forward".to_string(), "1".to_string())]),
-        networks: addresses.iter().map(|(n, a)| (n.clone(), Attachment::at(a))).collect(),
+        sysctls: crate::ipv6::forwarding(env),
+        networks: addresses
+            .iter()
+            .map(|(n, a)| (n.clone(), Some(crate::ipv6::router_attachment(env, n, *a))))
+            .collect(),
         environment: Some(environment),
         entrypoint: vec!["/bin/sh".into(), "-c".into(), start.into()],
         healthcheck: Some(Healthcheck::shell("nft list table inet isoloom >/dev/null 2>&1", "3s", 60)),
@@ -83,14 +86,13 @@ fn switch_service(env: &Environment, ts: &[&trunks::Trunk]) -> Service {
 /// A machine's networks, each at its address, with its aliases (resolved by Compose DNS).
 pub(crate) fn attachments(env: &Environment, name: &str, mp: &MachinePlan) -> IndexMap<String, Option<Attachment>> {
     let aliases: Vec<String> = mp.names.iter().skip(1).cloned().collect();
-    let _ = (env, name);
+    let _ = name;
     mp.addresses
         .iter()
         .map(|(n, a)| {
             let at = Attachment {
-                ipv4_address: Some(a.to_string()),
                 aliases: aliases.clone(),
-                ..Attachment::default()
+                ..crate::ipv6::attachment(env, mp, n, *a)
             };
             (n.clone(), Some(at))
         })
@@ -175,11 +177,13 @@ fn route_commands(env: &Environment, name: &str) -> Vec<String> {
         .map(|c| c.replace('$', "$$"))
         .collect();
     cmds.extend(mp.routes.iter().map(|r| format!("ip route replace {} via {}", r.cidr, r.via)));
+    cmds.extend(crate::ipv6::route_commands(mp));
     if let Some(gw) = mp.default_gateway.or_else(|| own_default(env, name)) {
         cmds.push(format!("ip route replace default via {gw}"));
     }
     if drops_default(env, name) {
         cmds.push("(ip route del default 2>/dev/null || true)".into());
+        cmds.extend(crate::ipv6::on_ipv6(env, mp).then(|| "(ip -6 route del default 2>/dev/null || true)".into()));
     }
     // `tc` on its own interfaces, one subshell per line (`$$`: not Compose's interpolation).
     if let Some(script) = router::machine_tc_script(spec, m, address) {
@@ -201,11 +205,15 @@ fn route_ready(env: &Environment, name: &str) -> String {
     if let Some(first) = mp.routes.first() {
         ready.push(format!("ip route show {} | grep -q via", first.cidr));
     }
+    if let Some(first) = mp.routes6.first() {
+        ready.push(format!("ip -6 route show {} | grep -q via", first.cidr));
+    }
     if let Some(gw) = mp.default_gateway.or_else(|| own_default(env, name)) {
         ready.push(format!("ip route | grep -q '^default via {gw} '"));
     }
     if drops_default(env, name) {
         ready.push("! ip route | grep -q '^default'".into());
+        ready.extend(crate::ipv6::on_ipv6(env, mp).then(|| "! ip -6 route | grep -q '^default'".into()));
     }
     if mp.addresses.keys().any(|n| env.networks[n].tc.is_some()) {
         ready.push("tc qdisc show | grep -q netem".into());
@@ -232,8 +240,14 @@ pub(crate) fn routes(env: &Environment, host: &str, name: &str) -> Service {
     let spec = env.spec();
     let m = &spec.machines[name];
     let image = if impaired(env, name) { TC_IMAGE } else { UTILITY_IMAGE };
+    // Its addresses gone means its namespace is (any family on an IPv6-only network).
+    let family = if env.machines[name].addresses.keys().any(|n| crate::ipv6::only(env, n)) {
+        ""
+    } else {
+        "-4 "
+    };
     let script = format!(
-        "{} && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1",
+        "{} && while ip -o {family}addr show | grep -qv ' lo '; do sleep 2; done; exit 1",
         route_commands(env, name).join(" && ")
     );
     let mut r = Service {
@@ -290,7 +304,7 @@ pub(crate) fn check_runners(env: &Environment, services: &mut IndexMap<String, S
     let host = |h: &checks::Host, _: &Position| -> String {
         match h {
             checks::Host::Literal(l) => l.clone(),
-            checks::Host::Machine { name, network } => env.machines[name].addresses[network].to_string(),
+            checks::Host::Machine { name, network } => env.probe_address(name, network),
         }
     };
     let run_script = |path: &str| format!("cd /isoloom/project && sh {path}");
@@ -397,7 +411,11 @@ fn on_networks(env: &Environment, c: &mut Service) {
         c.entrypoint = vec![
             "/bin/sh".into(),
             "-c".into(),
-            "ip route del default 2>/dev/null; exec sh /isoloom/run.sh".into(),
+            if env.networks.values().any(|n| n.ipv6.is_some()) {
+                "ip route del default 2>/dev/null; ip -6 route del default 2>/dev/null; exec sh /isoloom/run.sh".into()
+            } else {
+                "ip route del default 2>/dev/null; exec sh /isoloom/run.sh".into()
+            },
         ];
     }
 }

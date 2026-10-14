@@ -2,8 +2,8 @@
 //! the cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEVICES, DISKS, ENVIRONMENT, IMAGES, IPV6, LOCATION, MANAGED,
-    MONITORING, MTU, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT,
+    ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEVICES, DISKS, ENVIRONMENT, GCP_IPV6, IMAGES, LOCATION,
+    MANAGED, MONITORING, MTU, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, TAGS, TPM, VLANS, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -198,7 +198,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (DEVICES, "guest_accelerator guest_accelerator.*"),
             (
-                IPV6,
+                GCP_IPV6,
                 "network_interface.internal_ipv6_prefix_length network_interface.ipv6_address network_interface.stack_type
                 network_interface.ipv6_access_config network_interface.ipv6_access_config.*",
             ),
@@ -220,7 +220,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 network_firewall_policy_enforcement_order network_profile params params.*",
             ),
             (ALIAS, "delete_default_routes_on_create"),
-            (IPV6, "enable_ula_internal_ipv6 internal_ipv6_range"),
+            (GCP_IPV6, "enable_ula_internal_ipv6 internal_ipv6_range"),
             (MTU, "mtu"),
         ],
     ),
@@ -233,7 +233,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "allow_subnet_cidr_routes_overlap ip_collection private_ip_google_access private_ipv6_google_access purpose reserved_internal_range
                 resolve_subnet_mask role send_secondary_ip_range_if_empty params params.*",
             ),
-            (IPV6, "external_ipv6_prefix internal_ipv6_prefix ipv6_access_type stack_type"),
+            (GCP_IPV6, "external_ipv6_prefix internal_ipv6_prefix ipv6_access_type stack_type"),
             (MONITORING, "log_config log_config.*"),
             (ADDRESSES, "secondary_ip_range secondary_ip_range.*"),
         ],

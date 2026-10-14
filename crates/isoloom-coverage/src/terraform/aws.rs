@@ -2,7 +2,7 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, DISKS, ENVIRONMENT, IMAGE_BUILD, IMAGES, IPV6,
+    ACCOUNT, ADDRESSES, ALIAS, AWS_IPV6, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CPUS, CREDENTIALS, DEFAULTS, DISKS, ENVIRONMENT, IMAGE_BUILD, IMAGES,
     LOCATION, MANAGED, NAT, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER,
 };
 use super::table::{Provider, Rules, Table};
@@ -181,7 +181,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 capacity_reservation_specification capacity_reservation_specification.* instance_market_options instance_market_options.*
                 launch_template launch_template.*",
             ),
-            (IPV6, "enable_primary_ipv6 ipv6_address_count ipv6_addresses"),
+            (AWS_IPV6, "enable_primary_ipv6 ipv6_address_count ipv6_addresses"),
             (ADDRESSES, "secondary_private_ips"),
             (
                 ALIAS,
@@ -212,7 +212,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         &[
             (LOCATION, "region"),
             (
-                IPV6,
+                AWS_IPV6,
                 "enable_primary_ipv6 ipv6_address_count ipv6_address_list ipv6_address_list_enabled ipv6_addresses ipv6_prefix_count ipv6_prefixes",
             ),
             (
@@ -233,7 +233,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "propagating_vgws route.carrier_gateway_id route.core_network_arn route.destination_prefix_list_id route.local_gateway_id
                 route.odb_network_arn route.transit_gateway_id route.vpc_endpoint_id route.vpc_peering_connection_id",
             ),
-            (IPV6, "route.ipv6_cidr_block route.egress_only_gateway_id"),
+            (AWS_IPV6, "route.ipv6_cidr_block route.egress_only_gateway_id"),
             (NAT, "route.nat_gateway_id"),
             (ROUTER, "route.network_interface_id"),
         ],
@@ -248,7 +248,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "name_prefix revoke_rules_on_delete egress.prefix_list_ids egress.security_groups egress.self ingress.prefix_list_ids
                 ingress.security_groups ingress.self",
             ),
-            (IPV6, "egress.ipv6_cidr_blocks ingress.ipv6_cidr_blocks"),
+            (AWS_IPV6, "egress.ipv6_cidr_blocks ingress.ipv6_cidr_blocks"),
         ],
     ),
     (
@@ -256,7 +256,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         &[
             (LOCATION, "region availability_zone_id outpost_arn"),
             (
-                IPV6,
+                AWS_IPV6,
                 "assign_ipv6_address_on_creation enable_dns64 enable_resource_name_dns_aaaa_record_on_launch ipv6_cidr_block ipv6_native
                 ipv6_netmask_length ipv6_ipam_pool_id",
             ),
@@ -272,7 +272,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         &[
             (LOCATION, "region"),
             (
-                IPV6,
+                AWS_IPV6,
                 "assign_generated_ipv6_cidr_block ipv6_cidr_block ipv6_cidr_block_network_border_group ipv6_ipam_pool_id ipv6_netmask_length",
             ),
             (CLOUD, "enable_network_address_usage_metrics ipv4_ipam_pool_id ipv4_netmask_length"),

@@ -21,7 +21,7 @@ use crate::sidecars;
 use machine::machine;
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,
-/// gateway machines, ulimits and `tc` (in a sidecar). No controller: no `provision:`, no Ansible
+/// gateway machines, ulimits, `tc` (in a sidecar) and IPv6 networks of every kind. No controller: no `provision:`, no Ansible
 /// checks; `exec` checks run inside a container.
 pub fn capabilities() -> isoloom_plan::Capabilities {
     isoloom_plan::Capabilities::of([
@@ -30,6 +30,9 @@ pub fn capabilities() -> isoloom_plan::Capabilities {
         Feature::MachineAliases,
         Feature::Ulimits,
         Feature::TrafficControl,
+        Feature::Ipv6,
+        Feature::Ipv6Only,
+        Feature::Ipv6Auto,
     ])
 }
 
@@ -156,7 +159,10 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
         }
         // The spec is validated: every block parses.
         for (net, n) in &spec.networks {
-            if let Some(cidr) = isoloom_spec::validate::Cidr::parse(&n.cidr) {
+            // On an IPv6-only network, Docker hands the tool its address.
+            if crate::ipv6::only(env, net) {
+                t.networks.insert(net.clone(), None);
+            } else if let Some(cidr) = isoloom_spec::validate::Cidr::parse(&n.cidr) {
                 t.networks.insert(net.clone(), Attachment::at(cidr.tool(i)));
             }
         }
@@ -195,13 +201,9 @@ fn networks(env: &Environment, ts: &[trunks::Trunk]) -> IndexMap<String, Network
             let subnet = Subnet {
                 subnet: n.cidr.clone(),
                 gateway: Some(n.host.to_string()),
+                ip_range: None,
             };
-            let net = Network {
-                ipam: Some(Ipam { config: vec![subnet] }),
-                internal: sidecars::internal(env, name),
-                ..Network::default()
-            };
-            (name.clone(), net)
+            (name.clone(), crate::ipv6::network(n, subnet, sidecars::internal(env, name)))
         })
         .collect();
     for t in ts {
@@ -217,6 +219,7 @@ fn networks(env: &Environment, ts: &[trunks::Trunk]) -> IndexMap<String, Network
         let subnet = Subnet {
             subnet: appliances::MGMT_CIDR.into(),
             gateway: None,
+            ip_range: None,
         };
         out.insert(
             appliances::MGMT_NETWORK.into(),

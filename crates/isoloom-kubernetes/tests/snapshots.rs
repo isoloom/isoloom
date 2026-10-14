@@ -6,7 +6,7 @@
 use std::fmt::Write;
 use std::path::Path;
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Feature};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
@@ -218,5 +218,8 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
         file(&files, "chart/templates/NOTES.txt"),
         "Open the shop.\n\nChecks: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}\n"
     );
-    assert_eq!(isoloom_kubernetes::KubernetesBackend.capabilities(), isoloom_plan::Capabilities::default());
+    assert_eq!(
+        isoloom_kubernetes::KubernetesBackend.capabilities(),
+        isoloom_plan::Capabilities::of([Feature::Ipv6, Feature::Ipv6Only, Feature::Ipv6Auto])
+    );
 }

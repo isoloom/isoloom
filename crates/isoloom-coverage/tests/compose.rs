@@ -152,6 +152,14 @@ const COMPOSE_TARGETS: &[Target] = &[Target::Docker, Target::Hosted, Target::Doc
 /// Specs that exercise what no committed example does, so every row marked as written is
 /// proven by a generated file.
 const FIXTURES: &[&str] = &[
+    // An IPv6-only network: `networks.*.enable_ipv4`.
+    r#"
+version: 1
+name: ipv6-only
+networks: { lab: { cidr: 10.9.1.0/24, internet: false, ipv6: { cidr: "fd00:9:1::/64", only: true } } }
+machines:
+  web: { networks: { lab: 10 }, docker: { image: nginx:alpine } }
+"#,
     // A tool with its own command: `services.*.command`.
     r#"
 version: 1

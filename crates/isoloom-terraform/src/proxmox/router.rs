@@ -5,9 +5,10 @@
 use std::fmt::Write as _;
 
 use isoloom_plan::Environment;
+use isoloom_plan::ipv6;
 use isoloom_render::hcl_builder::{Expression, Module, Template, call, list, number, reference, string};
 use isoloom_render::router;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::validate::{Cidr, IPV6_PREFIX};
 
 use super::machine::{Vm, ip_config, nic, snippet};
 use crate::vm::cloud_init::{self, CloudConfig, file};
@@ -78,18 +79,28 @@ fn files(env: &Environment) -> Vec<Expression> {
     let mut out = vec![
         file("/etc/systemd/network/10-wan.network", None, network(mac(None), &["DHCP=yes"])),
         file("/etc/nftables.conf", None, string(ruleset(env))),
-        file("/etc/sysctl.d/90-isoloom.conf", None, string("net.ipv4.ip_forward=1\n")),
+        file("/etc/sysctl.d/90-isoloom.conf", None, string(forwarding(env))),
     ];
     for (i, (net, plan)) in env.networks.iter().enumerate() {
         let len = Cidr::parse(&plan.cidr).map_or(32, |c| c.len);
         let address = format!("Address={}/{len}", router::address(env.spec(), net));
-        out.push(file(
-            &format!("/etc/systemd/network/20-{net}.network"),
-            None,
-            network(mac(Some(i)), &[&address, "ConfigureWithoutCarrier=yes"]),
-        ));
+        // An IPv6 network's router address too (the routes6 of the machines go through it).
+        let address6 = ipv6::router_address(env.spec(), net).map(|a| format!("Address={a}/{IPV6_PREFIX}"));
+        let mut lines = vec![address.as_str()];
+        lines.extend(address6.as_deref());
+        lines.push("ConfigureWithoutCarrier=yes");
+        out.push(file(&format!("/etc/systemd/network/20-{net}.network"), None, network(mac(Some(i)), &lines)));
     }
     out
+}
+
+/// Forwarding on: IPv4, and IPv6 when a network is IPv6.
+fn forwarding(env: &Environment) -> &'static str {
+    if env.networks.values().any(|n| n.ipv6.is_some()) {
+        "net.ipv4.ip_forward=1\nnet.ipv6.conf.all.forwarding=1\n"
+    } else {
+        "net.ipv4.ip_forward=1\n"
+    }
 }
 
 /// The ruleset: the `reach` rules (the router's shared forward rules), the published ports

@@ -70,6 +70,7 @@ pub fn capabilities() -> Capabilities {
         Feature::MachineAliases,
         Feature::Ulimits,
         Feature::TrafficControl,
+        Feature::Ipv6,
     ])
 }
 

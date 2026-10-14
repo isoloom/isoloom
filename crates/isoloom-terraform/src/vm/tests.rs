@@ -97,6 +97,7 @@ fn limits_refuse_in_their_order() {
         gateways: Some("no gateways"),
         playbook_checks: None,
         tc: Some("no tc"),
+        ipv6: None,
     };
     assert_eq!(limits.refusal(&env).as_deref(), Some("no tc"));
     assert_eq!(Limits::default().refusal(&env), None);

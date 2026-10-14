@@ -39,6 +39,7 @@ pub const LIMITS: Limits = Limits {
     gateways: Some("networks with a `gateway` machine in the cloud come later"),
     playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none"),
+    ipv6: Some("an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks"),
 };
 
 /// The AMI lookup and SSH user for an OS name: (owner, name filter, ssh user).

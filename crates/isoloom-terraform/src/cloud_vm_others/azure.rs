@@ -43,6 +43,7 @@ pub const LIMITS: Limits = Limits {
     gateways: Some("networks with a `gateway` machine in the cloud come later"),
     playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none"),
+    ipv6: None,
 };
 
 /// The `cloud-vm` module on Azure.

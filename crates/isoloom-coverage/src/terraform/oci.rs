@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, DISKS, EGRESS_RULES, ENVIRONMENT, ICMP, IMAGES, IPV6,
-    LOCATION, MANAGED, NESTED, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, SOURCE_PORTS, TAGS, TPM, VLANS, VM_AGENT,
+    ACCOUNT, ADDRESSES, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, DEFAULTS, DISKS, EGRESS_RULES, ENVIRONMENT, ICMP, IMAGES, LOCATION,
+    MANAGED, NESTED, OCI_IPV6, PLACEMENT, PRIVATE_DNS, PROTECT, PUBLIC_DNS, ROUTER, SOURCE_PORTS, TAGS, TPM, VLANS, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 
@@ -166,7 +166,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 create_vnic_details.nsg_ids",
             ),
             (
-                IPV6,
+                OCI_IPV6,
                 "create_vnic_details.assign_ipv6ip create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details
                 create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.*",
             ),
@@ -208,7 +208,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (LOCATION, "availability_domain"),
             (PRIVATE_DNS, "dns_label dhcp_options_id"),
             (ADDRESSES, "ipv4cidr_blocks"),
-            (IPV6, "ipv6cidr_block ipv6cidr_blocks"),
+            (OCI_IPV6, "ipv6cidr_block ipv6cidr_blocks"),
             (ALIAS, "prohibit_internet_ingress prohibit_public_ip_on_vnic"),
         ],
     ),
@@ -217,7 +217,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         &[
             (PRIVATE_DNS, "dns_label"),
             (
-                IPV6,
+                OCI_IPV6,
                 "ipv6private_cidr_blocks is_ipv6enabled is_oracle_gua_allocation_enabled byoipv6cidr_details byoipv6cidr_details.*",
             ),
             (CLOUD, "security_attributes"),

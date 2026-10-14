@@ -6,10 +6,17 @@ use super::{Labels, Selector};
 
 /// A Service's spec.
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ServiceSpec {
     /// `LoadBalancer` when published; cluster-internal otherwise.
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub kind: Option<&'static str>,
+    /// `PreferDualStack` or `SingleStack` on IPv6 networks; the cluster's default otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ip_family_policy: Option<&'static str>,
+    /// `IPv4` and `IPv6`, or `IPv6` alone, on IPv6 networks.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ip_families: Vec<&'static str>,
     /// The pods behind it.
     pub selector: Labels,
     /// Its ports.

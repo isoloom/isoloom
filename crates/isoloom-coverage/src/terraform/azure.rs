@@ -2,8 +2,8 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, ENVIRONMENT, IMAGES, IPV6, MANAGED, OFFLINE, PLACEMENT, PRIVATE_DNS, PROTECT,
-    PUBLIC_DNS, SOURCE_PORTS, TAGS, TPM, VM_AGENT,
+    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, ENVIRONMENT, IMAGES, IPV6_GATED, MANAGED, OFFLINE, PLACEMENT, PRIVATE_DNS,
+    PROTECT, PUBLIC_DNS, PUBLIC_IPV6, SOURCE_PORTS, TAGS, TPM, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
@@ -234,7 +234,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (PRIVATE_DNS, "dns_servers internal_dns_name_label"),
             (ALIAS, "ip_configuration.primary"),
-            (IPV6, "ip_configuration.private_ip_address_version"),
+            (IPV6_GATED, "ip_configuration.private_ip_address_version"),
         ],
     ),
     (
@@ -245,7 +245,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 "ddos_protection_mode ddos_protection_plan_id edge_zone idle_timeout_in_minutes ip_tags public_ip_prefix_id sku_tier zones",
             ),
             (PUBLIC_DNS, "domain_name_label domain_name_label_scope reverse_fqdn"),
-            (IPV6, "ip_version"),
+            (PUBLIC_IPV6, "ip_version"),
         ],
     ),
     ("azurerm_resource_group", &[(TAGS, "managed_by")]),

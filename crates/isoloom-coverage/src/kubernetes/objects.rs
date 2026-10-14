@@ -1,7 +1,7 @@
 //! The objects around the pods: their metadata, the Deployment and Job that run them, the
 //! Services and NetworkPolicies of the networks, and the ConfigMaps and Secrets they read.
 
-use crate::Support::{self, Emitted, Equivalent, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, Tooling};
 
 const OBJECT: Support = Emitted {
     from: "(every object Isoloom writes)",
@@ -114,7 +114,9 @@ fn service(definition: &str, field: &str) -> Option<Support> {
         ("ServiceSpec", "type") => Emitted {
             from: "machines.*.services[].publish (a LoadBalancer Service)",
         },
-        ("ServiceSpec", "ipFamilies" | "ipFamilyPolicy") => Planned { note: "with IPv6 networks" },
+        ("ServiceSpec", "ipFamilies" | "ipFamilyPolicy") => Emitted {
+            from: "networks.*.ipv6 (PreferDualStack; SingleStack IPv6 on IPv6-only networks)",
+        },
         ("ServiceSpec", "externalIPs" | "loadBalancerIP") | ("ServicePort", "nodePort") => Equivalent {
             via: "`publish`: a LoadBalancer Service on the published port",
         },

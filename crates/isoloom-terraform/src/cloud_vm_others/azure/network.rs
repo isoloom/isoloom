@@ -1,7 +1,7 @@
 //! The resource group, the virtual network and its subnets; each machine's network security
 //! group, public IP and interfaces.
 
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, number, reference, string};
@@ -19,7 +19,9 @@ pub fn blocks(env: &Environment, m: &mut Module) {
             .add_attribute(("tags", reference("local.tags")))
             .build(),
     );
-    let spaces = env.networks.values().map(|n| string(n.cidr.as_str()));
+    // A dual-stack network's IPv6 block too: Azure takes unique local blocks.
+    let v6 = env.networks.values().filter_map(|n| n.ipv6.as_ref()).map(|v| string(v.cidr.as_str()));
+    let spaces = env.networks.values().map(|n| string(n.cidr.as_str())).chain(v6);
     m.commented(
         "The environment's networks: one virtual network, a subnet per network with its exact range.",
         placed("azurerm_virtual_network", "env", reference("local.name"))
@@ -32,7 +34,10 @@ pub fn blocks(env: &Environment, m: &mut Module) {
                 .add_attribute(("name", string(net.as_str())))
                 .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))
                 .add_attribute(("virtual_network_name", reference("azurerm_virtual_network.env.name")))
-                .add_attribute(("address_prefixes", list([string(p.cidr.as_str())])))
+                .add_attribute((
+                    "address_prefixes",
+                    list(std::iter::once(&p.cidr).chain(p.ipv6.as_ref().map(|v| &v.cidr)).map(|c| string(c.as_str()))),
+                ))
                 .build(),
         );
     }
@@ -110,6 +115,8 @@ pub struct Nic<'a> {
     pub net: &'a str,
     /// Its address there.
     pub address: Ipv4Addr,
+    /// Its IPv6 address there, on a dual-stack network.
+    pub address6: Option<Ipv6Addr>,
     /// The first interface carries the public IP.
     pub primary: bool,
     /// Forwarding on: the machine is on several networks.
@@ -137,8 +144,20 @@ pub fn nic(n: &Nic) -> [Block; 2] {
     if n.forwarding {
         b = b.add_attribute(("ip_forwarding_enabled", boolean(true)));
     }
+    b = b.add_block(config.build());
+    if let Some(v6) = n.address6 {
+        b = b.add_block(
+            Block::builder("ip_configuration")
+                .add_attribute(("name", string("ipv6")))
+                .add_attribute(("subnet_id", reference(&format!("azurerm_subnet.{}.id", res(n.net)))))
+                .add_attribute(("private_ip_address_version", string("IPv6")))
+                .add_attribute(("private_ip_address_allocation", string("Static")))
+                .add_attribute(("private_ip_address", string(v6.to_string())))
+                .build(),
+        );
+    }
     [
-        b.add_block(config.build()).build(),
+        b.build(),
         resource("azurerm_network_interface_security_group_association", &nid)
             .add_attribute(("network_interface_id", reference(&format!("azurerm_network_interface.{nid}.id"))))
             .add_attribute(("network_security_group_id", reference(&format!("azurerm_network_security_group.{}.id", n.id))))

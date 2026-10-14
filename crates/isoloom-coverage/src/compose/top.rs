@@ -52,12 +52,22 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
             why: "Docker IPAM drivers have no VM equivalent",
         },
     ),
-    ("networks.*.ipam.config", Emitted { from: "networks.*.cidr" }),
-    ("networks.*.ipam.config[].subnet", Emitted { from: "networks.*.cidr" }),
+    (
+        "networks.*.ipam.config",
+        Emitted {
+            from: "networks.*.cidr and networks.*.ipv6.cidr",
+        },
+    ),
+    (
+        "networks.*.ipam.config[].subnet",
+        Emitted {
+            from: "networks.*.cidr and networks.*.ipv6.cidr",
+        },
+    ),
     (
         "networks.*.ipam.config[].ip_range",
-        Tooling {
-            note: "Docker's pool for addresses it picks: every machine has a fixed one",
+        Emitted {
+            from: "networks.*.ipv6 (where Docker picks IPv6 addresses, clear of the fixed ones)",
         },
     ),
     (
@@ -94,11 +104,11 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
     ),
     (
         "networks.*.enable_ipv4",
-        Tooling {
-            note: "networks are IPv4 (the default)",
+        Emitted {
+            from: "networks.*.ipv6.only (off on an IPv6-only network)",
         },
     ),
-    ("networks.*.enable_ipv6", Planned { note: "IPv6 networks" }),
+    ("networks.*.enable_ipv6", Emitted { from: "networks.*.ipv6" }),
     ("networks.*.attachable", TOOLING),
     (
         "networks.*.labels",
