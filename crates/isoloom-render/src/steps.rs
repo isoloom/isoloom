@@ -67,8 +67,9 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
                 .map(|(a, names)| ps(&format!("{a} {}", names.join(" "))))
                 .collect::<Vec<_>>()
                 .join(", ");
+            // Each line once: running the step again adds nothing.
             Some(format!(
-                "Add-Content -Path \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\" -Value @({lines})"
+                "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @({lines})) {{ if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) {{ Add-Content -Path $h -Value $l }} }}"
             ))
         }
         Step::Routes { routes, .. } if !routes.is_empty() => Some(
@@ -90,6 +91,8 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             ps(path)
         )),
         Step::Ready => Some("New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready".into()),
+        Step::DiskGrow => Some(GROW_ROOT_PS1.into()),
+        Step::WaitFor { machine: dep, ports } if !ports.is_empty() => Some(windows_wait_for(dep, ports)),
         _ => None,
     }
 }
@@ -99,13 +102,46 @@ fn lines_or_none(lines: &[String]) -> Option<String> {
     (!lines.is_empty()).then(|| lines.iter().map(|l| format!("{l}\n")).collect())
 }
 
-/// Grows the root partition and file system to the disk (best effort: an image already sized,
-/// or a file system without online growth, leaves it as it is).
+/// Grows the root file system into a disk made bigger than the image's: its partition when it
+/// is the disk's last, LVM's physical and logical volumes (Ubuntu's images), then the file
+/// system (ext4 or XFS). Best effort and idempotent: with nothing to grow, nothing changes.
 fn disk_grow() -> String {
-    "ROOT=$(findmnt -n -o SOURCE /); DISK=$(lsblk -n -o PKNAME \"$ROOT\" | head -n 1); PART=$(echo \"$ROOT\" | grep -o '[0-9]*$')\n\
-     [ -z \"$DISK\" ] || [ -z \"$PART\" ] || growpart \"/dev/$DISK\" \"$PART\" 2>/dev/null || true\n\
-     resize2fs \"$ROOT\" 2>/dev/null || xfs_growfs / 2>/dev/null || true\n"
-        .into()
+    GROW_ROOT_SH.into()
+}
+
+const GROW_ROOT_SH: &str = r#"set -e
+part_grow() {
+  dev=$(readlink -f "$1")
+  disk=/dev/$(lsblk -no PKNAME "$dev" | head -n1)
+  num=$(cat "/sys/class/block/$(basename "$dev")/partition")
+  if command -v growpart >/dev/null; then growpart "$disk" "$num" >/dev/null || true
+  else echo ", +" | sfdisk --no-reread -N "$num" "$disk" >/dev/null 2>&1 && partx -u "$disk" || true; fi
+}
+fs_grow() { resize2fs "$1" >/dev/null 2>&1 || xfs_growfs / >/dev/null 2>&1 || true; }
+src=$(findmnt -n -o SOURCE /)
+case "$(lsblk -no TYPE "$src" | head -n1)" in
+  lvm)
+    vg=$(lvs --noheadings -o vg_name "$src" | tr -d ' ')
+    for pv in $(pvs --noheadings -o pv_name -S vg_name="$vg" | tr -d ' '); do part_grow "$pv"; pvresize "$pv" >/dev/null; done
+    lvextend -l +100%FREE "$src" >/dev/null 2>&1 || true
+    fs_grow "$src" ;;
+  part) part_grow "$src"; fs_grow "$src" ;;
+esac
+"#;
+
+/// The same on Windows: C: to the largest size its disk allows.
+const GROW_ROOT_PS1: &str = "$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; if ((Get-Partition -DriveLetter C).Size -lt $max) { Resize-Partition -DriveLetter C -Size $max }";
+
+/// Waits until `machine` (a name or an address) answers on each of `ports`, up to
+/// [`WAIT_TIMEOUT`] seconds, in PowerShell.
+fn windows_wait_for(machine: &str, ports: &[u16]) -> String {
+    let ports = ports.iter().map(u16::to_string).collect::<Vec<_>>().join(", ");
+    let target = crate::ps(machine);
+    let failed = crate::ps(&format!("{machine} didn't answer on port "));
+    let answers = crate::ps(&format!("{machine} answers"));
+    format!(
+        "$t = (Get-Date).AddSeconds({WAIT_TIMEOUT}); foreach ($p in @({ports})) {{ while (-not (Test-NetConnection {target} -Port $p -WarningAction SilentlyContinue).TcpTestSucceeded) {{ if ((Get-Date) -gt $t) {{ throw ({failed} + $p) }}; Start-Sleep 5 }} }}; {answers}"
+    )
 }
 
 /// The machine's environment, sysctls and ulimits: `machine_setup`'s script without the shared
@@ -119,7 +155,13 @@ fn settings(env: &Environment, machine: &str) -> Option<String> {
 /// The other machines by name, appended to `/etc/hosts`.
 fn hosts(entries: &[(std::net::Ipv4Addr, Vec<String>)]) -> Option<String> {
     let lines: Vec<String> = entries.iter().map(|(a, names)| quote(&format!("{a} {}", names.join(" ")))).collect();
-    (!lines.is_empty()).then(|| format!("printf '%s\\n' {} >> /etc/hosts\n", lines.join(" ")))
+    // Each line once: running the step again adds nothing.
+    (!lines.is_empty()).then(|| {
+        format!(
+            "for l in {}; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done\n",
+            lines.join(" ")
+        )
+    })
 }
 
 /// The machine's trunks, built inside it.
@@ -187,10 +229,13 @@ fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> String {
         // A Windows script: rendered by `windows` only.
         RunKind::PowerShell => String::new(),
         RunKind::Shell => format!("cd {PROJECT_DIR} && sh -c {}\n", quote(&format!("{inputs}sh {path}"))),
+        // Installed with the machine's own package manager; its inventory is the machine, by
+        // its name (a play may name it), run locally.
         RunKind::Playbook => format!(
-            "command -v ansible-playbook >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core)\n\
+            "{}\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\n\
              cd {PROJECT_DIR} && sh -c {}\n",
-            quote(&format!("{inputs}ansible-playbook -c local -i localhost, {path}"))
+            machine_setup::PKG,
+            quote(&format!("{inputs}ansible-playbook -c local -i {machine}, {path}"))
         ),
     }
 }
@@ -213,13 +258,16 @@ pub fn reboot_check() -> String {
 }
 
 /// Offline: no new connection leaves the environment's networks (each network's block is
-/// allowed, everything else new is dropped), now and at every boot (a unit loads the rules).
+/// allowed, everything else new is dropped; the loopback stays open), now and at every boot
+/// ([`boot::at_boot`](crate::boot::at_boot) loads the rules). Run again, it replaces its table:
+/// nftables comes from the machine's package manager (Alpine's too: the controller's default box).
 fn egress(env: &Environment) -> String {
     let lab = env.networks.values().map(|n| n.cidr.as_str()).collect::<Vec<_>>().join(", ");
+    let load = crate::boot::at_boot("egress", "No new connection leaves the isoloom networks", "nft -f /etc/isoloom-egress.nft\n", false, &[]);
     format!(
-        "command -v nft >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)\n\
-         printf '%s\\n' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    ip daddr != {{ {lab} }} ct state new drop' '  }}' '}}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft\n\
-         printf '%s\\n' '[Unit]' 'Description=Isoloom: no new connection leaves the environment' 'After=network.target' '' '[Service]' 'Type=oneshot' 'ExecStart=/usr/sbin/nft -f /etc/isoloom-egress.nft' '' '[Install]' 'WantedBy=multi-user.target' > /etc/systemd/system/isoloom-egress.service && (systemctl enable isoloom-egress.service 2>/dev/null || true)\n"
+        "{}\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\n\
+         printf '%s\\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    oifname \"lo\" accept' '    ip daddr != {{ {lab} }} ct state new drop' '  }}' '}}' > /etc/isoloom-egress.nft\n{load}",
+        machine_setup::PKG
     )
 }
 
@@ -304,6 +352,15 @@ machines:
         let env = env();
         let sh = rendered(&env, "reader", |s| matches!(s, Step::Hosts { .. }));
         assert!(sh.contains("writer store"), "{sh}");
+        assert!(sh.contains("grep -qxF"), "each line once: {sh}");
+    }
+
+    #[test]
+    fn offline_keeps_the_loopback() {
+        let env = env();
+        let sh = super::linux(&env, "reader", &Step::Egress).expect("the step renders");
+        let lo = sh.find("oifname \"lo\" accept").expect("the loopback stays open");
+        assert!(lo < sh.find("ct state new drop").expect("the drop"), "{sh}");
     }
 
     #[test]

@@ -149,11 +149,15 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
     steps
 }
 
+/// The other machines by name. A Linux machine leaves the Windows ones out: in a domain they are
+/// reached through AD DNS, and a short name in /etc/hosts shadows it (a realm join then fails
+/// the Kerberos SPN lookup, "Server not found").
 fn hosts(spec: &Spec, name: &str) -> Step {
+    let linux = !spec.machines.get(name).is_some_and(windows);
     let entries = spec
         .machines
         .iter()
-        .filter(|(o, om)| o.as_str() != name && !om.networks.is_empty())
+        .filter(|(o, om)| o.as_str() != name && !om.networks.is_empty() && !(linux && windows(om)))
         .map(|(o, om)| {
             let names = std::iter::once(o.clone()).chain(om.aliases.iter().cloned()).collect();
             (address_for(spec, name, o), names)
@@ -213,4 +217,9 @@ fn runs(m: &Machine) -> Vec<Step> {
         }
     }));
     steps
+}
+
+/// Whether a machine is a Windows VM.
+fn windows(m: &Machine) -> bool {
+    m.vm.as_ref().is_some_and(|vm| isoloom_spec::images::is_windows(&vm.os))
 }
