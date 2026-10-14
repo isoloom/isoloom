@@ -8,6 +8,7 @@ use std::fmt::Write;
 use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
 
+pub use super::label;
 use super::{Draft, Note, NoteKind};
 use crate::coverage::{Support, compose};
 use crate::model::Protocol;
@@ -43,23 +44,6 @@ struct Machine {
     args: Vec<(String, String)>,
 }
 
-/// Turns a Compose name into a DNS label (`my_app` -> `my-app`).
-pub fn label(s: &str) -> String {
-    let mut out = String::new();
-    for c in s.to_ascii_lowercase().chars() {
-        if c.is_ascii_alphanumeric() {
-            out.push(c);
-        } else if !out.ends_with('-') {
-            out.push('-');
-        }
-    }
-    let out = out.trim_matches('-').to_string();
-    match out.chars().next() {
-        None => "env".into(),
-        Some(c) if c.is_ascii_digit() => format!("m-{out}"),
-        _ => out.chars().take(63).collect(),
-    }
-}
 
 fn str_of(v: &Value) -> Option<String> {
     match v {

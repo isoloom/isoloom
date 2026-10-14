@@ -12,7 +12,7 @@ use hcl::{Body, Expression, Value};
 use indexmap::IndexMap;
 use serde_json::{Value as Json, json};
 
-use super::compose::label;
+use super::label;
 use super::{Draft, Note, NoteKind};
 use crate::validate::{Cidr, PRIVATE};
 
