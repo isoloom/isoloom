@@ -21,6 +21,7 @@ mod controller;
 mod machine;
 pub(crate) mod module;
 mod outputs;
+mod outside;
 mod router;
 
 pub use crate::vm::res;
@@ -101,6 +102,9 @@ impl Backend for ProxmoxBackend {
             Feature::Ulimits,
             Feature::TrafficControl,
             Feature::Ipv6,
+            // An existing bridge (`external`), or the uplink or another bridge (`bridged`).
+            Feature::ExternalNetworks,
+            Feature::BridgedNetworks,
         ])
     }
 

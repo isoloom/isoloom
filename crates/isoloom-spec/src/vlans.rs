@@ -166,6 +166,9 @@ fn vlan_as_network(lan: &str, net: &Network, id: u16, vlan: &Vlan) -> Network {
         tc: None,
         vlan: Some((lan.to_string(), id)),
         ipv6: None,
+        // A VLAN is the environment's own network, whatever its LAN joins.
+        external: None,
+        bridged: None,
     }
 }
 

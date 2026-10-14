@@ -25,11 +25,17 @@ pub fn blocks(env: &Environment, name: &str, m: &mut Module) {
     m.commented(&format!("Machine `{name}`."), snippet(&res(name), name, config.document()));
     let mut nics = Vec::new();
     let mut ips = Vec::new();
+    // The default route is the router's on the first network, unless the LAN's DHCP gives it.
+    let routed = !super::outside::lan_default_route(env, mp);
     for (i, (net, addr)) in mp.addresses.iter().enumerate() {
         nics.push(nic(&format!("proxmox_sdn_vnet.{}.id", res(net)), None));
         let len = Cidr::parse(&env.networks[net].cidr).map_or(32, |c| c.len);
-        let gateway = (i == 0).then(|| router::address(env.spec(), net).to_string());
+        let gateway = (i == 0 && routed).then(|| router::address(env.spec(), net).to_string());
         ips.push(ip_config(&format!("{addr}/{len}"), gateway));
+    }
+    for (device, ip) in super::outside::interfaces(env, mp) {
+        nics.push(device);
+        ips.push(ip);
     }
     let mut depends_on = vec![reference("proxmox_virtual_environment_vm.isoloom_router")];
     depends_on.extend(

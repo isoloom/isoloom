@@ -53,9 +53,22 @@ fn written_matches(rows: &[(String, Support)], written: &BTreeSet<String>, forma
     assert!(wrong.is_empty(), "{format}:\n{}", wrong.join("\n"));
 }
 
+/// Specs for what no example exercises: a VM on the host's LAN, at a fixed address and by DHCP
+/// with the LAN's default route (`public_network`).
+const VAGRANT_FIXTURES: &[&str] = &["
+version: 1
+name: home-lan
+networks:
+  lan: { cidr: 10.20.0.0/24 }
+  home: { cidr: 192.168.1.0/24, bridged: { interface: 'en0: Wi-Fi' } }
+  wifi: { cidr: 192.168.2.0/24, bridged: { dhcp: true, default_route: true } }
+machines:
+  a: { networks: { lan: 10, home: 50, wifi: 0 }, vm: { os: debian-12, provision: [setup.sh] } }
+"];
+
 /// Every Vagrantfile the generators write for the examples: the vagrant output (every provider
 /// is a block of the same file), docker-vm and hybrid, generated now rather than read from the
-/// committed copies, so the check follows the generators.
+/// committed copies, so the check follows the generators; then the fixtures' on `vagrant`.
 fn vagrantfiles() -> Vec<String> {
     let mut found = Vec::new();
     for target in [Target::Vagrant, Target::DockerVm, Target::Hybrid] {
@@ -67,6 +80,10 @@ fn vagrantfiles() -> Vec<String> {
             found.extend(files.into_iter().filter(|f| f.path.ends_with("/Vagrantfile")).map(|f| f.contents));
         }
         assert!(found.len() > before, "no example generates a Vagrantfile for {target:?}");
+    }
+    for fixture in VAGRANT_FIXTURES {
+        let files = generate(&isoloom_spec::parse(fixture).unwrap(), Target::Vagrant).unwrap();
+        found.extend(files.into_iter().filter(|f| f.path.ends_with("/Vagrantfile")).map(|f| f.contents));
     }
     found
 }

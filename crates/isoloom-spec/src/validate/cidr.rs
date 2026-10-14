@@ -99,8 +99,8 @@ pub const PRIVATE: [Cidr; 3] = [
 pub const DOCKER_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
 
 /// Each network's block on the Docker target: its `docker.cidr` when set; its `cidr` when it's
-/// inside 10.0.0.0/8; otherwise moved there automatically, keeping its size (so each machine
-/// keeps its last octet): 192.168.X.0 -> 10.192.X.0, 172.N.X.0 -> 10.N.X.0, or the next free
+/// inside 10.0.0.0/8 or outside the environment (`external`, `bridged`); otherwise moved there
+/// automatically, keeping its size (so each machine keeps its last octet): 192.168.X.0 -> 10.192.X.0, 172.N.X.0 -> 10.N.X.0, or the next free
 /// block when that one is taken. Validated specs only: a network whose block doesn't parse is
 /// left out (validation reports it).
 pub fn docker_cidrs(spec: &Spec) -> Vec<(String, Cidr)> {
@@ -110,7 +110,8 @@ pub fn docker_cidrs(spec: &Spec) -> Vec<(String, Cidr)> {
         let Some(c) = Cidr::parse(&n.cidr) else { continue };
         match n.docker.as_ref().and_then(|d| Cidr::parse(&d.cidr)) {
             Some(d) => fixed.push((name.clone(), d)),
-            None if DOCKER_BLOCK.contains(c) => fixed.push((name.clone(), c)),
+            // A network outside the environment keeps its own block: it exists as it is.
+            None if DOCKER_BLOCK.contains(c) || n.is_outside() => fixed.push((name.clone(), c)),
             None => moved.push((name.clone(), c)),
         }
     }

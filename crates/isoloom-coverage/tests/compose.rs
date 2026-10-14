@@ -194,6 +194,14 @@ machines:
     docker: { image: nginx:alpine }
     secrets: [db-password, { source: tls-key, target: /etc/ssl/app.key, uid: 101, gid: 101, mode: 0400 }]
 ",
+    // An existing Docker network, joined by name: `networks.*.external`.
+    r"
+version: 1
+name: corp-join
+networks: { lan: { cidr: 10.9.0.0/24 }, corp: { cidr: 10.77.0.0/24, external: corp-net } }
+machines:
+  web: { networks: { lan: 10, corp: 10 }, docker: { image: nginx:alpine } }
+",
 ];
 
 /// Every Compose file Isoloom writes for `spec`, on every target that writes one.

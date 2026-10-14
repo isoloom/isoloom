@@ -111,6 +111,9 @@ fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), Str
             p.add(nat, format!("no network named `{net}`"));
             continue;
         };
+        if super::outside::dhcp_address(s.spec, net, *octet, &nat, p) {
+            continue;
+        }
         let is_gateway = s.spec.networks[net].gateway.as_deref() == Some(name);
         if is_gateway {
             if *octet == c.gateway_octet() {

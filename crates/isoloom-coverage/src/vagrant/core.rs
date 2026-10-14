@@ -63,8 +63,8 @@ fn network(kind: &str) -> Option<Support> {
         "forwarded_port" => Emitted {
             from: "machines.*.services[].publish (on the host's loopback; `protocol: \"udp\"` with `protocol: udp`)",
         },
-        "public_network" => Planned {
-            note: "a network bridged to the outside (Compose `external`, a host bridge, a VPC)",
+        "public_network" => Emitted {
+            from: "networks.*.bridged (the host's LAN, through the interface it names; not on QEMU, Hyper-V or libvirt yet)",
         },
         _ => return None,
     })

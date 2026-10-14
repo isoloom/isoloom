@@ -1,7 +1,7 @@
 //! The top-level keys, then the networks, volumes, configs, secrets and models a file declares.
 
 use super::{FILES, LEGACY_NAME, MODEL_RUNNER, TOOLING};
-use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Planned, Tooling};
 
 /// The top-level keys, `include` items included.
 pub(super) const TOP: &[(&str, Support)] = &[
@@ -30,7 +30,7 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
     (
         "networks.*.name",
         Emitted {
-            from: "(the hybrid target: the Docker network its host VM created for each network; elsewhere Compose scopes names to the environment)",
+            from: "networks.*.external (the existing network's name; on the hybrid target, the Docker network its host VM created for each network; elsewhere Compose scopes names to the environment)",
         },
     ),
     (
@@ -90,9 +90,8 @@ pub(super) const DECLARED: &[(&str, Support)] = &[
     ),
     (
         "networks.*.external",
-        Partial {
-            from: "(the hybrid target: its containers join the macvlan networks the Docker host VM creates, shared with the VMs)",
-            gap: "joining a network outside the environment (a Docker network, a host bridge, a VPC)",
+        Emitted {
+            from: "networks.*.external (an existing Docker network, joined by name at fixed addresses; on the hybrid target, the macvlan networks its Docker host VM creates, shared with the VMs)",
         },
     ),
     ("networks.*.external.name", LEGACY_NAME),

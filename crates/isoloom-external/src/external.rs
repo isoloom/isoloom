@@ -47,6 +47,9 @@ impl Backend for ExternalBackend {
             // IPv6-only one would need their IPv6 addresses, which the spec doesn't give.
             Feature::Ipv6,
             Feature::Ipv6Auto,
+            // The hosts are already on their networks, outside ones included.
+            Feature::ExternalNetworks,
+            Feature::BridgedNetworks,
         ])
     }
 

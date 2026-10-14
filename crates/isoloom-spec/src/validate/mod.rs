@@ -18,6 +18,7 @@ mod groups;
 mod ipv6;
 mod machines;
 mod networks;
+mod outside;
 mod provision;
 mod reach;
 mod secrets;
@@ -98,7 +99,9 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     cloud::check(spec, &mut p);
     let blocks = networks::blocks(spec, &mut p);
     networks::gateways(spec, &blocks, &mut p);
+    outside::networks(spec, &mut p);
     reach::check(spec, &mut p);
+    outside::reach(spec, &mut p);
     top::inputs(spec, &mut p);
     secrets::check(spec, &mut p);
     machines::declared(spec, &mut p);
@@ -108,6 +111,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     volumes::shared(spec, &mut p);
     machines::each(spec, &blocks, &mut p);
     dns::options(spec, &mut p);
+    outside::first_networks(spec, &mut p);
     machines::cycle(spec, &mut p);
     provision::controller(spec, &mut p);
     provision::steps(spec, &mut p);

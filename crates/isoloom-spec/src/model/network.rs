@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::Ipv6;
+pub use super::bridged::Bridged;
 
 /// A network: an address block, whether it reaches the internet, and what routes it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -52,6 +53,28 @@ pub struct Network {
     /// target) and routes to the other IPv6 blocks the `reach` rules open. See [`Ipv6`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ipv6: Option<Ipv6>,
+    /// An existing network, by its name on the target (a Docker network, a Proxmox bridge):
+    /// the machines join it, and Isoloom never creates or deletes it. `cidr` is its block, and
+    /// the machines keep fixed addresses in it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external: Option<String>,
+    /// Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed
+    /// addresses in `cidr`, or DHCP from the LAN).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bridged: Option<Bridged>,
+}
+
+impl Network {
+    /// Whether the network is outside the environment (`external` or `bridged`): Isoloom
+    /// doesn't make it, route it or put its own machines on it.
+    pub fn is_outside(&self) -> bool {
+        self.external.is_some() || self.bridged.is_some()
+    }
+
+    /// Whether its machines take their address from the LAN's DHCP server.
+    pub fn is_dhcp(&self) -> bool {
+        self.bridged.as_ref().is_some_and(|b| b.dhcp)
+    }
 }
 
 /// Link impairment (Linux netem on the router's interface into the network).

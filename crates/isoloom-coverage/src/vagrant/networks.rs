@@ -4,7 +4,7 @@
 use super::{HOST_TUNING, IMAGE_BOOTS, IPV6, MAC, NETWORKS, USER_SETUP, pairs, table};
 use crate::{
     Format, Support,
-    Support::{Emitted, Equivalent, NotPortable, Planned, Tooling},
+    Support::{Emitted, Equivalent, NotPortable, Tooling},
 };
 
 /// The "Vagrant: networks" table.
@@ -15,9 +15,7 @@ pub(super) fn format() -> Format {
             let s = match kind {
                 "forwarded_port" => forwarded_port(o),
                 "private_network" => private_network(o),
-                "public_network" => Some(Planned {
-                    note: "with `public_network` (a network bridged to the outside)",
-                }),
+                "public_network" => public_network(o),
                 _ => None,
             };
             (format!("config.vm.network {kind}: {o}"), s)
@@ -28,6 +26,24 @@ pub(super) fn format() -> Format {
         "Vagrant 2.4.9 (the networking docs and the providers' network code) and vagrant-libvirt 0.12.2 (its network options)",
         keys,
     )
+}
+
+fn public_network(o: &str) -> Option<Support> {
+    Some(match o {
+        "bridge" => Emitted {
+            from: "networks.*.bridged.interface",
+        },
+        "ip" => Emitted {
+            from: "machines.*.networks (a fixed address on a bridged network; DHCP otherwise)",
+        },
+        "use_dhcp_assigned_default_route" => Emitted {
+            from: "networks.*.bridged.default_route",
+        },
+        "auto_config" => Equivalent {
+            via: "networks.*.bridged (Vagrant always configures the bridged interface: a fixed address, or DHCP)",
+        },
+        _ => return None,
+    })
 }
 
 fn forwarded_port(o: &str) -> Option<Support> {

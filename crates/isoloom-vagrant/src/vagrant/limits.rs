@@ -13,7 +13,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
     env.machines
         .iter()
         .filter(|(_, mp)| mp.shape == MachineShape::Vm)
-        .find_map(|(name, _)| machine(env, name, spec.machines.get(name)?))
+        .find_map(|(name, mp)| machine(env, name, spec.machines.get(name)?).or_else(|| super::bridged::refusal(env, name, mp)))
 }
 
 fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
