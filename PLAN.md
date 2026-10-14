@@ -142,6 +142,108 @@ isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ─
 - **New:** `isoloom-catalogue` and `isoloom-verify`.
 - **Changed:** `isoloom-external` becomes the Ansible output (existing hosts are an inventory plus playbooks).
 
+## 3b. Engineering standard (every repository, every phase)
+
+Clean code is built in as we go, not left for a later pass. Each rule is **enforced by a tool**, or it isn't a rule.
+
+### Design rules
+- **Functional core, imperative shell.** Parsing, validation, planning, rendering and manifest building are pure functions over data, with no I/O, no clock and no environment. All I/O (processes, files, network, Tauri) sits in a thin shell at the edge. The pure core is unit-testable without mocks.
+- **Ports and adapters** for everything that touches the outside world:
+  - **Runner:** drivers (Docker, Vagrant, Terraform, Proxmox, clouds) sit behind a `Driver` trait, and the process runner and the state store are traits too. Tests use fakes, never a real tool.
+  - **Launcher:** Tauri commands are thin adapters that call plain Rust services. Domain logic never imports `tauri`.
+- **Dependency direction is one-way, and a test checks it.**
+  - **Isoloom:** spec → plan → render → backends → targets → cli. No backend depends on another backend.
+  - **Isothrum:** compiler and runner, with no UI.
+  - **Apps:** depend on libraries, never the reverse.
+
+  Cyclic or upward dependencies fail the build.
+- **Parse, don't validate.** Raw input is converted once into types that can't hold invalid states:
+  - newtypes for names, ports, CIDRs, versions and IDs;
+  - enums instead of booleans and strings;
+  - no `Option` soup.
+- **Errors are typed and actionable.**
+  - One `thiserror` enum per library crate.
+  - Messages name the field path, the reason and the fix.
+  - `anyhow` only in binaries.
+  - No `unwrap`, `expect` or `panic` outside tests.
+- **No hidden state:** no globals, no `set_var`, no `unsafe`. Time, randomness, the environment and the filesystem are passed in.
+- **Determinism:** ordered maps in all output, and render-twice tests.
+- **One way to do each thing.** A helper exists once. A second copy fails review, and a duplicate-code check flags it.
+
+### Size and shape limits (lint-enforced)
+- **Rust:**
+  - functions ≤ 60 lines, ≤ 5 parameters, cognitive complexity ≤ 15;
+  - files ≤ 400 lines of code;
+  - clippy `pedantic` at deny, with a short commented allow-list;
+  - `missing_docs` on libraries.
+- **TypeScript:**
+  - `strict`, with no `any`;
+  - typescript-eslint `strict-type-checked`;
+  - components ≤ 200 lines, functions ≤ 60;
+  - no default exports outside framework entry points;
+  - Tauri types generated from Rust (`ts_bindings`), never hand-copied.
+- **Naming:** one vocabulary across all three repositories (lab, machine, network, target, form, manifest, run, driver). Comments say *why*, never *what*.
+
+### Tests
+- **The pyramid:**
+  - unit tests for the pure core;
+  - `insta` snapshots for every renderer;
+  - property tests for parsers, address planning and quoting (HCL, Ruby, shell, PowerShell injection safety);
+  - contract tests: Isoloom and Isothrum test against the same run-manifest fixtures;
+  - fake-tool tests for drivers;
+  - real runs only for Tier 1.
+- **Every bug fix starts with a failing test.**
+- **Fast and deterministic:** no sleeps, no network in unit tests. The unit suite of each repository runs in under a minute.
+
+### Ratchet
+- Each repository has `quality-baseline.json`: the current count of violations per rule, such as oversized files, long functions, `allow`s and `any`s. A check fails if any count goes **up**.
+- Every phase must bring the counts **down** in the code it touches (the boy-scout rule). The ratchet is what replaces launcher issue #150.
+
+### Process
+- **Every change:** format, lint, test, the ratchet and the dependency-direction check, all through `check-all`.
+- **Every phase ends with a review pass** over its own diff: a code review for bugs, then a simplify pass for duplication and dead code. Findings are fixed before the next phase starts.
+- **Dev tasks are `cargo xtask` commands, not shell scripts,** so they run the same on macOS, Windows and Linux. `scripts/*.sh` move into `xtask` in Phase 1.
+
+### Repository layouts
+- **Isoloom** (applied in Phase 1, after the snapshots land, so moves are proven output-neutral):
+
+  ```
+  crates/core/      isoloom-spec, isoloom-catalogue, isoloom-plan, isoloom-render
+  crates/backends/  isoloom-compose, isoloom-kubernetes, isoloom-vagrant, isoloom-terraform,
+                    isoloom-ansible (today's isoloom-external), and the CM backends as they arrive
+  crates/tools/     isoloom-import, isoloom-verify
+  crates/targets/   isoloom-targets (registry, capabilities, tiers)
+  crates/cli/       isoloom
+  xtask/            check-all, verify, dev-link, snapshots
+  catalogue/        data: <service>/{entry.yml, contract.yml, roles/}
+  examples/         specs only, no committed outputs
+  schemas/          generated JSON Schemas: spec, run manifest
+  tools/verify/     the pinned validator image
+  .github/          community files (CONTRIBUTING, SECURITY, CODE_OF_CONDUCT) and the disabled workflows
+  ```
+
+  - `rfcs/` and the hand-written `docs/` are removed now and rewritten at the end.
+  - `install.sh` moves to `packaging/`.
+  - `rust-toolchain.toml` pins the toolchain.
+- **Isothrum** (applied in Phase 2, when the runner arrives):
+
+  ```
+  crates/isothrum-compiler/  today's isothrum-core (drawing → spec)
+  crates/isothrum-wasm/
+  crates/isothrum-runner/    manifest executor, Driver trait, drivers as modules, state store, events
+  crates/isothrum-cli/
+  apps/desktop/              until it moves to isothrum-desktop (1.x)
+  xtask/
+  ```
+
+  The WASM npm package name stays the same, so the private website keeps building.
+- **Launcher:**
+  - **Now:** reorganize everything except `runtime/`.
+    - Group the loose `src-tauri/src/*.rs` modules into domains: `app/` (window, menu, quit, logging, config), `labs/`, `account/`, `terminal/`, `platform/` (fs, atomic files, MSIX data, exec), `cloud/`, and `commands/` (thin Tauri adapters only).
+    - Use one module convention (`foo.rs` plus `foo/`, never `mod.rs`).
+    - Group the packaging assets (`store/`, MSIX) under `packaging/`, and the attack-box image under `images/attack-box/`.
+  - **Phase 2–3:** `runtime/` moves into `isothrum-runner`, and the launcher keeps only CTF-specific code.
+
 ## 4. Work, in order
 
 **Principles:**
@@ -185,6 +287,8 @@ Sizes: S is about a day of focused work, M a few days, L about a week. There are
 4. **Local multi-repository setup.** Clone `isoloom`, `isothrum` and the launcher side by side, with `[patch]` path dependencies. One `check-all` script runs every repository's checks.
 5. **Cross-platform check (decided).** A manual-only GitHub workflow that runs `check-all` on macOS, Windows and Linux on demand. No PRs and no automatic runs. Without it, Windows and Linux bugs surface only after the squash.
 
+6. **The engineering standard in the launcher and Isothrum:** lint configs at the 3b levels, the ratchet baseline, the dependency-direction check, `check-all` wiring, and the launcher's folder reorganization (everything except `runtime/`).
+
 **Exit:** snapshots and `verify` are green or baselined, and `check-all` passes.
 
 ### Phase 1: Subtract (S–M)
@@ -194,8 +298,9 @@ Now safe, because the net is in place.
 2. **Delete `isoloom-coverage`.** Its schema checks are covered by `verify`, and its capability declarations stay in the backends.
 3. **Delete the committed example outputs.** The snapshots replace them.
 4. **Delete the compatibility debt** and fix the small debts: the Ruby-dependent test, the dead-code fixtures.
+5. **Apply the engineering standard to Isoloom:** the repository layout (3b), `xtask` replacing `scripts/*.sh`, the dependency-direction test, the ratchet baseline, and `rust-toolchain.toml`. Every move is proven output-neutral by the snapshots.
 
-**Exit:** green net; a smaller workspace.
+**Exit:** green net; a smaller workspace in the target layout; the ratchet in place.
 
 ### Phase 2: The walking skeleton (M–L)
 
