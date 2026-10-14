@@ -7,8 +7,8 @@
 //! - the inputs are read from the host's environment when Vagrant runs, written to the file
 //!   the steps read (on Windows, given to each step as its environment);
 //! - a reboot is Vagrant's own (`reboot: true`, which waits until the machine is back);
-//! - routes, trunks, link impairment and the egress rules are re-applied at every boot
-//!   (`isoloom_render::boot`): a reboot step and `vagrant reload` would otherwise drop them;
+//! - routes, trunks and link impairment are re-applied at every boot (`isoloom_render::boot`,
+//!   which the egress step uses itself): a reboot step and `vagrant reload` would otherwise drop them;
 //! - the default route through a gateway comes once the machine is provisioned: until then it
 //!   installs through Vagrant's NAT interface (a gateway may not let it out).
 
@@ -72,7 +72,7 @@ pub fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &
             };
             persisted(r, env, machine, &early);
         }
-        (Os::Linux, Step::Trunks | Step::Tc | Step::Egress) => persisted(r, env, machine, step),
+        (Os::Linux, Step::Trunks | Step::Tc) => persisted(r, env, machine, step),
         (Os::Linux, Step::WaitFor { machine: dep, ports }) => wait_for(r, env, machine, dep, ports),
         (Os::Windows, Step::Run { path, .. }) => {
             if let Some(script) = steps::windows(env, machine, step) {
@@ -147,7 +147,7 @@ fn inputs(r: &mut Ruby, env: &Environment, machine: &str, step: &Step) {
 /// Vagrant restarts the machine and waits until it answers; the boot is recorded before and
 /// checked after, so a machine that didn't restart fails the step.
 fn reboot(r: &mut Ruby) {
-    shell(r, "before reboot", &steps::reboot_mark());
+    shell(r, "before reboot", &steps::record_boot());
     r.call(vagrantfile::shell("m", "reboot").kw("reboot", true));
     shell(r, "after reboot", &steps::reboot_check());
 }
@@ -158,8 +158,7 @@ fn persisted(r: &mut Ruby, env: &Environment, machine: &str, step: &Step) {
     let (name, what, on_link_up): (&str, &str, bool) = match step {
         Step::Routes { .. } => ("routes", ROUTES, true),
         Step::Trunks => ("trunks", "802.1Q interfaces of the isoloom trunks", true),
-        Step::Tc => ("tc", "Link impairment (networks.*.tc) on this machine's interfaces", false),
-        _ => ("egress", "No new connections out of the isoloom networks", false),
+        _ => ("tc", "Link impairment (networks.*.tc) on this machine's interfaces", false),
     };
     let after: &[&str] = if name == "routes" { &["trunks"] } else { &[] };
     shell(r, &label(step), &boot::at_boot(name, what, &script, on_link_up, after));

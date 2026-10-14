@@ -156,7 +156,7 @@ fn windows_runs_powershell_with_its_inputs() {
 fn routes_trunks_tc_and_egress_survive_a_reboot() {
     let env = env();
     let s = text(|r| step_provisioners(r, &env, "app", &Step::Egress, Os::Linux));
-    assert!(s.contains("ExecStart=-/etc/isoloom/egress.sh"), "{s}");
+    assert!(s.contains("name: \"no internet\"") && s.contains("ExecStart=-/etc/isoloom/egress.sh"), "{s}");
     assert!(
         text(|r| step_provisioners(r, &env, "app", &Step::Trunks, Os::Linux)).is_empty(),
         "no trunk: nothing to run"

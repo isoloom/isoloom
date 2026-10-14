@@ -534,20 +534,21 @@ Vagrant.configure("2") do |config|
     m.vm.provision "shell", name: "volumes", inline: "mkdir -p '/data'"
     m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/cache.sh'"
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi
+      printf '%s\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    oifname "lo" accept' '    ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.sh <<'EGRESS'
       #!/bin/sh
-      # No new connections out of the isoloom networks
-      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
-      command -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi
-      printf '%s\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    oifname "lo" accept' '    ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft
+      # No new connection leaves the isoloom networks
+      nft -f /etc/isoloom-egress.nft
       exit 0
       EGRESS
       chmod +x /etc/isoloom/egress.sh
       if command -v systemctl >/dev/null; then
       cat > /etc/systemd/system/isoloom-egress.service <<'UNIT'
       [Unit]
-      Description=No new connections out of the isoloom networks
+      Description=No new connection leaves the isoloom networks
       After=network-online.target
       Wants=network-online.target
 

@@ -263,7 +263,13 @@ pub fn reboot_check() -> String {
 /// nftables comes from the machine's package manager (Alpine's too: the controller's default box).
 fn egress(env: &Environment) -> String {
     let lab = env.networks.values().map(|n| n.cidr.as_str()).collect::<Vec<_>>().join(", ");
-    let load = crate::boot::at_boot("egress", "No new connection leaves the isoloom networks", "nft -f /etc/isoloom-egress.nft\n", false, &[]);
+    let load = crate::boot::at_boot(
+        "egress",
+        "No new connection leaves the isoloom networks",
+        "nft -f /etc/isoloom-egress.nft\n",
+        false,
+        &[],
+    );
     format!(
         "{}\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\n\
          printf '%s\\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    oifname \"lo\" accept' '    ip daddr != {{ {lab} }} ct state new drop' '  }}' '}}' > /etc/isoloom-egress.nft\n{load}",
