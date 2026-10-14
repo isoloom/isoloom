@@ -1,0 +1,14 @@
+[package]
+name = "isoloom-external"
+description = "The external-hosts backend of Isoloom."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+isoloom-spec.workspace = true
+isoloom-plan.workspace = true
+isoloom-render.workspace = true
+serde_json.workspace = true

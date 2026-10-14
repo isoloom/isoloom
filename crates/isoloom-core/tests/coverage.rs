@@ -160,7 +160,7 @@ fn schema_keys(defs: &serde_json::Value, node: &serde_json::Value) -> BTreeSet<S
 
 #[test]
 fn compose_rows_are_exactly_the_schema_keys() {
-    let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("coverage/compose-spec.json")).unwrap();
+    let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../isoloom-coverage/coverage/compose-spec.json")).unwrap();
     let schema: serde_json::Value = serde_json::from_str(&text).unwrap();
     let defs = &schema["$defs"];
     let mut expected: BTreeSet<String> = schema_keys(defs, &schema);

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### One crate per layer and backend
+- `isoloom-core` is split into `isoloom-spec`, `isoloom-plan`, `isoloom-render`, the backends (`isoloom-compose`, `isoloom-kubernetes`, `isoloom-terraform`, `isoloom-vagrant`, `isoloom-external`), `isoloom-targets`, `isoloom-import`, `isoloom-coverage` and `isoloom-runtime`. No behavior change: every generated file is byte-identical. `isoloom-core` re-exports them at the same paths as before (`isoloom_core::load`, `::generate`, `::resolved`, `::checks`, `::host`, `::registry`...), so code using it compiles unchanged.
+
 ### Volumes shared between machines
 - A top-level `volumes:` declares volumes several machines mount: a machine volume of that name is the shared one, at the machine's own path. `owner` says which machine holds the data (default: the first that mounts it); the others start after it. On Docker one named volume for all; on Kubernetes one claim, seeded by the owner, its other users scheduled on the owner's node (so a ReadWriteOnce claim works on any storage class); on the VM targets (Vagrant, Proxmox, every cloud) the owner serves its directory over NFS and the others mount it before their steps, at boot too (fstab), waiting for the owner up to 15 minutes. Hybrid refuses a volume shared by a container and a VM, for now.
 - Validated: a shared volume is mounted, its owner is one of its machines, each user shares a network with the owner, Linux machines only.

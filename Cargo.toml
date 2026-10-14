@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/isoloom-core", "crates/isoloom"]
+members = ["crates/*"]
 
 [workspace.package]
 version = "0.10.1"
@@ -11,6 +11,18 @@ publish = false
 
 [workspace.dependencies]
 isoloom-core = { path = "crates/isoloom-core" }
+isoloom-spec = { path = "crates/isoloom-spec" }
+isoloom-plan = { path = "crates/isoloom-plan" }
+isoloom-render = { path = "crates/isoloom-render" }
+isoloom-compose = { path = "crates/isoloom-compose" }
+isoloom-kubernetes = { path = "crates/isoloom-kubernetes" }
+isoloom-terraform = { path = "crates/isoloom-terraform" }
+isoloom-vagrant = { path = "crates/isoloom-vagrant" }
+isoloom-external = { path = "crates/isoloom-external" }
+isoloom-targets = { path = "crates/isoloom-targets" }
+isoloom-coverage = { path = "crates/isoloom-coverage" }
+isoloom-import = { path = "crates/isoloom-import" }
+isoloom-runtime = { path = "crates/isoloom-runtime" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"

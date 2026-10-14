@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refreshes crates/isoloom-core/coverage/vagrant/*.txt: the settings each Vagrant config class
+"""Refreshes crates/isoloom-coverage/coverage/vagrant/*.txt: the settings each Vagrant config class
 accepts, extracted from the pinned upstream sources (names only; the sources aren't vendored).
 
 Usage: python3 scripts/vagrant-settings.py   (then `cargo test`: unclassified settings fail)
@@ -23,7 +23,7 @@ SOURCES = {
 }
 # Methods of the config classes that aren't settings.
 NOT_SETTINGS = {"merge", "validate", "finalize!", "to_s", "get_provider_config", "get_provider_overrides"}
-OUT = pathlib.Path(__file__).resolve().parent.parent / "crates/isoloom-core/coverage/vagrant"
+OUT = pathlib.Path(__file__).resolve().parent.parent / "crates/isoloom-coverage/coverage/vagrant"
 
 
 def settings(ruby: str) -> list[str]:
