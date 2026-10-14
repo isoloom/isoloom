@@ -89,8 +89,8 @@ pub fn blocks(w: Machine) -> Vec<Block> {
         uploads,
         parts: vec![commands],
         depends_on,
-        // A Windows machine gets no secrets (the plan's `WindowsSecrets`).
-        announce: None,
+        // `isoloom run` delivers its secrets over WinRM while the set-up waits for them.
+        announce: (!w.env.machines[w.name].secrets.is_empty()).then(|| w.name.to_string()),
     };
     out.push(setup.block());
     out

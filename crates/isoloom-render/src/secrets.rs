@@ -10,12 +10,14 @@
 
 use std::fmt::Write as _;
 
-use isoloom_plan::secrets::DEFAULT_MODE;
+use isoloom_plan::secrets::VM_DEFAULT_MODE;
 use isoloom_plan::{Environment, MachineShape, SecretFile};
 use isoloom_spec::model::secret_variable;
 
 use crate::boot;
 use crate::shell::quote;
+
+pub mod windows;
 
 /// Where a machine keeps the secrets delivered to it: root-only, on disk.
 pub const KEPT_DIR: &str = "/var/lib/isoloom/secrets";
@@ -49,7 +51,7 @@ pub fn receive(names: &[String], files: &[SecretFile]) -> String {
     sh
 }
 
-/// Each kept secret copied to its path, with its owner and mode (root and [`DEFAULT_MODE`]
+/// Each kept secret copied to its path, with its owner and mode (root and [`VM_DEFAULT_MODE`]
 /// unless the spec says), its folder made when missing.
 pub fn place(files: &[SecretFile]) -> String {
     files.iter().fold(String::new(), |mut sh, f| {
@@ -58,7 +60,7 @@ pub fn place(files: &[SecretFile]) -> String {
             "install -D -o {} -g {} -m {:04o} {KEPT_DIR}/{} {}",
             f.uid.unwrap_or(0),
             f.gid.unwrap_or(0),
-            f.mode.unwrap_or(DEFAULT_MODE),
+            f.mode.unwrap_or(VM_DEFAULT_MODE),
             f.name,
             quote(&f.path)
         );

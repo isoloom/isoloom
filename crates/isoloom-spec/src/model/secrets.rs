@@ -55,8 +55,8 @@ impl SecretSource {
     }
 }
 
-/// Where a machine's secret goes: by name alone (`/run/secrets/<name>`, read-only for every
-/// user), or with its path, owner and mode.
+/// Where a machine's secret goes: by name alone (`/run/secrets/<name>`, read-only, with the
+/// default mode of the machine's kind), or with its path, owner and mode.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum MachineSecret {
@@ -73,19 +73,29 @@ pub struct SecretMount {
     /// The secret, from the top-level `secrets`.
     pub source: String,
     /// The file's path in the machine: absolute, or a name under `/run/secrets/`. Default:
-    /// `/run/secrets/<source>`.
+    /// `/run/secrets/<source>`. On Windows, a drive path (`C:\app\db-password`) too; a path from
+    /// `/` is on drive C: (`/run/secrets/db` is `C:\run\secrets\db`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
-    /// The file's owner, a user id (default 0, root).
+    /// The file's owner, a user id (default 0, root). Not on Windows, where the file is
+    /// readable by SYSTEM and Administrators only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<u32>,
     /// The file's group, a group id (default 0, root).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gid: Option<u32>,
-    /// The file's mode, in octal (`0440`, or `"0440"`). Default `0444`.
+    /// The file's mode, in octal (`0440`, or `"0440"`). Default `0444` in a container (as
+    /// Compose and Kubernetes do), `0400` on a Linux VM, whose other users shouldn't read it.
+    /// Not on Windows.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "octal", serialize_with = "write_octal")]
     #[schemars(with = "Option<ScalarSchema>")]
     pub mode: Option<u32>,
+}
+
+/// Whether `p` is an absolute Windows path on a drive (`C:\app\db`, `C:/app/db`).
+pub fn is_drive_path(p: &str) -> bool {
+    let b = p.as_bytes();
+    b.len() > 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'\\' | b'/')
 }
 
 /// Where secrets go when a machine names no path.
@@ -103,7 +113,7 @@ impl MachineSecret {
     /// The file's absolute path in the machine.
     pub fn path(&self) -> String {
         match self {
-            MachineSecret::Mount(SecretMount { target: Some(t), .. }) if t.starts_with('/') => t.clone(),
+            MachineSecret::Mount(SecretMount { target: Some(t), .. }) if t.starts_with('/') || is_drive_path(t) => t.clone(),
             MachineSecret::Mount(SecretMount { target: Some(t), .. }) => format!("{SECRETS_DIR}/{t}"),
             _ => format!("{SECRETS_DIR}/{}", self.source()),
         }

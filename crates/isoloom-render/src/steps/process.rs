@@ -69,6 +69,16 @@ fn secrets_first(mp: &MachinePlan) -> Vec<&'static str> {
     }
 }
 
+/// On Windows, the secrets put in place by the script itself: Task Scheduler starts the
+/// startup tasks in no fixed order, so the placing task may not have run yet.
+fn windows_secrets_first(mp: &MachinePlan) -> Vec<String> {
+    if mp.secrets.is_empty() {
+        Vec::new()
+    } else {
+        vec![crate::secrets::windows::place_first()]
+    }
+}
+
 /// The healthcheck, tried until it passes before the machine is marked ready: the set-up fails
 /// when it hasn't passed after its retries.
 pub(super) fn healthy(env: &Environment, machine: &str) -> Option<String> {
@@ -123,10 +133,11 @@ fn windows_dir(mp: &MachinePlan) -> String {
 /// every boot, or a startup task of its own when there is no command.
 pub(super) fn windows_before(env: &Environment, machine: &str, paths: &[String]) -> Option<String> {
     let mp = env.machines.get(machine)?;
-    let mut lines = vec![format!(
+    let mut lines = windows_secrets_first(mp);
+    lines.push(format!(
         "New-Item -ItemType Directory -Force {d} | Out-Null; Set-Location {d}",
         d = windows_dir(mp)
-    )];
+    ));
     lines.extend(paths.iter().map(|p| {
         format!(
             "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
@@ -147,7 +158,10 @@ pub(super) fn windows_before(env: &Environment, machine: &str, paths: &[String])
 pub(super) fn windows_command(env: &Environment, machine: &str) -> Option<String> {
     let mp = env.machines.get(machine)?;
     let mut lines = Vec::new();
-    if !mp.process.before.is_empty() {
+    if mp.process.before.is_empty() {
+        lines.extend(windows_secrets_first(mp));
+    } else {
+        // `before.ps1` places the secrets first.
         lines.push(format!("& powershell -NoProfile -ExecutionPolicy Bypass -File {WINDOWS_DIR}\\before.ps1"));
     }
     lines.push(format!(

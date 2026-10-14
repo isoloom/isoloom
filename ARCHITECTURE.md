@@ -98,6 +98,22 @@ done; Proxmox (cloud-init) is delivered to after Terraform, an existing host bef
 provisioning. A Docker host gets its containers' secrets the same way and hands them to
 `docker compose up` as `ISOLOOM_SECRET_<NAME>`.
 
+A Windows machine (`isoloom_render::secrets::windows`, `crates/isoloom/src/secrets/windows.rs`)
+gets them the same way in PowerShell: the command line is one fixed bootstrap
+(`powershell -EncodedCommand`) that reads the receiving script, then the values, from its
+standard input. Over OpenSSH (`vm.image.winssh`, an existing host) that is `ssh` or `vagrant
+ssh`. Over WinRM, the runner talks WinRM itself, with `python3` and pywinrm, whose `Send`
+operation carries the input: `vagrant winrm -c` and Terraform feed no input to a remote command,
+and the controller (which has pywinrm) comes up after the machines it would deliver to. The
+endpoint is `vagrant winrm-config`'s, or the address a cloud's set-up announces with the
+password from Terraform's state, or on Proxmox an SSH tunnel through the router. The values are
+kept in `C:\ProgramData\isoloom\secrets`, and each file written, with an access list of SYSTEM
+and Administrators only; a startup task puts them back at every boot, and the `before` and
+command scripts run the same placing script first, since Task Scheduler orders no startup task.
+
+A secret file's default mode is `0444` in a container, as Compose and Kubernetes do (one process,
+one user), and `0400` on a Linux VM (owned by root or the spec's `uid`), which has other users.
+
 ### The controller's playbooks
 
 Every target that runs playbooks (Vagrant, Proxmox, the clouds) runs the same controller script,

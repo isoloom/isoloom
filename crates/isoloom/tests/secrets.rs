@@ -46,6 +46,23 @@ machines:
     secrets: [{ source: db-password, uid: 999, mode: 0400 }]
 ";
 
+/// A Windows machine, delivered to over WinRM, with its own process.
+const WINDOWS: &str = "
+version: 1
+name: secret-win
+networks: { lan: { cidr: 10.72.0.0/24 } }
+secrets:
+  db-password: { env: SECRET_LAB_DB_PASSWORD }
+  api-key: { file: api.key }
+machines:
+  win:
+    networks: { lan: 10 }
+    services: [{ port: 80 }]
+    vm: { os: windows-server-2022, provision: [setup.ps1] }
+    secrets: [db-password, { source: api-key, target: 'C:\\app\\api.key' }]
+    command: [app.exe]
+";
+
 fn project(spec: &str, tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("isoloom-secrets-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -53,6 +70,7 @@ fn project(spec: &str, tag: &str) -> PathBuf {
     std::fs::write(dir.join("isoloom.yml"), spec).unwrap();
     std::fs::write(dir.join("api.key"), FILE_VALUE).unwrap();
     std::fs::write(dir.join("db.sh"), "true\n").unwrap();
+    std::fs::write(dir.join("setup.ps1"), "exit 0\n").unwrap();
     dir
 }
 
@@ -130,4 +148,29 @@ fn no_secret_value_reaches_a_vm_target_file() {
             "{vm} doesn't wait for the secrets"
         );
     }
+}
+
+#[test]
+fn no_secret_value_reaches_a_windows_machines_file() {
+    let generated = generated(WINDOWS, "windows");
+    // Each VM target's Windows set-up waits for the delivery, then registers the startup task
+    // that puts the files back at every boot.
+    for target in [
+        "/.isoloom/vagrant/",
+        "/.isoloom/proxmox/",
+        "/.isoloom/cloud-vm/aws/",
+        "/.isoloom/cloud-vm/azure/",
+    ] {
+        let set_up = generated
+            .iter()
+            .filter(|(p, _)| p.display().to_string().contains(target))
+            .any(|(_, text)| text.contains("secrets\\\\.delivered") || text.contains("secrets\\.delivered"));
+        assert!(set_up, "{target} doesn't wait for the secrets");
+        let task = generated
+            .iter()
+            .any(|(p, text)| p.display().to_string().contains(target) && text.contains("isoloom-apply-secrets"));
+        assert!(task, "{target} doesn't put them back at boot");
+    }
+    // A cloud's set-up says how to reach its Windows machine over WinRM, never its password.
+    assert!(find(&generated, "cloud-vm/aws/main.tf").contains(" winrm\\\" > \\\""));
 }

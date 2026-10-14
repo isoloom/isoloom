@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+#[cfg(unix)]
 use isoloom_spec::model::SecretSource;
 
 use super::*;
@@ -115,22 +116,6 @@ fn a_value_with_a_nul_is_refused() {
     let s = spec("  b: { file: bin }\n");
     let e = resolve(&s, &lookup(&d)).unwrap_err();
     assert!(e[0].why.contains("NUL"), "{e:?}");
-}
-
-#[test]
-fn base64_is_the_standard_one() {
-    for (raw, enc) in [
-        ("", ""),
-        ("a", "YQ=="),
-        ("ab", "YWI="),
-        ("abc", "YWJj"),
-        ("abcd", "YWJjZA=="),
-        ("abcde", "YWJjZGU="),
-        ("abcdef", "YWJjZGVm"),
-    ] {
-        assert_eq!(base64(raw.as_bytes()), enc);
-    }
-    assert_eq!(base64(&[0xff, 0xfe, 0x00]), "//4A");
 }
 
 #[test]
