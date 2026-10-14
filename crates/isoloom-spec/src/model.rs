@@ -78,7 +78,8 @@ pub struct Spec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<CloudServices>,
     /// Volumes shared between machines: a machine volume with one of these names is this
-    /// volume, wherever it mounts it. See [`SharedVolume`].
+    /// volume, wherever it mounts it. One declared here can also outlive `isoloom down`
+    /// (`persistent: true`) or be one that exists already (`external: <name>`).
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub volumes: IndexMap<String, SharedVolume>,
     /// What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time

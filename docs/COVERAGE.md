@@ -10,7 +10,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 
 | Format | Coverage | Portable features | Done | Partly | To do |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| [Docker Compose](#docker-compose) | 96% | 151 | 143 | 4 | 4 |
+| [Docker Compose](#docker-compose) | 98% | 152 | 148 | 4 | 0 |
 | [Vagrant](#vagrant) | 100% | 42 | 42 | 0 | 0 |
 | [Vagrant: networks](#vagrant-networks) | 100% | 38 | 38 | 0 | 0 |
 | [Vagrant: disks and synced folders](#vagrant-disks-and-synced-folders) | 100% | 12 | 12 | 0 | 0 |
@@ -25,21 +25,21 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: QEMU](#vagrant-qemu) | 92% | 14 | 13 | 0 | 1 |
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 20 | 20 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
-| [Terraform: Proxmox](#terraform-proxmox) | 96% | 181 | 175 | 0 | 6 |
+| [Terraform: Proxmox](#terraform-proxmox) | 96% | 183 | 177 | 0 | 6 |
 | [Terraform: ESXi](#terraform-esxi) | 77% | 35 | 27 | 0 | 8 |
-| [Terraform: AWS](#terraform-aws) | 91% | 135 | 124 | 0 | 11 |
-| [Terraform: Azure](#terraform-azure) | 95% | 145 | 138 | 0 | 7 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 83% | 109 | 90 | 2 | 17 |
-| [Terraform: DigitalOcean](#terraform-digitalocean) | 90% | 32 | 29 | 0 | 3 |
-| [Terraform: Linode](#terraform-linode) | 98% | 50 | 49 | 0 | 1 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 80% | 206 | 166 | 0 | 40 |
+| [Terraform: AWS](#terraform-aws) | 97% | 135 | 131 | 0 | 4 |
+| [Terraform: Azure](#terraform-azure) | 96% | 156 | 151 | 0 | 5 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 94% | 117 | 109 | 2 | 6 |
+| [Terraform: DigitalOcean](#terraform-digitalocean) | 100% | 35 | 35 | 0 | 0 |
+| [Terraform: Linode](#terraform-linode) | 100% | 54 | 54 | 0 | 0 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 89% | 196 | 176 | 0 | 20 |
 | [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
-| [cloud-init](#cloud-init) | 96% | 80 | 77 | 0 | 3 |
+| [cloud-init](#cloud-init) | 100% | 86 | 86 | 0 | 0 |
 | [Ansible inventory](#ansible-inventory) | 100% | 31 | 31 | 0 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
-| [Kubernetes](#kubernetes) | 97% | 204 | 199 | 1 | 4 |
+| [Kubernetes](#kubernetes) | 98% | 206 | 203 | 1 | 2 |
 | [Kustomize](#kustomize) | 100% | 15 | 15 | 0 | 0 |
-| [Helm](#helm) | 100% | 19 | 19 | 0 | 0 |
+| [Helm](#helm) | 100% | 20 | 20 | 0 | 0 |
 
 Done includes features produced another way, or set in the image. The lists come from the
 formats themselves (every key of the Compose schema, every setting of Vagrant and each provider
@@ -50,7 +50,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Docker Compose
 
-96% of 151 portable features (143 done, 4 partly, 4 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
+98% of 152 portable features (148 done, 4 partly, 0 to do; 347 features in all). From the compose-spec schema, commit 914ec15d1fa4 (crates/isoloom-coverage/coverage/compose-spec.json).
 
 ### Top level
 
@@ -342,9 +342,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `userns_mode` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `uts` | No | No | Shares a kernel namespace with the host or another machine: separate VMs can't |
 | `volumes` | Yes | Yes | From `machines.*.volumes and volumes` (shared between machines; seeded with the image's files at the path, Kubernetes included; and read-only mounts of init and check scripts) |
-| `volumes[].type` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
-| `volumes[].source` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
-| `volumes[].target` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
+| `volumes[].type` | Yes | Yes | The long form, for a mount with options: a folder of a shared volume, a sized tmpfs |
+| `volumes[].source` | Yes | Yes | The long form, for a mount with options: a folder of a shared volume, a sized tmpfs |
+| `volumes[].target` | Yes | Yes | The long form, for a mount with options: a folder of a shared volume, a sized tmpfs |
 | `volumes[].read_only` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
 | `volumes[].consistency` | n/a | No | Docker Desktop's file sharing tuning |
 | `volumes[].bind` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
@@ -352,13 +352,13 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `volumes[].bind.create_host_path` | n/a | No | How Docker treats a missing host folder |
 | `volumes[].bind.recursive` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
 | `volumes[].bind.selinux` | n/a | No | Container mechanics: a VM has none; Isoloom sets them itself when a machine needs them |
-| `volumes[].volume` | Yes | Another way | Via the short form Isoloom writes (`source:target[:ro]`) |
+| `volumes[].volume` | Yes | Yes | The long form, for a mount with options: a folder of a shared volume, a sized tmpfs |
 | `volumes[].volume.labels` | n/a | No | Labels on a volume Compose creates on the fly: Isoloom declares its volumes |
 | `volumes[].volume.nocopy` | n/a | No | Skips seeding the volume with the image's files: Isoloom always seeds |
-| `volumes[].volume.subpath` | Yes | Not yet | Mounting one folder of a shared volume |
-| `volumes[].tmpfs` | Yes | Another way | Via tmpfs (from machines.*.tmpfs) |
-| `volumes[].tmpfs.size` | Yes | Not yet | A size for machines.*.tmpfs |
-| `volumes[].tmpfs.mode` | Yes | Not yet | A mode for machines.*.tmpfs |
+| `volumes[].volume.subpath` | Yes | Yes | From `machines.*.volumes.*.subpath` (created first by a one-shot job) |
+| `volumes[].tmpfs` | Yes | Yes | From `machines.*.tmpfs[] with a size or a mode` |
+| `volumes[].tmpfs.size` | Yes | Yes | From `machines.*.tmpfs[].size` |
+| `volumes[].tmpfs.mode` | Yes | Yes | From `machines.*.tmpfs[].mode` |
 | `volumes[].image` | No | No | Mounts another container image's files: VMs have no images to mount |
 | `volumes[].image.subpath` | No | No | Mounts another container image's files: VMs have no images to mount |
 | `volumes_from` | Yes | Another way | Via volumes (a volume shared between machines, each mounting it at its own path) |
@@ -385,16 +385,16 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `enable_ipv4` | Yes | Yes | From `networks.*.ipv6.only` (off on an IPv6-only network) |
 | `enable_ipv6` | Yes | Yes | From `networks.*.ipv6` |
 | `attachable` | n/a | No | Compose tooling, not the environment's behavior |
-| `labels` | Yes | Yes | The environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc` |
+| `labels` | Yes | Yes | The environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc`; isoloom.persistent from volumes.*.persistent, for `down` to keep it |
 
 ### Volumes
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `name` | n/a | No | Compose scopes names to the environment |
+| `name` | Yes | Yes | From `volumes.*.external` (the existing volume's name) |
 | `driver` | No | No | Docker volume drivers have no VM equivalent |
 | `driver_opts` | No | No | Docker volume driver options |
-| `external` | Yes | Not yet | With volumes (data that outlives the environment) |
+| `external` | Yes | Yes | From `volumes.*.external` |
 | `external.name` | n/a | No | Legacy spelling of `name` |
 | `labels` | Yes | Yes | The environment's labels: isoloom.managed and isoloom.environment, for `isoloom gc` |
 
@@ -471,7 +471,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `communicator` | Yes | Yes | From `vm.os` (Windows uses WinRM, plain HTTP or SSL per the box's `image.winrm`) |
 | `define` | Yes | Yes | From `machines` |
 | `disk` | Yes | Yes | From `machines.*.resources.disk_gb` (the root filesystem grown into it) |
-| `disks` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
+| `disks` | Yes | Another way | Via machines.*.disks (Vagrant's `config.vm.disk`, libvirt's `storage`, ESXi's `guest_storage`) |
 | `graceful_halt_timeout` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest` | Yes | Yes | From `vm.os` (Windows uses WinRM, plain HTTP or SSL per the box's `image.winrm`) |
 | `host_name` | n/a | No | Old name of `hostname` |
@@ -641,10 +641,10 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `disk_ext` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `file` | No | No | Display, input and host devices: containers and cloud VMs have none |
 | `id` | n/a | No | Vagrant's own identifier for the disk |
-| `name` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
+| `name` | Yes | Yes | From `machines.*.disks` (formatted and mounted by the machine's set-up) |
 | `primary` | Yes | Yes | The VM's own disk, `:disk` and primary, grown to `disk_gb` |
 | `provider_config` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `size` | Yes | Yes | From `machines.*.resources.disk_gb` |
+| `size` | Yes | Yes | From `machines.*.resources.disk_gb and machines.*.disks.*.size_gb` |
 | `type` | Yes | Yes | The VM's own disk, `:disk` and primary, grown to `disk_gb` |
 
 ### Synced folder options
@@ -1214,7 +1214,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `disk_device` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `disk_driver` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `disk_driver_opts` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
-| `disks` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
+| `disks` | Yes | Another way | Via machines.*.disks (Vagrant's `config.vm.disk`, libvirt's `storage`, ESXi's `guest_storage`) |
 | `driver` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `dtb` | Yes | Yes | From `machines.*.vm.boot.dtb` |
 | `emulator_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
@@ -1302,7 +1302,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `snapshot_pool_name` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `socket` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `sound_type` | No | No | Display, input and host devices: containers and cloud VMs have none |
-| `storage` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
+| `storage` | Yes | Yes | From `machines.*.disks` (formatted and mounted by the machine's set-up) |
 | `storage_pool_name` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `storage_pool_path` | n/a | No | The user's own setup (how Vagrant reaches the hypervisor, where it stores things) |
 | `suspend_mode` | n/a | No | Vagrant tooling, not the environment's behavior |
@@ -1450,7 +1450,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `guest_numvcpus` | Yes | Yes | From `machines.*.resources` |
 | `guest_snapshot_includememory` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_snapshot_quiesced` | n/a | No | Vagrant tooling, not the environment's behavior |
-| `guest_storage` | Yes | Another way | Via machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths) |
+| `guest_storage` | Yes | Yes | From `machines.*.disks` (formatted and mounted by the machine's set-up) |
 | `guest_username` | n/a | No | Vagrant tooling, not the environment's behavior |
 | `guest_virtualhw_version` | No | No | Hypervisor tuning: containers and cloud VMs have no such knob |
 | `guestos` | Yes | Another way | Via guest_guestos, the plugin's newer name for it |
@@ -1517,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-96% of 181 portable features (175 done, 0 partly, 6 to do; 558 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
+96% of 183 portable features (177 done, 0 partly, 6 to do; 558 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -2035,7 +2035,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `disk.cache` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `disk.datastore_id` | Yes | Yes | Written by the generator |
 | `disk.discard` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `disk.file_format` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.file_format` | Yes | Yes | Written by the generator |
 | `disk.file_id` | Yes | Yes | Written by the generator |
 | `disk.import_from` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `disk.interface` | Yes | Yes | Written by the generator |
@@ -2043,7 +2043,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `disk.path_in_datastore` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `disk.queues` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `disk.replicate` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
-| `disk.serial` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.serial` | Yes | Yes | Written by the generator |
 | `disk.size` | Yes | Yes | Written by the generator |
 | `disk.ssd` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `disk.speed` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
@@ -2202,9 +2202,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ovf_properties` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
 | `ovf_properties.key` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
 | `ovf_properties.value` | n/a | No | Another way to hand cloud-init its documents (an OVA's own properties): Isoloom uses `guestinfo`, which every OVA with VMware Tools reads |
-| `virtual_disks` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `virtual_disks.slot` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `virtual_disks.virtual_disk_id` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `virtual_disks` | Yes | Not yet | Machines.*.disks on ESXi: an esxi_virtual_disk each, attached by slot (the target refuses data disks until then) |
+| `virtual_disks.slot` | Yes | Not yet | Machines.*.disks on ESXi: an esxi_virtual_disk each, attached by slot (the target refuses data disks until then) |
+| `virtual_disks.virtual_disk_id` | Yes | Not yet | Machines.*.disks on ESXi: an esxi_virtual_disk each, attached by slot (the target refuses data disks until then) |
 
 ### esxi_portgroup
 
@@ -2235,7 +2235,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: AWS
 
-91% of 135 portable features (124 done, 0 partly, 11 to do; 2491 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
+97% of 135 portable features (131 done, 0 partly, 4 to do; 2491 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -2375,7 +2375,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_ebs_snapshot_block_public_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_ebs_snapshot_copy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `aws_ebs_snapshot_import` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
-| `aws_ebs_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `aws_ebs_volume` | Yes | Another way | Via machines.*.disks: the `ebs_block_device` blocks of aws_instance, each volume created and attached with it |
 | `aws_ebs_volume_copy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `aws_ec2_allowed_images_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_ec2_availability_zone_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -2573,7 +2573,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `aws_ssoadmin_trusted_token_issuer` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_uxc_account_customizations` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `aws_volume_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `aws_volume_attachment` | Yes | Another way | Via machines.*.disks: the `ebs_block_device` blocks of aws_instance, each volume created and attached with it |
 | `aws_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_vpc_block_public_access_exclusion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_block_public_access_options` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3057,9 +3057,9 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `cpu_options.threads_per_core` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
 | `credit_specification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `credit_specification.cpu_credits` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `ebs_block_device` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `ebs_block_device.delete_on_termination` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `ebs_block_device.device_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `ebs_block_device` | Yes | Yes | Written by the generator |
+| `ebs_block_device.delete_on_termination` | Yes | Yes | Written by the generator |
+| `ebs_block_device.device_name` | Yes | Yes | Written by the generator |
 | `ebs_block_device.encrypted` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `ebs_block_device.iops` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `ebs_block_device.kms_key_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -3067,8 +3067,8 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `ebs_block_device.tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `ebs_block_device.tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
 | `ebs_block_device.throughput` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `ebs_block_device.volume_size` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `ebs_block_device.volume_type` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `ebs_block_device.volume_size` | Yes | Yes | Written by the generator |
+| `ebs_block_device.volume_type` | Yes | Yes | Written by the generator |
 | `enclave_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `enclave_options.enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `ephemeral_block_device` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -3452,7 +3452,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: Azure
 
-95% of 145 portable features (138 done, 0 partly, 7 to do; 1599 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
+96% of 156 portable features (151 done, 0 partly, 5 to do; 1658 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -3532,7 +3532,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_maintenance_assignment_virtual_machine` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_maintenance_assignment_virtual_machine_scale_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_maintenance_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_managed_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `azurerm_managed_disk` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_managed_disk_sas_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_management_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_management_group_policy_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -3654,7 +3654,7 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `azurerm_user_assigned_identity` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_virtual_machine` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_virtual_machine_automanage_configuration_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `azurerm_virtual_machine_data_disk_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `azurerm_virtual_machine_data_disk_attachment` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_virtual_machine_implicit_data_disk_from_source` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `azurerm_virtual_machine_packet_capture` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_virtual_machine_restore_point` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -3861,6 +3861,58 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `termination_notification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `termination_notification.enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `termination_notification.timeout` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_managed_disk
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `create_option` | Yes | Yes | Written by the generator |
+| `disk_access_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_set_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_iops_read_only` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_iops_read_write` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_mbps_read_only` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_mbps_read_write` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_size_gb` | Yes | Yes | Written by the generator |
+| `edge_zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `gallery_image_reference_id` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `hyper_v_generation` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `image_reference_id` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `location` | Yes | Yes | Written by the generator |
+| `logical_sector_size` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `max_shares` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `name` | Yes | Yes | Written by the generator |
+| `network_access_policy` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `on_demand_bursting_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `optimized_frequent_attach_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_type` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `performance_plus_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `public_network_access_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `secure_vm_disk_encryption_set_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `security_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `source_resource_id` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `source_uri` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `storage_account_id` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `storage_account_type` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `tier` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `trusted_launch_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `upload_size_bytes` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `encryption_settings` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `encryption_settings.disk_encryption_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `encryption_settings.disk_encryption_key.secret_url` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `encryption_settings.disk_encryption_key.source_vault_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `encryption_settings.key_encryption_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `encryption_settings.key_encryption_key.key_url` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `encryption_settings.key_encryption_key.source_vault_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
@@ -4076,6 +4128,23 @@ And 1375 other resource types that only this cloud has: its managed services, ne
 | `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
 
+### azurerm_virtual_machine_data_disk_attachment
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `caching` | Yes | Yes | Written by the generator |
+| `create_option` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `lun` | Yes | Yes | Written by the generator |
+| `managed_disk_id` | Yes | Yes | Written by the generator |
+| `virtual_machine_id` | Yes | Yes | Written by the generator |
+| `write_accelerator_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
 ### azurerm_virtual_network
 
 | Key | Every target | Implemented | Notes |
@@ -4230,7 +4299,7 @@ And 897 other resource types that only this cloud has: its managed services, net
 
 ## Terraform: Google Cloud
 
-83% of 109 portable features (90 done, 2 partly, 17 to do; 1951 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
+94% of 117 portable features (109 done, 2 partly, 6 to do; 2002 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -4281,10 +4350,10 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `google_cloud_security_compliance_framework_deployment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_cloud_support_support_event_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_address` | Yes | Another way | Via `network_interface.network_ip` of google_compute_instance, which fixes each machine's spec address (its public one is Isoloom's way in, as on every cloud) |
-| `google_compute_attached_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `google_compute_attached_disk` | Yes | Another way | Via machines.*.disks: the `attached_disk` blocks of google_compute_instance |
 | `google_compute_autoscaler` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_bulk_per_instance_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `google_compute_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `google_compute_disk` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `google_compute_disk_async_replication` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `google_compute_disk_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_disk_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
@@ -4733,6 +4802,62 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `external_credentials.identity_token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
 | `external_credentials.service_account_email` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
 
+### google_compute_disk
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `access_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `architecture` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `create_snapshot_before_destroy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `create_snapshot_before_destroy_prefix` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `deletion_policy` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `description` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `enable_confidential_compute` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `image` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `labels` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `licenses` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `name` | Yes | Yes | Written by the generator |
+| `physical_block_size_bytes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `project` | Yes | Yes | Written by the generator |
+| `provisioned_iops` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `provisioned_throughput` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `size` | Yes | Yes | Written by the generator |
+| `snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `source_disk` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `source_instant_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `source_storage_object` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `storage_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `type` | Yes | Yes | Written by the generator |
+| `zone` | Yes | Yes | Written by the generator |
+| `async_primary_disk` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `async_primary_disk.disk` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `disk_encryption_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_key.kms_key_self_link` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_key.kms_key_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_key.raw_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_key.raw_key_wo` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_key.raw_key_wo_version` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_key.rsa_encrypted_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_key.rsa_encrypted_key_wo` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `disk_encryption_key.rsa_encrypted_key_wo_version` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `guest_os_features` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `guest_os_features.type` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `params` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `params.resource_manager_tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `source_image_encryption_key` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `source_image_encryption_key.kms_key_self_link` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `source_image_encryption_key.kms_key_service_account` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `source_image_encryption_key.raw_key` | Yes | Another way | Via machines.*.vm.image.<cloud>: a machine boots an image made beforehand, named by its id |
+| `source_snapshot_encryption_key` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `source_snapshot_encryption_key.kms_key_self_link` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `source_snapshot_encryption_key.kms_key_service_account` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `source_snapshot_encryption_key.raw_key` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
 ### google_compute_firewall
 
 | Key | Every target | Implemented | Notes |
@@ -4799,15 +4924,15 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `advanced_machine_features.threads_per_core` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
 | `advanced_machine_features.turbo_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `advanced_machine_features.visible_core_count` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
-| `attached_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `attached_disk.device_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `attached_disk` | Yes | Yes | Written by the generator |
+| `attached_disk.device_name` | Yes | Yes | Written by the generator |
 | `attached_disk.disk_encryption_key_raw` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `attached_disk.disk_encryption_key_rsa` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `attached_disk.disk_encryption_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `attached_disk.force_attach` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `attached_disk.force_attach` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `attached_disk.kms_key_self_link` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `attached_disk.mode` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `attached_disk.source` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `attached_disk.mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `attached_disk.source` | Yes | Yes | Written by the generator |
 | `boot_disk` | Yes | Yes | Written by the generator |
 | `boot_disk.auto_delete` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `boot_disk.device_name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
@@ -4910,10 +5035,10 @@ And 897 other resource types that only this cloud has: its managed services, net
 | `scheduling.node_affinities.values` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.on_instance_stop_action` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `scheduling.on_instance_stop_action.discard_local_ssd` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `scratch_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `scratch_disk.device_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `scratch_disk.interface` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `scratch_disk.size` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `scratch_disk` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scratch_disk.device_name` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scratch_disk.interface` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scratch_disk.size` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `service_account.email` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `service_account.scopes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -5150,7 +5275,7 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 
 ## Terraform: DigitalOcean
 
-90% of 32 portable features (29 done, 0 partly, 3 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
+100% of 35 portable features (35 done, 0 partly, 0 to do; 160 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5171,8 +5296,8 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 | `digitalocean_tag` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `digitalocean_uptime_alert` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `digitalocean_uptime_check` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `digitalocean_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `digitalocean_volume_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `digitalocean_volume` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `digitalocean_volume_attachment` | Yes | Another way | Via machines.*.disks: the `volume_ids` of digitalocean_droplet, each volume attached at creation |
 | `digitalocean_volume_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `digitalocean_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `digitalocean_vpc_nat_gateway` | Yes | Another way | Via each machine's own public address, through the cloud's internet gateway: every machine reaches the internet directly (Terraform sets it up over SSH at that address), so a NAT gateway would add a hop and a bill, not a way out |
@@ -5213,7 +5338,7 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 | `ssh_keys` | Yes | Yes | Written by the generator |
 | `tags` | Yes | Yes | Written by the generator |
 | `user_data` | Yes | Yes | Written by the generator |
-| `volume_ids` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `volume_ids` | Yes | Yes | Written by the generator |
 | `vpc_uuid` | Yes | Yes | Written by the generator |
 | `backup_policy` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `backup_policy.hour` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -5261,6 +5386,21 @@ And 1087 other resource types that only this cloud has: its managed services, ne
 | `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
 
+### digitalocean_volume
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `description` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filesystem_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `initial_filesystem_label` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `initial_filesystem_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `name` | Yes | Yes | Written by the generator |
+| `region` | Yes | Yes | Written by the generator |
+| `size` | Yes | Yes | Written by the generator |
+| `snapshot_id` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `tags` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+
 ### digitalocean_vpc
 
 | Key | Every target | Implemented | Notes |
@@ -5277,7 +5417,7 @@ And 59 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Linode
 
-98% of 50 portable features (49 done, 0 partly, 1 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
+100% of 54 portable features (54 done, 0 partly, 0 to do; 508 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5305,7 +5445,7 @@ And 59 other resource types that only this cloud has: its managed services, netw
 | `linode_sshkey` | Yes | Another way | Via each instance's own `authorized_keys`, which installs the environment's key without storing it in the account |
 | `linode_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `linode_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
-| `linode_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `linode_volume` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `linode_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `linode_vpc_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 
@@ -5760,6 +5900,22 @@ And 59 other resource types that only this cloud has: its managed services, netw
 | `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
 | `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
 
+### linode_volume
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `encryption` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `label` | Yes | Yes | Written by the generator |
+| `linode_id` | Yes | Yes | Written by the generator |
+| `region` | Yes | Yes | Written by the generator |
+| `size` | Yes | Yes | Written by the generator |
+| `source_volume_id` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `tags` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
 ### linode_vpc
 
 | Key | Every target | Implemented | Notes |
@@ -5788,7 +5944,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 
 ## Terraform: Oracle Cloud
 
-80% of 206 portable features (166 done, 0 partly, 40 to do; 1482 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
+89% of 196 portable features (176 done, 0 partly, 20 to do; 1482 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -5892,8 +6048,8 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `oci_core_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_vcn` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_vnic_attachment` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_volume` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `oci_core_volume_attachment` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `oci_core_volume` | Yes | Another way | Via machines.*.disks: the `launch_volume_attachments` blocks of oci_core_instance, each volume created and attached with it |
+| `oci_core_volume_attachment` | Yes | Another way | Via machines.*.disks: the `launch_volume_attachments` blocks of oci_core_instance, each volume created and attached with it |
 | `oci_core_volume_backup` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `oci_core_volume_backup_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `oci_core_volume_backup_policy_assignment` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
@@ -6191,24 +6347,24 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `launch_options.is_pv_encryption_in_transit_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `launch_options.network_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `launch_options.remote_data_volume_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `launch_volume_attachments` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.device` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.display_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.encryption_in_transit_type` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.is_agent_auto_iscsi_login_enabled` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.is_pv_encryption_in_transit_enabled` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.is_read_only` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.is_shareable` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.type` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.use_chap` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.volume_id` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.launch_create_volume_details` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.launch_create_volume_details.compartment_id` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.launch_create_volume_details.display_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.launch_create_volume_details.kms_key_id` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.launch_create_volume_details.size_in_gbs` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.launch_create_volume_details.volume_creation_type` | Yes | Not yet | With data disks: persistent volumes on VMs |
-| `launch_volume_attachments.launch_create_volume_details.vpus_per_gb` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments` | Yes | Yes | Written by the generator |
+| `launch_volume_attachments.device` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.display_name` | Yes | Yes | Written by the generator |
+| `launch_volume_attachments.encryption_in_transit_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.is_agent_auto_iscsi_login_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.is_pv_encryption_in_transit_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.is_read_only` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.is_shareable` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.type` | Yes | Yes | Written by the generator |
+| `launch_volume_attachments.use_chap` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.volume_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.launch_create_volume_details` | Yes | Yes | Written by the generator |
+| `launch_volume_attachments.launch_create_volume_details.compartment_id` | Yes | Yes | Written by the generator |
+| `launch_volume_attachments.launch_create_volume_details.display_name` | Yes | Yes | Written by the generator |
+| `launch_volume_attachments.launch_create_volume_details.kms_key_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments.launch_create_volume_details.size_in_gbs` | Yes | Yes | Written by the generator |
+| `launch_volume_attachments.launch_create_volume_details.volume_creation_type` | Yes | Yes | Written by the generator |
+| `launch_volume_attachments.launch_create_volume_details.vpus_per_gb` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `licensing_configs` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `licensing_configs.license_type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `licensing_configs.type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -7055,7 +7211,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 
 ## cloud-init
 
-96% of 80 portable features (77 done, 0 partly, 3 to do; 149 features in all). From cloud-init 26.2's schema-cloud-config-v1.json (crates/isoloom-coverage/coverage/cloud-init.txt).
+100% of 86 portable features (86 done, 0 partly, 0 to do; 160 features in all). From cloud-init 26.2's schema-cloud-config-v1.json (crates/isoloom-coverage/coverage/cloud-init.txt).
 
 ### Top level
 
@@ -7081,16 +7237,16 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `cloud_final_modules` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
 | `cloud_init_modules` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
 | `create_hostname_file` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
-| `device_aliases` | Yes | Not yet | Data disks, partitioned and formatted (Wave 3: persistent volumes and data disks) |
+| `device_aliases` | Yes | Yes | From `machines.*.disks` (each found by its serial, partitioned, formatted with its name as the label) |
 | `disable_ec2_metadata` | No | No | EC2's metadata service: AWS only |
 | `disable_root` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
 | `disable_root_opts` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
-| `disk_setup` | Yes | Not yet | Data disks, partitioned and formatted (Wave 3: persistent volumes and data disks) |
+| `disk_setup` | Yes | Yes | From `machines.*.disks` (each found by its serial, partitioned, formatted with its name as the label) |
 | `drivers` | No | No | NVIDIA drivers: most targets have no GPU to pass through |
 | `fan` | Yes | In the image | One OS's own service or tool: set it in the image or the machine's provisioning (`vm.provision`) |
 | `final_message` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
 | `fqdn` | Yes | Yes | From `machines.*.dns.domain` (the machine's name with its domain; the host name stays the short one) |
-| `fs_setup` | Yes | Not yet | Data disks, partitioned and formatted (Wave 3: persistent volumes and data disks) |
+| `fs_setup` | Yes | Yes | From `machines.*.disks` (each found by its serial, partitioned, formatted with its name as the label) |
 | `groups` | Yes | In the image | Set it in the machine's provisioning (`vm.provision`) or its image |
 | `growpart` | Yes | Another way | Via machines.*.resources.disk_gb (the disk-grow step) |
 | `grub-dpkg` | n/a | No | A deprecated spelling of a key in this table |
@@ -7109,7 +7265,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `merge_type` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
 | `migrate` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
 | `mount_default_fields` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
-| `mounts` | Yes | Another way | Via volumes (a shared volume is mounted from /etc/fstab) |
+| `mounts` | Yes | Yes | From `machines.*.disks.*.mount` (a data disk mounted by its label; a shared volume is mounted from /etc/fstab by its step) |
 | `no_ssh_fingerprints` | n/a | No | SSH access mechanics: Isoloom reaches its machines as its own user, with its own key |
 | `ntp` | Yes | Another way | Via constraints.ntp (the prelude sets the time servers) |
 | `output` | n/a | No | Cloud-init's own behavior (which modules run, how documents merge, what it logs), not the machine's |
@@ -7225,6 +7381,22 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `message` | Yes | Yes | The reboot step |
 | `mode` | Yes | Yes | Reboot |
 | `timeout` | n/a | No | When cloud-init restarts the machine: right away, once it is done, is what the steps need |
+
+### Top level
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `disk_setup.*.layout` | Yes | Yes | One partition, the whole disk |
+| `disk_setup.*.overwrite` | Yes | Yes | False: a disk with data is left as it is |
+| `disk_setup.*.table_type` | Yes | Yes | Gpt |
+| `fs_setup.*.cmd` | n/a | No | How cloud-init partitions and formats a disk: Isoloom sets the device, label and filesystem it needs |
+| `fs_setup.*.device` | Yes | Yes | The disk's first partition |
+| `fs_setup.*.extra_opts` | n/a | No | How cloud-init partitions and formats a disk: Isoloom sets the device, label and filesystem it needs |
+| `fs_setup.*.filesystem` | Yes | Yes | From `machines.*.disks.*.fs` |
+| `fs_setup.*.label` | Yes | Yes | The disk's name |
+| `fs_setup.*.overwrite` | n/a | No | How cloud-init partitions and formats a disk: Isoloom sets the device, label and filesystem it needs |
+| `fs_setup.*.partition` | n/a | No | How cloud-init partitions and formats a disk: Isoloom sets the device, label and filesystem it needs |
+| `fs_setup.*.replace_fs` | n/a | No | How cloud-init partitions and formats a disk: Isoloom sets the device, label and filesystem it needs |
 
 ## Ansible inventory
 
@@ -7438,7 +7610,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 
 ## Kubernetes
 
-97% of 204 portable features (199 done, 1 partly, 4 to do; 375 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
+98% of 206 portable features (203 done, 1 partly, 2 to do; 377 features in all). From the Kubernetes v1.37.0 OpenAPI document (the version CI's kind cluster runs).
 
 ### Instructions
 
@@ -7563,7 +7735,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `Container: terminationMessagePath` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Container: terminationMessagePolicy` | n/a | No | Kubernetes scheduling and lifecycle: where and how long a pod runs, not how the machine behaves |
 | `Container: tty` | n/a | No | A terminal for whoever attaches: `isoloom connect` opens its own |
-| `Container: volumeDevices` | Yes | Not yet | Raw data disks, with persistent volumes and data disks |
+| `Container: volumeDevices` | Yes | Yes | From `machines.*.disks with `fs: raw`` |
 | `Container: volumeMounts` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
 | `Container: workingDir` | Yes | Yes | From `machines.*.working_dir` |
 | `ContainerPort: containerPort` | Yes | Yes | From `machines.*.services[].port` |
@@ -7668,7 +7840,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `Volume: iscsi` | No | No | One storage system's plugin: no other target has it |
 | `Volume: name` | Yes | Yes | From `volumes` (and Isoloom's own: the scripts, the probe) |
 | `Volume: nfs` | No | No | One storage system's plugin: no other target has it |
-| `Volume: persistentVolumeClaim` | Yes | Yes | From `machines.*.volumes` |
+| `Volume: persistentVolumeClaim` | Yes | Yes | From `machines.*.volumes and machines.*.disks` |
 | `Volume: photonPersistentDisk` | No | No | One storage system's plugin: no other target has it |
 | `Volume: portworxVolume` | No | No | One storage system's plugin: no other target has it |
 | `Volume: projected` | n/a | No | The pod's own details and API tokens as files: machines don't read them |
@@ -7684,9 +7856,11 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `VolumeMount: name` | Yes | Yes | From `machines.*.volumes, machines.*.tmpfs and machines.*.shm_size` |
 | `VolumeMount: readOnly` | Yes | Yes | Isoloom's probe, mounted read-only |
 | `VolumeMount: recursiveReadOnly` | Yes | Another way | Via `readOnly` |
-| `VolumeMount: subPath` | Yes | Yes | From `machines.*.files and machines.*.secrets` (each file mounted at its path) |
+| `VolumeMount: subPath` | Yes | Yes | From `machines.*.files and machines.*.secrets` (each file mounted at its path), machines.*.volumes.*.subpath (a folder of a shared volume) |
 | `VolumeMount: subPathExpr` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
-| `PersistentVolumeClaimVolumeSource: claimName` | Yes | Yes | From `volumes` |
+| `VolumeDevice: devicePath` | Yes | Yes | From `machines.*.disks with `fs: raw`` (at /dev/isoloom-<disk>) |
+| `VolumeDevice: name` | Yes | Yes | From `machines.*.disks with `fs: raw`` (at /dev/isoloom-<disk>) |
+| `PersistentVolumeClaimVolumeSource: claimName` | Yes | Yes | From `volumes` (an existing claim by its name: volumes.*.external) |
 | `PersistentVolumeClaimVolumeSource: readOnly` | Yes | Another way | Via the mount's `readOnly` |
 | `ConfigMapVolumeSource: defaultMode` | Yes | Yes | The project's scripts, executable |
 | `ConfigMapVolumeSource: defaultUser` | n/a | No | A mount detail of the node: Isoloom mounts whole volumes, read-write |
@@ -7712,14 +7886,14 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `PersistentVolumeClaimSpec: accessModes` | Yes | Yes | From `volumes` (ReadWriteOnce: a shared volume's machines run on one node) |
 | `PersistentVolumeClaimSpec: dataSource` | n/a | No | A claim cloned from a snapshot: snapshots are `isoloom snapshot`'s |
 | `PersistentVolumeClaimSpec: dataSourceRef` | n/a | No | A claim cloned from a snapshot: snapshots are `isoloom snapshot`'s |
-| `PersistentVolumeClaimSpec: resources` | Yes | Yes | From `volumes` (1Gi each) |
+| `PersistentVolumeClaimSpec: resources` | Yes | Yes | From `volumes` (1Gi each) and machines.*.disks.*.size_gb |
 | `PersistentVolumeClaimSpec: selector` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
 | `PersistentVolumeClaimSpec: storageClassName` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
 | `PersistentVolumeClaimSpec: volumeAttributesClassName` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
-| `PersistentVolumeClaimSpec: volumeMode` | Yes | Not yet | Raw data disks, with persistent volumes and data disks |
+| `PersistentVolumeClaimSpec: volumeMode` | Yes | Yes | From `machines.*.disks.*.fs` (Block for a raw disk, Filesystem otherwise) |
 | `PersistentVolumeClaimSpec: volumeName` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
 | `VolumeResourceRequirements: limits` | n/a | No | The cluster's storage setup: Isoloom's claims take its default |
-| `VolumeResourceRequirements: requests` | Yes | Yes | From `volumes` (1Gi each) |
+| `VolumeResourceRequirements: requests` | Yes | Yes | From `volumes` (1Gi each) and machines.*.disks.*.size_gb |
 | `Service: apiVersion` | Yes | Yes | Every object Isoloom writes |
 | `Service: kind` | Yes | Yes | Every object Isoloom writes |
 | `Service: metadata` | Yes | Yes | Every object Isoloom writes |
@@ -7877,7 +8051,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 
 ## Helm
 
-100% of 19 portable features (19 done, 0 partly, 0 to do; 52 features in all). From SchemaStore's chart.json (pinned) and Helm 3.16's chart documentation.
+100% of 20 portable features (20 done, 0 partly, 0 to do; 52 features in all). From SchemaStore's chart.json (pinned) and Helm 3.16's chart documentation.
 
 ### Instructions
 
@@ -7934,7 +8108,7 @@ And 735 other resource types that only this cloud has: its managed services, net
 | `Hooks: test` | Yes | Yes | From `checks` (`helm test` runs them) |
 | `Hooks: helm.sh/hook-weight` | n/a | No | Orders hooks of one kind: Isoloom's checks are independent |
 | `Hooks: helm.sh/hook-delete-policy` | Yes | Yes | From `checks` (a run replaces the last one's Pods) |
-| `Hooks: helm.sh/resource-policy` | n/a | No | Keeps an object when the release is deleted: `isoloom down` removes everything |
+| `Hooks: helm.sh/resource-policy` | Yes | Yes | From `volumes.*.persistent` (its claim kept when the release is uninstalled) |
 
 ## From the spec's side
 
@@ -8016,6 +8190,9 @@ is marked ✗, with its reason below.
 | `machines.*.devices[].permissions` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | n/a |
 | `machines.*.read_only` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.tmpfs` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.tmpfs[].path` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.tmpfs[].size` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
+| `machines.*.tmpfs[].mode` | ✓ | ✓ | ✗ | ✗ | ✗ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.shm_size` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.dns.servers` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | ✓ | ✓ | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
 | `machines.*.dns.search` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | planned | planned | planned | planned | planned | planned | planned | planned | ✓ | n/a | n/a |
@@ -8036,6 +8213,8 @@ is marked ✗, with its reason below.
 | `machines.*.healthcheck.start_period` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.depends_on` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ◐ |
 | `volumes.*.owner` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | planned |
+| `volumes.*.persistent` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `volumes.*.external` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `machines.*.volumes` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
 | `machines.*.files[].path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.files[].source` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
@@ -8043,6 +8222,11 @@ is marked ✗, with its reason below.
 | `machines.*.files[].uid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
 | `machines.*.files[].gid` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
 | `machines.*.files[].mode` | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | n/a | ✗ |
+| `machines.*.volumes.*.path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | planned |
+| `machines.*.volumes.*.subpath` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | planned |
+| `machines.*.disks.*.size_gb` | n/a | n/a | ✓ | ✓ | ✓ | ◐ | n/a | ◐ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ✗ |
+| `machines.*.disks.*.fs` | n/a | n/a | ◐ | ◐ | ◐ | ✓ | n/a | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | n/a | ✗ |
+| `machines.*.disks.*.mount` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.access` | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | n/a | ✓ |
 | `machines.*.docker.image` | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `machines.*.docker.build` | ✓ | ✓ | ◐ | ◐ | ◐ | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
@@ -8120,25 +8304,25 @@ is marked ✗, with its reason below.
 
 | Output | Handled | Done | Partial | Planned | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| docker | 86% of 114 | 97 | 3 | 0 | 14 |
-| hosted | 86% of 114 | 97 | 3 | 0 | 14 |
-| kubernetes | 68% of 106 | 67 | 12 | 1 | 26 |
-| helm | 68% of 106 | 67 | 12 | 1 | 26 |
-| kustomize | 68% of 106 | 67 | 12 | 1 | 26 |
-| vagrant | 81% of 119 | 90 | 15 | 0 | 14 |
-| docker-vm | 78% of 114 | 88 | 3 | 0 | 23 |
-| hybrid | 66% of 139 | 90 | 5 | 7 | 37 |
-| proxmox | 82% of 114 | 93 | 2 | 3 | 16 |
-| esxi | 67% of 113 | 76 | 1 | 3 | 33 |
-| aws | 62% of 119 | 66 | 16 | 6 | 31 |
-| azure | 61% of 119 | 66 | 14 | 7 | 32 |
-| gcp | 61% of 119 | 66 | 15 | 7 | 31 |
-| digitalocean | 50% of 119 | 55 | 9 | 6 | 49 |
-| linode | 55% of 119 | 60 | 12 | 6 | 41 |
-| oci | 55% of 119 | 60 | 13 | 6 | 40 |
-| cloud-docker | 77% of 114 | 87 | 3 | 0 | 24 |
+| docker | 87% of 122 | 105 | 3 | 0 | 14 |
+| hosted | 87% of 122 | 105 | 3 | 0 | 14 |
+| kubernetes | 70% of 116 | 75 | 13 | 1 | 27 |
+| helm | 70% of 116 | 75 | 13 | 1 | 27 |
+| kustomize | 70% of 116 | 75 | 13 | 1 | 27 |
+| vagrant | 80% of 126 | 94 | 16 | 0 | 16 |
+| docker-vm | 78% of 122 | 94 | 3 | 0 | 25 |
+| hybrid | 65% of 149 | 95 | 6 | 7 | 41 |
+| proxmox | 81% of 121 | 98 | 2 | 3 | 18 |
+| esxi | 65% of 120 | 78 | 1 | 3 | 38 |
+| aws | 62% of 126 | 71 | 16 | 6 | 33 |
+| azure | 61% of 126 | 71 | 14 | 7 | 34 |
+| gcp | 62% of 126 | 71 | 15 | 7 | 33 |
+| digitalocean | 49% of 126 | 58 | 9 | 6 | 53 |
+| linode | 56% of 126 | 65 | 12 | 6 | 43 |
+| oci | 56% of 126 | 65 | 13 | 6 | 42 |
+| cloud-docker | 77% of 122 | 93 | 3 | 0 | 26 |
 | cloud-services | 100% of 25 | 25 | 0 | 0 | 0 |
-| external | 49% of 78 | 34 | 9 | 14 | 21 |
+| external | 45% of 85 | 34 | 9 | 16 | 26 |
 
 ### Refusals
 
@@ -8154,7 +8338,7 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **digitalocean**: Network `lan` sets its `mtu`: DigitalOcean has no setting for a network's MTU (`networks.*.mtu`)
 - **linode**: Network `lan` sets its `mtu`: Linode has no setting for a network's MTU (`networks.*.mtu`)
 - **oci**: Network `lan` sets its `mtu`: Oracle Cloud has no setting for a network's MTU (`networks.*.mtu`)
-- **digitalocean**: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`, `machines.*.depends_on`, `volumes.*.owner`, `machines.*.access`)
+- **digitalocean**: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address (`networks.*.vlans.*.cidr`, `networks.*.vlans.*.internet`, `networks.*.gateway`, `reach[].from`, `reach[].to`, `reach[].ports`, `machines.*.depends_on`, `volumes.*.owner`, `machines.*.volumes.*.path`, `machines.*.volumes.*.subpath`, `machines.*.access`)
 - **hybrid**: Machine `sw` is a network appliance (`docker.appliance`), which runs on the Docker targets (`networks.*.switch`)
 - **kubernetes, helm, kustomize**: Networks with a `gateway` machine on Kubernetes come later (`networks.*.gateway`)
 - **hybrid**: Networks with a `gateway` machine in hybrid environments come later (`networks.*.gateway`)
@@ -8203,9 +8387,13 @@ In the backends' words, from their probes (a machine a reason names is the probe
 - **kubernetes, helm, kustomize**: Machine `a`: `gpus.options` are Docker's GPU driver options, which Kubernetes has no place for (`machines.*.gpus.options`)
 - **kubernetes, helm, kustomize, docker-vm, hybrid, cloud-docker**: Machine `a` is given host devices (`devices`): only a container on your own Docker host reaches them (the `docker` target), not one in a VM Isoloom creates or a Kubernetes pod (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
 - **vagrant, proxmox, esxi, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` is given host devices (`devices`): a VM has its own virtual devices, so only a container gets the host's (a GPU reaches a VM through `gpus`) (`machines.*.devices[].host`, `machines.*.devices[].guest`, `machines.*.devices[].permissions`)
+- **kubernetes, helm, kustomize**: Machine `a` sets a tmpfs `mode`: Kubernetes' memory volumes have none (`machines.*.tmpfs[].mode`)
 - **external**: Machine `a` sets its own process (`command`, `working_dir`, `before` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it (`machines.*.command`, `machines.*.working_dir`, `machines.*.before`, `machines.*.healthcheck.test`, `machines.*.healthcheck.http.port`, `machines.*.healthcheck.http.path`, `machines.*.healthcheck.interval`, `machines.*.healthcheck.timeout`, `machines.*.healthcheck.retries`, `machines.*.healthcheck.start_period`)
-- **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`)
+- **hybrid**: Volume `data` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now (`volumes.*.owner`, `machines.*.volumes.*.path`, `machines.*.volumes.*.subpath`)
+- **vagrant, docker-vm, hybrid, proxmox, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Volume `data` is persistent: it outlives `down` on Docker and Kubernetes, while this target's storage goes with its machines (`volumes.*.persistent`)
+- **vagrant, docker-vm, hybrid, proxmox, esxi, aws, azure, gcp, digitalocean, linode, oci, cloud-docker, external**: Volume `data` is an existing one (`external`): Docker and Kubernetes mount one by name, this target has none to mount (`volumes.*.external`)
 - **external**: Machine `a` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook (`machines.*.files[].path`, `machines.*.files[].source`, `machines.*.files[].content`, `machines.*.files[].uid`, `machines.*.files[].gid`, `machines.*.files[].mode`)
+- **esxi, external**: Machine `a` has data disks (`disks`), which this target can't attach (`machines.*.disks.*.size_gb`, `machines.*.disks.*.fs`, `machines.*.disks.*.mount`)
 - **hybrid**: Machine `r` is a network appliance (`docker.appliance`), which runs on the Docker targets (`machines.*.docker.appliance`, `machines.*.docker.firmware`, `machines.*.docker.config`)
 - **hybrid, esxi, aws, azure, gcp, digitalocean, linode, oci**: Machine `a` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`, `machines.*.vm.boot.loader`, `machines.*.vm.boot.nvram`, `machines.*.vm.boot.network.tftp_root`, `machines.*.vm.boot.network.file`, `machines.*.vm.boot.network.server`, `machines.*.vm.boot.firmware`, `machines.*.vm.boot.firmware_format`, `machines.*.vm.boot.order`)
 - **proxmox**: Machine `a` sets `vm.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it (`machines.*.vm.boot.kernel`, `machines.*.vm.boot.initrd`, `machines.*.vm.boot.cmdline`, `machines.*.vm.boot.dtb`)

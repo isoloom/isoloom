@@ -180,7 +180,8 @@ entry takes a `size` and a `mode` (`{ path: /run, size: 64m, mode: "1777" }`). `
 machine data disks beside its own (`{ data: { size_gb: 50, fs: xfs, mount: /data } }`; `fs` is
 `ext4`, `xfs`, `ntfs` on Windows, or `raw`): an empty disk on Vagrant (VirtualBox, VMware,
 Hyper-V, libvirt, ESXi), Proxmox and every cloud, formatted with its name as the label and
-mounted at boot; a named volume on Docker; a claim on Kubernetes (a block device when raw).
+mounted at boot; a named volume on Docker; a claim on Kubernetes (a block device when raw). Each
+target's handling, and what it refuses: [docs/storage.md](docs/storage.md).
 
 Checks come in three kinds, and `isoloom test` runs them all from inside the environment:
 **derived** from the spec (every service answers from the machines `reach` lets through and from

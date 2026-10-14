@@ -171,7 +171,9 @@ pub struct Machine {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub files: Vec<MachineFile>,
     /// Data disks beside the machine's own, by name (kebab-case, at most 12 characters: the
-    /// filesystem's label): `{ size_gb: 50, fs: xfs, mount: /data }`. See [`Disk`].
+    /// filesystem's label): `{ size_gb: 50, fs: xfs, mount: /data }`. A VM gets an empty disk
+    /// of that size, formatted and mounted at boot; a container gets a volume at the mount. The
+    /// disks go with the machine.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub disks: IndexMap<String, Disk>,
     /// The machine the user lands on. It may have no implementation: the runner supplies it.

@@ -112,7 +112,8 @@ impl Backend for EsxiBackend {
     }
 
     /// What the router, the controller and the machines' own steps give: the rest (IPv6,
-    /// secrets, outside networks, own images and boots, TPM, GPUs, nesting, MTUs, rate limits)
+    /// secrets, outside networks, own images and boots, TPM, GPUs, nesting, MTUs, rate limits,
+    /// data disks, which would need an `esxi_virtual_disk` each and a guest that attaches it)
     /// is refused.
     fn capabilities(&self) -> Capabilities {
         Capabilities::of([
