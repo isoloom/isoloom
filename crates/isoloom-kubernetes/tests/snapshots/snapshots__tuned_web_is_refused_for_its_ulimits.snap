@@ -1,0 +1,5 @@
+---
+source: crates/isoloom-kubernetes/tests/snapshots.rs
+expression: err.to_string()
+---
+kubernetes: machine `web` sets `ulimits`: Kubernetes has no per-container process limits

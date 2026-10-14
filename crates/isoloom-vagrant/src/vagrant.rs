@@ -63,6 +63,9 @@ pub fn capabilities() -> Capabilities {
         Feature::PlaybookChecks,
         Feature::ExecWithoutContainer,
         Feature::Gateways,
+        Feature::MachineAliases,
+        Feature::Ulimits,
+        Feature::TrafficControl,
     ])
 }
 

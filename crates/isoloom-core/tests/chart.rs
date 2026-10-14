@@ -35,8 +35,8 @@ fn the_chart_is_the_same_environment_with_images_as_values() {
 
     let env = get(&files, "chart/templates/environment.yaml");
     assert!(!env.contains("kind: Namespace"), "the release's namespace");
-    assert!(env.contains("image: {{ index .Values.images \"cache\" | quote }}"));
-    assert!(env.contains("image: {{ index .Values.images \"web\" | quote }}"));
+    assert!(env.contains("image: '{{ index .Values.images \"cache\" }}'"));
+    assert!(env.contains("image: '{{ index .Values.images \"web\" }}'"));
     assert!(!env.contains("image: redis:7-alpine"), "the machine's own image is the value");
     assert!(env.contains("image: busybox:"), "Isoloom's probe stays as it is");
     // Every manifest of the plain output is in the chart, the namespace aside.
@@ -51,12 +51,12 @@ fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() {
     assert_eq!(tests.matches("helm.sh/hook: test").count(), 3);
     assert_eq!(tests.matches("kind: Pod").count(), 3, "pods, so `helm test --logs` finds them");
     assert!(tests.contains("name: isoloom-check\n") && tests.contains("restartPolicy: Never"));
-    assert!(tests.contains("networks.sh: {{ .Files.Get \"files/checks/networks.sh\" | quote }}"));
+    assert!(tests.contains("networks.sh: '{{ .Files.Get \"files/checks/networks.sh\" | b64enc }}'"));
     assert_eq!(get(&files, "chart/files/checks/web.sh"), get(&files, "kubernetes/checks/web.sh"));
     assert!(!tests.contains("exec-cache"), "exec checks stay with isoloom test");
 
     let scripts = get(&files, "chart/templates/scripts.yaml");
-    assert!(scripts.contains("build__cache__seed.sh: {{ required"), "{scripts}");
+    assert!(scripts.contains("build__cache__seed.sh: '{{ required"), "{scripts}");
     let copies = project_copies(&files, &dir).unwrap();
     let seed = copies.iter().find(|f| f.path.ends_with("chart/files/project/build__cache__seed.sh")).unwrap();
     assert_eq!(seed.contents, std::fs::read_to_string(dir.join("build/cache/seed.sh")).unwrap());
@@ -97,7 +97,7 @@ constraints:
     assert_eq!(values["images"]["web"].as_str(), Some("registry.corp/hub/library/nginx"));
     assert_eq!(values["inputs"]["API_KEY"].as_str(), Some(""));
     let secret = get(&files, "chart/templates/inputs.yaml");
-    assert!(secret.contains("name: isoloom-inputs") && secret.contains("range $name, $value := .Values.inputs"));
+    assert!(secret.contains("name: isoloom-inputs") && secret.contains("API_KEY: '{{ get .Values.inputs \"API_KEY\" | toString | b64enc }}'"));
     let notes = get(&files, "chart/templates/NOTES.txt");
     assert!(
         notes.contains("isoloom message --target kubernetes") && !notes.contains("machines.web"),

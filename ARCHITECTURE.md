@@ -27,7 +27,7 @@ isoloom.yml -> spec -> plan -> render -> backends -> .isoloom/<target>/...
    effect across restarts (a boot-time service). `backend` defines the
    `Backend` trait: a target, its capabilities, and `render(&Environment)`.
 4. **Backends** (`isoloom-compose`, `-kubernetes`, `-vagrant`, `-terraform`, `-external`):
-   each turns the plan (Compose, through typed structs in `file`; external) or, until it migrates, the
+   each turns the plan (Compose, through typed structs in `file`; Kubernetes, through typed objects in `objects`; external) or, until it migrates, the
    spec into its target's files. Every generator is a pure function of the
    spec: no file system access, so `isoloom check` can regenerate in memory and compare with
    what is committed.
@@ -43,7 +43,7 @@ requirements), a `MachineLifecycle` made of `Step`s with one Linux and one Windo
 each, and a `Backend` trait (`capabilities()` plus `render(&Environment)`). Refusal then becomes
 "requirements minus capabilities" instead of each generator deciding on its own. Until every
 backend moves to the plan (Wave 2), `LegacyBackend` keeps the other generators running
-unchanged; Compose, external, docker-vm, hybrid and Vagrant are on the plan, the Vagrant ones
+unchanged; Compose, Kubernetes, external, docker-vm, hybrid and Vagrant are on the plan, the Vagrant ones
 with the one Ruby builder (`isoloom_vagrant::ruby`) every Vagrantfile is meant to be written with;
 Vagrant's `transport` runs each planned step as a Vagrant provisioner.
 

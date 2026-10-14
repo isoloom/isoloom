@@ -41,7 +41,14 @@ impl Backend for HybridBackend {
     /// shared across containers and VMs, VMs waiting for containers and network appliances
     /// aren't wired yet.
     fn capabilities(&self) -> Capabilities {
-        Capabilities::of([Feature::EnvironmentProvisioning, Feature::PlaybookChecks, Feature::ExecWithoutContainer])
+        Capabilities::of([
+            Feature::EnvironmentProvisioning,
+            Feature::PlaybookChecks,
+            Feature::ExecWithoutContainer,
+            Feature::MachineAliases,
+            Feature::Ulimits,
+            Feature::TrafficControl,
+        ])
     }
 
     /// The Vagrantfile (the VMs, then the containers' host) and the checks next to it, and the

@@ -113,16 +113,39 @@ fn machines_start_after_what_they_wait_for() {
 fn a_backend_refuses_what_it_lacks_the_capability_for() {
     let spec = isoloom_spec::parse(&format!("{SPEC}provision:\n  - ansible: site.yml\n")).expect("parses");
     let env = Environment::build(&spec, Target::Docker, None);
-    assert_eq!(env.requirements, [Requirement::EnvironmentProvisioning]);
+    assert_eq!(env.requirements, [Requirement::EnvironmentProvisioning, Requirement::MachineAliases]);
     let none = Capabilities::default();
     let why = refusal(&env.requirements, &none).expect("refused");
     assert_eq!(why.to_string(), "environment-level provisioning (`provision:`) runs on VM targets for now");
-    assert!(refusal(&env.requirements, &Capabilities::of([Feature::EnvironmentProvisioning])).is_none());
+    let provisioning = Capabilities::of([Feature::EnvironmentProvisioning]);
+    let why = refusal(&env.requirements, &provisioning).expect("refused");
+    assert_eq!(why.to_string(), "machine `aliases` (dotted DNS names) aren't Kubernetes Service names");
+    let both = Capabilities::of([Feature::EnvironmentProvisioning, Feature::MachineAliases]);
+    assert!(refusal(&env.requirements, &both).is_none());
 }
 
 #[test]
-fn nothing_required_nothing_refused() {
+fn what_is_required_and_nothing_more_is_refused() {
     let env = env(Target::Docker);
-    assert_eq!(env.requirements.len(), 0);
-    assert!(refusal(&env.requirements, &Capabilities::default()).is_none());
+    assert_eq!(env.requirements, [Requirement::MachineAliases]);
+    assert!(refusal(&env.requirements, &Capabilities::of([Feature::MachineAliases])).is_none());
+}
+
+#[test]
+fn gateways_ulimits_and_tc_are_required_in_that_order() {
+    let spec = isoloom_spec::parse(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: gw, tc: { delay: 50ms } }\nmachines:\n  gw:\n    networks: { lan: 1 }\n    docker: { image: alpine }\n  web:\n    networks: { lan: 10 }\n    ulimits: { nofile: 1024 }\n    docker: { image: nginx }\n",
+    )
+    .expect("parses");
+    let env = Environment::build(&spec, Target::Kubernetes, None);
+    assert_eq!(
+        env.requirements,
+        [
+            Requirement::Gateway { network: "lan".into() },
+            Requirement::Ulimits { machine: "web".into() },
+            Requirement::TrafficControl
+        ]
+    );
+    let why = refusal(&env.requirements, &Capabilities::of([Feature::Gateways])).expect("refused");
+    assert_eq!(why.to_string(), "machine `web` sets `ulimits`: Kubernetes has no per-container process limits");
 }

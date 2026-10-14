@@ -43,29 +43,6 @@ pub const ENVIRONMENT_LABEL: &str = "isoloom.environment";
 /// The check runner: a small image with `sh`, `curl` and busybox `nc`.
 pub const CHECK_IMAGE: &str = "curlimages/curl:8.11.1";
 
-pub fn s(v: impl Into<String>) -> Value {
-    Value::String(v.into())
-}
-
-pub fn map(entries: impl IntoIterator<Item = (&'static str, Value)>) -> Value {
-    let mut m = Mapping::new();
-    for (k, v) in entries {
-        m.insert(s(k), v);
-    }
-    Value::Mapping(m)
-}
-
-pub fn list(items: impl IntoIterator<Item = Value>) -> Value {
-    Value::Sequence(items.into_iter().collect())
-}
-
-/// The image a machine runs: the published one, or the name its build is tagged with (so
-/// its `init:` jobs can reuse it).
-pub fn image_of(spec: &Spec, name: &str, m: &Machine) -> String {
-    let d = m.docker.as_ref().expect("docker target: every machine has docker:");
-    d.image.clone().unwrap_or_else(|| format!("isoloom/{}-{}", spec.name, name))
-}
-
 /// A static busybox Isoloom brings into every machine with services, so its probe needs
 /// nothing from the machine's image (distroless and `scratch` images have no shell).
 pub const PROBE_IMAGE: &str = "busybox:1.37.0-musl";
@@ -91,11 +68,6 @@ pub fn probe(m: &Machine) -> String {
 /// to probe, else started.
 pub fn ready_condition(m: &Machine) -> &'static str {
     if m.ready_ports().is_empty() { "service_started" } else { "service_healthy" }
-}
-
-/// The probe as an exec-form command: no shell from the image.
-pub fn probe_command(m: &Machine) -> Vec<Value> {
-    vec![s(format!("{PROBE_DIR}/busybox")), s("sh"), s("-c"), s(probe(m))]
 }
 
 /// `path` (from the project folder) as seen from the folder `from` (also from the project).
