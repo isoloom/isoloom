@@ -8301,7 +8301,7 @@ is marked ✗, with its reason below.
 | `networks.*.tc.jitter` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
 | `networks.*.tc.loss` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
 | `networks.*.tc.rate` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | n/a | planned |
-| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | planned | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `networks.*.mtu` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `networks.*.docker.cidr` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
 | `networks.*.vlans.*.cidr` | ✓ | ✓ | ◐ | ◐ | ◐ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | ✓ |
 | `networks.*.switch` | ✓ | ✓ | n/a | n/a | n/a | n/a | ✓ | ✗ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a |
@@ -8494,7 +8494,7 @@ is marked ✗, with its reason below.
 | esxi | 76% of 122 | 93 | 1 | 3 | 25 |
 | aws | 63% of 128 | 73 | 16 | 6 | 33 |
 | azure | 63% of 128 | 74 | 15 | 6 | 33 |
-| gcp | 63% of 128 | 73 | 16 | 7 | 32 |
+| gcp | 64% of 128 | 74 | 16 | 6 | 32 |
 | digitalocean | 49% of 128 | 59 | 9 | 6 | 54 |
 | linode | 57% of 128 | 67 | 12 | 6 | 43 |
 | oci | 58% of 128 | 69 | 13 | 6 | 40 |

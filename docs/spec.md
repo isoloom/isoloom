@@ -375,14 +375,13 @@ The largest packet the network carries, in bytes (576 to 9216): smaller to mimic
 
 - **Type:** integer
 - **Example:** `networks: { lan: { mtu: 1400 } }`
-- **Rendered by:** `proxmox`, `esxi`
+- **Rendered by:** `proxmox`, `esxi`, `cloud-vm` (gcp)
 - **Refused by:** `docker`, `hosted`, `kubernetes`, `helm`, `kustomize`, `vagrant`, `docker-vm`, `hybrid`, `cloud-docker`, `external`: network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does)
 - **Refused by:** `cloud-vm` (aws): network `lan` sets its `mtu`: AWS has no setting for a network's MTU
 - **Refused by:** `cloud-vm` (azure): network `lan` sets its `mtu`: Azure has no setting for a network's MTU
 - **Refused by:** `cloud-vm` (digitalocean): network `lan` sets its `mtu`: DigitalOcean has no setting for a network's MTU
 - **Refused by:** `cloud-vm` (linode): network `lan` sets its `mtu`: Linode has no setting for a network's MTU
 - **Refused by:** `cloud-vm` (oci): network `lan` sets its `mtu`: Oracle Cloud has no setting for a network's MTU
-- **Planned for:** `cloud-vm` (gcp)
 - **Not used by:** `cloud-services`
 
 ## `reach`

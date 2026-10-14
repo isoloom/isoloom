@@ -45,11 +45,15 @@ pub const VAGRANT: &[(&str, Status)] = &[
     NOT_LXC,
 ];
 
-/// The cloud VM core's.
+/// The cloud VM core's. The MTU is Google Cloud's claim: AWS, Azure, DigitalOcean, Linode and
+/// Oracle Cloud have no setting for it, so their backends refuse it and their cells say so.
 pub const CLOUD_VM: &[(&str, Status)] = &[
-    // A claim is proved on AWS, the target's first cloud, which has no setting for it.
-    mtu(
-        "Google Cloud sets it on each network's VPC network (1300 to 8896); AWS, Azure, DigitalOcean, Linode and Oracle Cloud have no setting for it and refuse it",
+    (
+        "networks.*.mtu",
+        Done {
+            how: "Google Cloud: `mtu` on the network's VPC network (1300 to 8896; Ethernet's 1500 when unset, not Google's 1460) (not run on a real host)",
+            proof: PROBE,
+        },
     ),
     rate("a VM's bandwidth cap inside it (tc) comes later"),
     NOT_LXC,
@@ -100,3 +104,16 @@ pub const ESXI: &[(&str, Status)] = &[
     ),
     NOT_LXC,
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::{COMPOSE, KUBERNETES, mtu, rate};
+
+    /// The tables are built at compile time; building their rows again at run time proves the
+    /// helpers give the same ones (and lets line coverage see them run).
+    #[test]
+    fn the_rows_are_the_helpers_at_run_time() {
+        assert_eq!(mtu("the networks' `driver_opts` MTU comes later"), COMPOSE[0]);
+        assert_eq!(rate("a bandwidth annotation needs the cluster's bandwidth plugin; comes later"), KUBERNETES[1]);
+    }
+}
