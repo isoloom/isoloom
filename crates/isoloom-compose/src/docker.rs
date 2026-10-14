@@ -7,7 +7,8 @@
 //!   behind it route everything through it (in a sidecar, once it answers).
 //! - Each machine becomes a service with its fixed address on every network; services find
 //!   each other by name (Compose DNS).
-//! - Machines with services get a healthcheck (TCP probe), so `depends_on` waits for them
+//! - Machines with services get a healthcheck (TCP probe; and the machine's own
+//!   `healthcheck` beside it), so `depends_on` waits for them
 //!   to answer and `docker compose up --wait` means "everything answers". The probe is
 //!   Isoloom's own static busybox (a one-shot `isoloom-probe-<arch>` copies it into a volume),
 //!   so it needs nothing from the image: distroless and `scratch` machines work too.
@@ -66,10 +67,18 @@ pub fn probe(m: &Machine) -> String {
         .join(" && ")
 }
 
+/// Everything a machine's readiness checks, as one line for Isoloom's busybox `sh`: its ports
+/// ([`probe`]), then its own healthcheck (`health`; a page through busybox `wget`), grouped so
+/// its own `||` stays its own. Empty when there is neither.
+pub fn ready_test(m: &Machine, health: Option<&isoloom_plan::Health>) -> String {
+    let own = health.map(|h| format!("( {} )", h.shell_test(&format!("{PROBE_DIR}/busybox wget"))));
+    [probe(m)].into_iter().filter(|t| !t.is_empty()).chain(own).collect::<Vec<_>>().join(" && ")
+}
+
 /// What a machine that waits for `m` waits for: healthy (its probe passes) when it has a port
-/// to probe, else started.
+/// to probe or a healthcheck of its own, else started.
 pub fn ready_condition(m: &Machine) -> &'static str {
-    if m.ready_ports().is_empty() { "service_started" } else { "service_healthy" }
+    if m.has_readiness() { "service_healthy" } else { "service_started" }
 }
 
 /// `path` (from the project folder) as seen from the folder `from` (also from the project).

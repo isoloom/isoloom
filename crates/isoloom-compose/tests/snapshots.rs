@@ -24,6 +24,40 @@ fn compose(example: &str) -> String {
         .contents
 }
 
+/// A machine with its own process: a command, a working directory, a `before` step and a
+/// healthcheck beside its port probe.
+const OWN_PROCESS: &str = r#"
+version: 1
+name: own-process
+inputs: [FLAG]
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    inputs: [FLAG]
+    services: [{ port: 8000 }]
+    docker: { image: "python:3-alpine" }
+    command: [python3, -m, http.server, "8000"]
+    working_dir: /srv
+    before: [flag.sh]
+    healthcheck: { test: "test -s /srv/flag && echo $FLAG", interval: 2s, retries: 30 }
+  api:
+    networks: { lan: 11 }
+    services: [{ port: 9000 }]
+    docker: { image: "python:3-alpine" }
+    command: python3 -m http.server 9000
+    healthcheck: { http: { port: 9000, path: /health }, start_period: 1m }
+"#;
+
+#[test]
+fn a_machine_runs_its_own_process() {
+    let spec = isoloom_spec::parse(OWN_PROCESS).unwrap();
+    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
+    let files = isoloom_compose::render(Target::Docker, &Environment::build(&spec, Target::Docker, None)).unwrap();
+    let compose = &files.iter().find(|f| f.path.ends_with("compose.yml")).unwrap().contents;
+    insta::assert_snapshot!(compose);
+}
+
 #[test]
 fn hello_stack() {
     insta::assert_snapshot!(compose("hello-stack"));

@@ -2,10 +2,7 @@
 //! docker, docker-vm and hybrid outputs), so a container feature here is produced there.
 
 use super::{PROVIDER_SPECIFIC, TOOLING, USER_SETUP};
-use crate::{
-    Support,
-    Support::{Equivalent, Planned},
-};
+use crate::{Support, Support::Equivalent};
 
 pub(super) fn classify(s: &str) -> Option<Support> {
     let via = match s {
@@ -27,8 +24,8 @@ pub(super) fn classify(s: &str) -> Option<Support> {
 
 fn rest(s: &str) -> Option<Support> {
     Some(match s {
-        "cmd" => Planned {
-            note: "a machine's own command, instead of its image's",
+        "cmd" => Equivalent {
+            via: "machines.*.command, in the Compose output",
         },
         "create_args" => PROVIDER_SPECIFIC,
         "auth_server" | "email" | "username" | "password" => USER_SETUP,

@@ -1,7 +1,7 @@
 //! Service keys from `deploy` to `hostname`, `deploy` and `healthcheck` included.
 
 use super::{CLOUD_SIZES, DEVICES, GPUS, IMAGE, LEGACY, NO_CONTAINER_ON_VMS, STAY_UP, SWARM, TOOLING};
-use crate::Support::{self, Emitted, Equivalent, Partial, Tooling};
+use crate::Support::{self, Emitted, Equivalent, Tooling};
 
 /// Service keys from `deploy` to `hostname`.
 pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
@@ -119,7 +119,7 @@ pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
     (
         "services.*.entrypoint",
         Emitted {
-            from: "(Isoloom's own containers and init jobs; a machine's own is its image's)",
+            from: "machines.*.before (a shell running the steps, then the command; Isoloom's own containers and init jobs)",
         },
     ),
     ("services.*.env_file", Equivalent { via: "inputs" }),
@@ -157,9 +157,8 @@ pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
     ("services.*.group_add", IMAGE),
     (
         "services.*.healthcheck",
-        Partial {
-            from: "machines.*.services (a probe of every port)",
-            gap: "a custom healthcheck command",
+        Emitted {
+            from: "machines.*.services and machines.*.healthcheck (a probe of every port, and the machine's own check beside it)",
         },
     ),
     (
@@ -171,32 +170,31 @@ pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
     (
         "services.*.healthcheck.interval",
         Emitted {
-            from: "(Isoloom's probe pace)",
+            from: "machines.*.healthcheck.interval (else Isoloom's probe pace)",
         },
     ),
     (
         "services.*.healthcheck.retries",
         Emitted {
-            from: "(Isoloom's probe pace)",
+            from: "machines.*.healthcheck.retries (else Isoloom's probe pace)",
         },
     ),
     (
         "services.*.healthcheck.test",
-        Partial {
-            from: "machines.*.services (a probe of every port)",
-            gap: "a custom healthcheck command",
+        Emitted {
+            from: "machines.*.healthcheck.test and machines.*.healthcheck.http (after the probe of every port)",
         },
     ),
     (
         "services.*.healthcheck.timeout",
         Emitted {
-            from: "(Isoloom's probe pace)",
+            from: "machines.*.healthcheck.timeout (else Isoloom's probe pace)",
         },
     ),
     (
         "services.*.healthcheck.start_period",
         Emitted {
-            from: "(a grace period for slow starters: appliances and built images)",
+            from: "machines.*.healthcheck.start_period (else a grace period for slow starters: appliances and built images)",
         },
     ),
     (

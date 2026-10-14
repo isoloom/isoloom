@@ -23,6 +23,7 @@ use crate::images::{Images, tag_of};
 use crate::ipv6::{self, Ipv6Plan, Route6};
 use crate::lifecycle::{self, MachineLifecycle};
 use crate::outside::{self, OutsideAddress, OutsideNetwork};
+use crate::process::Process;
 use crate::requirements::{self, Requirement};
 use crate::routing;
 use crate::secrets::SecretFile;
@@ -156,6 +157,8 @@ pub struct MachinePlan {
     pub host_vars: IndexMap<String, serde_json::Value>,
     /// Its addresses on the outside networks it joins, after its own networks.
     pub outside: IndexMap<String, OutsideAddress>,
+    /// Its own command, working directory, `before` steps and healthcheck.
+    pub process: Process,
 }
 
 impl MachinePlan {
@@ -445,6 +448,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         external: m.external.clone(),
         host_vars: ansible::host_vars(spec, name),
         outside: IndexMap::new(),
+        process: Process::of(m),
     }
 }
 

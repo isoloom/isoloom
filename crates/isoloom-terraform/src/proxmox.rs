@@ -113,6 +113,7 @@ impl Backend for ProxmoxBackend {
             Feature::ExternalNetworks,
             Feature::BridgedNetworks,
             Feature::Tpm,
+            Feature::MachineProcess,
         ])
     }
 

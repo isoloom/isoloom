@@ -55,7 +55,8 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     paths.problems
 }
 
-/// The machines' build contexts, Dockerfiles, appliance files, files and provisioning scripts.
+/// The machines' build contexts, Dockerfiles, appliance files, files, `before` steps and
+/// provisioning scripts.
 fn machines(spec: &Spec, paths: &mut Paths) {
     for (name, m) in &spec.machines {
         if let Some(d) = &m.docker {
@@ -84,6 +85,9 @@ fn machines(spec: &Spec, paths: &mut Paths) {
                     ));
                 }
             }
+        }
+        for (i, s) in m.before.iter().enumerate() {
+            paths.check(format!("machines.{name}.before[{i}]"), s);
         }
         if let Some(v) = &m.vm {
             for (i, s) in v.provision.iter().enumerate().filter(|(_, s)| !crate::model::is_reboot(s)) {

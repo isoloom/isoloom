@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Dns, DockerImpl, External, MachineFile, MachineSecret, Ulimit, VmImpl};
+use super::{CommandLine, Dns, DockerImpl, External, Healthcheck, MachineFile, MachineSecret, Ulimit, VmImpl};
 
 /// A machine's CPU architecture. Every target has one: a container platform, a box
 /// architecture, a cloud instance family. Defaults to x86-64.
@@ -112,6 +112,25 @@ pub struct Machine {
     /// CPU, 1024 MB, 20 GB.
     #[serde(default)]
     pub resources: Option<Resources>,
+    /// The machine's own command, instead of its image's (`CMD`; the image's entrypoint still
+    /// runs it). A text runs in the shell, a list as it is. On a VM it runs as a service
+    /// (systemd, OpenRC on Alpine; a startup task on Windows), restarted when it fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<CommandLine>,
+    /// The directory the command, the `before` steps and the healthcheck run in (an absolute
+    /// path). Default: the image's `WORKDIR`; on a VM, the project folder (`/opt/isoloom`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
+    /// Scripts in the project run inside the machine before its command, at every start, with
+    /// its inputs and volumes (a per-player flag written where the app reads it). `.sh` (`.ps1`
+    /// on a Windows VM). On a container they replace the image's entrypoint, so a container
+    /// machine with `before` restates its whole process in `command`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub before: Vec<String>,
+    /// When the machine counts as healthy beyond its services' ports answering: a command or a
+    /// page, with its pace. Checked beside the port probe, never instead of it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub healthcheck: Option<Healthcheck>,
     /// Machines that must be ready (their services answering) before this one starts.
     #[serde(default)]
     pub depends_on: Vec<String>,
@@ -231,6 +250,12 @@ impl Machine {
     /// readiness probe).
     pub fn ready_ports(&self) -> Vec<u16> {
         self.services.iter().filter(|s| !s.dormant && s.protocol.is_tcp()).map(|s| s.port).collect()
+    }
+
+    /// Whether anything says when the machine is ready: a port to probe or a healthcheck of its
+    /// own. Without either, the machine is ready once started.
+    pub fn has_readiness(&self) -> bool {
+        self.healthcheck.is_some() || !self.ready_ports().is_empty()
     }
 }
 

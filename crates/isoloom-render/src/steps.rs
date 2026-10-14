@@ -11,6 +11,8 @@ use isoloom_plan::lifecycle::{RunKind, SharedRole, Step};
 use crate::shell::quote;
 use crate::{address, constraints, machine_setup, router, trunks};
 
+mod process;
+
 /// Where the project is unpacked on a VM.
 pub const PROJECT_DIR: &str = "/opt/isoloom";
 /// The project's archive, uploaded before the steps run.
@@ -56,7 +58,12 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Reboot => Some(reboot()),
         Step::Egress => Some(egress(env)),
         Step::Tc => tc(env, machine),
-        Step::Ready => Some("mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready\n".into()),
+        Step::Before { paths } => process::before(env, machine, paths),
+        Step::Command => process::command(env, machine),
+        Step::Ready => Some(format!(
+            "{}mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready\n",
+            process::healthy(env, machine).unwrap_or_default()
+        )),
     }
 }
 
@@ -97,7 +104,12 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
             ps(path)
         )),
-        Step::Ready => Some("New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready".into()),
+        Step::Before { paths } => process::windows_before(env, machine, paths),
+        Step::Command => process::windows_command(env, machine),
+        Step::Ready => Some(format!(
+            "{}New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready",
+            process::windows_healthy(env, machine).unwrap_or_default()
+        )),
         Step::DiskGrow => Some(GROW_ROOT_PS1.into()),
         Step::WaitFor { machine: dep, ports } if !ports.is_empty() => Some(windows_wait_for(dep, ports)),
         _ => None,
@@ -229,14 +241,7 @@ fn shared_volume(volume: &str, path: &str, role: &SharedRole) -> String {
 
 /// One `provision` step, from the project folder, with the machine's inputs in its environment.
 fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> String {
-    let m = env.machines.get(machine);
-    let inputs = match m {
-        Some(m) if !m.inputs.is_empty() => {
-            let kept = m.lifecycle.iter().any(|s| matches!(s, Step::Inputs { persist: true }));
-            format!("set -a; . {}; set +a; ", if kept { KEPT_INPUTS_FILE } else { INPUTS_FILE })
-        }
-        _ => String::new(),
-    };
+    let inputs = inputs_file(env, machine).map(|f| format!("set -a; . {f}; set +a; ")).unwrap_or_default();
     match kind {
         // A Windows script: rendered by `windows` only.
         RunKind::PowerShell => String::new(),
@@ -250,6 +255,14 @@ fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> String {
             quote(&format!("{inputs}ansible-playbook -c local -i {machine}, {path}"))
         ),
     }
+}
+
+/// Where machine `machine`'s inputs are, when it reads any: kept on disk when a reboot comes or
+/// a service reads them at every boot, else where they were uploaded.
+fn inputs_file(env: &Environment, machine: &str) -> Option<&'static str> {
+    let m = env.machines.get(machine).filter(|m| !m.inputs.is_empty())?;
+    let kept = m.lifecycle.iter().any(|s| matches!(s, Step::Inputs { persist: true }));
+    Some(if kept { KEPT_INPUTS_FILE } else { INPUTS_FILE })
 }
 
 /// Records this boot and restarts; the backend runs the next steps once the machine is back,

@@ -171,6 +171,14 @@ fn machine(path: &str) -> Option<&'static str> {
         "vm.image.winrm" => "{ vm: { os: windows-server-2022, provision: [setup.ps1], image: { winrm: plaintext } } }",
         "vm.image.winssh" => "{ vm: { os: windows-server-2022, provision: [setup.ps1], image: { winssh: true } } }",
         "vm.tpm" => "{ vm: { tpm: true } }",
+        "command" => "{ command: [nginx, -g, 'daemon off;'] }",
+        "working_dir" => "{ working_dir: /srv }",
+        "before" => "{ command: [nginx, -g, 'daemon off;'], before: [before.sh] }",
+        "healthcheck.test" => "{ healthcheck: { test: 'true' } }",
+        "healthcheck.http.port" | "healthcheck.http.path" => "{ healthcheck: { http: { port: 80, path: / } } }",
+        "healthcheck.interval" | "healthcheck.timeout" | "healthcheck.retries" | "healthcheck.start_period" => {
+            "{ healthcheck: { test: 'true', interval: 2s, timeout: 1s, retries: 3, start_period: 0s } }"
+        }
         "external.user" => "{ external: { user: admin } }",
         "external.port" => "{ external: { port: 2222 } }",
         "external.key" => "{ external: { key: ~/.ssh/lab } }",

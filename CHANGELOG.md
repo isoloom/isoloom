@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### A machine's own command, working directory, `before` steps and healthcheck (#126)
+- `machines.*.command` (a text run by the shell, or a list run as is), `machines.*.working_dir` (absolute), `machines.*.before` (scripts in the project run inside the machine before its command, at every start, with its inputs and volumes) and `machines.*.healthcheck` (`test`: a command, or `http: { port, path }`: a page; `interval`, `timeout`, `retries`, `start_period`). Validation says how to fix a mistake: one test, durations like `1m30s`, `.sh` steps (`.ps1` on Windows), no process on an appliance or an `idle` machine.
+- The healthcheck is checked **beside** the port probe, never instead of it: a machine is ready when its services' ports answer and its own check passes. Machines without one keep today's probe unchanged.
+- Containers: `before` replaces the image's entrypoint with a shell that runs the steps then `exec`s the command, so a container machine with `before` restates its whole process in `command`.
+- Compose: `command`, `working_dir`, the `before` entrypoint (steps mounted read-only), the healthcheck test after the port probe at the spec's pace; `depends_on` waits for a machine with only a healthcheck too.
+- Kubernetes: `args`, `workingDir`, the `before` shell as `command` (steps from the scripts ConfigMap); a command healthcheck joins the port probe in the `exec` readiness probe, a page is an `httpGet` readiness probe with the port probe as the `startupProbe`; `initialDelaySeconds`, `timeoutSeconds`, `successThreshold` from the healthcheck.
+- VMs (Vagrant, Proxmox, every cloud, hybrid's VMs): new plan steps `Before` (a one-shot service run now and at every boot) and `Command` (a service restarted when it fails; OpenRC on Alpine; a startup task on Windows), both through `boot::service`, which shares `boot::at_boot`'s script and unit. The healthcheck is tried in the `Ready` step and fails the set-up when it doesn't pass. Inputs are kept on disk for them.
+- `external` refuses a machine process (`Feature::MachineProcess`): an existing host runs what it already runs.
+- Coverage: Compose 84% to 85% (`command`, `working_dir`, `healthcheck`, `healthcheck.test`), Vagrant Docker 92% to 100% (`cmd`), Kubernetes 93% to 96% (`args`, `workingDir`, `readinessProbe`, `startupProbe`, `Probe.*`, `HTTPGetAction` tabled); ten spec rows.
+- Breaking (library): `MachinePlan` gains `process`, `Step` gains `Before` and `Command`, `Requirement`/`Feature` gain `MachineProcess`, the Kubernetes `Probe` object's `exec` is optional.
+
 ### Machine files
 - `machines.*.files`: files placed at a path on the machine, on every target. Each has a `path`, a `source` (a file of the project) or a `content` (the text), and a `uid`, `gid` and `mode` (default root and `0644`; Linux machines only). Validation checks the path (absolute, a file, once per machine, outside the machine's volumes), one text source, an octal mode, no owner or mode on Windows, no files on an appliance, and that a `source` is a file of the project.
 - Compose: top-level `configs` (`content` for text, `file` for a project file) and each service's `configs` (`source`, `target`, `uid`, `gid`, `mode`). Compose ignores an owner or mode for a project file it mounts, so a container's project file with a `uid`, `gid` or `mode` is refused on the Compose targets (`Requirement::OwnedProjectFile`).

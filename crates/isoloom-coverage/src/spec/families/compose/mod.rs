@@ -13,4 +13,5 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::ipv6::COMPOSE,
     super::outside::COMPOSE,
     super::machine_files::COMPOSE,
+    super::process::COMPOSE,
 ];

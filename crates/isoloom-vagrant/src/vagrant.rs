@@ -80,6 +80,7 @@ pub fn capabilities() -> Capabilities {
         Feature::BridgedNetworks,
         // Given on VirtualBox, libvirt and Hyper-V; `provider_refusal` refuses the others.
         Feature::Tpm,
+        Feature::MachineProcess,
     ])
 }
 

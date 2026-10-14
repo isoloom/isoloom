@@ -149,3 +149,21 @@ fn gateways_ulimits_and_tc_are_required_in_that_order() {
     let why = refusal(&env.requirements, &Capabilities::of([Feature::Gateways])).expect("refused");
     assert_eq!(why.to_string(), "machine `web` sets `ulimits`: Kubernetes has no per-container process limits");
 }
+
+#[test]
+fn a_machine_process_is_required_and_planned_as_steps() {
+    let spec = isoloom_spec::parse(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [web.sh] }\n    command: [serve]\n    before: [flag.sh]\n    healthcheck: { test: 'true', interval: 1m }\n",
+    )
+    .expect("parses");
+    let env = Environment::build(&spec, Target::Vagrant, None);
+    assert_eq!(env.requirements, [Requirement::MachineProcess { machine: "web".into() }]);
+    let why = refusal(&env.requirements, &Capabilities::default()).expect("refused");
+    assert!(why.to_string().contains("an existing host runs what it already runs"), "{why}");
+    let steps = &env.machines["web"].lifecycle;
+    assert!(
+        steps.ends_with(&[Step::Before { paths: vec!["flag.sh".into()] }, Step::Command, Step::Ready]),
+        "{steps:?}"
+    );
+    assert_eq!(env.machines["web"].process.health.as_ref().map(|h| h.interval), Some(60));
+}

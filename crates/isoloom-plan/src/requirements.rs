@@ -55,6 +55,9 @@ pub enum Feature {
     ExistingHostFiles,
     /// A virtual TPM 2.0 in a VM.
     Tpm,
+    /// A process Isoloom starts on the machine: its own `command`, `before` steps, `working_dir`
+    /// or `healthcheck`.
+    MachineProcess,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -155,6 +158,11 @@ pub enum Requirement {
         /// The first machine that does.
         machine: String,
     },
+    /// A machine sets its own process (`command`, `working_dir`, `before`, `healthcheck`).
+    MachineProcess {
+        /// The first machine that does.
+        machine: String,
+    },
 }
 
 impl Requirement {
@@ -181,9 +189,15 @@ impl Requirement {
             Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
             Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
             Requirement::Tpm { .. } => Feature::Tpm,
+            Requirement::MachineProcess { .. } => Feature::MachineProcess,
         }
     }
 }
+
+/// Why a target without [`Feature::MachineProcess`] refuses a machine's own process: only
+/// `external` lacks it, and its hosts already run what they run.
+const OWN_PROCESS: &str =
+    "sets its own process (`command`, `working_dir`, `before` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it";
 
 impl fmt::Display for Requirement {
     /// Why a backend without the capability refuses the environment, in the user's terms.
@@ -247,6 +261,7 @@ impl fmt::Display for Requirement {
                 "machine `{machine}` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook"
             ),
             Requirement::Tpm { machine } => no_tpm(f, machine),
+            Requirement::MachineProcess { machine } => write!(f, "machine `{machine}` {OWN_PROCESS}"),
         }
     }
 }
@@ -324,8 +339,8 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
     out
 }
 
-/// What the containers' limits and the links' impairment ask for: at most one requirement of
-/// each kind, the first machine or network that asks.
+/// What the containers' limits, the links' impairment and the machines' own processes ask for:
+/// at most one requirement of each kind, the first machine or network that asks.
 fn limits(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
     if let Some((name, _)) = spec.machines.iter().find(|(_, m)| !m.ulimits.is_empty()) {
@@ -333,6 +348,9 @@ fn limits(spec: &Spec) -> Vec<Requirement> {
     }
     if spec.networks.values().any(|n| n.tc.is_some()) {
         out.push(Requirement::TrafficControl);
+    }
+    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| !crate::process::Process::of(m).is_empty()) {
+        out.push(Requirement::MachineProcess { machine: name.clone() });
     }
     out.extend(secrets(spec));
     out

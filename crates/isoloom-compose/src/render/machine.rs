@@ -8,8 +8,8 @@ use isoloom_spec::model::{Arch, Machine};
 
 use super::Out;
 use crate::appliances;
-use crate::docker::{DIR, PROBE_DIR, ROOT, file_name, init_names, probe, probe_service, ready_condition, relative_to};
-use crate::file::{Attachment, Build, Deploy, Healthcheck, Limits, Resources, Service, Ulimit};
+use crate::docker::{DIR, PROBE_DIR, ROOT, file_name, init_names, probe_service, ready_condition, relative_to};
+use crate::file::{Attachment, Build, Deploy, Limits, Resources, Service, Ulimit};
 use crate::sidecars;
 
 /// A machine's service, then its sidecar and its `init:` jobs.
@@ -62,6 +62,7 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
     if m.supplied || d.is_some_and(|d| d.idle) {
         svc.entrypoint = vec!["sleep".into(), "infinity".into()];
     }
+    super::process::apply(mp, &mut svc);
     // A VLAN it reaches through a trunk isn't an interface of its own: the trunk is.
     svc.networks.retain(|k, _| !trunks::carried(ts, name, k));
     for t in trunks::of(ts, name) {
@@ -216,17 +217,12 @@ fn pull_from(env: &Environment, dockerfile: &str) -> String {
         .collect()
 }
 
-/// The probe healthcheck and what the machine waits for before it starts.
+/// The healthcheck (the port probe and the machine's own) and what the machine waits for before
+/// it starts.
 fn readiness(env: &Environment, mp: &MachinePlan, m: &Machine, svc: &mut Service, archs: &mut Vec<Arch>) {
     let spec = env.spec();
-    if !m.ready_ports().is_empty() {
-        svc.healthcheck = Some(Healthcheck {
-            test: vec!["CMD".into(), format!("{PROBE_DIR}/busybox"), "sh".into(), "-c".into(), probe(m)],
-            interval: "5s".into(),
-            timeout: "3s".into(),
-            retries: 60,
-            start_period: Some("10s".into()),
-        });
+    if let Some(healthcheck) = super::process::healthcheck(m, mp) {
+        svc.healthcheck = Some(healthcheck);
         // Isoloom's own probe, copied into a volume before the machine starts.
         let probe_svc = probe_service(mp.arch);
         svc.volumes.push(format!("{probe_svc}:{PROBE_DIR}:ro"));

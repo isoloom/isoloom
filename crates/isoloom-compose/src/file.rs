@@ -83,6 +83,9 @@ pub struct Service {
     /// Replaces the image's command.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub command: Vec<String>,
+    /// The directory the process starts in, instead of the image's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
     /// The container's host name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hostname: Option<String>,

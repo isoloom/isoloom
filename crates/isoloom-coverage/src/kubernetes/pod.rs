@@ -1,6 +1,6 @@
 //! The pod and its containers: what a machine is on Kubernetes.
 
-use crate::Support::{self, Emitted, Equivalent, InImage, NotPortable, Partial, Planned, Tooling};
+use crate::Support::{self, Emitted, Equivalent, NotPortable, Partial, Planned, Tooling};
 
 /// Kubernetes' own handling of pods: where they run, how they are restarted or stopped.
 const SCHEDULING: Support = Tooling {
@@ -24,9 +24,6 @@ const DEVICES: Support = Planned {
 const WINDOWS: Support = NotPortable {
     why: "Windows containers only: Isoloom's Windows machines are VMs, which Kubernetes refuses (a Linux pod needs neither field)",
 };
-const HEALTHCHECK: Support = Planned {
-    note: "with a custom healthcheck command (the probe checks the services' ports today)",
-};
 const ATTACH: Support = Tooling {
     note: "a terminal for whoever attaches: `isoloom connect` opens its own",
 };
@@ -36,7 +33,7 @@ pub(super) fn classify(definition: &str, field: &str) -> Option<Support> {
     match definition {
         "PodSpec" => pod_spec(field),
         "Container" => container(field),
-        "ContainerPort" | "Probe" | "ExecAction" | "ResourceRequirements" => container_parts(definition, field),
+        "ContainerPort" | "Probe" | "ExecAction" | "HTTPGetAction" | "ResourceRequirements" => container_parts(definition, field),
         "EnvVar" | "EnvVarSource" | "SecretKeySelector" => environment(definition, field),
         "SecurityContext" => security(field),
         "PodSecurityContext" | "Sysctl" | "PodDNSConfig" | "PodDNSConfigOption" => pod_settings(definition, field),
@@ -130,15 +127,14 @@ fn container(field: &str) -> Option<Support> {
             from: "(IfNotPresent: an image built on the node is used as it is)",
         },
         "command" => Emitted {
-            from: "machines.*.docker.idle and machines.*.docker.init (and Isoloom's own containers)",
+            from: "machines.*.before (a shell running the steps, then the command), machines.*.docker.idle and machines.*.docker.init (and Isoloom's own containers)",
         },
         "env" => Emitted {
             from: "machines.*.environment and machines.*.inputs",
         },
         "ports" => Emitted { from: "machines.*.services" },
-        "readinessProbe" => Partial {
-            from: "machines.*.services (ready when its services' ports answer; dormant ones aren't waited for)",
-            gap: "a custom healthcheck command",
+        "readinessProbe" => Emitted {
+            from: "machines.*.services and machines.*.healthcheck (ready when its services' ports answer, dormant ones aside, and its own check passes)",
         },
         "resources" => Emitted { from: "machines.*.resources" },
         "securityContext" => Emitted {
@@ -147,18 +143,18 @@ fn container(field: &str) -> Option<Support> {
         "volumeMounts" => Emitted {
             from: "machines.*.volumes, machines.*.tmpfs and machines.*.shm_size",
         },
-        "args" => Planned {
-            note: "a machine's own `command` (the image's default runs today)",
+        "args" => Emitted { from: "machines.*.command" },
+        "workingDir" => Emitted {
+            from: "machines.*.working_dir",
         },
-        "workingDir" => InImage { note: "the image's WORKDIR" },
         "envFrom" => Equivalent {
             via: "`env`, one variable at a time",
         },
         "lifecycle" => Equivalent {
             via: "machines.*.docker.init: a container beside the machine's, run once it answers",
         },
-        "startupProbe" => Equivalent {
-            via: "`readinessProbe`, which waits as long as the machine takes to start",
+        "startupProbe" => Emitted {
+            from: "machines.*.services, when machines.*.healthcheck.http is the readiness probe (the ports answer first)",
         },
         "livenessProbe" => Tooling {
             note: "restarts a container Kubernetes finds unhealthy: the cluster's self-healing, not the machine's behavior",
@@ -187,15 +183,38 @@ fn container_parts(definition: &str, field: &str) -> Option<Support> {
             via: "`publish`: a LoadBalancer Service on the published port",
         },
         ("Probe", "exec") | ("ExecAction", "command") => Emitted {
-            from: "machines.*.services (Isoloom's port probe, the same on every target)",
+            from: "machines.*.services and machines.*.healthcheck.test (Isoloom's port probe, the same on every target, and the machine's own command)",
         },
-        ("Probe", "periodSeconds" | "failureThreshold") => Emitted {
-            from: "(every 5 seconds, for up to 5 minutes)",
+        ("Probe", "periodSeconds") => Emitted {
+            from: "machines.*.healthcheck.interval (else every 5 seconds)",
+        },
+        ("Probe", "failureThreshold") => Emitted {
+            from: "machines.*.healthcheck.retries (else for up to 5 minutes)",
+        },
+        ("Probe", "httpGet") | ("HTTPGetAction", "path" | "port") => Emitted {
+            from: "machines.*.healthcheck.http",
+        },
+        ("Probe", "initialDelaySeconds") => Emitted {
+            from: "machines.*.healthcheck.start_period",
+        },
+        ("Probe", "timeoutSeconds") => Emitted {
+            from: "machines.*.healthcheck.timeout",
+        },
+        ("Probe", "successThreshold") => Emitted {
+            from: "(1 with a healthcheck: one passing try makes the machine ready, as on Compose and the VMs)",
+        },
+        ("Probe", "grpc") => Equivalent {
+            via: "machines.*.healthcheck.test: a gRPC health client the image carries (`grpc_health_probe`)",
+        },
+        ("HTTPGetAction", "host") => Equivalent {
+            via: "the pod's own address, the default: the healthcheck requests the machine itself",
+        },
+        ("HTTPGetAction", "httpHeaders" | "scheme" | "protocol") => Equivalent {
+            via: "machines.*.healthcheck.test: a command that requests the page as it needs (headers, HTTPS)",
         },
         ("Probe", "tcpSocket") => Equivalent {
             via: "`exec`: Isoloom's port probe checks every service port, TCP and UDP",
         },
-        ("Probe", "httpGet" | "grpc" | "initialDelaySeconds" | "successThreshold" | "timeoutSeconds") => HEALTHCHECK,
         ("Probe", "terminationGracePeriodSeconds") => SCHEDULING,
         ("ResourceRequirements", "limits") => Emitted {
             from: "machines.*.resources (cpus, memory_mb)",

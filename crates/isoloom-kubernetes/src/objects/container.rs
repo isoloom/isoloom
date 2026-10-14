@@ -15,15 +15,24 @@ pub struct Container {
     /// `IfNotPresent` for a machine's image (a built one is only local).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image_pull_policy: Option<&'static str>,
-    /// Its command, instead of the image's.
+    /// Its command, instead of the image's entrypoint.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub command: Vec<String>,
+    /// Its arguments, instead of the image's command.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    /// The directory it starts in, instead of the image's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
     /// Its privileges.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub security_context: Option<ContainerSecurity>,
     /// The ports it serves.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub ports: Vec<ContainerPort>,
+    /// When it has started: probed before the readiness probe begins.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub startup_probe: Option<Probe>,
     /// When it is ready.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub readiness_probe: Option<Probe>,
@@ -46,8 +55,11 @@ impl Container {
             image,
             image_pull_policy: None,
             command: Vec::new(),
+            args: Vec::new(),
+            working_dir: None,
             security_context: None,
             ports: Vec::new(),
+            startup_probe: None,
             readiness_probe: None,
             env: Vec::new(),
             resources: None,
@@ -85,16 +97,38 @@ pub struct ContainerPort {
     pub protocol: Option<&'static str>,
 }
 
-/// A readiness probe: a command, retried.
-#[derive(Debug, Clone, Serialize)]
+/// A probe: a command or a page, retried.
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Probe {
     /// The command.
-    pub exec: Exec,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exec: Option<Exec>,
+    /// The page.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http_get: Option<HttpGet>,
+    /// Seconds after start before the first try.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_delay_seconds: Option<u32>,
     /// Seconds between tries.
     pub period_seconds: u32,
+    /// Seconds one try may take.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u32>,
+    /// Passing tries in a row before the pod is ready.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success_threshold: Option<u32>,
     /// Tries before the pod is unready.
     pub failure_threshold: u32,
+}
+
+/// A page a probe requests from the pod.
+#[derive(Debug, Clone, Serialize)]
+pub struct HttpGet {
+    /// The page's path.
+    pub path: String,
+    /// The port it is served on.
+    pub port: u16,
 }
 
 /// A command run in the container.

@@ -40,6 +40,39 @@ fn chart(example: &str) -> String {
     joined(&render(example), |p| p.contains("/chart/"))
 }
 
+/// A machine with its own process: a command, a working directory, a `before` step and a
+/// healthcheck beside its port probe.
+const OWN_PROCESS: &str = r#"
+version: 1
+name: own-process
+inputs: [FLAG]
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    inputs: [FLAG]
+    services: [{ port: 8000 }]
+    docker: { image: "python:3-alpine" }
+    command: [python3, -m, http.server, "8000"]
+    working_dir: /srv
+    before: [flag.sh]
+    healthcheck: { test: "test -s /srv/flag && echo $FLAG", interval: 2s, retries: 30 }
+  api:
+    networks: { lan: 11 }
+    services: [{ port: 9000 }]
+    docker: { image: "python:3-alpine" }
+    command: python3 -m http.server 9000
+    healthcheck: { http: { port: 9000, path: /health }, start_period: 1m }
+"#;
+
+#[test]
+fn a_machine_runs_its_own_process() {
+    let spec = isoloom_spec::parse(OWN_PROCESS).unwrap();
+    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
+    let files = isoloom_kubernetes::render(&Environment::build(&spec, Target::Kubernetes, None)).unwrap();
+    insta::assert_snapshot!(joined(&files, |p| p.ends_with("environment.yaml")));
+}
+
 #[test]
 fn hello_stack_manifests() {
     insta::assert_snapshot!(manifests("hello-stack"));
@@ -225,7 +258,8 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
             Feature::Ipv6Only,
             Feature::Ipv6Auto,
             Feature::Secrets,
-            Feature::OwnedProjectFiles
+            Feature::OwnedProjectFiles,
+            Feature::MachineProcess
         ])
     );
 }
