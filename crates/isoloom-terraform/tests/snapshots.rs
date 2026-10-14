@@ -126,7 +126,12 @@ fn refusals_come_from_the_plan_and_match_rendering() {
     for (backend, why) in [
         (
             &CloudVmBackend as &dyn Backend,
-            "machine `w`: arm64 on AWS comes later (Graviton instances and arm64 AMIs)",
+            "no cloud can run it (aws: machine `w`: arm64 on AWS comes later (Graviton instances and arm64 AMIs); \
+             azure: machine `w`: arm64 on Azure comes later (Arm-based sizes and arm64 images); \
+             gcp: machine `w`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images); \
+             digitalocean: machine `w`: arm64 on DigitalOcean comes later (it has no arm64 droplets); \
+             linode: machine `w`: arm64 on Linode comes later (it has no arm64 plans); \
+             oci: machine `w`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images))",
         ),
         (
             &ProxmoxBackend,
@@ -184,9 +189,18 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() {
         digitalocean.contains("asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none"),
         "{digitalocean}"
     );
+    // Windows with a TPM: AWS refuses it, which drops only its module; Azure's trusted launch is
+    // written.
     let windows = one_vm("{ os: windows-server-2022, provision: [a.ps1], tpm: true }");
-    let why = CloudVmBackend.refusal(&Environment::build(&windows, Target::CloudVm, None)).expect("refused");
-    assert!(why.contains("NitroTPM"), "{why}");
+    let env = Environment::build(&windows, Target::CloudVm, None);
+    let refusals = isoloom_terraform::cloud_vm::cloud_refusals(&env);
+    let aws = refusals[0].1.clone().expect("refused");
+    assert!(aws.contains("NitroTPM"), "{aws}");
+    assert_eq!(CloudVmBackend.refusal(&env), None);
+    let files = CloudVmBackend.render(&env).unwrap();
+    assert!(!files.iter().any(|f| f.path.contains("cloud-vm/aws/")));
+    let azure = files.iter().find(|f| f.path.ends_with("cloud-vm/azure/main.tf")).expect("an Azure module");
+    assert!(azure.contents.contains("vtpm_enabled"), "{}", azure.contents);
     // Windows 11 merely expects one: the clouds leave it out instead of refusing.
     let wanted = one_vm("{ os: windows-11, provision: [a.ps1] }");
     let tpm = |e: &Environment| e.machines["w"].tpm;

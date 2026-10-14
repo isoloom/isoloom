@@ -72,8 +72,10 @@ published-port redirects) and leaves out the steps its platform does itself; `vm
 what every cloud module repeats (the operator's variables, the auto-stop, interfaces found by
 MAC, the Windows password, the outputs). On `cloud-vm`, every cloud (AWS, Azure, Google Cloud,
 DigitalOcean, Linode, Oracle Cloud) is a `Backend` of its own (`cloud_vm::CLOUDS`, AWS first):
-AWS's refusal refuses the target, another cloud's refusal drops only its module, and
-`cloud_vm::cloud_refusals` says which cloud refuses and why.
+a cloud's refusal drops only its module, the target is refused only when every cloud refuses
+it, and `cloud_vm::cloud_refusals` says which cloud refuses and why. The runtime works on one
+cloud, picked with `--cloud` (else the recorded one, else AWS when it can, else the only one
+that can): [ADR 0007](docs/adr/0007-one-cloud-vm-target-many-clouds.md).
 
 `cloud-docker` (`CloudDockerBackend`, one module per cloud: `cloud_docker::Cloud`) and
 `docker-vm`'s Proxmox module render from the plan the same way: the Compose file is the Compose

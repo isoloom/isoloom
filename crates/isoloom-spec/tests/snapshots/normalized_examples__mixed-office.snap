@@ -41,6 +41,7 @@ machines:
       provision:
         - provision/share.ps1
       image: ~
+      tpm: true
   intranet:
     networks:
       office: 20

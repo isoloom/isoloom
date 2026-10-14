@@ -141,10 +141,10 @@
     "clouds": {
       "cloud-vm": {
         "generated": [
-          "aws",
           "azure"
         ],
         "refused": {
+          "aws": "machine `files01`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later",
           "gcp": "machine `files01`: Windows on GCP comes later",
           "digitalocean": "DigitalOcean cloud-vm is Linux only so far",
           "linode": "Linode cloud-vm is Linux only so far",

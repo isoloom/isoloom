@@ -293,6 +293,10 @@ resource "proxmox_virtual_environment_vm" "files01" {
     datastore_id = var.datastore
     type         = "4m"
   }
+  tpm_state {
+    datastore_id = var.datastore
+    version      = "v2.0"
+  }
   network_device {
     bridge = proxmox_sdn_vnet.office.id
   }

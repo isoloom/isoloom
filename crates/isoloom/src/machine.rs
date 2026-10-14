@@ -262,7 +262,8 @@ fn cloud_vm(call: &Call, m: &isoloom_spec::Machine) -> Res<Command> {
             .machine(call.machine)
             .into());
     }
-    let module = call.out().join("cloud-vm").join(call.env.cloud.unwrap_or("aws"));
+    let cloud = target::vm_cloud(call.env.dir, call.env.instance, call.env.spec, call.env.cloud)?;
+    let module = call.out().join("cloud-vm").join(cloud);
     let outputs = terraform::output(&module)?;
     let host = address_in(&outputs, call.machine)?;
     let user = outputs["ssh_users"][call.machine].as_str().unwrap_or("isoloom").to_string();

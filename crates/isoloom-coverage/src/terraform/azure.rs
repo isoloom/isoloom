@@ -2,17 +2,11 @@
 //! cloud-vm and cloud-docker targets write.
 
 use super::support::{
-    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, ENVIRONMENT, IMAGES, IPV6_GATED, MANAGED, OFFLINE, PLACEMENT, PRIVATE_DNS,
-    PROTECT, PUBLIC_DNS, PUBLIC_IPV6, SOURCE_PORTS, TAGS, TPM, VM_AGENT,
+    ACCOUNT, ALIAS, BACKUP, CLOUD, CLOUD_NETWORK, CLOUD_WRITTEN, CREDENTIALS, ENVIRONMENT, IMAGES, MANAGED, OFFLINE, PLACEMENT, PRIVATE_DNS, PROTECT,
+    PUBLIC_DNS, PUBLIC_IPV6, SOURCE_PORTS, TAGS, TPM, VM_AGENT,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Equivalent};
-
-/// A Windows VM's TPM: written for one that has a TPM, which `cloud-vm` can't give a Windows
-/// machine until AWS (whose refusal is the target's) has Amazon's NitroTPM Windows images.
-const WINDOWS_TPM: Support = Support::Planned {
-    note: "with a TPM on Windows in the cloud: AWS's NitroTPM Windows images (TPM-Windows_Server-*) first",
-};
 
 /// Rule resources whose effect the security groups' inline rules give.
 const INLINE: Support = Equivalent {
@@ -128,7 +122,8 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "azurerm_network_interface",
         "ip_configuration ip_configuration.name ip_configuration.private_ip_address ip_configuration.private_ip_address_allocation
-        ip_configuration.public_ip_address_id ip_configuration.subnet_id ip_forwarding_enabled location name resource_group_name tags",
+        ip_configuration.private_ip_address_version ip_configuration.public_ip_address_id ip_configuration.subnet_id
+        ip_forwarding_enabled location name resource_group_name tags",
     ),
     (
         "azurerm_network_interface_security_group_association",
@@ -147,9 +142,9 @@ const WRITTEN: &[(&str, &str)] = &[
     (
         "azurerm_windows_virtual_machine",
         "admin_password admin_username computer_name location name network_interface_ids os_disk os_disk.caching os_disk.disk_size_gb
-        os_disk.storage_account_type resource_group_name size source_image_id source_image_reference source_image_reference.offer
-        source_image_reference.publisher source_image_reference.sku source_image_reference.version tags winrm_listener
-        winrm_listener.protocol",
+        os_disk.storage_account_type resource_group_name secure_boot_enabled size source_image_id source_image_reference
+        source_image_reference.offer source_image_reference.publisher source_image_reference.sku source_image_reference.version
+        tags vtpm_enabled winrm_listener winrm_listener.protocol",
     ),
 ];
 
@@ -209,7 +204,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 termination_notification termination_notification.*",
             ),
             (ALIAS, "os_disk.name user_data os_managed_disk_id"),
-            (WINDOWS_TPM, "secure_boot_enabled vtpm_enabled"),
             (
                 CLOUD,
                 "automatic_updates_enabled hotpatching_enabled timezone additional_unattend_content additional_unattend_content.*
@@ -239,7 +233,6 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             ),
             (PRIVATE_DNS, "dns_servers internal_dns_name_label"),
             (ALIAS, "ip_configuration.primary"),
-            (IPV6_GATED, "ip_configuration.private_ip_address_version"),
         ],
     ),
     (

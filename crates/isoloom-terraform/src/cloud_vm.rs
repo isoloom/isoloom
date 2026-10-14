@@ -4,10 +4,11 @@
 //!
 //! Each cloud is a backend of its own ([`CLOUDS`]: AWS, Azure, Google Cloud, DigitalOcean,
 //! Linode, Oracle Cloud): its capabilities, its refusal read from the plan, its module, rendered
-//! from the plan through the VM core (`crate::vm`). AWS is the target's reference cloud: its
-//! refusal refuses the whole target ([`aws::refusal`]). Another cloud whose refusal fires drops
-//! only its module (best-effort: a lab runs on the clouds whose model fits it);
-//! [`cloud_refusals`] says which and why.
+//! from the plan through the VM core (`crate::vm`). No cloud stands for the others: a cloud whose
+//! refusal fires drops only its module, so a feature one cloud can't do never hides another
+//! cloud's working module. The target is refused only when every cloud refuses it.
+//! [`cloud_refusals`] says which clouds refuse and why; `isoloom run cloud-vm --cloud <name>`
+//! picks the module to apply (ADR 0007).
 
 pub mod aws;
 
@@ -101,7 +102,26 @@ pub(crate) fn refuse_cloud(env: &Environment, refusal: fn(&Environment) -> Optio
         .or_else(|| refusal(env))
 }
 
-/// The `cloud-vm` backend: every cloud whose model fits the environment, AWS required.
+/// Why no cloud can run the environment, when none can: the plan's requirements the target
+/// lacks, else each cloud's own reason, the clouds sharing one named together. `None` as soon as
+/// one cloud accepts it.
+pub fn refusal(env: &Environment) -> Option<String> {
+    if let Some(r) = isoloom_plan::refusal(&env.requirements, &capabilities()) {
+        return Some(r.to_string());
+    }
+    let mut reasons: Vec<(Vec<&str>, String)> = Vec::new();
+    for (name, why) in cloud_refusals(env) {
+        let why = why?;
+        match reasons.iter_mut().find(|(_, r)| *r == why) {
+            Some((clouds, _)) => clouds.push(name),
+            None => reasons.push((vec![name], why)),
+        }
+    }
+    let parts: Vec<String> = reasons.into_iter().map(|(clouds, why)| format!("{}: {why}", clouds.join(", "))).collect();
+    Some(format!("no cloud can run it ({})", parts.join("; ")))
+}
+
+/// The `cloud-vm` backend: a module for every cloud whose model fits the environment.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CloudVmBackend;
 
@@ -115,8 +135,12 @@ impl Backend for CloudVmBackend {
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        let mut files = AwsBackend.render(env)?;
-        for (_, cloud) in CLOUDS.iter().skip(1) {
+        backend::check(Target::CloudVm, env, &capabilities())?;
+        if let Some(why) = refusal(env) {
+            return Err(unsupported(why));
+        }
+        let mut files = Vec::new();
+        for (_, cloud) in CLOUDS {
             if cloud.refusal(env).is_none() {
                 files.extend(cloud.render(env)?);
             }
@@ -126,7 +150,7 @@ impl Backend for CloudVmBackend {
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
-        AwsBackend.refusal(env)
+        refusal(env)
     }
 }
 

@@ -100,6 +100,50 @@ fn run_rejects_an_unknown_target() {
     assert!(stderr(&o).contains("unknown target `bogus`"), "{}", stderr(&o));
 }
 
+/// A spec AWS refuses on `cloud-vm` (a /29 network: AWS subnets are /28 or larger) while other
+/// clouds run it.
+const SMALL_SUBNET: &str = "version: 1\nname: small\nnetworks:\n  lab: { cidr: 10.9.0.0/29 }\nmachines:\n  w:\n    networks: { lab: 2 }\n    vm: { os: debian-12, provision: [setup.sh] }\n";
+
+/// A project holding [`SMALL_SUBNET`] and its set-up script.
+fn small_subnet(name: &str) -> PathBuf {
+    let dir = project(name, SMALL_SUBNET);
+    std::fs::write(dir.join("setup.sh"), "#!/bin/sh\ntrue\n").unwrap();
+    dir
+}
+
+#[test]
+fn a_refusal_by_aws_drops_only_its_module() {
+    let dir = small_subnet("aws-refuses");
+    let o = isoloom(&dir, &["targets", dir.to_str().unwrap()]);
+    assert!(o.status.success(), "{}{}", stdout(&o), stderr(&o));
+    let out = stdout(&o);
+    let at = out.find("✓ cloud-vm\n").unwrap_or_else(|| panic!("cloud-vm not generated:\n{out}"));
+    assert!(out[at..].contains("    ✗ aws (AWS subnets are /28 or larger)"), "{out}");
+    let o = isoloom(&dir, &["generate", dir.to_str().unwrap()]);
+    assert!(o.status.success(), "{}{}", stdout(&o), stderr(&o));
+    assert!(!dir.join(".isoloom/cloud-vm/aws").exists());
+    assert!(dir.join(".isoloom/cloud-vm/gcp/main.tf").exists());
+}
+
+#[test]
+fn run_cloud_vm_names_the_clouds_to_pick_from_when_aws_refuses() {
+    let dir = small_subnet("pick-a-cloud");
+    let o = isoloom(&dir, &["run", "cloud-vm", dir.to_str().unwrap()]);
+    assert!(!o.status.success());
+    let err = stderr(&o);
+    assert!(err.contains("AWS can't run this environment on `cloud-vm`"), "{err}");
+    assert!(err.contains("--cloud gcp, --cloud digitalocean"), "{err}");
+    let o = isoloom(&dir, &["run", "cloud-vm", dir.to_str().unwrap(), "--cloud", "aws"]);
+    assert!(!o.status.success());
+    let err = stderr(&o);
+    assert!(
+        err.contains("`aws` can't run this environment on `cloud-vm`: AWS subnets are /28 or larger"),
+        "{err}"
+    );
+    let o = isoloom(&dir, &["run", "cloud-vm", dir.to_str().unwrap(), "--cloud", "nimbus"]);
+    assert!(stderr(&o).contains("`cloud-vm` has no cloud `nimbus`"), "{}", stderr(&o));
+}
+
 #[test]
 fn exec_needs_a_command() {
     let home = scratch("exec-no-command");

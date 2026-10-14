@@ -11,6 +11,8 @@ pub struct Args {
     target: Option<String>,
     #[arg(default_value = ".")]
     dir: PathBuf,
+    /// For the cloud targets, which cloud's module to destroy (as for `run`; on `cloud-vm`,
+    /// omitted: the one `run` recorded).
     #[arg(long)]
     cloud: Option<String>,
     /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
