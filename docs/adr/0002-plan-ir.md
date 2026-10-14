@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built in Wave 1 unit 6 (Compose on the plan, the others through `LegacyBackend`); every backend moves onto it in Wave 2.
+Accepted. Built in Wave 1 unit 6 (Compose on the plan, the others through `LegacyBackend`); every backend moved onto it in Wave 2, and `LegacyBackend` is gone.
 
 ## Context
 

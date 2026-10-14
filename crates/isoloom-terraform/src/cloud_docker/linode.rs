@@ -4,8 +4,8 @@ use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, Module, call, list, reference, string};
 use isoloom_spec::model::Protocol;
 
-use super::digitalocean::word_tags;
 use super::host::{self, Reach, Sizing, published};
+use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
 
 /// The module, from the plan.
@@ -18,15 +18,14 @@ pub fn module(env: &Environment) -> Module {
         Variable::new("type", "string").default(string(size)).block(),
     ]);
     m.blocks(host::variables(env, true));
-    m.block(host::id());
-    m.block(host::locals(env, Vec::new()));
+    m.blocks(cloud::id_and_locals(env, Vec::new()));
     m.block(
         resource("linode_instance")
             .add_attribute(("region", reference("var.region")))
             .add_attribute(("type", reference("var.type")))
             .add_attribute(("image", string("linode/debian12")))
             .add_attribute(("authorized_keys", list([call("trimspace", [reference("var.ssh_public_key")])])))
-            .add_attribute(("tags", word_tags(env)))
+            .add_attribute(("tags", cloud::tag_list(env)))
             .build(),
     );
     m.block(firewall(env));

@@ -24,7 +24,7 @@ variable "instance_type" {
 
 variable "allowed_cidr" {
   type        = string
-  description = "Who may reach the VM (SSH and the published ports), e.g. your IP/32"
+  description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
 }
 
 variable "ssh_public_key" {
@@ -33,13 +33,13 @@ variable "ssh_public_key" {
 
 variable "ssh_private_key_file" {
   type        = string
-  description = "The private key of ssh_public_key: Terraform copies the project over SSH"
+  description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
 }
 
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
-  description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
+  description = "Shut the machines down after this many minutes (0: never)"
 }
 
 variable "expires_at" {
@@ -59,7 +59,6 @@ provider "aws" {
   }
 }
 
-# A suffix, so two copies of the environment in one account don't collide.
 resource "terraform_data" "id" {
   input = substr(replace(uuid(), "-", ""), 0, 8)
   lifecycle {

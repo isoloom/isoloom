@@ -2,11 +2,12 @@
 //! schedules the auto-stop (it terminates on shutdown).
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, boolean, index, list, null, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, index, list, null, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::host::{self, Reach, Sizing, published};
 use crate::cloud_vm::aws::instance_type;
+use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
 
 /// The module, from the plan.
@@ -19,8 +20,7 @@ pub fn module(env: &Environment) -> Module {
     m.block(Variable::new("instance_type", "string").default(string(instance_type(size.memory_mb))).block());
     m.blocks(host::variables(env, true));
     m.block(provider(env));
-    m.commented("A suffix, so two copies of the environment in one account don't collide.", host::id());
-    m.block(host::locals(env, Vec::new()));
+    m.blocks(cloud::id_and_locals(env, Vec::new()));
     m.blocks(lookups());
     m.blocks(network());
     m.block(security_group(env));
@@ -155,9 +155,6 @@ fn security_group(env: &Environment) -> Block {
 
 /// The instance: the auto-stop in its user data, terminated when it shuts down.
 fn instance(size: Sizing) -> Block {
-    let shutdown = Template::text("#!/bin/sh\nshutdown -h +")
-        .with_expr(reference("var.auto_stop_minutes"))
-        .with_text("\n");
     resource("aws_instance")
         .add_attribute(("ami", reference("data.aws_ami.debian.id")))
         .add_attribute(("instance_type", reference("var.instance_type")))
@@ -165,7 +162,7 @@ fn instance(size: Sizing) -> Block {
         .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
         .add_attribute(("vpc_security_group_ids", list([reference("aws_security_group.env.id")])))
         .add_attribute(("instance_initiated_shutdown_behavior", string("terminate")))
-        .add_attribute(("user_data", host::auto_stop(shutdown.into_expression(), null())))
+        .add_attribute(("user_data", cloud::auto_stop(cloud::shutdown_script(), null())))
         .add_block(
             Block::builder("root_block_device")
                 .add_attribute(("volume_size", number(size.disk_gb.into())))

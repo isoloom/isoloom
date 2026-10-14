@@ -3,12 +3,12 @@
 //! brings its network, firewall and VM.
 
 use isoloom_plan::{Environment, MachineShape, Step};
-use isoloom_render::hcl_builder::{BinaryOperator, Block, Expression, Module, Template, binary, call, conditional, list, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, Template, list, reference, string};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 use isoloom_spec::model::Protocol;
 
 use crate::vm::linux::CLOUD_INIT_WAIT;
-use crate::vm::module::{Variable, inputs_file, inputs_variable, output, project_lists};
+use crate::vm::module::{inputs_file, output, project_lists};
 use crate::vm::provisioner::{Connection, Provisioner, Upload};
 use crate::vm::{as_root, step_command};
 
@@ -100,82 +100,14 @@ pub fn preamble(dir: &str, cloud: &str, settings: &str) -> String {
     )
 }
 
-/// The variables every host has: who may reach it (on a cloud), the SSH key, the auto-stop, the
-/// end date, and the inputs when the environment takes any.
+/// The variables every host has: vm::cloud's (who may reach it, the SSH key, the auto-stop,
+/// the end date, the inputs), without `allowed_cidr` off a cloud (Proxmox: its firewall is the
+/// operator's network).
 pub fn variables(env: &Environment, cloud: bool) -> Vec<Block> {
-    let mut v = Vec::new();
-    if cloud {
-        v.push(
-            Variable::new("allowed_cidr", "string")
-                .describe("Who may reach the VM (SSH and the published ports), e.g. your IP/32")
-                .block(),
-        );
-    }
-    v.extend([
-        Variable::new("ssh_public_key", "string").block(),
-        Variable::new("ssh_private_key_file", "string")
-            .describe("The private key of ssh_public_key: Terraform copies the project over SSH")
-            .block(),
-        Variable::new("auto_stop_minutes", "number")
-            .default(number(0))
-            .describe("Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses")
-            .block(),
-        Variable::new("expires_at", "string")
-            .default(string(""))
-            .describe("When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy")
-            .block(),
-    ]);
-    if !env.spec().inputs.is_empty() {
-        v.push(inputs_variable());
-    }
-    v
-}
-
-/// The environment's random id (`terraform_data.id`): two copies of it in one account don't
-/// collide.
-pub fn id() -> Block {
-    let id = call("substr", [call("replace", [call("uuid", []), string("-"), string("")]), number(0), number(8)]);
-    Block::builder("resource")
-        .add_label("terraform_data")
-        .add_label("id")
-        .add_attribute(("input", id))
-        .add_block(
-            Block::builder("lifecycle")
-                .add_attribute(("ignore_changes", list([reference("input")])))
-                .build(),
-        )
-        .build()
-}
-
-/// `locals`: the resources' name, the project's root, then a cloud's own.
-pub fn locals(env: &Environment, extra: Vec<(&str, Expression)>) -> Block {
-    let name = Template::text(format!("isoloom-{}-", env.name)).with_expr(reference("terraform_data.id.output"));
-    let root = call(
-        "abspath",
-        [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],
-    );
-    let mut b = Block::builder("locals")
-        .add_attribute(("name", name.into_expression()))
-        .add_attribute(("root", root));
-    for (k, v) in extra {
-        b = b.add_attribute((k, v));
-    }
-    b.build()
-}
-
-/// The tags (labels) a reaper finds the environment's resources by.
-pub fn tags(env: &Environment) -> Expression {
-    object([
-        ("isoloom-environment", string(env.name.as_str())),
-        ("managed-by", string("isoloom")),
-        ("isoloom-instance", reference("local.name")),
-        ("isoloom-expires-at", reference("var.expires_at")),
-    ])
-}
-
-/// `var.auto_stop_minutes > 0 ? <yes> : <no>`.
-pub fn auto_stop(yes: Expression, no: Expression) -> Expression {
-    conditional(binary(reference("var.auto_stop_minutes"), BinaryOperator::Greater, number(0)), yes, no)
+    crate::vm::cloud::variables(env)
+        .into_iter()
+        .filter(|b| cloud || !b.labels().iter().any(|l| l.as_str() == "allowed_cidr"))
+        .collect()
 }
 
 /// The host's set-up (`terraform_data.environment`), through the VM core's `remote-exec`
@@ -214,7 +146,7 @@ fn commands(env: &Environment, auto_stop_here: bool) -> Vec<Expression> {
         let shutdown = Template::text("sudo shutdown -h +")
             .with_expr(reference("var.auto_stop_minutes"))
             .with_text(" >/dev/null 2>&1");
-        cmds.push(auto_stop(shutdown.into_expression(), string("true")));
+        cmds.push(crate::vm::cloud::auto_stop(shutdown.into_expression(), string("true")));
     }
     let root = |step: &Step| step_command(env, "", step, true).map(string);
     cmds.extend(root(&Step::Prelude));

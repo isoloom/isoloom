@@ -1,10 +1,11 @@
 //! DigitalOcean: a VPC, the operator's key, a Debian droplet, and a firewall.
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{BinaryOperator, Block, Expression, Module, Template, binary, call, conditional, list, reference, string};
+use isoloom_render::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::host::{self, Reach, Sizing, published};
+use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
 
 /// The module, from the plan.
@@ -17,8 +18,7 @@ pub fn module(env: &Environment) -> Module {
         Variable::new("size", "string").default(string(size)).block(),
     ]);
     m.blocks(host::variables(env, true));
-    m.block(host::id());
-    m.block(host::locals(env, Vec::new()));
+    m.blocks(cloud::id_and_locals(env, Vec::new()));
     m.block(
         resource("digitalocean_vpc")
             .add_attribute(("region", reference("var.region")))
@@ -49,19 +49,6 @@ fn resource(kind: &str) -> isoloom_render::hcl_builder::BlockBuilder {
         .add_attribute(("name", reference("local.name")))
 }
 
-/// The environment's tags: DigitalOcean's are plain words, so the end date is one of them.
-pub fn word_tags(env: &Environment) -> Expression {
-    let expires = conditional(
-        binary(reference("var.expires_at"), BinaryOperator::Eq, string("")),
-        list([]),
-        list([Template::text("isoloom-expires-").with_expr(reference("var.expires_at")).into_expression()]),
-    );
-    call(
-        "concat",
-        [list([string("isoloom"), string(env.name.as_str()), reference("local.name")]), expires],
-    )
-}
-
 fn droplet(env: &Environment) -> Block {
     resource("digitalocean_droplet")
         .add_attribute(("region", reference("var.region")))
@@ -69,7 +56,7 @@ fn droplet(env: &Environment) -> Block {
         .add_attribute(("image", string("debian-12-x64")))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))
-        .add_attribute(("tags", word_tags(env)))
+        .add_attribute(("tags", cloud::tag_list(env)))
         .build()
 }
 

@@ -6,6 +6,7 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, list,
 use isoloom_spec::model::Protocol;
 
 use super::host::{self, Reach, Sizing, port_strings, published};
+use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
 
 /// The module, from the plan.
@@ -29,8 +30,7 @@ pub fn module(env: &Environment) -> Module {
             .add_attribute(("subscription_id", reference("var.subscription_id")))
             .build(),
     );
-    m.block(host::id());
-    m.block(host::locals(env, vec![("tags", host::tags(env))]));
+    m.blocks(cloud::id_and_locals(env, vec![("tags", cloud::tags(env))]));
     m.blocks(network());
     m.block(security_group(env));
     m.blocks(interface());

@@ -9,6 +9,7 @@ use isoloom_render::hcl_builder::{
 use isoloom_spec::model::Protocol;
 
 use super::host::{self, Reach, Sizing, port_strings, published};
+use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
 
 /// The module, from the plan.
@@ -28,13 +29,12 @@ pub fn module(env: &Environment) -> Module {
         project(env),
     );
     m.block(compute_service());
-    m.block(host::id());
     let project = conditional(
         project_given(true),
         reference("var.project"),
         attr(index(reference("google_project_service.compute"), 0), "project"),
     );
-    m.block(host::locals(env, vec![("project", project)]));
+    m.blocks(cloud::id_and_locals(env, vec![("project", project)]));
     m.blocks(network(env));
     m.block(instance(env));
     let reach = Reach {
@@ -152,7 +152,7 @@ fn instance(env: &Environment) -> Block {
     resource("google_compute_instance")
         .add_attribute(("machine_type", reference("var.machine_type")))
         .add_attribute(("zone", Template::new().with_expr(reference("var.region")).with_text("-a").into_expression()))
-        .add_attribute(("labels", host::tags(env)))
+        .add_attribute(("labels", cloud::tags(env)))
         .add_block(
             Block::builder("boot_disk")
                 .add_block(

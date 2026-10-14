@@ -6,6 +6,7 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, attr, boolean, in
 use isoloom_spec::model::Protocol;
 
 use super::host::{self, Reach, Sizing, published};
+use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
 
 /// The instance's shape: AMD, sized by its configuration.
@@ -26,8 +27,7 @@ pub fn module(env: &Environment) -> Module {
             .add_attribute(("region", reference("var.region")))
             .build(),
     );
-    m.block(host::id());
-    m.block(host::locals(env, Vec::new()));
+    m.blocks(cloud::id_and_locals(env, Vec::new()));
     m.blocks(lookups());
     m.blocks(network(env));
     m.block(instance(env));
