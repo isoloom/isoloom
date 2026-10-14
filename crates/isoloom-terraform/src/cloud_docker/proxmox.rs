@@ -13,6 +13,7 @@ use isoloom_render::hcl_builder::{
 use super::host::{self, Reach, Sizing};
 use crate::vm::cloud_init::{self, CloudConfig};
 use crate::vm::module::{Variable, terraform};
+use crate::vm::versions;
 
 /// `docker-vm`'s folder under `.isoloom/`.
 const DIR: &str = "docker-vm";
@@ -21,7 +22,7 @@ const DIR: &str = "docker-vm";
 pub fn render(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
     let settings = "-var proxmox_endpoint=https://<server>:8006/ -var proxmox_api_token=… ";
     let mut m = Module::new(host::preamble(DIR, "proxmox", settings));
-    m.block(terraform(&[("proxmox", "bpg/proxmox", "~> 0.84")]));
+    m.block(terraform(&[versions::PROXMOX, versions::LOCAL]));
     m.blocks(variables());
     m.blocks(host::variables(env, false));
     m.block(crate::proxmox::module::provider());

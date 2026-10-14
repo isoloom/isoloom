@@ -8,6 +8,7 @@ use isoloom_spec::model::Protocol;
 use super::host::{self, Reach, Sizing, published};
 use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
+use crate::vm::versions;
 
 /// The instance's shape: AMD, sized by its configuration.
 const SHAPE: &str = "VM.Standard.E4.Flex";
@@ -15,7 +16,7 @@ const SHAPE: &str = "VM.Standard.E4.Flex";
 /// The module, from the plan.
 pub fn module(env: &Environment) -> Module {
     let mut m = Module::new(host::preamble(super::DIR, "oci", "-var allowed_cidr=<your IP>/32 "));
-    m.block(terraform(&[("oci", "oracle/oci", "~> 9.0")]));
+    m.block(terraform(&[versions::OCI, versions::LOCAL]));
     m.blocks([
         Variable::new("compartment_id", "string").block(),
         Variable::new("region", "string").default(string("eu-paris-1")).block(),

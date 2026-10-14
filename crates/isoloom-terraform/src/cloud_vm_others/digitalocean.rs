@@ -15,6 +15,7 @@ use super::single_network::{self, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, shutdown_script, tag_list};
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
+use crate::vm::versions;
 use crate::vm::{os, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -82,7 +83,7 @@ const USAGE: &str = "# Auth:   export DIGITALOCEAN_TOKEN=<token>\n# Start:  terr
 /// The module: the VPC, the droplet, its firewall and set-up, the outputs.
 fn module(env: &Environment) -> Result<GeneratedFile, isoloom_render::hcl_builder::Error> {
     let mut m = Module::new(format!("{}{USAGE}", header("#")));
-    m.block(terraform(&[("digitalocean", "digitalocean/digitalocean", "~> 2.0")]));
+    m.block(terraform(&[versions::DIGITALOCEAN, versions::LOCAL]));
     m.block(Variable::new("region", "string").default(string("fra1")).block());
     m.blocks(cloud::variables(env));
     m.block(Block::builder("provider").add_label("digitalocean").build());

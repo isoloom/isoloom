@@ -27,6 +27,7 @@ use isoloom_spec::validate::Cidr;
 use crate::vm::cloud::{self, Reach, name_with, resource};
 use crate::vm::limits::Limits;
 use crate::vm::module::{Provider, Variable, project_lists, terraform};
+use crate::vm::versions;
 use crate::vm::{controller, res, vms};
 
 /// The module's folder under `.isoloom/cloud-vm/`.
@@ -170,11 +171,11 @@ fn public_ip(id: &str) -> Expression {
     attr(index(attr(nic, "access_config"), 0), "nat_ip")
 }
 
-/// Google; TLS for the controller's key.
+/// Google and local (the archive's file list); TLS for the controller's key.
 fn providers(env: &Environment) -> Vec<Provider> {
-    let mut p = vec![("google", "hashicorp/google", "~> 8.0")];
+    let mut p = vec![versions::GOOGLE, versions::LOCAL];
     if controller::needed(env) {
-        p.push(("tls", "hashicorp/tls", "~> 4.0"));
+        p.push(versions::TLS);
     }
     p
 }

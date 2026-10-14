@@ -1,0 +1,6 @@
+# Settings, and arguments and nested blocks of what Isoloom writes, of registry.terraform.io/hashicorp/null 3.3.2
+resource null_resource
+resource null_resource triggers
+data null_data_source
+data null_data_source has_computed_default
+data null_data_source inputs

@@ -8,8 +8,9 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    google = { source = "hashicorp/google", version = "~> 8.0" }
-    tls    = { source = "hashicorp/tls", version = "~> 4.0" }
+    google = { source = "hashicorp/google", version = "~> 8.5.0" }
+    local  = { source = "hashicorp/local", version = "~> 2.9.1" }
+    tls    = { source = "hashicorp/tls", version = "~> 4.4.1" }
   }
 }
 

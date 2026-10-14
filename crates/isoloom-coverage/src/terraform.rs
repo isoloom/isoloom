@@ -1,373 +1,54 @@
-//! Terraform: each provider's resource types, from `terraform providers schema -json`
-//! (`coverage/terraform/*.txt`, refreshed by scripts/terraform-resources.sh). Every type must
-//! be classified here, or the coverage tests fail. The generators for Proxmox and the six
-//! clouds write some of them: those are "written", and the coverage tests check them against
-//! every committed `main.tf` of the examples. The resources an environment needs but no
-//! generator writes yet are "not yet".
+//! Terraform: for each provider, every resource type it offers and, for what Isoloom writes,
+//! every setting, argument and nested block, from `terraform providers schema -json` with the
+//! provider pinned (`coverage/terraform/`, refreshed by scripts/refresh-terraform.sh). Every
+//! entry is classified by a family rule, reviewed: an entry no rule names is unclassified and
+//! fails the coverage tests, so a provider's new resource types and arguments get reviewed
+//! instead of silently counted. The tests also check the rows marked as written against every
+//! module the generators write for the committed examples.
+
+mod aws;
+mod azure;
+mod digitalocean;
+mod google;
+mod linode;
+mod oci;
+mod proxmox;
+mod support;
+pub mod table;
+mod utility;
 
 use super::vagrant::names;
 use super::{
-    Format, Support,
-    Support::{Emitted, Equivalent, NotPortable, Planned, Tooling, Unclassified},
+    Format,
+    Support::{Planned, Tooling, Unclassified},
 };
 
-const PROXMOX: &str = include_str!("../coverage/terraform/proxmox.txt");
-const AWS: &str = include_str!("../coverage/terraform/aws.txt");
-const AZURE: &str = include_str!("../coverage/terraform/azure.txt");
-const GOOGLE: &str = include_str!("../coverage/terraform/google.txt");
-const DIGITALOCEAN: &str = include_str!("../coverage/terraform/digitalocean.txt");
-const LINODE: &str = include_str!("../coverage/terraform/linode.txt");
-const OCI: &str = include_str!("../coverage/terraform/oci.txt");
-const ESXI: &str = include_str!("../coverage/terraform/esxi.txt");
+pub use table::Table;
 
-/// A cloud provider: the resource types an environment needs (one VM per machine on its own
-/// networks), and its Windows VM types. Every other type is one of that cloud's managed
-/// services, which no other VM target has.
-pub struct Cloud {
-    /// The table's title (`Terraform: AWS`).
-    pub name: &'static str,
-    /// Where the resource list comes from (the provider and its version).
-    pub source: &'static str,
-    /// The provider's resource types, one a line (vendored under `coverage/terraform/`).
-    pub list: &'static str,
-    /// The types an environment needs: the portable features.
-    pub environment: &'static [&'static str],
-    /// Its Windows VM types (planned with Windows guests).
-    pub windows: &'static [&'static str],
-    /// What the cloud generators (cloud-vm and cloud-docker) write today.
-    pub generated: &'static [&'static str],
-    /// Types an environment would need, whose effect the generators get another way.
-    pub equivalent: &'static [(&'static str, &'static str)],
-}
-
-/// Every cloud with a coverage table.
-pub const CLOUDS: &[Cloud] = &[
-    Cloud {
-        name: "Terraform: AWS",
-        source: "hashicorp/aws 6.67.0 (its resource types)",
-        list: AWS,
-        environment: &[
-            "aws_instance",
-            "aws_vpc",
-            "aws_subnet",
-            "aws_internet_gateway",
-            "aws_nat_gateway",
-            "aws_eip",
-            "aws_eip_association",
-            "aws_route_table",
-            "aws_route_table_association",
-            "aws_vpc_ipv4_cidr_block_association",
-            "aws_route",
-            "aws_security_group",
-            "aws_vpc_security_group_ingress_rule",
-            "aws_vpc_security_group_egress_rule",
-            "aws_network_interface",
-            "aws_network_interface_attachment",
-            "aws_key_pair",
-            "aws_ebs_volume",
-            "aws_volume_attachment",
-        ],
-        windows: &[],
-        generated: &[
-            "aws_vpc",
-            "aws_vpc_ipv4_cidr_block_association",
-            "aws_network_interface",
-            "aws_network_interface_attachment",
-            "aws_eip",
-            "aws_subnet",
-            "aws_internet_gateway",
-            "aws_route_table",
-            "aws_route_table_association",
-            "aws_security_group",
-            "aws_instance",
-            "aws_key_pair",
-        ],
-        equivalent: &[],
-    },
-    Cloud {
-        name: "Terraform: Azure",
-        source: "hashicorp/azurerm 5.8.0 (its resource types)",
-        list: AZURE,
-        environment: &[
-            "azurerm_resource_group",
-            "azurerm_linux_virtual_machine",
-            "azurerm_virtual_network",
-            "azurerm_subnet",
-            "azurerm_network_interface",
-            "azurerm_network_interface_security_group_association",
-            "azurerm_network_security_group",
-            "azurerm_network_security_rule",
-            "azurerm_subnet_network_security_group_association",
-            "azurerm_public_ip",
-            "azurerm_nat_gateway",
-            "azurerm_subnet_nat_gateway_association",
-            "azurerm_route_table",
-            "azurerm_route",
-            "azurerm_subnet_route_table_association",
-            "azurerm_managed_disk",
-            "azurerm_virtual_machine_data_disk_attachment",
-        ],
-        windows: &["azurerm_windows_virtual_machine"],
-        generated: &[
-            "azurerm_resource_group",
-            "azurerm_virtual_network",
-            "azurerm_subnet",
-            "azurerm_public_ip",
-            "azurerm_network_security_group",
-            "azurerm_network_interface",
-            "azurerm_network_interface_security_group_association",
-            "azurerm_linux_virtual_machine",
-            "azurerm_windows_virtual_machine",
-        ],
-        equivalent: &[],
-    },
-    Cloud {
-        name: "Terraform: Google Cloud",
-        source: "hashicorp/google 8.5.0 (its resource types)",
-        list: GOOGLE,
-        environment: &[
-            "google_compute_instance",
-            "google_compute_network",
-            "google_compute_subnetwork",
-            "google_compute_firewall",
-            "google_compute_address",
-            "google_compute_route",
-            "google_compute_router",
-            "google_compute_router_nat",
-            "google_compute_disk",
-            "google_compute_attached_disk",
-        ],
-        windows: &[],
-        generated: &[
-            "google_compute_network",
-            "google_compute_subnetwork",
-            "google_compute_firewall",
-            "google_compute_instance",
-            "google_project",
-            "google_project_service",
-        ],
-        equivalent: &[],
-    },
-    Cloud {
-        name: "Terraform: DigitalOcean",
-        source: "digitalocean/digitalocean 2.103.0 (its resource types)",
-        list: DIGITALOCEAN,
-        environment: &[
-            "digitalocean_droplet",
-            "digitalocean_vpc",
-            "digitalocean_firewall",
-            "digitalocean_ssh_key",
-            "digitalocean_reserved_ip",
-            "digitalocean_reserved_ip_assignment",
-            "digitalocean_volume",
-            "digitalocean_volume_attachment",
-        ],
-        windows: &[],
-        generated: &["digitalocean_vpc", "digitalocean_ssh_key", "digitalocean_droplet", "digitalocean_firewall"],
-        equivalent: &[],
-    },
-    Cloud {
-        name: "Terraform: Linode",
-        source: "linode/linode 4.7.0 (its resource types)",
-        list: LINODE,
-        environment: &[
-            "linode_instance",
-            "linode_instance_config",
-            "linode_instance_disk",
-            "linode_instance_ip",
-            "linode_vpc",
-            "linode_vpc_subnet",
-            "linode_firewall",
-            "linode_sshkey",
-            "linode_volume",
-        ],
-        windows: &[],
-        generated: &["linode_instance", "linode_firewall", "linode_vpc", "linode_vpc_subnet"],
-        equivalent: &[(
-            "linode_sshkey",
-            "each instance's own `authorized_keys`, which installs the environment's key without storing it in the account",
-        )],
-    },
-    Cloud {
-        name: "Terraform: Oracle Cloud",
-        source: "oracle/oci 9.8.0 (its resource types)",
-        list: OCI,
-        environment: &[
-            "oci_core_instance",
-            "oci_core_vcn",
-            "oci_core_subnet",
-            "oci_core_internet_gateway",
-            "oci_core_nat_gateway",
-            "oci_core_route_table",
-            "oci_core_security_list",
-            "oci_core_network_security_group",
-            "oci_core_network_security_group_security_rule",
-            "oci_core_public_ip",
-            "oci_core_vnic_attachment",
-            "oci_core_volume",
-            "oci_core_volume_attachment",
-        ],
-        windows: &[],
-        generated: &[
-            "oci_core_vcn",
-            "oci_core_internet_gateway",
-            "oci_core_route_table",
-            "oci_core_security_list",
-            "oci_core_subnet",
-            "oci_core_instance",
-        ],
-        equivalent: &[],
-    },
+/// Every Terraform table built from a provider's schema: Proxmox, the six clouds, then the
+/// utility providers.
+pub const TABLES: &[Table] = &[
+    proxmox::TABLE,
+    aws::TABLE,
+    azure::TABLE,
+    google::TABLE,
+    digitalocean::TABLE,
+    linode::TABLE,
+    oci::TABLE,
+    utility::TABLE,
 ];
 
-fn cloud(c: &Cloud) -> Format {
-    let managed = NotPortable {
-        why: "one of this cloud's managed services: no other VM target has it",
-    };
-    let rows = names(c.list)
-        .into_iter()
-        .map(|r| {
-            let s = if c.generated.contains(&r) {
-                Emitted {
-                    from: "(written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file)",
-                }
-            } else if let Some((_, via)) = c.equivalent.iter().find(|(t, _)| *t == r) {
-                Equivalent { via }
-            } else if c.environment.contains(&r) {
-                Planned {
-                    note: "with the cloud generator (one VM per machine)",
-                }
-            } else if c.windows.contains(&r) {
-                Planned {
-                    note: "with Windows guests (which make an environment VM-only)",
-                }
-            } else {
-                managed
-            };
-            (format!("resource {r}"), s)
-        })
-        .collect();
-    Format {
-        name: c.name,
-        file: ".isoloom/cloud-vm/ and .isoloom/cloud-docker/",
-        source: c.source,
-        rows,
-        collapse_not_portable: true,
-    }
-}
-const LEGACY: &str = "proxmox_virtual_environment_";
-
-const GENERATOR: Support = Planned {
-    note: "with the Proxmox generator",
-};
-const SERVER_ADMIN: Support = NotPortable {
-    why: "administers the Proxmox server itself: no other target has a server to administer",
-};
-const HOST_NETWORK: Support = NotPortable {
-    why: "changes the server's own network: no other target has one to change",
-};
-const MULTI_NODE: Support = Tooling {
-    note: "how a cluster spreads networks over its nodes: no change in behavior",
-};
-const LXC: Support = Planned {
-    note: "LXC containers: a way to run `docker:` machines on Proxmox",
-};
-const FIREWALL: Support = Planned {
-    note: "the Proxmox firewall: reach rules enforced outside the VMs, besides the router",
-};
-
-/// The Terraform tables: Proxmox, then one per cloud.
+/// The Terraform tables: Proxmox, ESXi, one per cloud, and the utility providers.
 pub fn formats() -> Vec<Format> {
-    let all = names(PROXMOX);
-    let rows = all
-        .iter()
-        .map(|r| {
-            // Older names of resources that also exist under the short name.
-            let current = r.strip_prefix(LEGACY).map(|s| format!("proxmox_{s}"));
-            let s = match current {
-                // The stable VM resource keeps its long name; the short `proxmox_vm` is experimental.
-                _ if *r == "proxmox_virtual_environment_vm" => Emitted {
-                    from: "machines (and the router)",
-                },
-                Some(c) if all.contains(&c.as_str()) => Tooling {
-                    note: "older name of the resource without `virtual_environment_`",
-                },
-                _ => proxmox(r.strip_prefix(LEGACY).or_else(|| r.strip_prefix("proxmox_")).unwrap_or(r)).unwrap_or(Unclassified),
-            };
-            (format!("resource {r}"), s)
-        })
-        .collect();
-    let mut all = vec![Format {
-        name: "Terraform: Proxmox",
-        file: ".isoloom/proxmox/ and .isoloom/docker-vm/proxmox/",
-        source: "bpg/proxmox 0.115.0 (its resource types)",
-        rows,
-        collapse_not_portable: false,
-    }];
-    all.push(esxi());
-    all.extend(CLOUDS.iter().map(cloud));
+    let mut all: Vec<Format> = TABLES.iter().map(Table::format).collect();
+    all.insert(1, esxi());
     all
 }
 
-fn proxmox(r: &str) -> Option<Support> {
-    Some(match r {
-        "vm" => Tooling {
-            note: "an experimental VM resource; Isoloom uses proxmox_virtual_environment_vm",
-        },
-        "download_file" => Emitted {
-            from: "machines.*.vm.os (cloud images)",
-        },
-        "file" => Emitted {
-            from: "(cloud-init for each VM)",
-        },
-        "sdn_zone_simple" | "sdn_vnet" | "sdn_applier" => Emitted { from: "networks" },
-        "pool" | "pool_membership" => GENERATOR,
-        "cloned_vm" => Tooling {
-            note: "linked clones: faster starts from one image, no change in behavior (as on Hyper-V and ESXi)",
-        },
-        "sdn_subnet" => Equivalent {
-            via: "the router VM, which holds each network's router address (a subnet would put it on the host bridge, which routes between networks)",
-        },
-        "vm2" => Tooling {
-            note: "an older, experimental VM resource",
-        },
-        "container" | "oci_image" => LXC,
-        "firewall_rules" | "firewall_options" | "firewall_ipset" | "firewall_alias" => FIREWALL,
-        r if r.starts_with("sdn_zone_") || r.starts_with("sdn_fabric") || r.starts_with("sdn_controller") => MULTI_NODE,
-        r if r.starts_with("network_") => HOST_NETWORK,
-        "node_firewall" | "cluster_firewall" | "cluster_firewall_security_group" => SERVER_ADMIN,
-        r if [
-            "acl",
-            "acme_",
-            "apt_",
-            "backup_job",
-            "ceph_",
-            "cluster_options",
-            "ha",
-            "hardware_mapping_",
-            "metrics_server",
-            "node_",
-            "realm_",
-            "replication",
-            "storage_",
-            "user",
-            "certificate",
-            "dns",
-            "hosts",
-            "group",
-            "role",
-            "time",
-        ]
-        .iter()
-        .any(|p| r.starts_with(p)) =>
-        {
-            SERVER_ADMIN
-        }
-        _ => return None,
-    })
-}
+const ESXI: &str = include_str!("../coverage/terraform/esxi.txt");
 
-/// Standalone ESXi hosts (no vCenter), with the community provider josenk/esxi.
+/// Standalone ESXi hosts (no vCenter), with the community provider josenk/esxi: no generator
+/// writes it yet, so its resource types are the whole table.
 fn esxi() -> Format {
     let rows = names(ESXI)
         .into_iter()

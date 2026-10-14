@@ -190,6 +190,12 @@ impl Score {
 }
 
 impl Format {
+    /// Whether the page counts this row in one line rather than listing it: one of the resource
+    /// types only this cloud has.
+    pub fn collapsed(&self, key: &str, s: Support) -> bool {
+        self.collapse_not_portable && key.starts_with("resource ") && matches!(s, Support::NotPortable { .. })
+    }
+
     /// The format's progress toward 100%: its portable features, by status.
     pub fn score(&self) -> Score {
         let portable: Vec<Support> = self.rows.iter().map(|(_, s)| *s).filter(|s| s.counts()).collect();
@@ -261,6 +267,16 @@ pub fn section(key: &str) -> (&str, &str) {
     if key.starts_with(|c: char| c.is_ascii_uppercase()) {
         return ("Instructions", key);
     }
+    if let Some(rest) = key.strip_prefix("data ") {
+        return ("Data sources", rest);
+    }
+    // A Terraform argument, `T.path` or `data.T.path`: in a section named after its type.
+    if let Some(rest) = key.strip_prefix("argument ") {
+        let skip = if rest.starts_with("data.") { 5 } else { 0 };
+        if let Some(dot) = rest[skip..].find('.') {
+            return (&rest[..skip + dot], &rest[skip + dot + 1..]);
+        }
+    }
     if let Some(rest) = key.strip_prefix("provider ") {
         return ("Settings", rest.split_once(": ").map_or(rest, |(_, s)| s));
     }
@@ -318,16 +334,8 @@ pub fn markdown() -> String {
     for f in &formats {
         let _ = write!(md, "\n## {}\n\n{}. From {}.\n", f.name, capitalize(&f.summary()), f.source);
         let mut current = "";
-        let collapsed = f
-            .rows
-            .iter()
-            .filter(|(_, s)| f.collapse_not_portable && matches!(s, Support::NotPortable { .. }))
-            .count();
-        for (key, s) in f
-            .rows
-            .iter()
-            .filter(|(_, s)| !(f.collapse_not_portable && matches!(s, Support::NotPortable { .. })))
-        {
+        let collapsed = f.rows.iter().filter(|(k, s)| f.collapsed(k, *s)).count();
+        for (key, s) in f.rows.iter().filter(|(k, s)| !f.collapsed(k, *s)) {
             let (title, name) = section(key);
             if title != current {
                 let _ = write!(md, "\n### {title}\n\n| Key | Every target | Implemented | Notes |\n| --- | --- | --- | --- |\n");
@@ -338,7 +346,7 @@ pub fn markdown() -> String {
         if collapsed > 0 {
             let _ = writeln!(
                 md,
-                "\nAnd {collapsed} other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them."
+                "\nAnd {collapsed} other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them."
             );
         }
     }

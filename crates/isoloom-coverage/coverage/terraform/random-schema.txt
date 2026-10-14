@@ -1,0 +1,55 @@
+# Settings, and arguments and nested blocks of what Isoloom writes, of registry.terraform.io/hashicorp/random 3.9.1
+resource random_bytes
+resource random_bytes keepers
+resource random_bytes length
+resource random_id
+resource random_id byte_length
+resource random_id keepers
+resource random_id prefix
+resource random_integer
+resource random_integer keepers
+resource random_integer max
+resource random_integer min
+resource random_integer seed
+resource random_password
+resource random_password keepers
+resource random_password length
+resource random_password lower
+resource random_password min_lower
+resource random_password min_numeric
+resource random_password min_special
+resource random_password min_upper
+resource random_password number
+resource random_password numeric
+resource random_password override_special
+resource random_password special
+resource random_password upper
+resource random_pet
+resource random_pet keepers
+resource random_pet length
+resource random_pet prefix
+resource random_pet separator
+resource random_shuffle
+resource random_shuffle input
+resource random_shuffle keepers
+resource random_shuffle result_count
+resource random_shuffle seed
+resource random_string
+resource random_string keepers
+resource random_string length
+resource random_string lower
+resource random_string min_lower
+resource random_string min_numeric
+resource random_string min_special
+resource random_string min_upper
+resource random_string number
+resource random_string numeric
+resource random_string override_special
+resource random_string special
+resource random_string upper
+resource random_uuid
+resource random_uuid keepers
+resource random_uuid4
+resource random_uuid4 keepers
+resource random_uuid7
+resource random_uuid7 keepers

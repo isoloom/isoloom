@@ -25,14 +25,15 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: QEMU](#vagrant-qemu) | 36% | 15 | 4 | 3 | 8 |
 | [Vagrant: ESXi](#vagrant-esxi) | 57% | 19 | 11 | 0 | 8 |
 | [Vagrant: Docker](#vagrant-docker) | 92% | 13 | 12 | 0 | 1 |
-| [Terraform: Proxmox](#terraform-proxmox) | 46% | 15 | 7 | 0 | 8 |
+| [Terraform: Proxmox](#terraform-proxmox) | 54% | 124 | 67 | 0 | 57 |
 | [Terraform: ESXi](#terraform-esxi) | 0% | 4 | 0 | 0 | 4 |
-| [Terraform: AWS](#terraform-aws) | 63% | 19 | 12 | 0 | 7 |
-| [Terraform: Azure](#terraform-azure) | 50% | 18 | 9 | 0 | 9 |
-| [Terraform: Google Cloud](#terraform-google-cloud) | 50% | 12 | 6 | 0 | 6 |
-| [Terraform: DigitalOcean](#terraform-digitalocean) | 50% | 8 | 4 | 0 | 4 |
-| [Terraform: Linode](#terraform-linode) | 55% | 9 | 5 | 0 | 4 |
-| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 46% | 13 | 6 | 0 | 7 |
+| [Terraform: AWS](#terraform-aws) | 58% | 158 | 92 | 0 | 66 |
+| [Terraform: Azure](#terraform-azure) | 73% | 136 | 100 | 0 | 36 |
+| [Terraform: Google Cloud](#terraform-google-cloud) | 55% | 110 | 61 | 0 | 49 |
+| [Terraform: DigitalOcean](#terraform-digitalocean) | 71% | 38 | 27 | 0 | 11 |
+| [Terraform: Linode](#terraform-linode) | 48% | 72 | 35 | 0 | 37 |
+| [Terraform: Oracle Cloud](#terraform-oracle-cloud) | 45% | 150 | 68 | 0 | 82 |
+| [Terraform: utility providers](#terraform-utility-providers) | 100% | 16 | 16 | 0 | 0 |
 | [cloud-init](#cloud-init) | 95% | 80 | 76 | 0 | 4 |
 | [Ansible inventory](#ansible-inventory) | 95% | 31 | 28 | 3 | 0 |
 | [Dockerfile](#dockerfile) | 100% | 24 | 24 | 0 | 0 |
@@ -1516,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-46% of 15 portable features (7 done, 0 partly, 8 to do; 116 features in all). From bpg/proxmox 0.115.0 (its resource types).
+54% of 124 portable features (67 done, 0 partly, 57 to do; 397 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1532,7 +1533,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `proxmox_ceph_pool` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_cloned_vm` | n/a | No | Linked clones: faster starts from one image, no change in behavior (as on Hyper-V and ESXi) |
 | `proxmox_cluster_options` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_download_file` | Yes | Yes | From `machines.*.vm.os` (cloud images) |
+| `proxmox_download_file` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_hagroup` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_hardware_mapping_dir` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_hardware_mapping_pci` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
@@ -1553,17 +1554,17 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `proxmox_realm_openid` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_realm_sync` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_replication` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_sdn_applier` | Yes | Yes | From `networks` |
+| `proxmox_sdn_applier` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_sdn_controller_evpn` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_fabric_node_openfabric` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_fabric_node_ospf` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_fabric_openfabric` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_fabric_ospf` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_subnet` | Yes | Another way | Via the router VM, which holds each network's router address (a subnet would put it on the host bridge, which routes between networks) |
-| `proxmox_sdn_vnet` | Yes | Yes | From `networks` |
+| `proxmox_sdn_vnet` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_sdn_zone_evpn` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_zone_qinq` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
-| `proxmox_sdn_zone_simple` | Yes | Yes | From `networks` |
+| `proxmox_sdn_zone_simple` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_sdn_zone_vlan` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_sdn_zone_vxlan` | n/a | No | How a cluster spreads networks over its nodes: no change in behavior |
 | `proxmox_storage_cifs` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
@@ -1574,70 +1575,386 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `proxmox_storage_pbs` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_storage_zfspool` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_user_token` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_virtual_environment_acl` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_acme_account` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_acme_certificate` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_acme_dns_plugin` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_apt_repository` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_apt_standard_repository` | n/a | No | Older name of the resource without `virtual_environment_` |
+| `proxmox_virtual_environment_acl` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_acme_account` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_acme_certificate` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_acme_dns_plugin` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_apt_repository` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_apt_standard_repository` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_certificate` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_virtual_environment_cloned_vm` | n/a | No | Older name of the resource without `virtual_environment_` |
+| `proxmox_virtual_environment_cloned_vm` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_cluster_firewall` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_cluster_firewall_security_group` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_virtual_environment_cluster_options` | n/a | No | Older name of the resource without `virtual_environment_` |
+| `proxmox_virtual_environment_cluster_options` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_container` | Yes | Not yet | LXC containers: a way to run `docker:` machines on Proxmox |
 | `proxmox_virtual_environment_dns` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_virtual_environment_download_file` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_file` | Yes | Yes | Cloud-init for each VM |
+| `proxmox_virtual_environment_download_file` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_file` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_virtual_environment_firewall_alias` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
 | `proxmox_virtual_environment_firewall_ipset` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
 | `proxmox_virtual_environment_firewall_options` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
 | `proxmox_virtual_environment_firewall_rules` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
 | `proxmox_virtual_environment_group` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_virtual_environment_hagroup` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_hardware_mapping_dir` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_hardware_mapping_pci` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_hardware_mapping_usb` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_haresource` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_harule` | n/a | No | Older name of the resource without `virtual_environment_` |
+| `proxmox_virtual_environment_hagroup` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_hardware_mapping_dir` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_hardware_mapping_pci` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_hardware_mapping_usb` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_haresource` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_harule` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_hosts` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_virtual_environment_metrics_server` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_network_linux_bridge` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_network_linux_vlan` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_node_firewall` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_oci_image` | n/a | No | Older name of the resource without `virtual_environment_` |
+| `proxmox_virtual_environment_metrics_server` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_network_linux_bridge` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_network_linux_vlan` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_node_firewall` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_oci_image` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_pool` | Yes | Not yet | With the Proxmox generator |
-| `proxmox_virtual_environment_pool_membership` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_realm_ldap` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_realm_openid` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_realm_sync` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_replication` | n/a | No | Older name of the resource without `virtual_environment_` |
+| `proxmox_virtual_environment_pool_membership` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_realm_ldap` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_realm_openid` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_realm_sync` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_replication` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_role` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_virtual_environment_sdn_applier` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_fabric_node_openfabric` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_fabric_node_ospf` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_fabric_openfabric` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_fabric_ospf` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_subnet` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_vnet` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_zone_evpn` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_zone_qinq` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_zone_simple` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_zone_vlan` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_sdn_zone_vxlan` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_storage_cifs` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_storage_directory` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_storage_lvm` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_storage_lvmthin` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_storage_nfs` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_storage_pbs` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_storage_zfspool` | n/a | No | Older name of the resource without `virtual_environment_` |
+| `proxmox_virtual_environment_sdn_applier` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_fabric_node_openfabric` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_fabric_node_ospf` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_fabric_openfabric` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_fabric_ospf` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_subnet` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_vnet` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_zone_evpn` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_zone_qinq` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_zone_simple` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_zone_vlan` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_sdn_zone_vxlan` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_storage_cifs` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_storage_directory` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_storage_lvm` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_storage_lvmthin` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_storage_nfs` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_storage_pbs` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_storage_zfspool` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
 | `proxmox_virtual_environment_time` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_virtual_environment_user` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_virtual_environment_user_token` | n/a | No | Older name of the resource without `virtual_environment_` |
-| `proxmox_virtual_environment_vm` | Yes | Yes | From `machines` (and the router) |
-| `proxmox_virtual_environment_vm2` | n/a | No | An older, experimental VM resource |
+| `proxmox_virtual_environment_user_token` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `proxmox_virtual_environment_vm` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
+| `proxmox_virtual_environment_vm2` | n/a | No | An experimental VM resource; Isoloom uses proxmox_virtual_environment_vm |
 | `proxmox_vm` | n/a | No | An experimental VM resource; Isoloom uses proxmox_virtual_environment_vm |
+
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `api_headers` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `api_token` | Yes | Yes | Written by the generator |
+| `auth_ticket` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `csrf_prevention_token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoint` | Yes | Yes | Written by the generator |
+| `insecure` | Yes | Yes | Written by the generator |
+| `min_tls` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `otp` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `password` | Yes | Yes | Written by the generator |
+| `random_vm_id_end` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `random_vm_id_start` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `random_vm_ids` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `tmp_dir` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `username` | Yes | Yes | Written by the generator |
+| `ssh` | Yes | Yes | Written by the generator |
+| `ssh.agent` | Yes | Yes | Written by the generator |
+| `ssh.agent_forwarding` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ssh.agent_socket` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ssh.node_address_source` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ssh.password` | Yes | Yes | Written by the generator |
+| `ssh.private_key` | Yes | Yes | Written by the generator |
+| `ssh.socks5_password` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ssh.socks5_server` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ssh.socks5_username` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ssh.username` | Yes | Yes | Written by the generator |
+| `ssh.node` | Yes | Yes | Written by the generator |
+| `ssh.node.address` | Yes | Yes | Written by the generator |
+| `ssh.node.name` | Yes | Yes | Written by the generator |
+| `ssh.node.port` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+
+### proxmox_download_file
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `checksum` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `checksum_algorithm` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `content_type` | Yes | Yes | Written by the generator |
+| `datastore_id` | Yes | Yes | Written by the generator |
+| `decompression_algorithm` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `file_name` | Yes | Yes | Written by the generator |
+| `node_name` | Yes | Yes | Written by the generator |
+| `overwrite` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `overwrite_unmanaged` | Yes | Yes | Written by the generator |
+| `upload_timeout` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `url` | Yes | Yes | Written by the generator |
+| `verify` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+
+### proxmox_sdn_applier
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `on_create` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `on_destroy` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+
+### proxmox_sdn_vnet
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `alias` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `id` | Yes | Yes | Written by the generator |
+| `isolate_ports` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `tag` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `vlan_aware` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `zone` | Yes | Yes | Written by the generator |
+
+### proxmox_sdn_zone_simple
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `dhcp` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `dns` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `dns_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `id` | Yes | Yes | Written by the generator |
+| `ipam` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `mtu` | Yes | Not yet | A network's MTU |
+| `nodes` | Yes | Yes | Written by the generator |
+| `reverse_dns` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+
+### proxmox_virtual_environment_file
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `content_type` | Yes | Yes | Written by the generator |
+| `datastore_id` | Yes | Yes | Written by the generator |
+| `file_mode` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `node_name` | Yes | Yes | Written by the generator |
+| `overwrite` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `timeout_upload` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `upload_mode` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_file` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_file.changed` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_file.checksum` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_file.file_name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_file.insecure` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_file.min_tls` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_file.path` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_raw` | Yes | Yes | Written by the generator |
+| `source_raw.data` | Yes | Yes | Written by the generator |
+| `source_raw.file_name` | Yes | Yes | Written by the generator |
+| `source_raw.resize` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+
+### proxmox_virtual_environment_vm
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `acpi` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `bios` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `boot_order` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `delete_unreferenced_disks_on_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `hook_script_file_id` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `hotplug` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `keyboard_layout` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `kvm_arguments` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `mac_addresses` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `machine` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `migrate` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `network_device` | Yes | Yes | Written by the generator |
+| `network_device.bridge` | Yes | Yes | Written by the generator |
+| `network_device.disconnected` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_device.enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_device.firewall` | Yes | Not yet | The Proxmox firewall: reach rules enforced outside the VMs, besides the router |
+| `network_device.mac_address` | Yes | Yes | Written by the generator |
+| `network_device.model` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `network_device.mtu` | Yes | Not yet | A network's MTU |
+| `network_device.queues` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `network_device.rate_limit` | Yes | Not yet | A rate limit per machine, beside `networks.*.tc` (a whole network, on its router) |
+| `network_device.trunks` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `network_device.vlan_id` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `node_name` | Yes | Yes | Written by the generator |
+| `on_boot` | Yes | Yes | Written by the generator |
+| `pool_id` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `protection` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `purge_on_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `reboot` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `reboot_after_update` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `scsi_hardware` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `started` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `stop_on_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `tablet_device` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `tags` | Yes | Yes | Written by the generator |
+| `template` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_clone` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_create` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_migrate` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_move_disk` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_reboot` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_shutdown_vm` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_start_vm` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `timeout_stop_vm` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `vm_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `agent` | Yes | Yes | Written by the generator |
+| `agent.enabled` | Yes | Yes | Written by the generator |
+| `agent.timeout` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `agent.trim` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `agent.type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `agent.wait_for_ip` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `agent.wait_for_ip.disabled` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `agent.wait_for_ip.ipv4` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `agent.wait_for_ip.ipv6` | Yes | Not yet | With IPv6 networks |
+| `amd_sev` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `amd_sev.allow_smt` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `amd_sev.kernel_hashes` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `amd_sev.no_debug` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `amd_sev.no_key_sharing` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `amd_sev.type` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `audio_device` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `audio_device.device` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `audio_device.driver` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `audio_device.enabled` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `cdrom` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `cdrom.enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `cdrom.file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `cdrom.interface` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.datastore_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.full` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.node_name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.retries` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `clone.vm_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `cpu` | Yes | Yes | Written by the generator |
+| `cpu.affinity` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `cpu.architecture` | Yes | Not yet | With `machines.*.arch`: another CPU architecture |
+| `cpu.cores` | Yes | Yes | Written by the generator |
+| `cpu.flags` | Yes | Not yet | With `machines.*.arch`: another CPU architecture |
+| `cpu.hotplugged` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `cpu.limit` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `cpu.numa` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `cpu.sockets` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `cpu.type` | Yes | Yes | Written by the generator |
+| `cpu.units` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk` | Yes | Yes | Written by the generator |
+| `disk.aio` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.backup` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.cache` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.datastore_id` | Yes | Yes | Written by the generator |
+| `disk.discard` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.file_format` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.file_id` | Yes | Yes | Written by the generator |
+| `disk.import_from` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.interface` | Yes | Yes | Written by the generator |
+| `disk.iothread` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.path_in_datastore` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.queues` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.replicate` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.serial` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.size` | Yes | Yes | Written by the generator |
+| `disk.ssd` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed.iops_read` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed.iops_read_burstable` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed.iops_write` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed.iops_write_burstable` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed.read` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed.read_burstable` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed.write` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `disk.speed.write_burstable` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `efi_disk` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `efi_disk.datastore_id` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `efi_disk.file_format` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `efi_disk.pre_enrolled_keys` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `efi_disk.type` | Yes | Not yet | With custom images and boot (firmware, machine type, boot order) |
+| `hostpci` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci.device` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci.id` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci.mapping` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci.mdev` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci.pcie` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci.rom_file` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci.rombar` | Yes | Not yet | With GPU and device passthrough |
+| `hostpci.xvga` | Yes | Not yet | With GPU and device passthrough |
+| `initialization` | Yes | Yes | Written by the generator |
+| `initialization.datastore_id` | Yes | Yes | Written by the generator |
+| `initialization.file_format` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.interface` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.meta_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.network_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.upgrade` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.user_data_file_id` | Yes | Yes | Written by the generator |
+| `initialization.vendor_data_file_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.dns` | Yes | Yes | Written by the generator |
+| `initialization.dns.domain` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `initialization.dns.servers` | Yes | Yes | Written by the generator |
+| `initialization.ip_config` | Yes | Yes | Written by the generator |
+| `initialization.ip_config.ipv4` | Yes | Yes | Written by the generator |
+| `initialization.ip_config.ipv4.address` | Yes | Yes | Written by the generator |
+| `initialization.ip_config.ipv4.gateway` | Yes | Yes | Written by the generator |
+| `initialization.ip_config.ipv6` | Yes | Not yet | With IPv6 networks |
+| `initialization.ip_config.ipv6.address` | Yes | Not yet | With IPv6 networks |
+| `initialization.ip_config.ipv6.gateway` | Yes | Not yet | With IPv6 networks |
+| `initialization.user_account` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.user_account.keys` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.user_account.password` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `initialization.user_account.username` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `memory` | Yes | Yes | Written by the generator |
+| `memory.dedicated` | Yes | Yes | Written by the generator |
+| `memory.floating` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `memory.hugepages` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `memory.keep_hugepages` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `memory.shared` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `numa` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `numa.cpus` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `numa.device` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `numa.hostnodes` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `numa.memory` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `numa.policy` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `operating_system` | Yes | Yes | Written by the generator |
+| `operating_system.type` | Yes | Yes | Written by the generator |
+| `rng` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `rng.max_bytes` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `rng.period` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `rng.source` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `serial_device` | Yes | Yes | Written by the generator |
+| `serial_device.device` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `smbios` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `smbios.family` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `smbios.manufacturer` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `smbios.product` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `smbios.serial` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `smbios.sku` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `smbios.uuid` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `smbios.version` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `startup` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
+| `startup.down_delay` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
+| `startup.order` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
+| `startup.up_delay` | n/a | No | The start order when the server restarts: `depends_on` orders the first start |
+| `tpm_state` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `tpm_state.datastore_id` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `tpm_state.version` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `usb` | Yes | Not yet | With GPU and device passthrough |
+| `usb.host` | Yes | Not yet | With GPU and device passthrough |
+| `usb.mapping` | Yes | Not yet | With GPU and device passthrough |
+| `usb.usb3` | Yes | Not yet | With GPU and device passthrough |
+| `vga` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `vga.clipboard` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `vga.memory` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `vga.type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `virtiofs` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
+| `virtiofs.cache` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
+| `virtiofs.direct_io` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
+| `virtiofs.expose_acl` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
+| `virtiofs.expose_xattr` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
+| `virtiofs.mapping` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
+| `watchdog` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `watchdog.action` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `watchdog.enabled` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
+| `watchdog.model` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 
 ## Terraform: ESXi
 
@@ -1655,148 +1972,4396 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: AWS
 
-63% of 19 portable features (12 done, 0 partly, 7 to do; 1728 features in all). From hashicorp/aws 6.67.0 (its resource types).
+58% of 158 portable features (92 done, 0 partly, 66 to do; 2438 features in all). From hashicorp/aws 6.67.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `aws_ebs_volume` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `aws_accessanalyzer_analyzer` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_accessanalyzer_archive_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_account_alternate_contact` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_account_primary_contact` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_account_region` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_accountaccess_application` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_accountaccess_entitlement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ami` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `aws_ami_copy` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `aws_ami_from_instance` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `aws_ami_launch_permission` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_arcregionswitch_plan` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_arczonalshift_autoshift_observer_notification_status` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_arczonalshift_zonal_autoshift_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_auditmanager_account_registration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_auditmanager_assessment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_auditmanager_assessment_delegation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_auditmanager_assessment_report` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_auditmanager_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_auditmanager_framework` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_auditmanager_framework_share` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_auditmanager_organization_admin_account_registration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_autoscaling_attachment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_autoscaling_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_autoscaling_group_tag` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_autoscaling_lifecycle_hook` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_autoscaling_notification` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_autoscaling_policy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_autoscaling_schedule` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_autoscaling_traffic_source_attachment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_autoscalingplans_scaling_plan` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_backup_framework` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_global_settings` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_logically_air_gapped_vault` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_plan` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_region_settings` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_report_plan` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_restore_testing_plan` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_restore_testing_selection` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_selection` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_vault` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_vault_lock_configuration` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_vault_notifications` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_backup_vault_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_billing_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_budgets_budget` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_budgets_budget_action` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ce_anomaly_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ce_anomaly_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ce_cost_allocation_tag` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ce_cost_category` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_chatbot_slack_channel_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_chatbot_teams_channel_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudcontrolapi_resource` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudformation_stack` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudformation_stack_instances` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudformation_stack_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudformation_stack_set_instance` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudformation_type` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudtrail` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudtrail_event_data_store` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudtrail_organization_delegated_admin_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_alarm_mute_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_composite_alarm` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_contributor_insight_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_contributor_managed_insight_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_dashboard` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_api_destination` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_archive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_bus` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_bus_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_connection` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_endpoint` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_permission` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_event_target` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_account_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_anomaly_detector` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_data_protection_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_delivery` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_delivery_destination` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_delivery_destination_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_delivery_source` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_destination` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_destination_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_index_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_metric_filter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_resource_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_s3_table_integration_source` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_storage_tier_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_stream` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_subscription_filter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_log_transformer` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_metric_alarm` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_metric_stream` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_otel_enrichment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cloudwatch_query_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_computeoptimizer_enrollment_status` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_computeoptimizer_recommendation_preferences` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_aggregate_authorization` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_config_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_configuration_aggregator` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_configuration_recorder` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_configuration_recorder_status` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_conformance_pack` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_delivery_channel` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_organization_conformance_pack` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_organization_custom_policy_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_organization_custom_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_organization_managed_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_remediation_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_config_retention_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_controltower_baseline` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_controltower_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_controltower_landing_zone` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_costoptimizationhub_enrollment_status` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_costoptimizationhub_preferences` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_cur_report_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_default_network_acl` | n/a | No | The account's default network: Isoloom builds its own |
+| `aws_default_route_table` | n/a | No | The account's default network: Isoloom builds its own |
+| `aws_default_security_group` | n/a | No | The account's default network: Isoloom builds its own |
+| `aws_default_subnet` | n/a | No | The account's default network: Isoloom builds its own |
+| `aws_default_vpc` | n/a | No | The account's default network: Isoloom builds its own |
+| `aws_default_vpc_dhcp_options` | n/a | No | The account's default network: Isoloom builds its own |
+| `aws_dlm_lifecycle_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_drs_replication_configuration_template` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_ebs_default_kms_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ebs_encryption_by_default` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ebs_fast_snapshot_restore` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_ebs_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_ebs_snapshot_block_public_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ebs_snapshot_copy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_ebs_snapshot_import` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `aws_ebs_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_ebs_volume_copy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_ec2_allowed_images_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ec2_availability_zone_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ec2_capacity_block_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ec2_capacity_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ec2_default_credit_specification` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ec2_fleet` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ec2_host` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ec2_image_block_public_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ec2_instance_metadata_defaults` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ec2_instance_state` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ec2_serial_console_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ec2_subnet_cidr_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ec2_tag` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_egress_only_internet_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `aws_eip` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_eip_association` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `aws_eip_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_flow_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_fms_admin_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_fms_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_fms_resource_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_access_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_account_alias` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_account_password_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_group_membership` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_group_policies_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_group_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_group_policy_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_group_policy_attachments_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_instance_profile` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_openid_connect_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_organizations_features` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_outbound_web_identity_federation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_policy_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_role` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_role_policies_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_role_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_role_policy_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_role_policy_attachments_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_saml_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_security_token_service_preferences` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_server_certificate` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_service_linked_role` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_service_specific_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_signing_certificate` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_user_group_membership` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_user_login_profile` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_user_policies_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_user_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_user_policy_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_user_policy_attachments_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_user_ssh_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_iam_virtual_mfa_device` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_identitystore_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_identitystore_group_membership` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_identitystore_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_imagebuilder_component` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
+| `aws_imagebuilder_container_recipe` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
+| `aws_imagebuilder_distribution_configuration` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
+| `aws_imagebuilder_image` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
+| `aws_imagebuilder_image_pipeline` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
+| `aws_imagebuilder_image_recipe` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
+| `aws_imagebuilder_infrastructure_configuration` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
+| `aws_imagebuilder_lifecycle_policy` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
+| `aws_imagebuilder_workflow` | n/a | No | Builds machine images: how an image is made, not what the environment runs |
 | `aws_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_internet_gateway` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `aws_internet_gateway_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_internetmonitor_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_invoicing_invoice_unit` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_key_pair` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `aws_launch_configuration` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_launch_template` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_licensemanager_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_licensemanager_grant` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_licensemanager_grant_accepter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_licensemanager_license_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_main_route_table_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_nat_gateway_eip_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_network_acl` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
+| `aws_network_acl_association` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
+| `aws_network_acl_rule` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
 | `aws_network_interface` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_network_interface_attachment` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_route` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `aws_network_interface_sg_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_networkflowmonitor_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_networkflowmonitor_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_networkmonitor_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_networkmonitor_probe` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notifications_channel_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notifications_event_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notifications_managed_notification_account_contact_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notifications_managed_notification_additional_channel_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notifications_notification_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notifications_notification_hub` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notifications_organizational_unit_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notifications_organizations_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_notificationscontacts_email_contact` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_oam_link` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_oam_sink` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_oam_sink_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_observabilityadmin_centralization_rule_for_organization` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_observabilityadmin_s3_table_integration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_observabilityadmin_telemetry_enrichment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_observabilityadmin_telemetry_evaluation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_observabilityadmin_telemetry_evaluation_for_organization` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_observabilityadmin_telemetry_pipeline` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_observabilityadmin_telemetry_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_observabilityadmin_telemetry_rule_for_organization` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_aws_service_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_delegated_administrator` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_organization` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_organizational_unit` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_policy_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_resource_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_organizations_tag` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ram_permission` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ram_principal_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ram_resource_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ram_resource_share` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ram_resource_share_accepter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ram_resource_share_associations_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ram_sharing_with_organization` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_rbin_rule` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_resiliencehub_resiliency_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resiliencehubv2_assertion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resiliencehubv2_input_source` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resiliencehubv2_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resiliencehubv2_service` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resiliencehubv2_service_function` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resiliencehubv2_system` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resiliencehubv2_user_journey` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resourceexplorer2_index` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resourceexplorer2_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resourcegroups_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_resourcegroups_resource` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_rolesanywhere_profile` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_rolesanywhere_trust_anchor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_route` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_route53_query_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_route53_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `aws_route53_records_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_route53_vpc_association_authorization` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `aws_route53_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `aws_route53_zone_association` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
 | `aws_route_table` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `aws_route_table_association` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `aws_savingsplans_savings_plan` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_security_group` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `aws_security_group_rule` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
+| `aws_servicecatalog_budget_resource_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_constraint` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_organizations_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_portfolio` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_portfolio_share` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_principal_portfolio_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_product` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_product_portfolio_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_provisioned_product` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_provisioning_artifact` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_service_action` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_tag_option` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalog_tag_option_resource_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalogappregistry_application` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalogappregistry_attribute_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicecatalogappregistry_attribute_group_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicequotas_auto_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicequotas_service_quota` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicequotas_template` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_servicequotas_template_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_snapshot_create_volume_permission` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `aws_spot_datafeed_subscription` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_spot_fleet_request` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_spot_instance_request` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `aws_ssoadmin_account_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_application` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_application_access_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_application_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_application_assignment_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_customer_managed_policy_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_customer_managed_policy_attachments_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_instance_access_control_attributes` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_managed_policy_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_managed_policy_attachments_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_permission_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_permission_set_inline_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_permissions_boundary_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_region` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_ssoadmin_trusted_token_issuer` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `aws_uxc_account_customizations` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `aws_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `aws_vpc_block_public_access_exclusion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_block_public_access_options` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_dhcp_options` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_vpc_dhcp_options_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_vpc_encryption_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam_organization_admin_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam_pool` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam_pool_cidr` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam_pool_cidr_allocation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam_preview_next_cidr` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam_resource_discovery` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam_resource_discovery_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_ipam_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `aws_vpc_ipv4_cidr_block_association` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `aws_vpc_security_group_egress_rule` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `aws_vpc_security_group_ingress_rule` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `aws_vpc_ipv6_cidr_block_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `aws_vpc_network_performance_metric_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `aws_vpc_security_group_egress_rule` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
+| `aws_vpc_security_group_ingress_rule` | Yes | Another way | Via the `ingress` and `egress` blocks of aws_security_group, which carry the reach rules |
+| `aws_vpc_security_group_rules_exclusive` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 
-And 1709 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+### Data sources
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `aws_ami` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `aws_availability_zones` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `access_key` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `allowed_account_ids` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `custom_ca_bundle` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ec2_metadata_service_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ec2_metadata_service_endpoint_mode` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `forbidden_account_ids` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `http_proxy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `https_proxy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `insecure` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `max_retries` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `no_proxy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `profile` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `region` | Yes | Yes | Written by the generator |
+| `retry_mode` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `s3_us_east_1_regional_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `s3_use_path_style` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `secret_key` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `shared_config_files` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `shared_credentials_files` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `skip_credentials_validation` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `skip_metadata_api_check` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `skip_region_validation` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `skip_requesting_account_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `sts_region` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `tag_policy_compliance` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_bucket_rate_limiter_capacity` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `use_dualstack_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `use_fips_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `user_agent` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.duration` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.external_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.policy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.policy_arns` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.role_arn` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.session_name` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.source_identity` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.tags` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role.transitive_tag_keys` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role_with_web_identity` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role_with_web_identity.duration` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role_with_web_identity.policy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role_with_web_identity.policy_arns` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role_with_web_identity.role_arn` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role_with_web_identity.session_name` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role_with_web_identity.web_identity_token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assume_role_with_web_identity.web_identity_token_file` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `default_tags` | Yes | Yes | Written by the generator |
+| `default_tags.tags` | Yes | Yes | Written by the generator |
+| `endpoints` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.accessanalyzer` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.account` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.accountaccess` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.acm` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.acmpca` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.agentregistry` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.amg` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.amp` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.amplify` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.apigateway` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.apigatewayv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appautoscaling` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appconfig` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appfabric` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appflow` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appintegrations` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appintegrationsservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.applicationautoscaling` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.applicationinsights` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.applicationsignals` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appmesh` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appregistry` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.apprunner` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appstream` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.appsync` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.arcregionswitch` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.arczonalshift` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.athena` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.auditmanager` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.autoscaling` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.autoscalingplans` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.backup` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.batch` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.bcmdataexports` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.beanstalk` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.bedrock` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.bedrockagent` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.bedrockagentcore` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.bedrockruntime` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.billing` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.budgets` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ce` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.chatbot` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.chime` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.chimesdkmediapipelines` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.chimesdkvoice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cleanrooms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloud9` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudcontrol` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudcontrolapi` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudformation` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudfront` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudfrontkeyvaluestore` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudhsm` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudhsmv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudsearch` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudtrail` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudwatch` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudwatchevents` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudwatchevidently` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudwatchlog` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudwatchlogs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudwatchobservabilityaccessmanager` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cloudwatchrum` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codeartifact` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codebuild` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codecatalyst` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codecommit` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codeconnections` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codedeploy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codeguruprofiler` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codegurureviewer` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codepipeline` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codestarconnections` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.codestarnotifications` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cognitoidentity` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cognitoidentityprovider` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cognitoidp` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.comprehend` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.computeoptimizer` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.config` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.configservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.connect` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.connectcases` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.controltower` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.costandusagereportservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.costexplorer` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.costoptimizationhub` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.cur` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.customerprofiles` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.databasemigration` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.databasemigrationservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.databrew` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.dataexchange` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.datapipeline` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.datasync` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.datazone` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.dax` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.deploy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.detective` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.devicefarm` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.devopsagent` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.devopsguru` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.directconnect` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.directoryservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.directoryservicedata` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.dlm` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.dms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.docdb` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.docdbelastic` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.drs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ds` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.dsql` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.dynamodb` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ec2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ecr` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ecrpublic` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ecs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.efs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.eks` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elasticache` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elasticbeanstalk` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elasticloadbalancing` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elasticloadbalancingv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elasticsearch` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elasticsearchservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elastictranscoder` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elb` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.elbv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.emr` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.emrcontainers` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.emrserverless` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.es` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.eventbridge` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.events` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.evidently` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.evs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.finspace` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.firehose` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.fis` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.fms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.fsx` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.gamelift` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.glacier` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.globalaccelerator` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.glue` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.gluedatabrew` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.grafana` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.greengrass` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.groundstation` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.guardduty` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.healthlake` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.iam` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.identitystore` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.imagebuilder` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.inspector` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.inspector2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.inspectorv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.interconnect` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.internetmonitor` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.invoicing` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.iot` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ivs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ivschat` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.kafka` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.kafkaconnect` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.kendra` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.keyspaces` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.kinesis` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.kinesisanalytics` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.kinesisanalyticsv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.kinesisvideo` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.kms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lakeformation` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lambda` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lambdacore` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lambdamicrovms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.launchwizard` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lex` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lexmodelbuilding` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lexmodelbuildingservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lexmodels` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lexmodelsv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lexv2models` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.licensemanager` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.lightsail` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.location` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.locationservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.logs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.m2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.macie2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mailmanager` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.managedgrafana` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mediaconnect` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mediaconvert` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.medialive` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mediapackage` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mediapackagev2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mediapackagevod` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mediastore` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.memorydb` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mgn` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mpa` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mq` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.msk` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mwaa` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.mwaaserverless` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.neptune` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.neptunegraph` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.networkfirewall` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.networkflowmonitor` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.networkmanager` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.networkmonitor` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.notifications` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.notificationscontacts` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.oam` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.observabilityadmin` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.odb` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.opensearch` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.opensearchingestion` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.opensearchserverless` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.opensearchservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.organizations` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.osis` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.outposts` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.paymentcryptography` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.pcaconnectorad` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.pcs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.pinpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.pinpointsmsvoicev2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.pipes` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.polly` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.pricing` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.prometheus` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.prometheusservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.qbusiness` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.qldb` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.quicksight` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ram` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.rbin` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.rds` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.rdsdata` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.rdsdataservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.recyclebin` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.redshift` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.redshiftdata` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.redshiftdataapiservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.redshiftserverless` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.rekognition` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.resiliencehub` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.resiliencehubv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.resourceexplorer2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.resourcegroups` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.resourcegroupstagging` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.resourcegroupstaggingapi` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.rolesanywhere` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.route53` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.route53domains` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.route53profiles` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.route53recoverycontrolconfig` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.route53recoveryreadiness` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.route53resolver` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.rum` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.s3` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.s3api` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.s3control` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.s3files` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.s3outposts` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.s3tables` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.s3vectors` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.sagemaker` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.savingsplans` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.scheduler` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.schemas` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.secretsmanager` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.securityhub` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.securitylake` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.serverlessapplicationrepository` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.serverlessapprepo` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.serverlessrepo` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.servicecatalog` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.servicecatalogappregistry` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.servicediscovery` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.servicequotas` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ses` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.sesv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.sfn` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.shield` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.signer` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.sns` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.sqs` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ssm` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ssmcontacts` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ssmincidents` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ssmquicksetup` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ssmsap` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.sso` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.ssoadmin` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.stepfunctions` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.storagegateway` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.sts` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.swf` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.synthetics` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.taxsettings` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.timestreaminfluxdb` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.timestreamquery` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.timestreamwrite` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.transcribe` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.transcribeservice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.transfer` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.uxc` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.verifiedpermissions` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.vpclattice` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.waf` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.wafregional` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.wafv2` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.wellarchitected` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.workmail` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.workspaces` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.workspacesweb` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `endpoints.xray` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ignore_tags` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ignore_tags.key_prefixes` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ignore_tags.keys` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+
+### aws_eip
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `address` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `associate_with_private_ip` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `customer_owned_ipv4_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `domain` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `instance` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ipam_pool_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_border_group` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `network_interface` | Yes | Yes | Written by the generator |
+| `public_ipv4_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### aws_instance
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `ami` | Yes | Yes | Written by the generator |
+| `associate_public_ip_address` | Yes | Yes | Written by the generator |
+| `availability_zone` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `disable_api_stop` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `disable_api_termination` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `ebs_optimized` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `enable_primary_ipv6` | Yes | Not yet | With IPv6 networks |
+| `force_destroy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `get_password_data` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `hibernation` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `host_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `host_resource_group_arn` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `iam_instance_profile` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `instance_initiated_shutdown_behavior` | Yes | Yes | Written by the generator |
+| `instance_type` | Yes | Yes | Written by the generator |
+| `ipv6_address_count` | Yes | Not yet | With IPv6 networks |
+| `ipv6_addresses` | Yes | Not yet | With IPv6 networks |
+| `key_name` | Yes | Yes | Written by the generator |
+| `monitoring` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_partition_number` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `private_ip` | Yes | Yes | Written by the generator |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `secondary_private_ips` | Yes | Not yet | With several addresses on one network |
+| `security_groups` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_dest_check` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `subnet_id` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `tenancy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `user_data` | Yes | Yes | Written by the generator |
+| `user_data_base64` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `user_data_replace_on_change` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `volume_tags` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `vpc_security_group_ids` | Yes | Yes | Written by the generator |
+| `capacity_reservation_specification` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `capacity_reservation_specification.capacity_reservation_preference` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `capacity_reservation_specification.capacity_reservation_target` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `capacity_reservation_specification.capacity_reservation_target.capacity_reservation_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `capacity_reservation_specification.capacity_reservation_target.capacity_reservation_resource_group_arn` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `cpu_options` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
+| `cpu_options.amd_sev_snp` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `cpu_options.core_count` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
+| `cpu_options.nested_virtualization` | Yes | Not yet | With nested virtualization |
+| `cpu_options.threads_per_core` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
+| `credit_specification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `credit_specification.cpu_credits` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ebs_block_device` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `ebs_block_device.delete_on_termination` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `ebs_block_device.device_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `ebs_block_device.encrypted` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ebs_block_device.iops` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ebs_block_device.kms_key_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ebs_block_device.snapshot_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ebs_block_device.tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `ebs_block_device.tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `ebs_block_device.throughput` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ebs_block_device.volume_size` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `ebs_block_device.volume_type` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `enclave_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `enclave_options.enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ephemeral_block_device` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ephemeral_block_device.device_name` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ephemeral_block_device.no_device` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ephemeral_block_device.virtual_name` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `instance_market_options` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `instance_market_options.market_type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `instance_market_options.spot_options` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `instance_market_options.spot_options.instance_interruption_behavior` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `instance_market_options.spot_options.max_price` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `instance_market_options.spot_options.spot_instance_type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `instance_market_options.spot_options.valid_until` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `launch_template` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `launch_template.id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `launch_template.name` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `launch_template.version` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `maintenance_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `maintenance_options.auto_recovery` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `metadata_options` | Yes | Yes | Written by the generator |
+| `metadata_options.http_endpoint` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `metadata_options.http_protocol_ipv6` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `metadata_options.http_put_response_hop_limit` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `metadata_options.http_tokens` | Yes | Yes | Written by the generator |
+| `metadata_options.instance_metadata_tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.delete_on_termination` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.device_index` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.network_card_index` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.network_interface_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `primary_network_interface` | Yes | Yes | Written by the generator |
+| `primary_network_interface.network_interface_id` | Yes | Yes | Written by the generator |
+| `private_dns_name_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `private_dns_name_options.enable_resource_name_dns_a_record` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `private_dns_name_options.enable_resource_name_dns_aaaa_record` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `private_dns_name_options.hostname_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `root_block_device` | Yes | Yes | Written by the generator |
+| `root_block_device.delete_on_termination` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `root_block_device.encrypted` | Yes | Yes | Written by the generator |
+| `root_block_device.iops` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `root_block_device.kms_key_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `root_block_device.tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `root_block_device.tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `root_block_device.throughput` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `root_block_device.volume_size` | Yes | Yes | Written by the generator |
+| `root_block_device.volume_type` | Yes | Yes | Written by the generator |
+| `secondary_network_interface` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `secondary_network_interface.delete_on_termination` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `secondary_network_interface.device_index` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `secondary_network_interface.interface_type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `secondary_network_interface.network_card_index` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `secondary_network_interface.private_ip_address_count` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `secondary_network_interface.secondary_subnet_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### aws_internet_gateway
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `tags` | Yes | Yes | Written by the generator |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `vpc_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### aws_key_pair
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `key_name` | Yes | Yes | Written by the generator |
+| `key_name_prefix` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `public_key` | Yes | Yes | Written by the generator |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+
+### aws_network_interface
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `enable_primary_ipv6` | Yes | Not yet | With IPv6 networks |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `interface_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ipv4_prefix_count` | Yes | Not yet | With several addresses on one network |
+| `ipv4_prefixes` | Yes | Not yet | With several addresses on one network |
+| `ipv6_address_count` | Yes | Not yet | With IPv6 networks |
+| `ipv6_address_list` | Yes | Not yet | With IPv6 networks |
+| `ipv6_address_list_enabled` | Yes | Not yet | With IPv6 networks |
+| `ipv6_addresses` | Yes | Not yet | With IPv6 networks |
+| `ipv6_prefix_count` | Yes | Not yet | With IPv6 networks |
+| `ipv6_prefixes` | Yes | Not yet | With IPv6 networks |
+| `private_ip` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `private_ip_list` | Yes | Not yet | With several addresses on one network |
+| `private_ip_list_enabled` | Yes | Not yet | With several addresses on one network |
+| `private_ips` | Yes | Yes | Written by the generator |
+| `private_ips_count` | Yes | Not yet | With several addresses on one network |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `security_groups` | Yes | Yes | Written by the generator |
+| `source_dest_check` | Yes | Yes | Written by the generator |
+| `subnet_id` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `attachment` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `attachment.device_index` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `attachment.instance` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `attachment.network_card_index` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ena_srd_specification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ena_srd_specification.ena_srd_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ena_srd_specification.ena_srd_udp_specification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ena_srd_specification.ena_srd_udp_specification.ena_srd_udp_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+
+### aws_network_interface_attachment
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `device_index` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `instance_id` | Yes | Yes | Written by the generator |
+| `network_card_index` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface_id` | Yes | Yes | Written by the generator |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+
+### aws_route_table
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `propagating_vgws` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `route` | Yes | Yes | Written by the generator |
+| `route.carrier_gateway_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `route.cidr_block` | Yes | Yes | Written by the generator |
+| `route.core_network_arn` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `route.destination_prefix_list_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `route.egress_only_gateway_id` | Yes | Not yet | With IPv6 networks |
+| `route.gateway_id` | Yes | Yes | Written by the generator |
+| `route.ipv6_cidr_block` | Yes | Not yet | With IPv6 networks |
+| `route.local_gateway_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `route.nat_gateway_id` | Yes | Not yet | Private networks reaching the internet through NAT |
+| `route.network_interface_id` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `route.odb_network_arn` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `route.transit_gateway_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `route.vpc_endpoint_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `route.vpc_peering_connection_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `tags` | Yes | Yes | Written by the generator |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `vpc_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### aws_route_table_association
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `gateway_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `route_table_id` | Yes | Yes | Written by the generator |
+| `subnet_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### aws_security_group
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `egress` | Yes | Yes | Written by the generator |
+| `egress.cidr_blocks` | Yes | Yes | Written by the generator |
+| `egress.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `egress.from_port` | Yes | Yes | Written by the generator |
+| `egress.ipv6_cidr_blocks` | Yes | Not yet | With IPv6 networks |
+| `egress.prefix_list_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `egress.protocol` | Yes | Yes | Written by the generator |
+| `egress.security_groups` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `egress.self` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `egress.to_port` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `ingress` | Yes | Yes | Written by the generator |
+| `ingress.cidr_blocks` | Yes | Yes | Written by the generator |
+| `ingress.description` | Yes | Yes | Written by the generator |
+| `ingress.from_port` | Yes | Yes | Written by the generator |
+| `ingress.ipv6_cidr_blocks` | Yes | Not yet | With IPv6 networks |
+| `ingress.prefix_list_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ingress.protocol` | Yes | Yes | Written by the generator |
+| `ingress.security_groups` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ingress.self` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ingress.to_port` | Yes | Yes | Written by the generator |
+| `name` | Yes | Yes | Written by the generator |
+| `name_prefix` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `revoke_rules_on_delete` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `vpc_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+
+### aws_subnet
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `assign_ipv6_address_on_creation` | Yes | Not yet | With IPv6 networks |
+| `availability_zone` | Yes | Yes | Written by the generator |
+| `availability_zone_id` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `cidr_block` | Yes | Yes | Written by the generator |
+| `customer_owned_ipv4_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `enable_dns64` | Yes | Not yet | With IPv6 networks |
+| `enable_lni_at_device_index` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `enable_resource_name_dns_a_record_on_launch` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `enable_resource_name_dns_aaaa_record_on_launch` | Yes | Not yet | With IPv6 networks |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `ipv4_ipam_pool_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ipv4_netmask_length` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ipv6_cidr_block` | Yes | Not yet | With IPv6 networks |
+| `ipv6_ipam_pool_id` | Yes | Not yet | With IPv6 networks |
+| `ipv6_native` | Yes | Not yet | With IPv6 networks |
+| `ipv6_netmask_length` | Yes | Not yet | With IPv6 networks |
+| `map_customer_owned_ip_on_launch` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `map_public_ip_on_launch` | Yes | Yes | Written by the generator |
+| `outpost_arn` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `private_dns_hostname_type_on_launch` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `tags` | Yes | Yes | Written by the generator |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `vpc_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+
+### aws_vpc
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `assign_generated_ipv6_cidr_block` | Yes | Not yet | With IPv6 networks |
+| `cidr_block` | Yes | Yes | Written by the generator |
+| `enable_dns_hostnames` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `enable_dns_support` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `enable_network_address_usage_metrics` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `instance_tenancy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `ipv4_ipam_pool_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ipv4_netmask_length` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ipv6_cidr_block` | Yes | Not yet | With IPv6 networks |
+| `ipv6_cidr_block_network_border_group` | Yes | Not yet | With IPv6 networks |
+| `ipv6_ipam_pool_id` | Yes | Not yet | With IPv6 networks |
+| `ipv6_netmask_length` | Yes | Not yet | With IPv6 networks |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `tags` | Yes | Yes | Written by the generator |
+| `tags_all` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+
+### aws_vpc_ipv4_cidr_block_association
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `cidr_block` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `ipv4_ipam_pool_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ipv4_netmask_length` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `vpc_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+
+### data.aws_ami
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allow_unsafe_filter` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `executable_users` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `include_deprecated` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `most_recent` | Yes | Yes | Written by the generator |
+| `name_regex` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `owners` | Yes | Yes | Written by the generator |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `tags` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `uefi_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter` | Yes | Yes | Written by the generator |
+| `filter.name` | Yes | Yes | Written by the generator |
+| `filter.values` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+
+### data.aws_availability_zones
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `all_availability_zones` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `exclude_names` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `exclude_zone_ids` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `region` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `state` | Yes | Yes | Written by the generator |
+| `filter` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `filter.name` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `filter.values` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+
+And 1373 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Azure
 
-50% of 18 portable features (9 done, 0 partly, 9 to do; 1106 features in all). From hashicorp/azurerm 5.8.0 (its resource types).
+73% of 136 portable features (100 done, 0 partly, 36 to do; 1559 features in all). From hashicorp/azurerm 5.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
+| `azurerm_advisor_suppression` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_insights` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_insights_analytics_item` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_insights_api_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_insights_smart_detection_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_insights_standard_web_test` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_insights_web_test` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_insights_workbook` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_insights_workbook_template` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_application_security_group` | Yes | Another way | Via the `security_rule` blocks of azurerm_network_security_group, which carry the reach rules |
+| `azurerm_automanage_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_availability_set` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_backup_container_storage_account` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_backup_policy_file_share` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_backup_policy_vm` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_backup_policy_vm_workload` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_backup_protected_file_share` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_backup_protected_vm` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_billing_account_cost_management_export` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_capacity_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_capacity_reservation_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_consumption_budget_management_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_consumption_budget_resource_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_consumption_budget_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_cost_anomaly_alert` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_cost_management_scheduled_action` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_dashboard_grafana` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_dashboard_grafana_managed_private_endpoint` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_data_protection_backup_instance_blob_storage` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_instance_data_lake_storage` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_instance_disk` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_instance_kubernetes_cluster` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_instance_mysql_flexible_server` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_instance_postgresql_flexible_server` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_policy_blob_storage` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_policy_data_lake_storage` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_policy_disk` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_policy_kubernetes_cluster` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_policy_mysql_flexible_server` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_policy_postgresql_flexible_server` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_vault` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_backup_vault_customer_managed_key` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_data_protection_resource_guard` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_dedicated_host` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_dedicated_host_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_disk_access` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_disk_encryption_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_federated_identity_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `azurerm_lighthouse_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_lighthouse_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_linux_virtual_machine` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_managed_disk` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_linux_virtual_machine_scale_set` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_log_analytics_cluster` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_cluster_customer_managed_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_data_export_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_datasource_windows_event` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_datasource_windows_performance_counter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_linked_service` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_linked_storage_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_query_pack` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_query_pack_query` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_saved_search` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_solution` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_storage_insights` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_workspace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_workspace_table` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_workspace_table_custom_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_log_analytics_workspace_table_microsoft` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_maintenance_assignment_dedicated_host` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_maintenance_assignment_dynamic_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_maintenance_assignment_virtual_machine` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_maintenance_assignment_virtual_machine_scale_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_maintenance_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_managed_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_managed_disk_sas_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_management_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_management_group_policy_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_management_group_policy_exemption` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_management_group_policy_remediation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_management_group_policy_set_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_management_group_subscription_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_management_group_template_deployment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_management_lock` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_marketplace_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_marketplace_role_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_aad_diagnostic_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_action_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_activity_log_alert` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_alert_processing_rule_action_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_alert_processing_rule_suppression` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_alert_prometheus_rule_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_autoscale_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_data_collection_endpoint` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_data_collection_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_data_collection_rule_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_diagnostic_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_metric_alert` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_private_link_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_private_link_scoped_service` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_scheduled_query_rules_alert` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_scheduled_query_rules_alert_v2` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_scheduled_query_rules_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_smart_detector_alert_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_monitor_workspace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_nat_gateway_public_ip_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_network_connection_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_network_interface` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `azurerm_network_interface_application_security_group_association` | Yes | Another way | Via the `security_rule` blocks of azurerm_network_security_group, which carry the reach rules |
 | `azurerm_network_interface_security_group_association` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `azurerm_network_security_group` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_network_security_rule` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_network_security_rule` | Yes | Another way | Via the `security_rule` blocks of azurerm_network_security_group, which carry the reach rules |
+| `azurerm_network_watcher` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_network_watcher_flow_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_orchestrated_virtual_machine_scale_set` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_pim_active_role_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_pim_eligible_role_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_policy_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_policy_set_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_policy_virtual_machine_configuration_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_portal_dashboard` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_portal_tenant_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_private_dns_a_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_aaaa_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_cname_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_mx_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_ptr_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_srv_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_txt_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_private_dns_zone_virtual_network_link` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `azurerm_proximity_placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_public_ip` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `azurerm_recovery_services_vault` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_recovery_services_vault_resource_guard_association` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_resource_deployment_script_azure_cli` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_deployment_script_azure_power_shell` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `azurerm_resource_group` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_route` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_route_table` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_resource_group_cost_management_export` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_group_cost_management_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_group_policy_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_group_policy_exemption` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_group_policy_remediation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_group_template_deployment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_policy_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_policy_exemption` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_policy_remediation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_provider_feature_registration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_resource_provider_registration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_role_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_role_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_role_management_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_route` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_route_table` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_security_center_assessment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_assessment_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_automation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_contact` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_server_vulnerability_assessment_virtual_machine` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_server_vulnerability_assessments_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_storage_defender` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_subscription_pricing` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_security_center_workspace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_shared_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `azurerm_shared_image_gallery` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `azurerm_shared_image_version` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `azurerm_site_recovery_fabric` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_hyperv_network_mapping` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_hyperv_replication_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_hyperv_replication_policy_association` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_network_mapping` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_protection_container` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_protection_container_mapping` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_replicated_vm` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_replication_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_replication_recovery_plan` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_services_vault_hyperv_site` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_vmware_replicated_vm` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_vmware_replication_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_site_recovery_vmware_replication_policy_association` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_ssh_public_key` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `azurerm_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `azurerm_subnet_nat_gateway_association` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_subnet_network_security_group_association` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_subnet_route_table_association` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `azurerm_virtual_machine_data_disk_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `azurerm_subnet_nat_gateway_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_subnet_network_security_group_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_subnet_route_table_association` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_subscription_cost_management_export` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_subscription_cost_management_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_subscription_policy_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_subscription_policy_exemption` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_subscription_policy_remediation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_subscription_template_deployment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_tenant_template_deployment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_user_assigned_identity` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_virtual_machine` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_virtual_machine_automanage_configuration_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_virtual_machine_data_disk_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `azurerm_virtual_machine_implicit_data_disk_from_source` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_virtual_machine_packet_capture` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `azurerm_virtual_machine_restore_point` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_virtual_machine_restore_point_collection` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `azurerm_virtual_machine_scale_set` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_virtual_machine_scale_set_extension` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_virtual_machine_scale_set_packet_capture` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `azurerm_virtual_machine_scale_set_standby_pool` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `azurerm_virtual_network` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `azurerm_virtual_network_dns_servers` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `azurerm_windows_virtual_machine` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `azurerm_windows_virtual_machine_scale_set` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 
-And 1088 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `ado_pipeline_service_connection_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `auxiliary_tenant_ids` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `client_certificate` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `client_certificate_password` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `client_certificate_path` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `client_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `client_id_file_path` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `client_secret` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `client_secret_file_path` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `disable_correlation_request_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `disable_terraform_partner_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `environment` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `metadata_host` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `msi_api_version` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `msi_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `oidc_request_token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `oidc_request_url` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `oidc_token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `oidc_token_file_path` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `partner_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `resource_provider_registrations` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `resource_providers_to_register` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `storage_use_azuread` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `subscription_id` | Yes | Yes | Written by the generator |
+| `tenant_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `use_aks_workload_identity` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `use_cli` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `use_msi` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `use_oidc` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features` | Yes | Yes | Written by the generator |
+| `features.persist_id_on_create_before_polling_for_completion` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.skip_import_check_on_create_and_allow_overwriting_existing_resources` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.api_management` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.api_management.purge_soft_delete_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.api_management.recover_soft_deleted` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.app_configuration` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.app_configuration.purge_soft_delete_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.app_configuration.recover_soft_deleted` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.application_insights` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.application_insights.disable_generated_rule` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.cognitive_account` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.cognitive_account.purge_soft_delete_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.databricks_workspace` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.databricks_workspace.force_delete` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.enhanced_validation` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.enhanced_validation.locations` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.enhanced_validation.preflight_enabled` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.enhanced_validation.preflight_location_fallback` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.enhanced_validation.resource_providers` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.purge_soft_delete_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.purge_soft_deleted_certificates_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.purge_soft_deleted_hardware_security_module_keys_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.purge_soft_deleted_hardware_security_modules_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.purge_soft_deleted_keys_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.purge_soft_deleted_secrets_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.recover_soft_deleted_certificates` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.recover_soft_deleted_hardware_security_module_keys` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.recover_soft_deleted_key_vaults` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.recover_soft_deleted_keys` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.key_vault.recover_soft_deleted_secrets` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.log_analytics_workspace` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.log_analytics_workspace.permanently_delete_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.machine_learning` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.machine_learning.purge_soft_deleted_workspace_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.managed_disk` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.managed_disk.expand_without_downtime` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.netapp` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.netapp.delete_backups_on_backup_vault_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.netapp.prevent_volume_destruction` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.postgresql_flexible_server` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.postgresql_flexible_server.restart_server_on_configuration_value_change` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.recovery_service` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.recovery_service.purge_protected_items_from_vault_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.recovery_service.vm_backup_stop_protection_and_retain_data_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.recovery_service.vm_backup_suspend_protection_and_retain_data_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.recovery_services_vaults` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.recovery_services_vaults.recover_soft_deleted_backup_protected_vm` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.resource_group` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.resource_group.prevent_deletion_if_contains_resources` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.servicebus` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.servicebus.auto_delete_subscription_default_rule` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.storage` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.storage.data_plane_available` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.subscription` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.subscription.prevent_cancellation_on_destroy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.template_deployment` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.template_deployment.delete_nested_items_during_deletion` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine.delete_os_disk_on_deletion` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine.detach_implicit_data_disk_on_deletion` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine.skip_shutdown_and_force_delete` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine_scale_set` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine_scale_set.force_delete` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine_scale_set.reimage_on_manual_upgrade` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine_scale_set.roll_instances_when_required` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `features.virtual_machine_scale_set.scale_to_zero_before_deletion` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+
+### azurerm_linux_virtual_machine
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `admin_password` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `admin_username` | Yes | Yes | Written by the generator |
+| `allow_extension_operations` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `availability_set_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `bypass_platform_safety_checks_on_user_schedule_enabled` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `capacity_reservation_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `computer_name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `custom_data` | Yes | Yes | Written by the generator |
+| `dedicated_host_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `dedicated_host_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `disable_password_authentication` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk_controller_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `edge_zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `encryption_at_host_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `eviction_policy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `extensions_time_budget` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `license_type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `location` | Yes | Yes | Written by the generator |
+| `max_bid_price` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `name` | Yes | Yes | Written by the generator |
+| `network_interface_ids` | Yes | Yes | Written by the generator |
+| `os_managed_disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `patch_assessment_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `patch_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_fault_domain` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `priority` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `provision_vm_agent` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `proximity_placement_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `reboot_setting` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `secure_boot_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `size` | Yes | Yes | Written by the generator |
+| `source_image_id` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `tags` | Yes | Yes | Written by the generator |
+| `user_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `virtual_machine_scale_set_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `vtpm_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `additional_capabilities` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `additional_capabilities.hibernation_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `additional_capabilities.ultra_ssd_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `admin_ssh_key` | Yes | Yes | Written by the generator |
+| `admin_ssh_key.public_key` | Yes | Yes | Written by the generator |
+| `admin_ssh_key.username` | Yes | Yes | Written by the generator |
+| `boot_diagnostics` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_diagnostics.storage_account_uri` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.automatic_upgrade_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.configuration_blob_uri` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.order` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.tag` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.treat_failure_as_deployment_failure_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.version_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `identity` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `identity.identity_ids` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `identity.type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk` | Yes | Yes | Written by the generator |
+| `os_disk.caching` | Yes | Yes | Written by the generator |
+| `os_disk.disk_encryption_set_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.disk_size_gb` | Yes | Yes | Written by the generator |
+| `os_disk.name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `os_disk.secure_vm_disk_encryption_set_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.security_encryption_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.storage_account_type` | Yes | Yes | Written by the generator |
+| `os_disk.write_accelerator_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.diff_disk_settings` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.diff_disk_settings.option` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.diff_disk_settings.placement` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_image_notification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_image_notification.timeout` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `plan` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `plan.name` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `plan.product` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `plan.publisher` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `secret` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `secret.key_vault_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `secret.certificate` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `secret.certificate.url` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `source_image_reference` | Yes | Yes | Written by the generator |
+| `source_image_reference.offer` | Yes | Yes | Written by the generator |
+| `source_image_reference.publisher` | Yes | Yes | Written by the generator |
+| `source_image_reference.sku` | Yes | Yes | Written by the generator |
+| `source_image_reference.version` | Yes | Yes | Written by the generator |
+| `termination_notification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `termination_notification.enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `termination_notification.timeout` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_network_interface
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `accelerated_networking_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `auxiliary_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `auxiliary_sku` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `dns_servers` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `edge_zone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `internal_dns_name_label` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `ip_forwarding_enabled` | Yes | Yes | Written by the generator |
+| `location` | Yes | Yes | Written by the generator |
+| `name` | Yes | Yes | Written by the generator |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `ip_configuration` | Yes | Yes | Written by the generator |
+| `ip_configuration.gateway_load_balancer_frontend_ip_configuration_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_configuration.name` | Yes | Yes | Written by the generator |
+| `ip_configuration.primary` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ip_configuration.private_ip_address` | Yes | Yes | Written by the generator |
+| `ip_configuration.private_ip_address_allocation` | Yes | Yes | Written by the generator |
+| `ip_configuration.private_ip_address_version` | Yes | Not yet | With IPv6 networks |
+| `ip_configuration.public_ip_address_id` | Yes | Yes | Written by the generator |
+| `ip_configuration.subnet_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_network_interface_security_group_association
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `network_interface_id` | Yes | Yes | Written by the generator |
+| `network_security_group_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_network_security_group
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `location` | Yes | Yes | Written by the generator |
+| `name` | Yes | Yes | Written by the generator |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `security_rule` | Yes | Yes | Written by the generator |
+| `security_rule.access` | Yes | Yes | Written by the generator |
+| `security_rule.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `security_rule.destination_address_prefix` | Yes | Yes | Written by the generator |
+| `security_rule.destination_address_prefixes` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `security_rule.destination_application_security_group_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `security_rule.destination_port_range` | Yes | Yes | Written by the generator |
+| `security_rule.destination_port_ranges` | Yes | Yes | Written by the generator |
+| `security_rule.direction` | Yes | Yes | Written by the generator |
+| `security_rule.name` | Yes | Yes | Written by the generator |
+| `security_rule.priority` | Yes | Yes | Written by the generator |
+| `security_rule.protocol` | Yes | Yes | Written by the generator |
+| `security_rule.source_address_prefix` | Yes | Yes | Written by the generator |
+| `security_rule.source_address_prefixes` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `security_rule.source_application_security_group_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `security_rule.source_port_range` | Yes | Yes | Written by the generator |
+| `security_rule.source_port_ranges` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `tags` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_public_ip
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allocation_method` | Yes | Yes | Written by the generator |
+| `ddos_protection_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ddos_protection_plan_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `domain_name_label` | No | No | Public DNS and domains: local targets have no public names |
+| `domain_name_label_scope` | No | No | Public DNS and domains: local targets have no public names |
+| `edge_zone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `idle_timeout_in_minutes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_version` | Yes | Not yet | With IPv6 networks |
+| `location` | Yes | Yes | Written by the generator |
+| `name` | Yes | Yes | Written by the generator |
+| `public_ip_prefix_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `reverse_fqdn` | No | No | Public DNS and domains: local targets have no public names |
+| `sku` | Yes | Yes | Written by the generator |
+| `sku_tier` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `tags` | Yes | Yes | Written by the generator |
+| `zones` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_resource_group
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `location` | Yes | Yes | Written by the generator |
+| `managed_by` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_subnet
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `address_prefixes` | Yes | Yes | Written by the generator |
+| `default_outbound_access_enabled` | Yes | Not yet | `networks.*.internet: false` enforced by the cloud |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `network_security_group_id_wo` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_security_group_id_wo_version` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `private_endpoint_network_policies` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `private_link_service_network_policies_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `route_table_id_wo` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `route_table_id_wo_version` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `service_endpoint_policy_ids` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `sharing_scope` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `virtual_network_name` | Yes | Yes | Written by the generator |
+| `delegation` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `delegation.name` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `delegation.service_delegation` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `delegation.service_delegation.actions` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `delegation.service_delegation.name` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_address_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_address_pool.id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_address_pool.number_of_ip_addresses` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `service_endpoint` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `service_endpoint.network_identifier` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `service_endpoint.service` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_virtual_network
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `address_space` | Yes | Yes | Written by the generator |
+| `bgp_community` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `dns_servers` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `edge_zone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `flow_timeout_in_minutes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `location` | Yes | Yes | Written by the generator |
+| `name` | Yes | Yes | Written by the generator |
+| `private_endpoint_vnet_policies` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `subnet` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.address_prefixes` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.default_outbound_access_enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.delegation` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.delegation.name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.delegation.service_delegation` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.delegation.service_delegation.actions` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.delegation.service_delegation.name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.private_endpoint_network_policies` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.private_link_service_network_policies_enabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.route_table_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.security_group` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.service_endpoint` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.service_endpoint.network_identifier` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.service_endpoint.service` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `subnet.service_endpoint_policy_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `tags` | Yes | Yes | Written by the generator |
+| `ddos_protection_plan` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ddos_protection_plan.enable` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ddos_protection_plan.id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `encryption` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `encryption.enforcement` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_address_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_address_pool.id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ip_address_pool.number_of_ip_addresses` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### azurerm_windows_virtual_machine
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `admin_password` | Yes | Yes | Written by the generator |
+| `admin_username` | Yes | Yes | Written by the generator |
+| `allow_extension_operations` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `automatic_updates_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `availability_set_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `bypass_platform_safety_checks_on_user_schedule_enabled` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `capacity_reservation_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `computer_name` | Yes | Yes | Written by the generator |
+| `custom_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `dedicated_host_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `dedicated_host_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `disk_controller_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `edge_zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `encryption_at_host_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `eviction_policy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `extensions_time_budget` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `hotpatching_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `license_type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `location` | Yes | Yes | Written by the generator |
+| `max_bid_price` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `name` | Yes | Yes | Written by the generator |
+| `network_interface_ids` | Yes | Yes | Written by the generator |
+| `os_managed_disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `patch_assessment_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `patch_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_fault_domain` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `priority` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `provision_vm_agent` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `proximity_placement_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `reboot_setting` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `resource_group_name` | Yes | Yes | Written by the generator |
+| `secure_boot_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `size` | Yes | Yes | Written by the generator |
+| `source_image_id` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `tags` | Yes | Yes | Written by the generator |
+| `timezone` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `user_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `virtual_machine_scale_set_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `vtpm_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `zone` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `additional_capabilities` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `additional_capabilities.hibernation_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `additional_capabilities.ultra_ssd_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `additional_unattend_content` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `additional_unattend_content.content` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `additional_unattend_content.setting` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_diagnostics` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_diagnostics.storage_account_uri` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.automatic_upgrade_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.configuration_blob_uri` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.order` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.tag` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.treat_failure_as_deployment_failure_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gallery_application.version_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `identity` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `identity.identity_ids` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `identity.type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk` | Yes | Yes | Written by the generator |
+| `os_disk.caching` | Yes | Yes | Written by the generator |
+| `os_disk.disk_encryption_set_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.disk_size_gb` | Yes | Yes | Written by the generator |
+| `os_disk.name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `os_disk.secure_vm_disk_encryption_set_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.security_encryption_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.storage_account_type` | Yes | Yes | Written by the generator |
+| `os_disk.write_accelerator_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.diff_disk_settings` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.diff_disk_settings.option` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_disk.diff_disk_settings.placement` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_image_notification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `os_image_notification.timeout` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `plan` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `plan.name` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `plan.product` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `plan.publisher` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `secret` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `secret.key_vault_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `secret.certificate` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `secret.certificate.store` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `secret.certificate.url` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `source_image_reference` | Yes | Yes | Written by the generator |
+| `source_image_reference.offer` | Yes | Yes | Written by the generator |
+| `source_image_reference.publisher` | Yes | Yes | Written by the generator |
+| `source_image_reference.sku` | Yes | Yes | Written by the generator |
+| `source_image_reference.version` | Yes | Yes | Written by the generator |
+| `termination_notification` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `termination_notification.enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `termination_notification.timeout` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+| `winrm_listener` | Yes | Yes | Written by the generator |
+| `winrm_listener.certificate_url` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `winrm_listener.protocol` | Yes | Yes | Written by the generator |
+
+And 894 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Google Cloud
 
-50% of 12 portable features (6 done, 0 partly, 6 to do; 1369 features in all). From hashicorp/google 8.5.0 (its resource types).
+55% of 110 portable features (61 done, 0 partly, 49 to do; 1850 features in all). From hashicorp/google 8.5.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
-| `google_compute_address` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `google_compute_attached_disk` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `google_compute_disk` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `google_access_context_manager_access_level` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_access_level_condition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_access_levels` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_access_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_access_policy_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_access_policy_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_access_policy_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_authorized_orgs_desc` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_egress_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_gcp_user_access_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_ingress_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_service_perimeter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_service_perimeter_dry_run_egress_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_service_perimeter_dry_run_ingress_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_service_perimeter_dry_run_resource` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_service_perimeter_egress_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_service_perimeter_ingress_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_service_perimeter_resource` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_access_context_manager_service_perimeters` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_apikeys_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_assured_workloads_workload` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_backup_dr_backup_plan` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_backup_dr_backup_plan_association` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_backup_dr_backup_vault` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_backup_dr_management_server` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_backup_dr_restore_workload` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_backup_dr_service_config` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_billing_account_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_billing_account_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_billing_account_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_billing_budget` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_billing_project_info` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_billing_subaccount` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_asset_folder_feed` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_asset_organization_feed` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_asset_project_feed` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_identity_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_identity_group_membership` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_quotas_quota_adjuster_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_quotas_quota_preference` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_security_compliance_cloud_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_security_compliance_framework` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_security_compliance_framework_deployment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_cloud_support_support_event_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_address` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_attached_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_autoscaler` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_bulk_per_instance_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_disk_async_replication` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_compute_disk_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_disk_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_disk_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_disk_resource_policy_attachment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `google_compute_firewall` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `google_compute_firewall_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_firewall_policy_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_firewall_policy_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_firewall_policy_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_firewall_policy_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_firewall_policy_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_firewall_policy_with_rules` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `google_compute_image_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_image_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_image_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `google_compute_instance_from_template` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_instance_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_instance_group_manager` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_instance_group_membership` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_instance_group_named_port` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_instance_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_instance_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_instance_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_instance_settings` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_instance_template` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_instance_template_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_instance_template_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_instance_template_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_instant_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_compute_instant_snapshot_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_instant_snapshot_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_instant_snapshot_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_network` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `google_compute_route` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `google_compute_router` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `google_compute_router_nat` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `google_compute_network_firewall_policy` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_network_firewall_policy_association` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_network_firewall_policy_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_network_firewall_policy_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_network_firewall_policy_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_network_firewall_policy_rule` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_network_firewall_policy_with_rules` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_node_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_node_template` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_organization_security_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_organization_security_policy_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_organization_security_policy_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_per_instance_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_preview_feature` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_project_cloud_armor_tier` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_project_default_network_tier` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_project_metadata` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_project_metadata_item` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_autoscaler` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_region_commitment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_region_disk` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_region_disk_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_disk_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_disk_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_disk_resource_policy_attachment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_region_instance_group_manager` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_region_instance_template` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_region_instant_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_compute_region_instant_snapshot_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_instant_snapshot_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_instant_snapshot_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_network_firewall_policy` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_region_network_firewall_policy_association` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_region_network_firewall_policy_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_network_firewall_policy_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_network_firewall_policy_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_region_network_firewall_policy_rule` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_region_network_firewall_policy_with_rules` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_compute_region_per_instance_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_region_resize_request` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_resize_request` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_resource_policy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_resource_policy_attachment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_rollout_plan` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_route` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_router` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_router_nat` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_router_nat_address` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `google_compute_shared_vpc_host_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_shared_vpc_service_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_compute_snapshot_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_snapshot_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_snapshot_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_snapshot_settings` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `google_compute_storage_pool` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `google_compute_storage_pool_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_storage_pool_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_storage_pool_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_compute_subnetwork` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `google_compute_subnetwork_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_subnetwork_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_compute_subnetwork_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_contact_center_insights_analysis_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_contact_center_insights_assessment_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_contact_center_insights_auto_labeling_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_contact_center_insights_encryption_spec` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_contact_center_insights_qa_question` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_contact_center_insights_qa_scorecard` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_contact_center_insights_qa_scorecard_revision` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_contact_center_insights_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_dns_managed_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `google_dns_managed_zone_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_dns_managed_zone_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_dns_managed_zone_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_dns_policy` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `google_dns_record_set` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `google_essential_contacts_contact` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_folder` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_folder_access_approval_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_folder_iam_audit_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_folder_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_folder_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_folder_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_folder_organization_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_access_boundary_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_deny_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_folder_access_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_folders_policy_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_oauth_client` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_oauth_client_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_organization_access_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_organizations_policy_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_principal_access_boundary_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_project_access_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_projects_policy_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workforce_pool` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workforce_pool_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workforce_pool_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workforce_pool_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workforce_pool_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workforce_pool_provider_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workforce_pool_provider_scim_tenant` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workforce_pool_provider_scim_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workload_identity_pool` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workload_identity_pool_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workload_identity_pool_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workload_identity_pool_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workload_identity_pool_managed_identity` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workload_identity_pool_namespace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_iam_workload_identity_pool_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_billing_account_bucket_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_billing_account_exclusion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_billing_account_sink` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_folder_bucket_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_folder_exclusion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_folder_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_folder_sink` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_linked_dataset` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_log_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_log_view` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_log_view_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_log_view_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_log_view_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_metric` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_organization_bucket_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_organization_exclusion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_organization_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_organization_sink` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_project_bucket_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_project_exclusion` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_project_sink` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_logging_saved_query` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_alert_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_custom_service` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_dashboard` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_metric_descriptor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_monitored_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_notification_channel` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_service` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_slo` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_snooze` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_monitoring_uptime_check_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_network_management_connectivity_test` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_network_management_network_monitoring_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_network_management_organization_vpc_flow_logs_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_network_management_vpc_flow_logs_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_observability_bucket` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_observability_folder_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_observability_link` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_observability_organization_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_observability_project_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_observability_trace_scope` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_org_policy_custom_constraint` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_org_policy_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_organization_access_approval_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_organization_iam_audit_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_organization_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_organization_iam_custom_role` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_organization_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_organization_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_organization_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_os_login_ssh_public_key` | Yes | Another way | Via google_compute_firewall rules, which carry the reach rules, and the instances' metadata for SSH keys |
+| `google_privileged_access_manager_entitlement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_project` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `google_project_access_approval_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_project_default_service_accounts` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_project_iam_audit_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_project_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_project_iam_custom_role` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_project_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_project_iam_member_remove` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_project_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_project_organization_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 | `google_project_service` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `google_project_usage_export_bucket` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_resource_manager_capability` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_resource_manager_capability_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_resource_manager_lien` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_service_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_service_account_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_service_account_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_service_account_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_service_account_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_location_tag_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_key_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_key_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_key_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_value` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_value_iam_binding` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_value_iam_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_tags_tag_value_iam_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `google_workload_identity_service_agent` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 
-And 1357 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `access_approval_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `access_context_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `access_token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `active_directory_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `add_terraform_attribution_label` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `agent_identity_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `agent_registry_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `agentic_applications_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `alloydb_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `apigee_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `apihub_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `apikeys_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `app_engine_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `apphub_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `artifact_registry_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `assured_workloads_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `backup_dr_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `beyondcorp_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `big_query_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `biglake_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `biglake_hive_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `biglake_iceberg_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `bigquery_analytics_hub_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `bigquery_connection_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `bigquery_data_transfer_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `bigquery_datapolicy_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `bigquery_datapolicyv2_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `bigquery_reservation_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `bigtable_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `billing_budgets_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `billing_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `billing_project` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `binary_authorization_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `blockchain_node_engine_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `certificate_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ces_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `chronicle_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_asset_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_billing_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_build_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_functions_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_identity_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_ids_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_quotas_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_resource_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_run_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_run_v2_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_scheduler_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_security_compliance_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_support_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloud_tasks_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloudbuildv2_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `clouddeploy_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `clouddomains_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `cloudfunctions2_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `colab_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `composer_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `compute_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `config_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `contact_center_insights_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `container_analysis_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `container_attached_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `container_aws_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `container_azure_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `container_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `core_billing_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `credentials` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `data_catalog_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `data_fusion_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `data_lineage_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `data_loss_prevention_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `data_pipeline_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `database_migration_service_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dataflow_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dataform_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dataplex_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dataproc_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dataproc_gdc_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dataproc_metastore_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `datastream_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `default_labels` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `deployment_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `developer_connect_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dialogflow_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dialogflow_cx_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `discovery_engine_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dns_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `document_ai_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `document_ai_warehouse_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `edgecontainer_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `edgenetwork_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `essential_contacts_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `eventarc_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `filestore_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `firebase_app_check_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `firebase_app_hosting_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `firebase_data_connect_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `firebase_remote_config_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `firebaserules_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `firestore_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `gemini_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `gke_backup_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `gke_hub2_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `gke_hub_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `gkeonprem_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `healthcare_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `hypercomputecluster_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `iam2_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `iam3_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `iam_beta_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `iam_credentials_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `iam_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `iam_workforce_pool_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `iap_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `identity_platform_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `impersonate_service_account` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `impersonate_service_account_delegates` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `integration_connectors_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `integrations_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `kms_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `license_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `logging_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `looker_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `lustre_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `managed_kafka_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `memcache_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `memorystore_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `migration_center_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `model_armor_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `model_armor_global_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `monitoring_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `netapp_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `network_connectivity_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `network_connectivityv1_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `network_management_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `network_managementv1_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `network_security_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `network_services_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `observability_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `oracle_database_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `org_policy_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `os_config_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `os_config_v2_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `os_login_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `parallelstore_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `parameter_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `parameter_manager_regional_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `poll_interval` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `prefer_global_endpoints` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `prefer_regional_endpoints` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `privateca_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `privileged_access_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `project` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `public_ca_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `pubsub_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `pubsub_lite_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `recaptcha_enterprise_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `redis_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `region` | Yes | Yes | Written by the generator |
+| `request_reason` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `request_timeout` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `resource_manager3_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `resource_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `resource_manager_v3_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `scopes` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `secret_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `secret_manager_regional_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `secure_source_manager_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `security_center_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `security_center_management_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `security_center_v2_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `securityposture_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `service_directory_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `service_management_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `service_networking_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `service_usage_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `site_verification_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `source_repo_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `spanner_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `sql_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `storage_batch_operations_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `storage_control_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `storage_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `storage_ftp_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `storage_insights_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `storage_transfer_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `tags_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `tags_location_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `terraform_attribution_label_addition_strategy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `transcoder_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `universe_domain` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `user_project_override` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `vector_search_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `vertex_ai_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `vmwareengine_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `vpc_access_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `workbench_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `workflows_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `workload_identity_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `workstations_custom_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `zone` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `batching` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `batching.enable_batching` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `batching.send_after` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `external_credentials` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `external_credentials.audience` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `external_credentials.identity_token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `external_credentials.service_account_email` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+
+### google_compute_firewall
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `destination_ranges` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `direction` | Yes | Yes | Written by the generator |
+| `disabled` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `enable_logging` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `network` | Yes | Yes | Written by the generator |
+| `priority` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `project` | Yes | Yes | Written by the generator |
+| `source_ranges` | Yes | Yes | Written by the generator |
+| `source_service_accounts` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `source_tags` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `target_service_accounts` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `target_tags` | Yes | Yes | Written by the generator |
+| `allow` | Yes | Yes | Written by the generator |
+| `allow.ports` | Yes | Yes | Written by the generator |
+| `allow.protocol` | Yes | Yes | Written by the generator |
+| `deny` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `deny.ports` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `deny.protocol` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `log_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `log_config.metadata` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `params` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `params.resource_manager_tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### google_compute_instance
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allow_stopping_for_update` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `can_ip_forward` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `deletion_protection` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `desired_status` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `enable_display` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `hostname` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `key_revocation_action_type` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `labels` | Yes | Yes | Written by the generator |
+| `machine_type` | Yes | Yes | Written by the generator |
+| `metadata` | Yes | Yes | Written by the generator |
+| `metadata_startup_script` | Yes | Yes | Written by the generator |
+| `min_cpu_platform` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `name` | Yes | Yes | Written by the generator |
+| `project` | Yes | Yes | Written by the generator |
+| `resource_policies` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `tags` | Yes | Yes | Written by the generator |
+| `zone` | Yes | Yes | Written by the generator |
+| `advanced_machine_features` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
+| `advanced_machine_features.enable_nested_virtualization` | Yes | Not yet | With nested virtualization |
+| `advanced_machine_features.enable_uefi_networking` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `advanced_machine_features.performance_monitoring_unit` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `advanced_machine_features.threads_per_core` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
+| `advanced_machine_features.turbo_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `advanced_machine_features.visible_core_count` | Yes | Another way | Via `resources.cpus`, through the machine type Isoloom picks |
+| `attached_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `attached_disk.device_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `attached_disk.disk_encryption_key_raw` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `attached_disk.disk_encryption_key_rsa` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `attached_disk.disk_encryption_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `attached_disk.force_attach` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `attached_disk.kms_key_self_link` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `attached_disk.mode` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `attached_disk.source` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `boot_disk` | Yes | Yes | Written by the generator |
+| `boot_disk.auto_delete` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_disk.device_name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_disk.disk_encryption_key_raw` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.disk_encryption_key_rsa` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.disk_encryption_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.force_attach` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_disk.guest_os_features` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.interface` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.kms_key_self_link` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.mode` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_disk.source` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_disk.initialize_params` | Yes | Yes | Written by the generator |
+| `boot_disk.initialize_params.architecture` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_disk.initialize_params.enable_confidential_compute` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.image` | Yes | Yes | Written by the generator |
+| `boot_disk.initialize_params.labels` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `boot_disk.initialize_params.provisioned_iops` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.provisioned_throughput` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.replica_zones` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `boot_disk.initialize_params.resource_manager_tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.resource_policies` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.size` | Yes | Yes | Written by the generator |
+| `boot_disk.initialize_params.snapshot` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_disk.initialize_params.storage_pool` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_disk.initialize_params.source_image_encryption_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_image_encryption_key.kms_key_self_link` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_image_encryption_key.kms_key_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_image_encryption_key.raw_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_image_encryption_key.rsa_encrypted_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_snapshot_encryption_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_snapshot_encryption_key.kms_key_self_link` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_snapshot_encryption_key.kms_key_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_snapshot_encryption_key.raw_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_disk.initialize_params.source_snapshot_encryption_key.rsa_encrypted_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `confidential_instance_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `confidential_instance_config.confidential_instance_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `confidential_instance_config.enable_confidential_compute` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `guest_accelerator` | Yes | Not yet | With GPU and device passthrough |
+| `guest_accelerator.count` | Yes | Not yet | With GPU and device passthrough |
+| `guest_accelerator.type` | Yes | Not yet | With GPU and device passthrough |
+| `instance_encryption_key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `instance_encryption_key.kms_key_self_link` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `instance_encryption_key.kms_key_service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface` | Yes | Yes | Written by the generator |
+| `network_interface.igmp_query` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface.internal_ipv6_prefix_length` | Yes | Not yet | With IPv6 networks |
+| `network_interface.ipv6_address` | Yes | Not yet | With IPv6 networks |
+| `network_interface.network` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.network_attachment` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface.network_ip` | Yes | Yes | Written by the generator |
+| `network_interface.nic_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface.queue_count` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface.stack_type` | Yes | Not yet | With IPv6 networks |
+| `network_interface.subnetwork` | Yes | Yes | Written by the generator |
+| `network_interface.subnetwork_project` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.vlan` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `network_interface.access_config` | Yes | Yes | Written by the generator |
+| `network_interface.access_config.nat_ip` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `network_interface.access_config.network_tier` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface.access_config.public_ptr_domain_name` | No | No | Public DNS and domains: local targets have no public names |
+| `network_interface.alias_ip_range` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface.alias_ip_range.ip_cidr_range` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface.alias_ip_range.subnetwork_range_name` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_interface.ipv6_access_config` | Yes | Not yet | With IPv6 networks |
+| `network_interface.ipv6_access_config.external_ipv6` | Yes | Not yet | With IPv6 networks |
+| `network_interface.ipv6_access_config.external_ipv6_prefix_length` | Yes | Not yet | With IPv6 networks |
+| `network_interface.ipv6_access_config.name` | Yes | Not yet | With IPv6 networks |
+| `network_interface.ipv6_access_config.network_tier` | Yes | Not yet | With IPv6 networks |
+| `network_interface.ipv6_access_config.public_ptr_domain_name` | Yes | Not yet | With IPv6 networks |
+| `network_performance_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_performance_config.total_egress_bandwidth_tier` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `params` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `params.resource_manager_tags` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `reservation_affinity` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `reservation_affinity.type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `reservation_affinity.specific_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `reservation_affinity.specific_reservation.key` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `reservation_affinity.specific_reservation.values` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `scheduling` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.automatic_restart` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.availability_domain` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.host_error_timeout_seconds` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.instance_termination_action` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.min_node_cpus` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.on_host_maintenance` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.preemptible` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.provisioning_model` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.termination_time` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.local_ssd_recovery_timeout` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.local_ssd_recovery_timeout.nanos` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.local_ssd_recovery_timeout.seconds` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.max_run_duration` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.max_run_duration.nanos` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.max_run_duration.seconds` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.node_affinities` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.node_affinities.key` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.node_affinities.operator` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.node_affinities.values` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.on_instance_stop_action` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scheduling.on_instance_stop_action.discard_local_ssd` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `scratch_disk` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `scratch_disk.device_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `scratch_disk.interface` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `scratch_disk.size` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `service_account` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `service_account.email` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `service_account.scopes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `shielded_instance_config` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `shielded_instance_config.enable_integrity_monitoring` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `shielded_instance_config.enable_secure_boot` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `shielded_instance_config.enable_vtpm` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+| `workload_identity_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `workload_identity_config.identity` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `workload_identity_config.identity_certificate_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+
+### google_compute_network
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `auto_create_subnetworks` | Yes | Yes | Written by the generator |
+| `bgp_always_compare_med` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `bgp_best_path_selection_mode` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `bgp_inter_region_cost` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `delete_bgp_always_compare_med` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `delete_default_routes_on_create` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `enable_ula_internal_ipv6` | Yes | Not yet | With IPv6 networks |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `internal_ipv6_range` | Yes | Not yet | With IPv6 networks |
+| `mtu` | Yes | Not yet | A network's MTU |
+| `name` | Yes | Yes | Written by the generator |
+| `network_firewall_policy_enforcement_order` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `network_profile` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `project` | Yes | Yes | Written by the generator |
+| `routing_mode` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `params` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `params.resource_manager_tags` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### google_compute_subnetwork
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allow_subnet_cidr_routes_overlap` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `external_ipv6_prefix` | Yes | Not yet | With IPv6 networks |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `internal_ipv6_prefix` | Yes | Not yet | With IPv6 networks |
+| `ip_cidr_range` | Yes | Yes | Written by the generator |
+| `ip_collection` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `ipv6_access_type` | Yes | Not yet | With IPv6 networks |
+| `name` | Yes | Yes | Written by the generator |
+| `network` | Yes | Yes | Written by the generator |
+| `private_ip_google_access` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `private_ipv6_google_access` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `project` | Yes | Yes | Written by the generator |
+| `purpose` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `region` | Yes | Yes | Written by the generator |
+| `reserved_internal_range` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `resolve_subnet_mask` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `role` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `send_secondary_ip_range_if_empty` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `stack_type` | Yes | Not yet | With IPv6 networks |
+| `log_config` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
+| `log_config.aggregation_interval` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
+| `log_config.filter_expr` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
+| `log_config.flow_sampling` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
+| `log_config.metadata` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
+| `log_config.metadata_fields` | n/a | No | The cloud's own logging and monitoring: no change in behavior |
+| `params` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `params.resource_manager_tags` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `secondary_ip_range` | Yes | Not yet | With several addresses on one network |
+| `secondary_ip_range.ip_cidr_range` | Yes | Not yet | With several addresses on one network |
+| `secondary_ip_range.range_name` | Yes | Not yet | With several addresses on one network |
+| `secondary_ip_range.reserved_internal_range` | Yes | Not yet | With several addresses on one network |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### google_project
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `auto_create_network` | Yes | Yes | Written by the generator |
+| `billing_account` | Yes | Yes | Written by the generator |
+| `deletion_policy` | Yes | Yes | Written by the generator |
+| `folder_id` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `labels` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `org_id` | Yes | Yes | Written by the generator |
+| `project_id` | Yes | Yes | Written by the generator |
+| `tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### google_project_service
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `deletion_policy` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `disable_dependent_services` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `disable_on_destroy` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `project` | Yes | Yes | Written by the generator |
+| `service` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.read` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+And 1087 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: DigitalOcean
 
-50% of 8 portable features (4 done, 0 partly, 4 to do; 79 features in all). From digitalocean/digitalocean 2.103.0 (its resource types).
+71% of 38 portable features (27 done, 0 partly, 11 to do; 150 features in all). From digitalocean/digitalocean 2.103.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
+| `digitalocean_custom_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
 | `digitalocean_droplet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `digitalocean_droplet_autoscale` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `digitalocean_droplet_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `digitalocean_firewall` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `digitalocean_reserved_ip` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `digitalocean_reserved_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `digitalocean_floating_ip` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `digitalocean_floating_ip_assignment` | n/a | No | An older name of a resource type the provider still has: no change in behavior |
+| `digitalocean_monitor_alert` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `digitalocean_nfs_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `digitalocean_project` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `digitalocean_project_resources` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `digitalocean_reserved_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `digitalocean_reserved_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `digitalocean_reserved_ipv6` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `digitalocean_reserved_ipv6_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `digitalocean_ssh_key` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `digitalocean_volume` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `digitalocean_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `digitalocean_tag` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `digitalocean_uptime_alert` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `digitalocean_uptime_check` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `digitalocean_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `digitalocean_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `digitalocean_volume_snapshot` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
 | `digitalocean_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `digitalocean_vpc_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 
-And 71 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `api_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `http_retry_max` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `http_retry_wait_max` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `http_retry_wait_min` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `requests_per_second` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `spaces_access_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `spaces_endpoint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `spaces_secret_key` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+
+### digitalocean_droplet
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `backups` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `droplet_agent` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `gpu_partition_mode` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `graceful_shutdown` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `image` | Yes | Yes | Written by the generator |
+| `ipv6` | Yes | Not yet | With IPv6 networks |
+| `ipv6_address` | Yes | Not yet | With IPv6 networks |
+| `monitoring` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `name` | Yes | Yes | Written by the generator |
+| `private_networking` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `public_networking` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `region` | Yes | Yes | Written by the generator |
+| `resize_disk` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `size` | Yes | Yes | Written by the generator |
+| `ssh_keys` | Yes | Yes | Written by the generator |
+| `tags` | Yes | Yes | Written by the generator |
+| `user_data` | Yes | Yes | Written by the generator |
+| `volume_ids` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `vpc_uuid` | Yes | Yes | Written by the generator |
+| `backup_policy` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `backup_policy.hour` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `backup_policy.plan` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `backup_policy.weekday` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### digitalocean_firewall
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `droplet_ids` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `inbound_rule` | Yes | Yes | Written by the generator |
+| `inbound_rule.action` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `inbound_rule.port_range` | Yes | Yes | Written by the generator |
+| `inbound_rule.protocol` | Yes | Yes | Written by the generator |
+| `inbound_rule.source_addresses` | Yes | Yes | Written by the generator |
+| `inbound_rule.source_droplet_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `inbound_rule.source_kubernetes_ids` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `inbound_rule.source_load_balancer_uids` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `inbound_rule.source_tags` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `outbound_rule` | Yes | Yes | Written by the generator |
+| `outbound_rule.action` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `outbound_rule.destination_addresses` | Yes | Yes | Written by the generator |
+| `outbound_rule.destination_droplet_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `outbound_rule.destination_kubernetes_ids` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `outbound_rule.destination_load_balancer_uids` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `outbound_rule.destination_tags` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `outbound_rule.port_range` | Yes | Yes | Written by the generator |
+| `outbound_rule.protocol` | Yes | Yes | Written by the generator |
+
+### digitalocean_ssh_key
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `name` | Yes | Yes | Written by the generator |
+| `public_key` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+
+### digitalocean_vpc
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `ip_range` | Yes | Yes | Written by the generator |
+| `name` | Yes | Yes | Written by the generator |
+| `region` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+
+And 55 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Linode
 
-55% of 9 portable features (5 done, 0 partly, 4 to do; 47 features in all). From linode/linode 4.7.0 (its resource types).
+48% of 72 portable features (35 done, 0 partly, 37 to do; 497 features in all). From linode/linode 4.7.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
+| `linode_account_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_consumer_image_share_group_token` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
 | `linode_firewall` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `linode_firewall_device` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_firewall_settings` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_iam_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
 | `linode_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `linode_instance_config` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `linode_instance_disk` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `linode_instance_ip` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `linode_instance_config` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_instance_disk` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_instance_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_instance_shared_ips` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_interface` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_ipv6_range` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_lock` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_monitor_alert_definition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_monitor_logs_destination` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_monitor_logs_stream` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_networking_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_networking_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `linode_placement_group_assignment` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `linode_producer_image_share_group` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `linode_producer_image_share_group_member` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `linode_reserved_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `linode_reserved_ip_assignment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_sshkey` | Yes | Another way | Via each instance's own `authorized_keys`, which installs the environment's key without storing it in the account |
-| `linode_volume` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `linode_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `linode_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `linode_vpc` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `linode_vpc_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 
-And 38 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `api_ca_path` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `api_version` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `config_path` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `config_profile` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `disable_internal_cache` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `event_poll_ms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `lke_event_poll_ms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `lke_node_ready_poll_ms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `max_retry_delay_ms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `min_retry_delay_ms` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `obj_access_key` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `obj_bucket_force_delete` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `obj_secret_key` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `obj_use_temp_keys` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `skip_implicit_reboots` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `skip_instance_delete_poll` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `skip_instance_ready_poll` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `skip_lke_cluster_delete_poll` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ua_prefix` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `url` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+
+### linode_firewall
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `disabled` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `inbound_policy` | Yes | Yes | Written by the generator |
+| `interfaces` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `label` | Yes | Yes | Written by the generator |
+| `linodes` | Yes | Yes | Written by the generator |
+| `nodebalancers` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `outbound_policy` | Yes | Yes | Written by the generator |
+| `tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `inbound` | Yes | Yes | Written by the generator |
+| `inbound.action` | Yes | Yes | Written by the generator |
+| `inbound.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `inbound.ipv4` | Yes | Yes | Written by the generator |
+| `inbound.ipv6` | Yes | Not yet | With IPv6 networks |
+| `inbound.label` | Yes | Yes | Written by the generator |
+| `inbound.ports` | Yes | Yes | Written by the generator |
+| `inbound.protocol` | Yes | Yes | Written by the generator |
+| `outbound` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `outbound.action` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `outbound.description` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `outbound.ipv4` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `outbound.ipv6` | Yes | Not yet | With IPv6 networks |
+| `outbound.label` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `outbound.ports` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `outbound.protocol` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+
+### linode_instance
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `authorized_keys` | Yes | Yes | Written by the generator |
+| `authorized_users` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `backup_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `backups_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `boot_config_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `boot_size` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `booted` | Yes | Yes | Written by the generator |
+| `disk_encryption` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `firewall_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `image` | Yes | Yes | Written by the generator |
+| `interface_generation` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `kernel` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `label` | Yes | Yes | Written by the generator |
+| `maintenance_policy` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `migration_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `network_helper` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `placement_group_externally_managed` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `private_ip` | Yes | Not yet | With several addresses on one network |
+| `region` | Yes | Yes | Written by the generator |
+| `resize_disk` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `root_pass` | Yes | Yes | Written by the generator |
+| `shared_ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `stackscript_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `stackscript_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `swap_size` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `tags` | Yes | Yes | Written by the generator |
+| `type` | Yes | Yes | Written by the generator |
+| `watchdog_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `alerts` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `alerts.cpu` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `alerts.io` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `alerts.network_in` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `alerts.network_out` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `alerts.transfer_quota` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `config` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.comments` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.kernel` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.memory_limit` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.root_device` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.run_level` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.virt_mode` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sda` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sda.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sda.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sda.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaa` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaa.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaa.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaa.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdab` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdab.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdab.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdab.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdac` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdac.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdac.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdac.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdad` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdad.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdad.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdad.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdae` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdae.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdae.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdae.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaf` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaf.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaf.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaf.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdag` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdag.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdag.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdag.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdah` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdah.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdah.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdah.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdai` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdai.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdai.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdai.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaj` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaj.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaj.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaj.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdak` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdak.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdak.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdak.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdal` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdal.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdal.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdal.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdam` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdam.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdam.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdam.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdan` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdan.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdan.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdan.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdao` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdao.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdao.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdao.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdap` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdap.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdap.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdap.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaq` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaq.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaq.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaq.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdar` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdar.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdar.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdar.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdas` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdas.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdas.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdas.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdat` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdat.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdat.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdat.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdau` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdau.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdau.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdau.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdav` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdav.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdav.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdav.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaw` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaw.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaw.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaw.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdax` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdax.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdax.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdax.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sday` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sday.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sday.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sday.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaz` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaz.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaz.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdaz.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdb` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdb.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdb.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdb.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdba` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdba.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdba.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdba.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbb` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbb.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbb.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbb.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbc` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbc.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbc.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbc.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbd` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbd.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbd.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbd.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbe` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbe.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbe.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbe.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbf` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbf.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbf.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbf.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbg` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbg.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbg.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbg.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbh` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbh.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbh.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbh.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbi` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbi.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbi.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbi.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbj` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbj.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbj.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbj.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbk` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbk.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbk.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbk.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbl` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbl.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbl.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdbl.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdc` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdc.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdc.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdc.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdd` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdd.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdd.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdd.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sde` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sde.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sde.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sde.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdf` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdf.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdf.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdf.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdg` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdg.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdg.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdg.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdh` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdh.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdh.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdh.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdi` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdi.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdi.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdi.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdj` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdj.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdj.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdj.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdk` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdk.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdk.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdk.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdl` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdl.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdl.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdl.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdm` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdm.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdm.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdm.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdn` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdn.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdn.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdn.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdo` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdo.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdo.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdo.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdp` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdp.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdp.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdp.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdq` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdq.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdq.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdq.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdr` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdr.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdr.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdr.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sds` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sds.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sds.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sds.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdt` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdt.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdt.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdt.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdu` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdu.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdu.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdu.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdv` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdv.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdv.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdv.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdw` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdw.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdw.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdw.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdx` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdx.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdx.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdx.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdy` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdy.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdy.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdy.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdz` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdz.disk_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdz.disk_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.devices.sdz.volume_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.helpers` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.helpers.devtmpfs_automount` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.helpers.distro` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.helpers.modules_dep` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.helpers.network` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.helpers.updatedb_disabled` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ip_ranges` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipam_address` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.primary` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.purpose` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.subnet_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv4.nat_1_1` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv4.vpc` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv6` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv6.is_public` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv6.range` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv6.range.range` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv6.slaac` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `config.interface.ipv6.slaac.range` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.authorized_keys` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.authorized_users` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.filesystem` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.image` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.read_only` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.root_pass` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.size` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.stackscript_data` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `disk.stackscript_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `interface` | Yes | Yes | Written by the generator |
+| `interface.ip_ranges` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `interface.ipam_address` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `interface.label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `interface.primary` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `interface.purpose` | Yes | Yes | Written by the generator |
+| `interface.subnet_id` | Yes | Yes | Written by the generator |
+| `interface.ipv4` | Yes | Yes | Written by the generator |
+| `interface.ipv4.nat_1_1` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `interface.ipv4.vpc` | Yes | Yes | Written by the generator |
+| `interface.ipv6` | Yes | Not yet | With IPv6 networks |
+| `interface.ipv6.is_public` | Yes | Not yet | With IPv6 networks |
+| `interface.ipv6.range` | Yes | Not yet | With IPv6 networks |
+| `interface.ipv6.range.range` | Yes | Not yet | With IPv6 networks |
+| `interface.ipv6.slaac` | Yes | Not yet | With IPv6 networks |
+| `interface.ipv6.slaac.range` | Yes | Not yet | With IPv6 networks |
+| `linode_interfaces` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.firewall_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.default_route` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.default_route.ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.default_route.ipv6` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.public` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.public.ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.public.ipv4.addresses` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.public.ipv4.addresses.address` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.public.ipv4.addresses.primary` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.public.ipv6` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.public.ipv6.ranges` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.public.ipv6.ranges.range` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.rdma_vpc` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.rdma_vpc.subnet_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.rdma_vpc.ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.rdma_vpc.ipv4.addresses` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.rdma_vpc.ipv4.addresses.address` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.rdma_vpc.ipv4.addresses.primary` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vlan` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vlan.ipam_address` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vlan.vlan_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc.subnet_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc.ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc.ipv4.addresses` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc.ipv4.addresses.address` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc.ipv4.addresses.nat_1_1_address` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc.ipv4.addresses.primary` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc.ipv4.ranges` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `linode_interfaces.vpc.ipv4.ranges.range` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `metadata` | Yes | Yes | Written by the generator |
+| `metadata.user_data` | Yes | Yes | Written by the generator |
+| `placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_group.compliant_only` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_group.id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_group.placement_group_policy` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### linode_vpc
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `ipv4` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ipv4.range` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ipv6` | Yes | Not yet | With IPv6 networks |
+| `ipv6.allocation_class` | Yes | Not yet | With IPv6 networks |
+| `ipv6.range` | Yes | Not yet | With IPv6 networks |
+| `label` | Yes | Yes | Written by the generator |
+| `region` | Yes | Yes | Written by the generator |
+| `vpc_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+
+### linode_vpc_subnet
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `ipv4` | Yes | Yes | Written by the generator |
+| `ipv6` | Yes | Not yet | With IPv6 networks |
+| `ipv6.range` | Yes | Not yet | With IPv6 networks |
+| `label` | Yes | Yes | Written by the generator |
+| `vpc_id` | Yes | Yes | Written by the generator |
+
+And 15 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
 
 ## Terraform: Oracle Cloud
 
-46% of 13 portable features (6 done, 0 partly, 7 to do; 1020 features in all). From oracle/oci 9.8.0 (its resource types).
+45% of 150 portable features (68 done, 0 partly, 82 to do; 1320 features in all). From oracle/oci 9.8.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
 | Key | Every target | Implemented | Notes |
 | --- | --- | --- | --- |
+| `oci_announcements_service_announcement_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_announcements_service_announcement_subscriptions_actions_change_compartment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_announcements_service_announcement_subscriptions_filter_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apiaccesscontrol_privileged_api_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apiaccesscontrol_privileged_api_request` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_apm_domain` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_config_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_config_data_file` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_synthetics_dedicated_vantage_point` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_synthetics_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_synthetics_on_premise_vantage_point` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_synthetics_on_premise_vantage_point_worker` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_synthetics_script` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_apm_traces_scheduled_query` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_audit_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_autoscaling_auto_scaling_configuration` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_budget_alert_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_budget_budget` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_budget_cost_alert_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_budget_cost_anomaly_event` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_budget_cost_anomaly_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_budget_cost_anomaly_monitor_costanomalymonitorenabletoggles_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_capacity_management_internal_occm_demand_signal` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_capacity_management_internal_occm_demand_signal_delivery` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_capacity_management_occ_availability_catalog` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_capacity_management_occ_capacity_request` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_capacity_management_occ_customer_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_capacity_management_occ_customer_group_occ_customer` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_capacity_management_occm_demand_signal` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_capacity_management_occm_demand_signal_item` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_cloud_bridge_agent` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_bridge_agent_dependency` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_bridge_agent_plugin` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_bridge_asset` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_bridge_asset_source` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_bridge_discovery_schedule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_bridge_environment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_bridge_inventory` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_adhoc_query` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_cloud_guard_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_data_mask_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_data_source` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_detector_recipe` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_managed_list` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_responder_recipe` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_saved_query` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_security_recipe` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_security_zone` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_target` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_guard_wlp_agent` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_migrations_migration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_migrations_migration_asset` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_migrations_migration_plan` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_migrations_replication_schedule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cloud_migrations_target_asset` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_cluster_placement_groups_cluster_placement_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_compute_cloud_at_customer_ccc_infrastructure` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_compute_cloud_at_customer_ccc_upgrade_schedule` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_app_catalog_listing_resource_version_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_core_app_catalog_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_core_boot_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_boot_volume_backup` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_core_cluster_network` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_capacity_report` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_capacity_reservation` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_capacity_topology` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_cluster` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_gpu_memory_cluster` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_gpu_memory_fabric` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_host` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_host_group` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_compute_image_capability_schema` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
+| `oci_core_dedicated_vm_host` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_default_dhcp_options` | n/a | No | The account's default network: Isoloom builds its own |
+| `oci_core_default_drg_route_table` | n/a | No | The account's default network: Isoloom builds its own |
+| `oci_core_default_route_table` | n/a | No | The account's default network: Isoloom builds its own |
+| `oci_core_default_security_list` | n/a | No | The account's default network: Isoloom builds its own |
+| `oci_core_dhcp_options` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_image` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
 | `oci_core_instance` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_core_instance_configuration` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_instance_maintenance_event` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_instance_pool` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_core_instance_pool_instance` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `oci_core_internet_gateway` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_network_security_group` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_network_security_group_security_rule` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_public_ip` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `oci_core_ipv6` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_listing_resource_version_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_core_nat_gateway` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_network_security_group` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_network_security_group_security_rule` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_private_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_public_ip` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `oci_core_route_table` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_core_route_table_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
 | `oci_core_security_list` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_core_shape_management` | Yes | Not yet | Custom cloud images: a machine's own image, as on the local targets |
 | `oci_core_subnet` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
 | `oci_core_vcn` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
-| `oci_core_vnic_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_volume` | Yes | Not yet | With the cloud generator (one VM per machine) |
-| `oci_core_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine) |
+| `oci_core_vlan` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_vnic_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_volume` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_volume_attachment` | Yes | Not yet | With the cloud generator (one VM per machine on its own networks) |
+| `oci_core_volume_backup` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_core_volume_backup_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_core_volume_backup_policy_assignment` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_core_volume_group` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_core_volume_group_backup` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_costad_cost_alert_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_costad_cost_anomaly_event` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_costad_cost_anomaly_monitor` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_costad_cost_anomaly_monitor_costanomalymonitorenabletoggles_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_delegate_access_control_delegation_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_delegate_access_control_delegation_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_demand_signal_occ_demand_signal` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_demand_signal_occ_metric_alarm` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_disaster_recovery_automatic_dr_configuration` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_disaster_recovery_dr_plan` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_disaster_recovery_dr_plan_execution` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_disaster_recovery_dr_protection_group` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_dns_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `oci_dns_resolver` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `oci_dns_resolver_endpoint` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `oci_dns_rrset` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `oci_dns_view` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `oci_dns_zone` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `oci_events_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_api_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_auth_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_authentication_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_compartment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_customer_secret_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_data_plane_generate_scoped_access_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_db_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domain` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domain_replication_to_region` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_account_recovery_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_api_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_app` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_app_role` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_approval_workflow` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_approval_workflow_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_approval_workflow_step` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_auth_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_authentication_factor_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_cloud_gate` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_cloud_gate_mapping` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_cloud_gate_server` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_condition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_customer_secret_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_dynamic_resource_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_grant` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_identity_proofing_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_identity_proofing_provider_template` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_identity_propagation_trust` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_identity_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_identity_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_kmsi_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_mapped_attribute` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_my_api_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_my_auth_token` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_my_customer_secret_key` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_my_oauth2client_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_my_request` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_my_smtp_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_my_support_account` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_my_user_db_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_network_perimeter` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_notification_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_oauth2client_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_oauth_client_certificate` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_oauth_partner_certificate` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_password_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_security_question` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_security_question_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_self_registration_profile` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_setting` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_smtp_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_social_identity_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_domains_user_db_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_dynamic_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_identity_provider` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_idp_group_mapping` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_import_standard_tags_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_network_source` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_smtp_credential` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_tag` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_tag_default` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_tag_namespace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_ui_password` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_user_capabilities_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_identity_user_group_membership` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_license_manager_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_license_manager_license_record` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_license_manager_product_license` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_limits_quota` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_entity` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_entity_associations_add` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_entity_associations_remove` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_entity_type` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_import_custom_content` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_log_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_object_collection_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_preferences_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_resource_categories_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_log_analytics_unprocessed_data_bucket_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_ingest_time_rule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_ingest_time_rules_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_lookup` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_lookups_append_data_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_lookups_update_data_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_scheduled_task` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_storage_archival_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_log_analytics_namespace_storage_enable_disable_archiving` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_logging_log` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_logging_log_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_logging_log_saved_search` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_logging_unified_agent_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_management_dashboard_management_dashboards_import` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_management_dashboard_management_saved_search` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_marketplace_accepted_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_marketplace_listing_package_agreement` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_marketplace_marketplace_external_attested_metadata` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_marketplace_publication` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_metering_computation_custom_table` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_metering_computation_query` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_metering_computation_schedule` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_metering_computation_usage` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_metering_computation_usage_carbon_emission` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_metering_computation_usage_carbon_emissions_query` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_metering_computation_usage_statement_email_recipients_group` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_monitoring_alarm` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_monitoring_alarm_suppression` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_ons_notification_topic` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_ons_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_operator_access_control_operator_control` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_operator_access_control_operator_control_assignment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_optimizer_enrollment_status` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_optimizer_profile` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_optimizer_recommendation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_optimizer_resource_action` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_recovery_protected_database` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_recovery_protection_policy` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_recovery_recovery_service_subnet` | n/a | No | Backs up, copies or restores disks: no change in how the environment behaves |
+| `oci_resource_analytics_monitored_region` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_resource_analytics_resource_analytics_instance` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_resource_analytics_resource_analytics_instance_oac_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_resource_analytics_tenancy_attachment` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_resource_scheduler_schedule` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `oci_sch_service_connector` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_security_attribute_security_attribute` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_security_attribute_security_attribute_namespace` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_self_subscription` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_service_catalog_private_application` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_service_catalog_service_catalog` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_service_catalog_service_catalog_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_baselineable_metric` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_config` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_discovery_job` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_maintenance_window` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_maintenance_windows_retry_failed_operation` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_maintenance_windows_stop` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_metric_extension` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_metric_extension_metric_extension_on_given_resources_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_metric_extensions_test_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitored_resource` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitored_resource_task` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitored_resource_type` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitored_resources_associate_monitored_resource` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitored_resources_list_member` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitored_resources_search` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitored_resources_search_association` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitoring_template` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitoring_template_alarm_condition` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_monitoring_template_monitoring_template_on_given_resources_management` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_stack_monitoring_process_set` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_tenantmanagercontrolplane_subscription_mapping` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_usage_proxy_subscription_redeemable_user` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_zpr_configuration` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
+| `oci_zpr_zpr_policy` | n/a | No | Administers the cloud account (identities, policies, billing, quotas, auditing, monitoring): no change in how the environment behaves |
 
-And 1007 other resource types: this cloud's managed services (databases, storage, functions...). Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+### Data sources
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `oci_core_images` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+| `oci_identity_availability_domains` | Yes | Yes | Written by the cloud-vm target, a VM per machine, or the cloud-docker target, one VM running the Compose file |
+
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `auth` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `config_file_profile` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `disable_auto_retries` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `dual_stack_endpoint_enabled` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `fingerprint` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `ignore_defined_tags` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `private_key` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `private_key_password` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `private_key_path` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `realm_specific_service_endpoint_template_enabled` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `region` | Yes | Yes | Written by the generator |
+| `retries_config_file` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `retry_duration_seconds` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `tenancy_ocid` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `test_time_maintenance_reboot_due` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_auth` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_client_id` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_client_secret` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_domain_url` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_public_key` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_requested_token_type` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_resource_type` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_rpst_exp` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `token_exchange_subject_token_type` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `user_ocid` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `workload_identity_token_path` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+
+### oci_core_instance
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `async` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `availability_domain` | Yes | Yes | Written by the generator |
+| `capacity_reservation_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `cluster_placement_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `compute_cluster_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `dedicated_vm_host_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `display_name` | Yes | Yes | Written by the generator |
+| `extended_metadata` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `fault_domain` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `hostname_label` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `image` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `instance_configuration_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `ipxe_script` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `is_ai_enterprise_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `is_pv_encryption_in_transit_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `metadata` | Yes | Yes | Written by the generator |
+| `preserve_boot_volume` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `preserve_data_volumes_created_at_launch` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `security_attributes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `shape` | Yes | Yes | Written by the generator |
+| `state` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `subnet_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `update_operation_constraint` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `agent_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `agent_config.are_all_plugins_disabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `agent_config.is_management_disabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `agent_config.is_monitoring_disabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `agent_config.plugins_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `agent_config.plugins_config.desired_state` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `agent_config.plugins_config.name` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `availability_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `availability_config.is_live_migration_preferred` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `availability_config.recovery_action` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `create_vnic_details` | Yes | Yes | Written by the generator |
+| `create_vnic_details.assign_ipv6ip` | Yes | Not yet | With IPv6 networks |
+| `create_vnic_details.assign_private_dns_record` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `create_vnic_details.assign_public_ip` | Yes | Yes | Written by the generator |
+| `create_vnic_details.defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `create_vnic_details.display_name` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `create_vnic_details.freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `create_vnic_details.hostname_label` | Yes | Yes | Written by the generator |
+| `create_vnic_details.nsg_ids` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.private_ip` | Yes | Yes | Written by the generator |
+| `create_vnic_details.private_ip_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.security_attributes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `create_vnic_details.skip_source_dest_check` | Yes | Not yet | With `networks.*.gateway`: a network routed through one of its machines |
+| `create_vnic_details.subnet_cidr` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `create_vnic_details.subnet_id` | Yes | Yes | Written by the generator |
+| `create_vnic_details.vlan_id` | Yes | Not yet | With VLANs and trunks (`networks.*.vlans`) |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details` | Yes | Not yet | With IPv6 networks |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6address` | Yes | Not yet | With IPv6 networks |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6id` | Yes | Not yet | With IPv6 networks |
+| `create_vnic_details.ipv6address_ipv6subnet_cidr_pair_details.ipv6subnet_cidr` | Yes | Not yet | With IPv6 networks |
+| `instance_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `instance_options.are_legacy_imds_endpoints_disabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_options` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_options.boot_volume_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_options.firmware` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_options.is_consistent_volume_naming_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_options.is_pv_encryption_in_transit_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_options.network_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_options.remote_data_volume_type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `launch_volume_attachments` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.device` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.display_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.encryption_in_transit_type` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.is_agent_auto_iscsi_login_enabled` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.is_pv_encryption_in_transit_enabled` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.is_read_only` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.is_shareable` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.type` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.use_chap` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.volume_id` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.launch_create_volume_details` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.launch_create_volume_details.compartment_id` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.launch_create_volume_details.display_name` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.launch_create_volume_details.kms_key_id` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.launch_create_volume_details.size_in_gbs` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.launch_create_volume_details.volume_creation_type` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `launch_volume_attachments.launch_create_volume_details.vpus_per_gb` | Yes | Not yet | With data disks: persistent volumes on VMs |
+| `licensing_configs` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `licensing_configs.license_type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `licensing_configs.type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_constraint_details` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_constraint_details.compute_bare_metal_host_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_constraint_details.compute_host_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `placement_constraint_details.type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `platform_config` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.are_virtual_instructions_enabled` | Yes | Not yet | With nested virtualization |
+| `platform_config.config_map` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.is_access_control_service_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.is_input_output_memory_management_unit_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.is_measured_boot_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `platform_config.is_memory_encryption_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.is_secure_boot_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `platform_config.is_symmetric_multi_threading_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.is_trusted_platform_module_enabled` | Yes | Not yet | With Windows 11's TPM and secure boot |
+| `platform_config.numa_nodes_per_socket` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.percentage_of_cores_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `platform_config.type` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `preemptible_instance_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `preemptible_instance_config.preemption_action` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `preemptible_instance_config.preemption_action.preserve_boot_volume` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `preemptible_instance_config.preemption_action.type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
+| `shape_config` | Yes | Yes | Written by the generator |
+| `shape_config.baseline_ocpu_utilization` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `shape_config.local_volume_size_in_gbs` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `shape_config.memory_in_gbs` | Yes | Yes | Written by the generator |
+| `shape_config.nvmes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `shape_config.ocpus` | Yes | Yes | Written by the generator |
+| `shape_config.resource_management` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `shape_config.vcpus` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_details` | Yes | Yes | Written by the generator |
+| `source_details.boot_volume_size_in_gbs` | Yes | Yes | Written by the generator |
+| `source_details.boot_volume_vpus_per_gb` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `source_details.is_preserve_boot_volume_enabled` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `source_details.kms_key_id` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `source_details.source_id` | Yes | Yes | Written by the generator |
+| `source_details.source_type` | Yes | Yes | Written by the generator |
+| `source_details.instance_source_image_filter_details` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_details.instance_source_image_filter_details.compartment_id` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_details.instance_source_image_filter_details.defined_tags_filter` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_details.instance_source_image_filter_details.operating_system` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `source_details.instance_source_image_filter_details.operating_system_version` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_core_internet_gateway
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `display_name` | Yes | Yes | Written by the generator |
+| `enabled` | n/a | No | How Terraform creates, updates or deletes it (protection, waits, forced deletes): no change in behavior |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `route_table_id` | No | No | One of this cloud's network services (VPN and interconnect gateways, peering, private endpoints, load balancers, CDN): no other VM target has it |
+| `vcn_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_core_route_table
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `display_name` | Yes | Yes | Written by the generator |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `vcn_id` | Yes | Yes | Written by the generator |
+| `route_rules` | Yes | Yes | Written by the generator |
+| `route_rules.cidr_block` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `route_rules.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `route_rules.destination` | Yes | Yes | Written by the generator |
+| `route_rules.destination_type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `route_rules.network_entity_id` | Yes | Yes | Written by the generator |
+| `route_rules.route_type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_core_security_list
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `display_name` | Yes | Yes | Written by the generator |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `vcn_id` | Yes | Yes | Written by the generator |
+| `egress_security_rules` | Yes | Yes | Written by the generator |
+| `egress_security_rules.description` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `egress_security_rules.destination` | Yes | Yes | Written by the generator |
+| `egress_security_rules.destination_type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `egress_security_rules.protocol` | Yes | Yes | Written by the generator |
+| `egress_security_rules.stateless` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `egress_security_rules.icmp_options` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.icmp_options.code` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.icmp_options.type` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.tcp_options` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.tcp_options.max` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.tcp_options.min` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.tcp_options.source_port_range` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.tcp_options.source_port_range.max` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.tcp_options.source_port_range.min` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.udp_options` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.udp_options.max` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.udp_options.min` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.udp_options.source_port_range` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.udp_options.source_port_range.max` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `egress_security_rules.udp_options.source_port_range.min` | Yes | Not yet | Outbound rules: reach enforced on traffic leaving a machine too |
+| `ingress_security_rules` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.description` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.protocol` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.source` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.source_type` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `ingress_security_rules.stateless` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `ingress_security_rules.icmp_options` | Yes | Not yet | ICMP in reach rules |
+| `ingress_security_rules.icmp_options.code` | Yes | Not yet | ICMP in reach rules |
+| `ingress_security_rules.icmp_options.type` | Yes | Not yet | ICMP in reach rules |
+| `ingress_security_rules.tcp_options` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.tcp_options.max` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.tcp_options.min` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.tcp_options.source_port_range` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `ingress_security_rules.tcp_options.source_port_range.max` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `ingress_security_rules.tcp_options.source_port_range.min` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `ingress_security_rules.udp_options` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.udp_options.max` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.udp_options.min` | Yes | Yes | Written by the generator |
+| `ingress_security_rules.udp_options.source_port_range` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `ingress_security_rules.udp_options.source_port_range.max` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `ingress_security_rules.udp_options.source_port_range.min` | n/a | No | A source port filter: reach rules name destination ports, from any source port |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_core_subnet
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `availability_domain` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `cidr_block` | Yes | Yes | Written by the generator |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `dhcp_options_id` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `display_name` | Yes | Yes | Written by the generator |
+| `dns_label` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `ipv4cidr_blocks` | Yes | Not yet | With several addresses on one network |
+| `ipv6cidr_block` | Yes | Not yet | With IPv6 networks |
+| `ipv6cidr_blocks` | Yes | Not yet | With IPv6 networks |
+| `prohibit_internet_ingress` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `prohibit_public_ip_on_vnic` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `route_table_id` | Yes | Yes | Written by the generator |
+| `security_list_ids` | Yes | Yes | Written by the generator |
+| `vcn_id` | Yes | Yes | Written by the generator |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### oci_core_vcn
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `cidr_block` | Yes | Yes | Written by the generator |
+| `cidr_blocks` | Yes | Yes | Written by the generator |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `defined_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `display_name` | Yes | Yes | Written by the generator |
+| `dns_label` | Yes | Not yet | Private DNS: the environment's names (machines and `aliases`) served by the platform's own DNS |
+| `freeform_tags` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `ipv6private_cidr_blocks` | Yes | Not yet | With IPv6 networks |
+| `is_ipv6enabled` | Yes | Not yet | With IPv6 networks |
+| `is_oracle_gua_allocation_enabled` | Yes | Not yet | With IPv6 networks |
+| `security_attributes` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
+| `byoipv6cidr_details` | Yes | Not yet | With IPv6 networks |
+| `byoipv6cidr_details.byoipv6range_id` | Yes | Not yet | With IPv6 networks |
+| `byoipv6cidr_details.ipv6cidr_block` | Yes | Not yet | With IPv6 networks |
+| `timeouts` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.create` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.delete` | n/a | No | How long Terraform waits: no change in behavior |
+| `timeouts.update` | n/a | No | How long Terraform waits: no change in behavior |
+
+### data.oci_core_images
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `display_name` | n/a | No | Names, labels and descriptions in the account: no change in behavior |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `operating_system` | Yes | Yes | Written by the generator |
+| `operating_system_version` | Yes | Yes | Written by the generator |
+| `shape` | Yes | Yes | Written by the generator |
+| `sort_by` | Yes | Yes | Written by the generator |
+| `sort_order` | Yes | Yes | Written by the generator |
+| `state` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter.name` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter.regex` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+| `filter.values` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+
+### data.oci_identity_availability_domains
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `compartment_id` | Yes | Yes | Written by the generator |
+| `id` | n/a | No | The identifier the provider sets: no change in behavior |
+| `filter` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `filter.name` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `filter.regex` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+| `filter.values` | n/a | No | Where in the account or region the resource lives: no change in behavior |
+
+And 732 other resource types that only this cloud has: its managed services, network services and public DNS. Not portable: no other VM target has them. `isoloom coverage --all` lists them.
+
+## Terraform: utility providers
+
+100% of 16 portable features (16 done, 0 partly, 0 to do; 225 features in all). From Terraform's built-in provider, hashicorp/random 3.9.1, hashicorp/tls 4.4.1, hashicorp/local 2.9.1, hashicorp/time 0.14.2, hashicorp/null 3.3.2, hashicorp/cloudinit 2.4.1 and hashicorp/http 3.6.2 (their whole schemas).
+
+### Resource types
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `terraform_data` | Yes | Yes | Written by the generators: the environment's key and passwords, the project's file list, Windows restarts, and the steps run on each machine |
+| `random_bytes` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `random_id` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `random_integer` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `random_password` | Yes | Yes | Written by the generators: the environment's key and passwords, the project's file list, Windows restarts, and the steps run on each machine |
+| `random_pet` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `random_shuffle` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `random_string` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `random_uuid` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `random_uuid4` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `random_uuid7` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `tls_cert_request` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `tls_locally_signed_cert` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `tls_private_key` | Yes | Yes | Written by the generators: the environment's key and passwords, the project's file list, Windows restarts, and the steps run on each machine |
+| `tls_self_signed_cert` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `local_file` | Yes | Yes | Written by the generators: the environment's key and passwords, the project's file list, Windows restarts, and the steps run on each machine |
+| `local_sensitive_file` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `time_offset` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `time_rotating` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `time_sleep` | Yes | Yes | Written by the generators: the environment's key and passwords, the project's file list, Windows restarts, and the steps run on each machine |
+| `time_static` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `null_resource` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `cloudinit_config` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### Data sources
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `terraform_remote_state` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `tls_certificate` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `tls_public_key` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `local_command` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `local_file` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `local_sensitive_file` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `null_data_source` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `cloudinit_config` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `http` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### Settings
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `proxy` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `proxy.from_env` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `proxy.password` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `proxy.url` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+| `proxy.username` | n/a | No | How Terraform reaches and authenticates to the API: no change in behavior |
+
+### terraform_data
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `input` | Yes | Yes | Written by the generator |
+| `triggers_replace` | Yes | Yes | Written by the generator |
+| `store` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `store.input` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `store.replace` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `store.sensitive` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `store.version` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.terraform_remote_state
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `backend` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `config` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `defaults` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `workspace` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_bytes
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `length` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_id
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `byte_length` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `prefix` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_integer
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `max` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `min` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `seed` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_password
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `length` | Yes | Yes | Written by the generator |
+| `lower` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `min_lower` | Yes | Yes | Written by the generator |
+| `min_numeric` | Yes | Yes | Written by the generator |
+| `min_special` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `min_upper` | Yes | Yes | Written by the generator |
+| `number` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `numeric` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `override_special` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `special` | Yes | Yes | Written by the generator |
+| `upper` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_pet
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `length` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `prefix` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `separator` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_shuffle
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `input` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `result_count` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `seed` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_string
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `length` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `lower` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `min_lower` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `min_numeric` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `min_special` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `min_upper` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `number` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `numeric` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `override_special` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `special` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `upper` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_uuid
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_uuid4
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### random_uuid7
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `keepers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### tls_cert_request
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `dns_names` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `ip_addresses` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `private_key_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `private_key_pem_wo` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `private_key_pem_wo_version` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `uris` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.common_name` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.country` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.email_address` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.locality` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.organization` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.organizational_unit` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.postal_code` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.province` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.serial_number` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.street_address` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### tls_locally_signed_cert
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allowed_uses` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `ca_cert_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `ca_private_key_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `ca_private_key_pem_wo` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `ca_private_key_pem_wo_version` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `cert_request_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `early_renewal_hours` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `is_ca_certificate` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `max_path_length` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `set_subject_key_id` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `validity_period_hours` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### tls_private_key
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `algorithm` | Yes | Yes | Written by the generator |
+| `ecdsa_curve` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `rsa_bits` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### tls_self_signed_cert
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allowed_uses` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `dns_names` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `early_renewal_hours` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `ip_addresses` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `is_ca_certificate` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `max_path_length` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `private_key_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `private_key_pem_wo` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `private_key_pem_wo_version` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `set_authority_key_id` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `set_subject_key_id` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `uris` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `validity_period_hours` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.common_name` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.country` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.email_address` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.locality` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.organization` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.organizational_unit` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.postal_code` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.province` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.serial_number` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `subject.street_address` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.tls_certificate
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `content` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `url` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `verify_chain` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.tls_public_key
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `private_key_openssh` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `private_key_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### local_file
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `content` | Yes | Yes | Written by the generator |
+| `content_base64` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `directory_permission` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `file_permission` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `filename` | Yes | Yes | Written by the generator |
+| `sensitive_content` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `source` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### local_sensitive_file
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `content` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `content_base64` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `directory_permission` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `file_permission` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `filename` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `source` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.local_command
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `allow_non_zero_exit_code` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `arguments` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `command` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `stdin` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `working_directory` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.local_file
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `filename` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.local_sensitive_file
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `filename` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### time_offset
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `base_rfc3339` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `offset_days` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `offset_hours` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `offset_minutes` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `offset_months` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `offset_seconds` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `offset_years` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `triggers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### time_rotating
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `rfc3339` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `rotation_days` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `rotation_hours` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `rotation_minutes` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `rotation_months` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `rotation_rfc3339` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `rotation_years` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `triggers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### time_sleep
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `create_duration` | Yes | Yes | Written by the generator |
+| `destroy_duration` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `triggers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### time_static
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `rfc3339` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `triggers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### null_resource
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `triggers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.null_data_source
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `has_computed_default` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `inputs` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### cloudinit_config
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `base64_encode` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `boundary` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `gzip` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part.content` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part.content_type` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part.filename` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part.merge_type` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.cloudinit_config
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `base64_encode` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `boundary` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `gzip` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part.content` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part.content_type` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part.filename` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `part.merge_type` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+
+### data.http
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `ca_cert_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `client_cert_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `client_key_pem` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `insecure` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `method` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `request_body` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `request_headers` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `request_timeout_ms` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `url` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `retry` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `retry.attempts` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `retry.max_delay_ms` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
+| `retry.min_delay_ms` | n/a | No | A value, file or wait on Terraform's side: no change in how the environment behaves |
 
 ## cloud-init
 

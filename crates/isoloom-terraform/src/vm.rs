@@ -41,6 +41,7 @@ pub mod limits;
 pub mod linux;
 pub mod module;
 pub mod provisioner;
+pub mod versions;
 pub mod windows;
 
 #[cfg(test)]

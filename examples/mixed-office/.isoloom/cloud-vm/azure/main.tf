@@ -8,8 +8,9 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    azurerm = { source = "hashicorp/azurerm", version = "~> 5.0" }
-    random  = { source = "hashicorp/random", version = "~> 3.0" }
+    azurerm = { source = "hashicorp/azurerm", version = "~> 5.8.0" }
+    local   = { source = "hashicorp/local", version = "~> 2.9.1" }
+    random  = { source = "hashicorp/random", version = "~> 3.9.1" }
   }
 }
 

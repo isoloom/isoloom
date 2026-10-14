@@ -8,7 +8,8 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    linode = { source = "linode/linode", version = "~> 4.0" }
+    linode = { source = "linode/linode", version = "~> 4.7.0" }
+    local  = { source = "hashicorp/local", version = "~> 2.9.1" }
   }
 }
 

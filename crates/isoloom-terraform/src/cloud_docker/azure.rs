@@ -8,11 +8,12 @@ use isoloom_spec::model::Protocol;
 use super::host::{self, Reach, Sizing, port_strings, published};
 use crate::vm::cloud;
 use crate::vm::module::{Variable, terraform};
+use crate::vm::versions;
 
 /// The module, from the plan.
 pub fn module(env: &Environment) -> Module {
     let mut m = Module::new(host::preamble(super::DIR, "azure", "-var allowed_cidr=<your IP>/32 "));
-    m.block(terraform(&[("azurerm", "hashicorp/azurerm", "~> 5.0")]));
+    m.block(terraform(&[versions::AZURERM, versions::LOCAL]));
     let size = Sizing::of(env).pick(["Standard_D2als_v6", "Standard_D2as_v6", "Standard_D4as_v6"]);
     m.blocks([
         Variable::new("subscription_id", "string")
