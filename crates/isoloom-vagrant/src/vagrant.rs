@@ -225,6 +225,3 @@ pub fn qemu_refusal(spec: &Spec) -> Option<String> {
     let with_controller = env.controller.is_some() || !checks.controller.is_empty();
     qemu::refusal(qemu::links(&env, with_controller))
 }
-
-#[cfg(test)]
-mod tests;

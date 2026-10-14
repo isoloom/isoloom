@@ -546,8 +546,11 @@ Vagrant.configure("2") do |config|
       set -e
       mkdir -p /tmp/isoloom-facts
       export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200
-      _isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'
+      mkdir -p /tmp/isoloom-retry
+      export ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry
       _isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
+      _isoloom_attempts=4
+      _isoloom_transient='send_input failed|the pipe has been ended|winrmtransporterror|winrmoperationtimeouterror|read timeout|bad http response returned from server|(kerberos|ntlm|credssp).*500|remote end closed connection|connection reset by peer|connection refused|connection aborted|broken pipe|timed out|failed to connect to the host via ssh|shared connection to .* closed'
       retry_download() {
         _isoloom_n=1
         until "$@"; do
@@ -557,26 +560,87 @@ Vagrant.configure("2") do |config|
           _isoloom_n=$((_isoloom_n + 1))
         done
       }
+      play_hosts() {
+        awk -v transient="$_isoloom_transient" '
+          function commit() {
+            if (pending != "") { if (pending_real) real[pending] = 1; else cut[pending] = 1 }
+            pending = ""
+          }
+          { gsub(/\033\[[0-9;]*m/, "") }
+          /^\.\.\.ignoring/ { pending = ""; next }
+          { commit() }
+          /^(fatal|failed): \[/ && !/UNREACHABLE!/ {
+            pending = $0
+            sub(/^(fatal|failed): \[/, "", pending)
+            sub(/\].*/, "", pending)
+            sub(/ -> .*/, "", pending)
+            pending_real = (tolower($0) !~ transient)
+            next
+          }
+          /^PLAY RECAP/ { recap = 1; next }
+          recap && / : ok=/ {
+            for (i = 2; i <= NF; i++) {
+              split($i, kv, "=")
+              if (kv[1] == "failed" && kv[2] > 0) failed[$1] = 1
+              if (kv[1] == "unreachable" && kv[2] > 0) unreachable[$1] = 1
+            }
+          }
+          END {
+            commit()
+            for (h in failed) print ((h in real || !(h in cut)) ? "real " : "cut ") h
+            for (h in unreachable) if (!(h in failed)) print "unreachable " h
+          }
+        ' "$1" | sort
+      }
+      _isoloom_kind() {
+        echo "$1" | awk -v k="$2" '$1 == k { printf "%s%s", s, $2; s = " " }'
+      }
       run_play() {
-        _isoloom_n=1
+        # The playbook is the last argument; Ansible names its retry file after it.
+        for _isoloom_book; do :; done
+        _isoloom_name=$(basename "$_isoloom_book")
+        _isoloom_retry=${ANSIBLE_RETRY_FILES_SAVE_PATH:-/tmp/isoloom-retry}/${_isoloom_name%.*}.retry
+        _isoloom_limit=
         _isoloom_log=$(mktemp)
         _isoloom_rcf=$(mktemp)
+        _isoloom_n=1
+        rm -f "$_isoloom_retry"
         while :; do
-          { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
+          { "$@" $_isoloom_limit && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
           _isoloom_rc=$(cat "$_isoloom_rcf")
-          if [ "$_isoloom_rc" -eq 0 ]; then
-            rm -f "$_isoloom_log" "$_isoloom_rcf"
-            return 0
+          [ "$_isoloom_rc" -ne 0 ] || break
+          _isoloom_hosts=$(play_hosts "$_isoloom_log")
+          _isoloom_real=$(_isoloom_kind "$_isoloom_hosts" real)
+          _isoloom_gone=$(_isoloom_kind "$_isoloom_hosts" unreachable)
+          _isoloom_cut=$(_isoloom_kind "$_isoloom_hosts" cut)
+          _isoloom_again=$(echo $_isoloom_gone $_isoloom_cut)
+          if [ -n "$_isoloom_real" ]; then
+            echo "isoloom: $_isoloom_name: a task failed on $_isoloom_real: not retried"
+            break
           fi
-          if [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log"; then
-            echo "isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)"
-            sleep $((2 * _isoloom_pause))
-            _isoloom_n=$((_isoloom_n + 1))
+          if [ -z "$_isoloom_again" ]; then
+            echo "isoloom: $_isoloom_name failed (exit $_isoloom_rc) with no unreachable host or dropped connection: not retried"
+            break
+          fi
+          if [ "$_isoloom_n" -ge "$_isoloom_attempts" ]; then
+            echo "isoloom: $_isoloom_name: still unreachable after $_isoloom_n runs: $_isoloom_again; giving up"
+            break
+          fi
+          printf '%s\n' $_isoloom_again > "$_isoloom_retry"
+          _isoloom_limit="--limit @$_isoloom_retry"
+          _isoloom_n=$((_isoloom_n + 1))
+          if [ -n "$_isoloom_gone" ]; then
+            _isoloom_wait=$((4 * _isoloom_pause))
+            echo "isoloom: $_isoloom_name: unreachable: $_isoloom_again; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)"
           else
-            rm -f "$_isoloom_log" "$_isoloom_rcf"
-            return "$_isoloom_rc"
+            _isoloom_wait=$((2 * _isoloom_pause))
+            echo "isoloom: $_isoloom_name: the play was cut by a dropped connection on $_isoloom_cut; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)"
           fi
+          sleep "$_isoloom_wait"
         done
+        rm -f "$_isoloom_log" "$_isoloom_rcf"
+        [ "$_isoloom_rc" -ne 0 ] || rm -f "$_isoloom_retry"
+        return "$_isoloom_rc"
       }
       cd /opt/isoloom/ansible
       retry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml

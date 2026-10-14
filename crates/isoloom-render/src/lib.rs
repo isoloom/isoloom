@@ -1,5 +1,5 @@
 //! Shared pieces every Isoloom backend renders with: addresses and names, the generated
-//! files' header, the controller's Ansible runs, HCL and shell quoting, the project copy, the
+//! files' header, the controller's playbook script, HCL and shell quoting, the project copy, the
 //! hosts' setup, the router, VLAN trunks and the image constraints.
 
 pub mod backend;
@@ -9,6 +9,7 @@ pub mod hcl_builder;
 pub mod ignore;
 pub mod inventory;
 pub mod machine_setup;
+pub mod playbooks;
 pub mod project;
 pub mod router;
 pub mod steps;
@@ -17,6 +18,9 @@ pub mod trunks;
 pub use isoloom_plan::addressing::{address, address_for, host_address, names_of, netmask, start_order};
 pub use isoloom_spec::files::GeneratedFile;
 use isoloom_spec::{model, shell, validate};
+/// The controller's script running the environment's playbooks, the same on every target (see
+/// [`playbooks`]).
+pub use playbooks::script as ansible_runs;
 use std::fmt;
 
 use crate::model::{Spec, Target};
@@ -138,88 +142,6 @@ pub fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateErr
 pub fn container_checks_unsupported(spec: &Spec) -> Option<String> {
     isoloom_plan::requirements::container_checks(spec).map(|r| r.to_string())
 }
-
-/// The controller's script running the environment's playbooks (`provision:`), in order, with
-/// the inventory at /etc/isoloom/inventory.ini plus each step's own files. Shared with the
-/// cloud output.
-///
-/// `limit`: only these machines (`isoloom provision web`); every machine when empty.
-pub fn ansible_runs(spec: &Spec, limit: &[String]) -> String {
-    let limit = if limit.is_empty() {
-        String::new()
-    } else {
-        format!(" --limit {}", shell::quote(&limit.join(",")))
-    };
-    // Performance: gather facts once and cache them (the WinRM `setup` module is slow and the
-    // environment playbooks re-run across many imported plays), fan out across hosts (default
-    // forks is 5, too few for a multi-DC range), and pipeline SSH steps (a no-op over WinRM).
-    let mut script = String::from(
-        "set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False \
-         ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
-         ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\n",
-    );
-    script.push_str(RETRIES);
-    for step in &spec.provision {
-        let dir = step.ansible.rsplit_once('/').map(|(d, _)| d).unwrap_or(".");
-        let file = step.ansible.rsplit('/').next().unwrap_or(&step.ansible);
-        let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect();
-        // As JSON: `-e k=v` splits values on spaces.
-        let vars = if step.vars.is_empty() {
-            String::new()
-        } else {
-            format!(" -e {}", shell::quote(&serde_json::to_string(&step.vars).expect("JSON values serialize")))
-        };
-        let requirements = match &step.requirements {
-            Some(r) => format!("retry_download ansible-galaxy install -r /opt/isoloom/{r}\n"),
-            None => "[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\n".into(),
-        };
-        script.push_str(&format!(
-            "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i /etc/isoloom/inventory.ini{extra}{vars}{limit} {file}\n"
-        ));
-    }
-    script
-}
-
-/// The shell helpers of [`ansible_runs`] (POSIX sh, safe under `set -e`):
-/// - `retry_download`: role downloads (Galaxy, from GitHub) fail now and then on the network;
-///   tried 5 times, with a growing pause (`ISOLOOM_RETRY_PAUSE` seconds, 15 by default).
-/// - `run_play`: a play cut by a dropped connection (WinRM's shell crashing mid-task, an SSH
-///   reset, a host briefly unreachable, often under CPU emulation) runs again, up to 4 times in
-///   all. The play is the environment's own setup, which re-runs idempotently, so it picks up
-///   where it stopped. A task that fails on its own isn't retried.
-pub const RETRIES: &str = r#"_isoloom_transient='winrm send_input failed|The pipe has been ended|Bad HTTP response returned from server|WinRMOperationTimeoutError|UNREACHABLE!|Connection reset by peer|Connection timed out|Remote end closed connection'
-_isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
-retry_download() {
-  _isoloom_n=1
-  until "$@"; do
-    [ "$_isoloom_n" -lt 5 ] || return 1
-    echo "isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)"
-    sleep $((_isoloom_n * _isoloom_pause))
-    _isoloom_n=$((_isoloom_n + 1))
-  done
-}
-run_play() {
-  _isoloom_n=1
-  _isoloom_log=$(mktemp)
-  _isoloom_rcf=$(mktemp)
-  while :; do
-    { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
-    _isoloom_rc=$(cat "$_isoloom_rcf")
-    if [ "$_isoloom_rc" -eq 0 ]; then
-      rm -f "$_isoloom_log" "$_isoloom_rcf"
-      return 0
-    fi
-    if [ "$_isoloom_n" -lt 4 ] && grep -qE "$_isoloom_transient" "$_isoloom_log"; then
-      echo "isoloom: the play was cut by a dropped connection; running it again ($((_isoloom_n + 1))/4)"
-      sleep $((2 * _isoloom_pause))
-      _isoloom_n=$((_isoloom_n + 1))
-    else
-      rm -f "$_isoloom_log" "$_isoloom_rcf"
-      return "$_isoloom_rc"
-    fi
-  done
-}
-"#;
 
 /// Unpacks the project's tar.gz on Windows (`$archive`, `$dest`, `$strip` set before it).
 pub const UNTAR_PS1: &str = include_str!("untar.ps1");

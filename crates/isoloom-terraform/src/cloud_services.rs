@@ -7,76 +7,134 @@
 //! `up.sh` (init and apply), `down.sh` (destroy) and `outputs.sh` (the outputs, as JSON). The
 //! cloud's credentials come from the environment, as Terraform expects.
 
-use super::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
-use crate::model::Spec;
-use crate::shell;
+use isoloom_plan::{Capabilities, Environment};
+use isoloom_render::backend::{self, Backend, Files, RenderError};
+use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
+use isoloom_spec::model::{CloudServices, Spec, Target};
+use isoloom_spec::shell;
 
+/// The target's folder under `.isoloom/`.
 const DIR: &str = "cloud-services";
 /// From `.isoloom/cloud-services/` back to the project folder.
 const ROOT: &str = "../..";
+/// Terraform's plugins and modules, next to the scripts.
+const INIT: &str = "terraform -chdir=\"$module\" init -input=false >&2\n";
+/// The fixed variables, then the launch-time inputs `run` wrote (when the spec takes any).
+const VAR_FILES: &str =
+    "set -- -var-file=\"$here/terraform.tfvars.json\"\n[ ! -f \"$here/inputs.tfvars.json\" ] || set -- \"$@\" -var-file=\"$here/inputs.tfvars.json\"\n";
+/// The state, next to the scripts.
+const STATE: &str = "-state=\"$here/terraform.tfstate\"";
 
-pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
-    let cloud = spec.cloud.as_ref().expect("the cloud-services target needs cloud:");
-    let module = shell::quote(&format!("{ROOT}/{}", cloud.terraform.trim_end_matches('/')));
-    // Fixed values only: a variable taking a launch-time input is written by `run`, from the
-    // environment, to inputs.tfvars.json next to the state (kept for `down`).
+/// The `cloud-services` backend.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CloudServicesBackend;
+
+impl Backend for CloudServicesBackend {
+    fn target(&self) -> Target {
+        Target::CloudServices
+    }
+
+    /// None: a spec of cloud services has no machines, so it asks for nothing a machine does
+    /// (provisioning, playbook checks...); whatever it asks for is refused.
+    fn capabilities(&self) -> Capabilities {
+        Capabilities::of([])
+    }
+
+    fn render(&self, env: &Environment) -> Result<Files, RenderError> {
+        backend::check(Target::CloudServices, env, &self.capabilities())?;
+        let spec = env.spec();
+        let cloud = spec.cloud.as_ref().ok_or(GenerateError::NotPossible(Target::CloudServices))?;
+        Ok(files(spec, cloud))
+    }
+}
+
+/// The variables and the three scripts.
+fn files(spec: &Spec, cloud: &CloudServices) -> Files {
+    let path = |f: &str| format!("{OUTPUT_DIR}/{DIR}/{f}");
+    let file = |f: &str, contents: String| GeneratedFile { path: path(f), contents };
+    let script = |what: &str, body: String| format!("{}{body}", prelude(spec, cloud, what));
+    vec![
+        file("terraform.tfvars.json", vars_json(cloud)),
+        file(
+            "up.sh",
+            script(
+                "Creates the services (`isoloom run cloud-services`).",
+                format!("{INIT}{VAR_FILES}terraform -chdir=\"$module\" apply -auto-approve -input=false {STATE} \"$@\"\n"),
+            ),
+        ),
+        file(
+            "down.sh",
+            script(
+                "Destroys them (`isoloom down cloud-services`): what they cost stops here.",
+                format!("{INIT}{VAR_FILES}terraform -chdir=\"$module\" destroy -auto-approve -input=false {STATE} \"$@\"\n"),
+            ),
+        ),
+        file(
+            "outputs.sh",
+            script(
+                "Prints the module's outputs as JSON (what `isoloom test` and the message read).",
+                format!("terraform -chdir=\"$module\" output -json {STATE}\n"),
+            ),
+        ),
+    ]
+}
+
+/// The fixed variables only: a variable taking a launch-time input is written by `run`, from
+/// the environment, to `inputs.tfvars.json` next to the state (kept for `down`).
+fn vars_json(cloud: &CloudServices) -> String {
     let vars: serde_json::Map<String, serde_json::Value> = cloud
         .vars
         .iter()
-        .filter(|(_, v)| crate::model::CloudServices::input_of(v).is_none())
+        .filter(|(_, v)| CloudServices::input_of(v).is_none())
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
-    let mut vars_json = serde_json::to_string_pretty(&serde_json::Value::Object(vars)).expect("vars serialize");
-    vars_json.push('\n');
+    // A map of JSON values always serializes; the pretty form is what a reader expects.
+    let mut text = serde_json::to_string_pretty(&serde_json::Value::Object(vars)).unwrap_or_else(|_| "{}".into());
+    text.push('\n');
+    text
+}
 
-    // Every script starts in its own folder, keeps Terraform's plugins and state there, and runs
-    // Terraform on the module (`-chdir`), whatever the caller's working directory.
-    let prelude = |what: &str| {
-        let mut s = String::from("#!/bin/sh\n");
-        s.push_str(&header("#"));
-        s.push_str(&format!("# {what}\n"));
-        s.push_str(&format!(
-            "# The services of `{}`: the Terraform module `{}`, in the user's {} account.\nset -eu\ncd \"$(dirname \"$0\")\"\nhere=\"$(pwd)\"\nexport TF_DATA_DIR=\"$here/.terraform\"\nmodule={module}\n",
-            spec.name,
-            cloud.terraform,
-            cloud.provider.id()
-        ));
-        s
-    };
-    let init = "terraform -chdir=\"$module\" init -input=false >&2\n";
-    // The fixed variables, then the launch-time inputs `run` wrote (when the spec takes any).
-    let files =
-        "set -- -var-file=\"$here/terraform.tfvars.json\"\n[ ! -f \"$here/inputs.tfvars.json\" ] || set -- \"$@\" -var-file=\"$here/inputs.tfvars.json\"\n";
-    let state = "-state=\"$here/terraform.tfstate\"";
-    let up = format!(
-        "{}{init}{files}terraform -chdir=\"$module\" apply -auto-approve -input=false {state} \"$@\"\n",
-        prelude("Creates the services (`isoloom run cloud-services`).")
-    );
-    let down = format!(
-        "{}{init}{files}terraform -chdir=\"$module\" destroy -auto-approve -input=false {state} \"$@\"\n",
-        prelude("Destroys them (`isoloom down cloud-services`): what they cost stops here.")
-    );
-    let outputs = format!(
-        "{}terraform -chdir=\"$module\" output -json {state}\n",
-        prelude("Prints the module's outputs as JSON (what `isoloom test` and the message read).")
-    );
-    let path = |f: &str| format!("{OUTPUT_DIR}/{DIR}/{f}");
-    Ok(vec![
-        GeneratedFile {
-            path: path("terraform.tfvars.json"),
-            contents: vars_json,
-        },
-        GeneratedFile {
-            path: path("up.sh"),
-            contents: up,
-        },
-        GeneratedFile {
-            path: path("down.sh"),
-            contents: down,
-        },
-        GeneratedFile {
-            path: path("outputs.sh"),
-            contents: outputs,
-        },
-    ])
+/// Every script starts in its own folder, keeps Terraform's plugins and state there, and runs
+/// Terraform on the module (`-chdir`), whatever the caller's working directory.
+fn prelude(spec: &Spec, cloud: &CloudServices, what: &str) -> String {
+    let module = shell::quote(&format!("{ROOT}/{}", cloud.terraform.trim_end_matches('/')));
+    format!(
+        "#!/bin/sh\n{}# {what}\n# The services of `{}`: the Terraform module `{}`, in the user's {} account.\nset -eu\ncd \"$(dirname \"$0\")\"\nhere=\"$(pwd)\"\nexport TF_DATA_DIR=\"$here/.terraform\"\nmodule={module}\n",
+        header("#"),
+        spec.name,
+        cloud.terraform,
+        cloud.provider.id()
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_plan::Environment;
+    use isoloom_render::backend::Backend;
+    use isoloom_spec::model::Target;
+
+    use super::CloudServicesBackend;
+
+    fn env(yaml: &str) -> Environment {
+        let spec = isoloom_spec::parse(yaml).unwrap();
+        Environment::build(&spec, Target::CloudServices, None)
+    }
+
+    #[test]
+    fn a_spec_without_cloud_is_not_possible() {
+        let e = env("version: 1\nname: x\nnetworks: {}\nmachines: {}\n");
+        let err = CloudServicesBackend.render(&e).unwrap_err();
+        assert!(err.to_string().contains("not possible"), "{err}");
+    }
+
+    #[test]
+    fn inputs_stay_out_of_the_fixed_variables() {
+        let e = env(
+            "version: 1\nname: x\ninputs: [TOKEN]\ncloud:\n  provider: aws\n  terraform: tf/\n  vars: { region: eu-west-3, token: \"{{ inputs.TOKEN }}\" }\n",
+        );
+        let files = CloudServicesBackend.render(&e).unwrap();
+        assert_eq!(files[0].contents, "{\n  \"region\": \"eu-west-3\"\n}\n");
+        assert!(files[1].contents.contains("module='../../tf'\n"), "{}", files[1].contents);
+        assert!(CloudServicesBackend.refusal(&e).is_none());
+    }
 }

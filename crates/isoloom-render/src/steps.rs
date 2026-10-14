@@ -19,6 +19,9 @@ pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
 pub const INPUTS_FILE: &str = "/tmp/isoloom-inputs.env";
 /// Where the inputs are kept when a reboot comes (`/tmp` is emptied at boot).
 pub const KEPT_INPUTS_FILE: &str = "/var/lib/isoloom/inputs.env";
+/// Installs Docker from Docker's own script, unless it is there (a root script): the Docker
+/// hosts of `docker-vm` and `cloud-docker`.
+pub const INSTALL_DOCKER: &str = "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh";
 /// Seconds a machine waits for one it depends on.
 pub const WAIT_TIMEOUT: u32 = 900;
 

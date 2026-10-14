@@ -19,7 +19,7 @@
 
 mod controller;
 mod machine;
-mod module;
+pub(crate) mod module;
 mod outputs;
 mod router;
 

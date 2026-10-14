@@ -128,6 +128,11 @@ fn every_linux_vm_runs_the_preamble_first() {
         let tf = file(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"));
         assert_eq!(tf.matches("sudo sh -c 'set -e").count(), 1, "the Docker host on {cloud}");
     }
+    // On Proxmox, before cloud-init installs the guest agent (through the proxy), then again
+    // over SSH before Docker.
+    let pve_docker = file(&spec, Target::DockerVm, "docker-vm/proxmox/main.tf");
+    assert!(pve_docker.contains("bootcmd = [\n        \"sh -c 'set -e\\n# The proxy"), "{pve_docker}");
+    assert_eq!(pve_docker.matches("sudo sh -c 'set -e").count(), 1, "{pve_docker}");
     let docker_vm = file(&spec, Target::DockerVm, "docker-vm/Vagrantfile");
     let first = docker_vm.lines().find(|l| l.contains("config.vm.provision")).unwrap();
     assert!(first.contains("name: \"constraints\""), "{first}");

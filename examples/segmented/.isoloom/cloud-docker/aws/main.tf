@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
+    aws = { source = "hashicorp/aws", version = "~> 6.0" }
   }
 }
 
@@ -19,25 +16,30 @@ variable "region" {
   type    = string
   default = "eu-west-3"
 }
-variable "allowed_cidr" {
-  type        = string
-  description = "Who may reach the VM (SSH and the published ports), e.g. your IP/32"
-}
-variable "ssh_public_key" {
-  type = string
-}
-variable "ssh_private_key_file" {
-  type        = string
-  description = "The private key of ssh_public_key: Terraform copies the project over SSH"
-}
+
 variable "instance_type" {
   type    = string
   default = "c7i-flex.large"
 }
+
+variable "allowed_cidr" {
+  type        = string
+  description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
+}
+
+variable "ssh_public_key" {
+  type = string
+}
+
+variable "ssh_private_key_file" {
+  type        = string
+  description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
+}
+
 variable "auto_stop_minutes" {
   type        = number
   default     = 0
-  description = "Shut the VM down (and terminate it) after this long; 0 = never"
+  description = "Shut the machines down after this many minutes (0: never)"
 }
 
 variable "expires_at" {
@@ -49,15 +51,10 @@ variable "expires_at" {
 provider "aws" {
   region = var.region
   default_tags {
-    tags = {
-      "isoloom:environment" = "segmented"
-      "managed-by"          = "isoloom"
-      "isoloom-expires-at"  = var.expires_at
-    }
+    tags = { "isoloom:environment" = "segmented", managed-by = "isoloom", isoloom-expires-at = var.expires_at }
   }
 }
 
-# A suffix, so two copies of the environment in one account don't collide.
 resource "terraform_data" "id" {
   input = substr(replace(uuid(), "-", ""), 0, 8)
   lifecycle {
@@ -168,24 +165,21 @@ resource "terraform_data" "environment" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = ["cloud-init status --wait >/dev/null 2>&1 || true", "sudo mkdir -p /opt/isoloom && sudo chown admin /opt/isoloom"]
-  }
-  # The project as an archive: a plain copy drops the executable bits (entrypoint scripts).
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
+    command = "tar -czf \"${path.module}/.isoloom-project-environment.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
-    source      = "${path.module}/.isoloom-project.tgz"
+    source      = "${path.module}/.isoloom-project-environment.tgz"
     destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "remote-exec" {
     inline = [
       "set -e",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
       "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -193,9 +187,11 @@ resource "terraform_data" "environment" {
 output "ip" {
   value = aws_instance.env.public_ip
 }
+
 output "ssh_user" {
   value = "admin"
 }
+
 output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }

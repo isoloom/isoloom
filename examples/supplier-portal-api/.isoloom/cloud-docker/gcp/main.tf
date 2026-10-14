@@ -8,10 +8,7 @@ terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 8.0"
-    }
+    google = { source = "hashicorp/google", version = "~> 8.0" }
   }
 }
 
@@ -20,22 +17,59 @@ variable "project" {
   default     = ""
   description = "An existing project; or leave empty and give billing_account for a project of its own"
 }
+
 variable "billing_account" {
   type        = string
   default     = ""
   description = "With no project: create one for this environment, billed here, deleted with it"
 }
+
 variable "org_id" {
   type    = string
   default = ""
 }
+
 variable "region" {
   type    = string
   default = "europe-west9"
 }
+
 variable "machine_type" {
   type    = string
   default = "e2-medium"
+}
+
+variable "allowed_cidr" {
+  type        = string
+  description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
+}
+
+variable "ssh_public_key" {
+  type = string
+}
+
+variable "ssh_private_key_file" {
+  type        = string
+  description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
+}
+
+variable "auto_stop_minutes" {
+  type        = number
+  default     = 0
+  description = "Shut the machines down after this many minutes (0: never)"
+}
+
+variable "expires_at" {
+  type        = string
+  default     = ""
+  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+}
+
+variable "inputs" {
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+  description = "Values given at launch"
 }
 
 provider "google" {
@@ -94,7 +128,7 @@ resource "google_compute_firewall" "env" {
   source_ranges = [var.allowed_cidr]
   allow {
     protocol = "tcp"
-    ports    = concat(["22"], ["3206"])
+    ports    = ["22", "3206"]
   }
 }
 
@@ -103,7 +137,12 @@ resource "google_compute_instance" "env" {
   name         = local.name
   machine_type = var.machine_type
   zone         = "${var.region}-a"
-  labels       = { "isoloom-environment" = "supplier-portal-api", "managed-by" = "isoloom", "isoloom-instance" = local.name, "isoloom-expires-at" = var.expires_at }
+  labels = {
+    isoloom-environment = "supplier-portal-api"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
@@ -114,37 +153,7 @@ resource "google_compute_instance" "env" {
     subnetwork = google_compute_subnetwork.env.id
     access_config {}
   }
-  metadata = {
-    ssh-keys = "isoloom:${var.ssh_public_key}"
-  }
-}
-
-variable "allowed_cidr" {
-  type        = string
-  description = "Who may reach the VM (SSH and the published ports), e.g. your IP/32"
-}
-variable "ssh_public_key" {
-  type = string
-}
-variable "ssh_private_key_file" {
-  type        = string
-  description = "The private key of ssh_public_key: Terraform copies the project over SSH"
-}
-variable "auto_stop_minutes" {
-  type        = number
-  default     = 0
-  description = "Shut the VM down after this many minutes (0: never). Destroy still ends the billing of disks and addresses"
-}
-
-variable "expires_at" {
-  type        = string
-  default     = ""
-  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
-}
-variable "inputs" {
-  type      = map(string)
-  default   = {}
-  sensitive = true
+  metadata = { ssh-keys = "isoloom:${var.ssh_public_key}" }
 }
 
 # The environment, over SSH: the project, Docker, then the Compose file.
@@ -157,32 +166,29 @@ resource "terraform_data" "environment" {
     private_key = file(pathexpand(var.ssh_private_key_file))
     timeout     = "10m"
   }
-  provisioner "remote-exec" {
-    inline = [
-      "cloud-init status --wait >/dev/null 2>&1 || true",
-      var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
-      "sudo mkdir -p /opt/isoloom && sudo chown isoloom /opt/isoloom",
-    ]
-  }
-  # The project as an archive: a plain copy drops the executable bits (entrypoint scripts).
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
+    command = "tar -czf \"${path.module}/.isoloom-project-environment.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
-    source      = "${path.module}/.isoloom-project.tgz"
+    source      = "${path.module}/.isoloom-project-environment.tgz"
     destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "file" {
-    content     = join("\n", [for k, v in var.inputs : "${k}=${jsonencode(v)}"])
+    content = join("\n", [
+      "API_URL='${replace(lookup(var.inputs, "API_URL", ""), "'", "'\\''")}'",
+      "LAUNCH_TOKEN='${replace(lookup(var.inputs, "LAUNCH_TOKEN", ""), "'", "'\\''")}'"
+    ])
     destination = "/tmp/isoloom-inputs.env"
   }
   provisioner "remote-exec" {
     inline = [
       "set -e",
-      "tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz",
-      "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh",
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
+      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
       "cd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
-      "sudo mkdir -p /var/lib/isoloom && echo ready | sudo tee /var/lib/isoloom/ready >/dev/null",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
 }
@@ -190,9 +196,11 @@ resource "terraform_data" "environment" {
 output "ip" {
   value = google_compute_instance.env.network_interface[0].access_config[0].nat_ip
 }
+
 output "ssh_user" {
   value = "isoloom"
 }
+
 output "ready_file" {
   value = "/var/lib/isoloom/ready"
 }

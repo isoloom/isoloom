@@ -5,7 +5,7 @@
 pub mod backends;
 pub mod resolved;
 
-pub use backends::{BACKENDS, LegacyBackend, backend};
+pub use backends::{BACKENDS, backend};
 pub use isoloom_plan::Environment;
 pub use isoloom_render::backend::{Backend, Files, RenderError};
 

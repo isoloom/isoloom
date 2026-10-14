@@ -21,18 +21,17 @@ isoloom.yml -> spec -> plan -> render -> backends -> .isoloom/<target>/...
    `lifecycle::Step`), the checks resolved to positions and probes, and the `requirements` a
    backend must meet to render it.
 3. **Render** (`isoloom-render`): the pieces every backend shares: addresses and names, the
-   generated files' header, the controller's Ansible runs, HCL, Ruby and PowerShell quoting,
+   generated files' header, the controller's playbook script (`playbooks`), HCL, Ruby and PowerShell quoting,
    the project copy, the hosts' setup, each set-up step's Linux and Windows script (`steps`),
    the router, VLAN trunks, image constraints and `.isoloomignore`; `boot` keeps a step's
    effect across restarts (a boot-time service). `backend` defines the
    `Backend` trait: a target, its capabilities, and `render(&Environment)`.
 4. **Backends** (`isoloom-compose`, `-kubernetes`, `-vagrant`, `-terraform`, `-external`):
-   each turns the plan (Compose, through typed structs in `file`; Kubernetes, through typed objects in `objects`; external) or, until it migrates, the
-   spec into its target's files. Every generator is a pure function of the
-   spec: no file system access, so `isoloom check` can regenerate in memory and compare with
+   each turns the plan (Compose, through typed structs in `file`; Kubernetes, through typed
+   objects in `objects`; the Terraform modules, through the HCL builder) into its target's
+   files. Every backend is a pure function of the plan: no file system access, so `isoloom check` can regenerate in memory and compare with
    what is committed.
-5. **Targets** (`isoloom-targets`): the registry of backends (`BACKENDS`; generators not on
-   the plan yet run through `LegacyBackend`), the refusals (requirements minus capabilities), `generate_all`, and the resolved snapshot
+5. **Targets** (`isoloom-targets`): the registry of backends (`BACKENDS`), the refusals (requirements minus capabilities), `generate_all`, and the resolved snapshot
    (`resolved.json`) written beside every target's files.
 
 ### Where it is heading
@@ -42,10 +41,10 @@ Wave 1 unit 6 introduced the typed plan IR ([ADR 0002](docs/adr/0002-plan-ir.md)
 requirements), a `MachineLifecycle` made of `Step`s with one Linux and one Windows rendering
 each, and a `Backend` trait (`capabilities()` plus `render(&Environment)`). Refusal then becomes
 "requirements minus capabilities" instead of each generator deciding on its own. Until every
-backend moves to the plan (Wave 2), `LegacyBackend` keeps the other generators running
-unchanged; Compose, Kubernetes, external, docker-vm, hybrid and Vagrant are on the plan, the Vagrant ones
-with the one Ruby builder (`isoloom_vagrant::ruby`) every Vagrantfile is meant to be written with;
-Vagrant's `transport` runs each planned step as a Vagrant provisioner.
+backend moved to the plan (Wave 2), a `LegacyBackend` adapter kept the other generators running
+unchanged; every target now renders the plan and the adapter is gone. The Vagrant targets use
+the one Ruby builder (`isoloom_vagrant::ruby`) every Vagrantfile is written with; Vagrant's
+`transport` runs each planned step as a Vagrant provisioner.
 
 ### The Ansible inventory
 
@@ -76,13 +75,31 @@ DigitalOcean, Linode, Oracle Cloud) is a `Backend` of its own (`cloud_vm::CLOUDS
 AWS's refusal refuses the target, another cloud's refusal drops only its module, and
 `cloud_vm::cloud_refusals` says which cloud refuses and why.
 
+`cloud-docker` (`CloudDockerBackend`, one module per cloud: `cloud_docker::Cloud`) and
+`docker-vm`'s Proxmox module render from the plan the same way: the Compose file is the Compose
+backend's, each cloud adds its network, firewall and VM, and the Docker host's set-up
+(`cloud_docker::host`) goes through the core's `remote-exec` transport: the `Prelude`, `Project`
+and `Ready` steps around Docker and `docker compose up --wait`. `cloud-services`
+(`CloudServicesBackend`) writes its scripts from the plan and refuses from its capabilities.
+
+### The controller's playbooks
+
+Every target that runs playbooks (Vagrant, Proxmox, the clouds) runs the same controller script,
+`isoloom_render::playbooks::script` (also `ansible_runs`): Ansible's settings, the helpers, then
+each `provision:` step through `run_play` (the playbook last). After a failed run with no task
+failed on its own, the hosts that failed only because of the connection (unreachable in the PLAY
+RECAP, or a `fatal:` message in `playbooks::TRANSIENT`: WinRM dropping during a reboot, an SSH
+reset) run it again, on those hosts only (`--limit @<playbook>.retry`, Ansible's retry file
+rewritten with them), after a logged pause, up to `playbooks::ATTEMPTS` runs in all. A task that
+failed on its own stops the setup at once.
+
 ## Crate map
 
 | Crate | Holds |
 |---|---|
 | `isoloom-spec` | The model, parsing and loading, the JSON schema, normalization (groups, clones, VLANs, profiles, instances, defaults, the image table), validation, shell quoting |
 | `isoloom-plan` | The target-neutral plan: `Environment`, addressing, routing, images, the lifecycle steps, checks, requirements and refusal |
-| `isoloom-render` | The `Backend` trait and shared rendering pieces: addresses, header, Ansible runs, the Ansible inventory, the HCL builder (`hcl_builder`), HCL, Ruby and PowerShell quoting, step scripts, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
+| `isoloom-render` | The `Backend` trait and shared rendering pieces: addresses, header, the controller's playbook script (`playbooks`), the Ansible inventory, the HCL builder (`hcl_builder`), HCL, Ruby and PowerShell quoting, step scripts, project copy, host setup, router, trunks, constraints, `.isoloomignore` |
 | `isoloom-compose` | The Docker Compose backend (`docker`, `hosted`, and the Compose file Docker-on-a-VM targets carry), with the network appliances |
 | `isoloom-kubernetes` | The Kubernetes backend: manifests, Kustomize, the Helm chart |
 | `isoloom-vagrant` | The Vagrant backends: `vagrant` (every provider), `docker-vm`, `hybrid`; the Ruby builder (`ruby`) and the Vagrantfile pieces they share (`vagrantfile`) |
