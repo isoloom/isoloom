@@ -3,6 +3,7 @@
 //! hosts' setup, the router, VLAN trunks and the image constraints.
 
 pub mod backend;
+pub mod boot;
 pub mod constraints;
 pub mod hcl_builder;
 pub mod ignore;

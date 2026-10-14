@@ -387,27 +387,29 @@ Vagrant.configure("2") do |config|
       v.memory = 1024
       v.machine_arch = "x86_64"
     end
-    m.vm.provision "shell", name: "settings", inline: "set -e
-mkdir -p /etc/systemd/system.conf.d
-grep -v -E '^(APP_MODE)=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true
-printf %s 'APP_MODE=production
-' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment
-printf '[Manager]\\nDefaultEnvironment=%s\\n' '\"APP_MODE=production\"' > /etc/systemd/system.conf.d/90-isoloom-environment.conf
-printf %s 'net.core.somaxconn = 4096
-' > /etc/sysctl.d/90-isoloom.conf
-sysctl -q -p /etc/sysctl.d/90-isoloom.conf
-mkdir -p /etc/security/limits.d && printf %s '* soft nofile 8192
-* hard nofile 16384
-root soft nofile 8192
-root hard nofile 16384
-' > /etc/security/limits.d/90-isoloom.conf
-printf %s '[Manager]
-DefaultLimitNOFILE=8192:16384
-' > /etc/systemd/system.conf.d/90-isoloom-limits.conf
-systemctl daemon-reexec 2>/dev/null || true
-"
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh provision/web.sh"
+    m.vm.provision "shell", name: "settings", inline: <<~'SH'
+      set -e
+      mkdir -p /etc/systemd/system.conf.d
+      grep -v -E '^(APP_MODE)=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true
+      printf %s 'APP_MODE=production
+      ' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment
+      printf '[Manager]\nDefaultEnvironment=%s\n' '"APP_MODE=production"' > /etc/systemd/system.conf.d/90-isoloom-environment.conf
+      printf %s 'net.core.somaxconn = 4096
+      ' > /etc/sysctl.d/90-isoloom.conf
+      sysctl -q -p /etc/sysctl.d/90-isoloom.conf
+      mkdir -p /etc/security/limits.d && printf %s '* soft nofile 8192
+      * hard nofile 16384
+      root soft nofile 8192
+      root hard nofile 16384
+      ' > /etc/security/limits.d/90-isoloom.conf
+      printf %s '[Manager]
+      DefaultLimitNOFILE=8192:16384
+      ' > /etc/systemd/system.conf.d/90-isoloom-limits.conf
+      systemctl daemon-reexec 2>/dev/null || true
+    SH
+    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/web.sh'"
+    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end

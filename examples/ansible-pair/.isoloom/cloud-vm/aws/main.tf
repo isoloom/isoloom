@@ -188,7 +188,7 @@ resource "terraform_data" "web" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.63.0.20 cache'\\'' >> /etc/hosts'",
+      "sudo sh -c 'for l in '\\''10.63.0.20 cache'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -257,7 +257,7 @@ resource "terraform_data" "cache" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.63.0.10 web'\\'' >> /etc/hosts'",
+      "sudo sh -c 'for l in '\\''10.63.0.10 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }

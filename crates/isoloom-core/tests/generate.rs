@@ -332,11 +332,12 @@ fn vagrant_moves_machines_behind_their_gateway_after_provisioning() {
     assert!(fw < web, "the gateway starts first");
     assert!(vf.contains("name: \"forwarding\""));
     let web_block = &vf[web..vf.find("config.vm.define \"cache\"").unwrap()];
-    let provision = web_block.find("provision/web.sh").unwrap();
-    let behind = web_block.find("name: \"through the gateway\"").unwrap();
-    let default = web_block.find("ip route replace default via 10.70.10.1").unwrap();
-    assert!(provision < behind && behind < default, "installs first, then moves behind the firewall");
-    assert!(web_block.contains("th dport 53 accept"), "name lookups still work behind a gateway");
+    let routes = web_block.find("name: \"routes\"").unwrap();
+    let provision = web_block.find("name: \"provision/web.sh\"").unwrap();
+    let default = web_block.find("name: \"default route\"").unwrap();
+    assert!(routes < provision && provision < default, "installs first, then moves behind the firewall");
+    assert_eq!(web_block.matches("ip route replace default via 10.70.10.1").count(), 1, "{web_block}");
+    assert!(web_block[default..].contains("ip route replace default via 10.70.10.1"));
 }
 
 #[test]
@@ -387,13 +388,13 @@ fn windows_machines_use_winrm_and_powershell() {
     // The project in C:\isoloom first, then each step run from there.
     let project = dc.find("m.vm.provision \"isoloom_project\", name: \"project\"").expect("the project step");
     let step = dc
-        .find("name: \"provision/dc.ps1\", inline: \"Set-Location C:\\\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\\\isoloom\\\\provision\\\\dc.ps1'; exit $LASTEXITCODE\"")
+        .find("name: \"provision/dc.ps1\", inline: \"Set-Location C:\\\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'provision/dc.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }\"")
         .expect("the step, from the project");
     assert!(project < step);
     let web = &vf[vf.find("config.vm.define \"web\"").unwrap()..];
     assert!(web.contains("m.vm.box = \"example/win2019\""), "the spec's image wins");
     assert!(web.contains("m.vm.box_version = \"1.0\""));
-    assert!(web.contains("Test-NetConnection dc01 -Port $p"));
+    assert!(web.contains("Test-NetConnection 'dc01' -Port $p"));
 }
 
 #[test]

@@ -275,7 +275,7 @@ resource "proxmox_virtual_environment_file" "database" {
       ])
       runcmd = [
         "install -m 600 /var/lib/isoloom/inputs.env /tmp/isoloom-inputs.env",
-        "sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' >> /etc/hosts'",
+        "sh -c 'for l in '\\''10.20.0.31 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
         "sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
         "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
       ]
@@ -337,7 +337,7 @@ resource "proxmox_virtual_environment_file" "web" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.32 database'\\'' >> /etc/hosts'",
+        "sh -c 'for l in '\\''10.20.0.32 database'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
         "sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
         "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
         "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"

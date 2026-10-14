@@ -258,7 +258,7 @@ resource "proxmox_virtual_environment_file" "web" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.1.21 cache'\\'' >> /etc/hosts'",
+        "sh -c 'for l in '\\''192.168.1.21 cache'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
         "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
         "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
       ]
@@ -336,7 +336,7 @@ resource "proxmox_virtual_environment_file" "cache" {
         }
       ])
       runcmd = [
-        "sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.1.20 web'\\'' >> /etc/hosts'",
+        "sh -c 'for l in '\\''192.168.1.20 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
         "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache-boot.sh'\\'''",
         "mkdir -p /var/lib/isoloom && echo 1 > /var/lib/isoloom/next-boot && systemctl enable isoloom-steps.service"
       ]

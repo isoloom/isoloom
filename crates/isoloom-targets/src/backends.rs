@@ -1,5 +1,5 @@
 //! The registry of backends, one per generated target. Compose, external, docker-vm, hybrid,
-//! Proxmox and cloud-vm render the plan; the targets not migrated yet go through
+//! Vagrant, Proxmox and cloud-vm render the plan; the targets not migrated yet go through
 //! [`LegacyBackend`], which runs today's generator on the spec the plan was built from, with
 //! the text post-passes it still needs, so their output is unchanged.
 
@@ -13,7 +13,8 @@ use isoloom_spec::model::{Spec, Target};
 use isoloom_terraform::cloud_vm::CloudVmBackend;
 use isoloom_terraform::proxmox::ProxmoxBackend;
 use isoloom_terraform::{cloud_docker, cloud_services};
-use isoloom_vagrant::{DockerVmBackend, HybridBackend, vagrant};
+use isoloom_vagrant::vagrant::VagrantBackend;
+use isoloom_vagrant::{DockerVmBackend, HybridBackend};
 
 /// A generator that predates the plan: a pure function of the spec.
 type Generator = fn(&Spec) -> Result<Files, GenerateError>;
@@ -97,7 +98,7 @@ static DOCKER_VM: DockerVmBackend = DockerVmBackend;
 static CLOUD_DOCKER: LegacyBackend = legacy(Target::CloudDocker, cloud_docker_files);
 static KUBERNETES: LegacyBackend = legacy(Target::Kubernetes, kubernetes::generate);
 static HYBRID: HybridBackend = HybridBackend;
-static VAGRANT: LegacyBackend = legacy(Target::Vagrant, vagrant::generate);
+static VAGRANT: VagrantBackend = VagrantBackend;
 static PROXMOX: ProxmoxBackend = ProxmoxBackend;
 static CLOUD_VM: CloudVmBackend = CloudVmBackend;
 static EXTERNAL: ExternalBackend = ExternalBackend;

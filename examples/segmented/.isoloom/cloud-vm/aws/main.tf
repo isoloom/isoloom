@@ -230,12 +230,12 @@ resource "terraform_data" "cache" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "sudo sh -c 'ROOT=$(findmnt -n -o SOURCE /); DISK=$(lsblk -n -o PKNAME \"$ROOT\" | head -n 1); PART=$(echo \"$ROOT\" | grep -o '\\''[0-9]*$'\\'')\n[ -z \"$DISK\" ] || [ -z \"$PART\" ] || growpart \"/dev/$DISK\" \"$PART\" 2>/dev/null || true\nresize2fs \"$ROOT\" 2>/dev/null || xfs_growfs / 2>/dev/null || true'",
+      "sudo sh -c 'set -e\npart_grow() {\n  dev=$(readlink -f \"$1\")\n  disk=/dev/$(lsblk -no PKNAME \"$dev\" | head -n1)\n  num=$(cat \"/sys/class/block/$(basename \"$dev\")/partition\")\n  if command -v growpart >/dev/null; then growpart \"$disk\" \"$num\" >/dev/null || true\n  else echo \", +\" | sfdisk --no-reread -N \"$num\" \"$disk\" >/dev/null 2>&1 && partx -u \"$disk\" || true; fi\n}\nfs_grow() { resize2fs \"$1\" >/dev/null 2>&1 || xfs_growfs / >/dev/null 2>&1 || true; }\nsrc=$(findmnt -n -o SOURCE /)\ncase \"$(lsblk -no TYPE \"$src\" | head -n1)\" in\n  lvm)\n    vg=$(lvs --noheadings -o vg_name \"$src\" | tr -d '\\'' '\\'')\n    for pv in $(pvs --noheadings -o pv_name -S vg_name=\"$vg\" | tr -d '\\'' '\\''); do part_grow \"$pv\"; pvresize \"$pv\" >/dev/null; done\n    lvextend -l +100%FREE \"$src\" >/dev/null 2>&1 || true\n    fs_grow \"$src\" ;;\n  part) part_grow \"$src\"; fs_grow \"$src\" ;;\nesac'",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.10.10 web'\\'' '\\''10.61.99.10 user'\\'' >> /etc/hosts'",
+      "sudo sh -c 'for l in '\\''10.61.10.10 web'\\'' '\\''10.61.99.10 user'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'mkdir -p '\\''/data'\\'''",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache.sh'\\'''",
-      "sudo sh -c 'command -v nft >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft && nft -f /etc/isoloom-egress.nft\nprintf '\\''%s\\n'\\'' '\\''[Unit]'\\'' '\\''Description=Isoloom: no new connection leaves the environment'\\'' '\\''After=network.target'\\'' '\\'''\\'' '\\''[Service]'\\'' '\\''Type=oneshot'\\'' '\\''ExecStart=/usr/sbin/nft -f /etc/isoloom-egress.nft'\\'' '\\'''\\'' '\\''[Install]'\\'' '\\''WantedBy=multi-user.target'\\'' > /etc/systemd/system/isoloom-egress.service && (systemctl enable isoloom-egress.service 2>/dev/null || true)'",
+      "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -310,7 +310,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.20.20 cache'\\'' '\\''10.61.99.10 user'\\'' >> /etc/hosts'",
+      "sudo sh -c 'for l in '\\''10.61.20.20 cache'\\'' '\\''10.61.99.10 user'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/cache/6379'\\'' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"cache didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -381,7 +381,7 @@ resource "terraform_data" "user" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.20.20 cache'\\'' '\\''10.61.10.10 web'\\'' >> /etc/hosts'",
+      "sudo sh -c 'for l in '\\''10.61.20.20 cache'\\'' '\\''10.61.10.10 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }

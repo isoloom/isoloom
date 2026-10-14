@@ -143,7 +143,7 @@ fn core() -> Format {
         (
             "config.vm.provision shell",
             Emitted {
-                from: "machines.*.vm.provision (.sh, `reboot`), and Isoloom's own steps",
+                from: "machines.*.vm.provision (.sh, .yml, .yaml, `reboot`), and Isoloom's own steps",
             },
         ),
         (
@@ -160,14 +160,14 @@ fn core() -> Format {
         ),
         (
             "config.vm.provision ansible_local",
-            Emitted {
-                from: "machines.*.vm.provision (.yml, .yaml)",
+            Equivalent {
+                via: "a shell provisioner running the playbook with `ansible-playbook -c local` inside the VM, the machine as its inventory (as on every VM target)",
             },
         ),
         (
             "config.vm.provision ansible",
             Equivalent {
-                via: "ansible_local: the same playbooks, run inside the VM",
+                via: "the same playbooks, run inside the VM by a shell provisioner",
             },
         ),
         (
