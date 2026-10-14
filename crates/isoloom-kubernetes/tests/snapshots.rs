@@ -196,3 +196,24 @@ fn each_unsupported_feature_is_refused_with_its_reason() {
     assert_eq!(err.to_string(), format!("kubernetes: {why}"));
     assert_eq!(isoloom_kubernetes::KubernetesBackend.refusal(&env).as_deref(), Some(why));
 }
+
+#[test]
+fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
+    let spec = MIRRORED
+        .replace(
+            "docker: { build: db }",
+            "docker: { build: db, dockerfile: db/Dockerfile.dev, args: { V: \"1 2\" } }",
+        )
+        .replace("constraints:", "message: Open the shop.\nconstraints:");
+    let files = isoloom_kubernetes::render(&parsed(&spec)).unwrap();
+    let env = file(&files, "kubernetes/environment.yaml");
+    assert!(
+        env.contains("#   docker build -t isoloom/shop-db -f db/Dockerfile.dev --build-arg 'V=1 2' db\n"),
+        "{env}"
+    );
+    assert_eq!(
+        file(&files, "chart/templates/NOTES.txt"),
+        "Open the shop.\n\nChecks: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}\n"
+    );
+    assert_eq!(isoloom_kubernetes::KubernetesBackend.capabilities(), isoloom_plan::Capabilities::default());
+}

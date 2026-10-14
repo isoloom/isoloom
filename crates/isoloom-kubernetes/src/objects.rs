@@ -707,3 +707,18 @@ pub struct JobSpec {
     /// The pod.
     pub template: PodTemplate,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_go_string_escapes_quotes_and_backslashes() {
+        assert_eq!(go_string(r#"a"b\c"#), r#""a\"b\\c""#);
+    }
+
+    #[test]
+    fn literal_text_is_written_as_it_is() {
+        assert_eq!(serde_yaml_ng::to_string(&Text::Literal("x".into())).unwrap(), "x\n");
+    }
+}
