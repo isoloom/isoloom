@@ -223,6 +223,7 @@ impl Arch {
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
 pub struct Machine {
     /// Network name -> last octet of the machine's address on it. Every machine has one, but a
     /// LAN's `switch`, whose ports the LAN gives it.
@@ -315,6 +316,7 @@ pub struct Machine {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
 pub struct Service {
     pub port: u16,
     #[serde(default)]
@@ -873,6 +875,7 @@ impl Spec {
 
     /// The spec with `{{ cloud.outputs.<name> }}` filled in (checks and message), from a
     /// deployed cloud-services environment's outputs.
+    #[must_use]
     pub fn with_cloud_outputs(&self, outputs: &IndexMap<String, String>) -> Spec {
         let fill = |t: &str| {
             outputs

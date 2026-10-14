@@ -1,5 +1,7 @@
 //! `message:`: shown after `run`, its placeholders filled from the resolved snapshot.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::resolved::{fill, render_message, resolve};

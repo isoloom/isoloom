@@ -326,6 +326,7 @@ fn azure_protocol(p: Protocol) -> &'static str {
     if p.is_tcp() { "Tcp" } else { "Udp" }
 }
 
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct when this moves onto the plan IR (Wave 2).
 fn inbound(sg: &mut String, prio: &mut u32, name: &str, proto: &str, port: &str, src: &str) {
     let _ = write!(
         sg,
@@ -352,6 +353,7 @@ fn public_ip(tf: &mut String, id: &str, name: &str) {
 
 /// A network interface on `net` at `addr`, with its security group; the primary one carries the
 /// public IP. Forwarding is on for multi-homed machines (the AWS source/destination check off).
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct when this moves onto the plan IR (Wave 2).
 fn nic(tf: &mut String, id: &str, name: &str, net: &str, addr: std::net::Ipv4Addr, primary: bool, forwarding: bool) {
     let nid = res(net);
     let public = if primary {
@@ -368,6 +370,7 @@ fn nic(tf: &mut String, id: &str, name: &str, net: &str, addr: std::net::Ipv4Add
 
 /// A machine's set-up over SSH: the project copied to /opt/isoloom, its inputs, then its steps.
 /// A faithful port of the AWS provisioning block, swapping the resource refs.
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct when this moves onto the plan IR (Wave 2).
 fn provision(spec: &Spec, id: &str, pip: &str, user: &str, m: &crate::model::Machine, cmds: &[String]) -> String {
     let deps: Vec<String> = m
         .depends_on
@@ -507,6 +510,7 @@ fn controller(spec: &Spec, tf: &mut String) {
 /// its computer name set at creation (so no rename), WinRM over HTTP from `allowed_cidr`, then
 /// over WinRM its `.ps1` steps, the other machines' names, firewall openings, published-port
 /// redirects and the ready marker. A port of AWS's `windows_machine`.
+#[allow(clippy::too_many_arguments)] // Tracked: the arguments become one struct when this moves onto the plan IR (Wave 2).
 fn windows_machine(spec: &Spec, name: &str, tf: &mut String, mem: u32, disk: u32, published_out: &mut Vec<(String, String)>) {
     let m = &spec.machines[name];
     let vm = m.vm.as_ref().expect("a VM machine");

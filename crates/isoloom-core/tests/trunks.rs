@@ -1,5 +1,7 @@
 //! 802.1Q on Docker: a machine on several VLANs of one LAN gets one trunk to the LAN's switch.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Target, generate, load};

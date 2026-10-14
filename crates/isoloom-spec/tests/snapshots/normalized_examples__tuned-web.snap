@@ -1,0 +1,81 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: tuned-web
+networks:
+  app:
+    cidr: 10.83.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  web:
+    networks:
+      app: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    environment:
+      APP_MODE: production
+    sysctls:
+      net.core.somaxconn: "4096"
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 16384
+    services:
+      - port: 80
+        name: ~
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "nginx:1.27-alpine"
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: "the machine's environment has APP_MODE"
+    from: web
+    http: ~
+    tcp: ~
+    exec: printenv APP_MODE
+    script: ~
+    expect: production
+    wait: ~
+  - name: the accept queue is 4096 deep
+    from: web
+    http: ~
+    tcp: ~
+    exec: cat /proc/sys/net/core/somaxconn
+    script: ~
+    expect: "4096"
+    wait: ~
+  - name: a process may open 8192 files (16384 at most)
+    from: web
+    http: ~
+    tcp: ~
+    exec: "sh -c 'echo $(ulimit -Sn)/$(ulimit -Hn)'"
+    script: ~
+    expect: 8192/16384
+    wait: ~
+targets: ~

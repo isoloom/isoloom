@@ -6,7 +6,10 @@
 //! generator writes yet are "not yet".
 
 use super::vagrant::names;
-use super::{Format, Support, Support::*};
+use super::{
+    Format, Support,
+    Support::{Emitted, Equivalent, NotPortable, Planned, Tooling, Unclassified},
+};
 
 const PROXMOX: &str = include_str!("../coverage/terraform/proxmox.txt");
 const AWS: &str = include_str!("../coverage/terraform/aws.txt");

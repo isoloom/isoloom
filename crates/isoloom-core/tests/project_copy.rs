@@ -4,6 +4,8 @@
 //! `tar` are on the PATH (CI has both), on a project with a symlink loop. Every output leaves
 //! out what `.isoloomignore` lists.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 

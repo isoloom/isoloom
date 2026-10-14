@@ -1,0 +1,110 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: ansible-pair
+networks:
+  lab:
+    cidr: 10.63.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  web:
+    networks:
+      lab: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 80
+        name: ~
+        http: true
+        publish: ~
+    inputs: []
+    resources:
+      cpus: 1
+      memory_mb: 1024
+      disk_gb: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: debian-12
+      provision: []
+      image: ~
+  cache:
+    networks:
+      lab: 20
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 6379
+        name: redis
+        http: false
+        publish: ~
+    inputs: []
+    resources:
+      cpus: 1
+      memory_mb: 1024
+      disk_gb: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: debian-12
+      provision: []
+      image: ~
+common:
+  vm:
+    os: debian-12
+groups:
+  pair:
+    members:
+      - web
+      - cache
+    resources:
+      cpus: 1
+      memory_mb: 1024
+      disk_gb: ~
+provision:
+  - ansible: ansible/site.yml
+    inventory:
+      - ansible/groups.ini
+    groups:
+      webservers:
+        - web
+      caches:
+        - cache
+    vars:
+      greeting: hello from ansible
+      tools:
+        - curl
+        - jq
+      cache_port: 6379
+    host_vars:
+      cache:
+        maxmemory: 64mb
+    requirements: ansible/requirements.yml
+controller:
+  image: ~
+  resources:
+    cpus: ~
+    memory_mb: 768
+    disk_gb: ~
+  keep_running: false
+checks:
+  - checks/web-answers.sh
+targets: ~

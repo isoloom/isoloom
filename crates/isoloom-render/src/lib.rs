@@ -256,6 +256,34 @@ pub fn hcl(s: &str) -> String {
     format!("\"{escaped}\"")
 }
 
+/// A Ruby double-quoted string literal (a Vagrantfile's): backslashes and quotes escaped, and
+/// every `#` that could start an interpolation (`#{...}`, `#$global`, `#@ivar`) made literal.
+pub fn rb(s: &str) -> String {
+    let escaped = s
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace("#{", "\\#{")
+        .replace("#$", "\\#$")
+        .replace("#@", "\\#@");
+    format!("\"{escaped}\"")
+}
+
+/// A PowerShell single-quoted string literal: nothing inside is expanded. PowerShell takes the
+/// typographic single quotes (U+2018 to U+201B) as quotes too, so each of those is doubled as
+/// well as `'`.
+pub fn ps(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}') {
+            out.push(c);
+        }
+        out.push(c);
+    }
+    out.push('\'');
+    out
+}
+
 #[cfg(test)]
 mod gcp_project_name_tests {
     #[test]

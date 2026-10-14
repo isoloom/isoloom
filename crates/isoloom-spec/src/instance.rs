@@ -22,6 +22,7 @@ pub fn output_dir(instance: Option<u8>) -> String {
 }
 
 /// The spec as instance `n` of itself (validated specs only).
+#[allow(clippy::many_single_char_names)] // an address's octets read best as `a.b.c.d`.
 pub fn apply(spec: &Spec, n: u8) -> Result<Spec, String> {
     if n == 0 || n > MAX {
         return Err(format!("an instance number is 1 to {MAX}"));
@@ -44,8 +45,8 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec, String> {
         });
     }
     // Published host ports: 100 apart per instance (8080 -> 8180 for instance 1).
-    for (mname, m) in s.machines.iter_mut() {
-        for svc in m.services.iter_mut() {
+    for (mname, m) in &mut s.machines {
+        for svc in &mut m.services {
             if let Some(p) = svc.publish {
                 let shifted = u32::from(p) + 100 * u32::from(n);
                 svc.publish =

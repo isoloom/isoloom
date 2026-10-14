@@ -1,6 +1,8 @@
 //! `isoloom import compose` against a fixture written the way people write Compose files:
 //! what the format expresses lands in a valid draft, and everything else is a note.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::import::NoteKind;

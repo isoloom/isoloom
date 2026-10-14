@@ -2,6 +2,8 @@
 //! generated files use, and what it says about targets and checks is what `isoloom targets` and
 //! the runners say.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::resolved::{lookup, resolve};

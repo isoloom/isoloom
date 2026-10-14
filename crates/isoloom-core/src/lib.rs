@@ -49,7 +49,9 @@ pub use isoloom_targets::resolved;
 pub use generate::qemu_refusal;
 pub use generate::{GenerateError, GeneratedFile, OUTPUT_DIR, generate, generate_all, generate_instance, project_copies, refusal, refusal_on};
 pub use isoloom_spec::validate::{self, Problem, validate, validate_files};
-pub use isoloom_spec::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB, LoadError, SPEC_FILES, Totals, find, load, load_profiled, load_with, parse, totals};
+pub use isoloom_spec::{
+    DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB, LoadError, SPEC_FILES, Stage, Totals, find, load, load_profiled, load_with, parse, totals,
+};
 pub use model::{
     Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target, Tc, Vlan,
 };

@@ -1,6 +1,8 @@
 //! `volumes:` shared between machines: one Docker volume, one Kubernetes claim (its users on
 //! the owner's node), and on VMs the owner's directory served over NFS to the others.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Spec, Target, generate, load, parse, refusal, validate};

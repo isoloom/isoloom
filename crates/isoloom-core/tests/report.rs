@@ -1,6 +1,8 @@
 //! `isoloom graph` and `isoloom report` read the resolved snapshot: the picture and the tables
 //! show every network, machine, address and rule the generators use.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::report::{REPORTS, graph_d2, graph_dot, report};
@@ -50,6 +52,6 @@ fn reports_cover_addresses_services_wiring_and_resources() {
     );
     let resources = report("resources", &r, false).unwrap();
     assert!(resources.lines().last().unwrap().starts_with("total"), "{resources}");
-    assert!(report("nope", &r, false).unwrap_err().contains("addressing"));
+    assert!(report("nope", &r, false).unwrap_err().to_string().contains("addressing"));
     assert_eq!(REPORTS.len(), 4);
 }

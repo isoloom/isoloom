@@ -30,7 +30,7 @@ pub fn project_copies(files: &[GeneratedFile], dir: &std::path::Path) -> Result<
                 Err(e) => return Err(format!("{path} (copied into the Helm chart): {e}")),
             };
             out.push(GeneratedFile {
-                path: format!("{base}{}/{}/{key}", CHART, CHART_PROJECT_FILES),
+                path: format!("{base}{CHART}/{CHART_PROJECT_FILES}/{key}"),
                 contents,
             });
         }

@@ -19,8 +19,8 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo fmt --all --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
       - name: Examples validate
         run: |
           for e in examples/*/; do cargo run -q -- validate "$e" --skip-files; cargo run -q -- targets "$e"; done
@@ -57,14 +57,92 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo test --workspace --locked
 
-  # Known vulnerabilities (RustSec) in the locked dependencies.
-  audit:
+  # The locked dependencies (deny.toml): known vulnerabilities (RustSec), licenses on the
+  # allow-list, banned crates, and crates.io as the only source.
+  deny:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
-          command: check advisories
+          command: check
+
+  # Line coverage per crate (cargo-llvm-cov), each held at its floor in
+  # .github/coverage-floors.txt: the Wave 1 baseline minus one point, ratcheted up each wave.
+  llvm-cov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-llvm-cov
+      - run: cargo llvm-cov --workspace --json --summary-only --output-path "$RUNNER_TEMP/cov.json"
+      - name: Per-crate floors
+        shell: bash # -o pipefail: the script's status, not tee's
+        run: scripts/coverage-floors.sh "$RUNNER_TEMP/cov.json" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # The API docs build without a warning (broken intra-doc links, bare URLs).
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -Dwarnings
+
+  # Every declared dependency is used.
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-machete
+      - run: cargo machete
+
+  # Spelling, in code and docs (_typos.toml lists the words that are right here).
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: typos
+      - run: typos
+
+  # Generation is deterministic: every example rendered twice in one process (the test), then
+  # generated twice by the command line in the same folder, gives the same files.
+  determinism:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo test -p isoloom-core --test determinism
+      - name: The command line, twice
+        run: |
+          cargo build -q -p isoloom
+          for e in examples/*/; do
+            n=$(basename "$e")
+            for run in 1 2; do
+              rm -rf "$e.isoloom"
+              target/debug/isoloom generate "$e" > /dev/null 2>&1 || true
+              mkdir -p "$RUNNER_TEMP/$run/$n" && cp -R "$e.isoloom" "$RUNNER_TEMP/$run/$n/" 2>/dev/null || true
+            done
+          done
+          git checkout -- examples
+          diff -r "$RUNNER_TEMP/1" "$RUNNER_TEMP/2"
 
   # isoloom-core's public API, compared by cargo-semver-checks: with the pull request's base (what
   # this change does to the API) and with the last release tag (what the next release must bump

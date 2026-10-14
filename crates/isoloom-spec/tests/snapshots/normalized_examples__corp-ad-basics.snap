@@ -1,0 +1,186 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: corp-ad-basics
+networks:
+  dmz:
+    cidr: 10.40.10.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+  corp:
+    cidr: 10.40.20.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+  access:
+    cidr: 10.40.99.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach:
+  - from: access
+    to: dmz
+    ports: []
+  - from: dmz
+    to: corp
+    ports: []
+inputs: []
+machines:
+  dc01:
+    networks:
+      corp: 5
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 53
+        name: ~
+        http: false
+        publish: ~
+      - port: 88
+        name: ~
+        http: false
+        publish: ~
+      - port: 389
+        name: ~
+        http: false
+        publish: ~
+      - port: 445
+        name: ~
+        http: false
+        publish: ~
+    inputs: []
+    resources:
+      cpus: 2
+      memory_mb: 4096
+      disk_gb: 60
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: windows-server-2022
+      provision:
+        - provision/ad-domain.yml
+      image: ~
+  ws-01:
+    networks:
+      corp: 21
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources:
+      cpus: 2
+      memory_mb: 4096
+      disk_gb: 60
+    depends_on:
+      - dc01
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: windows-11
+      provision:
+        - provision/ad-join.yml
+        - provision/ws.yml
+      image: ~
+  ws-02:
+    networks:
+      corp: 22
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources:
+      cpus: 2
+      memory_mb: 4096
+      disk_gb: 60
+    depends_on:
+      - dc01
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: windows-11
+      provision:
+        - provision/ad-join.yml
+        - provision/ws.yml
+      image: ~
+  web01:
+    networks:
+      dmz: 10
+      corp: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services:
+      - port: 80
+        name: ~
+        http: false
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/web01
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web01.yml
+      image: ~
+  user:
+    networks:
+      access: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    services: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: true
+    docker: ~
+    vm: ~
+common: ~
+groups:
+  domain:
+    members:
+      - dc01
+      - ws-01
+      - ws-02
+    resources:
+      cpus: 2
+      memory_mb: 4096
+      disk_gb: 60
+provision: []
+checks:
+  - checks/domain-up.sh
+  - checks/web01-reaches-dc01.sh
+targets: ~

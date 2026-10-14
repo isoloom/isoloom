@@ -1,5 +1,7 @@
 //! The plan built from a spec: addresses, shared volumes, start order, refusals.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::net::Ipv4Addr;
 
 use isoloom_plan::lifecycle::SharedRole;
@@ -121,6 +123,6 @@ fn a_backend_refuses_what_it_lacks_the_capability_for() {
 #[test]
 fn nothing_required_nothing_refused() {
     let env = env(Target::Docker);
-    assert!(env.requirements.is_empty());
+    assert_eq!(env.requirements.len(), 0);
     assert!(refusal(&env.requirements, &Capabilities::default()).is_none());
 }

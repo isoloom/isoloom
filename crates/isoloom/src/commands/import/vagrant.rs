@@ -46,9 +46,9 @@ fn run_recorder(script: &Path, file: &Path) -> Res<serde_json::Value> {
                 last = format!(
                     "the Vagrantfile failed to run: {}",
                     String::from_utf8_lossy(&out.stderr).lines().next().unwrap_or("")
-                )
+                );
             }
-            Err(_) => continue,
+            Err(_) => {}
         }
     }
     Err(last.into())

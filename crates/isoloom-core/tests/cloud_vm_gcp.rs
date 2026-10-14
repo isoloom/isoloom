@@ -1,6 +1,8 @@
 //! The GCP driver for the `cloud-vm` target: it produces a valid-shaped `google` module for the
 //! specs it supports, and declines Windows and multi-NIC specs (which come later).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Target, generate, load};

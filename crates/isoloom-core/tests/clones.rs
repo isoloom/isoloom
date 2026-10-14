@@ -1,6 +1,8 @@
 //! `count:`: a machine written once becomes numbered clones with consecutive addresses, and
 //! every place that named it means all of them.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{checks, load, parse, validate};

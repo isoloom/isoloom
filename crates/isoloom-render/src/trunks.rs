@@ -76,9 +76,9 @@ pub fn interface(lan: &str) -> String {
 /// A locally administered MAC address for one end of a trunk (`side` 0: the machine, 1: the
 /// switch), so each end finds its interface whatever Docker names it.
 pub fn mac(t: &Trunk, side: u8) -> String {
-    let mut h: u32 = 2166136261;
+    let mut h: u32 = 2_166_136_261;
     for b in format!("{}/{}", t.lan, t.machine).bytes() {
-        h = (h ^ u32::from(b)).wrapping_mul(16777619);
+        h = (h ^ u32::from(b)).wrapping_mul(16_777_619);
     }
     let b = h.to_be_bytes();
     format!("02:1e:{:02x}:{:02x}:{:02x}:{:02x}", b[0], b[1], b[2], (b[3] & 0xfe) | side)

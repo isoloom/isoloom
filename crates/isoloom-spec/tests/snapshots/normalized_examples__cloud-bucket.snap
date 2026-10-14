@@ -1,0 +1,41 @@
+---
+source: crates/isoloom-spec/tests/normalized_examples.rs
+expression: spec
+---
+version: 1
+name: cloud-bucket
+networks: {}
+reach: []
+inputs: []
+machines: {}
+cloud:
+  provider: aws
+  terraform: terraform
+  vars:
+    region: us-east-1
+  outputs:
+    site: website_url
+  hourly_usd: 0.01
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the website answers
+    from: ~
+    http: "{{ cloud.outputs.site }}"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: ~
+    wait: 120
+  - name: the page greets
+    from: ~
+    http: "{{ cloud.outputs.site }}"
+    contains: hello from isoloom
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: ~
+    wait: ~
+targets: ~
+message: "The website answers at {{ cloud.outputs.site }}.\n"

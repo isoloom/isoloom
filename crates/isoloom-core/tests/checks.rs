@@ -1,6 +1,8 @@
 //! Checks: what the spec implies (derived), what the author declares, how both become runner
 //! scripts, and what `isoloom validate` says about a check that's off.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::checks::{self, HttpExpect, Line, Position, Probe, TcpExpect};
@@ -69,7 +71,7 @@ fn windows_machines_are_not_vantage_points() {
     assert!(derived.iter().all(|c| c.position != Position::Machine("dc01".into())));
     assert!(derived.iter().all(|c| c.position != Position::Machine("ws-01".into())));
     // The access machine (no implementation) still is: the runner supplies it.
-    assert!(!names(&derived, "user").is_empty());
+    assert_ne!(names(&derived, "user"), [] as [std::string::String; 0]);
     // A machine can run them, so nothing stands on the networks instead.
     assert!(derived.iter().all(|c| c.position != Position::Networks));
 }

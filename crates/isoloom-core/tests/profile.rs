@@ -1,6 +1,8 @@
 //! Profiles: one file per customer or site, merged into the spec and the defaults, checked
 //! against the spec, and pinning a target.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::{Path, PathBuf};
 
 use isoloom_core::profile::{self, Profile};
@@ -130,5 +132,5 @@ fn profiles_are_listed_and_found_by_name() {
     assert!(profile::load(&dir, "../etc").unwrap_err().contains("kebab-case"));
     std::fs::write(dir.join(profile::DIR).join("a-site.yaml"), "{}\n").unwrap();
     assert!(profile::load(&dir, "a-site").unwrap_err().contains("keep one"));
-    assert!(profile::list(Path::new("/nonexistent")).is_empty());
+    assert_eq!(profile::list(Path::new("/nonexistent")), [] as [std::string::String; 0]);
 }

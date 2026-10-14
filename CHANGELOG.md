@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Quality gates
+- Workspace lints (clippy pedantic with a short allow-list, no `unsafe`, no `unwrap`, `panic`, `dbg!` or `todo!`, at most 5 parameters), `clippy.toml` shape limits, and new CI jobs: per-crate line coverage floors (cargo-llvm-cov), API docs without warnings, unused dependencies (cargo-machete), `cargo deny check` (advisories, licenses, bans, sources), spelling (typos) and determinism (every example rendered twice). Lints not passing yet are listed in ARCHITECTURE.md, to deny by the end of Wave 2.
+- Property tests for IPv4 blocks and the shell, HCL, Ruby and PowerShell quoting; snapshot tests of every example's normalized spec. Ruby strings now escape `#$` and `#@` (interpolations) as well as `#{`; PowerShell strings double the typographic single quotes, which PowerShell also reads as quotes. One `rb` helper in isoloom-render replaces the Vagrant crate's three copies.
+- Breaking (library): typed errors with `thiserror`. `LoadError` gains `Yaml`, `Expand { stage, reason }` and `Profile { problems }` in place of `Parse(String)`, and `Read` becomes `Read { path, source }`; `Problem` is an error type; isoloom-import returns `ImportError`; the registry returns `RegistryError`, `report` a `ReportError` and `run_limited` a `HostError`. Messages are unchanged.
+- ARCHITECTURE.md, CONTRIBUTING.md and the first ADRs (docs/adr/).
+
 ### One crate per layer and backend
 - `isoloom-core` is split into `isoloom-spec`, `isoloom-plan`, `isoloom-render`, the backends (`isoloom-compose`, `isoloom-kubernetes`, `isoloom-terraform`, `isoloom-vagrant`, `isoloom-external`), `isoloom-targets`, `isoloom-import`, `isoloom-coverage` and `isoloom-runtime`. No behavior change: every generated file is byte-identical. `isoloom-core` re-exports them at the same paths as before (`isoloom_core::load`, `::generate`, `::resolved`, `::checks`, `::host`, `::registry`...), so code using it compiles unchanged.
 

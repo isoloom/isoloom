@@ -19,13 +19,13 @@ pub fn outputs(dir: &Path, instance: Option<u8>) -> indexmap::IndexMap<String, S
         .stderr(Stdio::null())
         .output()
     else {
-        return Default::default();
+        return indexmap::IndexMap::default();
     };
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
     let Ok((spec, _)) = spec::load_settings(dir, None, &[]) else {
-        return Default::default();
+        return indexmap::IndexMap::default();
     };
-    let Some(cloud) = &spec.cloud else { return Default::default() };
+    let Some(cloud) = &spec.cloud else { return indexmap::IndexMap::default() };
     cloud
         .outputs
         .iter()

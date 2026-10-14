@@ -12,13 +12,13 @@
 //!   Docker Desktop and k3s answer on localhost).
 //! - Volumes: a PersistentVolumeClaim each, seeded from the image as Docker seeds a named
 //!   volume: an init container of the machine's image copies what the image has at the path
-//!   into the claim while it is empty (see [`seed_container`]). `init:` jobs: a container in
+//!   into the claim while it is empty (see `seed_container`). `init:` jobs: a container in
 //!   the machine's pod (same network and volumes), run once the machine answers.
 //!   `depends_on`: init containers that wait for the dependencies' services.
 //! - Checks: a Job per position in `.isoloom/kubernetes/checks/`, with the networks (labels) of
 //!   the machine it stands for, so the same policies apply to it.
 //! - Addresses: Kubernetes picks pod addresses; names, ports and reachability are kept.
-//! - A Helm chart of the same manifests in `.isoloom/kubernetes/chart/` (see [`chart`]): the
+//! - A Helm chart of the same manifests in `.isoloom/kubernetes/chart/` (see `chart`): the
 //!   machines' images and the inputs as values, the checks as `helm test` Pods, the project's
 //!   scripts under `files/project/` (copied there by the command line, see
 //!   [`crate::project_copies`]).
@@ -446,7 +446,10 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
             ]));
         }
         if needs_probe {
-            volumes.push(map([("name", s(PROBE_VOLUME)), ("emptyDir", Value::Mapping(Default::default()))]));
+            volumes.push(map([
+                ("name", s(PROBE_VOLUME)),
+                ("emptyDir", Value::Mapping(serde_yaml_ng::Mapping::default())),
+            ]));
         }
         for (i, _) in m.tmpfs.iter().enumerate() {
             volumes.push(map([("name", s(format!("tmpfs-{i}"))), ("emptyDir", map([("medium", s("Memory"))]))]));
@@ -748,7 +751,7 @@ pub fn generate(spec: &Spec) -> Result<Vec<GeneratedFile>, GenerateError> {
                 )],
             ));
         }
-        chart_tests = jobs.clone();
+        chart_tests.clone_from(&jobs);
         let job_names: Vec<String> = jobs.iter().filter_map(|j| j["metadata"]["name"].as_str().map(str::to_string)).collect();
         let mut out = header("#");
         out.push_str(&format!(

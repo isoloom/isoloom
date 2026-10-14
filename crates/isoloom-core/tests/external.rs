@@ -1,5 +1,7 @@
 //! The `external` target: machines that already exist, described with their SSH endpoints.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Target, derive, generate, load, parse, validate};

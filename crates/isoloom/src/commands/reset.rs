@@ -60,8 +60,7 @@ fn has_baseline(vdir: &Path) -> bool {
         .args(["snapshot", "list"])
         .current_dir(vdir)
         .output()
-        .ok()
-        .is_some_and(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).lines().any(|l| l.trim() == BASELINE))
+        .is_ok_and(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).lines().any(|l| l.trim() == BASELINE))
 }
 
 /// Every machine back to the baseline snapshot, without provisioning again.

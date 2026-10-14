@@ -1,6 +1,8 @@
 //! The `cloud-vm` Azure driver: a faithful port of the AWS one to the azurerm provider. These
 //! assert the Azure-specific facts; `generate.rs` checks the committed output stays in sync.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Spec, Target, generate, load};

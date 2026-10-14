@@ -36,7 +36,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Routes { routes, default } => {
             let mut lines: Vec<String> = routes.iter().map(|r| format!("ip route replace {} via {}", r.cidr, r.via)).collect();
             lines.extend(default.map(|gw| format!("ip route replace default via {gw}")));
-            lines_or_none(lines)
+            lines_or_none(&lines)
         }
         Step::Trunks => trunk_commands(env, machine),
         Step::Volumes { paths } => (!paths.is_empty()).then(|| format!("mkdir -p {}\n", paths.iter().map(|p| quote(p)).collect::<Vec<_>>().join(" "))),
@@ -95,7 +95,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
 }
 
 /// The lines joined as a script, or `None` when there are none.
-fn lines_or_none(lines: Vec<String>) -> Option<String> {
+fn lines_or_none(lines: &[String]) -> Option<String> {
     (!lines.is_empty()).then(|| lines.iter().map(|l| format!("{l}\n")).collect())
 }
 
@@ -130,7 +130,7 @@ fn trunk_commands(env: &Environment, machine: &str) -> Option<String> {
         .filter(|t| t.machine == machine)
         .flat_map(|t| trunks::vm_commands(spec, t, |n, o| address(spec, n, o)))
         .collect();
-    lines_or_none(lines)
+    lines_or_none(&lines)
 }
 
 /// A shared volume: its owner serves the directory over NFS to the machines mounting it; each
@@ -240,7 +240,7 @@ mod tests {
     use isoloom_plan::lifecycle::Step;
     use isoloom_spec::model::Target;
 
-    const SPEC: &str = r#"
+    const SPEC: &str = r"
 version: 1
 name: steps
 networks:
@@ -263,7 +263,7 @@ machines:
   web:
     networks: { front: 12 }
     vm: { os: debian-12, provision: [steps/web.sh] }
-"#;
+";
 
     fn env() -> Environment {
         let spec = isoloom_spec::parse(SPEC).expect("the test spec parses");

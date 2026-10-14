@@ -56,7 +56,7 @@ fn start_stand_ins(ctx: &Ctx) -> Res<()> {
     let stand_ins: Vec<String> = ["isoloom-access", "isoloom-access-routes"]
         .iter()
         .filter(|n| yaml.contains(&format!("\n  {n}:\n")))
-        .map(|n| n.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
     if stand_ins.is_empty() {
         return Ok(());

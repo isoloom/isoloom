@@ -1,6 +1,8 @@
 //! `constraints:`: a customer's proxy, registry and package mirrors and time servers, applied on
 //! every target, and nothing changed without them.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::generate::constraints::rewrite_image;
@@ -42,7 +44,7 @@ fn mirrors(registries: &[(&str, &str)]) -> Constraints {
 }
 
 #[test]
-fn images_go_through_their_registrys_mirror() {
+fn images_go_through_their_registry_mirror() {
     let c = mirrors(&[("docker.io", "registry.corp/dockerhub/"), ("ghcr.io", "registry.corp/ghcr")]);
     assert_eq!(rewrite_image(&c, "redis:7"), "registry.corp/dockerhub/library/redis:7");
     assert_eq!(rewrite_image(&c, "curlimages/curl:8.11.1"), "registry.corp/dockerhub/curlimages/curl:8.11.1");

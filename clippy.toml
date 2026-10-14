@@ -1,0 +1,11 @@
+# Shape limits from CONTRIBUTING.md (functions at most 60 lines, at most 5 parameters).
+too-many-lines-threshold = 60
+cognitive-complexity-threshold = 15
+too-many-arguments-threshold = 5
+
+# Tests may unwrap, expect, panic and print: a failing test is the report.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = false

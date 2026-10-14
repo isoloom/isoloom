@@ -1,6 +1,8 @@
 //! `isoloom targets` on a spec that parses but is invalid: the problems and exit code 1, as
 //! `generate` and `check` do, not a panic (exit code 101).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::PathBuf;
 use std::process::Command;
 

@@ -3,7 +3,10 @@
 //! (`coverage/vagrant/*.txt`, see SOURCES.md); every one must be classified here, or the
 //! coverage tests fail.
 
-use super::{Format, Support, Support::*};
+use super::{
+    Format, Support,
+    Support::{Emitted, Equivalent, NotPortable, Partial, Planned, Tooling, Unclassified},
+};
 
 const VM: &str = include_str!("../coverage/vagrant/vm.txt");
 const VIRTUALBOX: &str = include_str!("../coverage/vagrant/virtualbox.txt");

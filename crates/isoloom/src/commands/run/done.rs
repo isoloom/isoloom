@@ -42,7 +42,7 @@ fn record(p: &Prepared, ask: &Ask, down: bool, project: Option<String>) {
                 target: p.target,
                 instance: ask.instance,
                 cloud: ask.cloud.map(str::to_string),
-                project: project.clone(),
+                project,
                 profile: spec::profile_name(),
                 started: core::registry::now(),
             });

@@ -1,10 +1,12 @@
 //! The `reboot` step of a Linux machine's `vm.provision`: the machine restarts and the steps
 //! after it run once it's back, on every VM target, each its own way.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use isoloom_core::{Target, generate, parse, validate};
 
 /// A Linux machine on two networks, with an input, restarting twice between its steps.
-const SPEC: &str = r#"
+const SPEC: &str = r"
 version: 1
 name: boots
 inputs: [TOKEN]
@@ -18,7 +20,7 @@ machines:
     vm:
       os: debian-12
       provision: [kernel.sh, reboot, middle.sh, reboot, last.sh]
-"#;
+";
 
 fn file(target: Target, suffix: &str) -> String {
     let spec = parse(SPEC).unwrap();

@@ -4,6 +4,7 @@
 pub mod appliance;
 pub mod clones;
 pub mod defaults;
+pub mod error;
 pub mod files;
 pub mod groups;
 pub mod home;
@@ -20,6 +21,7 @@ pub mod vlans;
 
 use std::path::{Path, PathBuf};
 
+pub use error::{LoadError, Stage};
 pub use model::{
     Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Reach, Resources, Service, Shape, Spec, Target, Tc, Vlan,
 };
@@ -29,40 +31,18 @@ pub use validate::{Problem, validate, validate_files};
 /// The spec file names, at the root of a project: `isoloom.yml` (canonical) or `isoloom.yaml`.
 pub const SPEC_FILES: &[&str] = &["isoloom.yml", "isoloom.yaml"];
 
-#[derive(Debug)]
-pub enum LoadError {
-    NotFound(PathBuf),
-    /// Both `isoloom.yml` and `isoloom.yaml` exist: which one is meant is ambiguous.
-    Ambiguous(PathBuf),
-    Read(PathBuf, std::io::Error),
-    Parse(String),
-}
-
-impl std::fmt::Display for LoadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LoadError::NotFound(d) => write!(f, "no isoloom.yml in {}", d.display()),
-            LoadError::Ambiguous(d) => write!(f, "both isoloom.yml and isoloom.yaml exist in {}; keep one", d.display()),
-            LoadError::Read(p, e) => write!(f, "can't read {}: {e}", p.display()),
-            LoadError::Parse(e) => write!(f, "{e}"),
-        }
-    }
-}
-
-impl std::error::Error for LoadError {}
-
 /// Parses a spec from YAML text. Unknown fields are errors (typos shouldn't pass silently).
 /// VLANs written under their LAN come back as networks of their own ([`vlans::flatten`]): the
 /// rest of Isoloom only deals in networks.
 pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
-    let mut doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml).map_err(|e| LoadError::Parse(e.to_string()))?;
+    let mut doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml)?;
     // `count:` clones, then `common:` and `groups:` fold into the machines, so every reader sees
     // finished ones.
-    let clones = clones::expand(&mut doc).map_err(LoadError::Parse)?;
-    groups::expand(&mut doc).map_err(LoadError::Parse)?;
-    let mut spec: Spec = serde_yaml_ng::from_value(doc).map_err(|e| LoadError::Parse(e.to_string()))?;
+    let clones = clones::expand(&mut doc).map_err(LoadError::at(Stage::Clones))?;
+    groups::expand(&mut doc).map_err(LoadError::at(Stage::Groups))?;
+    let mut spec: Spec = serde_yaml_ng::from_value(doc)?;
     spec.clones = clones;
-    vlans::flatten(spec).map_err(LoadError::Parse)
+    vlans::flatten(spec).map_err(LoadError::at(Stage::Vlans))
 }
 
 /// The spec file in `dir`: `isoloom.yml` or `isoloom.yaml`, never both.
@@ -90,19 +70,19 @@ pub fn load_with(dir: &Path, sets: &[String]) -> Result<Spec, LoadError> {
 /// see [`profile::Profile::check`]), then `-s key=value` overrides.
 pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[String]) -> Result<Spec, LoadError> {
     let path = find(dir)?;
-    let text = std::fs::read_to_string(&path).map_err(|e| LoadError::Read(path, e))?;
+    let text = std::fs::read_to_string(&path).map_err(|source| LoadError::Read { path, source })?;
     let text = match profile {
         Some(p) => {
-            let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text).map_err(|e| LoadError::Parse(e.to_string()))?;
+            let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text)?;
             let problems = p.check(&doc);
             if !problems.is_empty() {
-                return Err(LoadError::Parse(problems.join("\n")));
+                return Err(LoadError::Profile { problems });
             }
             defaults::override_spec_with(&text, Some(&p.spec), sets)
         }
         None => defaults::override_spec(&text, sets),
     }
-    .map_err(LoadError::Parse)?;
+    .map_err(LoadError::at(Stage::Overrides))?;
     parse(&text)
 }
 

@@ -13,6 +13,7 @@ use crate::tools::{compose, process};
 use crate::{Res, spec};
 
 #[derive(clap::Args)]
+#[allow(clippy::struct_field_names)] // `args`: tcpdump's own arguments, named as `--help` shows them.
 pub struct Args {
     /// The machine.
     machine: String,

@@ -408,7 +408,7 @@ fn image(spec: &Spec, shape: MachineShape, name: &str, m: &Machine) -> Option<Im
 }
 
 fn controller(spec: &Spec) -> Option<Controller> {
-    let needed = !spec.provision.is_empty() || spec.checks.iter().any(|c| c.is_playbook());
+    let needed = !spec.provision.is_empty() || spec.checks.iter().any(isoloom_spec::Check::is_playbook);
     needed.then(|| {
         let r = spec.controller.as_ref().and_then(|c| c.resources.as_ref());
         Controller {

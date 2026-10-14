@@ -1,6 +1,8 @@
 //! The `isoloom` binary itself, on paths that need no Docker or VMs: argument errors, a missing
 //! or invalid spec, and the registry behind `status`. Each test gets its own `ISOLOOM_HOME`.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -74,7 +76,7 @@ fn invalid_spec_fails_validate_with_its_problems() {
     assert_eq!(o.status.code(), Some(1), "{}{}", stdout(&o), stderr(&o));
     let v: serde_json::Value = serde_json::from_str(&stdout(&o)).unwrap();
     assert_eq!(v["ok"], false);
-    assert!(!v["problems"].as_array().unwrap().is_empty());
+    assert_ne!(v["problems"].as_array().unwrap().len(), 0);
 }
 
 #[test]

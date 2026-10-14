@@ -1,6 +1,8 @@
 //! Instances: a spec several times on one host, each with its own names, Docker blocks,
 //! published ports and output folder.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Target, generate, generate_instance, instance, load};

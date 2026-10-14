@@ -2,7 +2,10 @@
 //! and whether an Isoloom spec produces it. The rule: a machine feature belongs in the format
 //! when the VM targets can produce it; containers produce what they can (see [`super`]).
 
-use super::{Format, Support, Support::*};
+use super::{
+    Format, Support,
+    Support::{Emitted, Equivalent, InImage, NotPortable, Partial, Planned, Tooling},
+};
 
 const IMAGE: Support = InImage {
     note: "set it in the image (`docker.build`) or the VM's provisioning",

@@ -1,6 +1,8 @@
 //! `common:` and `groups:`: shared machine fields fold into the machines before anything else
 //! reads the spec; the machine's own value wins, then the most specific group, then `common`.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use std::path::Path;
 
 use isoloom_core::{Target, generate, groups, load, parse, validate};

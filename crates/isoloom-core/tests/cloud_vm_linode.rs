@@ -2,6 +2,8 @@
 //! with each machine pinned to its spec address on a VPC subnet; multi-network (and other
 //! out-of-scope) specs are refused, so no Linode file is produced.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
 use isoloom_core::{Target, generate, parse};
 
 const LINODE: &str = ".isoloom/cloud-vm/linode/main.tf";
@@ -17,7 +19,7 @@ fn tf(spec: &isoloom_core::Spec) -> Option<String> {
 #[test]
 fn single_network_linux_lab_pins_each_machine_on_a_vpc_subnet() {
     let spec = parse(
-        r#"
+        r"
 version: 1
 name: ln-lab
 networks:
@@ -31,7 +33,7 @@ machines:
     networks: { lab: 11 }
     services: [{ port: 5432, name: postgres }]
     vm: { os: ubuntu-24.04, provision: [p.sh] }
-"#,
+",
     )
     .expect("spec parses");
 
@@ -56,7 +58,7 @@ machines:
 #[test]
 fn multi_network_lab_is_refused_so_no_linode_file() {
     let spec = parse(
-        r#"
+        r"
 version: 1
 name: ln-two
 networks:
@@ -71,7 +73,7 @@ machines:
     networks: { b: 10 }
     services: [{ port: 5432 }]
     vm: { os: debian-12 }
-"#,
+",
     )
     .expect("spec parses");
 

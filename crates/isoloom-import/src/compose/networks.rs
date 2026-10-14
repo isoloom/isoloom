@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use indexmap::map::Entry;
 use serde_yaml_ng::Value;
 
-use super::super::{NoteKind, Notes, label};
+use super::super::{ImportError, NoteKind, Notes, label};
 use super::DEFAULT_NETWORK;
 use super::values::str_of;
 use super::verdict;
@@ -58,14 +58,14 @@ impl Networks {
     }
 
     /// Adds a network the file declares under `networks:`.
-    pub fn declare(&mut self, compose_name: &str, def: &Value, notes: &mut Notes) -> Result<(), String> {
+    pub fn declare(&mut self, compose_name: &str, def: &Value, notes: &mut Notes) -> Result<(), ImportError> {
         let net = make(&mut self.next_block, compose_name, Some(def), notes)?;
         self.nets.insert(compose_name.to_string(), net);
         Ok(())
     }
 
     /// A network a service joins, added first when the file doesn't declare it.
-    pub fn get(&mut self, compose_name: &str, notes: &mut Notes) -> Result<&mut Net, String> {
+    pub fn get(&mut self, compose_name: &str, notes: &mut Notes) -> Result<&mut Net, ImportError> {
         Ok(match self.nets.entry(compose_name.to_string()) {
             Entry::Occupied(e) => e.into_mut(),
             Entry::Vacant(e) => e.insert(make(&mut self.next_block, compose_name, None, notes)?),
@@ -74,7 +74,7 @@ impl Networks {
 }
 
 /// A network from its Compose definition (none when it isn't declared).
-fn make(next_block: &mut u32, compose_name: &str, def: Option<&Value>, notes: &mut Notes) -> Result<Net, String> {
+fn make(next_block: &mut u32, compose_name: &str, def: Option<&Value>, notes: &mut Notes) -> Result<Net, ImportError> {
     let at = format!("networks.{compose_name}");
     let (cidr, cidr_text) = block(next_block, &at, def, notes)?;
     let internal = def.and_then(|d| d.get("internal")).and_then(Value::as_bool).unwrap_or(false);
@@ -103,7 +103,7 @@ fn make(next_block: &mut u32, compose_name: &str, def: Option<&Value>, notes: &m
 
 /// The network's block: its subnet when that's a private /24 to /29, else the next
 /// 10.88.<n>.0/24, with a note.
-fn block(next_block: &mut u32, at: &str, def: Option<&Value>, notes: &mut Notes) -> Result<(Cidr, String), String> {
+fn block(next_block: &mut u32, at: &str, def: Option<&Value>, notes: &mut Notes) -> Result<(Cidr, String), ImportError> {
     let subnet = def
         .and_then(|d| d.get("ipam"))
         .and_then(|i| i.get("config"))
@@ -125,6 +125,9 @@ fn block(next_block: &mut u32, at: &str, def: Option<&Value>, notes: &mut Notes)
         None => format!("no subnet given; addressed as {text}"),
     };
     notes.add(format!("{at}.ipam"), NoteKind::Changed, why);
-    let cidr = Cidr::parse(&text).ok_or_else(|| format!("{at}: no {READDRESS_BASE}.<n>.0/24 block left to address it"))?;
+    let cidr = Cidr::parse(&text).ok_or_else(|| ImportError::Addressing {
+        at: at.to_string(),
+        reason: format!("no {READDRESS_BASE}.<n>.0/24 block left to address it"),
+    })?;
     Ok((cidr, text))
 }
