@@ -167,6 +167,9 @@ machines:
     secrets: [token, { source: token, target: /etc/app/token, uid: 0, gid: 0, mode: 0400 }]
     arch: amd64
     privileged: true
+    nested_virtualization: true
+    gpus: { count: 1, ids: [], driver: nvidia, capabilities: [compute], options: { a: b } }
+    devices: [{ host: /dev/fuse, guest: /dev/fuse, permissions: rw }]
     read_only: true
     tmpfs: [/tmp, /run]
     shm_size: 256m

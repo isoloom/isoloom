@@ -180,7 +180,7 @@ pub struct Resources {
     pub limits: Limits,
 }
 
-/// CPU and memory limits.
+/// CPU and memory limits, and the devices a device plugin offers (`nvidia.com/gpu`).
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Limits {
     /// CPUs.
@@ -189,6 +189,9 @@ pub struct Limits {
     /// Memory (`512Mi`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory: Option<String>,
+    /// A count of each device plugin resource, by its name.
+    #[serde(flatten)]
+    pub devices: indexmap::IndexMap<String, String>,
 }
 
 /// Where a container sees a volume.

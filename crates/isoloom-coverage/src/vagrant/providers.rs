@@ -14,9 +14,9 @@ pub(super) fn virtualbox(s: &str) -> Option<Support> {
         "cpus" | "memory" => RESOURCES,
         "name" => VM_NAME,
         "linked_clone" => LINKED_CLONE_ON,
-        // Raw `modifyvm` stays out of the format, but Isoloom writes two itself.
+        // Raw `modifyvm` stays out of the format; Isoloom writes the ones it needs.
         "customize" => Emitted {
-            from: "machines.*.vm.tpm (a TPM 2.0, `--tpm-type`), and the hybrid target's Docker host (its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks); no spec field writes raw commands",
+            from: "machines.*.vm.tpm (a TPM 2.0, `--tpm-type`), machines.*.nested_virtualization (`--nested-hw-virt on`), and the hybrid target's Docker host (its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks); no spec field writes raw commands",
         },
         "customizations" => PROVIDER_SPECIFIC,
         "network_adapter" | "network_adapters" => PRIVATE_NETWORKS,
@@ -31,7 +31,7 @@ pub(super) fn virtualbox(s: &str) -> Option<Support> {
 pub(super) fn vmware(s: &str) -> Option<Support> {
     Some(match s {
         "vmx" => Emitted {
-            from: "machines.*.resources and machines.*.privileged: displayName, numvcpus, memsize, and vhv.enable (nested virtualization)",
+            from: "machines.*.resources and machines.*.nested_virtualization: displayName, numvcpus, memsize, and vhv.enable (nested virtualization)",
         },
         "cpus" | "memory" => Equivalent {
             via: "machines.*.resources, written in `vmx`",
@@ -53,7 +53,10 @@ pub(super) fn parallels(s: &str) -> Option<Support> {
         "cpus" | "memory" => RESOURCES,
         "name" => VM_NAME,
         "linked_clone" => LINKED_CLONE_ON,
-        "customize" | "customizations" => PROVIDER_SPECIFIC,
+        "customize" => Emitted {
+            from: "machines.*.nested_virtualization (`--nested-virt on`); no spec field writes raw commands",
+        },
+        "customizations" => PROVIDER_SPECIFIC,
         "network_adapter" | "network_adapters" => PRIVATE_NETWORKS,
         "optimize_power_consumption" => HOST_TUNING,
         "functional_psf" => NO_SHARED_FOLDERS,
@@ -71,7 +74,7 @@ pub(super) fn hyperv(s: &str) -> Option<Support> {
         "linked_clone" => LINKED_CLONE_ON,
         "differencing_disk" => LINKED_CLONE,
         "enable_virtualization_extensions" => Emitted {
-            from: "machines.*.privileged (nested virtualization)",
+            from: "machines.*.nested_virtualization",
         },
         "maxmemory" => HOST_TUNING,
         // Isoloom's networks are private switches with an adapter per VM (Vagrant's triggers).

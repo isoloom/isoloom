@@ -3,6 +3,7 @@
 //! tools, then the networks and volumes; every resource labelled as the environment's.
 
 mod files;
+mod hardware;
 mod machine;
 mod process;
 mod secrets;
@@ -25,7 +26,8 @@ use machine::machine;
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,
 /// gateway machines, ulimits, `tc` (in a sidecar), IPv6 networks of every kind, secrets
-/// (Compose's own, owners included) and existing Docker networks. No controller: no
+/// (Compose's own, owners included), existing Docker networks, and the host's GPUs and devices
+/// (the containers run on the user's own Docker host, which has them). No controller: no
 /// `provision:`, no Ansible checks; `exec` checks run inside a container. No bridged
 /// networks: a container reaches the host's LAN through a macvlan network made beforehand
 /// (`external`).
@@ -43,12 +45,15 @@ pub fn capabilities() -> isoloom_plan::Capabilities {
         Feature::SecretOwners,
         Feature::ExternalNetworks,
         Feature::MachineProcess,
+        Feature::ContainerGpus,
+        Feature::ContainerDevices,
     ])
 }
 
 /// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
-/// secrets, which `isoloom run` hands only to a Compose it starts on this machine, and existing
-/// networks, which a fresh Docker host VM has none of.
+/// secrets, which `isoloom run` hands only to a Compose it starts on this machine, existing
+/// networks, which a fresh Docker host VM has none of, and the host's GPUs and devices, which
+/// a VM Isoloom creates doesn't have.
 pub fn capabilities_on_a_vm() -> isoloom_plan::Capabilities {
     isoloom_plan::Capabilities::of([
         Feature::NetworkAppliances,

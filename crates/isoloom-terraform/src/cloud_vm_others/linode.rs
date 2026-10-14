@@ -13,6 +13,7 @@ use isoloom_spec::model::Target;
 
 use super::single_network::{self, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, name_with, shutdown_script, tag_list};
+use crate::vm::gpus::GpuSizes;
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
@@ -33,6 +34,19 @@ const RULES: Rules = Rules {
     images: "Debian 12/13, Ubuntu 22.04/24.04",
     tpm: false,
     own: own_image::linode,
+    // NVIDIA Quadro RTX 6000s, in the regions that have GPU plans.
+    gpus: GpuSizes {
+        cloud: "Linode",
+        gpu: "NVIDIA RTX 6000",
+        sizes: &[
+            (1, "g1-gpu-rtx6000-1"),
+            (2, "g1-gpu-rtx6000-2"),
+            (3, "g1-gpu-rtx6000-3"),
+            (4, "g1-gpu-rtx6000-4"),
+        ],
+        none: "",
+    },
+    nests: false,
 };
 
 /// The `cloud-vm` module on Linode.
@@ -211,7 +225,10 @@ fn instance(env: &Environment, name: &str, m: &mut Module) {
         resource("linode_instance", &id)
             .add_attribute(("label", name_with(&format!("-{name}"))))
             .add_attribute(("region", reference("var.region")))
-            .add_attribute(("type", string(plan(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))))
+            .add_attribute((
+                "type",
+                string(RULES.gpus.of(mp).unwrap_or(plan(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))),
+            ))
             .add_attribute((
                 "image",
                 string(own_image::of(mp, own_image::linode).unwrap_or_else(|| image(os(mp).unwrap_or_default()).unwrap_or_default())),

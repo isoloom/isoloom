@@ -182,7 +182,23 @@ fn machine(path: &str) -> Option<&'static str> {
         "external.user" => "{ external: { user: admin } }",
         "external.port" => "{ external: { port: 2222 } }",
         "external.key" => "{ external: { key: ~/.ssh/lab } }",
-        field => return super::families::own_image::probe(field),
+        other => return hardware(other).or_else(|| super::families::own_image::probe(other)),
+    })
+}
+
+/// A machine's hardware field set: GPUs, the host's devices, nested virtualization.
+fn hardware(field: &str) -> Option<&'static str> {
+    Some(match field {
+        "nested_virtualization" => "{ nested_virtualization: true }",
+        "gpus.count" => "{ gpus: { count: 1 } }",
+        "gpus.ids" => "{ gpus: { ids: ['0000:01:00.0'] } }",
+        "gpus.driver" => "{ gpus: { count: 1, driver: nvidia } }",
+        "gpus.capabilities" => "{ gpus: { count: 1, capabilities: [compute, utility] } }",
+        "gpus.options" => "{ gpus: { count: 1, options: { virtualization: 'false' } } }",
+        "devices[].host" => "{ devices: [{ host: /dev/fuse }] }",
+        "devices[].guest" => "{ devices: [{ host: /dev/fuse, guest: /dev/fuse0 }] }",
+        "devices[].permissions" => "{ devices: [{ host: /dev/fuse, permissions: rw }] }",
+        _ => return None,
     })
 }
 

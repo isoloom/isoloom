@@ -113,7 +113,7 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
         boxed: image.hyperv.clone(),
         nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
         windows: os == Os::Windows,
-        nested: env.spec().machines.get(name).is_some_and(|m| m.privileged),
+        nested: mp.hardware.nested_virtualization,
         published: mp.ports.iter().map(|p| (p.port, p.publish)).collect(),
         tpm: mp.tpm,
     };
@@ -134,5 +134,6 @@ fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a 
         hyperv,
         tpm: mp.tpm,
         esxi_guestos: mp.os.as_deref().and_then(windows::esxi_guestos),
+        nested: mp.hardware.nested_virtualization,
     }
 }

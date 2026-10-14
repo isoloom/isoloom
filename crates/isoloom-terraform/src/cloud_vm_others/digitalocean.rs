@@ -13,6 +13,7 @@ use isoloom_spec::model::Target;
 
 use super::single_network::{self, Rules};
 use crate::vm::cloud::{self, Reach, auto_stop, shutdown_script, tag_list};
+use crate::vm::gpus::GpuSizes;
 use crate::vm::linux;
 use crate::vm::module::{Variable, project_lists, terraform};
 use crate::vm::versions;
@@ -33,6 +34,14 @@ const RULES: Rules = Rules {
     images: "Debian 12/13, Ubuntu 22.04/24.04",
     tpm: false,
     own: own_image::digitalocean,
+    // NVIDIA H100s, in the regions that have GPU droplets (tor1, nyc2, atl1).
+    gpus: GpuSizes {
+        cloud: "DigitalOcean",
+        gpu: "NVIDIA H100",
+        sizes: &[(1, "gpu-h100x1-80gb"), (8, "gpu-h100x8-640gb")],
+        none: "",
+    },
+    nests: false,
 };
 
 /// The `cloud-vm` module on DigitalOcean.
@@ -147,7 +156,10 @@ fn droplet(env: &Environment, name: &str, m: &mut Module) {
         resource("digitalocean_droplet", &id)
             .add_attribute(("name", cloud::name_with(&format!("-{name}"))))
             .add_attribute(("region", reference("var.region")))
-            .add_attribute(("size", string(size(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))))
+            .add_attribute((
+                "size",
+                string(RULES.gpus.of(mp).unwrap_or(size(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))),
+            ))
             .add_attribute(("image", string(slug)))
             .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
             .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.fingerprint")])))

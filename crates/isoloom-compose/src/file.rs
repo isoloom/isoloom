@@ -1,6 +1,10 @@
 //! The Compose file Isoloom writes, as typed structs: the keys it uses, in one fixed order, each
 //! left out when empty. Serialized with `serde_yaml_ng`.
 
+mod hardware;
+
+pub use hardware::{DeviceRequest, Reservations, ServiceDevice};
+
 use indexmap::IndexMap;
 use serde::Serialize;
 
@@ -98,6 +102,9 @@ pub struct Service {
     /// Kernel capabilities added to the container's defaults.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub cap_add: Vec<String>,
+    /// The host's devices, at a path inside the container.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub devices: Vec<ServiceDevice>,
     /// Lines added to the container's `/etc/hosts` (`name:address`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub extra_hosts: Vec<String>,
@@ -253,17 +260,21 @@ pub struct Condition {
 }
 
 /// `deploy.resources.limits`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Deploy {
     /// The container's resources.
     pub resources: Resources,
 }
 
 /// `deploy.resources`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Resources {
     /// The most the container may use.
-    pub limits: Limits,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limits: Option<Limits>,
+    /// What the container is given before it starts (its GPUs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reservations: Option<Reservations>,
 }
 
 /// `deploy.resources.limits`.

@@ -34,6 +34,12 @@ pub fn render(env: &Environment) -> Result<Files, RenderError> {
     if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &capabilities()) {
         return Err(refused(refusal));
     }
+    if let Some(what) = crate::gpus::refusal(env) {
+        return Err(RenderError::Generate(GenerateError::Unsupported {
+            target: Target::Kubernetes,
+            what,
+        }));
+    }
     let r = objects(env);
     let mut files = vec![
         GeneratedFile {

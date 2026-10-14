@@ -1,7 +1,7 @@
 //! Vagrant's Hyper-V provider (`vagrant up --provider hyperv`, from an elevated shell). Vagrant
 //! puts every adapter of a VM on one switch and sets no address in the guest, so each VM gets,
 //! besides its provider block (name, size, a linked clone, nested virtualization when
-//! `privileged`), triggers that hang on Hyper-V's own actions (other providers run and print
+//! `nested_virtualization`), triggers that hang on Hyper-V's own actions (other providers run and print
 //! none of them):
 //!
 //! - before `Configure`: the first adapter's switch (`ISOLOOM_HYPERV_SWITCH`, else the Default
@@ -43,7 +43,7 @@ pub struct HyperV<'a> {
     pub nics: Vec<Nic<'a>>,
     /// Whether it runs Windows (its addresses set through WMI, not `ip`).
     pub windows: bool,
-    /// Nested virtualization (`privileged`): the VM runs VMs of its own.
+    /// Nested virtualization (`nested_virtualization`): the VM runs VMs of its own.
     pub nested: bool,
     /// Its published ports (guest, host): not forwarded on Hyper-V, so a warning says where.
     pub published: Vec<(u16, u16)>,
@@ -142,7 +142,7 @@ pub fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
         r.assign("v.memory", size.mem);
         r.assign("v.linked_clone", true);
         if hv.nested {
-            r.assign("v.enable_virtualization_extensions", true);
+            super::nested::switch(r, "hyperv");
         }
         // Hyper-V reads only `bridge` here: the switch of the VM's first adapter.
         let first = Call::new("o.vm.network").arg(Value::str("private_network"));

@@ -151,7 +151,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (
                 CLOUD,
                 "extended_metadata ipxe_script is_ai_enterprise_enabled is_pv_encryption_in_transit_enabled security_attributes agent_config
-                agent_config.* instance_options instance_options.* launch_options launch_options.* platform_config platform_config.*
+                agent_config.* instance_options instance_options.* launch_options launch_options.* platform_config.*
                 shape_config.baseline_ocpu_utilization shape_config.local_volume_size_in_gbs shape_config.nvmes shape_config.resource_management
                 source_details.boot_volume_vpus_per_gb source_details.kms_key_id create_vnic_details.security_attributes",
             ),
@@ -160,7 +160,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
                 TPM,
                 "platform_config.is_secure_boot_enabled platform_config.is_trusted_platform_module_enabled platform_config.is_measured_boot_enabled",
             ),
-            (NESTED, "platform_config.are_virtual_instructions_enabled"),
+            (NESTED, "platform_config platform_config.type platform_config.are_virtual_instructions_enabled"),
             (
                 ALIAS,
                 "hostname_label image subnet_id shape_config.vcpus source_details.instance_source_image_filter_details

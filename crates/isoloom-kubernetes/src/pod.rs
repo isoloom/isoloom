@@ -101,6 +101,7 @@ fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
     process::probes(m, &mut c);
     c.env = env(m);
     c.resources = limits(m);
+    crate::gpus::apply(m.plan.hardware.gpus.as_ref(), &mut c);
     c.volume_mounts = mounts.to_vec();
     if process::runs_scripts(m) {
         c.volume_mounts.push(VolumeMount::at("scripts", SCRIPTS_DIR));
@@ -113,6 +114,7 @@ fn limits(m: &Machine) -> Option<Resources> {
     let limits = Limits {
         cpu: m.plan.size.cpus.map(|c| c.to_string()),
         memory: m.plan.size.memory_mb.map(|mb| format!("{mb}Mi")),
+        ..Limits::default()
     };
     (limits.cpu.is_some() || limits.memory.is_some()).then_some(Resources { limits })
 }

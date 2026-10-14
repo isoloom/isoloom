@@ -77,6 +77,7 @@ fn vm(env: &Environment, name: &str, boot: Boot) -> Vm {
         own_boot: mp.boot.clone(),
         agent: false,
         nics,
+        pci: super::gpus::hostpci(mp.hardware.gpus.as_ref()),
         dns: Some(dns(env, name)),
         ips,
         depends_on,
@@ -193,6 +194,8 @@ pub struct Vm {
     pub agent: bool,
     /// Its network devices.
     pub nics: Vec<Block>,
+    /// The server's PCI devices passed through to it (its GPUs), on a q35 machine.
+    pub pci: Vec<Block>,
     /// Its resolver.
     pub dns: Option<Block>,
     /// Its addresses, one per device.
@@ -218,9 +221,14 @@ impl Vm {
             .add_attribute(("node_name", reference("var.node")))
             .add_attribute(("tags", list([string("isoloom"), string(env.name.as_str())])))
             .add_attribute(("on_boot", boolean(false)));
-        if let Boot::Template { .. } = self.boot {
+        let template = matches!(self.boot, Boot::Template { .. });
+        if template {
             // Windows 11 and its TPM need UEFI on a Q35 machine; the template is made so.
-            b = b.add_attribute(("bios", string("ovmf"))).add_attribute(("machine", string("q35")));
+            b = b.add_attribute(("bios", string("ovmf")));
+        }
+        if template || !self.pci.is_empty() {
+            // Q35 also gives a passed-through device its PCIe slot (i440fx has none).
+            b = b.add_attribute(("machine", string("q35")));
         }
         b = super::boot::add(b, self.own_boot.as_ref());
         if self.agent {
@@ -235,7 +243,8 @@ impl Vm {
             )
             .add_block(Block::builder("memory").add_attribute(("dedicated", number(memory.into()))).build())
             .add_blocks(self.disks())
-            .add_blocks(self.nics);
+            .add_blocks(self.nics)
+            .add_blocks(self.pci);
         let mut init = Block::builder("initialization").add_attribute(("datastore_id", reference("var.datastore")));
         if let Boot::Template { .. } = self.boot {
             // cloudbase-init reads an OpenStack configuration drive.

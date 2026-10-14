@@ -3,7 +3,7 @@
 use super::{ARCH, DEVICES, DISK, HOST_TUNING, MORE_DISKS, RESOURCES, TOOLING, USER_SETUP};
 use crate::{
     Support,
-    Support::{Emitted, Equivalent, Planned, Tooling},
+    Support::{Emitted, Equivalent, Tooling},
 };
 
 pub(super) fn classify(s: &str) -> Option<Support> {
@@ -12,8 +12,8 @@ pub(super) fn classify(s: &str) -> Option<Support> {
         "machine_arch" => ARCH,
         "machine_virtual_size" => DISK,
         "storage" | "disks" => MORE_DISKS,
-        "nested" => Planned {
-            note: "nested virtualization: running VMs inside (makes an environment VM-only)",
+        "nested" => Emitted {
+            from: "machines.*.nested_virtualization",
         },
         "tpm_model" | "tpm_type" | "tpm_version" => Emitted {
             from: "machines.*.vm.tpm (Windows 11's by default): an emulated TPM 2.0",

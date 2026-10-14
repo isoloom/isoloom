@@ -7,7 +7,7 @@ use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
-use super::{USER, image, public_ip as address_of, size, vnet_does};
+use super::{USER, image, machine_size, public_ip as address_of, size, vnet_does};
 use crate::vm::cloud::{self, name_with};
 use crate::vm::linux::{self, Hooks};
 use crate::vm::{controller, os, own_image, res, windows};
@@ -30,7 +30,7 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         &id,
         name,
         (os(mp).unwrap_or_default(), own),
-        (memory, disk, mp.tpm.is_some()),
+        (machine_size(mp, memory), disk, mp.tpm.is_some()),
         list(ids),
     ));
     let hooks = Hooks {
@@ -87,12 +87,12 @@ fn controller_nics(
         .collect()
 }
 
-/// A Linux VM (memory in MB, disk in GB, and whether it has a virtual TPM), as `isoloom` with
+/// A Linux VM (its size, its disk in GB, and whether it has a virtual TPM), as `isoloom` with
 /// the operator's key; the auto-stop scheduled at first boot.
-fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (memory, disk, tpm): (u32, u32, bool), nics: Expression) -> Block {
+fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (vm_size, disk, tpm): (&str, u32, bool), nics: Expression) -> Block {
     let custom_data = cloud::auto_stop(call("base64encode", [cloud::shutdown_script()]), isoloom_render::hcl_builder::null());
     let vm = trusted_launch(placed("azurerm_linux_virtual_machine", id, name_with(&format!("-{who}"))), tpm)
-        .add_attribute(("size", string(size(memory))))
+        .add_attribute(("size", string(vm_size)))
         .add_attribute(("admin_username", string(USER)))
         .add_attribute(("network_interface_ids", nics))
         .add_attribute(("custom_data", custom_data))
@@ -224,7 +224,7 @@ fn windows_vm(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
     let vm = trusted_launch(placed("azurerm_windows_virtual_machine", &id, name_with(&format!("-{name}"))), mp.tpm.is_some())
         .add_attribute(("computer_name", string(name.chars().take(15).collect::<String>())))
-        .add_attribute(("size", string(size(memory))))
+        .add_attribute(("size", string(machine_size(mp, memory))))
         .add_attribute(("admin_username", string(USER)))
         .add_attribute(("admin_password", reference(cloud::WINDOWS_PASSWORD)))
         .add_attribute(("network_interface_ids", list(ids)))
@@ -277,7 +277,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, memory, disk) = controller::size(env);
     let disk = disk.unwrap_or(30).max(30);
-    m.block(linux_vm(id, "controller", (controller::OS, None), (memory, disk, false), list(ids)));
+    m.block(linux_vm(id, "controller", (controller::OS, None), (size(memory), disk, false), list(ids)));
     let ssh = controller::Ssh {
         env,
         replace_on: reference(&format!("azurerm_linux_virtual_machine.{id}.id")),

@@ -11,6 +11,7 @@ use isoloom_spec::windows::Tpm;
 
 use crate::checks::{self, Position, Probe};
 use crate::environment::{MachinePlan, MachineShape};
+use crate::hardware::Need;
 
 /// A capability a backend may have: the kind of a [`Requirement`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -60,6 +61,18 @@ pub enum Feature {
     MachineProcess,
     /// A VM booting its own way (`vm.boot`): a kernel, firmware, boot order or network boot.
     OwnBoot,
+    /// GPUs for a container (`gpus`), from the host its runtime runs on.
+    ContainerGpus,
+    /// The host's devices for a container (`devices`).
+    ContainerDevices,
+    /// VMs inside a container (`nested_virtualization`): no backend has it.
+    ContainerNestedVirtualization,
+    /// GPUs for a VM (`gpus`): passed through, or sized in.
+    VmGpus,
+    /// The host's devices for a VM (`devices`): no backend has it.
+    VmDevices,
+    /// VMs inside a VM (`nested_virtualization`).
+    NestedVirtualization,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -170,6 +183,13 @@ pub enum Requirement {
         /// The first VM that does.
         machine: String,
     },
+    /// A machine asks for hardware (`gpus`, `devices`, `nested_virtualization`).
+    Hardware {
+        /// The machine.
+        machine: String,
+        /// What it asks for, in its shape on the target.
+        need: Need,
+    },
 }
 
 impl Requirement {
@@ -198,6 +218,7 @@ impl Requirement {
             Requirement::Tpm { .. } => Feature::Tpm,
             Requirement::MachineProcess { .. } => Feature::MachineProcess,
             Requirement::OwnBoot { .. } => Feature::OwnBoot,
+            Requirement::Hardware { need, .. } => need.feature(),
         }
     }
 }
@@ -232,9 +253,7 @@ impl fmt::Display for Requirement {
             ),
             // Only Kubernetes lacks these today: the messages say so in its terms.
             Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
-            Requirement::Ulimits { machine } => {
-                write!(f, "machine `{machine}` sets `ulimits`: Kubernetes has no per-container process limits")
-            }
+            Requirement::Ulimits { machine } => write!(f, "machine `{machine}` sets `ulimits`: Kubernetes has no per-container process limits"),
             Requirement::TrafficControl => f.write_str("link impairment (`tc`) needs a router in the path; Kubernetes has none"),
             Requirement::Ipv6 { network } => write!(f, "network `{network}` is IPv6 (`ipv6`), which this target's networks don't carry yet"),
             Requirement::Ipv6Only { network } => write!(
@@ -272,6 +291,7 @@ impl fmt::Display for Requirement {
             Requirement::Tpm { machine } => no_tpm(f, machine),
             Requirement::MachineProcess { machine } => write!(f, "machine `{machine}` {OWN_PROCESS}"),
             Requirement::OwnBoot { machine } => crate::boot::no_own_boot(f, machine),
+            Requirement::Hardware { machine, need } => need.reason(machine, f),
         }
     }
 }

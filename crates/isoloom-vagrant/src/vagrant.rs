@@ -32,6 +32,7 @@ mod helpers;
 pub mod hyperv;
 mod limits;
 mod machine;
+mod nested;
 mod providers;
 mod qemu;
 pub mod transport;
@@ -84,6 +85,7 @@ pub fn capabilities() -> Capabilities {
         Feature::MachineProcess,
         // The libvirt provider boots it; `provider_refusal` says which providers can't.
         Feature::OwnBoot,
+        Feature::NestedVirtualization,
     ])
 }
 

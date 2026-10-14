@@ -1,6 +1,6 @@
 //! Service keys from `deploy` to `hostname`, `deploy` and `healthcheck` included.
 
-use super::{CLOUD_SIZES, DEVICES, GPUS, IMAGE, LEGACY, NO_CONTAINER_ON_VMS, STAY_UP, SWARM, TOOLING};
+use super::{CLOUD_SIZES, DEVICES, GPUS, GPUS_KEY, IMAGE, LEGACY, NO_CONTAINER_ON_VMS, RESERVED, STAY_UP, SWARM, TOOLING};
 use crate::Support::{self, Emitted, Equivalent, Tooling};
 
 /// Service keys from `deploy` to `hostname`.
@@ -49,7 +49,7 @@ pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
         },
     ),
     ("services.*.deploy.resources.limits.pids", NO_CONTAINER_ON_VMS),
-    ("services.*.deploy.resources.reservations", CLOUD_SIZES),
+    ("services.*.deploy.resources.reservations", RESERVED),
     ("services.*.deploy.resources.reservations.cpus", CLOUD_SIZES),
     ("services.*.deploy.resources.reservations.memory", CLOUD_SIZES),
     ("services.*.deploy.resources.reservations.generic_resources", SWARM),
@@ -148,12 +148,12 @@ pub(super) const SERVICES_D_H: &[(&str, Support)] = &[
             from: "machines.*.networks (names of machines on other networks)",
         },
     ),
-    ("services.*.gpus", GPUS),
-    ("services.*.gpus[].capabilities", GPUS),
-    ("services.*.gpus[].count", GPUS),
-    ("services.*.gpus[].device_ids", GPUS),
-    ("services.*.gpus[].driver", GPUS),
-    ("services.*.gpus[].options", GPUS),
+    ("services.*.gpus", GPUS_KEY),
+    ("services.*.gpus[].capabilities", GPUS_KEY),
+    ("services.*.gpus[].count", GPUS_KEY),
+    ("services.*.gpus[].device_ids", GPUS_KEY),
+    ("services.*.gpus[].driver", GPUS_KEY),
+    ("services.*.gpus[].options", GPUS_KEY),
     ("services.*.group_add", IMAGE),
     (
         "services.*.healthcheck",

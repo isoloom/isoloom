@@ -233,6 +233,16 @@ machines:
     before: [flag.sh]
     healthcheck: { test: "test -s /srv/flag", interval: 2s, retries: 30 }
 "#,
+    // GPUs and the host's devices: `deploy.resources.reservations.devices` and `devices`.
+    r#"
+version: 1
+name: hardware
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  gpu: { networks: { lan: 10 }, docker: { image: nginx:alpine }, gpus: { count: all, capabilities: [compute], options: { virtualization: "false" } } }
+  pinned: { networks: { lan: 11 }, docker: { image: nginx:alpine }, gpus: { ids: ["0"], driver: nvidia } }
+  fuse: { networks: { lan: 12 }, docker: { image: nginx:alpine }, devices: [{ host: /dev/fuse, guest: /dev/fuse, permissions: rw }] }
+"#,
 ];
 
 /// Every Compose file Isoloom writes for `spec`, on every target that writes one.

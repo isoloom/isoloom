@@ -17,6 +17,7 @@ mod constraints;
 mod dns;
 mod files;
 mod groups;
+mod hardware;
 mod ipv6;
 mod machine_files;
 mod machines;

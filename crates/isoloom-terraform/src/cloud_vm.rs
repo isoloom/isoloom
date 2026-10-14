@@ -63,6 +63,10 @@ pub fn capabilities() -> Capabilities {
         // refuse it on their own.
         Feature::Tpm,
         Feature::MachineProcess,
+        // A GPU instance type (each cloud's own table; refused where it has none).
+        Feature::VmGpus,
+        // A size that nests and the cloud's switch (refused by the clouds that have none).
+        Feature::NestedVirtualization,
     ])
 }
 

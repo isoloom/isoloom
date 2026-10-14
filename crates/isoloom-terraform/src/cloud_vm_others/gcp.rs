@@ -25,6 +25,7 @@ use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use crate::vm::cloud::{self, Reach, name_with, resource};
+use crate::vm::gpus::{self, GpuSizes};
 use crate::vm::limits::Limits;
 use crate::vm::module::{Provider, Variable, project_lists, terraform};
 use crate::vm::versions;
@@ -41,6 +42,18 @@ pub const LIMITS: Limits = Limits {
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none"),
     ipv6: Some("Google Cloud assigns a VPC's internal IPv6 range itself (inside fd20::/20), so the spec's block can't be kept"),
 };
+
+/// Google Cloud's GPU machine types: NVIDIA L4s (G2, the GPUs attached). Projects get no quota
+/// for them until they ask, and only some zones have them.
+pub const GPUS: GpuSizes = GpuSizes {
+    cloud: "Google Cloud",
+    gpu: "NVIDIA L4",
+    sizes: &[(1, "g2-standard-4"), (2, "g2-standard-24"), (4, "g2-standard-48"), (8, "g2-standard-96")],
+    none: "",
+};
+
+/// The machine types whose CPUs nest (N2: E2 has no nested virtualization), by memory in MB.
+pub const NESTING: &[(u32, &str)] = &[(8192, "n2-standard-2"), (16384, "n2-standard-4"), (32768, "n2-standard-8")];
 
 /// The `cloud-vm` module on Google Cloud.
 #[derive(Debug, Clone, Copy, Default)]
@@ -95,7 +108,11 @@ fn machine_type(memory_mb: u32) -> &'static str {
 /// then single-interface Linux machines with images, and the controller on one network.
 pub fn refusal(env: &Environment) -> Option<String> {
     let spec = env.spec();
-    if let Some(why) = LIMITS.refusal(env) {
+    if let Some(why) = LIMITS
+        .refusal(env)
+        .or_else(|| gpus::refusal(env, &GPUS))
+        .or_else(|| crate::vm::nested::refusal(env, "Google Cloud", true))
+    {
         return Some(why);
     }
     if env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).any(|c| c.len > 29) {

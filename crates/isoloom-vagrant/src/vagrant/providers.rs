@@ -10,6 +10,7 @@ use isoloom_spec::windows::Tpm;
 
 use super::boot;
 use super::hyperv::{self, HyperV};
+use super::nested;
 use super::qemu::{HubPort, Link};
 use super::windows;
 use crate::ruby::{Call, Ruby, Value};
@@ -89,6 +90,8 @@ pub struct Guest<'a> {
     pub tpm: Option<Tpm>,
     /// The guest OS ESXi registers it as, when its box's own isn't enough (Windows).
     pub esxi_guestos: Option<&'static str>,
+    /// Whether it runs VMs of its own (`nested_virtualization`).
+    pub nested: bool,
 }
 
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
@@ -120,6 +123,9 @@ pub fn blocks(r: &mut Ruby, g: &Guest) {
     r.block(provider("vmware_esxi"), "v", |r| esxi(r, g));
     libvirt(r, g);
     hyperv::block(r, &g.vm_name, g.size, &g.hyperv);
+    if g.nested {
+        nested::refuse_elsewhere(r);
+    }
 }
 
 fn provider(name: &str) -> Call {
@@ -137,6 +143,9 @@ fn desktop(r: &mut Ruby, name: &str, g: &Guest, linked_clone: bool, more: impl F
         r.assign("v.cpus", g.size.cpus);
         r.assign("v.memory", g.size.mem);
         more(r);
+        if g.nested {
+            nested::switch(r, name);
+        }
     });
 }
 
@@ -145,9 +154,8 @@ fn vmware(r: &mut Ruby, g: &Guest) {
         r.assign("v.vmx[\"displayName\"]", Value::str(&g.label));
         r.assign("v.vmx[\"numvcpus\"]", Value::str(&g.size.cpus.to_string()));
         r.assign("v.vmx[\"memsize\"]", Value::str(&g.size.mem.to_string()));
-        if g.hyperv.nested {
-            // Nested virtualization (`privileged`), as Hyper-V's `enable_virtualization_extensions`.
-            r.assign("v.vmx[\"vhv.enable\"]", Value::str("TRUE"));
+        if g.nested {
+            nested::switch(r, "vmware_desktop");
         }
     });
 }
@@ -180,6 +188,9 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
             windows::libvirt_tpm(r);
         }
         g.boot.into_iter().for_each(|b| boot::libvirt(r, b));
+        if g.nested {
+            nested::switch(r, "libvirt");
+        }
     });
 }
 
@@ -298,5 +309,8 @@ fn esxi(r: &mut Ruby, g: &Guest) {
     r.assign("v.guest_memsize", g.size.mem);
     if let Some(d) = g.size.disk {
         r.assign("v.guest_boot_disk_size", d);
+    }
+    if g.nested {
+        nested::switch(r, "vmware_esxi");
     }
 }

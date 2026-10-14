@@ -26,6 +26,7 @@ use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use crate::vm::cloud::{self, Reach};
+use crate::vm::gpus::{self, GpuSizes};
 use crate::vm::limits::Limits;
 use crate::vm::module::{Provider, Variable, project_lists, terraform};
 use crate::vm::versions;
@@ -44,6 +45,15 @@ pub const LIMITS: Limits = Limits {
     playbook_checks: Some("Ansible checks (.yml) in the cloud come later"),
     tc: Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none"),
     ipv6: None,
+};
+
+/// Azure's GPU sizes: NVIDIA T4s (NCasT4_v3). Subscriptions get no quota for them until they
+/// ask.
+const GPUS: GpuSizes = GpuSizes {
+    cloud: "Azure",
+    gpu: "NVIDIA T4",
+    sizes: &[(1, "Standard_NC4as_T4_v3"), (4, "Standard_NC64as_T4_v3")],
+    none: "",
 };
 
 /// The `cloud-vm` module on Azure.
@@ -83,6 +93,11 @@ fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
     })
 }
 
+/// The VM size for a machine: its GPUs' size when it asks for GPUs, else by its memory.
+fn machine_size(mp: &isoloom_plan::MachinePlan, memory_mb: u32) -> &'static str {
+    GPUS.of(mp).unwrap_or(size(memory_mb))
+}
+
 /// The VM size for a machine's memory: B-series burstable, which covers the lab sizes.
 fn size(memory_mb: u32) -> &'static str {
     match memory_mb {
@@ -98,7 +113,11 @@ fn size(memory_mb: u32) -> &'static str {
 /// images, then what no cloud does yet for a Windows machine.
 pub fn refusal(env: &Environment) -> Option<String> {
     let spec = env.spec();
-    if let Some(why) = LIMITS.refusal(env) {
+    if let Some(why) = LIMITS
+        .refusal(env)
+        .or_else(|| gpus::refusal(env, &GPUS))
+        .or_else(|| crate::vm::nested::refusal(env, "Azure", false))
+    {
         return Some(why);
     }
     if env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).any(|c| c.len > 29) {

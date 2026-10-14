@@ -58,6 +58,7 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         own_boot: None,
         agent: false,
         nics,
+        pci: Vec::new(),
         dns: Some(
             isoloom_render::hcl_builder::Block::builder("dns")
                 .add_attribute(("servers", isoloom_render::hcl_builder::list([string("1.1.1.1")])))

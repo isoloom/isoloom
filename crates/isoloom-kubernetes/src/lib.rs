@@ -44,6 +44,7 @@ pub mod chart;
 mod checks;
 mod dns;
 mod files;
+pub mod gpus;
 mod ipv6;
 pub mod kustomize;
 mod machine;
@@ -75,7 +76,9 @@ pub const CHART_PROJECT_FILES: &str = "files/project";
 /// container). No controller (no `provision:`, no Ansible checks), `exec` checks run inside a
 /// container, no network appliances, Service names have no dots, no gateway machine routes a
 /// network, containers have no ulimits, with no router in the path there is nothing to impair
-/// links with, and a Secret volume's files belong to root.
+/// links with, a Secret volume's files belong to root, and no host devices (a pod reaches a
+/// node's devices only through a device plugin). GPUs are the device plugin's resource
+/// (`nvidia.com/gpu`).
 pub fn capabilities() -> Capabilities {
     Capabilities::of([
         Feature::Ipv6,
@@ -84,6 +87,7 @@ pub fn capabilities() -> Capabilities {
         Feature::Secrets,
         Feature::OwnedProjectFiles,
         Feature::MachineProcess,
+        Feature::ContainerGpus,
     ])
 }
 
@@ -104,9 +108,12 @@ impl Backend for KubernetesBackend {
         render(env)
     }
 
-    /// The plan's refusal, in Kubernetes' words ([`reason`]).
+    /// The plan's refusal, in Kubernetes' words ([`reason`]), then what its GPUs can't be
+    /// ([`gpus::refusal`]).
     fn refusal(&self, env: &Environment) -> Option<String> {
-        isoloom_plan::refusal(&env.requirements, &capabilities()).map(|r| reason(&r))
+        isoloom_plan::refusal(&env.requirements, &capabilities())
+            .map(|r| reason(&r))
+            .or_else(|| gpus::refusal(env))
     }
 }
 

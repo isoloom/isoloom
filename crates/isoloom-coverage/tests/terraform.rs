@@ -124,9 +124,10 @@ fn owner<'a>(tables: &'a [Format], key: &str) -> Option<&'a Format> {
     tables.iter().find(|f| f.rows.iter().any(|(k, _)| *k == anchor))
 }
 
-/// Machines with images and boots of their own, which no example needs: every cloud's own
-/// image (and a cloud image's URL on Proxmox), a Windows machine's own Azure image, and a
-/// Proxmox template booted through UEFI in an order of its own.
+/// Machines with what no example needs: images and boots of their own (every cloud's own image,
+/// a cloud image's URL on Proxmox, a Windows machine's own Azure image, a Proxmox template
+/// booted through UEFI in an order of its own), GPUs (passed through on Proxmox by PCI address
+/// and by resource mapping; a cloud's GPU instance type), and VMs running VMs of their own.
 const OWN_IMAGES: &[(&str, Target)] = &[
     (
         "web: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh], image: { proxmox: 'https://images.example/d.qcow2', aws: ami-0abc, azure: /subscriptions/s/resourceGroups/g/providers/Microsoft.Compute/images/d, gcp: projects/p/global/images/d, digitalocean: '4242', linode: private/42, oci: ocid1.image.oc1..d } } }",
@@ -139,6 +140,18 @@ const OWN_IMAGES: &[(&str, Target)] = &[
     (
         "web: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh], image: { proxmox: '9000' }, boot: { firmware: uefi, firmware_format: raw, order: [hd, network] } } }",
         Target::Proxmox,
+    ),
+    (
+        "gpu: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh] }, gpus: { ids: ['0000:01:00.0', rtx] } }",
+        Target::Proxmox,
+    ),
+    (
+        "gpu: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh] }, gpus: 1 }",
+        Target::CloudVm,
+    ),
+    (
+        "hv: { networks: { lan: 10 }, vm: { os: debian-12, provision: [s.sh] }, nested_virtualization: true }",
+        Target::CloudVm,
     ),
 ];
 
@@ -167,7 +180,7 @@ fn written_by_table(tables: &[Format]) -> BTreeMap<&'static str, BTreeSet<String
     let examples = MODULES
         .iter()
         .flat_map(|m| module_files(m).into_iter().map(move |t| (format!(".isoloom/{m}"), t)));
-    let fixtures = own_image_modules().into_iter().map(|t| ("the own-image fixtures".to_string(), t));
+    let fixtures = own_image_modules().into_iter().map(|t| ("the fixtures".to_string(), t));
     for (module, text) in examples.chain(fixtures) {
         for key in written_keys(&text) {
             let table = owner(tables, &key).unwrap_or_else(|| panic!("{module}: writes `{key}`, which no Terraform table lists"));

@@ -558,7 +558,6 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "existing-hosts · cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
-      v.vmx["vhv.enable"] = "TRUE"
     end
     m.vm.provider "parallels" do |v|
       v.name = "existing-hosts · cache"
@@ -611,7 +610,6 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
-      v.enable_virtualization_extensions = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|

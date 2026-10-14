@@ -19,6 +19,7 @@ use isoloom_spec::windows::{self, Tpm};
 use crate::addressing::{address, address_for, host_address, start_order};
 use crate::ansible;
 use crate::checks::{self, Resolved};
+use crate::hardware::{self, Hardware};
 use crate::images::{Images, tag_of};
 use crate::ipv6::{self, Ipv6Plan, Route6};
 use crate::lifecycle::{self, MachineLifecycle};
@@ -164,6 +165,8 @@ pub struct MachinePlan {
     pub outside: IndexMap<String, OutsideAddress>,
     /// Its own command, working directory, `before` steps and healthcheck.
     pub process: Process,
+    /// The GPUs, host devices and nested virtualization it asks for.
+    pub hardware: Hardware,
 }
 
 impl MachinePlan {
@@ -311,6 +314,7 @@ impl Environment {
         requirements.extend(crate::machine_files::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
         requirements.extend(requirements::tpm(&machines));
         requirements.extend(crate::boot::requirements(&machines));
+        requirements.extend(hardware::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
         Environment {
             name: spec.name.clone(),
             target,
@@ -457,6 +461,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         host_vars: ansible::host_vars(spec, name),
         outside: IndexMap::new(),
         process: Process::of(m),
+        hardware: Hardware::of(m),
     }
 }
 
