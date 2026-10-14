@@ -25,7 +25,7 @@ Container mechanics (capabilities, cgroups) aren't machine features: Isoloom set
 | [Vagrant: QEMU](#vagrant-qemu) | 92% | 14 | 13 | 0 | 1 |
 | [Vagrant: ESXi](#vagrant-esxi) | 100% | 20 | 20 | 0 | 0 |
 | [Vagrant: Docker](#vagrant-docker) | 100% | 13 | 13 | 0 | 0 |
-| [Terraform: Proxmox](#terraform-proxmox) | 96% | 183 | 177 | 0 | 6 |
+| [Terraform: Proxmox](#terraform-proxmox) | 100% | 189 | 189 | 0 | 0 |
 | [Terraform: ESXi](#terraform-esxi) | 77% | 35 | 27 | 0 | 8 |
 | [Terraform: AWS](#terraform-aws) | 97% | 135 | 131 | 0 | 4 |
 | [Terraform: Azure](#terraform-azure) | 96% | 156 | 151 | 0 | 5 |
@@ -1517,7 +1517,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 
 ## Terraform: Proxmox
 
-96% of 183 portable features (177 done, 0 partly, 6 to do; 558 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
+100% of 189 portable features (189 done, 0 partly, 0 to do; 563 features in all). From bpg/proxmox 0.115.0 (its resource types, and the schema of what Isoloom writes).
 
 ### Resource types
 
@@ -1535,7 +1535,7 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `proxmox_cluster_options` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_download_file` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_hagroup` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
-| `proxmox_hardware_mapping_dir` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
+| `proxmox_hardware_mapping_dir` | Yes | Yes | Written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module |
 | `proxmox_hardware_mapping_pci` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_hardware_mapping_usb` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
 | `proxmox_haresource` | No | No | Administers the Proxmox server itself: no other target has a server to administer |
@@ -1690,6 +1690,16 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `upload_timeout` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `url` | Yes | Yes | Written by the generator |
 | `verify` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
+
+### proxmox_hardware_mapping_dir
+
+| Key | Every target | Implemented | Notes |
+| --- | --- | --- | --- |
+| `comment` | Yes | Yes | Written by the generator; not run on a real host |
+| `map` | Yes | Yes | Written by the generator; not run on a real host |
+| `map.node` | Yes | Yes | Written by the generator; not run on a real host |
+| `map.path` | Yes | Yes | Written by the generator; not run on a real host |
+| `name` | Yes | Yes | Written by the generator; not run on a real host |
 
 ### proxmox_oci_image
 
@@ -2136,12 +2146,12 @@ Only what the examples generate is checked: a feature no example uses can still 
 | `vga.clipboard` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `vga.memory` | n/a | No | Another way to write what Isoloom already sets, or a default it keeps: no change in behavior |
 | `vga.type` | Yes | Yes | Written by the generator |
-| `virtiofs` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
-| `virtiofs.cache` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
-| `virtiofs.direct_io` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
-| `virtiofs.expose_acl` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
-| `virtiofs.expose_xattr` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
-| `virtiofs.mapping` | Yes | Not yet | Shared volumes (`volumes`) as host folders |
+| `virtiofs` | Yes | Yes | Written by the generator; not run on a real host |
+| `virtiofs.cache` | Yes | Yes | Written by the generator; not run on a real host |
+| `virtiofs.direct_io` | Yes | Yes | Written by the generator; not run on a real host |
+| `virtiofs.expose_acl` | Yes | Yes | Written by the generator; not run on a real host |
+| `virtiofs.expose_xattr` | Yes | Yes | Written by the generator; not run on a real host |
+| `virtiofs.mapping` | Yes | Yes | Written by the generator; not run on a real host |
 | `watchdog` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `watchdog.action` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
 | `watchdog.enabled` | No | No | Tunes the Proxmox server's hardware for the VM (caches, NUMA, hugepages, SMBIOS, NIC model): no other target exposes it |
@@ -6372,7 +6382,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `placement_constraint_details.compute_bare_metal_host_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `placement_constraint_details.compute_host_group_id` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `placement_constraint_details.type` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
-| `platform_config` | Yes | Yes | Written by the generator |
+| `platform_config` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `platform_config.are_virtual_instructions_enabled` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `platform_config.config_map` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `platform_config.is_access_control_service_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
@@ -6384,7 +6394,7 @@ And 22 other resource types that only this cloud has: its managed services, netw
 | `platform_config.is_trusted_platform_module_enabled` | Yes | Yes | Written by the generator |
 | `platform_config.numa_nodes_per_socket` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
 | `platform_config.percentage_of_cores_enabled` | No | No | An option only this cloud has (its agents, metadata service, encryption keys, performance tiers): no other VM target has it |
-| `platform_config.type` | Yes | Yes | Written by the generator |
+| `platform_config.type` | Yes | Yes | From `machines.*.nested_virtualization` |
 | `preemptible_instance_config` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `preemptible_instance_config.preemption_action` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
 | `preemptible_instance_config.preemption_action.preserve_boot_volume` | n/a | No | How the cloud places, scales or bills the VMs (zones, templates, scaling groups, reservations, dedicated hosts, spot): no change in how the environment behaves |
@@ -8215,6 +8225,11 @@ is marked ✗, with its reason below.
 | `volumes.*.owner` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ◐ | ◐ | ◐ | ✗ | ◐ | ◐ | ✓ | n/a | planned |
 | `volumes.*.persistent` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
 | `volumes.*.external` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | n/a | ✗ |
+| `volumes.*.virtiofs.mapping` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `volumes.*.virtiofs.cache` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `volumes.*.virtiofs.direct_io` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `volumes.*.virtiofs.xattr` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| `volumes.*.virtiofs.acl` | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | ✓ | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | `machines.*.volumes` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✓ | n/a | planned |
 | `machines.*.files[].path` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
 | `machines.*.files[].source` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n/a | ✗ |
@@ -8312,7 +8327,7 @@ is marked ✗, with its reason below.
 | vagrant | 80% of 126 | 94 | 16 | 0 | 16 |
 | docker-vm | 78% of 122 | 94 | 3 | 0 | 25 |
 | hybrid | 65% of 149 | 95 | 6 | 7 | 41 |
-| proxmox | 81% of 121 | 98 | 2 | 3 | 18 |
+| proxmox | 82% of 126 | 103 | 2 | 3 | 18 |
 | esxi | 65% of 120 | 78 | 1 | 3 | 38 |
 | aws | 62% of 126 | 71 | 16 | 6 | 33 |
 | azure | 62% of 126 | 72 | 14 | 6 | 34 |

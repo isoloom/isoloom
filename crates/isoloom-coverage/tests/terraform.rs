@@ -62,10 +62,28 @@ fn walk(body: &Body, prefix: &str, top: bool, out: &mut BTreeSet<String>) {
     for s in body {
         match s {
             Structure::Attribute(a) if !(top && META.contains(&a.key.as_str())) => {
-                out.insert(format!("{prefix}{}", a.key.as_str()));
+                let key = format!("{prefix}{}", a.key.as_str());
+                objects(&a.expr, &key, out);
+                out.insert(key);
             }
             Structure::Block(b) if !(top && META.contains(&b.identifier.as_str())) => nested(b, prefix, out),
             _ => {}
+        }
+    }
+}
+
+/// The fields of a nested attribute written as a list of objects (`map = [{ node = ... }]`),
+/// which the schema lists like a nested block's. A lone object is a map (tags, labels): its
+/// keys are data, not arguments.
+fn objects(expr: &hcl::Expression, key: &str, out: &mut BTreeSet<String>) {
+    let hcl::Expression::Array(items) = expr else { return };
+    for item in items {
+        if let hcl::Expression::Object(fields) = item {
+            for (field, _) in fields {
+                if let hcl::ObjectKey::Identifier(id) = field {
+                    out.insert(format!("{key}.{}", id.as_str()));
+                }
+            }
         }
     }
 }
@@ -185,8 +203,10 @@ fn own_image_modules() -> Vec<String> {
 }
 
 /// Whole environments with what no example needs, on Proxmox (not run on a real host): a
-/// network's MTU and a machine's rate limit, and machines run as LXC containers.
+/// network's MTU and a machine's rate limit, machines run as LXC containers, and shared volumes
+/// as folders of the server (virtiofs).
 const PROXMOX_FIXTURES: &[&str] = &[
+    "version: 1\nname: folders\nnetworks:\n  lan: { cidr: 10.30.0.0/24 }\nvolumes:\n  shared: { virtiofs: {} }\n  media: { virtiofs: { mapping: lab-media, cache: never, xattr: true } }\nmachines:\n  writer: { networks: { lan: 10 }, volumes: { shared: /srv/shared, media: /srv/media }, vm: { os: debian-12, provision: [s.sh] } }\n  reader: { networks: { lan: 11 }, volumes: { shared: { path: /data, subpath: out } }, vm: { os: debian-12, provision: [s.sh] } }\n",
     "version: 1\nname: links\nnetworks:\n  lan: { cidr: 10.30.0.0/24, mtu: 1400 }\nmachines:\n  web: { networks: { lan: 10 }, rate_limit: 10mbit, vm: { os: debian-12, provision: [s.sh] } }\n",
     "version: 1\nname: lxc\nnetworks:\n  lan: { cidr: 10.30.0.0/24, mtu: 1400 }\n  office: { cidr: 10.31.0.0/16, vlans: { 10: { cidr: 10.31.10.0/24 } } }\nmachines:\n  web: { networks: { lan: 10, office.vlan10: 10 }, rate_limit: 10mbit, environment: { MODE: lab }, docker: { image: 'nginx:1.27', idle: true, lxc: true } }\n",
 ];

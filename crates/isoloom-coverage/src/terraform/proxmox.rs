@@ -2,8 +2,8 @@
 //! docker-vm's Proxmox module write.
 
 use super::support::{
-    ALIAS, CREDENTIALS, GPU_PASSTHROUGH, ID, LOCATION, ORDER, PASSTHROUGH_TUNING, PROTECT, PROXMOX_IPV6, ROUTER_DNS, SDN_DNS, SERVER, SHARED, SOURCE_PORTS,
-    TAGS, TPM, USB,
+    ALIAS, CREDENTIALS, GPU_PASSTHROUGH, ID, LOCATION, ORDER, PASSTHROUGH_TUNING, PROTECT, PROXMOX_IPV6, ROUTER_DNS, SDN_DNS, SERVER, SOURCE_PORTS, TAGS, TPM,
+    USB,
 };
 use super::table::{Provider, Rules, Table};
 use crate::Support::{self, Emitted, Equivalent, NotPortable, Tooling};
@@ -73,6 +73,11 @@ const SERVER_ADMIN: Support = NotPortable {
     why: "administers the Proxmox server itself: no other target has a server to administer",
 };
 
+/// What the module writes for a feature no real host has run yet.
+const UNTRIED: Support = Emitted {
+    from: "(written by the generator; not run on a real host)",
+};
+
 /// The types the Proxmox modules write.
 const PROXMOX_WRITTEN: Support = Emitted {
     from: "(written by the proxmox target, a VM per machine and the router, or docker-vm's Proxmox module)",
@@ -112,7 +117,7 @@ const TYPES: Rules = &[
     (
         SERVER_ADMIN,
         "node_firewall cluster_firewall cluster_firewall_security_group acl* acme_* apt_* backup_job* ceph_* cluster_options* ha*
-        hardware_mapping_* metrics_server* node_* realm_* replication* storage_* user* certificate* dns* hosts* group* role* time*",
+        hardware_mapping_pci hardware_mapping_usb metrics_server* node_* realm_* replication* storage_* user* certificate* dns* hosts* group* role* time*",
     ),
 ];
 
@@ -120,7 +125,7 @@ const TYPES: Rules = &[
 const WRITTEN: &[(&str, &str)] = &[
     (
         "types",
-        "proxmox_download_file proxmox_oci_image proxmox_sdn_applier proxmox_sdn_vnet proxmox_sdn_zone_simple
+        "proxmox_download_file proxmox_hardware_mapping_dir proxmox_oci_image proxmox_sdn_applier proxmox_sdn_vnet proxmox_sdn_zone_simple
         proxmox_virtual_environment_container proxmox_virtual_environment_file proxmox_virtual_environment_firewall_ipset
         proxmox_virtual_environment_firewall_options proxmox_virtual_environment_firewall_rules proxmox_virtual_environment_pool
         proxmox_virtual_environment_vm",
@@ -131,6 +136,7 @@ const WRITTEN: &[(&str, &str)] = &[
         ssh.username username",
     ),
     ("proxmox_download_file", "content_type datastore_id file_name node_name overwrite_unmanaged url"),
+    ("proxmox_hardware_mapping_dir", "comment map map.node map.path name"),
     ("proxmox_oci_image", "datastore_id file_name node_name overwrite_unmanaged reference"),
     ("proxmox_sdn_vnet", "id vlan_aware zone"),
     ("proxmox_sdn_zone_simple", "id mtu nodes"),
@@ -167,7 +173,8 @@ const WRITTEN: &[(&str, &str)] = &[
         initialization.ip_config.ipv4.gateway initialization.interface initialization.type initialization.user_data_file_id machine memory memory.dedicated name
         network_device network_device.bridge network_device.firewall network_device.mac_address network_device.mtu
         network_device.rate_limit network_device.vlan_id node_name on_boot operating_system operating_system.type pool_id
-        serial_device tags vga vga.type tpm_state tpm_state.datastore_id tpm_state.version disk.file_format disk.serial",
+        serial_device tags vga vga.type tpm_state tpm_state.datastore_id tpm_state.version disk.file_format disk.serial virtiofs
+        virtiofs.cache virtiofs.direct_io virtiofs.expose_acl virtiofs.expose_xattr virtiofs.mapping",
     ),
 ];
 
@@ -185,6 +192,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
         &[(ALIAS, "checksum checksum_algorithm decompression_algorithm overwrite upload_timeout verify")],
     ),
     ("proxmox_sdn_applier", &[(ALIAS, "on_create on_destroy")]),
+    ("proxmox_hardware_mapping_dir", &[(UNTRIED, "comment map map.* name")]),
     ("proxmox_oci_image", &[(ALIAS, "overwrite"), (PROTECT, "upload_timeout")]),
     ("proxmox_virtual_environment_pool", &[(ID, "id")]),
     (
@@ -275,7 +283,7 @@ const ARGUMENTS: &[(&str, Rules)] = &[
             (PASSTHROUGH_TUNING, "hostpci.mdev hostpci.rom_file hostpci.rombar hostpci.xvga"),
             (USB, "usb usb.*"),
             (ORDER, "startup startup.*"),
-            (SHARED, "virtiofs virtiofs.*"),
+            (UNTRIED, "virtiofs virtiofs.*"),
             (TRUNKS, "network_device.trunks"),
             (SERVER, "network_device.model network_device.queues"),
             (ALIAS, "network_device.disconnected network_device.enabled"),

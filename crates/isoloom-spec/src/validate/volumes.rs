@@ -27,11 +27,12 @@ pub(super) fn shared(spec: &Spec, p: &mut Problems) {
             continue;
         }
         kept(spec, v, &at, p);
+        host_folder(spec, v, &at, p);
         let Some(owner) = spec.volume_owner(v) else { continue };
         for u in &users {
             let m = &spec.machines[*u];
             if m.vm.as_ref().is_some_and(|vm| crate::images::is_windows(&vm.os)) {
-                p.add(format!("machines.{u}.volumes.{v}"), "a shared volume is mounted over NFS: Linux machines only");
+                p.add(format!("machines.{u}.volumes.{v}"), windows_why(spec, v));
             }
             if *u != owner && !m.networks.keys().any(|n| spec.machines[owner].networks.contains_key(n)) {
                 p.add(
@@ -40,6 +41,29 @@ pub(super) fn shared(spec: &Spec, p: &mut Problems) {
                 );
             }
         }
+    }
+}
+
+/// Why a Windows VM can't mount shared volume `v`: NFS, and with `virtiofs` the virtio-fs
+/// driver and WinFsp, which the guest set-up doesn't install.
+fn windows_why(spec: &Spec, v: &str) -> &'static str {
+    if spec.volumes[v].virtiofs.is_some() {
+        "a shared volume is mounted over NFS, or virtiofs on Proxmox, whose Windows driver (virtio-fs and WinFsp) the set-up doesn't install: Linux machines only"
+    } else {
+        "a shared volume is mounted over NFS: Linux machines only"
+    }
+}
+
+/// A volume shared as a folder of the Proxmox server: a mapping named as Proxmox names them.
+fn host_folder(spec: &Spec, v: &str, at: &str, p: &mut Problems) {
+    let Some(mapping) = spec.volumes[v].virtiofs.as_ref().and_then(|f| f.mapping.as_deref()) else {
+        return;
+    };
+    if !crate::model::mapping_id(mapping) {
+        p.add(
+            format!("{at}.virtiofs.mapping"),
+            format!("`{mapping}` isn't a directory mapping id: a letter, then letters, digits, '-' and '_', at most 64"),
+        );
     }
 }
 

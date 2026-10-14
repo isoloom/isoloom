@@ -177,7 +177,7 @@ reach: [{ from: out, to: dmz, ports: [80] }]
 dns: { private: true, domain: every.internal }
 inputs: [TOKEN]
 secrets: { token: { env: TOKEN } }
-volumes: { data: { owner: fw, persistent: true, external: lab-data } }
+volumes: { data: { owner: fw, persistent: true, external: lab-data, virtiofs: { mapping: lab-data, cache: never, direct_io: true, xattr: true, acl: true } } }
 machines:
   fw:
     networks: { out: 2, dmz: 1 }

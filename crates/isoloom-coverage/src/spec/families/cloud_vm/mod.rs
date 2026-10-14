@@ -21,5 +21,6 @@ pub const PARTS: &[&[(&str, Status)]] = &[
     super::own_image::CLOUD_BOOT,
     hardware::CELLS,
     super::links::CLOUD_VM,
+    super::virtiofs::NOT_PROXMOX,
     storage::CELLS,
 ];

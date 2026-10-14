@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Shared volumes as folders of the Proxmox server (virtiofs)
+- Spec: a top-level volume takes `virtiofs: { mapping, cache, direct_io, xattr, acl }` (`virtiofs: {}` for the defaults). On Proxmox the volume is then a folder of the server shared into each VM that mounts it, instead of NFS from its owner; every other target ignores it. `validate` checks the mapping id, and names the missing virtio-fs driver and WinFsp for a Windows VM.
+- Proxmox: a `virtiofs` device on each VM that mounts the volume (`mapping`, `cache` (`auto` by default), `direct_io`, `expose_xattr`, `expose_acl`), and a `proxmox_hardware_mapping_dir` per volume that names no mapping, for `<virtiofs_root>/<environment>/<volume>` on the node (new variable `virtiofs_root`, `/srv/isoloom` by default; make the folder before `apply`). Each VM mounts the folder by its tag from `/etc/fstab`; a `subpath` binds its folder from the whole one. Refused: an LXC container mounting one, a Windows VM, more than 8 on a VM. Validated with `terraform validate`; not run on a real host.
+- Plan: `SharedRole::HostFolder`, which a target puts in place of the NFS roles. Coverage: the six `virtiofs` rows and `proxmox_hardware_mapping_dir` are written (Terraform: Proxmox at 100%); the spec table has rows for the new fields. A written Terraform argument's own rule may now carry its note.
+
 ### IPv6 networks on Oracle Cloud
 - Oracle Cloud `cloud-vm` takes dual-stack networks. The VCN holds each network's IPv6 block as a private prefix (`is_ipv6enabled`, `ipv6private_cidr_blocks`), with no Oracle-allocated public prefix beside them (`is_oracle_gua_allocation_enabled = false`), and each subnet holds its network's block (`ipv6cidr_block`). Each VNIC, on the instance and on each `oci_core_vnic_attachment`, asks for an address in that prefix (`assign_ipv6ip`): the machine's derived one (`ipv6address_ipv6subnet_cidr_pair_details`), which the IPv6 set-up step puts on the interface.
 - `ipv6.addresses: auto` on Oracle Cloud: the VNIC names no address, Oracle Cloud picks one, and the set-up reads it back from Terraform (the instance's primary VNIC details, a secondary VNIC's `data.oci_core_vnic`) and puts it on the interface at every boot. Azure refuses `auto` with its own reason (it gives each interface the derived address); the plan no longer refuses `auto` on `cloud-vm` as a whole.

@@ -31,6 +31,7 @@ pub fn blocks(env: &Environment, name: &str, m: &mut Module) {
         if needs_project(env, name) {
             config.file_lists.push(reference("local.project_files"));
         }
+        config.files.extend(super::virtiofs::tag_files(env, name));
         cloud_init::machine(env, name, &mut config);
         m.commented(&format!("Machine `{name}`."), snippet(&res(name), name, config.document()));
         super::image::boot(name, mp).unwrap_or_else(|| Boot::Image(super::arch::image_res(mp)))
@@ -77,6 +78,7 @@ fn vm(env: &Environment, name: &str, boot: Boot) -> Vm {
         ips,
         depends_on: depends_on(env, mp),
         data_disks: mp.disks.clone(),
+        folders: super::virtiofs::devices(env, name),
     }
 }
 
@@ -230,6 +232,8 @@ pub struct Vm {
     pub depends_on: Vec<Expression>,
     /// Its data disks, after its own.
     pub data_disks: Vec<isoloom_plan::DataDisk>,
+    /// The server's folders shared into it (`virtiofs` devices).
+    pub folders: Vec<Block>,
 }
 
 impl Vm {
@@ -272,6 +276,7 @@ impl Vm {
             .add_blocks(self.data_disks.iter().enumerate().map(|(i, d)| data_disk(i, d)))
             .add_blocks(std::mem::take(&mut self.nics))
             .add_blocks(std::mem::take(&mut self.pci))
+            .add_blocks(std::mem::take(&mut self.folders))
             .add_block(self.initialization());
         let ostype = match self.boot {
             Boot::Image(_) | Boot::Clone(_) => "l26",

@@ -12,6 +12,8 @@
 //!   `reboot` step, cloud-init restarts the machine and a unit runs the rest at the next boot.
 //! - A Windows machine is a full clone of a template you give per OS, set up by cloudbase-init
 //!   and reached by the controller over WinRM as `isoloom` (its `windows` module).
+//! - A shared volume may be a folder of the server instead (`virtiofs`), mounted by each VM
+//!   that uses it (its `virtiofs` module).
 //! - A machine with a virtual TPM (`vm.tpm`, or Windows 11's own) has its state on the VM
 //!   datastore (`tpm_state`).
 //! - The connection, the node, the datastores and a `slot` (unique per environment on the
@@ -34,6 +36,7 @@ pub(crate) mod module;
 pub(crate) mod outputs;
 mod outside;
 pub(crate) mod router;
+mod virtiofs;
 mod windows;
 
 pub use crate::vm::res;
@@ -96,6 +99,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
             .or_else(|| image::refusal(env))
             .or_else(|| boot::refusal(env))
             .or_else(|| arch::refusal(env))
+            .or_else(|| virtiofs::refusal(env))
             .or_else(|| lxc::refusal(env))
     })
 }
@@ -151,7 +155,8 @@ impl Backend for ProxmoxBackend {
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        let env = &*lxc::checked(env);
+        let checked = lxc::checked(env);
+        let env = &*virtiofs::mounted(&checked);
         backend::check(Target::Proxmox, env, &self.capabilities())?;
         if let Some(what) = refusal(env) {
             return Err(unsupported(what));

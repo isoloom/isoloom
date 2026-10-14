@@ -70,6 +70,11 @@ pub fn probe(path: &str) -> Option<String> {
             format!("{{ volumes: {{ data: {{ owner: a }} }}, machines: {{ a: {{ volumes: {{ data: /data }} }}, {B}, volumes: {{ data: /data }} }} }} }}")
         }
         "volumes.*.persistent" => "{ volumes: { data: { persistent: true } }, machines: { a: { volumes: { data: /data } } } }".to_string(),
+        "volumes.*.virtiofs.mapping"
+        | "volumes.*.virtiofs.cache"
+        | "volumes.*.virtiofs.direct_io"
+        | "volumes.*.virtiofs.xattr"
+        | "volumes.*.virtiofs.acl" => "{ volumes: { data: { virtiofs: { mapping: lab-data, cache: never, direct_io: true, xattr: true, acl: true } } }, machines: { a: { volumes: { data: /data } } } }".to_string(),
         "volumes.*.external" => "{ volumes: { data: { external: lab-data } }, machines: { a: { volumes: { data: /data } } } }".to_string(),
         "machines.*.volumes.*.path" | "machines.*.volumes.*.subpath" => format!(
             "{{ volumes: {{ data: {{ owner: a }} }}, machines: {{ a: {{ volumes: {{ data: /data }} }}, {B}, volumes: {{ data: {{ path: /srv, subpath: www }} }} }} }} }}"
