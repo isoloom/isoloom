@@ -169,6 +169,8 @@ fn machine(path: &str) -> Option<&'static str> {
         "vm.image.qemu" => "{ vm: { image: { qemu: generic/debian12 } } }",
         "vm.image.hyperv" => "{ vm: { image: { hyperv: generic/debian12 } } }",
         "vm.image.winrm" => "{ vm: { os: windows-server-2022, provision: [setup.ps1], image: { winrm: plaintext } } }",
+        "vm.image.winssh" => "{ vm: { os: windows-server-2022, provision: [setup.ps1], image: { winssh: true } } }",
+        "vm.tpm" => "{ vm: { tpm: true } }",
         "external.user" => "{ external: { user: admin } }",
         "external.port" => "{ external: { port: 2222 } }",
         "external.key" => "{ external: { key: ~/.ssh/lab } }",

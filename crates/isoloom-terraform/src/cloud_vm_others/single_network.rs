@@ -26,6 +26,8 @@ pub struct Rules {
     pub has_image: fn(&str) -> bool,
     /// The OSes it has images for, as its refusal lists them.
     pub images: &'static str,
+    /// Whether its VMs can have a virtual TPM.
+    pub tpm: bool,
 }
 
 /// The features every cloud lacks for now, `arm64` and `ipv6` the cloud's own.
@@ -63,6 +65,12 @@ pub fn refusal(env: &Environment, rules: &Rules) -> Option<String> {
     }
     if let Some(why) = rules.limits.refusal(env) {
         return Some(why);
+    }
+    if let Some((name, _)) = vms(env)
+        .find(|(_, mp)| mp.tpm == Some(isoloom_spec::windows::Tpm::Required))
+        .filter(|_| !rules.tpm)
+    {
+        return Some(format!("machine `{name}` asks for a virtual TPM (`vm.tpm: true`): {cloud} gives none"));
     }
     vms(env).find_map(|(name, mp)| {
         let os = os(mp).unwrap_or_default();

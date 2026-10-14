@@ -54,6 +54,8 @@ fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ip
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
         qemu: Qemu::helper(link),
         hyperv: HyperV::helper(env, at),
+        tpm: None,
+        esxi_guestos: None,
     }
 }
 

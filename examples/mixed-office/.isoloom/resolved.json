@@ -125,11 +125,10 @@
     "generated": [
       "hybrid",
       "vagrant",
+      "proxmox",
       "cloud-vm"
     ],
-    "refused": {
-      "proxmox": "machine `files01`: no Proxmox image for `windows-server-2019` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7)"
-    },
+    "refused": {},
     "not_possible": {
       "docker": "needs `docker:` on files01",
       "hosted": "needs `docker:` on files01",

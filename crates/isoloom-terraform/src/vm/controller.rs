@@ -5,7 +5,7 @@
 
 use isoloom_plan::{Environment, Step};
 use isoloom_render::hcl_builder::{Block, Expression, Template, call, reference, string};
-use isoloom_render::inventory::{self, Access};
+use isoloom_render::inventory::{self, Access, WinrmAuth};
 use isoloom_render::{address, ansible_runs, names_of, steps};
 
 use super::provisioner::{Connection, Provisioner, Upload};
@@ -76,11 +76,17 @@ pub fn playbooks(env: &Environment) -> String {
 const WINDOWS_PASSWORD: &str = "random_password.windows.result";
 
 /// A cloud's inventory (the shared one, `isoloom_render::inventory`): each Linux VM as its
-/// image's user (`user(os)`), the Windows VMs over WinRM with the generated password, which is
-/// interpolated where the inventory names it.
-pub fn cloud_inventory(env: &Environment, user: impl Fn(&str) -> String) -> Template {
+/// image's user (`user(os)`), the Windows VMs over WinRM (authenticated with `auth`, as
+/// Terraform's own connection is) with the generated password.
+pub fn cloud_inventory(env: &Environment, user: impl Fn(&str) -> String, auth: WinrmAuth) -> Template {
+    inventory_template(env, |password| Access::cloud(user, password, auth))
+}
+
+/// The inventory `access` gives (from the generated Windows password's Terraform expression),
+/// that password interpolated where the inventory names it.
+pub fn inventory_template<'a>(env: &Environment, access: impl FnOnce(&str) -> Access<'a>) -> Template {
     let marker = format!("${{{WINDOWS_PASSWORD}}}");
-    let text = inventory::render(env, &Access::cloud(user, &marker));
+    let text = inventory::render(env, &access(&marker));
     let mut t = Template::new();
     for (i, part) in text.split(marker.as_str()).enumerate() {
         if i > 0 {

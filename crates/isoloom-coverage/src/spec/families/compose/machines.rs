@@ -276,5 +276,7 @@ pub const CELLS: &[(&str, Status)] = &[
     ("machines.*.vm.image.qemu", NOT_A_VM),
     ("machines.*.vm.image.hyperv", NOT_A_VM),
     ("machines.*.vm.image.winrm", NOT_A_VM),
+    ("machines.*.vm.image.winssh", NOT_A_VM),
     ("machines.*.vm.provision", NOT_A_VM),
+    ("machines.*.vm.tpm", NOT_A_VM),
 ];

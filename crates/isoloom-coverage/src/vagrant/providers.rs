@@ -14,9 +14,9 @@ pub(super) fn virtualbox(s: &str) -> Option<Support> {
         "cpus" | "memory" => RESOURCES,
         "name" => VM_NAME,
         "linked_clone" => LINKED_CLONE_ON,
-        // Raw `modifyvm` stays out of the format, but the hybrid target writes one itself.
+        // Raw `modifyvm` stays out of the format, but Isoloom writes two itself.
         "customize" => Emitted {
-            from: "(the hybrid target's Docker host only: its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks; no spec field writes raw commands)",
+            from: "machines.*.vm.tpm (a TPM 2.0, `--tpm-type`), and the hybrid target's Docker host (its NICs in promiscuous mode, so its containers get their own addresses on the VMs' networks); no spec field writes raw commands",
         },
         "customizations" => PROVIDER_SPECIFIC,
         "network_adapter" | "network_adapters" => PRIVATE_NETWORKS,

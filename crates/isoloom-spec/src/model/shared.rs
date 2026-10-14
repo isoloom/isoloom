@@ -94,6 +94,9 @@ pub struct SharedVm {
     /// Images per target instead of the OS name's, as `vm.image` on a machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image: Option<VmImage>,
+    /// A virtual TPM 2.0, as `vm.tpm` on a machine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tpm: Option<bool>,
 }
 
 /// A group: the machines in it, and the fields they share.

@@ -19,8 +19,10 @@ const HOST: Support = NotPortable {
 const DEVICES: Support = Planned {
     note: "device passthrough (GPUs), where the cluster offers it",
 };
-const WINDOWS: Support = Planned {
-    note: "Windows machines in Windows containers (Windows makes an environment VM-only today)",
+/// Windows containers (ADR 0006): Isoloom's Windows machines are full Windows VMs (a desktop or a
+/// server with WinRM, a domain controller), which no Windows container image is.
+const WINDOWS: Support = NotPortable {
+    why: "Windows containers only: Isoloom's Windows machines are VMs, which Kubernetes refuses (a Linux pod needs neither field)",
 };
 const HEALTHCHECK: Support = Planned {
     note: "with a custom healthcheck command (the probe checks the services' ports today)",

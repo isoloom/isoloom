@@ -102,9 +102,6 @@ pub(crate) const MORE_DISKS: Support = Equivalent {
     via: "machines.*.resources.disk_gb and machines.*.volumes (one disk, sized, holding the volumes' paths)",
 };
 pub(crate) const ARCH: Support = Emitted { from: "machines.*.arch" };
-pub(crate) const WINDOWS: Support = Planned {
-    note: "with Windows guests (which make an environment VM-only)",
-};
 pub(crate) const RESOURCES: Support = Emitted { from: "machines.*.resources" };
 pub(crate) const VM_NAME: Support = Emitted {
     from: "(the environment and machine names, as the VM's display name)",

@@ -99,7 +99,9 @@ const WRITTEN: &[(&str, &str)] = &[
         "oci_core_instance",
         "availability_domain compartment_id create_vnic_details create_vnic_details.assign_public_ip create_vnic_details.hostname_label
         create_vnic_details.private_ip create_vnic_details.subnet_id display_name metadata shape shape_config shape_config.memory_in_gbs
-        shape_config.ocpus source_details source_details.boot_volume_size_in_gbs source_details.source_id source_details.source_type",
+        platform_config platform_config.is_measured_boot_enabled platform_config.is_secure_boot_enabled
+        platform_config.is_trusted_platform_module_enabled platform_config.type shape_config.ocpus source_details
+        source_details.boot_volume_size_in_gbs source_details.source_id source_details.source_type",
     ),
     ("oci_core_internet_gateway", "compartment_id display_name vcn_id"),
     (

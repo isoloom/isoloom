@@ -220,10 +220,24 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.vm.image.winssh",
+        NotApplicable {
+            why: "cloud Windows images get WinRM from their user data",
+        },
+    ),
+    (
         "machines.*.vm.provision",
         Done {
             how: "steps over SSH (.sh, Ansible on the machine, `reboot` between provisioners); .ps1 over WinRM on Windows",
             proof: "existing-hosts",
+        },
+    ),
+    (
+        "machines.*.vm.tpm",
+        Partial {
+            how: "NitroTPM on AWS (the plan stops if the AMI has none), trusted launch on Azure, a shielded VM on Google Cloud and Oracle Cloud",
+            gap: "Windows on AWS (Amazon's NitroTPM Windows images)",
+            proof: "tuned-web",
         },
     ),
 ];

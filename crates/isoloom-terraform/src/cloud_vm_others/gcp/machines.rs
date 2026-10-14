@@ -4,7 +4,7 @@
 use std::net::Ipv4Addr;
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Module, list, null, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, list, null, number, object, reference, string};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
@@ -32,6 +32,7 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         memory: mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
         disk: Some(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)),
         on: (net, *address),
+        tpm: mp.tpm.is_some(),
     }));
     let hooks = Hooks {
         at_boot: Vec::new(),
@@ -128,6 +129,8 @@ struct Instance<'a> {
     disk: Option<u32>,
     /// Its network and address there.
     on: (&'a str, Ipv4Addr),
+    /// A shielded VM with a virtual TPM and secure boot (`vm.tpm`).
+    tpm: bool,
 }
 
 /// An instance at its address with a public one; its user from the `ssh-keys` metadata; the
@@ -144,8 +147,17 @@ fn instance(i: &Instance) -> Block {
         .add_block(Block::builder("access_config").build())
         .build();
     let key = isoloom_render::hcl_builder::Template::text(format!("{user}:")).with_expr(reference("var.ssh_public_key"));
-    resource("google_compute_instance", i.id)
-        .add_attribute(("project", reference("local.project")))
+    let mut b = resource("google_compute_instance", i.id);
+    if i.tpm {
+        // Google's public images are all shielded-VM images: a vTPM and secure boot.
+        b = b.add_block(
+            Block::builder("shielded_instance_config")
+                .add_attribute(("enable_secure_boot", boolean(true)))
+                .add_attribute(("enable_vtpm", boolean(true)))
+                .build(),
+        );
+    }
+    b.add_attribute(("project", reference("local.project")))
         .add_attribute(("name", name_with(&format!("-{}", i.who))))
         .add_attribute(("machine_type", string(machine_type(i.memory))))
         .add_attribute(("zone", reference("local.zone")))
@@ -180,6 +192,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
         memory,
         disk,
         on: (net, address),
+        tpm: false,
     }));
     let ssh = controller::Ssh {
         env,
@@ -187,7 +200,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
         host: public_ip(id),
         user: user(controller::OS).to_string(),
         at_boot: Vec::new(),
-        inventory: controller::cloud_inventory(env, |os| user(os).to_string()),
+        inventory: controller::cloud_inventory(env, |os| user(os).to_string(), isoloom_render::inventory::WinrmAuth::Basic),
     };
     m.block(controller::provisioner(ssh).block());
 }

@@ -113,11 +113,14 @@ fn external_hosts_carry_their_user_port_and_quoted_key() {
 }
 
 #[test]
-fn proxmox_keeps_the_groups_and_gives_windows_no_account() {
-    let inv = render(&env(SPEC, Target::Proxmox), &Access::proxmox());
+fn proxmox_keeps_the_groups_and_gives_windows_its_winrm_account() {
+    let inv = render(&env(SPEC, Target::Proxmox), &Access::proxmox("pw"));
     assert!(section(&inv, "linux").starts_with("web ansible_host=10.8.0.10 ansible_user=isoloom code="));
     assert_eq!(section(&inv, "windows"), "dc ansible_host=10.9.0.20\n\n");
-    assert!(!inv.contains("[windows:vars]"), "{inv}");
+    assert!(
+        section(&inv, "windows:vars").starts_with("ansible_user=isoloom\nansible_password=pw\nansible_connection=winrm\n"),
+        "{inv}"
+    );
     assert_eq!(section(&inv, "servers"), "web\ndc\n");
 }
 
@@ -126,6 +129,7 @@ fn a_cloud_names_each_linux_user_and_the_windows_password() {
     let access = Access::cloud(
         |os| if os == "debian-12" { "admin".into() } else { "ubuntu".into() },
         "${random_password.windows.result}",
+        WinrmAuth::Basic,
     );
     let inv = render(&env(SPEC, Target::CloudVm), &access);
     assert!(section(&inv, "linux").starts_with("web ansible_host=10.8.0.10 ansible_user=admin code="));

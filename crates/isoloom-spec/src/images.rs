@@ -82,6 +82,7 @@ impl Table {
                     os: os.clone(),
                     provision: Vec::new(),
                     image: self.os.get(os).cloned(),
+                    tpm: None,
                 });
                 m.supplied = true;
             }

@@ -2,7 +2,9 @@
 //! through the VM core; the Windows machines' and the controller's.
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, object, reference, string};
+use isoloom_render::hcl_builder::{
+    BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string,
+};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
@@ -27,11 +29,14 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
     let mp = &env.machines[name];
     let id = res(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, name, false));
-    let ami = r(&format!("data.aws_ami.{}.id", res(os(mp).unwrap_or_default())));
+    let ami = res(os(mp).unwrap_or_default());
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
-    let instance = resource("aws_instance", &id)
-        .add_attribute(("ami", ami))
+    let mut instance = resource("aws_instance", &id)
+        .add_attribute(("ami", r(&format!("data.aws_ami.{ami}.id"))))
         .add_attribute(("instance_type", string(instance_type(mem))));
+    if mp.tpm.is_some() {
+        instance = instance.add_block(nitro_tpm(&ami));
+    }
     if mp.addresses.len() > 1 {
         m.blocks(several_networks(env, name, instance));
     } else {
@@ -52,6 +57,20 @@ pub fn linux(env: &Environment, name: &str, m: &mut Module) {
         hooks,
     };
     m.block(linux::provisioner(machine).block());
+}
+
+/// A TPM on AWS is NitroTPM, which the AMI enables (`tpm_support`): the plan stops when the
+/// image has none rather than start a VM without.
+fn nitro_tpm(ami: &str) -> Block {
+    let condition = binary(r(&format!("data.aws_ami.{ami}.tpm_support")), BinaryOperator::Eq, string("v2.0"));
+    let precondition = Block::builder("precondition")
+        .add_attribute(("condition", condition))
+        .add_attribute((
+            "error_message",
+            string("The machine asks for a TPM (vm.tpm), and this AMI has no NitroTPM support."),
+        ))
+        .build();
+    Block::builder("lifecycle").add_block(precondition).build()
 }
 
 /// The instance on its network, at its address.
@@ -230,7 +249,7 @@ pub fn controller(env: &Environment, m: &mut Module) {
         .iter()
         .map(|(n, p)| (n.clone(), Cidr::parse(&p.cidr).map_or(std::net::Ipv4Addr::UNSPECIFIED, Cidr::controller)))
         .collect();
-    let inventory = controller::cloud_inventory(env, |os| image_user(os).to_string());
+    let inventory = controller::cloud_inventory(env, |os| image_user(os).to_string(), isoloom_render::inventory::WinrmAuth::Basic);
     let ssh = controller::Ssh {
         env,
         replace_on: r("aws_instance.isoloom_controller.id"),

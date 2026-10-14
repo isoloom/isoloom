@@ -34,6 +34,7 @@ mod machine;
 mod providers;
 mod qemu;
 pub mod transport;
+mod windows;
 
 use indexmap::IndexMap;
 use isoloom_plan::{Capabilities, Environment, Feature, MachineShape};
@@ -77,6 +78,8 @@ pub fn capabilities() -> Capabilities {
         Feature::TrafficControl,
         Feature::Ipv6,
         Feature::BridgedNetworks,
+        // Given on VirtualBox, libvirt and Hyper-V; `provider_refusal` refuses the others.
+        Feature::Tpm,
     ])
 }
 
@@ -287,4 +290,18 @@ pub fn hyperv_refusal(spec: &Spec) -> Option<String> {
 /// network (`refusal_on` asks it for `libvirt`).
 pub fn libvirt_refusal(spec: &Spec) -> Option<String> {
     bridged::provider_refusal(&Environment::build(spec, Target::Vagrant, None), "libvirt")
+}
+
+/// Why this environment's VMs can't all run under Vagrant's `provider` (as `vagrant up
+/// --provider` names it), if they can't: a machine requiring a TPM the provider doesn't give,
+/// then QEMU's and UTM's networks, Hyper-V's boxes and libvirt's bridged networks. `refusal_on` asks it.
+pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
+    let env = Environment::build(spec, Target::Vagrant, None);
+    windows::tpm_refusal(&env, provider).or_else(|| match provider {
+        "qemu" => qemu_refusal(spec),
+        "utm" => utm_refusal(spec),
+        "hyperv" => hyperv_refusal(spec),
+        "libvirt" => libvirt_refusal(spec),
+        _ => None,
+    })
 }

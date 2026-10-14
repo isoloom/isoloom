@@ -5,10 +5,12 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use indexmap::IndexMap;
 use isoloom_spec::model::Spec;
+use isoloom_spec::windows::Tpm;
 
 use crate::checks::{self, Position, Probe};
-use crate::environment::MachineShape;
+use crate::environment::{MachinePlan, MachineShape};
 
 /// A capability a backend may have: the kind of a [`Requirement`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -51,6 +53,8 @@ pub enum Feature {
     OwnedProjectFiles,
     /// Files written on a host that already exists.
     ExistingHostFiles,
+    /// A virtual TPM 2.0 in a VM.
+    Tpm,
 }
 
 /// One thing the environment needs from the backend that renders it, with what in the spec
@@ -146,6 +150,11 @@ pub enum Requirement {
         /// The machine.
         machine: String,
     },
+    /// A VM asks for a virtual TPM (`vm.tpm: true`).
+    Tpm {
+        /// The first machine that does.
+        machine: String,
+    },
 }
 
 impl Requirement {
@@ -171,6 +180,7 @@ impl Requirement {
             Requirement::BridgedNetwork { .. } => Feature::BridgedNetworks,
             Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
             Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
+            Requirement::Tpm { .. } => Feature::Tpm,
         }
     }
 }
@@ -193,12 +203,10 @@ impl fmt::Display for Requirement {
                 f,
                 "volume `{volume}` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now"
             ),
-            Requirement::VmDependsOnContainer { vm, container } => {
-                write!(
-                    f,
-                    "VM `{vm}` depends on container `{container}`: VMs start first in a hybrid environment, for now"
-                )
-            }
+            Requirement::VmDependsOnContainer { vm, container } => write!(
+                f,
+                "VM `{vm}` depends on container `{container}`: VMs start first in a hybrid environment, for now"
+            ),
             // Only Kubernetes lacks these today: the messages say so in its terms.
             Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
             Requirement::Ulimits { machine } => {
@@ -238,8 +246,17 @@ impl fmt::Display for Requirement {
                 f,
                 "machine `{machine}` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook"
             ),
+            Requirement::Tpm { machine } => no_tpm(f, machine),
         }
     }
+}
+
+/// Why a target without a virtual TPM refuses a machine that requires one.
+fn no_tpm(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
+    write!(
+        f,
+        "machine `{machine}` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+    )
 }
 
 /// What a backend can render.
@@ -354,6 +371,15 @@ pub fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -
         }
     }
     out
+}
+
+/// The first VM that requires a TPM (`vm.tpm: true`); one Windows 11 merely expects is given
+/// where the target can, so it requires nothing.
+pub fn tpm(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
+    machines
+        .iter()
+        .find(|(_, m)| m.shape == MachineShape::Vm && m.tpm == Some(Tpm::Required))
+        .map(|(name, _)| Requirement::Tpm { machine: name.clone() })
 }
 
 /// The checks' requirements beyond probing from a container: playbooks, and `exec` checks that

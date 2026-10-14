@@ -13,8 +13,14 @@ use crate::vm::{controller, os, res, vms};
 
 /// Everything before the router.
 pub fn blocks(env: &Environment, m: &mut Module) {
-    m.block(terraform(&[versions::PROXMOX, versions::TLS]));
+    let windows = vms(env).any(|(_, mp)| mp.is_windows());
+    let mut providers = vec![versions::PROXMOX, versions::TLS];
+    if windows {
+        providers.push(versions::RANDOM);
+    }
+    m.block(terraform(&providers));
     m.blocks(variables());
+    m.blocks(super::windows::variables(env));
     if !env.spec().inputs.is_empty() {
         m.block(inputs_variable());
     }
@@ -34,6 +40,12 @@ pub fn blocks(env: &Environment, m: &mut Module) {
     );
     if controller::needed(env) {
         m.commented("The controller's own key: it runs the playbooks over SSH on every machine.", controller::key());
+    }
+    if windows {
+        m.commented(
+            "The Windows machines' administrator password (user isoloom), for WinRM.",
+            crate::vm::cloud::windows_password(),
+        );
     }
     let mut vnets = Vec::new();
     for (i, (net, plan)) in env.networks.iter().enumerate() {

@@ -54,8 +54,10 @@ fn written_matches(rows: &[(String, Support)], written: &BTreeSet<String>, forma
 }
 
 /// Specs for what no example exercises: a VM on the host's LAN, at a fixed address and by DHCP
-/// with the LAN's default route (`public_network`).
-const VAGRANT_FIXTURES: &[&str] = &["
+/// with the LAN's default route (`public_network`); a Windows 11 machine (the TPM its OS
+/// expects) and a Windows box reached over OpenSSH (`winssh`) that requires a TPM.
+const VAGRANT_FIXTURES: &[&str] = &[
+    "
 version: 1
 name: home-lan
 networks:
@@ -64,7 +66,20 @@ networks:
   wifi: { cidr: 192.168.2.0/24, bridged: { dhcp: true, default_route: true } }
 machines:
   a: { networks: { lan: 10, home: 50, wifi: 0 }, vm: { os: debian-12, provision: [setup.sh] } }
-"];
+",
+    "
+version: 1
+name: windows-guests
+networks: { lab: { cidr: 192.168.58.0/24 } }
+machines:
+  ws01:
+    networks: { lab: 21 }
+    vm: { os: windows-11, provision: [setup.ps1] }
+  srv01:
+    networks: { lab: 10 }
+    vm: { os: windows-server-2022, provision: [setup.ps1], image: { winssh: true }, tpm: true }
+",
+];
 
 /// Every Vagrantfile the generators write for the examples: the vagrant output (every provider
 /// is a block of the same file), docker-vm and hybrid, generated now rather than read from the

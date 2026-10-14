@@ -160,10 +160,10 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
     end
 
     # Builds the archive, uploads it, unpacks it in /opt/isoloom (C:\isoloom on Windows, over
-    # WinRM, with UNTAR_PS1), replacing an older copy.
+    # WinRM or OpenSSH, with UNTAR_PS1), replacing an older copy.
     class Provisioner < Vagrant.plugin("2", :provisioner)
       def provision
-        windows = @machine.config.vm.communicator.to_s == "winrm"
+        windows = %w[winrm winssh].include?(@machine.config.vm.communicator.to_s)
         Tempfile.create(["isoloom-project", ".tgz"]) do |f|
           f.binmode
           IsoloomProject.write(ROOT, f, generated: config.generated, extra: config.extra)
@@ -361,6 +361,15 @@ module IsoloomHyperV
     }).join("; "))
   end
 
+  # Before the VM starts: a virtual TPM 2.0, with a key protector of this host's own (Hyper-V
+  # enables none without one). A generation 1 VM has no TPM to give: an error when the spec
+  # requires one, else it starts without (Windows 11's boxes install without one).
+  def self.tpm(machine, required)
+    ps("$vm = Hyper-V\\Get-VM -Id #{q(machine.id)}; " \
+       "if ($vm.Generation -lt 2) { if (#{required ? '$true' : '$false'}) { throw ($vm.Name + ' is a generation 1 VM: it has no virtual TPM') } } " \
+       "elseif (-not (Hyper-V\\Get-VMSecurity -VM $vm).TpmEnabled) { Hyper-V\\Set-VMKeyProtector -VM $vm -NewLocalKeyProtector; Hyper-V\\Enable-VMTPM -VM $vm }")
+  end
+
   # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
   # answers, before its provisioning: its addresses on the networks.
   def self.address(machine, script)
@@ -543,6 +552,7 @@ Vagrant.configure("2") do |config|
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks(["office"])
       v.guest_name = "mixed-office-files01"
+      v.guest_guestos = "windows2019srv-64"
       v.guest_numvcpus = 2
       v.guest_memsize = 3072
     end

@@ -10,7 +10,7 @@ use isoloom_render::hcl_builder::{Expression, Module, Template, call, list, numb
 use isoloom_render::router;
 use isoloom_spec::validate::{Cidr, IPV6_PREFIX};
 
-use super::machine::{Vm, ip_config, nic, snippet};
+use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::vm::cloud_init::{self, CloudConfig, file};
 use crate::vm::{controller, res};
 
@@ -46,7 +46,8 @@ pub fn blocks(env: &Environment, m: &mut Module) {
         snippet: "router".into(),
         name: "router".into(),
         size: (1, 512, 8),
-        image: res(controller::OS),
+        boot: Boot::Image(res(controller::OS)),
+        tpm: false,
         agent: true,
         nics,
         dns: None,

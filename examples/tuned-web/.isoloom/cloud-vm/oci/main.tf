@@ -151,6 +151,12 @@ resource "oci_core_instance" "web" {
     ocpus         = 1
     memory_in_gbs = 1
   }
+  platform_config {
+    type                               = "AMD_VM"
+    is_secure_boot_enabled             = true
+    is_measured_boot_enabled           = true
+    is_trusted_platform_module_enabled = true
+  }
   source_details {
     source_type             = "image"
     source_id               = data.oci_core_images.ubuntu_2404.images[0].id

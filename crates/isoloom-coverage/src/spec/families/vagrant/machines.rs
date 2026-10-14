@@ -1,7 +1,7 @@
 //! The Vagrant output's cells for the machines' fields and the shared volumes.
 
 use crate::spec::status::Status::{Done, NotApplicable, Partial};
-use crate::spec::status::{NOT_A_CONTAINER, Status};
+use crate::spec::status::{NOT_A_CONTAINER, PROBE, Status};
 
 /// The cells of this section.
 pub const CELLS: &[(&str, Status)] = &[
@@ -202,10 +202,9 @@ pub const CELLS: &[(&str, Status)] = &[
     ("machines.*.docker.idle", NOT_A_CONTAINER),
     (
         "machines.*.vm.os",
-        Partial {
-            how: "Vagrant boxes for debian-12, ubuntu-24.04 and kali",
-            gap: "Windows",
-            proof: "hello-stack",
+        Done {
+            how: "a Vagrant box for every OS name, Windows among them (over WinRM, or OpenSSH with `vm.image.winssh`)",
+            proof: "windows-hello",
         },
     ),
     (
@@ -244,10 +243,24 @@ pub const CELLS: &[(&str, Status)] = &[
         },
     ),
     (
+        "machines.*.vm.image.winssh",
+        Done {
+            how: "a Windows box reached over OpenSSH (`config.winssh`, PowerShell), the playbooks over SSH",
+            proof: PROBE,
+        },
+    ),
+    (
         "machines.*.vm.provision",
         Done {
             how: "`.sh` steps, Ansible run inside the VM, and `reboot` (Vagrant restarts the VM)",
             proof: "existing-hosts",
+        },
+    ),
+    (
+        "machines.*.vm.tpm",
+        Done {
+            how: "a TPM 2.0 on VirtualBox (`--tpm-type`), libvirt (emulated) and Hyper-V (a trigger); `tpm: true` is refused on the other providers",
+            proof: PROBE,
         },
     ),
 ];

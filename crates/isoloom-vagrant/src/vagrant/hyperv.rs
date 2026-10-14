@@ -6,7 +6,8 @@
 //!
 //! - before `Configure`: the first adapter's switch (`ISOLOOM_HYPERV_SWITCH`, else the Default
 //!   Switch) must exist, and each network is a private switch `isoloom-<env>-<network>`;
-//! - before `StartInstance`: an adapter per network with a fixed MAC ([`mac`]), connected there;
+//! - before `StartInstance`: an adapter per network with a fixed MAC ([`mac`]), connected there,
+//!   and the virtual TPM (`vm.tpm`, or Windows 11's own) enabled with a key protector of the host;
 //! - after `WaitForIPAddress`: the machine's addresses set in the guest, found by MAC (a
 //!   boot-time script on Linux, a static address through WMI on Windows), and a warning saying
 //!   where the published ports are (Hyper-V forwards none);
@@ -22,6 +23,7 @@ use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::netmask;
 use isoloom_spec::images::{self, HyperVBox};
 use isoloom_spec::validate::Cidr;
+use isoloom_spec::windows::Tpm;
 
 use super::providers::Size;
 use crate::ruby::{Call, Ruby, Value};
@@ -45,6 +47,8 @@ pub struct HyperV<'a> {
     pub nested: bool,
     /// Its published ports (guest, host): not forwarded on Hyper-V, so a warning says where.
     pub published: Vec<(u16, u16)>,
+    /// Its virtual TPM, enabled before it starts.
+    pub tpm: Option<Tpm>,
 }
 
 /// A VM's adapter on one network, and its address there.
@@ -85,6 +89,7 @@ impl<'a> HyperV<'a> {
             windows: false,
             nested: false,
             published: Vec::new(),
+            tpm: None,
         }
     }
 
@@ -163,14 +168,21 @@ fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
     trigger(r, "before", "Configure", |r| {
         r.line(format_args!("t.ruby {{ |_, _| IsoloomHyperV.switches({switches}) }}"));
     });
+    let nics = Value::array(
+        hv.nics
+            .iter()
+            .map(|n| Value::array([Value::str(&hv.switch(n.net)), Value::str(&mac_text(mac(vm_name, n.net), "", true))])),
+    );
+    let mut before_start = Vec::new();
     if !hv.nics.is_empty() {
-        let nics = Value::array(
-            hv.nics
-                .iter()
-                .map(|n| Value::array([Value::str(&hv.switch(n.net)), Value::str(&mac_text(mac(vm_name, n.net), "", true))])),
-        );
+        before_start.push(format!("IsoloomHyperV.attach(machine, {nics})"));
+    }
+    if let Some(t) = hv.tpm {
+        before_start.push(format!("IsoloomHyperV.tpm(machine, {})", t == Tpm::Required));
+    }
+    if !before_start.is_empty() {
         trigger(r, "before", "StartInstance", |r| {
-            r.line(format_args!("t.ruby {{ |_, machine| IsoloomHyperV.attach(machine, {nics}) }}"));
+            r.line(format_args!("t.ruby {{ |_, machine| {} }}", before_start.join("; ")));
         });
     }
     if hv.nics.is_empty() && hv.published.is_empty() {

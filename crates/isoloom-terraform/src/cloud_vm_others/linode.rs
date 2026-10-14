@@ -31,6 +31,7 @@ const RULES: Rules = Rules {
     ),
     has_image: |os| image(os).is_some(),
     images: "Debian 12/13, Ubuntu 22.04/24.04",
+    tpm: false,
 };
 
 /// The `cloud-vm` module on Linode.

@@ -147,8 +147,14 @@ resource "aws_security_group" "web" {
 }
 
 resource "aws_instance" "web" {
-  ami                         = data.aws_ami.debian_12.id
-  instance_type               = "t3.micro"
+  ami           = data.aws_ami.debian_12.id
+  instance_type = "t3.micro"
+  lifecycle {
+    precondition {
+      condition     = data.aws_ami.debian_12.tpm_support == "v2.0"
+      error_message = "The machine asks for a TPM (vm.tpm), and this AMI has no NitroTPM support."
+    }
+  }
   subnet_id                   = aws_subnet.app.id
   private_ip                  = "10.83.0.10"
   associate_public_ip_address = true

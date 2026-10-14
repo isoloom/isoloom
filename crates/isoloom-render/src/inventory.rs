@@ -86,7 +86,8 @@ pub fn winrm_vars(winrm: Winrm) -> Vars {
 
 impl Access<'static> {
     /// Vagrant: the boxes' own `vagrant` account (password auth); WinRM set per box, so a lab
-    /// can mix plain-HTTP and HTTPS Windows boxes.
+    /// can mix plain-HTTP and HTTPS Windows boxes, and a box reached over OpenSSH instead
+    /// (`vm.image.winssh`) gets SSH with PowerShell on its line.
     pub fn vagrant() -> Access<'static> {
         let account = [("ansible_user", "vagrant"), ("ansible_password", "vagrant")];
         let mut windows = vars(&account);
@@ -95,22 +96,11 @@ impl Access<'static> {
         Access {
             linux: vars(&account),
             windows,
-            host: Box::new(|h| h.machine.winrm.map(winrm_vars).unwrap_or_default()),
-        }
-    }
-
-    /// Proxmox: the `isoloom` user cloud-init creates on each Linux VM, with the controller's
-    /// key. Windows VMs get no connection variables (Proxmox's Windows set-up has no WinRM
-    /// account yet).
-    pub fn proxmox() -> Access<'static> {
-        Access {
-            linux: vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
-            windows: Vars::new(),
             host: Box::new(|h| {
-                if h.machine.is_windows() {
-                    Vars::new()
+                if h.machine.winssh {
+                    vars(&WINDOWS_OVER_SSH)
                 } else {
-                    vars(&[("ansible_user", "isoloom")])
+                    h.machine.winrm.map(winrm_vars).unwrap_or_default()
                 }
             }),
         }
@@ -121,27 +111,63 @@ impl Access<'static> {
     pub fn external() -> Access<'static> {
         Access {
             linux: Vars::new(),
-            windows: vars(&[("ansible_connection", "ssh"), ("ansible_shell_type", "powershell")]),
+            windows: vars(&WINDOWS_OVER_SSH),
             host: Box::new(|h| external_vars(h.machine)),
         }
     }
 }
 
+/// A Windows host reached over OpenSSH, its commands run by PowerShell.
+const WINDOWS_OVER_SSH: [(&str, &str); 2] = [("ansible_connection", "ssh"), ("ansible_shell_type", "powershell")];
+
+/// How a Windows machine set up by Isoloom (on Proxmox and the clouds) is reached: as
+/// `isoloom` with a generated password, over WinRM on plain HTTP.
+fn isoloom_over_winrm(password: &str, transport: WinrmAuth) -> Vars {
+    let mut windows = vars(&[("ansible_user", "isoloom"), ("ansible_password", password), ("ansible_connection", "winrm")]);
+    windows.extend(match transport {
+        WinrmAuth::Basic => winrm_vars(Winrm::Plaintext),
+        WinrmAuth::Ntlm => vars(&[("ansible_port", "5985"), ("ansible_winrm_scheme", "http"), ("ansible_winrm_transport", "ntlm")]),
+    });
+    windows.extend(vars(&WINRM_PATIENCE));
+    windows
+}
+
+/// How WinRM authenticates over plain HTTP: Basic where the image allows it, NTLM where it
+/// doesn't (Azure's Windows images).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WinrmAuth {
+    /// Basic authentication (the user data allows it).
+    Basic,
+    /// NTLM.
+    Ntlm,
+}
+
 impl<'a> Access<'a> {
-    /// A cloud: each Linux VM as its image's user (`linux_user` of its OS) with the
-    /// controller's key; Windows over plain-HTTP WinRM as `isoloom`, whose password is
-    /// `windows_password` (a Terraform expression, as the module writes it).
-    pub fn cloud(linux_user: impl Fn(&str) -> String + 'a, windows_password: &str) -> Access<'a> {
-        let mut windows = vars(&[
-            ("ansible_user", "isoloom"),
-            ("ansible_password", windows_password),
-            ("ansible_connection", "winrm"),
-        ]);
-        windows.extend(winrm_vars(Winrm::Plaintext));
-        windows.extend(vars(&WINRM_PATIENCE));
+    /// Proxmox: the `isoloom` user cloud-init creates on each Linux VM, with the controller's
+    /// key; on a Windows VM, the `isoloom` administrator its set-up makes, whose password is
+    /// `windows_password` (a Terraform expression, as the module writes it), over WinRM.
+    pub fn proxmox(windows_password: &str) -> Access<'a> {
         Access {
             linux: vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
-            windows,
+            windows: isoloom_over_winrm(windows_password, WinrmAuth::Basic),
+            host: Box::new(|h| {
+                if h.machine.is_windows() {
+                    Vars::new()
+                } else {
+                    vars(&[("ansible_user", "isoloom")])
+                }
+            }),
+        }
+    }
+
+    /// A cloud: each Linux VM as its image's user (`linux_user` of its OS) with the
+    /// controller's key; Windows over plain-HTTP WinRM as `isoloom`, whose password is
+    /// `windows_password` (a Terraform expression, as the module writes it), authenticated as
+    /// the cloud's images allow (`auth`, as Terraform's own connection does).
+    pub fn cloud(linux_user: impl Fn(&str) -> String + 'a, windows_password: &str, auth: WinrmAuth) -> Access<'a> {
+        Access {
+            linux: vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
+            windows: isoloom_over_winrm(windows_password, auth),
             host: Box::new(move |h| match h.machine.os.as_deref() {
                 Some(os) if !h.machine.is_windows() => vec![("ansible_user".to_string(), linux_user(os))],
                 _ => Vars::new(),

@@ -10,6 +10,10 @@
 //!   router as its gateway. Its set-up is a cloud-init document (the core's cloud-init
 //!   transport): the project written to /opt/isoloom, then its steps from the plan. After a
 //!   `reboot` step, cloud-init restarts the machine and a unit runs the rest at the next boot.
+//! - A Windows machine is a full clone of a template you give per OS, set up by cloudbase-init
+//!   and reached by the controller over WinRM as `isoloom` (its `windows` module).
+//! - A machine with a virtual TPM (`vm.tpm`, or Windows 11's own) has its state on the VM
+//!   datastore (`tpm_state`).
 //! - The connection, the node, the datastores and a `slot` (unique per environment on the
 //!   server: SDN ids are short) are variables.
 //! - Machines are reached through the router (`ssh -J isoloom@<address>`, the `isoloom` user
@@ -23,6 +27,7 @@ pub(crate) mod module;
 mod outputs;
 mod outside;
 mod router;
+mod windows;
 
 pub use crate::vm::res;
 
@@ -68,15 +73,17 @@ fn image_url(os: &str) -> Option<&'static str> {
     })
 }
 
-/// Why Proxmox can't run this environment, if it can't: its limits, then a machine with no
-/// cloud image (Windows among them).
+/// Why Proxmox can't run this environment, if it can't: its limits, then a Linux machine with
+/// no cloud image, then what a Windows machine can't have here yet.
 pub fn refusal(env: &Environment) -> Option<String> {
     LIMITS.refusal(env).or_else(|| {
-        vms(env).find_map(|(name, mp)| {
-            let os = os(mp).unwrap_or_default();
-            (is_windows(os) || image_url(os).is_none())
-                .then(|| format!("machine `{name}`: no Proxmox image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7)"))
-        })
+        vms(env)
+            .find_map(|(name, mp)| {
+                let os = os(mp).unwrap_or_default();
+                (!is_windows(os) && image_url(os).is_none())
+                    .then(|| format!("machine `{name}`: no Proxmox image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)"))
+            })
+            .or_else(|| windows::refusal(env))
     })
 }
 
@@ -105,6 +112,7 @@ impl Backend for ProxmoxBackend {
             // An existing bridge (`external`), or the uplink or another bridge (`bridged`).
             Feature::ExternalNetworks,
             Feature::BridgedNetworks,
+            Feature::Tpm,
         ])
     }
 

@@ -203,8 +203,8 @@ pub const CELLS: &[(&str, Status)] = &[
     (
         "machines.*.vm.os",
         Partial {
-            how: "cloud images for debian-12 and ubuntu-24.04",
-            gap: "Kali and Windows",
+            how: "cloud images for debian-12 and ubuntu-24.04; Windows as a clone of a template you give (cloudbase-init)",
+            gap: "Kali",
             proof: "segmented",
         },
     ),
@@ -215,7 +215,13 @@ pub const CELLS: &[(&str, Status)] = &[
     (
         "machines.*.vm.image.winrm",
         NotApplicable {
-            why: "about a Windows Vagrant box: Proxmox has no Windows image yet",
+            why: "about a Windows Vagrant box: a Windows template's set-up opens WinRM itself",
+        },
+    ),
+    (
+        "machines.*.vm.image.winssh",
+        NotApplicable {
+            why: "about a Windows Vagrant box: a Windows template's set-up opens WinRM itself",
         },
     ),
     (
@@ -223,6 +229,13 @@ pub const CELLS: &[(&str, Status)] = &[
         Done {
             how: "cloud-init writes the project and runs the steps; after a `reboot`, a unit runs the rest at the next boot",
             proof: "existing-hosts",
+        },
+    ),
+    (
+        "machines.*.vm.tpm",
+        Done {
+            how: "a TPM 2.0 (`tpm_state` on the VM datastore)",
+            proof: PROBE,
         },
     ),
 ];
