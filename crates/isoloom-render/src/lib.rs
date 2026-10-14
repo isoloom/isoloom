@@ -2,22 +2,21 @@
 //! files' header, the controller's Ansible runs, HCL and shell quoting, the project copy, the
 //! hosts' setup, the router, VLAN trunks and the image constraints.
 
+pub mod backend;
 pub mod constraints;
 pub mod ignore;
 pub mod machine_setup;
 pub mod project;
 pub mod router;
+pub mod steps;
 pub mod trunks;
 
-use std::fmt;
-use std::net::Ipv4Addr;
-
-use isoloom_plan::checks;
+pub use isoloom_plan::addressing::{address, address_for, host_address, names_of, netmask, start_order};
 pub use isoloom_spec::files::GeneratedFile;
 use isoloom_spec::{model, shell, validate};
+use std::fmt;
 
 use crate::model::{Spec, Target};
-use crate::validate::Cidr;
 
 /// The `provision[].host_vars` of `machine`, as ` key='value'` pairs for its inventory line.
 /// Ansible splits a host line like a shell and reads each value as a Python literal, so every
@@ -137,20 +136,6 @@ pub fn header(comment: &str) -> String {
     )
 }
 
-/// A machine's address on a network (validated specs only).
-pub fn address(spec: &Spec, network: &str, octet: u8) -> Ipv4Addr {
-    let cidr = Cidr::parse(&spec.networks[network].cidr).expect("validated cidr");
-    cidr.host(octet)
-        .or_else(|| (octet == cidr.gateway_octet()).then(|| cidr.gateway()))
-        .expect("validated address")
-}
-
-/// Dotted netmask of a network.
-pub fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
-    let cidr = Cidr::parse(&spec.networks[network].cidr).expect("validated cidr");
-    Ipv4Addr::from(if cidr.len == 0 { 0 } else { u32::MAX << (32 - cidr.len) })
-}
-
 /// Features no generator supports yet, shared by both (none today: kept as the place to
 /// refuse a spec feature before a generator learns it).
 pub fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> {
@@ -172,76 +157,7 @@ pub fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateErr
 /// (they run from the VM targets' controller) and `exec` from a machine with no container of its
 /// own (`exec` checks are piped into the machine: `docker compose exec`, `kubectl exec`).
 pub fn container_checks_unsupported(spec: &Spec) -> Option<String> {
-    if spec.checks.iter().any(|c| c.is_playbook()) {
-        return Some("Ansible checks (.yml) run on VM targets for now".into());
-    }
-    for c in crate::checks::plan(spec) {
-        if !matches!(c.probe, crate::checks::Probe::Exec { .. }) {
-            continue;
-        }
-        let in_container = match &c.position {
-            crate::checks::Position::Machine(m) => spec.machines.get(m).is_some_and(|m| m.docker.is_some() && !m.supplied),
-            _ => false,
-        };
-        if !in_container {
-            return Some(format!(
-                "`exec` check \"{}\" needs `from:` a machine with its own container (it runs inside it)",
-                c.name
-            ));
-        }
-    }
-    None
-}
-
-/// A machine's names for a hosts line: its own, then its `aliases`.
-pub fn names_of(spec: &Spec, name: &str) -> String {
-    std::iter::once(name)
-        .chain(spec.machines.get(name).map(|m| m.aliases.iter().map(String::as_str)).into_iter().flatten())
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// Machines in start order: each after the machines it depends on (validated: no cycles).
-pub fn start_order(spec: &Spec) -> Vec<&str> {
-    let mut order: Vec<&str> = Vec::new();
-    fn visit<'a>(spec: &'a Spec, name: &'a str, order: &mut Vec<&'a str>) {
-        if order.contains(&name) {
-            return;
-        }
-        for dep in crate::validate::starts_after(spec, name, &spec.machines[name]) {
-            visit(spec, dep, order);
-        }
-        order.push(name);
-    }
-    for name in spec.machines.keys() {
-        visit(spec, name, &mut order);
-    }
-    order
-}
-
-/// The address `from` should use to reach `to`: on a network they share if any, else
-/// `to`'s first address.
-pub fn address_for(spec: &Spec, from: &str, to: &str) -> Ipv4Addr {
-    let a = &spec.machines[from];
-    let b = &spec.machines[to];
-    let (net, octet) = b
-        .networks
-        .iter()
-        .find(|(n, _)| a.networks.contains_key(*n))
-        .or_else(|| b.networks.first())
-        .expect("validated: machines have a network");
-    address(spec, net, *octet)
-}
-
-/// The host's own address on a network (Docker's bridge): the gateway address, unless a
-/// machine is the network's gateway; then the router's address, unused on such networks.
-pub fn host_address(spec: &Spec, network: &str) -> Ipv4Addr {
-    let cidr = Cidr::parse(&spec.networks[network].cidr).expect("validated cidr");
-    if spec.networks[network].gateway.is_some() {
-        cidr.router()
-    } else {
-        cidr.gateway()
-    }
+    isoloom_plan::requirements::container_checks(spec).map(|r| r.to_string())
 }
 
 /// The controller's script running the environment's playbooks (`provision:`), in order, with

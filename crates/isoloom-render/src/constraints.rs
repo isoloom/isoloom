@@ -94,24 +94,7 @@ pub fn build_args(spec: &Spec) -> Vec<(String, String)> {
     machine_env(spec)
 }
 
-/// `image` pulled through the mirror of its registry, when there is one.
-pub fn rewrite_image(c: &Constraints, image: &str) -> String {
-    if c.registries.is_empty() {
-        return image.to_string();
-    }
-    let (first, rest) = match image.split_once('/') {
-        Some((f, r)) if f.contains('.') || f.contains(':') || f == "localhost" => (f, r.to_string()),
-        _ => ("docker.io", if image.contains('/') { image.to_string() } else { format!("library/{image}") }),
-    };
-    let registry = match first {
-        "index.docker.io" | "registry-1.docker.io" => "docker.io",
-        r => r,
-    };
-    match c.registries.get(registry) {
-        Some(mirror) => format!("{}/{rest}", mirror.trim_end_matches('/')),
-        None => image.to_string(),
-    }
-}
+pub use isoloom_plan::images::rewrite_image;
 
 /// Every image the generated files pull, through the registry mirrors: `image:` lines of YAML
 /// (Compose, Kubernetes) and `FROM` lines of the Dockerfiles Isoloom writes. The images the
