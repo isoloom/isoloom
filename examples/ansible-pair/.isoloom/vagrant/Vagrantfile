@@ -544,10 +544,11 @@ Vagrant.configure("2") do |config|
     SH
     m.vm.provision "shell", name: "ansible", inline: <<~'SH'
       set -e
-      mkdir -p /tmp/isoloom-facts /tmp/isoloom-retry
-      export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200 ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry
+      mkdir -p /tmp/isoloom-facts
+      export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200
       _isoloom_pause=${ISOLOOM_RETRY_PAUSE:-15}
       _isoloom_attempts=3
+      _isoloom_transient='send_input failed|the pipe has been ended|winrmtransporterror|winrmoperationtimeouterror|read timeout|bad http response returned from server|(kerberos|ntlm|credssp).*500|remote end closed connection|connection reset by peer|connection refused|connection aborted|broken pipe|timed out|failed to connect to the host via ssh|shared connection to .* closed'
       retry_download() {
         _isoloom_n=1
         until "$@"; do
@@ -557,51 +558,77 @@ Vagrant.configure("2") do |config|
           _isoloom_n=$((_isoloom_n + 1))
         done
       }
-      play_outcome() {
-        awk '
+      play_hosts() {
+        awk -v transient="$_isoloom_transient" '
+          function commit() {
+            if (pending != "") { if (pending_real) real[pending] = 1; else seen[pending] = 1 }
+            pending = ""
+          }
           { gsub(/\033\[[0-9;]*m/, "") }
+          /^\.\.\.ignoring/ { pending = ""; next }
+          { commit() }
+          /^(fatal|failed): \[/ && !/UNREACHABLE!/ {
+            pending = $0
+            sub(/^(fatal|failed): \[/, "", pending)
+            sub(/\].*/, "", pending)
+            sub(/ -> .*/, "", pending)
+            pending_real = (tolower($0) !~ transient)
+            next
+          }
           /^PLAY RECAP/ { recap = 1; next }
           recap && / : ok=/ {
-            for (i = 1; i <= NF; i++) {
+            for (i = 2; i <= NF; i++) {
               split($i, kv, "=")
-              if (kv[1] == "failed") failed += kv[2]
-              if (kv[1] == "unreachable") unreachable += kv[2]
+              if (kv[1] == "failed" && kv[2] > 0) failed[$1] = 1
+              if (kv[1] == "unreachable" && kv[2] > 0) unreachable[$1] = 1
             }
           }
-          END { if (failed > 0) print "failed"; else if (unreachable > 0) print "unreachable"; else print "none" }
-        ' "$1"
+          END {
+            commit()
+            for (h in failed) print ((h in real) ? "real " : "retry ") h
+            for (h in unreachable) if (!(h in failed)) print "retry " h
+          }
+        ' "$1" | sort
       }
       run_play() {
         _isoloom_book=$1
         shift
-        _isoloom_retry="${ANSIBLE_RETRY_FILES_SAVE_PATH:-.}/${_isoloom_book%.*}.retry"
+        _isoloom_limit="${ISOLOOM_RETRY_DIR:-/tmp/isoloom-retry}/${_isoloom_book%.*}.retry"
         _isoloom_log=$(mktemp)
         _isoloom_rcf=$(mktemp)
         _isoloom_n=1
-        rm -f "$_isoloom_retry"
+        _isoloom_real_rc=0
         while :; do
           if [ "$_isoloom_n" -eq 1 ]; then
             { "$@" "$_isoloom_book" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
           else
-            { "$@" "$_isoloom_book" --limit "@$_isoloom_retry" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
+            { "$@" "$_isoloom_book" --limit "@$_isoloom_limit" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
           fi
           _isoloom_rc=$(cat "$_isoloom_rcf")
           [ "$_isoloom_rc" -ne 0 ] || break
-          _isoloom_outcome=$(play_outcome "$_isoloom_log")
-          if [ "$_isoloom_outcome" != unreachable ] || [ ! -s "$_isoloom_retry" ]; then
-            echo "isoloom: $_isoloom_book failed (exit $_isoloom_rc, recap: $_isoloom_outcome): not retried, only unreachable hosts are"
+          _isoloom_hosts=$(play_hosts "$_isoloom_log")
+          _isoloom_real=$(echo "$_isoloom_hosts" | awk '$1 == "real" { printf "%s%s", s, $2; s = " " }')
+          _isoloom_retry=$(echo "$_isoloom_hosts" | awk '$1 == "retry" { printf "%s%s", s, $2; s = " " }')
+          if [ -n "$_isoloom_real" ]; then
+            echo "isoloom: $_isoloom_book: a task failed on $_isoloom_real: not retried"
+            _isoloom_real_rc=$_isoloom_rc
+          fi
+          if [ -z "$_isoloom_retry" ]; then
+            [ -n "$_isoloom_real" ] || echo "isoloom: $_isoloom_book failed (exit $_isoloom_rc) with no unreachable host or dropped connection: not retried"
             break
           fi
-          _isoloom_hosts=$(tr '\n' ' ' < "$_isoloom_retry" | sed 's/ *$//')
           if [ "$_isoloom_n" -ge "$_isoloom_attempts" ]; then
-            echo "isoloom: $_isoloom_book: hosts still unreachable after $_isoloom_n attempts: $_isoloom_hosts"
+            echo "isoloom: $_isoloom_book: still unreachable or disconnected after $_isoloom_n attempts: $_isoloom_retry"
             break
           fi
+          mkdir -p "$(dirname "$_isoloom_limit")"
+          printf '%s\n' $_isoloom_retry > "$_isoloom_limit"
           _isoloom_n=$((_isoloom_n + 1))
-          echo "isoloom: $_isoloom_book: unreachable: $_isoloom_hosts; waiting $((4 * _isoloom_pause)) s, then attempt $_isoloom_n/$_isoloom_attempts on them (--limit @$_isoloom_retry)"
+          echo "isoloom: $_isoloom_book: unreachable or disconnected: $_isoloom_retry; waiting $((4 * _isoloom_pause)) s, then attempt $_isoloom_n/$_isoloom_attempts on them (--limit @$_isoloom_limit)"
           sleep $((4 * _isoloom_pause))
         done
         rm -f "$_isoloom_log" "$_isoloom_rcf"
+        [ "$_isoloom_real_rc" -eq 0 ] || [ "$_isoloom_rc" -ne 0 ] || _isoloom_rc=$_isoloom_real_rc
         return "$_isoloom_rc"
       }
       cd /opt/isoloom/ansible
