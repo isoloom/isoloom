@@ -7,11 +7,11 @@ use std::num::NonZeroU32;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::ManifestError;
 use crate::list::NonEmpty;
 use crate::names::{Name, SnakeName, StepId};
 use crate::step::Step;
 use crate::template::Template;
+use crate::{ManifestError, Result};
 
 /// How a run can be parked: absent, it can't (Terraform runs are created or destroyed); a mode
 /// absent inside it is refused.
@@ -128,7 +128,11 @@ pub struct Retries(u8);
 
 impl Retries {
     /// The count, when it is 0 to 3.
-    pub fn new(count: u8) -> Result<Retries, ManifestError> {
+    ///
+    /// # Errors
+    ///
+    /// [`ManifestError::OutOfRange`] over 3.
+    pub fn new(count: u8) -> Result<Retries> {
         if count <= 3 {
             Ok(Retries(count))
         } else {
@@ -142,8 +146,23 @@ impl Retries {
     }
 
     /// The count.
+    #[must_use]
     pub fn get(self) -> u8 {
         self.0
+    }
+}
+
+impl TryFrom<u8> for Retries {
+    type Error = ManifestError;
+
+    fn try_from(count: u8) -> Result<Retries> {
+        Retries::new(count)
+    }
+}
+
+impl From<Retries> for u8 {
+    fn from(r: Retries) -> u8 {
+        r.0
     }
 }
 
@@ -212,4 +231,20 @@ pub struct Expiry {
     /// The run's life when the embedder sets none, in minutes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_minutes: Option<u32>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_retry_count_is_0_to_3() {
+        assert_eq!(Retries::new(3).map(Retries::get), Ok(3));
+        assert_eq!(Retries::try_from(1).map(u8::from), Ok(1));
+        assert_eq!(Retries::default().get(), 0);
+        assert_eq!(Retries::new(4).unwrap_err().code(), "out_of_range");
+        assert!(serde_json::from_str::<Retries>("4").is_err());
+        assert_eq!(serde_json::from_str::<Retries>("2").map(Retries::get).ok(), Some(2));
+        assert_eq!(serde_json::to_string(&Retries::new(2).unwrap()).unwrap(), "2");
+    }
 }

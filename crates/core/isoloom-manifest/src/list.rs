@@ -7,8 +7,8 @@ use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::de::{self, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::ManifestError;
 use crate::names::StepId;
+use crate::{ManifestError, Result};
 
 /// A list with at least one item.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -16,7 +16,11 @@ pub struct NonEmpty<T>(Vec<T>);
 
 impl<T> NonEmpty<T> {
     /// The list, when it has an item (`what` names it in the error).
-    pub fn new(items: Vec<T>, what: &'static str) -> Result<NonEmpty<T>, ManifestError> {
+    ///
+    /// # Errors
+    ///
+    /// [`ManifestError::Empty`] naming `what`, when `items` is empty.
+    pub fn new(items: Vec<T>, what: &'static str) -> Result<NonEmpty<T>> {
         if items.is_empty() {
             Err(ManifestError::Empty { what })
         } else {
@@ -25,11 +29,13 @@ impl<T> NonEmpty<T> {
     }
 
     /// A list of one.
+    #[must_use]
     pub fn one(item: T) -> NonEmpty<T> {
         NonEmpty(vec![item])
     }
 
     /// The items, in order.
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         &self.0
     }
@@ -158,6 +164,28 @@ mod tests {
                 .contains("alone")
         );
         assert!(serde_json::from_str::<StepSelection>("[]").unwrap_err().to_string().contains("empty"));
+    }
+
+    #[test]
+    fn a_list_is_iterated_in_order() {
+        let list = NonEmpty::new(vec![1, 2, 3], "the numbers").unwrap();
+        let mut seen = Vec::new();
+        for n in &list {
+            seen.push(*n);
+        }
+        assert_eq!(seen, [1, 2, 3]);
+        assert_eq!(list.iter().count(), 3);
+        assert_eq!(NonEmpty::one(9).as_slice(), [9]);
+        assert_eq!(
+            NonEmpty::<u8>::new(Vec::new(), "the numbers").unwrap_err().to_string(),
+            "the numbers is empty: it needs at least one"
+        );
+    }
+
+    #[test]
+    fn a_selection_of_the_wrong_shape_says_what_was_expected() {
+        let err = serde_json::from_str::<StepSelection>(r#""up""#).unwrap_err().to_string();
+        assert!(err.contains("a list of step ids, or `[\"*\"]` for every step"), "{err}");
     }
 
     #[test]

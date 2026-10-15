@@ -10,6 +10,7 @@ use crate::{Manifest, PathTemplate};
 impl Manifest {
     /// Every list of steps, with its location. The status probe is a list of one, and the check
     /// runners' steps are one list.
+    #[must_use]
     pub fn step_lists(&self) -> Vec<(String, Vec<&Step>)> {
         let l = &self.lifecycle;
         let mut out: Vec<(String, Vec<&Step>)> = vec![
@@ -39,6 +40,7 @@ impl Manifest {
     }
 
     /// Every template, with its location.
+    #[must_use]
     pub fn templates(&self) -> Vec<(String, &Template)> {
         let mut out: Vec<(String, &Template)> = Vec::new();
         if let Some(m) = &self.lab.message {
@@ -47,7 +49,7 @@ impl Manifest {
         if let crate::Identity::Compose(c) = &self.identity {
             out.push(("identity.compose.project".into(), &c.project));
             let files = c.files.iter().enumerate().map(|(i, f)| (format!("identity.compose.files[{i}]"), f));
-            let pinned = c.pinned_ports_file.iter().map(|f| ("identity.compose.pinned_ports_file".to_string(), f));
+            let pinned = c.pinned_ports_file.iter().map(|f| ("identity.compose.pinned_ports_file".to_owned(), f));
             out.extend(files.chain(pinned).map(|(at, f)| (at, PathTemplate::template(f))));
         }
         for (i, t) in self.tools.iter().enumerate() {
@@ -92,9 +94,9 @@ fn host_argv<'a>(at: &str, a: &'a HostArgv, out: &mut Vec<(String, &'a Template)
     match a {
         HostArgv::Every(a) => argv(at, a, out),
         HostArgv::PerHost(p) => {
-            for (host, a) in [("default", &p.default), ("linux", &p.linux), ("macos", &p.macos), ("windows", &p.windows)] {
-                if let Some(a) = a {
-                    argv(&format!("{at}.{host}"), a, out);
+            for (host, per_host) in [("default", &p.default), ("linux", &p.linux), ("macos", &p.macos), ("windows", &p.windows)] {
+                if let Some(one) = per_host {
+                    argv(&format!("{at}.{host}"), one, out);
                 }
             }
         }

@@ -1,11 +1,11 @@
 //! Why a manifest, or one value in it, was refused: one enum for the crate, each message naming
 //! where, why and what to write instead.
 
-/// The manifest version this crate reads and writes.
-pub const SUPPORTED_VERSION: u64 = 0;
+use crate::provenance::SUPPORTED_VERSION;
 
 /// Why a manifest, or one of its values, was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum ManifestError {
     /// The text isn't JSON.
     #[error("the manifest isn't JSON (line {line}, column {column}): {reason}; generate it again")]
@@ -249,8 +249,12 @@ pub enum ManifestError {
     },
 }
 
+/// What reading or building a manifest returns.
+pub type Result<T, E = ManifestError> = std::result::Result<T, E>;
+
 impl ManifestError {
     /// A stable code for the error, the same in Isoloom and the runner (`shell_program`).
+    #[must_use]
     pub fn code(&self) -> &'static str {
         match self {
             ManifestError::Syntax { .. } => "syntax",

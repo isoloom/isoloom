@@ -2,24 +2,36 @@
 //! writes back unchanged, what is refused is refused for the right reason, and the generated JSON
 //! Schema accepts exactly what the types accept.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
-
 use std::sync::OnceLock;
 
-use isoloom_manifest::{Part, PathTemplate, Placeholder, Program, RelPath, RunVar, Template};
+use isoloom_manifest::{EnvName, Name, Part, PathTemplate, Placeholder, Program, RelPath, RunVar, SnakeName, Template};
 use proptest::prelude::*;
 use serde_json::{Value, json};
 
-/// A validator for one definition of the generated schema.
-fn validator(def: &str) -> jsonschema::Validator {
+/// A validator for one definition of the generated schema, when the schema has it.
+fn validator(def: &str) -> Option<jsonschema::Validator> {
     let schema = isoloom_manifest::schema();
-    jsonschema::validator_for(&json!({ "$defs": schema["$defs"], "$ref": format!("#/$defs/{def}") })).unwrap()
+    jsonschema::validator_for(&json!({ "$defs": schema.get("$defs")?, "$ref": format!("#/$defs/{def}") })).ok()
 }
 
+/// Whether the schema's definition `def` accepts `text` (no such definition accepts nothing).
 fn accepts(def: &'static str, text: &str) -> bool {
-    static VALIDATORS: OnceLock<Vec<(&'static str, jsonschema::Validator)>> = OnceLock::new();
-    let all = VALIDATORS.get_or_init(|| ["Template", "PathTemplate", "RelPath", "Program"].map(|d| (d, validator(d))).into());
-    all.iter().find(|(d, _)| *d == def).unwrap().1.is_valid(&Value::String(text.to_string()))
+    static VALIDATORS: OnceLock<Vec<(&'static str, Option<jsonschema::Validator>)>> = OnceLock::new();
+    let all = VALIDATORS.get_or_init(|| DEFINITIONS.map(|d| (d, validator(d))).into());
+    all.iter()
+        .find(|(d, _)| *d == def)
+        .and_then(|(_, v)| v.as_ref())
+        .is_some_and(|v| v.is_valid(&Value::String(text.to_owned())))
+}
+
+/// The definitions the properties compare the types with.
+const DEFINITIONS: [&str; 4] = ["Template", "PathTemplate", "RelPath", "Program"];
+
+#[test]
+fn the_schema_defines_what_the_properties_compare() {
+    for def in DEFINITIONS {
+        assert!(validator(def).is_some(), "no `{def}` in the schema's $defs");
+    }
 }
 
 /// Strings made of the pieces the grammar cares about, valid or not.
@@ -63,12 +75,12 @@ fn placeholder() -> impl Strategy<Value = Placeholder> {
         Just(Placeholder::Run(RunVar::StateDir)),
         Just(Placeholder::Machine),
         Just(Placeholder::Value),
-        "[A-Z_][A-Z0-9_]{0,8}".prop_map(|n| Placeholder::Param(isoloom_manifest::EnvName::parse(&n).unwrap())),
-        "[a-z][a-z0-9_]{0,8}".prop_map(|n| Placeholder::Output(isoloom_manifest::SnakeName::parse(&n).unwrap())),
-        ("[a-z][a-z0-9.-]{0,6}", "[a-z][a-z0-9-]{0,30}").prop_map(|(m, port)| Placeholder::Published {
-            machine: isoloom_manifest::Name::parse(&m).unwrap(),
-            port: isoloom_manifest::Name::parse(&port).unwrap(),
-        }),
+        "[A-Z_][A-Z0-9_]{0,8}".prop_filter_map("a param's name", |n| EnvName::parse(&n).ok().map(Placeholder::Param)),
+        "[a-z][a-z0-9_]{0,8}".prop_filter_map("an output's name", |n| SnakeName::parse(&n).ok().map(Placeholder::Output)),
+        ("[a-z][a-z0-9.-]{0,6}", "[a-z][a-z0-9-]{0,30}").prop_filter_map("a machine and a port", |(m, port)| Some(Placeholder::Published {
+            machine: Name::parse(&m).ok()?,
+            port: Name::parse(&port).ok()?,
+        })),
     ]
 }
 

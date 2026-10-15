@@ -4,53 +4,75 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::str::FromStr;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::ManifestError;
+use crate::{ManifestError, Result};
 
 /// A newtype over `String` that holds only values `$check` accepts; `$pattern` is the same rule
 /// as a JSON Schema pattern, `$rule` as a reader would fix the value.
 macro_rules! pattern_type {
     ($(#[$doc:meta])* $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
         $(#[$doc])*
-        #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+        #[serde(transparent)]
         pub struct $ty(String);
 
         impl $ty {
             /// The value, when it matches the pattern.
-            pub fn parse(value: &str) -> Result<$ty, ManifestError> {
-                let check: fn(&str) -> bool = $check;
-                if check(value) {
-                    Ok($ty(value.to_string()))
-                } else {
-                    Err(ManifestError::Pattern { what: $what, value: value.to_string(), rule: $rule })
-                }
+            ///
+            /// # Errors
+            ///
+            /// [`ManifestError::Pattern`], naming the value and the rule it breaks.
+            pub fn parse(value: &str) -> Result<$ty> {
+                $ty::try_from(value.to_owned())
             }
 
             /// The value as written.
+            #[must_use]
             pub fn as_str(&self) -> &str {
                 &self.0
+            }
+        }
+
+        impl TryFrom<String> for $ty {
+            type Error = ManifestError;
+
+            fn try_from(value: String) -> Result<$ty> {
+                let check: fn(&str) -> bool = $check;
+                if check(&value) {
+                    Ok($ty(value))
+                } else {
+                    Err(ManifestError::Pattern { what: $what, value, rule: $rule })
+                }
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $ty {
+            fn deserialize<D: Deserializer<'de>>(d: D) -> Result<$ty, D::Error> {
+                $ty::try_from(String::deserialize(d)?).map_err(serde::de::Error::custom)
+            }
+        }
+
+        impl FromStr for $ty {
+            type Err = ManifestError;
+
+            fn from_str(value: &str) -> Result<$ty> {
+                $ty::parse(value)
+            }
+        }
+
+        impl From<$ty> for String {
+            fn from(value: $ty) -> String {
+                value.0
             }
         }
 
         impl fmt::Display for $ty {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.write_str(&self.0)
-            }
-        }
-
-        impl Serialize for $ty {
-            fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-                s.serialize_str(&self.0)
-            }
-        }
-
-        impl<'de> Deserialize<'de> for $ty {
-            fn deserialize<D: Deserializer<'de>>(d: D) -> Result<$ty, D::Error> {
-                let raw = String::deserialize(d)?;
-                $ty::parse(&raw).map_err(serde::de::Error::custom)
             }
         }
 
@@ -113,7 +135,7 @@ pattern_type!(
 );
 
 pattern_type!(
-    /// A snake_case name: an output's, a Terraform variable's, an action argument's.
+    /// A `snake_case` name: an output's, a Terraform variable's, an action argument's.
     SnakeName,
     "snake_case name",
     "^[a-z][a-z0-9_]*$",
@@ -221,6 +243,24 @@ mod tests {
         assert!(PinnedImage::parse(&format!("hashicorp/terraform:1.9.8@sha256:{digest}")).is_ok());
         assert!(PinnedImage::parse("hashicorp/terraform:1.9.8").is_err());
         assert!(PinnedImage::parse(&format!("@sha256:{digest}")).is_err());
+        assert!(PinnedImage::parse(&format!("hashicorp/terraform 1.9@sha256:{digest}")).is_err());
+        assert!(PinnedImage::parse(&format!("a@b@sha256:{digest}")).is_err());
+        assert!(PinnedImage::parse(&format!("a@sha256:{}", "A".repeat(64))).is_err());
+        assert!(PinnedImage::parse(&format!("a@sha256:{}", "a".repeat(63))).is_err());
+    }
+
+    #[test]
+    fn a_name_converts_from_and_to_its_text() {
+        let name: Name = "web".parse().unwrap();
+        assert_eq!((name.as_str(), name.to_string()), ("web", "web".to_owned()));
+        assert_eq!(Name::try_from("db".to_owned()).map(String::from), Ok("db".to_owned()));
+        assert_eq!(serde_json::to_string(&name).unwrap(), r#""web""#);
+        assert!(
+            serde_json::from_str::<Name>(r#""-web""#)
+                .unwrap_err()
+                .to_string()
+                .contains("isn't a valid name")
+        );
     }
 
     #[test]

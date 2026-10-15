@@ -3,31 +3,37 @@
 //! one under `fixtures/invalid/` is refused with the error its `.error.json` names, and by the
 //! schema too when that file says the schema can tell.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
-
+use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-fn fixtures(dir: &str) -> Vec<PathBuf> {
+/// A test's outcome: a failed step is its report.
+type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+
+/// The manifests in the fixtures folder `dir`, in name order.
+fn fixtures(dir: &str) -> Outcome<Vec<PathBuf>> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join(dir);
-    let mut out: Vec<PathBuf> = std::fs::read_dir(dir)
-        .unwrap()
-        .map(|e| e.unwrap().path())
-        .filter(|p| p.to_string_lossy().ends_with(".run.json"))
-        .collect();
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.to_string_lossy().ends_with(".run.json") {
+            out.push(path);
+        }
+    }
     out.sort();
-    out
+    Ok(out)
 }
 
-fn validator() -> jsonschema::Validator {
-    jsonschema::validator_for(&isoloom_manifest::schema()).unwrap()
+/// A validator of the generated schema.
+fn validator() -> Outcome<jsonschema::Validator> {
+    Ok(jsonschema::validator_for(&isoloom_manifest::schema())?)
 }
 
 #[test]
-fn every_valid_fixture_parses_validates_and_writes_back() {
-    let schema = validator();
-    let valid = fixtures("");
+fn every_valid_fixture_parses_validates_and_writes_back() -> Outcome {
+    let schema = validator()?;
+    let valid = fixtures("")?;
     assert!(valid.len() >= 3, "{valid:?}");
     for path in valid {
         let text = std::fs::read_to_string(&path).unwrap();
@@ -39,12 +45,13 @@ fn every_valid_fixture_parses_validates_and_writes_back() {
         assert_eq!(isoloom_manifest::parse(&written).unwrap(), manifest, "{}", path.display());
         assert!(schema.is_valid(&serde_json::from_str(&written).unwrap()), "{}: written back", path.display());
     }
+    Ok(())
 }
 
 #[test]
-fn every_invalid_fixture_gives_its_error() {
-    let schema = validator();
-    let invalid = fixtures("invalid");
+fn every_invalid_fixture_gives_its_error() -> Outcome {
+    let schema = validator()?;
+    let invalid = fixtures("invalid")?;
     assert!(invalid.len() >= 15, "{invalid:?}");
     for path in invalid {
         let text = std::fs::read_to_string(&path).unwrap();
@@ -58,4 +65,5 @@ fn every_invalid_fixture_gives_its_error() {
             .unwrap_or_else(|| panic!("{}: missing; it would hold:\n{actual:#}", expected_path.display()));
         assert_eq!(actual, expected, "{}", path.display());
     }
+    Ok(())
 }

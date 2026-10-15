@@ -6,15 +6,16 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::net::IpAddr;
 use std::num::NonZeroU16;
+use std::str::FromStr;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::ManifestError;
 use crate::identity::Provider;
 use crate::names::{Name, OsName};
 use crate::path::GuestPath;
 use crate::template::Template;
+use crate::{ManifestError, Result};
 
 /// A port's transport protocol.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
@@ -56,7 +57,7 @@ pub enum Role {
 }
 
 /// A network block, IPv4 or IPv6 (`10.30.0.0/24`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Cidr {
     address: IpAddr,
     prefix: u8,
@@ -64,8 +65,13 @@ pub struct Cidr {
 
 impl Cidr {
     /// The block written as `<address>/<prefix length>`.
-    pub fn parse(text: &str) -> Result<Cidr, ManifestError> {
-        let err = || ManifestError::Cidr { value: text.to_string() };
+    ///
+    /// # Errors
+    ///
+    /// [`ManifestError::Cidr`] when it isn't an address, a `/` and a prefix length that fits the
+    /// address (at most 32 for IPv4, 128 for IPv6).
+    pub fn parse(text: &str) -> Result<Cidr> {
+        let err = || ManifestError::Cidr { value: text.to_owned() };
         let (address, prefix) = text.split_once('/').ok_or_else(err)?;
         let address: IpAddr = address.parse().map_err(|_| err())?;
         let prefix: u8 = prefix.parse().map_err(|_| err())?;
@@ -74,6 +80,14 @@ impl Cidr {
             return Err(err());
         }
         Ok(Cidr { address, prefix })
+    }
+}
+
+impl FromStr for Cidr {
+    type Err = ManifestError;
+
+    fn from_str(text: &str) -> Result<Cidr> {
+        Cidr::parse(text)
     }
 }
 
@@ -241,7 +255,7 @@ pub struct Volume {
 pub enum PublishMode {
     /// Always `preferred`.
     Fixed,
-    /// A free port, unless ISOLOOM_PUBLISH_FIXED is set; the runner pins it at the first start.
+    /// A free port, unless `ISOLOOM_PUBLISH_FIXED` is set; the runner pins it at the first start.
     Ephemeral,
 }
 
@@ -327,7 +341,9 @@ mod tests {
     fn a_block_has_an_address_and_a_prefix() {
         assert_eq!(Cidr::parse("10.30.0.0/24").unwrap().to_string(), "10.30.0.0/24");
         assert_eq!(Cidr::parse("fd00:30::/64").unwrap().to_string(), "fd00:30::/64");
-        for bad in ["10.30.0.0", "10.30.0.0/33", "lab/24"] {
+        assert_eq!(Cidr::parse("10.30.0.1/32").unwrap().to_string(), "10.30.0.1/32");
+        assert_eq!("fd00::1/128".parse::<Cidr>().unwrap().to_string(), "fd00::1/128");
+        for bad in ["10.30.0.0", "10.30.0.0/33", "fd00::/129", "lab/24", "10.30.0.0/x"] {
             assert_eq!(Cidr::parse(bad).unwrap_err().code(), "cidr", "{bad}");
         }
     }

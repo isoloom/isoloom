@@ -106,7 +106,7 @@ pub struct Check {
     pub kind: CheckKind,
     /// How long the runner retries it before it fails (the spec's `wait`), in seconds.
     pub wait_s: u32,
-    /// Derived from the spec (reachability, no internet); skipped with ISOLOOM_DERIVED=0.
+    /// Derived from the spec (reachability, no internet); skipped with `ISOLOOM_DERIVED=0`.
     pub derived: bool,
 }
 

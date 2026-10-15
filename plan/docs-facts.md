@@ -193,3 +193,6 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **Catalogue services:** a machine with `service:` is refused by every target at `machines.<m>.service` ("no catalogue entry `postgres` yet: the catalogue arrives in Phase 4") until the catalogue has its entry; before, the container targets silently left it out as a supplied machine. `isoloom targets` lists no possible target for such a lab.
 - **Lowering's own problems:** a port without its number (`machines.<m>.ports.<name>.port`) and a healthcheck page on a port the machine doesn't name (`machines.<m>.healthcheck.http.port`) are problems at their field when lowered too, so the lowered spec never holds a dropped port or port 0; a healthcheck with nothing left to try is left out.
 - **`external` target, a machine's own process:** the refusal names the fields the spec has, `command` or `healthcheck` (no more `working_dir` or `before`, which the spec doesn't have).
+
+## Phase 1c: the spec and the run manifest
+- **Run manifest schema:** the descriptions name environment variables as code (`` `ISOLOOM_PUBLISH_FIXED` ``, `` `TF_DATA_DIR` ``); the rules are unchanged.

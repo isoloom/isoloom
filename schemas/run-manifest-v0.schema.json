@@ -849,7 +849,7 @@
         "set_by",
         "deliver"
       ],
-      "description": "A non-secret value set at run time that the generated files read (ISOLOOM_PUBLISH_ADDRESS, ISOLOOM_HYPERV_SWITCH, a Terraform variable such as `region`)."
+      "description": "A non-secret value set at run time that the generated files read (`ISOLOOM_PUBLISH_ADDRESS`, `ISOLOOM_HYPERV_SWITCH`, a Terraform variable such as `region`)."
     },
     "EnvName": {
       "type": "string",
@@ -1641,7 +1641,7 @@
         {
           "type": "string",
           "const": "ephemeral",
-          "description": "A free port, unless ISOLOOM_PUBLISH_FIXED is set; the runner pins it at the first start."
+          "description": "A free port, unless `ISOLOOM_PUBLISH_FIXED` is set; the runner pins it at the first start."
         }
       ],
       "description": "How a port is published on the host."
@@ -1773,7 +1773,7 @@
               "$ref": "#/$defs/Template"
             }
           },
-          "description": "Non-secret environment of this step, values as templates (TF_DATA_DIR, TF_IN_AUTOMATION). Secrets and params come through their slots."
+          "description": "Non-secret environment of this step, values as templates (`TF_DATA_DIR`, `TF_IN_AUTOMATION`). Secrets and params come through their slots."
         },
         "stdin": {
           "anyOf": [
@@ -2434,7 +2434,7 @@
         },
         "derived": {
           "type": "boolean",
-          "description": "Derived from the spec (reachability, no internet); skipped with ISOLOOM_DERIVED=0."
+          "description": "Derived from the spec (reachability, no internet); skipped with `ISOLOOM_DERIVED=0`."
         }
       },
       "required": [

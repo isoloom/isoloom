@@ -4,12 +4,13 @@
 
 use std::borrow::Cow;
 use std::fmt::{self, Display, Formatter};
+use std::str::FromStr;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::ManifestError;
 use crate::names::{EnvName, Name, SnakeName};
+use crate::{ManifestError, Result};
 
 /// A value the runner knows about the run itself (`${run.…}`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -39,6 +40,7 @@ impl RunVar {
     ];
 
     /// The path after `run.`.
+    #[must_use]
     pub fn key(self) -> &'static str {
         match self {
             RunVar::Name => "name",
@@ -75,16 +77,14 @@ pub enum Placeholder {
 
 impl Placeholder {
     /// Reads what is between `${` and `}` (`template` is the whole text, for the error).
-    fn parse(inner: &str, template: &str) -> Result<Placeholder, ManifestError> {
+    fn parse(inner: &str, template: &str) -> Result<Placeholder> {
         let trimmed = inner.trim();
         if trimmed == "secrets" || trimmed.starts_with("secrets.") {
-            return Err(ManifestError::SecretPlaceholder {
-                template: template.to_string(),
-            });
+            return Err(ManifestError::SecretPlaceholder { template: template.to_owned() });
         }
         let unknown = || ManifestError::UnknownPlaceholder {
-            template: template.to_string(),
-            placeholder: inner.to_string(),
+            template: template.to_owned(),
+            placeholder: inner.to_owned(),
         };
         if let Some(key) = inner.strip_prefix("run.") {
             return RunVar::ALL.into_iter().find(|v| v.key() == key).map(Placeholder::Run).ok_or_else(unknown);
@@ -106,6 +106,7 @@ impl Placeholder {
     }
 
     /// The root, as validation names it (`run`, `params`, `machine`).
+    #[must_use]
     pub fn root(&self) -> &'static str {
         match self {
             Placeholder::Run(_) => "run",
@@ -160,27 +161,33 @@ pub struct Template {
 
 impl Template {
     /// The template written as `text`.
-    pub fn parse(text: &str) -> Result<Template, ManifestError> {
+    ///
+    /// # Errors
+    ///
+    /// [`ManifestError::LoneDollar`] for a `$` that starts no placeholder (a literal one is
+    /// `$$`), [`ManifestError::UnclosedPlaceholder`] for a `${` without its `}`,
+    /// [`ManifestError::SecretPlaceholder`] for `${secrets.…}`, and
+    /// [`ManifestError::UnknownPlaceholder`] for a root or a name outside the grammar.
+    pub fn parse(text: &str) -> Result<Template> {
         let mut parts = Vec::new();
         let mut literal = String::new();
         let mut rest = text;
-        while let Some(at) = rest.find('$') {
-            literal.push_str(&rest[..at]);
-            let after = &rest[at + 1..];
-            if let Some(r) = after.strip_prefix('$') {
+        while let Some((before, after)) = rest.split_once('$') {
+            literal.push_str(before);
+            if let Some(next) = after.strip_prefix('$') {
                 literal.push('$');
-                rest = r;
+                rest = next;
                 continue;
             }
             let Some(open) = after.strip_prefix('{') else {
-                return Err(ManifestError::LoneDollar { template: text.to_string() });
+                return Err(ManifestError::LoneDollar { template: text.to_owned() });
             };
-            let Some(end) = open.find('}') else {
-                return Err(ManifestError::UnclosedPlaceholder { template: text.to_string() });
+            let Some((inner, next)) = open.split_once('}') else {
+                return Err(ManifestError::UnclosedPlaceholder { template: text.to_owned() });
             };
             parts.push(Part::Text(std::mem::take(&mut literal)));
-            parts.push(Part::Placeholder(Placeholder::parse(&open[..end], text)?));
-            rest = &open[end + 1..];
+            parts.push(Part::Placeholder(Placeholder::parse(inner, text)?));
+            rest = next;
         }
         literal.push_str(rest);
         parts.push(Part::Text(literal));
@@ -188,8 +195,9 @@ impl Template {
     }
 
     /// Literal text, with no placeholder.
+    #[must_use]
     pub fn text(text: &str) -> Template {
-        Template::from_parts(vec![Part::Text(text.to_string())])
+        Template::from_parts(vec![Part::Text(text.to_owned())])
     }
 
     /// The template of `parts`, in order.
@@ -206,6 +214,7 @@ impl Template {
     }
 
     /// Its parts, in order.
+    #[must_use]
     pub fn parts(&self) -> &[Part] {
         &self.parts
     }
@@ -216,6 +225,14 @@ impl Template {
             Part::Placeholder(p) => Some(p),
             Part::Text(_) => None,
         })
+    }
+}
+
+impl FromStr for Template {
+    type Err = ManifestError;
+
+    fn from_str(text: &str) -> Result<Template> {
+        Template::parse(text)
     }
 }
 
@@ -254,12 +271,12 @@ impl<'de> Deserialize<'de> for Template {
 /// The template grammar as a regular expression: literal text, `$$`, and the known placeholders.
 pub(crate) fn grammar() -> String {
     let roots = [
-        "run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts)".to_string(),
-        "params\\.[A-Za-z_][A-Za-z0-9_]*".to_string(),
-        "outputs\\.[a-z][a-z0-9_]*".to_string(),
-        "published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[A-Za-z0-9][A-Za-z0-9_-]*".to_owned(),
-        "machine".to_string(),
-        "value".to_string(),
+        "run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts)",
+        "params\\.[A-Za-z_][A-Za-z0-9_]*",
+        "outputs\\.[a-z][a-z0-9_]*",
+        "published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[A-Za-z0-9][A-Za-z0-9_-]*",
+        "machine",
+        "value",
     ];
     format!("^(?:[^$]|\\$\\$|\\$\\{{(?:{})\\}})*$", roots.join("|"))
 }
@@ -295,8 +312,8 @@ mod tests {
             t.parts(),
             [Part::Placeholder(Placeholder::Run(RunVar::StateDir)), Part::Text("/ports.yml".into())]
         );
-        let t = round_trip("http://localhost:${published.web.site}/ and ${published.dns.dns-udp}");
-        assert_eq!(t.placeholders().count(), 2);
+        let two = round_trip("http://localhost:${published.web.site}/ and ${published.dns.dns-udp}");
+        assert_eq!(two.placeholders().count(), 2);
         round_trip("{{.ServerVersion}}");
         round_trip("costs $$5");
     }
@@ -315,6 +332,30 @@ mod tests {
         for unknown in ["${run.title}", "${env.HOME}", "${published.web}", "${published.web.-x}", "${outputs.Web}"] {
             assert_eq!(Template::parse(unknown).unwrap_err().code(), "unknown_placeholder", "{unknown}");
         }
+    }
+
+    #[test]
+    fn a_placeholder_is_written_from_its_root() {
+        for text in [
+            "${run.known_hosts}",
+            "${params.REGION}",
+            "${outputs.web_site}",
+            "${published.web.site}",
+            "${machine}",
+            "${value}",
+        ] {
+            let t = round_trip(text);
+            let p = t.placeholders().next().unwrap();
+            assert!(text.starts_with(&format!("${{{}", p.root())), "{text}: {}", p.root());
+        }
+        assert_eq!(RunVar::SshKey.key(), "ssh_key");
+    }
+
+    #[test]
+    fn a_template_is_built_from_text_or_a_placeholder() {
+        assert_eq!(Template::text("a $ b").to_string(), "a $$ b");
+        assert_eq!(Template::from(Placeholder::Machine).to_string(), "${machine}");
+        assert_eq!(Template::from(Placeholder::Run(RunVar::Dir)).parts().len(), 1);
     }
 
     #[test]

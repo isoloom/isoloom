@@ -8,11 +8,20 @@ use crate::lifecycle::Condition;
 use crate::outputs::OutputSource;
 use crate::slots::Delivery;
 use crate::template::Placeholder;
-use crate::{Manifest, ManifestError, StepSelection};
+use crate::{Manifest, ManifestError, Result, StepSelection};
 
 impl Manifest {
     /// Checks what spans fields; the first problem found, if any.
-    pub fn validate(&self) -> Result<(), ManifestError> {
+    ///
+    /// # Errors
+    ///
+    /// The first of: [`ManifestError::NoHosts`], [`ManifestError::DriverIdentity`] (an identity
+    /// for another driver), [`ManifestError::DuplicateStep`], [`ManifestError::UnknownStep`] (a
+    /// delivery's step), [`ManifestError::ReadyNotUp`], [`ManifestError::DuplicateMachine`],
+    /// [`ManifestError::DuplicatePort`], [`ManifestError::UnknownMachine`],
+    /// [`ManifestError::UnknownPublished`], [`ManifestError::UnknownParam`],
+    /// [`ManifestError::UnknownOutput`] and [`ManifestError::PlaceholderOutOfPlace`].
+    pub fn validate(&self) -> Result<()> {
         if self.hosts.is_empty() {
             return Err(ManifestError::NoHosts);
         }
@@ -29,7 +38,7 @@ impl Manifest {
         self.placeholders()
     }
 
-    fn unique_steps(&self) -> Result<(), ManifestError> {
+    fn unique_steps(&self) -> Result<()> {
         for (list, steps) in self.step_lists() {
             let mut seen = BTreeSet::new();
             if let Some(dup) = steps.iter().find(|s| !seen.insert(&s.id)) {
@@ -39,7 +48,7 @@ impl Manifest {
         Ok(())
     }
 
-    fn deliveries(&self) -> Result<(), ManifestError> {
+    fn deliveries(&self) -> Result<()> {
         let lists = self.step_lists();
         let ids: BTreeSet<&str> = lists.iter().flat_map(|(_, steps)| steps.iter().map(|s| s.id.as_str())).collect();
         let params = self.params.iter().enumerate().map(|(i, p)| (format!("params[{i}]"), p.deliver.as_slice()));
@@ -67,14 +76,14 @@ impl Manifest {
                     _ => Vec::new(),
                 };
                 if let Some(missing) = named.into_iter().find(|s| !ids.contains(s)) {
-                    return Err(ManifestError::UnknownStep { at, step: missing.to_string() });
+                    return Err(ManifestError::UnknownStep { at, step: missing.to_owned() });
                 }
             }
         }
         Ok(())
     }
 
-    fn ready_conditions(&self) -> Result<(), ManifestError> {
+    fn ready_conditions(&self) -> Result<()> {
         for (index, c) in self.ready.iter().enumerate() {
             match c {
                 Condition::StepOk { step, .. } if !self.lifecycle.up.iter().any(|s| &s.id == step) => {
@@ -91,7 +100,7 @@ impl Manifest {
         Ok(())
     }
 
-    fn machine_references(&self) -> Result<(), ManifestError> {
+    fn machine_references(&self) -> Result<()> {
         let mut seen = BTreeSet::new();
         if let Some(dup) = self.machines.iter().find(|m| !seen.insert(&m.name)) {
             return Err(ManifestError::DuplicateMachine { name: dup.name.to_string() });
@@ -123,7 +132,7 @@ impl Manifest {
         Ok(())
     }
 
-    fn placeholders(&self) -> Result<(), ManifestError> {
+    fn placeholders(&self) -> Result<()> {
         for (at, template) in self.templates() {
             for p in template.placeholders() {
                 match p {
@@ -147,19 +156,19 @@ impl Manifest {
         Ok(())
     }
 
-    fn machine_exists(&self, at: &str, machine: &str) -> Result<(), ManifestError> {
+    fn machine_exists(&self, at: &str, machine: &str) -> Result<()> {
         if self.machines.iter().any(|m| m.name.as_str() == machine) {
             Ok(())
         } else {
             Err(ManifestError::UnknownMachine {
-                at: at.to_string(),
-                machine: machine.to_string(),
+                at: at.to_owned(),
+                machine: machine.to_owned(),
             })
         }
     }
 
     /// Whether `machine` publishes its port named `port`.
-    fn published(&self, at: &str, machine: &str, port: &str) -> Result<(), ManifestError> {
+    fn published(&self, at: &str, machine: &str, port: &str) -> Result<()> {
         let found = self
             .machines
             .iter()
@@ -170,7 +179,7 @@ impl Manifest {
             return Ok(());
         }
         Err(ManifestError::UnknownPublished {
-            at: at.to_string(),
+            at: at.to_owned(),
             port: format!("{machine}.{port}"),
         })
     }
@@ -179,3 +188,6 @@ impl Manifest {
 fn out_of_place(at: String, root: &'static str, only: &'static str) -> ManifestError {
     ManifestError::PlaceholderOutOfPlace { at, root, only }
 }
+
+#[cfg(test)]
+mod tests;

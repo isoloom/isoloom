@@ -9,10 +9,13 @@ use crate::Manifest;
 pub const SCHEMA_URL: &str = "https://www.isoloom.com/schema/run-manifest/v0.json";
 
 /// The schema of a [`Manifest`], with its URL and description.
+#[must_use]
 pub fn schema() -> Value {
     let generated = schemars::schema_for!(Manifest).to_value();
     let mut out = Map::new();
-    out.insert("$schema".into(), generated["$schema"].clone());
+    if let Some(dialect) = generated.get("$schema") {
+        out.insert("$schema".into(), dialect.clone());
+    }
     out.insert("$id".into(), json!(SCHEMA_URL));
     out.insert(
         "description".into(),
@@ -45,5 +48,20 @@ fn unwrap_descriptions(v: &mut Value) {
         }
         Value::Array(items) => items.iter_mut().for_each(unwrap_descriptions),
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_description_reads_as_one_line_per_paragraph_and_nothing_else_changes() {
+        let mut v = json!({ "description": "one\ntwo\n\nthree", "pattern": "a\nb", "items": [{ "description": "x\ny" }] });
+        unwrap_descriptions(&mut v);
+        assert_eq!(
+            v,
+            json!({ "description": "one two\n\nthree", "pattern": "a\nb", "items": [{ "description": "x y" }] })
+        );
     }
 }

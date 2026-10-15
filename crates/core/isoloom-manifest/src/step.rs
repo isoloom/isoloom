@@ -7,12 +7,12 @@ use std::num::NonZeroU32;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::ManifestError;
 use crate::argv::HostArgv;
 use crate::identity::{HostOs, Provider};
 use crate::names::{EnvName, SnakeName, StepId};
 use crate::path::RelPath;
 use crate::template::Template;
+use crate::{ManifestError, Result};
 
 /// A driver primitive: a read-then-act sequence one argv can't express (list, then remove what
 /// was listed). The manifest's documentation fixes each action's native commands.
@@ -130,11 +130,13 @@ pub struct Step {
 
 impl Step {
     /// A step running `argv`, with every other field at its default.
+    #[must_use]
     pub fn argv(id: StepId, argv: HostArgv) -> Step {
         Step::new(id, Run::Argv(argv))
     }
 
     /// A step running `action` with no argument, every other field at its default.
+    #[must_use]
     pub fn action(id: StepId, action: Action) -> Step {
         Step::new(id, Run::Action { action, with: BTreeMap::new() })
     }
@@ -157,7 +159,8 @@ impl Step {
     }
 }
 
-fn is_default<T: Default + PartialEq>(v: &T) -> bool {
+/// Whether `v` is its type's default: a field left out when it holds it.
+pub(crate) fn is_default<T: Default + PartialEq>(v: &T) -> bool {
     *v == T::default()
 }
 
@@ -187,8 +190,8 @@ struct StepFields {
     /// Its working folder (default: the manifest's folder).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cwd: Option<RelPath>,
-    /// Non-secret environment of this step, values as templates (TF_DATA_DIR,
-    /// TF_IN_AUTOMATION). Secrets and params come through their slots.
+    /// Non-secret environment of this step, values as templates (`TF_DATA_DIR`,
+    /// `TF_IN_AUTOMATION`). Secrets and params come through their slots.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     env: BTreeMap<EnvName, Template>,
     /// A generated file piped into the program (a check script into `docker compose exec -T <m>
@@ -220,7 +223,7 @@ struct StepFields {
 impl TryFrom<StepFields> for Step {
     type Error = ManifestError;
 
-    fn try_from(f: StepFields) -> Result<Step, ManifestError> {
+    fn try_from(f: StepFields) -> Result<Step> {
         let shape = |reason| ManifestError::StepShape { id: f.id.to_string(), reason };
         let run = match (f.argv, f.action) {
             (Some(_), Some(_)) => return Err(shape("it has both `argv` and `action`: keep one")),

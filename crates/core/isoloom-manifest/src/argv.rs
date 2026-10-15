@@ -4,14 +4,14 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::str::FromStr;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
-use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::ManifestError;
 use crate::template::Template;
+use crate::{ManifestError, Result};
 
 /// Programs that would run code given as an argument (shells, interpreters, privilege and
 /// environment wrappers), refused whatever their case and with or without `.exe`.
@@ -49,23 +49,37 @@ pub struct Program(String);
 
 impl Program {
     /// The program, when it is a bare tool name and not a shell.
-    pub fn parse(name: &str) -> Result<Program, ManifestError> {
+    ///
+    /// # Errors
+    ///
+    /// [`ManifestError::ProgramNotBare`] for a path, an option, a placeholder or anything but a
+    /// tool's name; [`ManifestError::ShellProgram`] for a shell or an interpreter.
+    pub fn parse(name: &str) -> Result<Program> {
         let mut chars = name.chars();
         let bare = chars.next().is_some_and(|c| c.is_ascii_alphabetic()) && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'));
         if !bare {
-            return Err(ManifestError::ProgramNotBare { program: name.to_string() });
+            return Err(ManifestError::ProgramNotBare { program: name.to_owned() });
         }
         let lower = name.to_ascii_lowercase();
         let stem = lower.strip_suffix(".exe").unwrap_or(&lower);
         if SHELLS.contains(&stem) {
-            return Err(ManifestError::ShellProgram { program: name.to_string() });
+            return Err(ManifestError::ShellProgram { program: name.to_owned() });
         }
-        Ok(Program(name.to_string()))
+        Ok(Program(name.to_owned()))
     }
 
     /// The tool's name.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl FromStr for Program {
+    type Err = ManifestError;
+
+    fn from_str(name: &str) -> Result<Program> {
+        Program::parse(name)
     }
 }
 
@@ -125,29 +139,37 @@ pub struct Argv {
 
 impl Argv {
     /// `program` with `args`.
+    #[must_use]
     pub fn new(program: Program, args: Vec<Template>) -> Argv {
         Argv { program, args }
     }
 
     /// The program.
+    #[must_use]
     pub fn program(&self) -> &Program {
         &self.program
     }
 
     /// The arguments, in order.
+    #[must_use]
     pub fn args(&self) -> &[Template] {
         &self.args
     }
 }
 
+/// One word of an argv as written: the program first, then each argument.
+#[derive(Serialize)]
+#[serde(untagged)]
+enum Word<'a> {
+    /// The program.
+    Program(&'a Program),
+    /// An argument.
+    Arg(&'a Template),
+}
+
 impl Serialize for Argv {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        let mut seq = s.serialize_seq(Some(self.args.len() + 1))?;
-        seq.serialize_element(&self.program)?;
-        for arg in &self.args {
-            seq.serialize_element(arg)?;
-        }
-        seq.end()
+        s.collect_seq(std::iter::once(Word::Program(&self.program)).chain(self.args.iter().map(Word::Arg)))
     }
 }
 
@@ -293,6 +315,20 @@ mod tests {
             assert_eq!(Program::parse(shell).unwrap_err().code(), "shell_program", "{shell}");
         }
         assert!(Program::parse("shellcheck").is_ok());
+    }
+
+    #[test]
+    fn a_program_converts_from_and_to_its_name() {
+        let docker: Program = "docker".parse().unwrap();
+        assert_eq!((docker.as_str(), docker.to_string()), ("docker", "docker".to_owned()));
+    }
+
+    #[test]
+    fn a_value_of_the_wrong_shape_says_what_was_expected() {
+        let argv = serde_json::from_str::<Argv>("5").unwrap_err().to_string();
+        assert!(argv.contains("a program and its arguments, as a list of strings"), "{argv}");
+        let host = serde_json::from_str::<HostArgv>("5").unwrap_err().to_string();
+        assert!(host.contains("one argv per host (`default`, `linux`, `macos`, `windows`)"), "{host}");
     }
 
     #[test]

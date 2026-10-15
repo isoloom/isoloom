@@ -54,10 +54,6 @@ pub enum Transport {
     Winrm,
 }
 
-fn is_default<T: Default + PartialEq>(v: &T) -> bool {
-    *v == T::default()
-}
-
 /// Where a value goes. Never a command-line argument.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "via", rename_all = "snake_case", deny_unknown_fields)]
@@ -74,7 +70,7 @@ pub enum Delivery {
         /// The variable.
         var: SnakeName,
         /// `string` (default): `TF_VAR_<var>`. `map_entry`: one key of a JSON-object variable.
-        #[serde(default, skip_serializing_if = "is_default")]
+        #[serde(default, skip_serializing_if = "crate::step::is_default")]
         shape: TfVarShape,
     },
     /// A file in the run's state folder, written owner-only and kept until `down` succeeded (a
@@ -100,8 +96,8 @@ pub enum Delivery {
     },
 }
 
-/// A non-secret value set at run time that the generated files read (ISOLOOM_PUBLISH_ADDRESS,
-/// ISOLOOM_HYPERV_SWITCH, a Terraform variable such as `region`).
+/// A non-secret value set at run time that the generated files read (`ISOLOOM_PUBLISH_ADDRESS`,
+/// `ISOLOOM_HYPERV_SWITCH`, a Terraform variable such as `region`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Param {
@@ -221,6 +217,14 @@ mod tests {
             })
             .unwrap(),
             r#"{"via":"tf_var","var":"region"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&Delivery::TfVar {
+                var: SnakeName::parse("inputs").unwrap(),
+                shape: TfVarShape::MapEntry
+            })
+            .unwrap(),
+            r#"{"via":"tf_var","var":"inputs","shape":"map_entry"}"#
         );
         assert!(serde_json::from_str::<Delivery>(r#"{"via": "argv", "var": "X"}"#).is_err());
         assert!(serde_json::from_str::<Delivery>(r#"{"via": "env", "var": "X", "steps": ["*"], "value": "secret"}"#).is_err());

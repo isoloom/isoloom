@@ -68,6 +68,7 @@ pub enum Driver {
 
 impl Driver {
     /// The driver as the manifest writes it.
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             Driver::Compose => "compose",
@@ -233,6 +234,7 @@ pub enum Identity {
 
 impl Identity {
     /// The driver this identity is for.
+    #[must_use]
     pub fn driver(&self) -> Driver {
         match self {
             Identity::Compose(_) => Driver::Compose,
