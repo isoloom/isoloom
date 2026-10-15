@@ -8,7 +8,7 @@ use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
 use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, BlockBuilder, Expression, Structure, Template, binary, boolean, call, conditional, index, list, null, number, reference, string,
+    BinaryOperator, Block, BlockBuilder, Expression, Structure, Template, binary, boolean, call, conditional, list, null, number, reference, string,
 };
 use isoloom_spec::model::Target;
 
@@ -94,14 +94,14 @@ fn variables() -> Vec<Block> {
 /// The project's root, and the VM's address on the uplink: the guest agent's that isn't the
 /// loopback.
 fn locals() -> Block {
-    let addresses = super::uplink::addresses("proxmox_virtual_environment_vm.env", &[]);
+    let address = super::uplink::first_address("proxmox_virtual_environment_vm.env", &[]);
     let root = call(
         "abspath",
         [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],
     );
     Block::builder("locals")
         .add_attribute(("root", root))
-        .add_attribute(("ip", index(addresses, 0)))
+        .add_attribute(("ip", address))
         .build()
 }
 

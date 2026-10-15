@@ -48,6 +48,8 @@ fn the_module_is_applied_with_the_runners_state_and_values() {
         }
     ));
     assert!(m.lifecycle.park.is_none(), "a server run is created or destroyed");
+    let destroy = isoloom_manifest::to_json(&m).unwrap();
+    assert!(destroy.contains("\"-refresh=false\""), "a destroy never waits on a router's missing agent");
 }
 
 #[test]

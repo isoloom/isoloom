@@ -61,13 +61,25 @@ fn a_router_that_cant_report_its_address_fails_within_minutes_and_says_why() -> 
     // and the apply waited the provider's 15 minutes, then failed on an empty list's index.
     let tf = proxmox("hello-stack")?;
     let router = block(&tf, "resource \"proxmox_virtual_environment_vm\" \"isoloom_router\"");
-    assert!(router.contains("timeout = \"5m\""), "{router}");
+    assert!(router.contains("timeout = \"8m\""), "{router}");
     assert!(router.contains("wait_for_ip"), "{router}");
     assert!(router.contains("stop_on_destroy = true"), "a destroy never waits on a missing agent: {router}");
     assert!(router.contains("postcondition"), "{router}");
     assert!(router.contains("no DHCP"), "{router}");
     assert!(router.contains("qemu-guest-agent"), "{router}");
     Ok(())
+}
+
+#[test]
+fn a_router_that_never_reported_an_address_can_still_be_destroyed() {
+    // Found on the real server: after the postcondition failed, `destroy` stopped on "Invalid
+    // index" (the router's address list is empty in the state), leaving the lab behind.
+    let tf = proxmox("hello-stack").unwrap();
+    assert!(tf.contains("router_address = try(["), "{tf}");
+    let lab = testing::spec("version: 1\nname: d\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n").unwrap();
+    let env = planned(&lab, Target::DockerVm);
+    let host = isoloom_terraform::docker_vm_module(&env).unwrap().contents;
+    assert!(host.contains("ip   = try(["), "{host}");
 }
 
 #[test]

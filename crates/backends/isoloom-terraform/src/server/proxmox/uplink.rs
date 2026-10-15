@@ -1,13 +1,15 @@
 //! A VM whose uplink address the guest agent reports (the router, the Docker host): a bounded
 //! wait, and a clear failure when no address comes. A Debian cloud image boots and installs
-//! `qemu-guest-agent` in one to three minutes; with no DHCP, DNS or internet on the uplink the
-//! agent never reports one, and the provider's own wait is 15 minutes, after which the module
-//! failed on an empty list's index with no reason.
+//! `qemu-guest-agent` in one to three minutes on a server, four and a half on a nested Proxmox
+//! under load (measured); with no DHCP, DNS or internet on the uplink the agent never reports one,
+//! and the provider's own wait was 15 minutes, after which the module failed on an empty list's
+//! index with no reason. The address is read with `try`, so a destroy after such a failure still
+//! runs.
 
-use isoloom_render::hcl_builder::{BinaryOperator, Block, Expression, Template, binary, boolean, call, for_list, list, not, number, reference, string};
+use isoloom_render::hcl_builder::{BinaryOperator, Block, Expression, Template, binary, boolean, call, for_list, index, list, not, number, reference, string};
 
-/// How long the provider waits for the agent's address.
-const AGENT_WAIT: &str = "5m";
+/// How long the provider waits for the agent's address: the slowest boot measured, and margin.
+const AGENT_WAIT: &str = "8m";
 
 /// The `agent` block: on, an IPv4 address awaited for [`AGENT_WAIT`] at most.
 pub(super) fn agent() -> Block {
@@ -16,6 +18,12 @@ pub(super) fn agent() -> Block {
         .add_attribute(("timeout", string(AGENT_WAIT)))
         .add_block(Block::builder("wait_for_ip").add_attribute(("ipv4", boolean(true))).build())
         .build()
+}
+
+/// The first address of [`addresses`], or `""` when it reported none (a destroy after a failed
+/// apply evaluates it too).
+pub(super) fn first_address(vm: &str, own: &[String]) -> Expression {
+    call("try", [index(addresses(vm, own), 0), string("")])
 }
 
 /// The IPv4 addresses `vm` (`self`, or a resource address) reports that are neither the loopback

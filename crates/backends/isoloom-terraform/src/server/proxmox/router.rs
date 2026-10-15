@@ -4,7 +4,7 @@
 
 use isoloom_plan::Environment;
 use isoloom_plan::ipv6;
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, call, index, list, number, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, Template, call, list, number, reference, string};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::{Cidr, IPV6_PREFIX};
@@ -114,7 +114,7 @@ fn own_addresses(env: &Environment) -> Vec<String> {
 /// The outputs, from `local.router_address`: the router's address that is none of its
 /// environment addresses.
 pub(super) fn outputs(env: &Environment, m: &mut Module) {
-    let all = super::uplink::addresses("proxmox_virtual_environment_vm.isoloom_router", &own_addresses(env));
-    m.block(Block::builder("locals").add_attribute(("router_address", index(all, 0))).build());
+    let first = super::uplink::first_address("proxmox_virtual_environment_vm.isoloom_router", &own_addresses(env));
+    m.block(Block::builder("locals").add_attribute(("router_address", first)).build());
     crate::server::router::outputs(env, Target::Proxmox, m);
 }

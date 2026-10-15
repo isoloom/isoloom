@@ -87,9 +87,11 @@ pub(super) fn lifecycle() -> Result<Lifecycle, ManifestError> {
         3600,
         "Creating the lab's VMs on the server…",
     )?;
+    // No refresh: the state names everything to remove, and a router whose guest agent never
+    // ran would hold a refresh for the agent's whole wait.
     let destroy = terraform(
         "destroy",
-        words(&["destroy", "-auto-approve", "-input=false", "-no-color"]),
+        words(&["destroy", "-auto-approve", "-input=false", "-no-color", "-refresh=false"]),
         1800,
         "Removing the lab from the server…",
     )?;
