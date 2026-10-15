@@ -346,7 +346,7 @@ pub enum ScalarSchema {
 }
 
 /// A mapping of scalars, read as texts (`1024`, `true` and `"x"` alike).
-fn scalars<'de, D: serde::Deserializer<'de>>(d: D) -> Result<IndexMap<String, String>, D::Error> {
+pub(crate) fn scalars<'de, D: serde::Deserializer<'de>>(d: D) -> Result<IndexMap<String, String>, D::Error> {
     let raw: IndexMap<String, serde_json::Value> = serde::Deserialize::deserialize(d)?;
     raw.into_iter()
         .map(|(k, v)| match v {

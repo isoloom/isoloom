@@ -19,6 +19,7 @@ pub mod profile;
 pub mod reference;
 pub mod schema;
 pub mod shell;
+pub mod syntax;
 pub mod targets;
 pub mod validate;
 pub mod vlans;

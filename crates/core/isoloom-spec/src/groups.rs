@@ -90,6 +90,25 @@ type Groups = IndexMap<String, Mapping>;
 /// Expands `common:` and `groups:` into the machines of a spec document (the YAML, parsed).
 /// Unknown members are left for validation to report.
 pub fn expand(doc: &mut Value) -> Result<(), String> {
+    expand_with(doc, Implementations::CompleteOnly)
+}
+
+/// [`expand`] for the authored spec ([`crate::syntax`]): every shared field folds in, `os` and
+/// `app` included.
+pub fn expand_shared(doc: &mut Value) -> Result<(), String> {
+    expand_with(doc, Implementations::Shared)
+}
+
+/// What shared `docker:` and `vm:` blocks do to a machine.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Implementations {
+    /// They only complete one the machine declares itself (the lowered form's rule).
+    CompleteOnly,
+    /// They are fields like any other (the authored spec has none).
+    Shared,
+}
+
+fn expand_with(doc: &mut Value, implementations: Implementations) -> Result<(), String> {
     let Value::Mapping(top) = doc else { return Ok(()) };
     let common = common_of(top)?;
     let groups = groups_of(top)?;
@@ -104,7 +123,7 @@ pub fn expand(doc: &mut Value) -> Result<(), String> {
     let mut expanded = Mapping::new();
     for (k, v) in &machines {
         let merged = match (k.as_str(), v) {
-            (Some(name), Value::Mapping(own)) => merged(own, &common, &nesting.layers_for(name), &groups),
+            (Some(name), Value::Mapping(own)) => merged(own, &common, &nesting.layers_for(name), &groups, implementations),
             _ => v.clone(),
         };
         expanded.insert(k.clone(), merged);
@@ -212,7 +231,7 @@ fn resolve(groups: &Groups, names: &[String], group: &str, seen: &mut Vec<String
 }
 
 /// A machine's own fields over its groups' (least specific first) over `common:`.
-fn merged(own: &Mapping, common: &Mapping, mine: &[&str], groups: &Groups) -> Value {
+fn merged(own: &Mapping, common: &Mapping, mine: &[&str], groups: &Groups, implementations: Implementations) -> Value {
     let mut merged = Value::Mapping(Mapping::new());
     let layers = std::iter::once(common).chain(mine.iter().map(|g| &groups[*g]));
     for layer in layers {
@@ -220,7 +239,7 @@ fn merged(own: &Mapping, common: &Mapping, mine: &[&str], groups: &Groups) -> Va
         shared.remove(key("members"));
         // An implementation is only completed, never added.
         for imp in ["docker", "vm"] {
-            if !own.contains_key(key(imp)) {
+            if implementations == Implementations::CompleteOnly && !own.contains_key(key(imp)) {
                 shared.remove(key(imp));
             }
         }
