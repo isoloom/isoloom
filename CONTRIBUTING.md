@@ -17,24 +17,20 @@ cargo machete                                 # no unused dependencies
 cargo deny check                              # advisories, licenses, bans, sources
 typos                                         # spelling; legitimate words go in _typos.toml
 
-# Every example with committed output is up to date.
-for e in examples/*/; do [ -d "$e.isoloom" ] && cargo run -q -p isoloom -- check "$e"; done
-
-# Regenerate every example and the spec reference: nothing may change unless the change is the point.
+# Regenerate the spec reference: nothing may change unless the change is the point.
 cargo run -q -- docs --spec > docs/spec.md
-git diff --exit-code examples docs
+git diff --exit-code docs
 ```
 
 When a change is meant to alter output, review the snapshot diffs with `cargo insta review`,
-commit the accepted snapshots and regenerated examples, and explain each kind of difference in
+commit the accepted snapshots, and explain each kind of difference in
 the pull request.
 
 A change touching Compose, the plan or the runtime is also run for real:
 
 ```sh
 cargo build -q -p isoloom && export PATH=$PWD/target/debug:$PATH
-cd examples/hello-stack && isoloom run docker . && git diff --exit-code -- .isoloom \
-  && isoloom test docker . && isoloom down docker .
+cd examples/hello-stack && isoloom run docker . && isoloom test docker . && isoloom down docker .
 ```
 
 ## Conventions

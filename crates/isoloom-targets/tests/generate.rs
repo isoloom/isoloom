@@ -1,102 +1,22 @@
-//! Generators against the examples: the committed files under each example's `.isoloom/`
-//! are exactly what `generate` produces (what `isoloom check` enforces in CI), and specs
-//! a generator can't handle yet are refused with the reason.
+//! Generators against the examples and small specs: what each target writes, and specs a
+//! generator can't handle yet refused with the reason.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
-use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use isoloom_spec::{Target, load, parse};
 use isoloom_targets::{GenerateError, generate, generate_all};
 
-fn example(name: &str) -> (PathBuf, isoloom_spec::Spec) {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples").join(name);
-    let spec = load(&dir).expect("example parses");
-    (dir, spec)
-}
-
-/// Every example with committed outputs (a `.isoloom/` folder), by name.
-fn examples_with_outputs() -> Vec<String> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
-    let mut names: Vec<String> = std::fs::read_dir(root)
-        .expect("examples folder")
-        .filter_map(std::result::Result::ok)
-        .filter(|e| e.path().join(".isoloom").is_dir())
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
-    names
-}
-
-/// Files a run leaves next to the generated ones (all git-ignored): not outputs.
-fn is_run_artifact(rel: &str) -> bool {
-    rel.split('/').any(|c| c == ".terraform" || c == ".vagrant")
-        || rel.ends_with(".terraform.lock.hcl")
-        || rel.contains(".tfstate")
-        // cloud-services: the module's copy, the launch-time inputs, the apply's marker, the
-        // deployment's name.
-        || rel.contains("/cloud-services/module/")
-        || ["inputs.tfvars.json", "deploying", "isoloom-instance"].iter().any(|f| rel.ends_with(&format!("/cloud-services/{f}")))
-}
-
-/// Every file under `dir`, as paths relative to `base` with `/` separators.
-fn files_under(base: &Path, dir: &Path, out: &mut BTreeSet<String>) {
-    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            files_under(base, &path, out);
-        } else {
-            let rel = path.strip_prefix(base).unwrap().to_string_lossy().replace('\\', "/");
-            out.insert(rel);
-        }
-    }
-}
-
-/// The problems with one example's committed outputs: stale or missing files, and files on disk
-/// that `generate` no longer writes.
-fn committed_problems(name: &str) -> Vec<String> {
-    let (dir, spec) = example(name);
-    let (mut files, _) = generate_all(&spec);
-    // The Helm chart's copies of the project's scripts, as `isoloom generate` writes them.
-    files.extend(isoloom_targets::project_copies(&files, &dir).expect("the scripts the chart copies exist"));
-    if files.is_empty() {
-        return vec![format!("{name}: nothing generated")];
-    }
-    let mut problems: Vec<String> = files
-        .iter()
-        .filter(|f| std::fs::read_to_string(dir.join(&f.path)).ok().as_deref() != Some(f.contents.as_str()))
-        .map(|f| format!("{name}: {} is stale or missing", f.path))
-        .collect();
-    let generated: BTreeSet<&str> = files.iter().map(|f| f.path.as_str()).collect();
-    let mut on_disk = BTreeSet::new();
-    files_under(&dir, &dir.join(".isoloom"), &mut on_disk);
-    problems.extend(
-        on_disk
-            .iter()
-            .filter(|rel| !is_run_artifact(rel) && !generated.contains(rel.as_str()))
-            .map(|rel| format!("{name}: {rel} is no longer generated")),
-    );
-    problems
+fn example(name: &str) -> isoloom_spec::Spec {
+    load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples").join(name)).expect("example parses")
 }
 
 #[test]
-fn committed_outputs_are_up_to_date() {
-    let names = examples_with_outputs();
-    assert!(names.len() >= 20, "examples not found: {names:?}");
-    let problems: Vec<String> = names.iter().flat_map(|n| committed_problems(n)).collect();
-    assert!(
-        problems.is_empty(),
-        "run `cargo run -- generate examples/<name>` and delete what it no longer writes:\n{}",
-        problems.join("\n")
-    );
-}
-
-#[test]
-fn an_example_without_outputs_is_refused_with_reasons() {
-    // corp-ad-basics has no `.isoloom/`: every generator refuses it (Windows provisioning with an
-    // Ansible playbook, no Proxmox image for Windows), so the walk above has nothing to compare.
-    let (_, spec) = example("corp-ad-basics");
+fn an_example_every_generator_refuses_is_refused_with_reasons() {
+    // corp-ad-basics: every generator refuses it (Windows provisioning with an Ansible playbook,
+    // no Proxmox image for Windows).
+    let spec = example("corp-ad-basics");
     let (files, skipped) = generate_all(&spec);
     assert!(files.is_empty(), "{:?}", files.iter().map(|f| &f.path).collect::<Vec<_>>());
     assert_ne!(skipped, [] as [isoloom_targets::GenerateError; 0]);
@@ -107,17 +27,17 @@ fn refusal_reports_what_a_generator_would_refuse() {
     // A target can be possible by its machines' editions yet refused by its generator; `targets`
     // used to show ✓ for those (Proxmox for a Windows lab whose steps are playbooks, or one with
     // environment provisioning).
-    let (_, ad) = example("corp-ad-basics");
+    let ad = example("corp-ad-basics");
     let why = isoloom_targets::refusal(&ad, Target::Proxmox).expect("Windows steps are PowerShell on Proxmox");
     assert!(why.contains("PowerShell scripts"), "{why}");
     // A Windows lab of PowerShell steps clones a template on Proxmox.
-    let (_, windows) = example("windows-hello");
+    let windows = example("windows-hello");
     assert_eq!(isoloom_targets::refusal(&windows, Target::Proxmox), None);
     // Environment-level provisioning runs from a controller on Proxmox now, so it is not refused.
-    let (_, ansible) = example("ansible-pair");
+    let ansible = example("ansible-pair");
     assert_eq!(isoloom_targets::refusal(&ansible, Target::Proxmox), None);
     // A plain Linux lab is generated: nothing to refuse.
-    let (_, plain) = example("hello-stack");
+    let plain = example("hello-stack");
     assert_eq!(isoloom_targets::refusal(&plain, Target::Proxmox), None);
     assert_eq!(isoloom_targets::refusal(&plain, Target::Docker), None);
 }
@@ -153,7 +73,7 @@ fn checks_plan_of_an_undeclared_network_does_not_panic() {
 
 #[test]
 fn hybrid_runs_containers_beside_the_vms() {
-    let (_, spec) = example("mixed-office");
+    let spec = example("mixed-office");
     let files = generate(&spec, Target::Hybrid).unwrap();
     let vagrantfile = &files.iter().find(|f| f.path.ends_with("hybrid/Vagrantfile")).unwrap().contents;
     let compose = &files.iter().find(|f| f.path.ends_with("hybrid/compose.yml")).unwrap().contents;
@@ -173,15 +93,15 @@ fn hybrid_runs_containers_beside_the_vms() {
 
 #[test]
 fn hybrid_is_offered_only_for_mixed_environments() {
-    let (_, spec) = example("hello-stack");
+    let spec = example("hello-stack");
     assert!(!isoloom_spec::targets::derive(&spec).contains(&Target::Hybrid));
-    let (_, spec) = example("mixed-office");
+    let spec = example("mixed-office");
     assert!(isoloom_spec::targets::derive(&spec).contains(&Target::Hybrid));
 }
 
 #[test]
 fn compose_has_addresses_healthchecks_init_and_checks() {
-    let (_, spec) = example("hello-stack");
+    let spec = example("hello-stack");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(compose.contains("ipv4_address: 10.60.0.20"));
     assert!(compose.contains("gateway: 10.60.0.1"));
@@ -207,7 +127,7 @@ fn compose_has_addresses_healthchecks_init_and_checks() {
 
 #[test]
 fn inputs_reach_only_the_machines_that_list_them() {
-    let (_, spec) = example("supplier-portal-api");
+    let spec = example("supplier-portal-api");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     let web = compose.split("\n  web:").nth(1).unwrap().split("\n  isoloom-check:").next().unwrap();
     assert!(compose.contains("LAUNCH_TOKEN: ${LAUNCH_TOKEN:-}"));
@@ -216,7 +136,7 @@ fn inputs_reach_only_the_machines_that_list_them() {
 
 #[test]
 fn vagrant_orders_machines_and_names_them() {
-    let (_, spec) = example("hello-stack");
+    let spec = example("hello-stack");
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     let cache = vf.find("config.vm.define \"cache\"").unwrap();
     let web = vf.find("config.vm.define \"web\"").unwrap();
@@ -228,7 +148,7 @@ fn vagrant_orders_machines_and_names_them() {
 #[test]
 fn libvirt_domains_are_named_after_the_environment() {
     // Unset, vagrant-libvirt prefixes the folder's name ("vagrant_web"), the same for every lab.
-    let (_, spec) = example("hello-stack");
+    let spec = example("hello-stack");
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     assert!(vf.contains("v.default_prefix = \"hello-stack_\""), "{vf}");
     let two = isoloom_spec::instance::apply(&spec, 2).unwrap();
@@ -240,7 +160,7 @@ fn libvirt_domains_are_named_after_the_environment() {
 
 #[test]
 fn the_controller_gets_every_provider_block_the_machines_get() {
-    let (_, spec) = example("ansible-pair");
+    let spec = example("ansible-pair");
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     let controller = vf.split("config.vm.define \"isoloom-controller\"").nth(1).unwrap();
     for provider in ["virtualbox", "vmware_desktop", "parallels", "utm", "qemu", "vmware_esxi", "libvirt"] {
@@ -253,7 +173,7 @@ fn the_controller_gets_every_provider_block_the_machines_get() {
 
 #[test]
 fn reach_rules_add_a_router_with_matching_rules() {
-    let (_, spec) = example("segmented");
+    let spec = example("segmented");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(compose.contains("isoloom-router:"));
     assert!(compose.contains("ipv4_address: 10.61.20.254"), "router at the last address");
@@ -273,7 +193,7 @@ fn reach_rules_add_a_router_with_matching_rules() {
 
 #[test]
 fn vagrant_router_waits_and_offline_blocks() {
-    let (_, spec) = example("segmented");
+    let spec = example("segmented");
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     let router = vf.find("config.vm.define \"isoloom-router\"").unwrap();
     let cache = vf.find("config.vm.define \"cache\"").unwrap();
@@ -287,7 +207,7 @@ fn vagrant_router_waits_and_offline_blocks() {
 
 #[test]
 fn unsupported_features_are_refused_with_the_reason() {
-    let (_, ad) = example("corp-ad-basics");
+    let ad = example("corp-ad-basics");
     assert_eq!(generate(&ad, Target::Docker), Err(GenerateError::NotPossible(Target::Docker)));
     assert!(
         matches!(generate(&ad, Target::Vagrant), Err(GenerateError::Unsupported { .. })),
@@ -316,7 +236,7 @@ fn an_arm64_access_machine_that_is_actually_built_is_still_refused_on_the_cloud(
 
 #[test]
 fn a_gateway_routes_its_networks_instead_of_the_router() {
-    let (_, spec) = example("edge-firewall");
+    let spec = example("edge-firewall");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(!compose.contains("isoloom-router"), "no router: the firewall routes");
     // The firewall takes .1; Docker's bridge moves to the last address on its networks.
@@ -336,7 +256,7 @@ fn a_gateway_routes_its_networks_instead_of_the_router() {
 
 #[test]
 fn vagrant_moves_machines_behind_their_gateway_after_provisioning() {
-    let (_, spec) = example("edge-firewall");
+    let spec = example("edge-firewall");
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     let fw = vf.find("config.vm.define \"fw\"").unwrap();
     let web = vf.find("config.vm.define \"web\"").unwrap();
@@ -429,7 +349,7 @@ fn contents(files: &[isoloom_targets::GeneratedFile], path: &str) -> String {
 
 #[test]
 fn the_runner_supplies_the_access_machine_through_its_image_table() {
-    let (_, spec) = example("segmented");
+    let spec = example("segmented");
     let table = isoloom_spec::images::Table::parse("access:\n  docker: kalilinux/kali-rolling\n  vm: kali\n").unwrap();
     let applied = table.apply(&spec);
     let compose = contents(&generate(&applied, Target::Docker).unwrap(), ".isoloom/docker/compose.yml");
@@ -448,7 +368,7 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() {
 
 #[test]
 fn the_image_table_sits_between_built_in_images_and_the_spec() {
-    let (_, spec) = example("hello-stack");
+    let spec = example("hello-stack");
     let table = isoloom_spec::images::Table::parse("os:\n  debian-12: { vagrant: my-org/debian-12, vagrant_version: \"1.2.0\" }\n").unwrap();
     let vagrant = contents(&generate(&table.apply(&spec), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(
@@ -456,7 +376,7 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
         "{vagrant}"
     );
     // A spec's own vm.image still wins.
-    let (_, windows) = example("windows-hello");
+    let windows = example("windows-hello");
     let table = isoloom_spec::images::Table::parse("os:\n  windows-server-2019: { vagrant: other/box }\n").unwrap();
     let mut pinned = windows.clone();
     for m in pinned.machines.values_mut() {
@@ -474,7 +394,7 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
 
 #[test]
 fn proxmox_forwards_published_ports_from_the_router() {
-    let (_, spec) = example("hello-stack");
+    let spec = example("hello-stack");
     let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
     // From anything outside the lab to the machine, and the forward allowed through.
     assert!(tf.contains("tcp dport 8080 dnat ip to 10.60.0.10:"), "{tf}");
@@ -501,7 +421,7 @@ fn proxmox_cloud_init_uses_the_machines_declared_resolver() {
 
 #[test]
 fn kubernetes_turns_networks_and_reach_into_network_policies() {
-    let (_, spec) = example("segmented");
+    let spec = example("segmented");
     let files = generate(&spec, Target::Kubernetes).unwrap();
     let env = contents(&files, ".isoloom/kubernetes/environment.yaml");
     // Deny by default, each network's machines together, then the reach rules (with ports).
@@ -567,7 +487,7 @@ fn kubernetes_seeds_a_volume_from_the_image_before_the_init_jobs() {
 
 #[test]
 fn kubernetes_publishes_and_keeps_offline_machines_inside() {
-    let (_, spec) = example("hello-stack");
+    let spec = example("hello-stack");
     let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
     assert!(env.contains("type: LoadBalancer") && env.contains("port: 8080"), "{env}");
     assert!(env.contains("name: offline-"));
@@ -578,7 +498,7 @@ fn kubernetes_publishes_and_keeps_offline_machines_inside() {
 
 #[test]
 fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() {
-    let (_, mut spec) = example("pivot-dmz");
+    let mut spec = example("pivot-dmz");
     // Kali has no AWS image yet: the user lands on Debian here.
     for m in spec.machines.values_mut() {
         if let Some(vm) = &mut m.vm
@@ -600,7 +520,7 @@ fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() {
 
 #[test]
 fn cloud_vm_runs_the_environments_playbooks_from_a_controller() {
-    let (_, spec) = example("ansible-pair");
+    let spec = example("ansible-pair");
     let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
     // A key of its own, authorized on every machine; the controller at the controller address.
     assert!(tf.contains("resource \"tls_private_key\" \"controller\""));
@@ -614,7 +534,7 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() {
 
 #[test]
 fn playbook_vars_keep_their_types() {
-    let (_, spec) = example("ansible-pair");
+    let spec = example("ansible-pair");
     let vars = &spec.provision[0].vars;
     assert_eq!(vars["tools"], serde_json::json!(["curl", "jq"]));
     assert_eq!(vars["cache_port"], serde_json::json!(6379));
@@ -627,7 +547,7 @@ fn playbook_vars_keep_their_types() {
 
 #[test]
 fn cloud_vm_runs_windows_over_winrm_with_its_name() {
-    let (_, spec) = example("windows-hello");
+    let spec = example("windows-hello");
     let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
     // Amazon's image, no key pair (AWS refuses ED25519 on Windows), WinRM with a generated password.
     assert!(tf.contains("Windows_Server-2019-English-Full-Base-*"));
@@ -690,7 +610,7 @@ fn an_idle_container_is_kept_running() {
 #[test]
 fn the_controller_is_small_by_default_and_sized_by_the_spec() {
     // ansible-pair asks for 768 MB.
-    let (_, spec) = example("ansible-pair");
+    let spec = example("ansible-pair");
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
     assert!(
@@ -727,7 +647,7 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() {
 
 #[test]
 fn the_controller_halts_after_provisioning_unless_kept_running() {
-    let (_, mut spec) = example("ansible-pair");
+    let mut spec = example("ansible-pair");
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
     // After the playbooks, before the on-demand checks; marked so a check run waits it out.
@@ -741,7 +661,7 @@ fn the_controller_halts_after_provisioning_unless_kept_running() {
 
 #[test]
 fn the_resolved_snapshot_tells_infra_from_targets() {
-    let (_, spec) = example("ansible-pair");
+    let spec = example("ansible-pair");
     let resolved = isoloom_targets::resolved::resolve(&spec);
     assert_eq!(resolved["machines"]["web"]["role"], "target");
     assert_eq!(resolved["controller"]["role"], "infra");
@@ -750,7 +670,7 @@ fn the_resolved_snapshot_tells_infra_from_targets() {
 
 #[test]
 fn the_provision_script_can_be_limited_to_machines() {
-    let (_, spec) = example("ansible-pair");
+    let spec = example("ansible-pair");
     let all = isoloom_targets::provision_script(&spec, &[]);
     // (The retry of unreachable hosts limits itself, from the retry file: only the runs count.)
     let runs = |s: &str| s.lines().filter(|l| l.starts_with("run_play ")).map(String::from).collect::<Vec<_>>();
@@ -763,7 +683,7 @@ fn the_provision_script_can_be_limited_to_machines() {
 /// play whose only failures are unreachable hosts runs again on those hosts (`--limit @…`).
 #[test]
 fn the_controller_retries_unreachable_hosts_from_the_retry_file() {
-    let (_, spec) = example("ansible-pair");
+    let spec = example("ansible-pair");
     for (target, path) in [
         (Target::Vagrant, ".isoloom/vagrant/Vagrantfile"),
         (Target::Proxmox, ".isoloom/proxmox/main.tf"),
@@ -781,7 +701,7 @@ fn the_controller_retries_unreachable_hosts_from_the_retry_file() {
 
 #[test]
 fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
-    let (_, spec) = example("ansible-pair");
+    let spec = example("ansible-pair");
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(vagrantfile.contains("cache ansible_host=10.63.0.20 maxmemory='\"64mb\"'"), "{vagrantfile}");
     assert!(vagrantfile.contains("web ansible_host=10.63.0.10\n"), "{vagrantfile}");
@@ -856,7 +776,7 @@ machines:
         isoloom_targets::start_commands("docker compose", &[], None),
         "docker compose up -d --build --wait"
     );
-    let (_, hello) = example("hello-stack");
+    let hello = example("hello-stack");
     let compose = &generate(&hello, Target::Docker).unwrap()[0].contents;
     assert_eq!(isoloom_targets::start_plan(compose).unwrap(), isoloom_targets::StartPlan::default());
 }
@@ -865,7 +785,7 @@ machines:
 /// re-seeding the environment on every test (#47).
 #[test]
 fn checks_on_the_docker_vm_never_rerun_init_jobs() {
-    let (_, spec) = example("hello-stack");
+    let spec = example("hello-stack");
     let files = generate(&spec, Target::DockerVm).unwrap();
     let vf = files.iter().find(|f| f.path.ends_with("Vagrantfile")).unwrap();
     assert!(vf.contents.contains("--profile check run --rm --no-deps"));
@@ -1115,7 +1035,7 @@ fn define_block<'a>(vf: &'a str, name: &str) -> &'a str {
 
 #[test]
 fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_guest() {
-    let (_, spec) = example("segmented");
+    let spec = example("segmented");
     let v = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     // The first adapter's switch from ISOLOOM_HYPERV_SWITCH, the helper module once.
     assert_eq!(v.matches("HYPERV_SWITCH = ENV.fetch(\"ISOLOOM_HYPERV_SWITCH\", \"Default Switch\")").count(), 1);
@@ -1166,7 +1086,7 @@ fn hyperv_router_and_macs(v: &str, networks: usize) {
 #[test]
 fn vagrant_on_hyperv_takes_windows_and_privileged_machines() {
     // Windows: the box's Hyper-V build from `vm.image.hyperv`, a static address through WMI.
-    let (_, win) = example("windows-hello");
+    let win = example("windows-hello");
     let v = contents(&generate(&win, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(
         v.contains("      o.vm.box = \"StefanScherer/windows_2019\"\n      o.vm.box_version = \">= 0\"\n      v.vmname = \"windows-hello-web01\""),
@@ -1181,7 +1101,7 @@ fn vagrant_on_hyperv_takes_windows_and_privileged_machines() {
     assert!(v.contains("mac = '02:15:") && v.contains("ip = '192.168.57.10'; mask = '255.255.255.0'"), "{v}");
 
     // Nested virtualization comes from `nested_virtualization`, not from `privileged`.
-    let (_, hosts) = example("existing-hosts");
+    let hosts = example("existing-hosts");
     let v = contents(&generate(&hosts, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(!define_block(&v, "cache").contains("enable_virtualization_extensions"));
     let nested = parse("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  hv: { networks: { lab: 10 }, nested_virtualization: true, vm: { os: debian-12, provision: [a.sh] } }\n").unwrap();

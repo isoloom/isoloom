@@ -7,7 +7,7 @@
 //! path, each under a `## <path>` header. A refused target's snapshot holds the refusal: the
 //! `isoloom targets` reason and `generate`'s message.
 //!
-//! Each run copies the example, without its committed `.isoloom/` outputs, into a fresh folder,
+//! Each run copies the example, without any generated `.isoloom/` outputs, into a fresh folder,
 //! and runs the binary with an empty `ISOLOOM_HOME` and no other `ISOLOOM_*` variable, so the
 //! user's defaults and profile never leak in. A file a target shares with an earlier target of the
 //! same example (the Compose file under `docker-vm`, `resolved.json` everywhere), byte for byte,

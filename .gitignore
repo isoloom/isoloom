@@ -8,12 +8,7 @@
 *.tfstate.*
 .claude/
 
-# Instance folders written by `isoloom run --instance N` (the committed files are under .isoloom/).
+# What `isoloom generate` and `isoloom run` write in a project folder, the examples included:
+# outputs are generated, never committed (the characterization snapshots hold the examples').
+.isoloom/
 .isoloom-*/
-
-# What `isoloom run cloud-services` writes next to the state: the module's copy, the
-# launch-time inputs, the marker of an apply in progress, the deployment's name.
-.isoloom/cloud-services/module/
-.isoloom/cloud-services/inputs.tfvars.json
-.isoloom/cloud-services/deploying
-.isoloom/cloud-services/isoloom-instance

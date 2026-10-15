@@ -1,5 +1,5 @@
 //! The `cloud-vm` Azure module: the AWS model on the azurerm provider, from the plan. These
-//! assert the Azure-specific facts; `generate.rs` checks the committed output stays in sync.
+//! assert the Azure-specific facts; the characterization snapshots hold the whole output.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 

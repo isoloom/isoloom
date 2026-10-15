@@ -15,8 +15,7 @@ Closes #
 - [ ] `cargo machete`
 - [ ] `cargo deny check`
 - [ ] `typos`
-- [ ] every example with committed output passes `isoloom check`
-- [ ] `docs/spec.md` regenerated, and `git diff --exit-code examples docs` is clean unless the change is the point
+- [ ] `docs/spec.md` regenerated, and `git diff --exit-code docs` is clean unless the change is the point
 - [ ] snapshot changes reviewed (`cargo insta review`) and each kind of difference explained below
 - [ ] a CHANGELOG line, if a user or embedder notices the change ("Breaking (library)" for the supported surface)
 - [ ] no secrets: no token, password, key or private address in the diff, the snapshots, the examples or the pasted output
