@@ -18,8 +18,8 @@ pub struct Args {
     json: bool,
 }
 
-pub fn run(a: &Args) -> Res<ExitCode> {
-    let spec = spec::load_spec(&a.dir)?;
+pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
+    let spec = spec::load_spec(profile, &a.dir)?;
     let mut problems = isoloom_spec::validate(&spec);
     if !a.skip_files {
         problems.extend(isoloom_spec::validate_files(&spec, &a.dir));

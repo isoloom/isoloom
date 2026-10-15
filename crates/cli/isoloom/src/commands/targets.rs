@@ -1,9 +1,8 @@
-//! `isoloom targets`: the targets the spec can run on, and why the others can't.
+//! `isoloom targets`: the targets the spec can be generated for, and why the others can't.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use isoloom_runtime::host::Readiness;
 use isoloom_spec::Target;
 
 use crate::{Res, output, spec};
@@ -14,34 +13,20 @@ pub struct Args {
     dir: PathBuf,
     #[arg(long)]
     json: bool,
-    /// Also say whether this machine can run each target (tools installed, credentials
-    /// present), and what is missing.
-    #[arg(long)]
-    host: bool,
 }
 
-pub fn run(a: &Args) -> Res<ExitCode> {
-    let spec = spec::load_spec(&a.dir)?;
+pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
+    let spec = spec::load_spec(profile, &a.dir)?;
     if spec::report_invalid(&spec) {
         return Ok(ExitCode::FAILURE);
     }
     if a.json {
-        print_json(&spec, a.host)?;
+        let ids: Vec<&str> = ready(&spec).iter().map(|t| t.id()).collect();
+        output::print_json(&ids)?;
     } else {
-        print_text(&spec, a.host);
+        print_text(&spec);
     }
     Ok(ExitCode::SUCCESS)
-}
-
-/// With --host, whether this machine has what each target needs (one line per cloud).
-fn on_host(t: Target, host: bool) -> Vec<Readiness> {
-    if !host {
-        return vec![];
-    }
-    match t {
-        Target::CloudDocker | Target::CloudVm => isoloom_runtime::host::CLOUDS.iter().map(|c| isoloom_runtime::host::check(t, Some(c))).collect(),
-        _ => vec![isoloom_runtime::host::check(t, None)],
-    }
 }
 
 /// The targets `generate` really produces: possible by the machines' editions, and not
@@ -53,26 +38,7 @@ fn ready(spec: &isoloom_spec::Spec) -> Vec<Target> {
         .collect()
 }
 
-fn print_json(spec: &isoloom_spec::Spec, host: bool) -> Res<()> {
-    let ready = ready(spec);
-    if !host {
-        let ids: Vec<&str> = ready.iter().map(|t| t.id()).collect();
-        return output::print_json(&ids);
-    }
-    let list: Vec<serde_json::Value> = ready
-        .iter()
-        .map(|t| {
-            let checks: Vec<serde_json::Value> = on_host(*t, host)
-                .iter()
-                .map(|r| serde_json::json!({ "cloud": r.cloud, "ready": r.ready, "notes": r.notes }))
-                .collect();
-            serde_json::json!({ "target": t.id(), "host": checks })
-        })
-        .collect();
-    output::print_json(&list)
-}
-
-fn print_text(spec: &isoloom_spec::Spec, host: bool) {
+fn print_text(spec: &isoloom_spec::Spec) {
     let effective = isoloom_spec::effective(spec);
     for t in Target::ALL {
         if !effective.contains(&t) {
@@ -88,10 +54,6 @@ fn print_text(spec: &isoloom_spec::Spec, host: bool) {
                 // A cloud whose model doesn't fit drops its module, not the target.
                 for (cloud, why) in isoloom_targets::cloud_refusals(spec, t).map(|(_, r)| r).unwrap_or_default() {
                     println!("    ✗ {cloud} ({why})");
-                }
-                for r in on_host(t, host) {
-                    let label = r.cloud.as_deref().map(|c| format!(" {c}")).unwrap_or_default();
-                    println!("    host{label}: {}", r.summary());
                 }
             }
             Some(why) => println!("✗ {} ({why})", t.id()),

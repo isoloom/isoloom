@@ -1,6 +1,6 @@
 //! The `cloud-services` target's scripts: Terraform on a copy of the module, the `before`
 //! steps, `env`, `apply_retries`, the deployment's name; and how the new `cloud:` keys are
-//! validated. What `cloud.requires` asks of the host is tested in `isoloom_runtime::host`.
+//! validated.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 

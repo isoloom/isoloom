@@ -427,17 +427,14 @@ name = "isoloom"
 version = "0.10.1"
 dependencies = [
  "clap",
- "indexmap",
  "insta",
  "isoloom-import",
- "isoloom-plan",
- "isoloom-render",
- "isoloom-runtime",
  "isoloom-spec",
  "isoloom-targets",
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "thiserror",
 ]
 
 [[package]]
@@ -530,19 +527,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "isoloom-runtime"
-version = "0.10.1"
-dependencies = [
- "isoloom-spec",
- "isoloom-targets",
- "schemars",
- "serde",
- "serde_json",
- "serde_yaml_ng",
- "thiserror",
-]
-
-[[package]]
 name = "isoloom-spec"
 version = "0.10.1"
 dependencies = [
@@ -569,13 +553,13 @@ dependencies = [
  "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
- "isoloom-runtime",
  "isoloom-spec",
  "isoloom-terraform",
  "isoloom-vagrant",
  "jsonschema",
  "serde_json",
  "serde_yaml_ng",
+ "thiserror",
 ]
 
 [[package]]

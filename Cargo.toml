@@ -6,7 +6,6 @@ members = [
   "crates/tools/*",
   "crates/targets/*",
   "crates/cli/*",
-  "crates/isoloom-runtime",
 ]
 
 [workspace.package]
@@ -28,7 +27,6 @@ isoloom-vagrant = { path = "crates/backends/isoloom-vagrant" }
 isoloom-ansible = { path = "crates/backends/isoloom-ansible" }
 isoloom-targets = { path = "crates/targets/isoloom-targets" }
 isoloom-import = { path = "crates/tools/isoloom-import" }
-isoloom-runtime = { path = "crates/isoloom-runtime" }
 isoloom-manifest = { path = "crates/core/isoloom-manifest" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

@@ -20,10 +20,10 @@ isoloom-ansible.workspace = true
 isoloom-manifest.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 isoloom-import.workspace = true
-isoloom-runtime.workspace = true
 serde_yaml_ng.workspace = true
 jsonschema.workspace = true
 

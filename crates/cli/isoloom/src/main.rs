@@ -1,9 +1,9 @@
-//! `isoloom`: describe an environment once, run it anywhere.
+//! `isoloom`: describe an environment once, and convert it to each tool's own files.
 //!
 //! `cli` holds the command line's definition and `commands` one file per subcommand. The other
 //! modules are what several commands share: the spec with its profile (`spec`), the target to
-//! use (`target`), the files written for it (`generated`, `prepare`), the secrets handed to it (`secrets`), the tools each target runs
-//! with (`tools`), and a running environment's machines (`machine`, `external`).
+//! use (`target`), the files written for it (`generated`), the errors of the command line
+//! itself (`error`) and its JSON output (`output`).
 
 // The command line prints its results: that is its interface, not stray debugging output.
 #![allow(clippy::print_stdout)]
@@ -13,21 +13,14 @@ use std::process::ExitCode;
 use clap::Parser;
 
 mod cli;
-mod cloud_services;
 mod commands;
-mod external;
-mod failure;
+mod error;
 mod generated;
-mod machine;
 mod output;
-mod prepare;
-mod secrets;
 mod spec;
 mod target;
-mod tools;
 
-/// What a command returns: its exit code, or the error printed as `error: ...` (exit code 2;
-/// with `--json`, the error document `failure` describes).
+/// What a command returns: its exit code, or the error printed as `error: ...` (exit code 2).
 type Res<T> = Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> ExitCode {
@@ -40,10 +33,7 @@ fn main() -> ExitCode {
         .spawn(|| match run(cli::Cli::parse()) {
             Ok(code) => code,
             Err(e) => {
-                // With `--json`, the error document on stdout; otherwise the message on stderr.
-                if !output::print_error(e.as_ref()) {
-                    eprintln!("error: {e}");
-                }
+                eprintln!("error: {e}");
                 ExitCode::from(2)
             }
         });
@@ -57,6 +47,6 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: cli::Cli) -> Res<ExitCode> {
-    spec::set_profile(cli.profile);
-    commands::run(cli.command)
+    let profile = spec::Profile::new(cli.profile, std::env::var("ISOLOOM_PROFILE").ok());
+    commands::run(cli.command, &profile)
 }

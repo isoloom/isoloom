@@ -13,8 +13,8 @@ pub struct Args {
     json: bool,
 }
 
-pub fn run(a: &Args) -> Res<ExitCode> {
-    let spec = spec::load_spec(&a.dir)?;
+pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
+    let spec = spec::load_spec(profile, &a.dir)?;
     let t = isoloom_spec::totals(&spec);
     if a.json {
         output::print_json(&serde_json::json!({ "machines": t.machines, "cpus": t.cpus, "memoryMb": t.memory_mb, "diskGb": t.disk_gb }))?;

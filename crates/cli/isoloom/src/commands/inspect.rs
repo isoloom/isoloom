@@ -24,13 +24,13 @@ pub struct Args {
     sets: Vec<String>,
 }
 
-pub fn run(a: Args) -> Res<ExitCode> {
+pub fn run(a: Args, profile: &spec::Profile) -> Res<ExitCode> {
     // `isoloom inspect examples/segmented` names the project, not a path in the snapshot.
     let (what, dir) = match (a.what, a.dir) {
         (Some(w), None) if w.contains('/') || std::path::Path::new(&w).is_dir() => (None, PathBuf::from(w)),
         (w, d) => (w, d.unwrap_or_else(|| PathBuf::from("."))),
     };
-    let all = spec::snapshot_of(&dir, a.instance, &a.sets)?;
+    let all = spec::snapshot_of(profile, &dir, a.instance, &a.sets)?;
     let value = match &what {
         Some(path) => {
             isoloom_targets::resolved::lookup(&all, path).ok_or_else(|| format!("nothing at `{path}` in the snapshot; try `isoloom inspect` to see it all"))?

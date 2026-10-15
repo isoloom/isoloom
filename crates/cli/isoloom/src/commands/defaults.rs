@@ -17,9 +17,9 @@ pub struct Args {
     json: bool,
 }
 
-pub fn run(a: &Args) -> Res<ExitCode> {
+pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
     if !a.system {
-        return in_effect(&a.dir, a.json);
+        return in_effect(profile, &a.dir, a.json);
     }
     let value = isoloom_spec::defaults::builtin();
     if a.json {
@@ -31,8 +31,8 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 }
 
 /// Every layer merged, each value with its source.
-fn in_effect(dir: &Path, json: bool) -> Res<ExitCode> {
-    let profile = spec::profile_for(dir)?;
+fn in_effect(profile: &spec::Profile, dir: &Path, json: bool) -> Res<ExitCode> {
+    let profile = profile.load(dir)?;
     let r = isoloom_spec::defaults::load_profiled(dir, None, profile.as_ref(), &[])?;
     let mut merged = isoloom_spec::defaults::builtin();
     isoloom_spec::defaults::merge(&mut merged, &r.merged);

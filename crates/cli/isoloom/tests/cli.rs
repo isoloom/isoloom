@@ -1,5 +1,5 @@
-//! The `isoloom` binary itself, on paths that need no Docker or VMs: argument errors, a missing
-//! or invalid spec, and the registry behind `status`. Each test gets its own `ISOLOOM_HOME`.
+//! The `isoloom` binary itself: argument errors, a missing or invalid spec, the targets a spec
+//! can be generated for, and profiles. Each test gets its own `ISOLOOM_HOME`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
@@ -93,9 +93,9 @@ fn invalid_spec_fails_validate_with_its_problems() {
 }
 
 #[test]
-fn run_rejects_an_unknown_target() {
-    let home = scratch("run-unknown-target");
-    let o = isoloom(&home, &["run", "bogus", &example("hello-stack")]);
+fn generate_rejects_an_unknown_target() {
+    let home = scratch("generate-unknown-target");
+    let o = isoloom(&home, &["generate", &example("hello-stack"), "--target", "bogus"]);
     assert_eq!(o.status.code(), Some(2));
     assert!(stderr(&o).contains("unknown target `bogus`"), "{}", stderr(&o));
 }
@@ -123,84 +123,6 @@ fn a_refusal_by_aws_drops_only_its_module() {
     assert!(o.status.success(), "{}{}", stdout(&o), stderr(&o));
     assert!(!dir.join(".isoloom/cloud-vm/aws").exists());
     assert!(dir.join(".isoloom/cloud-vm/gcp/main.tf").exists());
-}
-
-#[test]
-fn run_cloud_vm_names_the_clouds_to_pick_from_when_aws_refuses() {
-    let dir = small_subnet("pick-a-cloud");
-    let o = isoloom(&dir, &["run", "cloud-vm", dir.to_str().unwrap()]);
-    assert!(!o.status.success());
-    let err = stderr(&o);
-    assert!(err.contains("AWS can't run this environment on `cloud-vm`"), "{err}");
-    assert!(err.contains("--cloud gcp, --cloud digitalocean"), "{err}");
-    let o = isoloom(&dir, &["run", "cloud-vm", dir.to_str().unwrap(), "--cloud", "aws"]);
-    assert!(!o.status.success());
-    let err = stderr(&o);
-    assert!(
-        err.contains("`aws` can't run this environment on `cloud-vm`: AWS subnets are /28 or larger"),
-        "{err}"
-    );
-    let o = isoloom(&dir, &["run", "cloud-vm", dir.to_str().unwrap(), "--cloud", "nimbus"]);
-    assert!(stderr(&o).contains("`cloud-vm` has no cloud `nimbus`"), "{}", stderr(&o));
-}
-
-#[test]
-fn exec_needs_a_command() {
-    let home = scratch("exec-no-command");
-    let o = isoloom(&home, &["exec", "web", &example("hello-stack")]);
-    assert_eq!(o.status.code(), Some(2));
-    assert!(stderr(&o).contains("give the command after `--`"), "{}", stderr(&o));
-}
-
-#[test]
-fn status_with_nothing_running() {
-    let home = scratch("status-empty");
-    let o = isoloom(&home, &["status"]);
-    assert!(o.status.success(), "{}", stderr(&o));
-    assert!(stdout(&o).contains("no environment is up"), "{}", stdout(&o));
-    let o = isoloom(&home, &["status", "--json"]);
-    let v: serde_json::Value = serde_json::from_str(&stdout(&o)).unwrap();
-    assert_eq!(v["environments"], serde_json::json!([]));
-}
-
-#[test]
-fn status_cleanup_of_an_unknown_name_fails() {
-    let home = scratch("status-cleanup-unknown");
-    let o = isoloom(&home, &["status", "--cleanup", "nope"]);
-    assert_eq!(o.status.code(), Some(2));
-    assert!(stderr(&o).contains("no environment named `nope`"), "{}", stderr(&o));
-}
-
-/// A registry entry whose project folder is gone, as `run` would have written it.
-fn write_stale_entry(home: &Path, name: &str) {
-    let gone = home.join("gone-project");
-    let yaml = format!(
-        "environments:\n- name: {name}\n  dir: {}\n  target: docker\n  started: 2026-01-01T00:00:00Z\n",
-        gone.display()
-    );
-    std::fs::write(home.join("status.yml"), yaml).unwrap();
-}
-
-#[test]
-fn status_reports_an_environment_whose_folder_is_gone() {
-    let home = scratch("status-stale");
-    write_stale_entry(&home, "lost");
-    let o = isoloom(&home, &["status", "--json"]);
-    assert!(o.status.success(), "{}", stderr(&o));
-    let v: serde_json::Value = serde_json::from_str(&stdout(&o)).unwrap();
-    assert_eq!(v["environments"][0]["name"], "lost");
-    assert_eq!(v["environments"][0]["state"], "stale (folder gone)");
-}
-
-#[test]
-fn status_cleanup_forgets_a_stale_environment() {
-    let home = scratch("status-cleanup-stale");
-    write_stale_entry(&home, "lost");
-    let o = isoloom(&home, &["status", "--cleanup", "lost"]);
-    assert!(o.status.success(), "{}", stderr(&o));
-    let o = isoloom(&home, &["status", "--json"]);
-    let v: serde_json::Value = serde_json::from_str(&stdout(&o)).unwrap();
-    assert_eq!(v["environments"], serde_json::json!([]));
 }
 
 const PROFILED: &str = "version: 1
@@ -297,12 +219,4 @@ fn a_profile_applies_to_every_command_and_pins_its_target() {
     let o = isoloom(&home, &["validate", d, "--profile", "small"]);
     assert_eq!(o.status.code(), Some(2));
     assert!(stderr(&o).contains("no profile `small` (profiles here: big)"), "{}", stderr(&o));
-}
-
-#[test]
-fn chart_wants_a_semantic_version() {
-    let home = scratch("chart-version-home");
-    let o = isoloom(&home, &["chart", &example("hello-stack"), "--version", "v1.2"]);
-    assert_eq!(o.status.code(), Some(2));
-    assert!(stderr(&o).contains("a semantic version, like 4.2.1"), "{}", stderr(&o));
 }

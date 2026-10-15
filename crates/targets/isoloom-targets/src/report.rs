@@ -1,12 +1,25 @@
 //! Pictures and tables of an environment, from the resolved snapshot: `isoloom graph` draws
 //! the networks, machines, reach rules and gateways (D2 or Graphviz; SVG/PNG when the renderer
 //! is installed); `isoloom report` prints addressing, ports, wiring and resources as text or
-//! Markdown. Both read what `resolved::resolve` (in isoloom-targets) worked out, so they can't disagree
-//! with the generated files.
+//! Markdown. Both read what [`crate::resolved::resolve`] worked out, so they can't disagree with
+//! the generated files.
 
 use std::fmt::Write;
 
 use serde_json::Value;
+
+/// A report that can't be made.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ReportError {
+    /// No report has this name.
+    #[error("no report named `{name}`; one of: {known}")]
+    Unknown {
+        /// The name asked for.
+        name: String,
+        /// The report names, comma separated.
+        known: String,
+    },
+}
 
 /// The graph as D2 (<https://d2lang.com>): networks as hexagons, machines as boxes (the
 /// access machine as a person, gateways as diamonds), membership edges labeled with the last
@@ -176,14 +189,14 @@ pub const REPORTS: &[(&str, &str)] = &[
 ];
 
 /// One report, as text (aligned columns) or Markdown.
-pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String, crate::ReportError> {
+pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String, ReportError> {
     let (head, rows) = match name {
         "addressing" => addressing(r),
         "ports" | "services" => ports(r),
         "wiring" => wiring(r),
         "resources" => resources(r),
         other => {
-            return Err(crate::ReportError::Unknown {
+            return Err(ReportError::Unknown {
                 name: other.to_string(),
                 known: REPORTS.iter().map(|(n, _)| *n).collect::<Vec<_>>().join(", "),
             });

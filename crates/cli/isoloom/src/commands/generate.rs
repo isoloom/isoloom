@@ -22,10 +22,10 @@ pub struct Args {
     sets: Vec<String>,
 }
 
-pub fn run(a: &Args) -> Res<ExitCode> {
+pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
     let dir = &a.dir;
-    let target = spec::pinned(dir, a.target.as_deref())?;
-    let (spec, settings) = spec::load_settings(dir, a.images.as_deref(), &a.sets)?;
+    let target = spec::pinned(profile, dir, a.target.as_deref())?;
+    let (spec, settings) = spec::load_settings(profile, dir, a.images.as_deref(), &a.sets)?;
     if spec::report_invalid(&spec) {
         return Ok(ExitCode::FAILURE);
     }

@@ -5,7 +5,6 @@ use std::process::ExitCode;
 
 use super::draft::{Dest, source_of, write_draft};
 use crate::Res;
-use crate::tools::process;
 
 pub fn run(file: Option<PathBuf>, dest: &Dest) -> Res<ExitCode> {
     let file = file.unwrap_or_else(|| PathBuf::from("Vagrantfile"));
@@ -22,11 +21,21 @@ pub fn run(file: Option<PathBuf>, dest: &Dest) -> Res<ExitCode> {
 /// installed) and returns every setting it made, as JSON. Nothing is created or started.
 fn record_vagrantfile(file: &Path) -> Res<serde_json::Value> {
     const RECORDER: &str = include_str!("vagrant_record.rb");
-    let dir = process::private_dir("isoloom-vagrant")?;
+    let dir = private_dir("isoloom-vagrant")?;
     let script = dir.join("record.rb");
     let recorded = std::fs::write(&script, RECORDER).map_err(Into::into).and_then(|()| run_recorder(&script, file));
     let _ = std::fs::remove_dir_all(&dir);
     recorded
+}
+
+/// A private folder under the system's temporary folder, `<prefix>-<pid>-<nonce>`, created
+/// exclusively (it fails if it exists), so a local attacker can't pre-place a symlink at a
+/// guessable path and have the recorder swapped.
+fn private_dir(prefix: &str) -> Res<PathBuf> {
+    let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    let dir = std::env::temp_dir().join(format!("{prefix}-{}-{nonce:x}", std::process::id()));
+    std::fs::create_dir(&dir)?;
+    Ok(dir)
 }
 
 /// The recorder run by the first Ruby found: Vagrant's own, else `ruby` on the PATH.
@@ -38,7 +47,7 @@ fn run_recorder(script: &Path, file: &Path) -> Res<serde_json::Value> {
     ];
     let mut last = String::from("no Ruby found (Vagrant's own, or `ruby` on the PATH)");
     for ruby in rubies {
-        match crate::tools::process::command(ruby).arg(script).arg(file).output() {
+        match std::process::Command::new(ruby).arg(script).arg(file).output() {
             Ok(out) if out.status.success() => return Ok(serde_json::from_slice(&out.stdout)?),
             Ok(out) => {
                 last = format!(

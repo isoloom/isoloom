@@ -139,9 +139,8 @@ pub fn command_line() -> String {
     format!("powershell {}", powershell_args().join(" "))
 }
 
-/// What `isoloom run` writes on the connection's standard input: the receiving script in
-/// base64 on the first line, then `values` (one base64 line per secret, as
-/// `isoloom_runtime::secrets::delivery_input` makes them).
+/// What the deliverer writes on the connection's standard input: the receiving script in
+/// base64 on the first line, then `values` (one base64 line per secret, in `names`' order).
 pub fn input(names: &[String], files: &[SecretFile], values: &[u8]) -> Vec<u8> {
     let mut out = base64(receive(names, files).as_bytes()).into_bytes();
     out.push(b'\n');

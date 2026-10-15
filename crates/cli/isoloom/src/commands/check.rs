@@ -18,8 +18,8 @@ pub struct Args {
     sets: Vec<String>,
 }
 
-pub fn run(a: &Args) -> Res<ExitCode> {
-    let (spec, settings) = spec::load_settings(&a.dir, a.images.as_deref(), &a.sets)?;
+pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
+    let (spec, settings) = spec::load_settings(profile, &a.dir, a.images.as_deref(), &a.sets)?;
     if spec::report_invalid(&spec) {
         return Ok(ExitCode::FAILURE);
     }

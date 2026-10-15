@@ -1,6 +1,6 @@
 [package]
 name = "isoloom"
-description = "Describe an environment once (machines, networks, services), run it anywhere: Docker, local VMs, Proxmox, cloud."
+description = "Describe an environment once (machines, networks, services), and get each tool's own files to run it: Compose, Kubernetes, Vagrant, Terraform, Ansible."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,17 +13,14 @@ name = "isoloom"
 path = "src/main.rs"
 
 [dependencies]
-indexmap.workspace = true
 isoloom-spec.workspace = true
-isoloom-plan.workspace = true
-isoloom-render.workspace = true
 isoloom-targets.workspace = true
 isoloom-import.workspace = true
-isoloom-runtime.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml_ng.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

@@ -24,11 +24,11 @@ pub struct Args {
     sets: Vec<String>,
 }
 
-pub fn run(a: &Args) -> Res<ExitCode> {
-    let snapshot = spec::snapshot_of(&a.dir, a.instance, &a.sets)?;
+pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
+    let snapshot = spec::snapshot_of(profile, &a.dir, a.instance, &a.sets)?;
     let text = match a.format.as_str() {
-        "d2" => isoloom_runtime::report::graph_d2(&snapshot),
-        "dot" => isoloom_runtime::report::graph_dot(&snapshot),
+        "d2" => isoloom_targets::report::graph_d2(&snapshot),
+        "dot" => isoloom_targets::report::graph_dot(&snapshot),
         other => return Err(format!("unknown format `{other}`; `d2` or `dot`").into()),
     };
     let Some(out) = &a.out else {
@@ -55,7 +55,7 @@ fn render(format: &str, out: &Path, ext: &str, text: &str) -> Res<ExitCode> {
             vec![format!("-T{ext}"), "-o".into(), out.display().to_string(), src.display().to_string()],
         ),
     };
-    match crate::tools::process::command(program).args(&args).status() {
+    match std::process::Command::new(program).args(&args).status() {
         Ok(st) if st.success() => {
             println!("✓ {} (source: {})", out.display(), src.display());
             Ok(ExitCode::SUCCESS)

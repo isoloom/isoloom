@@ -22,8 +22,3 @@ pub fn write_file(dir: &Path, f: &isoloom_targets::GeneratedFile) -> Res<()> {
     std::fs::write(&path, &f.contents)?;
     Ok(())
 }
-
-/// Writes every file under `dir`.
-pub fn write_all(dir: &Path, files: &[isoloom_targets::GeneratedFile]) -> Res<()> {
-    files.iter().try_for_each(|f| write_file(dir, f))
-}

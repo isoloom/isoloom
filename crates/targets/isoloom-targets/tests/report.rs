@@ -5,12 +5,12 @@
 
 use std::path::Path;
 
-use isoloom_runtime::report::{REPORTS, graph_d2, graph_dot, hyperv_ports_note, report};
 use isoloom_spec::load;
+use isoloom_targets::report::{REPORTS, graph_d2, graph_dot, hyperv_ports_note, report};
 use isoloom_targets::resolved::resolve;
 
 fn snapshot(name: &str) -> serde_json::Value {
-    resolve(&load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples").join(name)).unwrap())
+    resolve(&load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).unwrap())
 }
 
 #[test]

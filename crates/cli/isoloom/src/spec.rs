@@ -1,78 +1,47 @@
 //! The spec of a project as a command sees it: with the profile asked for, the command's `-s`
 //! overrides and the image table, validated, and as the instance when one is named.
 
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
-
-use isoloom_runtime::events::ErrorCode;
+use std::path::Path;
 
 use crate::Res;
-use crate::failure::Failure;
+use crate::error::CliError;
 
-/// The profile asked for (`--profile`, else `ISOLOOM_PROFILE`), set once at start.
-static PROFILE: OnceLock<Option<String>> = OnceLock::new();
+/// The profile a command runs with: `--profile`, else `ISOLOOM_PROFILE` when it isn't empty.
+/// Worked out once in `main` and handed to every command that reads the spec.
+#[derive(Debug, Clone, Default)]
+pub struct Profile(Option<String>);
 
-/// Records the profile asked for: `--profile`, else `ISOLOOM_PROFILE` when it isn't empty.
-pub fn set_profile(asked: Option<String>) {
-    let profile = asked.or_else(|| std::env::var("ISOLOOM_PROFILE").ok().filter(|s| !s.is_empty()));
-    let _ = PROFILE.set(profile);
+impl Profile {
+    /// The profile asked for on the command line, else the one in the environment variable.
+    pub fn new(asked: Option<String>, from_env: Option<String>) -> Self {
+        Self(asked.or_else(|| from_env.filter(|s| !s.is_empty())))
+    }
+
+    /// The profile, read from `dir`; none when none was asked for.
+    pub fn load(&self, dir: &Path) -> Res<Option<isoloom_spec::profile::Profile>> {
+        let Some(name) = self.0.as_deref() else { return Ok(None) };
+        let profile = isoloom_spec::profile::load(dir, name).map_err(CliError::Profile)?;
+        Ok(Some(profile))
+    }
 }
 
-/// The name of the profile asked for, recorded with an environment `run` brings up.
-pub fn profile_name() -> Option<String> {
-    PROFILE.get().cloned().flatten()
-}
-
-/// The profile's inputs every tool started from here gets, recorded when the profile is first
-/// read: those not already set in this process's environment (the user's own value wins).
-static INPUTS: OnceLock<Vec<(String, String)>> = OnceLock::new();
-
-/// The profile asked for, read from `dir`. Its inputs become [`child_env`] the first time.
-pub fn profile_for(dir: &Path) -> Res<Option<isoloom_spec::profile::Profile>> {
-    let Some(name) = PROFILE.get().and_then(Option::as_deref) else {
-        return Ok(None);
-    };
-    let p = isoloom_spec::profile::load(dir, name).map_err(|e| Failure::new(ErrorCode::Profile, e))?;
-    INPUTS.get_or_init(|| {
-        p.inputs
-            .iter()
-            .filter(|(k, _)| std::env::var_os(k).is_none())
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
-    });
-    Ok(Some(p))
-}
-
-/// The variables added to every tool's environment (`Command::envs`): the profile's inputs, so
-/// each target's tool sees them as it sees the user's own. Empty without a profile.
-pub fn child_env() -> &'static [(String, String)] {
-    INPUTS.get().map_or(&[], Vec::as_slice)
-}
-
-/// An input's value as the tools see it: this process's environment, else the profile's.
-pub fn input(name: &str) -> Option<String> {
-    std::env::var(name)
-        .ok()
-        .or_else(|| child_env().iter().find(|(k, _)| k == name).map(|(_, v)| v.clone()))
-}
-
-/// The spec in `dir`, with the profile asked for.
-pub fn load_spec(dir: &Path) -> Res<isoloom_spec::Spec> {
-    let profile = profile_for(dir)?;
+/// The spec in `dir`, with the profile.
+pub fn load_spec(profile: &Profile, dir: &Path) -> Res<isoloom_spec::Spec> {
+    let profile = profile.load(dir)?;
     Ok(isoloom_spec::load_profiled(dir, profile.as_ref(), &[])?)
 }
 
 /// The target to use: the profile's when none is asked for.
-pub fn pinned(dir: &Path, asked: Option<&str>) -> Res<Option<String>> {
-    Ok(match profile_for(dir)? {
+pub fn pinned(profile: &Profile, dir: &Path, asked: Option<&str>) -> Res<Option<String>> {
+    Ok(match profile.load(dir)? {
         Some(p) => p.pin(asked)?,
         None => asked.map(str::to_string),
     })
 }
 
 /// The spec with `-s` overrides and the image table applied, and the defaults in effect.
-pub fn load_settings(dir: &Path, images: Option<&Path>, sets: &[String]) -> Res<(isoloom_spec::Spec, isoloom_spec::defaults::Resolved)> {
-    let profile = profile_for(dir)?;
+pub fn load_settings(profile: &Profile, dir: &Path, images: Option<&Path>, sets: &[String]) -> Res<(isoloom_spec::Spec, isoloom_spec::defaults::Resolved)> {
+    let profile = profile.load(dir)?;
     let spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
     let settings = isoloom_spec::defaults::load_profiled(dir, images, profile.as_ref(), sets)?;
     let spec = settings.defaults.images.apply(&spec);
@@ -93,48 +62,37 @@ pub fn report_invalid(spec: &isoloom_spec::Spec) -> bool {
     !problems.is_empty()
 }
 
-/// Prints the spec's problems and fails when it has any: for the commands that need a valid
-/// spec to say anything at all.
-pub fn require_valid(spec: &isoloom_spec::Spec) -> Res<()> {
-    let problems = isoloom_spec::validate(spec);
+/// The spec with `-s` overrides, validated (its problems printed, then an error), as the
+/// instance when one is named.
+pub fn load_valid(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<isoloom_spec::Spec> {
+    let (spec, _) = load_settings(profile, dir, None, sets)?;
+    let problems = isoloom_spec::validate(&spec);
     if !problems.is_empty() {
-        if !crate::output::json() {
-            for p in &problems {
-                eprintln!("✗ {p}");
-            }
+        for p in &problems {
+            eprintln!("✗ {p}");
         }
-        return Err(Failure::invalid(&problems).into());
+        return Err(CliError::SpecInvalid.into());
     }
-    Ok(())
-}
-
-/// The spec as instance `n` when one is named: its names, blocks and ports are the instance's.
-pub fn as_instance(spec: isoloom_spec::Spec, instance: Option<u8>) -> Res<isoloom_spec::Spec> {
     Ok(match instance {
         Some(n) => isoloom_spec::instance::apply(&spec, n)?,
         None => spec,
     })
 }
 
-/// The spec, as the instance when one is named (its names and ports are the instance's).
-pub fn load_as(dir: &Path, instance: Option<u8>) -> Res<isoloom_spec::Spec> {
-    as_instance(load_spec(dir)?, instance)
-}
-
-/// The spec with `-s` overrides, validated, as the instance when one is named.
-pub fn load_valid(dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<isoloom_spec::Spec> {
-    let (spec, _) = load_settings(dir, None, sets)?;
-    require_valid(&spec)?;
-    as_instance(spec, instance)
-}
-
 /// The resolved snapshot of a project (as an instance when asked), after validation.
-pub fn snapshot_of(dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<serde_json::Value> {
-    let spec = load_valid(dir, instance, sets)?;
+pub fn snapshot_of(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<serde_json::Value> {
+    let spec = load_valid(profile, dir, instance, sets)?;
     Ok(isoloom_targets::resolved::resolve_with(&spec, instance))
 }
 
-/// A project folder as an absolute path (the registry and the tools' working directories need one).
-pub fn abs(dir: &Path) -> Res<PathBuf> {
-    std::fs::canonicalize(dir).map_err(|e| Failure::new(ErrorCode::Io, format!("{}: {e}", dir.display())).into())
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_command_line_profile_wins_and_an_empty_variable_is_none() {
+        assert_eq!(Profile::new(Some("a".into()), Some("b".into())).0.as_deref(), Some("a"));
+        assert_eq!(Profile::new(None, Some("b".into())).0.as_deref(), Some("b"));
+        assert_eq!(Profile::new(None, Some(String::new())).0, None);
+    }
 }
