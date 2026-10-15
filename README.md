@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>One spec. Every environment.</strong><br>
-  <a href="https://www.isoloom.com">Website</a> · <a href="docs/getting-started.md">Getting started</a> · <a href="docs/spec.md">Spec reference</a> · <a href="docs/targets.md">Targets</a>
+  <a href="https://www.isoloom.com">Website</a> · <a href="docs/spec.md">Spec reference</a>
 </p>
 
 Describe an environment once (its machines, networks, who reaches whom, the services they
@@ -52,7 +52,7 @@ isoloom run vagrant            # the same environment, one VM per machine
   Vagrantfiles, Terraform modules) are written under `.isoloom/`, to run by hand or commit;
   `isoloom check` fails in CI when they drift from the spec.
 - **Secrets stay secret.** Values come from a store at run time and reach machines as files,
-  never in a generated file: [Secrets](docs/secrets.md).
+  never in a generated file.
 
 ## Install
 
@@ -62,45 +62,31 @@ curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/install.sh | s
 
 Release binaries for macOS, Linux and Windows are on the
 [releases page](https://github.com/isoloom/isoloom/releases); in GitHub Actions,
-`uses: isoloom/isoloom@v0.10.1`. Then follow [Getting started](docs/getting-started.md).
+`uses: isoloom/isoloom@v0.10.1`.
 
 ## Targets
 
 | Target | Runs the environment as |
 |---|---|
-| [`docker`](docs/targets.md#docker) | Containers on your Docker, with Compose |
-| [`hosted`](docs/targets.md#hosted) | The same Compose file, on a hosting service |
-| [`kubernetes`](docs/targets.md#kubernetes) | Manifests on your cluster, with NetworkPolicies for `reach` |
-| [`helm`](docs/targets.md#helm), [`kustomize`](docs/targets.md#kustomize) | The same manifests as a Helm chart or a Kustomize overlay |
-| [`vagrant`](docs/targets.md#vagrant) | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, ESXi |
-| [`docker-vm`](docs/targets.md#docker-vm) | The containers on one VM (Vagrant, or Proxmox) |
-| [`hybrid`](docs/targets.md#hybrid) | Containers and VMs together on the same networks |
-| [`proxmox`](docs/targets.md#proxmox) | One VM (or LXC container) per machine on Proxmox VE, its own SDN, router and firewall |
-| [`esxi`](docs/targets.md#esxi) | One VM per machine on a standalone ESXi host |
-| [`cloud-vm`](docs/targets.md#cloud-vm) | One cloud VM per machine: AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle Cloud |
-| [`cloud-docker`](docs/targets.md#cloud-docker) | The containers on one cloud VM, on the same six clouds |
-| [`cloud-services`](docs/targets.md#cloud-services) | A Terraform module of yours, applied into your cloud account |
-| [`external`](docs/targets.md#external) | Hosts that already exist, set up and checked over SSH |
-
-Which targets run for real in CI, and which are generated and validated only, is said for each
-one in [Targets](docs/targets.md).
+| `docker` | Containers on your Docker, with Compose |
+| `hosted` | The same Compose file, on a hosting service |
+| `kubernetes` | Manifests on your cluster, with NetworkPolicies for `reach` |
+| `helm`, `kustomize` | The same manifests as a Helm chart or a Kustomize overlay |
+| `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, ESXi |
+| `docker-vm` | The containers on one VM (Vagrant, or Proxmox) |
+| `hybrid` | Containers and VMs together on the same networks |
+| `proxmox` | One VM (or LXC container) per machine on Proxmox VE, its own SDN, router and firewall |
+| `esxi` | One VM per machine on a standalone ESXi host |
+| `cloud-vm` | One cloud VM per machine: AWS, Azure, Google Cloud, DigitalOcean, Linode, Oracle Cloud |
+| `cloud-docker` | The containers on one cloud VM, on the same six clouds |
+| `cloud-services` | A Terraform module of yours, applied into your cloud account |
+| `external` | Hosts that already exist, set up and checked over SSH |
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md): install, a first spec, run, test, down.
-- [Targets](docs/targets.md): what each target builds, what the host needs, its limits.
 - [Spec reference](docs/spec.md): every field, generated from the schema.
-- [Secrets](docs/secrets.md): stores, delivery per target, and what never happens.
-- [Storage](docs/storage.md): volumes (shared, persistent, external, `subpath`), `tmpfs` and data
-  disks, and how each target handles them.
-- [The `esxi` target](docs/esxi.md), [cloud modules](docs/cloud-modules.md): variables and
-  outputs of the generated Terraform modules.
-- [JSON output](docs/json.md) and [the registry](docs/registry.md), for tools that drive
-  Isoloom.
-- [Real targets in CI](docs/real-targets.md): the workflows that run the VM and cloud targets.
-- [Architecture](ARCHITECTURE.md), [Contributing](CONTRIBUTING.md), the
-  [decision records](docs/adr/) and the [changelog](CHANGELOG.md).
-- [Stability](docs/stability.md), [comparisons with other tools](docs/comparisons/README.md), [RFCs](rfcs/README.md), the [code of conduct](CODE_OF_CONDUCT.md) and the [security policy](SECURITY.md).
+- [Contributing](.github/CONTRIBUTING.md), the [code of conduct](.github/CODE_OF_CONDUCT.md) and
+  the [security policy](.github/SECURITY.md).
 
 ## Using the library
 
@@ -140,20 +126,14 @@ isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
   Every other public item (the spec's `clones`, `groups`, `vlans`, `images`, `schema`, `shell`;
   `isoloom-render`, the backends, `isoloom-import`,
   `isoloom_runtime::report` and `isoloom_runtime::secrets`) is internal: public for the command
-  line, and may change in any release. Up to 0.10 the `isoloom-core` crate re-exported the
-  supported surface; it is gone, and each item is used from the crate that holds it
-  (`isoloom_core::generate` is `isoloom_targets::generate`, `isoloom_core::registry` is
-  `isoloom_runtime::registry`, `isoloom_core::checks` is `isoloom_plan::checks`).
+  line, and may change in any release.
 - **Versions**: while Isoloom is at 0.x, a breaking change to the supported surface bumps the
-  minor version (0.10 -> 0.11), never the patch, and the CHANGELOG lists it under a
-  "Breaking (library)" line. A new public field or enum variant isn't breaking (a new spec key
+  minor version (0.10 -> 0.11), never the patch. A new public field or enum variant isn't breaking (a new spec key
   is one): get the model's types by parsing a spec rather than writing struct literals. CI
   reports every pull request's API changes (`cargo semver-checks`, against the base and the
   last tag) in its summary.
-- **Files**: `~/.isoloom/status.yml` has a `version:` and is documented in
-  [docs/registry.md](docs/registry.md); the cloud modules' variables and outputs in
-  [docs/cloud-modules.md](docs/cloud-modules.md); the resolved snapshot
-  (`.isoloom/resolved.json`) carries its own `version`.
+- **Files**: `~/.isoloom/status.yml` has a `version:`, and the resolved snapshot
+  (`.isoloom/resolved.json`) carries its own.
 
 ## License
 

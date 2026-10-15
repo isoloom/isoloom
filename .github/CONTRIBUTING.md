@@ -1,8 +1,6 @@
 # Contributing
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) first: it explains how a spec becomes files and where
-a change belongs. The decisions behind the layout are in [docs/adr/](docs/adr/).
-A spec syntax change, a new target or a breaking change starts as an [RFC](rfcs/README.md); everyone follows the [code of conduct](CODE_OF_CONDUCT.md), and a vulnerability is reported as [SECURITY.md](SECURITY.md) says.
+Everyone follows the [code of conduct](CODE_OF_CONDUCT.md), and a vulnerability is reported as [SECURITY.md](SECURITY.md) says.
 
 ## Gates
 
@@ -44,7 +42,7 @@ cd examples/hello-stack && isoloom run docker . && isoloom test docker . && isol
   public paths, or its tests move to a `tests.rs`. `crates/isoloom-spec/tests/code_size.rs`
   enforces it.
 - **Errors:** typed, with `thiserror`, one enum per library crate; variants carry the field
-  path and reason ([ADR 0004](docs/adr/0004-error-model.md)). No new `String` errors.
+  path and reason. No new `String` errors.
 - **No `unwrap`, `expect` or `panic`** outside tests. A spec reaching a generator is validated:
   return an error for what validation should have caught, don't assume it.
 - **Docs on public items:** say why, not what the signature already says.
@@ -66,9 +64,7 @@ cd examples/hello-stack && isoloom run docker . && isoloom test docker . && isol
   between machines", "libvirt runs a machine as its own CPU"). No attribution lines.
 - A pull request says what changed, links the issue (`Closes #N`), pastes how it was verified
   and lists what was deliberately left out.
-- Add a CHANGELOG line for anything a user or embedder notices; a breaking change to the
-  supported library surface gets a "Breaking (library)" line.
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the [Apache License, Version 2.0](LICENSE), the project's license. Sign off each commit (`git commit -s`, the Developer Certificate of Origin).
+By contributing, you agree that your contributions are licensed under the [Apache License, Version 2.0](../LICENSE), the project's license. Sign off each commit (`git commit -s`, the Developer Certificate of Origin).

@@ -28,7 +28,7 @@ fn azure_uses_azurerm_with_static_addresses() {
     // The azurerm provider and an Azure VM, not an AWS instance.
     assert!(tf.contains("azurerm = { source = \"hashicorp/azurerm\", version = \"~> 5.8.0\" }"), "{tf}");
     assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"web\""));
-    // The module interface (docs/cloud-modules.md): a `region` var and ARM_SUBSCRIPTION_ID from the environment.
+    // The module interface: a `region` var and ARM_SUBSCRIPTION_ID from the environment.
     assert!(tf.contains("variable \"region\""), "{tf}");
     assert!(tf.contains("subscription_id = var.subscription_id"), "{tf}");
     assert!(tf.contains("location            = var.region"), "{tf}");
@@ -44,7 +44,7 @@ fn azure_uses_azurerm_with_static_addresses() {
 #[test]
 fn azure_has_the_shared_outputs() {
     let tf = azure(&example("hello-stack"));
-    // The module outputs (docs/cloud-modules.md), identical in name and shape to AWS.
+    // The module outputs, identical in name and shape to AWS.
     assert!(tf.contains("output \"machines\""));
     assert!(tf.contains("output \"ssh_users\""));
     assert!(tf.contains("output \"ip\""));

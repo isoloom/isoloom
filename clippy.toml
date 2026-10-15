@@ -1,4 +1,4 @@
-# Shape limits from CONTRIBUTING.md (functions at most 60 lines, at most 5 parameters).
+# Shape limits from .github/CONTRIBUTING.md (functions at most 60 lines, at most 5 parameters).
 too-many-lines-threshold = 60
 cognitive-complexity-threshold = 15
 too-many-arguments-threshold = 5

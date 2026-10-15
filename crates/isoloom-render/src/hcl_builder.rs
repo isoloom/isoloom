@@ -1,6 +1,5 @@
-//! The HCL builder ([ADR 0003](https://github.com/isoloom/isoloom/blob/main/docs/adr/0003-hcl-builder.md)):
-//! a Terraform module is built as `hcl-rs` structures ([`Block`], [`Attribute`], [`Expression`])
-//! and written once.
+//! The HCL builder: a Terraform module is built as `hcl-rs` structures ([`Block`],
+//! [`Attribute`], [`Expression`]) and written once.
 //!
 //! - Values go in as values: a string is an [`Expression::String`], escaped by `hcl-rs` (quotes,
 //!   backslashes, newlines, and Terraform's `${` and `%{` markers). Text that holds Terraform

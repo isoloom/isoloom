@@ -36,7 +36,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 serde_path_to_error = "0.1"
 jsonschema = { version = "0.58", default-features = false }
 
-# Every crate inherits these (`[lints] workspace = true`); see CONTRIBUTING.md. Every lint is at
+# Every crate inherits these (`[lints] workspace = true`); see .github/CONTRIBUTING.md. Every lint is at
 # "deny": a new exception is a local `#[allow]` with a one-line reason, never an entry here.
 [workspace.lints.rust]
 # No exception: a profile's inputs reach the tools through `Command::envs`, not `set_var`.

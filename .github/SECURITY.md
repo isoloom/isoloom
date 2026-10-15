@@ -8,8 +8,7 @@
 | 0.x | No: upgrade to 1.x |
 
 Until 1.0 is released, only the latest 0.x release is fixed. Fixes are not backported to older
-minor releases: upgrading within a major version is meant to be safe (see
-[Stability](docs/stability.md)).
+minor releases: upgrading within a major version is meant to be safe.
 
 ## Reporting a vulnerability
 
@@ -52,8 +51,7 @@ In scope:
   leave an environment less isolated or less protected than its spec says. For example: a
   service reachable from a network `reach` doesn't allow, a port published beyond the host's
   loopback when the spec doesn't ask for it, a firewall rule wider than the spec's, or a secret's
-  value written into a generated file ([Secrets](docs/secrets.md) says what must never
-  happen).
+  value written into a generated file.
 - **The command line.** `isoloom` itself: command or code injection through a spec, a profile
   or a project file, path traversal outside the project, unsafe handling of credentials or of
   `~/.isoloom/`, and the install script (`install.sh`) and release binaries.

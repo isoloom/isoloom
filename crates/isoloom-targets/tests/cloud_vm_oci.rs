@@ -55,7 +55,7 @@ fn single_network_linux_lab_builds_oci_instances_at_fixed_addresses() {
     // The network's security list, and the published port opened on its machine's own group.
     assert!(tf.contains("resource \"oci_core_security_list\" \"lab\""), "{tf}");
     assert!(tf.contains("min = 8080"));
-    // The module outputs (docs/cloud-modules.md), the same shape the AWS driver gives.
+    // The module outputs, the same shape the AWS driver gives.
     assert!(tf.contains("output \"ip\""));
     assert!(tf.contains("value = \"/var/lib/isoloom/ready\""));
 }

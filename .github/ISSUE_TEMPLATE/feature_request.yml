@@ -5,8 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        A change to the spec's syntax, a new target or a breaking change needs an RFC
-        (rfcs/README.md); this issue is a good place to start the conversation.
+        A change to the spec's syntax, a new target or a breaking change starts here, as a
+        conversation.
   - type: textarea
     id: problem
     attributes:

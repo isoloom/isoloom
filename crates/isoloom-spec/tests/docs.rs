@@ -13,18 +13,17 @@ fn root() -> PathBuf {
 }
 
 /// The README, the contributor and community guides, the pull request template, and every page
-/// under docs/ and rfcs/.
+/// under docs/.
 fn pages() -> Vec<PathBuf> {
     let top = [
         "README.md",
-        "ARCHITECTURE.md",
-        "CONTRIBUTING.md",
-        "CODE_OF_CONDUCT.md",
-        "SECURITY.md",
+        ".github/CONTRIBUTING.md",
+        ".github/CODE_OF_CONDUCT.md",
+        ".github/SECURITY.md",
         ".github/pull_request_template.md",
     ];
     let mut out: Vec<PathBuf> = top.iter().map(|p| root().join(p)).collect();
-    let mut dirs = vec![root().join("docs"), root().join("rfcs")];
+    let mut dirs = vec![root().join("docs")];
     while let Some(dir) = dirs.pop() {
         for entry in std::fs::read_dir(&dir).unwrap() {
             let path = entry.unwrap().path();
@@ -86,7 +85,7 @@ fn every_spec_in_the_docs_validates() {
             }
         }
     }
-    assert!(seen >= 3, "only {seen} specs found: mark a spec's block with `# isoloom.yml` as its first line");
+    assert!(seen >= 1, "no spec found: mark a spec's block with `# isoloom.yml` as its first line");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
@@ -153,13 +152,7 @@ fn links_between_the_docs_resolve() {
 #[test]
 fn the_community_pages_are_checked() {
     let checked = pages();
-    for page in [
-        "SECURITY.md",
-        "CODE_OF_CONDUCT.md",
-        "rfcs/README.md",
-        "docs/stability.md",
-        "docs/comparisons/README.md",
-    ] {
+    for page in [".github/SECURITY.md", ".github/CODE_OF_CONDUCT.md", ".github/CONTRIBUTING.md", "docs/spec.md"] {
         assert!(checked.iter().any(|p| p.ends_with(page)), "{page} isn't among the checked pages");
     }
 }
