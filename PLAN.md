@@ -28,6 +28,24 @@ Working document for the local rebuild. It is squashed away with the history at 
 - the Windows leg of Phase 1b's final run;
 - **first:** the launcher's Windows-only Rust code moved during the cleanup has never been compiled (`platform::sys::windows`, the elevate split, job objects, registry, winget ids). Run Windows `pnpm check` and clippy on karen. Once that's clean, raise the launcher's zero-count lints from warn to deny.
 
+## Resume point (weekly usage limit hit, Thu 2026-10-15 22:3x; reset expected Fri 2026-10-16 20:00 Paris)
+
+Every worker stopped mid-step. Their state is safe in their worktrees. To resume, message each worker by its id (SendMessage keeps its context); start a fresh worker from the worktree only if a resume is refused.
+
+| Worker (id) | Worktree / branch | State at stop | Next step |
+|---|---|---|---|
+| Phase 4.1 model (`af3ea7f9476963ba1`) | `isoloom-4.1-model` (detached `dd24bc2b`, 1 commit, **80 changed files**) | sharing the three-line rendering between problems and warnings | finish the model, gates, land; then start **4.2 + 4.3** in parallel (`plan/phase4/design.md` §6.2) |
+| 1c spec + manifest (`aeff7ecf52e9445f1`) | `isoloom-1c-spec*` (t1/t2/t3 ahead 6/6/9; s3 has 3 changed files) | the rename is landed (`d7f83f2c`); updating the quality baseline and gates | the review checklists, the final spec mutants count (the shard on friday), verify, check-all |
+| 1c plan + render (`a753fa47995a027b7`) | `isoloom-1c-core2` (1 ahead) | **plan's review is closed and landed** (`fb53ba54`); the final check-all was running | the last check-all, then done |
+| Phase 3 Vagrant (`a19a8c03a200ce0c7`) | `isoloom-vagrant-b` (`tmp/vagrant-hyperv`, 1 ahead); launcher `cyber-ctf-launcher-wt/vagrant` (1 ahead) | Hyper-V on karen (up/status/check pass); landing two Isoloom Hyper-V Vagrantfile fixes; the launcher step rebased on `b4ba5c5`, Mac VirtualBox run through the launcher under way | land the Hyper-V fixes, finish karen's park/resume/down, the launcher Mac run, land the launcher step |
+| Phase 3 Server (`ab3309f1e356f5806`) | `isoloom-server` (2 ahead); Isothrum `isothrum-wt/server` | ESXi through the runner works; making the additive manifest change (`provider_timeout_s`, `${host.<machine>}`) on top of the rename | land it, rerun ESXi, record tier evidence |
+| Phase 5a verify (`a86b1bccb663441c3`) | `isoloom-5a-verify` (1 ahead) | the shellcheck/kustomize/hadolint fixes and the verify CPU cap (`ISOLOOM_VERIFY_CPUS`) | finish check-all, land |
+| Phase 6a tf-test (`a3f179567b157182b`) | `isoloom-6a-tftest` (5 changed files) | writing suites (edge-firewall on AWS); a helper was writing the cloud-docker suites | finish the suites, land |
+| Phase 6b matrix (`a33676fb13a1fef95`) | `isoloom-6b-matrix` (2 ahead) | extending the `uses` logic and the matrix rows | finish, land |
+| Isothrum 1c (`abf4a43ac2afc7507`) | `isothrum-wt/1c`, `isothrum-wt/1c-crates`; `isoloom-isothrum-gates` (1 ahead) | the tooling and lint set; the compiler pins move to Isoloom `d7f83f2c`+; the runner refactor (both drivers landed) | continue |
+
+Also pending: the launcher's next pin bump adapts to the rename (`plan/phase2/api-migration.md` items 11–20).
+
 ## 0. Three products
 
 | Product | Role | Contains |
