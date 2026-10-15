@@ -82,3 +82,24 @@ pub(crate) fn no_owner(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result
         "a secret of machine `{machine}` sets `uid` or `gid`, and this target places a secret's file as root's"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{SecretFile, ValueSource};
+    use crate::testing;
+
+    #[test]
+    fn a_file_from_an_input_is_given_at_each_start_and_one_from_a_secret_read_from_its_store() {
+        let spec = testing::spec(
+            "version: 1\nname: t\ninputs: [FLAG]\nsecrets: { db: { env: DB } }\nmachines:\n  web: { app: { image: nginx }, files: [{ path: /flag, input: FLAG, mode: '0440' }, { path: /run/db, secret: db, uid: 70 }] }\n",
+        );
+        let files: Vec<SecretFile> = spec.machines["web"].secrets.iter().map(|s| SecretFile::of(&spec, s)).collect();
+        let at = |i: usize| files.get(i).map(|f| (f.name.as_str(), &f.source, f.path.as_str(), f.uid, f.mode));
+        assert_eq!(at(0), Some(("input-flag", &ValueSource::Input("FLAG".into()), "/flag", None, Some(0o440))));
+        assert_eq!(
+            at(1),
+            Some(("db", &ValueSource::Secret("db".into()), "/run/db", Some(70), Some(0o400))),
+            "root-only by default"
+        );
+    }
+}

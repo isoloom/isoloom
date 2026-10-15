@@ -165,6 +165,15 @@ machines:
     }
 
     #[test]
+    fn a_machine_named_the_gateway_of_a_network_it_isnt_on_routes_nothing_through_itself() {
+        // Validation refuses it; unvalidated, the plan still answers: no route.
+        let spec = testing::spec(
+            "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, inside: { cidr: 10.3.0.0/24, gateway: fw } }\nmachines:\n  fw: { networks: { a: 1 }, app: { image: x } }\n",
+        );
+        assert_eq!(routes(&spec, "fw", &spec.machines["fw"]), []);
+    }
+
+    #[test]
     fn without_reach_or_gateways_nothing_is_routed() {
         let spec = testing::spec(
             "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  m: { networks: { a: 10 }, app: { image: x } }\n",

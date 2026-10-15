@@ -170,7 +170,7 @@ mod tests {
         );
         let db = disks("db", &spec.machines["db"]);
         assert_eq!((db[0].key.as_str(), db[0].fs, db[0].bytes()), ("db-data", Filesystem::Ext4, 5 << 30));
-        assert!(db[1].is_raw());
+        assert!(db[1].is_raw() && !db[0].is_raw());
         assert_eq!(disks("win", &spec.machines["win"])[0].fs, Filesystem::Ntfs);
         let kinds: Vec<_> = requirements(&spec).iter().map(Requirement::feature).collect();
         assert_eq!(kinds, [crate::Feature::DataDisks, crate::Feature::RawDisks]);
