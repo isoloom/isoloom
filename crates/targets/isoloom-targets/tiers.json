@@ -1,0 +1,417 @@
+{
+  "hosts": {
+    "friday": "linux",
+    "jarvis": "linux",
+    "karen": "windows",
+    "mac": "macos"
+  },
+  "entries": [
+    {
+      "entry": "docker",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "hello-stack, segmented and invoice-portal-api: up, checks, park, resume and down, through the launcher and the Isothrum runner (Docker Desktop 29.8.1)"
+        }
+      ]
+    },
+    {
+      "entry": "hosted",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/virtualbox",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/vmware_desktop",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/parallels",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/utm",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/qemu",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/libvirt",
+      "goal": 1,
+      "exists_on": [
+        "linux"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/vmware_esxi",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/proxmox",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/aws",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/azure",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/gcp",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/digitalocean",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/linode",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/oci",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "kubernetes",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "hybrid",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/virtualbox",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass"
+        }
+      ]
+    },
+    {
+      "entry": "vagrant/vmware_desktop",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/hyperv",
+      "goal": 1,
+      "exists_on": [
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/parallels",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/libvirt",
+      "goal": 1,
+      "exists_on": [
+        "linux"
+      ],
+      "runs": [
+        {
+          "host": "friday",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "Vagrant 2.4.9 with vagrant-libvirt 0.12.2 on Debian 13"
+        }
+      ]
+    },
+    {
+      "entry": "vagrant/qemu",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/utm",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/vmware_esxi",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "esxi-lab",
+          "note": "ESXi 8.0U3e with promiscuous mode on: nested DHCP and the launcher's Vagrant self-test"
+        }
+      ]
+    },
+    {
+      "entry": "proxmox",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "pve-lab",
+          "note": "Proxmox VE 9.2: a generated lab applied, served, passed its check and was destroyed (Terraform in a container)"
+        }
+      ]
+    },
+    {
+      "entry": "esxi",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "esxi-lab",
+          "note": "ESXi 8.0U3e: the module serves and passes its check, finished from a container"
+        }
+      ]
+    },
+    {
+      "entry": "cloud-vm/aws",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/azure",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/gcp",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/digitalocean",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/linode",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/oci",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "external",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-services/aws",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-services/azure",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-services/gcp",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    }
+  ]
+}

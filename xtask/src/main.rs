@@ -13,7 +13,9 @@
 //!   combination of its features (cargo-hack);
 //! - `fuzz`: the fuzz targets of `fuzz/` (cargo-fuzz), each for a while;
 //! - `mutants`: mutation testing of the core crates (cargo-mutants);
-//! - `bench`: the generation benchmarks against `bench-baseline.json`.
+//! - `bench`: the generation benchmarks against `bench-baseline.json`;
+//! - `tiers record`: a real run added to the tier list, the evidence the tiers are worked out
+//!   from.
 //!
 //! Each task is a module; `process` runs the tools they drive, `repo` finds the checkouts. `deps`
 //! is the test that keeps the workspace's dependencies one way.
@@ -39,6 +41,7 @@ mod quality;
 mod repo;
 mod test;
 mod text;
+mod tiers;
 mod verify;
 
 use std::process::ExitCode;
@@ -88,6 +91,9 @@ enum Task {
     /// The generation benchmarks (criterion) against bench-baseline.json; exits 1 when one is
     /// slower than the threshold allows.
     Bench(bench::Args),
+    /// The tier list (crates/targets/isoloom-targets/tiers.json): `record <entry> <host>
+    /// <result>` adds a real run, the evidence a tier is worked out from.
+    Tiers(tiers::Args),
 }
 
 fn main() -> ExitCode {
@@ -114,5 +120,6 @@ fn run(cli: Cli) -> Res<ExitCode> {
         Task::Fuzz(a) => fuzz::run(&a),
         Task::Mutants(a) => mutants::run(&a),
         Task::Bench(a) => bench::run(&a),
+        Task::Tiers(a) => tiers::run(&a),
     }
 }

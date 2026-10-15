@@ -8,6 +8,7 @@ pub(crate) mod generate;
 pub(crate) mod graph;
 pub(crate) mod import;
 pub(crate) mod inspect;
+pub(crate) mod matrix;
 pub(crate) mod message;
 pub(crate) mod profiles;
 pub(crate) mod report;
@@ -59,5 +60,6 @@ pub(crate) fn run(command: Command, profile: &Profile, console: &mut Console) ->
         Command::Schema(a) => schema::run(&a, console),
         Command::Import(i) => import::run(i, console),
         Command::Docs(a) => docs::run(&a, console),
+        Command::Matrix(a) => matrix::run(&a, console),
     }
 }

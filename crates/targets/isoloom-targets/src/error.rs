@@ -34,6 +34,25 @@ pub enum Error {
     /// A file the generated output copies from the project can't be read.
     #[error("a project file the output copies can't be read")]
     ProjectCopies(#[source] isoloom_kubernetes::Error),
+    /// The tier list (`tiers.json`) isn't JSON of its shape.
+    #[error("tiers.json can't be read as the tier list")]
+    TiersJson(#[source] serde_json::Error),
+    /// A row of the capability matrix (`probes.yml`) names what doesn't exist.
+    #[error("the capability matrix's row `{row}`: {what}")]
+    Probe {
+        /// The row's field.
+        row: String,
+        /// What is wrong with it.
+        what: String,
+    },
+    /// An entry of the tier list names what doesn't exist.
+    #[error("tiers.json: `{entry}`: {what}")]
+    Tiers {
+        /// The entry (`vagrant/libvirt`).
+        entry: String,
+        /// What is wrong with it.
+        what: String,
+    },
 }
 
 /// What the crate returns: a value, or why it can't be made.

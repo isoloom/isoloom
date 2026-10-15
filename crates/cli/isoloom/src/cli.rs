@@ -3,7 +3,7 @@
 
 use clap::{Parser, Subcommand};
 
-use crate::commands::{Listing, check, defaults, docs, generate, graph, import, inspect, message, report, schema, validate};
+use crate::commands::{Listing, check, defaults, docs, generate, graph, import, inspect, matrix, message, report, schema, validate};
 
 // No doc comments on the clap types themselves: clap would print them in `--help`.
 #[derive(Debug, Parser)]
@@ -25,7 +25,8 @@ pub(crate) struct Cli {
 pub(crate) enum Command {
     /// Check the spec for mistakes (and that every path it mentions exists).
     Validate(validate::Args),
-    /// List the targets the spec can be generated for, and why the others can't.
+    /// List the targets the spec can be generated for, why the others can't, and the tier of
+    /// each one generated (how far it has been proven).
     Targets(Listing),
     /// Add up the machines, CPUs, memory and disk the spec needs.
     Resources(Listing),
@@ -57,6 +58,11 @@ pub(crate) enum Command {
     /// Draft an isoloom.yml from files you already have.
     #[command(subcommand)]
     Import(import::Import),
-    /// Print a reference page generated from the code: `--spec` for docs/spec.md.
+    /// Print a reference page generated from the code: `--spec` for docs/spec.md, `--matrix` for
+    /// docs/matrix.md.
     Docs(docs::Args),
+    /// Show what each target does with each spec field (✓ generated, ✗ refused, with the step
+    /// that refuses and why, – not applicable), worked out from the generators themselves, and
+    /// each target's tier with its evidence. `--json` for tools.
+    Matrix(matrix::Args),
 }

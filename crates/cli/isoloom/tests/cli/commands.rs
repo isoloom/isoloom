@@ -30,6 +30,49 @@ fn targets_lists_the_refused_clouds_under_cloud_vm() -> Outcome {
 }
 
 #[test]
+fn targets_gives_the_tier_of_each_target_generated_and_its_evidence() -> Outcome {
+    let home = scratch("targets-tiers")?;
+    let text = isoloom(&home, &[&"targets", &example("hello-stack")])?;
+    assert_eq!(text.code, Some(0), "{text:?}");
+    let (_, tiers) = text.stdout.split_once("\nTiers (").ok_or("no tiers after the listing")?;
+    assert!(tiers.lines().any(|l| l.starts_with("  docker ")), "{}", text.stdout);
+    let o = isoloom(&home, &[&"targets", &example("hello-stack"), &"--json"])?;
+    let listed: serde_json::Value = serde_json::from_str(&o.stdout)?;
+    let targets = listed.as_array().ok_or("not a list")?;
+    assert!(targets.iter().any(|t| t["id"] == "vagrant"), "{listed}");
+    for t in targets {
+        let entries = t["tiers"].as_array().ok_or("no tiers")?;
+        assert!(!entries.is_empty(), "{t}");
+        for e in entries {
+            assert!(matches!(e["tier"].as_u64(), Some(1..=3)), "{e}");
+            assert!(e["evidence"].as_str().is_some_and(|s| !s.is_empty()), "{e}");
+            assert_eq!(e["target"], t["id"], "{e}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn matrix_shows_each_field_against_each_target_with_the_tiers() -> Outcome {
+    let home = scratch("matrix")?;
+    let text = isoloom(&home, &[&"matrix"])?;
+    assert_eq!(text.code, Some(0), "{text:?}");
+    assert!(text.stdout.starts_with("Capability matrix: "), "{}", text.stdout);
+    assert!(text.stdout.contains("\n  vagrant/libvirt "), "the tiers");
+    assert!(text.stdout.contains("\nmachines.*.app.image: "), "a row");
+    let json = isoloom(&home, &[&"matrix", &"--json"])?;
+    let v: serde_json::Value = serde_json::from_str(&json.stdout)?;
+    assert_eq!(v["columns"][0]["id"], "docker", "{v}");
+    let row = v["rows"].as_array().and_then(|r| r.first()).ok_or("no rows")?;
+    assert_eq!(row["cells"].as_object().map(serde_json::Map::len), v["columns"].as_array().map(Vec::len));
+    let page = isoloom(&home, &[&"docs", &"--matrix"])?;
+    assert!(page.stdout.starts_with("# Capability matrix\n"), "{}", page.stdout);
+    let neither = isoloom(&home, &[&"docs"])?;
+    assert_eq!(neither.code, Some(2), "docs needs --spec or --matrix: {neither:?}");
+    Ok(())
+}
+
+#[test]
 fn validate_lists_an_invalid_specs_problems_as_json_and_gives_1() -> Outcome {
     let dir = project(
         "invalid-spec",

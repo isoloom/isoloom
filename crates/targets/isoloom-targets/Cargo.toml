@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-targets"
-description = "Isoloom's targets: the registry of backends, the targets made of two, refusals, the resolved snapshot and its reports."
+description = "Isoloom's targets: the registry of backends, the targets made of two, refusals, the resolved snapshot and its reports, the tiers and the capability matrix."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -18,13 +18,14 @@ isoloom-terraform.workspace = true
 isoloom-vagrant.workspace = true
 isoloom-ansible.workspace = true
 isoloom-manifest.workspace = true
+serde.workspace = true
 serde_json.workspace = true
+serde_yaml_ng.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
 proptest.workspace = true
-serde_yaml_ng.workspace = true
 jsonschema.workspace = true
 criterion.workspace = true
 
