@@ -1,6 +1,8 @@
 use isoloom_plan::SecretFile;
 
-use super::{BOOTSTRAP, DELIVERED, KEPT_DIR, PLACE_SCRIPT, command_line, input, path, place, place_first, powershell_args, receive, step, wait};
+use super::{
+    BOOTSTRAP, DELIVERED, KEPT_DIR, PLACE_SCRIPT, command_line, from_environment, input, path, place, place_first, powershell_args, receive, step, wait,
+};
 
 fn file(name: &str, path: &str) -> SecretFile {
     SecretFile {
@@ -106,4 +108,26 @@ fn the_input_is_the_script_then_the_values() {
     assert_eq!(String::from_utf8(decode(script)).expect("UTF-8"), receive(&names, &files));
     assert_eq!(values, "c2VjcmV0\n");
     assert!(!receive(&names, &files).contains("c2VjcmV0") && !receive(&names, &files).contains(KEPT_DIR.replace('\\', "/").as_str()));
+}
+
+#[test]
+fn values_from_the_environment_are_kept_then_placed_without_waiting() {
+    let ps = from_environment(
+        &[("db".to_owned(), "PW_B64".to_owned()), ("it's".to_owned(), "X".to_owned())],
+        &[file("db", "C:\\db.txt")],
+    );
+    assert!(ps.contains("foreach ($e in @{ 'db' = 'PW_B64'; 'it''s' = 'X' }.GetEnumerator())"), "{ps}");
+    assert!(
+        ps.contains("if (-not $v -and (Test-Path \"$k\\$($e.Key)\")) { continue }"),
+        "an empty value keeps the kept one: {ps}"
+    );
+    assert!(ps.contains(&format!("Set-Content -Path '{DELIVERED}' -Value ''\n")), "{ps}");
+    assert!(
+        ps.contains("Register-ScheduledTask -TaskName 'isoloom-apply-secrets'") && !ps.contains("Start-Sleep"),
+        "nothing waits: {ps}"
+    );
+    assert!(
+        ps.starts_with("$ErrorActionPreference = 'Stop'\n") && ps.contains(&format!("$k = '{KEPT_DIR}'")),
+        "{ps}"
+    );
 }

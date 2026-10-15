@@ -1,6 +1,6 @@
 #[cfg(unix)]
 use super::{DELIVERED, KEPT_DIR, host_environment};
-use super::{compose_variable, of_containers, place, receive, step, wait};
+use super::{compose_variable, from_environment, of_containers, place, receive, step, wait};
 use crate::testing;
 use isoloom_plan::SecretFile;
 use isoloom_spec::model::Target;
@@ -165,4 +165,28 @@ fn a_docker_host_gets_the_secrets_of_its_containers_in_the_spec_s_order() {
     assert_eq!(of_containers(&env), ["db-password", "input-flag"]);
     assert_eq!(compose_variable(env.spec(), "db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
     assert_eq!(compose_variable(env.spec(), "input-flag"), "FLAG", "an input's file reads the input itself");
+}
+
+// The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
+#[cfg(unix)]
+#[test]
+fn values_from_the_environment_are_kept_and_an_empty_one_keeps_the_kept_value() {
+    let script = from_environment(&[("db".to_owned(), "PW_B64".to_owned()), ("api".to_owned(), "API_B64".to_owned())], &[]);
+    // Only what keeps the values: the placing service needs a real machine's `/etc`.
+    let (keeping, placing) = script.split_once(&format!("touch {DELIVERED}\n")).expect("the mark");
+    assert!(placing.contains("systemctl enable isoloom-apply-secrets.service"), "{placing}");
+    let first = format!("export PW_B64={}; {keeping}touch {DELIVERED}\n", b64("p@ss 'word'\n"));
+    let (fresh, fresh_dir) = run(&first, "", "env-first");
+    assert!(fresh.status.success(), "{}", String::from_utf8_lossy(&fresh.stderr));
+    assert_eq!(std::fs::read_to_string(fresh_dir.join("db")).unwrap(), "p@ss 'word'\n");
+    let unset = std::fs::read_to_string(fresh_dir.join("api")).unwrap();
+    assert_eq!(unset, "", "an unset variable writes an empty value the first time");
+    assert!(fresh_dir.join(".delivered").exists());
+    std::fs::remove_dir_all(&fresh_dir).ok();
+    // Again with no value: the kept one stays (`run` starts from an empty folder, so seed it).
+    let again = format!("mkdir -p {KEPT_DIR} && printf kept > {KEPT_DIR}/db && {keeping}");
+    let (kept, kept_dir) = run(&again, "", "env-again");
+    assert!(kept.status.success(), "{}", String::from_utf8_lossy(&kept.stderr));
+    assert_eq!(std::fs::read_to_string(kept_dir.join("db")).unwrap(), "kept");
+    std::fs::remove_dir_all(&kept_dir).ok();
 }
