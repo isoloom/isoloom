@@ -14,7 +14,7 @@ Working document for the local rebuild. It is squashed away with the history at 
 | **Phase 2: syntax** | **Approved by the maintainer** (`plan/phase2/spec.md`, including the flag via `files:` with `input:`). Implementation is next. |
 | **Track C: Proxmox 9.2** | Proven: a real apply, serve, check and destroy. |
 | **Track C: ESXi 8.0U3e** | Proven with promiscuous mode on: nested DHCP works, the launcher's Vagrant self-test passes, and Isoloom's `esxi` Terraform module serves and passes its check (finishing from a container). Two fixes are queued for Phase 3 (the controller box on ESXi; guest SSH moving to the runner). |
-| **Launcher standard (0.6)** | Ratchet, lints, reorg and repository-root grouping landed (`0560c78`). 1,724 violations remain outside `runtime/`, fixed by area in parallel. |
+| **Launcher standard (0.6)** | Ratchet, lints, reorg (`0560c78`). Labs and components at 0 (`a350772`); Rust outside `runtime/` from 332 to 5 (`c9338e5`; the 5 are the planned `tauri` calls into `runtime/`). Remaining: lib, settings and small areas (running); machine, onboarding, servers and cloud (next). |
 | **Test hosts** | jarvis (Linux) and karen (Windows) are offline until the end of 2026-10-15. Meanwhile Linux uses `check-all --hosts linux-docker`, and Windows uses clippy on `x86_64-pc-windows-msvc`. The real Windows and Linux legs are queued below and run as soon as the hosts are back. |
 | **Websites** | Kept separate. The isoloom.com rebuild banner is live. **Standard (0.7) done:** 0 violations on both (isoloom-website `1b23d23`, isothrum-website `e7c0bd6`, local, not pushed), proven by byte-identical builds, routes and screenshots. Follow-up: unit tests (vitest) and the remaining `.mjs` scripts as TypeScript. |
 
@@ -24,7 +24,8 @@ Working document for the local rebuild. It is squashed away with the history at 
 - the launcher's `pnpm quality --update` on both, for the Windows and Linux baselines;
 - the flag-file proof on Linux and Windows Docker (owner, mode, no flag in `env`);
 - the runner's real run on jarvis;
-- the Windows leg of Phase 1b's final run.
+- the Windows leg of Phase 1b's final run;
+- **first:** the launcher's Windows-only Rust code moved during the cleanup has never been compiled (`platform::sys::windows`, the elevate split, job objects, registry, winget ids). Run Windows `pnpm check` and clippy on karen. Once that's clean, raise the launcher's zero-count lints from warn to deny.
 
 ## 0. Three products
 
