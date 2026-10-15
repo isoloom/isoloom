@@ -1,6 +1,6 @@
-//! A machine's own process: `command`, `working_dir`, `before` and `healthcheck`. What each
-//! target needs to run them the same way: a command to run, an absolute directory, scripts the
-//! machine's OS runs, and a healthcheck with one test and a pace it can keep.
+//! A machine's own process: `command`, `working_dir` and `healthcheck`. What each target needs
+//! to run them the same way: a command to run, an absolute directory, and a healthcheck with one
+//! test and a pace it can keep.
 
 use super::Problems;
 use crate::model::{Healthcheck, Machine, Spec, seconds};
@@ -15,16 +15,10 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
         {
             p.add(format!("{at}.working_dir"), format!("`{dir}` must be an absolute path, like /srv/app"));
         }
-        before(&at, m, p);
         if let Some(h) = &m.healthcheck {
             healthcheck(&format!("{at}.healthcheck"), h, p);
         }
     }
-}
-
-/// Whether the machine's VM runs Windows.
-fn windows(m: &Machine) -> bool {
-    m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os))
 }
 
 /// A command to run, on a machine that runs one of its own (an appliance or an idle machine
@@ -33,36 +27,14 @@ fn command(at: &str, m: &Machine, p: &mut Problems) {
     if m.command.as_ref().is_some_and(crate::model::CommandLine::is_empty) {
         p.add(format!("{at}.command"), "give the program to run (a text, or a list starting with the program)");
     }
-    let set = m.command.is_some() || !m.before.is_empty() || m.working_dir.is_some();
+    let set = m.command.is_some() || m.working_dir.is_some();
     let Some(d) = m.docker.as_ref().filter(|_| set) else { return };
     if d.appliance.is_some() {
-        p.add(at, "a network appliance runs its own OS: no `command`, `working_dir` or `before`");
+        p.add(at, "a network appliance runs its own OS: no `command` or `working_dir`");
     } else if d.idle {
         p.add(
             at,
-            "an `idle` machine runs nothing of its own: leave `idle` out to give it a `command`, `working_dir` or `before`",
-        );
-    }
-}
-
-/// Scripts the machine's OS runs, and on a container the command they hand over to.
-fn before(at: &str, m: &Machine, p: &mut Problems) {
-    let windows = windows(m);
-    for (i, step) in m.before.iter().enumerate() {
-        let is = |ext: &str| std::path::Path::new(step).extension().is_some_and(|e| e.eq_ignore_ascii_case(ext));
-        if windows && !is("ps1") {
-            p.add(
-                format!("{at}.before[{i}]"),
-                "a Windows machine runs PowerShell scripts (.ps1) before its command",
-            );
-        } else if !windows && !is("sh") {
-            p.add(format!("{at}.before[{i}]"), "a shell script (.sh), run with the machine's `sh`");
-        }
-    }
-    if !m.before.is_empty() && m.docker.is_some() && m.command.is_none() {
-        p.add(
-            format!("{at}.before"),
-            "on a container the `before` steps replace the image's entrypoint, so they need the process to start after them: restate it in `command` (the image's ENTRYPOINT and CMD, e.g. [docker-entrypoint.sh, postgres])",
+            "an `idle` machine runs nothing of its own: leave `idle` out to give it a `command` or `working_dir`",
         );
     }
 }
@@ -112,7 +84,7 @@ mod tests {
     #[test]
     fn a_machine_with_its_own_process_is_valid() {
         let ok = problems(
-            "docker: { image: postgres }, command: [docker-entrypoint.sh, postgres], working_dir: /srv, before: [flag.sh], healthcheck: { test: pg_isready, interval: 2s, retries: 30, start_period: 1m }",
+            "docker: { image: postgres }, command: [docker-entrypoint.sh, postgres], working_dir: /srv, healthcheck: { test: pg_isready, interval: 2s, retries: 30, start_period: 1m }",
         );
         assert!(ok.is_empty(), "{ok:?}");
         let vm = problems("vm: { os: debian@12 }, command: 'python3 -m http.server 80', healthcheck: { http: { port: 80 } }");
@@ -120,10 +92,8 @@ mod tests {
     }
 
     #[test]
-    fn a_before_script_is_a_shell_script_and_the_working_dir_absolute() {
-        let p = problems("docker: { image: postgres }, before: [flag.py], working_dir: srv");
-        assert!(p.iter().any(|m| m.contains("before[0]: a shell script")), "{p:?}");
-        assert!(p.iter().any(|m| m.contains("restate it in `command`")), "{p:?}");
+    fn the_working_dir_is_absolute() {
+        let p = problems("docker: { image: postgres }, working_dir: srv");
         assert!(p.iter().any(|m| m.contains("working_dir: `srv` must be an absolute path")), "{p:?}");
     }
 
@@ -150,16 +120,10 @@ mod tests {
     }
 
     #[test]
-    fn a_windows_machine_runs_powershell_before_scripts() {
-        let p = problems("vm: { os: windows-server@2022 }, command: x, before: [set.sh]");
-        assert!(p.iter().any(|m| m.contains("PowerShell scripts (.ps1)")), "{p:?}");
-    }
-
-    #[test]
     fn an_appliance_runs_no_process_of_its_own() {
         assert_eq!(
             problems("docker: { image: x, appliance: cisco-iol }, working_dir: /srv"),
-            ["machines.a: a network appliance runs its own OS: no `command`, `working_dir` or `before`"]
+            ["machines.a: a network appliance runs its own OS: no `command` or `working_dir`"]
         );
     }
 

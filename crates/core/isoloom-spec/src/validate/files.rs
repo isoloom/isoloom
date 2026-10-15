@@ -61,8 +61,8 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     paths.problems
 }
 
-/// The machines' build contexts, Dockerfiles, appliance files, files, `before` steps and
-/// provisioning scripts.
+/// The machines' build contexts, Dockerfiles, appliance files, files and provisioning
+/// scripts.
 fn machines(spec: &Spec, paths: &mut Paths) {
     for (name, m) in &spec.machines {
         if let Some(d) = &m.docker {
@@ -92,9 +92,6 @@ fn machines(spec: &Spec, paths: &mut Paths) {
                     ));
                 }
             }
-        }
-        for (i, s) in m.before.iter().enumerate() {
-            paths.check(format!("machines.{name}.before[{i}]"), s);
         }
         if let Some(v) = &m.vm {
             for (i, s) in v.provision.iter().enumerate().filter(|(_, s)| !crate::model::is_reboot(s)) {
@@ -135,7 +132,7 @@ mod tests {
 
     /// Every file a spec of machines can name, in its project.
     const MACHINES: &str = "machines:
-  web: { networks: { lan: 10 }, docker: { build: app, dockerfile: app/Dockerfile, init: [init.sh] }, files: [{ path: /etc/a.ini, source: conf/a.ini }], before: [before.sh] }
+  web: { networks: { lan: 10 }, docker: { build: app, dockerfile: app/Dockerfile, init: [init.sh] }, files: [{ path: /etc/a.ini, source: conf/a.ini }] }
   r1: { networks: { lan: 20 }, docker: { image: x, appliance: cisco-iol, config: r1.cfg, firmware: fw.bin } }
   vm1: { networks: { lan: 30 }, vm: { os: debian@12, provision: [setup.sh, reboot], image: { vagrant: my/box, box_url: boxes/my.box } } }
   vm2: { networks: { lan: 40 }, vm: { os: debian@12, image: { vagrant: my/box, box_url: 'https://boxes.corp/my.box' } } }
@@ -148,7 +145,6 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
         "app/Dockerfile",
         "init.sh",
         "conf/a.ini",
-        "before.sh",
         "r1.cfg",
         "fw.bin",
         "setup.sh",
@@ -197,7 +193,6 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
             missing("machines.web.docker.dockerfile", "app/Dockerfile"),
             missing("machines.web.docker.init[0]", "init.sh"),
             missing("machines.web.files[0].source", "conf/a.ini"),
-            missing("machines.web.before[0]", "before.sh"),
             missing("machines.r1.docker.config", "r1.cfg"),
             missing("machines.r1.docker.firmware", "fw.bin"),
             missing("machines.vm1.vm.provision[0]", "setup.sh"),

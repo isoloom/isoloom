@@ -161,16 +161,10 @@ pub struct Machine {
     /// (systemd, OpenRC on Alpine; a startup task on Windows), restarted when it fails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<CommandLine>,
-    /// The directory the command, the `before` steps and the healthcheck run in (an absolute
+    /// The directory the command and the healthcheck run in (an absolute
     /// path). Default: the image's `WORKDIR`; on a VM, the project folder (`/opt/isoloom`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_dir: Option<String>,
-    /// Scripts in the project run inside the machine before its command, at every start, with
-    /// its inputs and volumes (a per-player flag written where the app reads it). `.sh` (`.ps1`
-    /// on a Windows VM). On a container they replace the image's entrypoint, so a container
-    /// machine with `before` restates its whole process in `command`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub before: Vec<String>,
     /// When the machine counts as healthy beyond its ports answering: a command or a
     /// page, with its pace. Checked beside the port probe, never instead of it.
     #[serde(default, skip_serializing_if = "Option::is_none")]

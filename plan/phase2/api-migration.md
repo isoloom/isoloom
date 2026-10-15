@@ -90,3 +90,4 @@ None of this reaches the launcher or Isothrum, which read `isoloom-targets` (its
 ## Phase 1c, `isoloom-spec` follow-ups (the 1c-spec unit)
 
 28. **A lowered spec's problem has a code:** `isoloom_spec::Problem` (`validate::Problem`) carries `code: syntax::Code` (`UnknownReference` for a name that names nothing, else `InvalidValue`), and `Problem::new(code, at, message)` takes it first. `groups::problems` returns these problems instead of `(path, message)` pairs. The plan places them with their own code instead of reading their wording.
+29. **`model::Machine.before` is gone**, with its checks: the authored spec has no `before`, and lowering always left it empty.

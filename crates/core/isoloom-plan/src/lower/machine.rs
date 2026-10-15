@@ -62,7 +62,6 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         resources: m.resources,
         command: m.command.as_ref().map(|c| c.run.clone()),
         working_dir: m.command.as_ref().and_then(|c| c.cwd.clone()),
-        before: Vec::new(),
         healthcheck,
         depends_on: m.depends_on.clone(),
         volumes: m.volumes.clone(),
