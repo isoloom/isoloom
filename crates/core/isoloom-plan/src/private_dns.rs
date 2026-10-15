@@ -58,7 +58,7 @@ pub fn plan(spec: &Spec) -> Option<PrivateDns> {
 /// `names` (a machine's own and its aliases), then each of them under the private zone's domain
 /// when `dns.private` is on.
 #[must_use]
-pub fn with_domain(spec: &Spec, names: Vec<String>) -> Vec<String> {
+pub(crate) fn with_domain(spec: &Spec, names: Vec<String>) -> Vec<String> {
     match spec.private_domain() {
         Some(domain) => {
             let full: Vec<String> = names.iter().map(|n| format!("{n}.{domain}")).collect();

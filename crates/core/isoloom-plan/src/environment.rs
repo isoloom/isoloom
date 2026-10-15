@@ -18,7 +18,7 @@ use isoloom_spec::windows::{self, Tpm};
 
 mod image;
 
-pub use image::{Build, Image, generated_dockerfile};
+pub use image::{Build, Image};
 
 use crate::addressing::{address, address_for, host_address, start_order};
 use crate::ansible;

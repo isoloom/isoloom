@@ -51,7 +51,7 @@ pub enum Build {
 
 /// Where a machine's generated Dockerfile is written, from the project folder.
 #[must_use]
-pub fn generated_dockerfile(machine: &str) -> String {
+pub(crate) fn generated_dockerfile(machine: &str) -> String {
     format!(".isoloom/docker/build/{machine}/Dockerfile")
 }
 

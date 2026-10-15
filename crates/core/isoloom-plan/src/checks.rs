@@ -105,12 +105,9 @@ pub const HTTP_MAX_REDIRECTS: u32 = 5;
 pub struct TcpExchange {
     /// A line written once connected (a newline is added).
     pub send: Option<String>,
-    /// Text the bytes read within [`TCP_READ_SECONDS`] must contain.
+    /// Text the bytes read in the first 5 seconds of the connection must contain.
     pub contains: Option<String>,
 }
-
-/// How long a `tcp` check with `contains` reads from the connection, per attempt.
-pub const TCP_READ_SECONDS: u32 = 5;
 
 /// One resolved probe.
 #[derive(Debug, Clone, PartialEq, Eq)]

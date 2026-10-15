@@ -117,7 +117,7 @@ pub fn routes(spec: &Spec, m: &Machine) -> Vec<Route6> {
 
 /// A cloud's network routes between its subnets, IPv6 included, and has no Isoloom router:
 /// the IPv6 step keeps the addresses and drops the routes.
-pub fn cloud_routes(steps: &mut [crate::lifecycle::Step]) {
+pub(crate) fn cloud_routes(steps: &mut [crate::lifecycle::Step]) {
     for s in steps {
         if let crate::lifecycle::Step::Ipv6 { routes, .. } = s {
             routes.clear();

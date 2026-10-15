@@ -480,7 +480,7 @@ fn secrets(spec: &Spec) -> Vec<Requirement> {
 /// a VM waiting for a container. `shape` is each machine's shape on the target; only containers
 /// and VMs count (an external or supplied machine is neither), so nothing comes out unless the
 /// target runs both.
-pub fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+pub(crate) fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
     let is = |name: &str, s: MachineShape| shape(name) == Some(s);
     let volumes = spec.volumes.keys().filter(|v| {
         let users = spec.volume_users(v);
@@ -511,7 +511,7 @@ pub fn tpm(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
 /// The checks' requirements beyond probing from a container: playbooks, and `exec` checks that
 /// would have no container to run in. At most one of them: the first, as a container output
 /// reports it.
-pub fn container_checks(spec: &Spec) -> Option<Requirement> {
+pub(crate) fn container_checks(spec: &Spec) -> Option<Requirement> {
     if spec.checks.iter().any(isoloom_spec::Check::is_playbook) {
         return Some(Requirement::PlaybookChecks);
     }

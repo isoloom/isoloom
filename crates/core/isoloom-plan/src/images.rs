@@ -26,7 +26,7 @@ pub fn rewrite_image(c: &Constraints, image: &str) -> String {
 
 /// The tag a machine's container image goes by: the published one, or the name its build is
 /// tagged with (so its `init:` jobs can reuse it).
-pub fn tag_of(spec: &Spec, name: &str, image: Option<&str>) -> String {
+pub(crate) fn tag_of(spec: &Spec, name: &str, image: Option<&str>) -> String {
     image.map_or_else(|| format!("isoloom/{}-{name}", spec.name), str::to_owned)
 }
 
