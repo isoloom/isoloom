@@ -8,6 +8,20 @@ use serde_yaml_ng::{Mapping, Value};
 use crate::model::Spec;
 use crate::{clones, groups, os, vlans};
 
+/// A spec named `t` with one network, `lan` (10.0.0.0/24), then `rest` (its machines, checks,
+/// volumes...), as YAML.
+pub(crate) fn lab(rest: &str) -> String {
+    format!("version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.0.0.0/24 }}\n{rest}")
+}
+
+/// What validation finds in the lowered spec `yaml` describes, each as `path: message`.
+pub(crate) fn problems(yaml: &str) -> Vec<String> {
+    match model(yaml) {
+        Ok(spec) => crate::validate(&spec).iter().map(ToString::to_string).collect(),
+        Err(why) => vec![format!("doesn't read: {why}")],
+    }
+}
+
 /// The lowered spec `yaml` describes, or why it doesn't read.
 pub(crate) fn model(yaml: &str) -> Result<Spec, String> {
     let mut doc: Value = serde_yaml_ng::from_str(yaml).map_err(|e| e.to_string())?;

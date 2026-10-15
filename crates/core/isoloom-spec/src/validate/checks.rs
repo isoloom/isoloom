@@ -147,3 +147,161 @@ fn tcp(at: &str, t: &str, d: &Declared, p: &mut Problems) {
         Some(_) => p.add(format!("{at}.expect"), "for `tcp`: `open` or `blocked`"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::testing::{lab, problems};
+
+    /// The problems of the checks `checks` (a YAML list) in a lab of a Linux container (`web`), a
+    /// network appliance (`r1`) and a Windows VM (`win`).
+    fn of(checks: &str) -> Vec<String> {
+        problems(&lab(&format!(
+            "machines:\n  web: {{ networks: {{ lan: 10 }}, docker: {{ image: nginx }} }}\n  r1: {{ networks: {{ lan: 20 }}, docker: {{ image: x, appliance: cisco-iol }} }}\n  win: {{ networks: {{ lan: 30 }}, vm: {{ os: windows-server@2022 }} }}\nchecks: {checks}\n"
+        )))
+    }
+
+    #[test]
+    fn sound_checks_pass() {
+        let ok = "[probe.sh, { http: 'http://web/', expect: 200 }, { http: 'http://web/', expect: any }, { tcp: 'web:80', expect: open }, { tcp: 'web:80', expect: blocked }, { exec: id, from: web, expect: uid }, { script: s.sh, from: web, wait: 3600 }, { http: 'http://web/', method: POST, headers: { A: b }, body: x, follow: true, contains: ok }, { tcp: 'web:6379', send: PING, contains: PONG }]";
+        assert_eq!(of(ok), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_script_check_names_its_script() {
+        assert_eq!(of("['  ']"), ["checks[0]: give the script's path in the project"]);
+    }
+
+    #[test]
+    fn a_declared_check_has_exactly_one_probe() {
+        let why = "checks[0]: say what to check with exactly one of `http`, `tcp`, `exec` or `script`";
+        assert_eq!(of("[{ name: x }]"), [why]);
+        assert_eq!(of("[{ http: 'http://web/', tcp: 'web:80' }]"), [why]);
+    }
+
+    #[test]
+    fn a_name_wait_and_from_are_checked() {
+        assert_eq!(
+            of("[{ http: 'http://web/', name: ' ' }]"),
+            ["checks[0].name: give the check a name, or leave `name` out"]
+        );
+        assert_eq!(of("[{ http: 'http://web/', wait: 3601 }]"), ["checks[0].wait: at most 3600 seconds"]);
+        assert_eq!(of("[{ http: 'http://web/', from: db }]"), ["checks[0].from: no machine named `db`"]);
+        assert_eq!(
+            of("[{ http: 'http://web/', from: r1 }]"),
+            ["checks[0].from: `r1` is a network appliance: checks run from the machines around it"]
+        );
+        assert_eq!(
+            of("[{ http: 'http://web/', from: win }]"),
+            ["checks[0].from: `win` runs Windows; checks run from Linux machines for now"]
+        );
+        assert_eq!(of("[{ exec: id }]"), ["checks[0]: `exec` runs inside a machine: say which with `from`"]);
+    }
+
+    #[test]
+    fn http_options_go_with_http() {
+        assert_eq!(
+            of("[{ tcp: 'web:80', method: GET }]"),
+            ["checks[0]: `method`, `headers` and `body` go with `http`"]
+        );
+        assert_eq!(
+            of("[{ tcp: 'web:80', headers: { A: b } }]"),
+            ["checks[0]: `method`, `headers` and `body` go with `http`"]
+        );
+        assert_eq!(of("[{ tcp: 'web:80', body: x }]"), ["checks[0]: `method`, `headers` and `body` go with `http`"]);
+        assert_eq!(of("[{ tcp: 'web:80', follow: true }]"), ["checks[0]: `follow` (redirects) goes with `http`"]);
+        assert_eq!(
+            of("[{ http: 'http://web/', expect: blocked, follow: true }]"),
+            ["checks[0]: a `blocked` check gets no answer, so no redirect to follow: leave out `follow`"]
+        );
+        assert_eq!(
+            of("[{ exec: id, from: web, contains: x }]"),
+            ["checks[0]: `contains` goes with `http` or `tcp`"]
+        );
+    }
+
+    #[test]
+    fn send_goes_with_tcp_and_contains_on_one_line() {
+        let why = "checks[0]: `send` goes with `tcp` and `contains` (the text the answer must contain)";
+        assert_eq!(of("[{ tcp: 'web:80', send: x }]"), [why]);
+        assert_eq!(of("[{ http: 'http://web/', send: x, contains: y }]"), [why]);
+        assert_eq!(
+            of("[{ tcp: 'web:80', send: \"a\\nb\", contains: y }]"),
+            ["checks[0].send: one line: Isoloom adds the newline"]
+        );
+    }
+
+    #[test]
+    fn a_blocked_check_looks_at_nothing() {
+        let why = "checks[0]: a `blocked` check sends nothing to look at: leave out `method`, `headers`, `body`, `send` and `contains`";
+        assert_eq!(of("[{ http: 'http://web/', expect: blocked, method: GET }]"), [why]);
+        assert_eq!(of("[{ tcp: 'web:80', expect: blocked, contains: x }]"), [why]);
+        assert_eq!(of("[{ tcp: 'web:80', expect: blocked, send: x, contains: y }]"), [why]);
+    }
+
+    #[test]
+    fn contains_and_method_say_something() {
+        assert_eq!(
+            of("[{ http: 'http://web/', contains: '' }]"),
+            ["checks[0].contains: give the text to look for, or leave `contains` out"]
+        );
+        assert_eq!(
+            of("[{ http: 'http://web/', method: '' }]"),
+            ["checks[0].method: `` isn't an HTTP method like GET or POST"]
+        );
+        assert_eq!(
+            of("[{ http: 'http://web/', method: 'GE T' }]"),
+            ["checks[0].method: `GE T` isn't an HTTP method like GET or POST"]
+        );
+    }
+
+    #[test]
+    fn an_http_probe_is_a_url_and_its_expect_a_status_any_or_blocked() {
+        assert_eq!(of("[{ http: web }]"), ["checks[0].http: `web` isn't a URL like http://web:8080/path"]);
+        let why = "checks[0].expect: for `http`: a status code (100-599), `any` or `blocked`";
+        assert_eq!(of("[{ http: 'http://web/', expect: 99 }]"), [why]);
+        assert_eq!(of("[{ http: 'http://web/', expect: 600 }]"), [why]);
+        assert_eq!(of("[{ http: 'http://web/', expect: open }]"), [why]);
+        assert_eq!(
+            of("[{ http: 'http://web/', expect: 100 }, { http: 'http://web/', expect: 599 }]"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn a_cloud_output_url_is_known_only_once_deployed() {
+        let services =
+            "version: 1\nname: t\ncloud: { provider: aws, terraform: infra, outputs: { site: site_url } }\nchecks: [{ http: '{{ cloud.outputs.site }}' }]\n";
+        assert_eq!(problems(services), Vec::<String>::new());
+        assert_eq!(
+            of("[{ http: '{{ cloud.outputs.site }}' }]"),
+            ["checks[0].http: `{{ cloud.outputs.site }}` isn't a URL like http://web:8080/path"]
+        );
+    }
+
+    #[test]
+    fn a_tcp_probe_is_host_and_port_and_its_expect_open_or_blocked() {
+        for bad in ["web", "web:0", "web:x", ":80", "we b:80", "'web':80", "\"web\":80", "web:65536"] {
+            assert_eq!(
+                of(&format!("[{{ tcp: '{}' }}]", bad.replace('\'', "''"))),
+                [format!("checks[0].tcp: `{bad}` isn't `host:port`, like cache:6379")],
+                "{bad}"
+            );
+        }
+        assert_eq!(of("[{ tcp: 'web:65535' }, { tcp: '[fd00::1]:22' }]"), Vec::<String>::new());
+        assert_eq!(of("[{ tcp: 'web:80', expect: 200 }]"), ["checks[0].expect: for `tcp`: `open` or `blocked`"]);
+        assert_eq!(of("[{ tcp: 'web:80', expect: any }]"), ["checks[0].expect: for `tcp`: `open` or `blocked`"]);
+    }
+
+    #[test]
+    fn exec_and_script_expect_their_own_kind() {
+        assert_eq!(of("[{ exec: ' ', from: web }]"), ["checks[0].exec: give a command to run"]);
+        assert_eq!(
+            of("[{ exec: id, from: web, expect: 200 }]"),
+            ["checks[0].expect: for `exec`: the text the output must contain"]
+        );
+        assert_eq!(
+            of("[{ script: s.sh, expect: ok }]"),
+            ["checks[0].expect: a script says whether it passed by exiting 0; leave `expect` out"]
+        );
+    }
+}
