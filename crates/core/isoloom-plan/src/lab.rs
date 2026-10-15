@@ -338,7 +338,8 @@ mod tests {
     use super::*;
     use crate::testing;
 
-    const LAB: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, app: { image: nginx, steps: [{ run: a.sh }] } }\n";
+    /// A lab each target lowers its own way: an existing network on Docker and on Proxmox.
+    const LAB: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 }, corp: { cidr: 10.8.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10, corp: 10 }, os: debian@12, app: { image: nginx, steps: [{ run: a.sh }] } }\noverrides: { docker: { networks: { corp: { external: corp } } }, proxmox: { networks: { corp: { external: vmbr9 } } } }\n";
 
     #[test]
     fn every_scope_is_lowered_once_and_kept() {
@@ -355,7 +356,7 @@ mod tests {
         let (a, b) = (testing::lab(LAB), testing::lab(LAB));
         assert_eq!(a.problems(), []);
         assert_eq!(a, b);
-        assert_ne!(a, testing::lab(&LAB.replace("lan: 10", "lan: 11")));
+        assert_ne!(a, testing::lab(&LAB.replace("lan: 10,", "lan: 11,")));
     }
 
     #[test]

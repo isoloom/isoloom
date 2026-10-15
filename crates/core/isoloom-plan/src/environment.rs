@@ -661,6 +661,11 @@ overrides:
         assert_eq!(shape_of(Target::Hybrid, "vm"), Some(Vm));
         assert_eq!(shape_of(Target::Proxmox, "ct"), Some(Container), "an LXC container");
         assert_eq!(shape_of(Target::Proxmox, "both"), Some(Vm));
+        assert_eq!(
+            shape_of(Target::Proxmox, "img"),
+            Some(Supplied),
+            "no VM and no LXC: Proxmox refuses it, nothing is built"
+        );
         assert_eq!(shape_of(Target::Vagrant, "both"), Some(Vm));
         assert_eq!(shape_of(Target::External, "both"), Some(External));
     }
