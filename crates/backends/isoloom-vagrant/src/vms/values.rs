@@ -171,8 +171,10 @@ machines:
         let script = isoloom_render::secrets::from_environment(&[("input-flag".into(), "V".into())], &[]);
         let dir = std::env::temp_dir().join(format!("isoloom-values-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("a temporary folder");
+        // The kept folder as a relative path, the shell in the test's folder: a Windows path in a
+        // shell script (Git's `sh` on Windows) loses its backslashes.
         let script = script
-            .replace("/var/lib/isoloom/secrets", &dir.display().to_string())
+            .replace("/var/lib/isoloom/secrets", ".")
             .lines()
             .take_while(|l| !l.starts_with("touch"))
             .collect::<Vec<_>>()
@@ -200,7 +202,7 @@ machines:
         let dir = std::env::temp_dir().join(format!("isoloom-values-keep-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("a temporary folder");
         let script: String = script
-            .replace("/var/lib/isoloom/secrets", &dir.display().to_string())
+            .replace("/var/lib/isoloom/secrets", ".")
             .lines()
             .take_while(|l| !l.starts_with("touch"))
             .flat_map(|l| [l, "\n"])
@@ -209,6 +211,7 @@ machines:
             std::process::Command::new("sh")
                 .arg("-c")
                 .arg(&script)
+                .current_dir(&dir)
                 .env("V", isoloom_spec::shell::base64(value.as_bytes()))
                 .status()
                 .expect("sh runs")

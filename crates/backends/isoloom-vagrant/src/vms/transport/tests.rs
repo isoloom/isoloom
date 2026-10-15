@@ -130,15 +130,19 @@ fn the_inputs_file_quotes_every_value() {
         .take(3)
         .map(|l| format!("{}\n", l.trim_start()))
         .collect();
+    // Run from a file, in the test's folder, the inputs file at a relative path: on Windows, Git's
+    // `sh` reads a `-c` script's backslashes before quotes otherwise than it was written, and a
+    // Windows path has no `/`, so `.` would look it up on PATH.
     let script = lines.concat().replace("/tmp/isoloom-inputs.env", "\"$OUT\"");
     let dir = std::env::temp_dir().join(format!("isoloom-inputs-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("a temporary folder");
-    let out = dir.join("inputs.env");
+    let read_back = "set -a; . \"$OUT\"; set +a; printf %s \"$TOKEN\" > \"$OUT.read\"\n";
+    std::fs::write(dir.join("inputs.sh"), format!("{script}{read_back}")).expect("the script written");
     let tricky = "it's $(not run) \"quoted\" `nor this`";
     let status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(format!("{script}set -a; . \"$OUT\"; set +a; printf %s \"$TOKEN\" > \"$OUT.read\""))
-        .env("OUT", &out)
+        .arg("inputs.sh")
+        .current_dir(&dir)
+        .env("OUT", "./inputs.env")
         .env("TOKEN", isoloom_spec::shell::base64(tricky.as_bytes()))
         .status()
         .expect("sh runs");
