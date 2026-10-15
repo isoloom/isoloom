@@ -1,0 +1,93 @@
+# A routed branch office: an edge machine routes the DMZ, the inside network and the management
+# network, the reach rules say what its firewall must let through, and the checks prove it. Made
+# up for the syntax design (plan/phase2/spec.md); the project files it names aren't part of the
+# example.
+#
+# Targets: every machine target. `edge` and `web` have both forms from their steps; `db` comes
+# from the catalogue (Phase 4).
+version: 1
+name: branch-office
+
+networks:
+  outside: { cidr: 10.81.0.0/24 }
+  dmz:     { cidr: 10.81.10.0/24, gateway: edge }
+  inside:  { cidr: 10.81.20.0/24, gateway: edge, internet: false }
+  mgmt:    { cidr: 10.81.99.0/24, gateway: edge, internet: false }
+
+# A network with a `gateway` machine is routed by that machine's own rules, so these are the
+# behaviour the edge must have, and the checks below verify it.
+reach:
+  - { from: outside, to: dmz, ports: [80, 443] }
+  - { from: dmz, to: inside, ports: [5432] }
+  - { from: mgmt, to: inside }
+
+secrets:
+  db-password: { env: BRANCH_DB_PASSWORD }
+
+machines:
+  edge:
+    os: debian@12
+    networks: { outside: 5, dmz: 1, inside: 1, mgmt: 1 }   # the gateway address of the three it routes
+    app:
+      steps:
+        - packages: [nftables]
+        - copy: { from: edge/nftables.conf, to: /etc/nftables.conf, mode: "0600" }
+    setup: [edge/apply-rules.sh]     # loads the rules once the machine is up, on both forms
+
+  web:
+    os: debian@12
+    networks: { dmz: [10, 11] }      # .10 is its own; .11 serves the partner site
+    aliases: [www.branch.test, partners.branch.test]
+    app:
+      steps:
+        - packages: [nginx]
+        - copy: { from: web/sites/, to: /etc/nginx/sites-enabled/ }
+        - copy: { from: web/html/, to: /var/www/ }
+    command: [nginx, -g, daemon off;]
+    ports:
+      http: { port: 80, protocol: http }
+      https: { port: 443, protocol: https }
+    depends_on: [db]
+
+  db:
+    os: debian@12
+    service: postgres@16
+    with:
+      database: branch
+      user: branch
+      password: { secret: db-password }
+    networks: { inside: 20 }
+
+  admin:
+    os: debian@12
+    networks: { mgmt: 10 }
+
+  visitor:
+    os: kali
+    access: true
+    networks: { outside: 10 }
+
+checks:
+  - name: the public site answers through the edge
+    from: visitor
+    http: http://www.branch.test/
+    wait: 2m
+  - name: the partner site answers at the second address
+    from: visitor
+    http: https://10.81.10.11/
+    expect: any
+  - name: the database is sealed off from outside
+    from: visitor
+    tcp: db:5432
+    expect: blocked
+  - name: the web server reaches the database
+    from: web
+    tcp: db:5432
+    wait: 2m
+  - name: the management network reaches the inside
+    from: admin
+    tcp: db:5432
+
+message: |
+  You are on the outside network. The branch's public site is www.branch.test
+  ({{ machines.web.addresses.dmz }}); everything behind it is yours to find.

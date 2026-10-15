@@ -1,0 +1,47 @@
+# One web app in one container, built from the project's own Dockerfile, with a per-run flag
+# delivered as a file. Made up for the syntax design (plan/phase2/spec.md); the project files it
+# names (build/web, checks/) aren't part of the example.
+#
+# Targets: the container ones (docker, hosted, docker-vm, cloud-docker, kubernetes). `app.build`
+# is a container recipe, so the VM targets refuse `web` with a reason.
+version: 1
+name: help-desk
+
+networks:
+  lab: { cidr: 10.44.0.0/24, internet: false }
+
+inputs:
+  FLAG:
+    description: The flag hidden in the ticket archive.
+
+machines:
+  web:
+    networks: { lab: 10 }
+    app:
+      build: build/web               # build/web/Dockerfile; no `os`: the Dockerfile's FROM decides
+    ports:
+      site: { port: 8000, protocol: http, publish: 8080 }
+    files:
+      - path: /srv/archive/flag.txt
+        input: FLAG                  # a file before the app starts; never in its environment
+        uid: 1000                    # the app's own user
+        mode: "0400"
+    healthcheck:
+      http: { port: site, path: /health }
+    resources: { cpus: 1, memory_mb: 512 }
+
+checks:
+  - name: the help desk answers
+    http: http://web:8000/
+    wait: 1m
+  - name: the archive holds the flag file
+    from: web
+    exec: test -s /srv/archive/flag.txt && echo present
+    expect: present
+  - name: a ticket can be filed and read back
+    script: checks/file-a-ticket.sh
+    wait: 3m
+
+message: |
+  The help desk answers at {{ machines.web.ports.site.url }}.
+  Somewhere in its ticket archive is a file only the app should read.
