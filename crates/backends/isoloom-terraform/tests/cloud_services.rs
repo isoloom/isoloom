@@ -6,7 +6,7 @@
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_services::CloudServicesBackend;
+use isoloom_terraform::CloudServicesBackend;
 
 const SPEC: &str = r#"version: 1
 name: goat

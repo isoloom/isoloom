@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-terraform"
-description = "The Terraform backends of Isoloom (Proxmox, cloud VMs, cloud Docker, cloud services)."
+description = "The Terraform backends of Isoloom (Proxmox, ESXi, cloud VMs, cloud Docker, cloud services)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,6 +14,7 @@ isoloom-plan.workspace = true
 isoloom-render.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

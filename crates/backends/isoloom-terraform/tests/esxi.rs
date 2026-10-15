@@ -9,7 +9,7 @@ use std::path::Path;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::esxi::EsxiBackend;
+use isoloom_terraform::EsxiBackend;
 
 fn env(example: &str) -> Environment {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);

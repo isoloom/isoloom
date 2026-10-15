@@ -6,7 +6,7 @@
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::proxmox::ProxmoxBackend;
+use isoloom_terraform::ProxmoxBackend;
 
 fn render(yaml: &str) -> String {
     let spec = isoloom_spec::parse(yaml).unwrap();

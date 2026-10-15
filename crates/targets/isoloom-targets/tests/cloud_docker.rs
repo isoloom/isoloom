@@ -24,7 +24,7 @@ fn the_compose_file_comes_first_then_a_module_per_cloud() {
     let compose = paths.iter().position(|p| *p == ".isoloom/docker/compose.yml").expect("the Compose file");
     let first_module = paths.iter().position(|p| p.starts_with(".isoloom/cloud-docker/")).expect("a module");
     assert!(compose < first_module, "{paths:?}");
-    for cloud in isoloom_terraform::cloud_docker::Cloud::ALL {
+    for cloud in isoloom_terraform::Cloud::ALL {
         assert!(paths.contains(&format!(".isoloom/cloud-docker/{}/main.tf", cloud.id()).as_str()), "{paths:?}");
     }
 }

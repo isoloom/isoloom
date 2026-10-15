@@ -8,7 +8,7 @@
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_vm::CLOUDS;
+use isoloom_terraform::{Cloud, CloudVmModule, ProxmoxBackend};
 
 const SPEC: &str = "version: 1
 name: names
@@ -24,7 +24,7 @@ fn env(spec: &str, target: Target) -> Environment {
 }
 
 fn module(cloud: &str, spec: &str) -> String {
-    let (_, backend) = CLOUDS.iter().find(|(n, _)| *n == cloud).unwrap();
+    let backend = Cloud::ALL.into_iter().find(|c| c.id() == cloud).map(CloudVmModule::from).unwrap();
     backend.render(&env(spec, Target::CloudVm)).unwrap()[0].contents.clone()
 }
 
@@ -79,7 +79,7 @@ fn off_no_zone_is_written() {
 
 #[test]
 fn proxmox_takes_the_domain_as_its_search_domain() {
-    let files = isoloom_terraform::proxmox::ProxmoxBackend.render(&env(SPEC, Target::Proxmox)).unwrap();
+    let files = ProxmoxBackend.render(&env(SPEC, Target::Proxmox)).unwrap();
     let tf = &files.iter().find(|f| f.path.ends_with("proxmox/main.tf")).unwrap().contents;
     assert!(tf.contains("domain  = \"corp.internal\""), "{tf}");
 }

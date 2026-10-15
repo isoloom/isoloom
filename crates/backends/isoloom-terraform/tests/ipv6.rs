@@ -6,7 +6,7 @@
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_vm::CLOUDS;
+use isoloom_terraform::{Cloud, CloudVmModule};
 
 const SPEC: &str = "version: 1
 name: v6
@@ -25,7 +25,7 @@ fn env(target: Target) -> Environment {
 
 #[test]
 fn azure_writes_the_block_the_interfaces_and_the_rules() {
-    let (_, azure) = CLOUDS.iter().find(|(n, _)| *n == "azure").unwrap();
+    let azure = cloud("azure");
     let e = env(Target::CloudVm);
     assert_eq!(azure.refusal(&e), None);
     let tf = &azure.render(&e).unwrap()[0].contents;
@@ -42,7 +42,7 @@ fn azure_writes_the_block_the_interfaces_and_the_rules() {
 fn the_other_clouds_refuse_with_their_reason() {
     let e = env(Target::CloudVm);
     for (name, why) in [("aws", "Amazon-provided"), ("gcp", "fd20::/20")] {
-        let (_, cloud) = CLOUDS.iter().find(|(n, _)| *n == name).unwrap();
+        let cloud = cloud(name);
         let refusal = cloud.refusal(&e).unwrap();
         assert!(refusal.starts_with("network `front` is IPv6: ") && refusal.contains(why), "{name}: {refusal}");
     }
@@ -50,15 +50,15 @@ fn the_other_clouds_refuse_with_their_reason() {
 
 #[test]
 fn the_proxmox_router_takes_its_ipv6_address_and_forwards() {
-    let files = isoloom_terraform::proxmox::ProxmoxBackend.render(&env(Target::Proxmox)).unwrap();
+    let files = isoloom_terraform::ProxmoxBackend.render(&env(Target::Proxmox)).unwrap();
     let tf = &files.iter().find(|f| f.path.ends_with("proxmox/main.tf")).unwrap().contents;
     assert!(tf.contains("Address=fd00:67:20::254/64"), "{tf}");
     assert!(tf.contains("net.ipv6.conf.all.forwarding=1"), "{tf}");
     assert!(tf.contains("ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64"), "{tf}");
 }
 
-fn cloud(name: &str) -> &'static dyn Backend {
-    CLOUDS.iter().find(|(n, _)| *n == name).unwrap().1
+fn cloud(name: &str) -> CloudVmModule {
+    Cloud::ALL.into_iter().find(|c| c.id() == name).map(CloudVmModule::from).unwrap()
 }
 
 fn env_of(spec: &str) -> Environment {

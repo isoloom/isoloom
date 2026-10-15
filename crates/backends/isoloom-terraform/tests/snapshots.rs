@@ -8,8 +8,7 @@ use std::path::Path;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_vm::CloudVmBackend;
-use isoloom_terraform::proxmox::ProxmoxBackend;
+use isoloom_terraform::{Cloud, CloudVmBackend, CloudVmModule, ProxmoxBackend};
 
 fn env(example: &str, target: Target) -> Environment {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);
@@ -170,10 +169,10 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() {
     assert!(module("azure").unwrap().contains("vtpm_enabled"));
     assert!(module("gcp").unwrap().contains("enable_vtpm"));
     assert!(module("oci").unwrap().contains("is_trusted_platform_module_enabled"));
-    let refusals = isoloom_terraform::cloud_vm::cloud_refusals(&cloud);
+    let refusals = CloudVmBackend.refusals(&cloud);
     let digitalocean = refusals
         .iter()
-        .find(|(n, _)| *n == "digitalocean")
+        .find(|(n, _)| *n == Cloud::DigitalOcean)
         .and_then(|(_, w)| w.clone())
         .expect("refused");
     assert!(
@@ -184,7 +183,7 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() {
     // written.
     let windows = one_vm("{ os: windows-server@2022, provision: [a.ps1], tpm: true }");
     let env = Environment::build(&windows, Target::CloudVm, None);
-    let refusals = isoloom_terraform::cloud_vm::cloud_refusals(&env);
+    let refusals = CloudVmBackend.refusals(&env);
     let aws = refusals[0].1.clone().expect("refused");
     assert!(aws.contains("NitroTPM"), "{aws}");
     assert_eq!(CloudVmBackend.refusal(&env), None);
@@ -211,10 +210,10 @@ fn proxmox_refuses_what_its_windows_machines_cant_have_yet() {
 
 #[test]
 fn each_cloud_refuses_on_its_own() {
-    use isoloom_terraform::cloud_vm::cloud_refusals;
+    let cloud_refusals = |e: &Environment| CloudVmBackend.refusals(e);
     // Two networks, each machine on one: AWS, Azure and Google Cloud take it.
     let refusals = cloud_refusals(&env("segmented", Target::CloudVm));
-    let names: Vec<&str> = refusals.iter().map(|(n, _)| *n).collect();
+    let names: Vec<&str> = refusals.iter().map(|(n, _)| n.id()).collect();
     assert_eq!(names, ["aws", "azure", "gcp", "digitalocean", "linode", "oci"]);
     assert!(refusals[..3].iter().all(|(_, why)| why.is_none()), "{refusals:?}");
     // A Windows machine: Google Cloud only.
@@ -227,7 +226,6 @@ fn each_cloud_refuses_on_its_own() {
 
 #[test]
 fn a_cloud_refuses_from_the_plan_without_rendering() {
-    use isoloom_terraform::cloud_vm::CLOUDS;
     let spec = isoloom_spec::parse(
         "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    vm: { os: debian@12 }\n",
     )
@@ -240,7 +238,7 @@ fn a_cloud_refuses_from_the_plan_without_rendering() {
             "machine `w`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images)",
         ),
     ] {
-        let (_, cloud) = CLOUDS.iter().find(|(n, _)| *n == name).unwrap();
+        let cloud = Cloud::ALL.into_iter().find(|c| c.id() == name).map(CloudVmModule::from).unwrap();
         assert_eq!(cloud.refusal(&e).as_deref(), Some(why));
         assert!(cloud.render(&e).unwrap_err().to_string().ends_with(why));
     }

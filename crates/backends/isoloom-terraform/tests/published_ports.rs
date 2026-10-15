@@ -4,8 +4,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
 use isoloom_plan::Environment;
+use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_vm::CLOUDS;
+use isoloom_terraform::{Cloud, CloudVmModule};
 
 /// `web` publishes 18080 (UDP 18053 too); `db` and `cache`, beside it, publish nothing.
 const SPEC: &str = "
@@ -53,7 +54,7 @@ fn a_published_port_opens_on_its_machine_only() {
     assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
     let env = Environment::build(&spec, Target::CloudVm, None);
     let mut checked = 0;
-    for (cloud, backend) in CLOUDS {
+    for (cloud, backend) in Cloud::ALL.map(|c| (c.id(), CloudVmModule::from(c))) {
         if backend.refusal(&env).is_some() {
             continue;
         }

@@ -9,7 +9,7 @@ use std::path::Path;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::{Target, Virtiofs, VirtiofsCache};
-use isoloom_terraform::proxmox::ProxmoxBackend;
+use isoloom_terraform::ProxmoxBackend;
 
 fn render(spec: &isoloom_spec::Spec) -> String {
     assert_eq!(isoloom_spec::validate(spec), vec![]);

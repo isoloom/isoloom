@@ -7,11 +7,13 @@
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_vm::AwsBackend;
-use isoloom_terraform::cloud_vm_others::azure::AzureBackend;
-use isoloom_terraform::cloud_vm_others::gcp::GcpBackend;
-use isoloom_terraform::cloud_vm_others::linode::LinodeBackend;
-use isoloom_terraform::cloud_vm_others::oci::OciBackend;
+use isoloom_terraform::{Cloud, CloudVmModule};
+
+const AWS: CloudVmModule = CloudVmModule::new(Cloud::Aws);
+const AZURE: CloudVmModule = CloudVmModule::new(Cloud::Azure);
+const GCP: CloudVmModule = CloudVmModule::new(Cloud::Gcp);
+const LINODE: CloudVmModule = CloudVmModule::new(Cloud::Linode);
+const OCI: CloudVmModule = CloudVmModule::new(Cloud::Oci);
 
 fn env(spec: &str) -> Environment {
     let spec = isoloom_spec::parse(spec).unwrap();
@@ -40,7 +42,7 @@ machines:
 
 #[test]
 fn aws_routes_a_network_through_its_gateway_both_ways() {
-    let tf = module(&AwsBackend, &env(EDGE));
+    let tf = module(&AWS, &env(EDGE));
     // One VPC block holds both networks, so routes to each can be more specific than it.
     assert!(tf.contains("cidr_block = \"10.70.0.0/20\""), "{tf}");
     assert!(!tf.contains("aws_vpc_ipv4_cidr_block_association"));
@@ -64,7 +66,7 @@ fn aws_routes_a_network_through_its_gateway_both_ways() {
 
 #[test]
 fn oracle_cloud_routes_a_network_through_its_gateway() {
-    let tf = module(&OciBackend, &env(EDGE));
+    let tf = module(&OCI, &env(EDGE));
     assert!(tf.contains("data \"oci_core_private_ips\" \"fw_dmz\""), "{tf}");
     assert!(tf.contains("resource \"oci_core_route_table_attachment\" \"dmz\""));
     assert!(tf.contains("network_entity_id = data.oci_core_private_ips.fw_dmz.private_ips[0].id"));
@@ -84,7 +86,7 @@ fn block(tf: &str, kind: &str, name: &str) -> String {
 
 #[test]
 fn azure_routes_a_network_through_its_gateway_both_ways() {
-    let tf = module(&AzureBackend, &env(EDGE));
+    let tf = module(&AZURE, &env(EDGE));
     // fw takes the router's address on dmz (Azure keeps .1 to .3), forwarding on its interfaces.
     assert!(tf.contains("private_ip_address            = \"10.70.10.254\""), "{tf}");
     assert!(block(&tf, "azurerm_network_interface", "fw_dmz").contains("ip_forwarding_enabled = true"));
@@ -100,7 +102,7 @@ fn azure_routes_a_network_through_its_gateway_both_ways() {
 
 #[test]
 fn google_cloud_routes_a_network_through_its_gateway_in_a_vpc_of_its_own() {
-    let tf = module(&GcpBackend, &env(EDGE));
+    let tf = module(&GCP, &env(EDGE));
     // Google keeps .1 and the router's .254: fw takes the highest free address on dmz.
     assert!(tf.contains("network_ip = \"10.70.10.252\""), "{tf}");
     assert!(tf.contains("10.70.10.252 fw"));
@@ -124,7 +126,7 @@ fn google_cloud_peers_the_networks_and_routes_a_routed_one_through_a_peer() {
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }",
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }\n  far: { cidr: 10.80.0.0/24 }",
     );
-    let tf = module(&GcpBackend, &env(&spec));
+    let tf = module(&GCP, &env(&spec));
     let peering = block(&tf, "google_compute_network_peering", "out_far");
     assert!(
         peering.contains("export_custom_routes = true") && peering.contains("import_custom_routes = true"),
@@ -148,19 +150,19 @@ fn google_cloud_refuses_more_interfaces_than_a_vm_takes() {
         "version: 1\nname: wide\nnetworks:\n{nets}machines:\n  x:\n    networks: {{ {} }}\n    vm: {{ os: debian@12, provision: [x.sh] }}\n",
         on.join(", ")
     );
-    let why = GcpBackend.refusal(&env(&spec)).unwrap();
+    let why = GCP.refusal(&env(&spec)).unwrap();
     assert!(why.contains("8 interfaces at most"), "{why}");
     // Three networks: a machine type with four vCPUs.
     let three = env(&EDGE.replace("dmz: 1 }", "dmz: 1, far: 10 }").replace(
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }",
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }\n  far: { cidr: 10.80.0.0/24 }",
     ));
-    assert!(block(&module(&GcpBackend, &three), "google_compute_instance", "fw").contains("e2-standard-4"));
+    assert!(block(&module(&GCP, &three), "google_compute_instance", "fw").contains("e2-standard-4"));
 }
 
 #[test]
 fn linode_refuses_a_gateway_with_its_reason() {
-    let why = LinodeBackend.refusal(&env(EDGE)).unwrap();
+    let why = LINODE.refusal(&env(EDGE)).unwrap();
     assert!(why.contains("one VPC interface") || why.contains("route tables"), "{why}");
 }
 
@@ -179,15 +181,15 @@ machines:
 #[test]
 fn google_cloud_sets_the_mtu_and_the_others_refuse_it() {
     let e = env(MTU);
-    assert!(module(&GcpBackend, &e).contains("mtu                     = 1400"));
-    assert!(AwsBackend.refusal(&e).unwrap().contains("no setting for a network's MTU"));
+    assert!(module(&GCP, &e).contains("mtu                     = 1400"));
+    assert!(AWS.refusal(&e).unwrap().contains("no setting for a network's MTU"));
     // A VPC network each: each network its own MTU, in Google's range.
     let two = env(&MTU.replace("10.81.0.0/24 }", "10.81.0.0/24, mtu: 8896 }"));
-    let tf = module(&GcpBackend, &two);
+    let tf = module(&GCP, &two);
     assert!(tf.contains("= 1400") && tf.contains("= 8896"), "{tf}");
     let big = env(&MTU.replace("10.81.0.0/24 }", "10.81.0.0/24, mtu: 9000 }"));
-    assert!(GcpBackend.refusal(&big).unwrap().contains("1300 to 8896"));
+    assert!(GCP.refusal(&big).unwrap().contains("1300 to 8896"));
     // Without one, Ethernet's 1500, as on every other target.
     let none = env(&MTU.replace(", mtu: 1400", ""));
-    assert!(module(&GcpBackend, &none).contains("= 1500"));
+    assert!(module(&GCP, &none).contains("= 1500"));
 }

@@ -8,10 +8,11 @@ use std::path::Path;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_vm::{CLOUDS, CloudVmBackend, cloud_refusals};
-use isoloom_terraform::cloud_vm_others::digitalocean::DigitalOceanBackend;
-use isoloom_terraform::cloud_vm_others::linode::LinodeBackend;
-use isoloom_terraform::cloud_vm_others::oci::OciBackend;
+use isoloom_terraform::{Cloud, CloudVmBackend, CloudVmModule};
+
+const DIGITALOCEAN: CloudVmModule = CloudVmModule::new(Cloud::DigitalOcean);
+const LINODE: CloudVmModule = CloudVmModule::new(Cloud::Linode);
+const OCI: CloudVmModule = CloudVmModule::new(Cloud::Oci);
 
 fn env(example: &str) -> Environment {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);
@@ -29,32 +30,32 @@ fn module(backend: &dyn Backend, example: &str) -> String {
 
 #[test]
 fn digitalocean_solo_web() {
-    insta::assert_snapshot!(module(&DigitalOceanBackend, "solo-web"));
+    insta::assert_snapshot!(module(&DIGITALOCEAN, "solo-web"));
 }
 
 #[test]
 fn linode_solo_web() {
-    insta::assert_snapshot!(module(&LinodeBackend, "solo-web"));
+    insta::assert_snapshot!(module(&LINODE, "solo-web"));
 }
 
 #[test]
 fn oci_solo_web() {
-    insta::assert_snapshot!(module(&OciBackend, "solo-web"));
+    insta::assert_snapshot!(module(&OCI, "solo-web"));
 }
 
 #[test]
 fn linode_hello_stack() {
-    insta::assert_snapshot!(module(&LinodeBackend, "hello-stack"));
+    insta::assert_snapshot!(module(&LINODE, "hello-stack"));
 }
 
 #[test]
 fn oci_hello_stack() {
-    insta::assert_snapshot!(module(&OciBackend, "hello-stack"));
+    insta::assert_snapshot!(module(&OCI, "hello-stack"));
 }
 
 #[test]
 fn oci_opens_a_published_port_on_its_machine_only() {
-    let m = module(&OciBackend, "hello-stack");
+    let m = module(&OCI, "hello-stack");
     let list = m.split("resource \"oci_core_security_list\"").nth(1).unwrap();
     let list = list.split("resource \"oci_core_subnet\"").next().unwrap();
     assert!(list.contains("SSH from allowed_cidr"), "the list read is the shared one");
@@ -69,7 +70,7 @@ fn oci_opens_a_published_port_on_its_machine_only() {
 fn rendering_twice_gives_the_same_files() {
     for example in ["solo-web", "hello-stack", "existing-hosts", "supplier-portal-api"] {
         let e = env(example);
-        for (name, backend) in CLOUDS {
+        for (name, backend) in Cloud::ALL.map(|c| (c.id(), CloudVmModule::from(c))) {
             assert_eq!(backend.render(&e), backend.render(&e), "{name} {example}");
         }
     }
@@ -77,8 +78,10 @@ fn rendering_twice_gives_the_same_files() {
 
 /// Each single-network cloud's refusal of `example`, in `CLOUDS` order.
 fn refusals(example: &str) -> Vec<(&'static str, Option<String>)> {
-    cloud_refusals(&env(example))
+    CloudVmBackend
+        .refusals(&env(example))
         .into_iter()
+        .map(|(c, why)| (c.id(), why))
         .filter(|(n, _)| ["digitalocean", "linode", "oci"].contains(n))
         .collect()
 }
@@ -119,8 +122,8 @@ fn refusals_keep_their_messages() {
 #[test]
 fn a_refusal_matches_rendering_and_drops_only_that_cloud() {
     let e = env("hello-stack");
-    let why = DigitalOceanBackend.refusal(&e).expect("refused");
-    let err = DigitalOceanBackend.render(&e).expect_err("refused");
+    let why = DIGITALOCEAN.refusal(&e).expect("refused");
+    let err = DIGITALOCEAN.render(&e).expect_err("refused");
     assert!(err.to_string().ends_with(&why), "{err}");
     let files = CloudVmBackend.render(&e).expect("cloud-vm renders");
     let has = |sub: &str| files.iter().any(|f| f.path.ends_with(&format!("cloud-vm/{sub}/main.tf")));
@@ -134,10 +137,10 @@ fn an_os_without_an_image_is_refused() {
     )
     .unwrap();
     let e = Environment::build(&spec, Target::CloudVm, None);
-    let why = LinodeBackend.refusal(&e).expect("refused");
+    let why = LINODE.refusal(&e).expect("refused");
     assert_eq!(why, "machine `w`: no Linode image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04)");
     // Oracle Cloud runs Debian on Ubuntu, but no other OS: it would no longer be the spec's.
-    let why = OciBackend.refusal(&e).expect("refused");
+    let why = OCI.refusal(&e).expect("refused");
     assert_eq!(
         why,
         "machine `w`: no Oracle Cloud image for `rocky-9` yet (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)"

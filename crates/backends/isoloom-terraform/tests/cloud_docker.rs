@@ -11,8 +11,7 @@ use std::path::Path;
 use isoloom_plan::Environment;
 use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_docker::modules;
-use isoloom_terraform::cloud_services::CloudServicesBackend;
+use isoloom_terraform::{CloudServicesBackend, cloud_docker_modules as modules, docker_vm_module};
 
 fn env(example: &str, target: Target) -> Environment {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);
@@ -62,7 +61,7 @@ fn cloud_docker_oci_hello_stack() {
 
 #[test]
 fn docker_vm_proxmox_hello_stack() {
-    let tf = isoloom_terraform::cloud_docker::proxmox::render(&env("hello-stack", Target::DockerVm)).unwrap();
+    let tf = docker_vm_module(&env("hello-stack", Target::DockerVm)).unwrap();
     insta::assert_snapshot!(tf.contents);
 }
 
@@ -80,7 +79,7 @@ fn cloud_services_cloud_bucket() {
 fn rendering_twice_gives_the_same_files() {
     for example in ["hello-stack", "udp-dns", "segmented", "workbench"] {
         let e = env(example, Target::CloudDocker);
-        assert_eq!(modules(&e), modules(&e), "{example}");
+        assert_eq!(modules(&e).map_err(|e| e.to_string()), modules(&e).map_err(|e| e.to_string()), "{example}");
     }
     let e = env("cloud-bucket", Target::CloudServices);
     assert_eq!(CloudServicesBackend.render(&e), CloudServicesBackend.render(&e));

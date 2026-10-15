@@ -162,10 +162,10 @@ pub fn cloud_refusals(spec: &Spec, target: Target) -> Option<(Vec<&'static str>,
     }
     let env = Environment::build(spec, target, None);
     let (mut generated, mut refused) = (Vec::new(), Vec::new());
-    for (cloud, why) in isoloom_terraform::cloud_vm::cloud_refusals(&env) {
+    for (cloud, why) in isoloom_terraform::CloudVmBackend.refusals(&env) {
         match why {
-            None => generated.push(cloud),
-            Some(why) => refused.push((cloud, why)),
+            None => generated.push(cloud.id()),
+            Some(why) => refused.push((cloud.id(), why)),
         }
     }
     Some((generated, refused))

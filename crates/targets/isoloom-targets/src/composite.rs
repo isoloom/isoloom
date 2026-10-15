@@ -12,7 +12,6 @@ use isoloom_plan::{Capabilities, Environment};
 use isoloom_render::GenerateError;
 use isoloom_render::backend::{self, Backend, Files, RenderError};
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_docker;
 use isoloom_vagrant::{docker_vm, hybrid};
 
 /// The `docker` target's files for `env`: what a Docker host runs.
@@ -40,16 +39,16 @@ impl Backend for CloudDockerBackend {
     /// The `docker` target's Compose file (and the files it mounts), then a module per cloud.
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         backend::check(Target::CloudDocker, env, &self.capabilities())?;
-        cloud_docker::check(env)?;
+        let modules = isoloom_terraform::cloud_docker_modules(env)?;
         let mut files = docker_files(env)?;
-        files.extend(cloud_docker::modules(env)?);
+        files.extend(modules);
         Ok(files)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
         isoloom_plan::refusal(&env.requirements, &self.capabilities())
             .map(|r| r.to_string())
-            .or_else(|| cloud_docker::refusal(env))
+            .or_else(|| isoloom_terraform::cloud_docker_refusal(env))
     }
 }
 
@@ -74,13 +73,7 @@ impl Backend for DockerVmBackend {
         backend::check(Target::DockerVm, env, &self.capabilities())?;
         let mut files = docker_files(env)?;
         files.push(docker_vm::vagrantfile(env));
-        let proxmox = cloud_docker::proxmox::render(env).map_err(|e| {
-            RenderError::Generate(GenerateError::Unsupported {
-                target: Target::DockerVm,
-                what: format!("the Proxmox module couldn't be written: {e}"),
-            })
-        })?;
-        files.push(proxmox);
+        files.push(isoloom_terraform::docker_vm_module(env)?);
         Ok(files)
     }
 }
