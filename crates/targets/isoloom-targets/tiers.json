@@ -288,7 +288,7 @@
           "date": "2026-10-15",
           "result": "pass",
           "server": "esxi-lab",
-          "note": "through the Isothrum runner"
+          "note": "up, status, checks, park, resume and down through the Isothrum runner"
         }
       ]
     },
