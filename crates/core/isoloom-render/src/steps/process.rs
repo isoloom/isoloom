@@ -364,7 +364,10 @@ machines:
             linux.contains("After=network-online.target isoloom-apply-secrets.service\nWants=network-online.target\nRequires=isoloom-apply-secrets.service\n"),
             "{linux}"
         );
-        assert!(linux.contains("mkdir -p '/opt/isoloom' && cd '/opt/isoloom'\nexec '/bin/sh' '-c' 'postgres'\n"), "{linux}");
+        assert!(
+            linux.contains("mkdir -p '/opt/isoloom' && cd '/opt/isoloom'\nexec '/bin/sh' '-c' 'postgres'\n"),
+            "{linux}"
+        );
         let windows = super::super::windows(&env, "iis", &Step::Command).expect("renders");
         assert!(
             windows.starts_with("Set-Content -Path 'C:\\isoloom\\command.ps1' -Value '& powershell -NoProfile -ExecutionPolicy Bypass -File ''C:\\ProgramData\\isoloom\\apply-secrets.ps1'';"),
