@@ -8,7 +8,8 @@ Working document for the local rebuild. It is squashed away with the history at 
 |---|---|
 | **Phase 0: safety net** | **Done.** 336 characterization snapshots (`d64255fb`). `verify` with the pinned validator image and 886 baseline failures (`115bb503`). `dev-link`, and `check-all` on macOS, Linux (`jarvis`) and Windows (`karen`) (`ac79b0c6`). |
 | **Phase 1a: subtract** | **Done** (`58ae8e6b`). About 195k lines and 943 files removed: coverage, committed outputs, compatibility, hand-written docs, the CHANGELOG. Tests are green on macOS. |
-| **Phase 1b: runtime out, layout, xtask, ratchet** | Next. |
+| **Phase 1b: runtime out, layout, xtask, ratchet** | Layout (`b6c218c9`) and runtime out (`4ed14e1e`) landed. `xtask`, the dependency test and the ratchet are running. |
+| **Phase 1c: deep organization, zero violations** | Next, after 1b. Phase 1 isn't done until 1c's exit. |
 | **Phase 2: manifest** | `isoloom-manifest` crate and docker `run.json` landed (`defe7a65`). |
 | **Phase 2: syntax** | **Approved by the maintainer** (`plan/phase2/spec.md`, including the flag via `files:` with `input:`). Implementation is next. |
 | **Track C: Proxmox 9.2** | Proven: a real apply, serve, check and destroy. |
@@ -376,7 +377,35 @@ Now safe, because the net is in place.
 - **Keep `isoloom targets` (and its refusal reasons) working without the runtime crate.** The characterization snapshots call it (today it reaches into the runtime for `--host`).
 5. **Apply the engineering standard to Isoloom:** the repository layout (3b), `xtask` replacing `scripts/*.sh`, the dependency-direction test, `rust-toolchain.toml`, and the ratchet **driven to zero**. Every move is proven output-neutral by the snapshots.
 
-**Exit:** green net; a smaller workspace in the target layout; the ratchet in place.
+### Phase 1c: Deep organization and clean code, no shortcut (maintainer, 2026-10-15)
+
+Phase 1 is done only when every Isoloom crate is deeply organized and has **zero** violations. Grouping the crates isn't enough.
+
+1. **The strictest lint set, enforced at deny,** across the workspace:
+   - **Exceptions need reasons:**
+     - `clippy::allow_attributes` and `allow_attributes_without_reason`: every exception is `#[expect(lint, reason = "…")]`, which also fails once it's no longer needed;
+     - `#![deny(warnings)]` in CI terms, through `check-all`.
+   - **Rust and clippy:**
+     - `unreachable_pub`: the public API is minimal, `pub(crate)` by default;
+     - `missing_docs` on every public item, and `clippy::missing_errors_doc` / `missing_panics_doc`;
+     - clippy `pedantic` at deny.
+   - **Clippy restriction rules:**
+     - `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented` and `dbg_macro`;
+     - `print_stdout` and `print_stderr` in libraries;
+     - `indexing_slicing` and `string_slice` in libraries;
+     - `as_conversions`, `wildcard_imports`, `shadow_unrelated`, `let_underscore_must_use`, `clone_on_ref_ptr` and `rc_buffer`;
+     - `str_to_string` and `get_unwrap`.
+   - **Limits:** `too_many_lines` 60, `too_many_arguments` 5, `cognitive_complexity` 15, `fn_params_excessive_bools`, `struct_excessive_bools`, and files ≤ 400 LOC.
+2. **Organization inside every crate,** reviewed against one template:
+   - **Module layout:** `lib.rs` holds only the module tree and the re-exported public API. One concept per module, and folders by domain concept, never by kind (no `utils.rs`, `helpers.rs` or `misc.rs`).
+   - **Errors:** one error enum per crate in `error.rs`, with the CLI mapping codes to exit codes in one place.
+   - **Tests:** unit tests next to the code (`#[cfg(test)] mod tests` in the same file, or `foo/tests.rs`), integration tests in `tests/`, fixtures in `tests/fixtures/`, snapshots beside their test, and shared test helpers in one `testing` module (`#[cfg(test)]` or a dev-only crate).
+   - **Names:** the 3b vocabulary everywhere; no stutter (`isoloom_spec::spec::SpecSpec`); the same word for the same concept in every crate.
+   - **Dependencies:** each crate lists only what it uses (machete); the dependency-direction test passes.
+3. **Ratchet every count to zero, crate by crate,** with real refactors only. This runs in parallel by crate group: backends, then targets, tools and cli, then core, once the spec front end has landed in core.
+4. **A principles review per crate,** using the 3b table as a checklist: SRP, DRY, KISS/YAGNI, CQS, Demeter, boundaries, F.I.R.S.T. tests and names. The review notes every finding with its fix, and the phase closes when every finding is fixed.
+
+**Exit:** green net (snapshots byte-identical, `verify` with no new failures); `quality-baseline.json` at zero for every crate; every `#[expect]` carries a reason; each crate's review checklist closed; all of it on three hosts (`check-all`).
 
 ### Phase 2: The walking skeleton (M–L)
 
