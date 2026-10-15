@@ -15,7 +15,7 @@ mod linux;
 
 use std::process::{Command, ExitCode};
 
-use crate::{Res, repo};
+use crate::{Res, process, repo};
 
 /// The arguments of `cargo xtask host-setup`.
 #[derive(clap::Args)]
@@ -40,7 +40,9 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
 fn windows(check: bool) -> Res<ExitCode> {
     let script = repo::root().join("xtask/host-setup/windows.ps1");
     let mut cmd = Command::new("powershell");
-    cmd.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]).arg(script);
+    process::without_run_env(&mut cmd)
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(script);
     if check {
         cmd.arg("-CheckOnly");
     }

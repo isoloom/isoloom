@@ -4,19 +4,23 @@
 //! Hosts (default: mac):
 //! - `mac`: this machine, natively, every gate (the full profile).
 //! - `linux`: a Linux host over SSH: `ISOLOOM_LINUX_HOST` (10.0.0.10), `ISOLOOM_LINUX_USER`
-//!   (florianamette), sources and build folders under `ISOLOOM_LINUX_DIR` (~/isoloom-check-all).
+//!   (florianamette), `ISOLOOM_LINUX_PORT`, sources and build folders under `ISOLOOM_LINUX_DIR`
+//!   (~/isoloom-check-all), `ISOLOOM_LINUX_JOBS` build jobs.
 //! - `windows`: a Windows host over SSH, MSVC toolchain: `ISOLOOM_WIN_HOST` (10.0.0.40),
-//!   `ISOLOOM_WIN_USER` (florianamette), `ISOLOOM_WIN_DIR` (`C:/isoloom-check-all`);
-//!   `cargo xtask host-setup` prepares it.
+//!   `ISOLOOM_WIN_USER` (florianamette), `ISOLOOM_WIN_PORT`, `ISOLOOM_WIN_DIR`
+//!   (`C:/isoloom-check-all`), `ISOLOOM_WIN_JOBS`; `cargo xtask host-setup` prepares it.
 //! - `linux-docker`: a pinned Rust container on this machine (`xtask/check-all/linux.Dockerfile`),
 //!   with the repositories mounted at their own paths.
+//!
+//! The SSH hosts' settings come from the environment, else from the hosts file
+//! (`~/.isoloom-lab/hosts.env`, or the one `ISOLOOM_HOSTS_ENV` names; see [`settings`]).
 //!
 //! The other hosts run the platform gates (the tests, and the launcher's `pnpm check`) on a copy
 //! of the working trees as git sees them: tracked and new files, without the ignored ones. A
 //! consumer linked by `cargo xtask dev-link` stays linked in the copy. Each host runs its part
 //! as `cargo xtask check-all --leg <host>`, which prints each gate as `@@begin` and `@@result`
 //! lines ([`protocol`]); the remote hosts run in the background while this machine runs its own.
-//! `CARGO_BUILD_JOBS` defaults to 4.
+//! `CARGO_BUILD_JOBS` defaults to 4, on each host unless its own `_JOBS` setting says otherwise.
 //!
 //! Repositories: this Isoloom tree, and the Isothrum and launcher checkouts next to the main
 //! Isoloom checkout (`ISOLOOM_ISOTHRUM_DIR`, `ISOLOOM_LAUNCHER_DIR`). The launcher needs Node 24:
@@ -35,6 +39,7 @@ mod hosts;
 mod pack;
 mod protocol;
 mod remote;
+mod settings;
 mod summary;
 
 use std::path::{Path, PathBuf};
@@ -194,6 +199,8 @@ pub(crate) struct Run {
     pub logs: PathBuf,
     /// Whether this Mac also runs the slow gates.
     pub deep: bool,
+    /// The hosts reached over SSH.
+    pub ssh: settings::Hosts,
 }
 
 /// Runs the gates (or, with `--leg`, this host's part; with `--clean`, the clean-up).
@@ -215,8 +222,9 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
         gates::leg(host, a.profile, &dirs, a.target_root.as_deref()).run(&a.repos, &mut collect::Printer);
         return Ok(ExitCode::SUCCESS);
     }
+    let ssh = settings::load()?;
     if a.clean {
-        hosts::clean(&a.hosts, &dirs);
+        hosts::clean(&a.hosts, &dirs, &ssh);
         return Ok(ExitCode::SUCCESS);
     }
     let logs = a.logs.clone().unwrap_or_else(default_logs);
@@ -226,6 +234,7 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
         dirs,
         logs,
         deep: a.deep,
+        ssh,
     };
     let names = |ids: Vec<&str>| ids.join(",");
     println!(
@@ -235,6 +244,12 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     );
     for r in [Repo::Isoloom, Repo::Isothrum, Repo::Launcher] {
         println!("  {:<8} {}", r.id(), run.dirs.of(r).display());
+    }
+    for (host, remote) in [(Host::Linux, &run.ssh.linux), (Host::Windows, &run.ssh.windows)] {
+        if a.hosts.contains(&host) {
+            let port = remote.port.map(|p| format!(":{p}")).unwrap_or_default();
+            println!("  {:<8} {}{port}, {} build jobs", host.id(), remote.target(), remote.jobs);
+        }
     }
     let runs = all_hosts(&a.hosts, &run);
     print!("{}", summary::table(&runs, &run.logs));

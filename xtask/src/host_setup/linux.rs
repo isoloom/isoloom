@@ -29,9 +29,12 @@ struct Ctx {
 }
 
 impl Ctx {
+    /// `program` on the tools' search path, without the variables `cargo run` set for this
+    /// task (cargo-machete reads `CARGO_PKG_NAME` as running in a build script, and takes
+    /// `--version` for a folder).
     fn cmd(&self, program: &str) -> Command {
         let mut c = Command::new(program);
-        c.env("PATH", &self.path);
+        process::without_run_env(&mut c).env("PATH", &self.path);
         c
     }
 

@@ -1659,6 +1659,7 @@ name = "xtask"
 version = "0.10.1"
 dependencies = [
  "clap",
+ "proptest",
  "serde_json",
  "sha2",
  "tar",

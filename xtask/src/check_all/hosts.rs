@@ -7,7 +7,7 @@ use std::process::Command;
 use sha2::{Digest, Sha256};
 
 use super::collect::{Collector, Sink};
-use super::{Dirs, Host, Profile, Run, Status, gates, remote};
+use super::{Dirs, Host, Profile, Run, Status, gates, remote, settings};
 use crate::{dev_link, process, repo};
 
 /// The Docker volume holding the container's build folders and caches.
@@ -36,8 +36,8 @@ pub(super) fn repos_arg(run: &Run) -> String {
     run.repos.iter().map(|r| r.id()).collect::<Vec<_>>().join(",")
 }
 
-/// `CARGO_BUILD_JOBS` for the other hosts: this one's, else 4.
-pub(super) fn jobs() -> String {
+/// `CARGO_BUILD_JOBS` for the container: this machine's, else 4.
+fn jobs() -> String {
     std::env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| "4".into())
 }
 
@@ -135,11 +135,11 @@ fn linux_docker(run: &Run, out: &mut Collector) {
 }
 
 /// Removes the hosts' build folders and copies.
-pub(super) fn clean(hosts: &[Host], dirs: &Dirs) {
+pub(super) fn clean(hosts: &[Host], dirs: &Dirs, ssh: &settings::Hosts) {
     for host in hosts {
         let done = match host {
-            Host::Linux => remote::clean_linux(),
-            Host::Windows => remote::clean_windows(),
+            Host::Linux => remote::clean_linux(&ssh.linux),
+            Host::Windows => remote::clean_windows(&ssh.windows),
             Host::LinuxDocker => clean_docker(),
             Host::Mac => Ok(format!("the repositories' own build folders stay (cargo clean in {})", dirs.isoloom.display())),
         };
