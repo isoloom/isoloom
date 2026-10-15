@@ -568,6 +568,15 @@ Each step means: lowered generation passes the snapshots and `verify`, then a ma
 
 ### Phase 4: The catalogue and the CM model (L)
 
+**Design approved by the maintainer (2026-10-15),** with all 13 recommendations: `plan/phase4/design.md`, the examples, and the nginx example entry.
+- **The model:** eight new step kinds (`repository`, `file`, `template`, `user`, `group`, `service`, `command` with a required guard, `firewall` allow-only) join the approved five. Ordered and guarded; downloads pinned by SHA-256 or digest.
+- **Rendering:** one POSIX shell library for Dockerfile, shell and cloud-init; Ansible with official modules only, from the Linux controller; a PowerShell library for Windows. The VM set-up splits after the secrets step (the IaC tool before, the CM tool after). Defaults keep today's output; `--configure` plus a per-target override chooses the CM tool.
+- **Services in containers:** one daemon runs as the container's foreground process; several run under the engine's init (tini, Compose `init: true`) with a generated runner; refusal only when a daemon has no known foreground form. No s6-overlay in 1.0.
+- **The catalogue:** a hand-written `entry.yml`; a `lock.yml` (digests, exact package versions) written only by `cargo xtask catalogue refresh`. The official image is used only when its OS matches the machine's; otherwise the same recipe builds from the OS image. GPL Galaxy content is referenced, never embedded, and no vendored Galaxy content in 1.0. The folder is `files/`, not `roles/`. Version prefixes (`postgres@16`) resolve to the newest 16.x. Old versions come from the OS that shipped them (MySQL 5.7 on ubuntu@18.04); vulhub-style images stay `app.image`.
+- **Entries, wave 1:** openssh, nginx, apache, php-fpm, mysql/mariadb, postgres, **mongodb**, dvwa, juice-shop. Then wordpress, redis **and valkey** (Redis 7.4+ isn't open source), rabbitmq, iis, ad-ds.
+- **Not in 1.0:** a `start` phase on `app`; several catalogue services on one container stay refused.
+- **Parity:** proven on Docker plus Vagrant/VirtualBox through the Isothrum CLI first, then libvirt on jarvis.
+
 1. **The configuration resource model** (repository, package, file, template, user, group, service, command, firewall rule). `app:` build recipes are written in it, so the container build and the VM install come from one source.
 2. **CM backends:** Ansible, cloud-init, shell/PowerShell and Dockerfile, with the pairing rules.
 3. **The catalogue engine,** salvaging from `v1/catalogue-engine`. GPL Ansible collections are referenced, never embedded.
