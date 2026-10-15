@@ -198,3 +198,13 @@ fn headings_get_github_anchors() {
     assert_eq!(slug("Top level"), "top-level");
     assert_eq!(slug("`ip_forward` and `rate-limit`"), "ip_forward-and-rate-limit");
 }
+
+#[test]
+fn a_closed_sets_type_is_its_first_values() {
+    let kind = |set: Value| fields(&json!({ "properties": { "x": set } }))[0].kind.clone();
+    assert_eq!(kind(json!({ "const": true })), "boolean");
+    assert_eq!(kind(json!({ "enum": [1, 2] })), "integer");
+    assert_eq!(kind(json!({ "enum": [0.5] })), "number");
+    assert_eq!(kind(json!({ "anyOf": [{ "const": "a" }, { "const": 1 }] })), "string");
+    assert_eq!(kind(json!({ "const": null })), "value");
+}
