@@ -97,6 +97,8 @@ pub enum CheckKind {
     Script,
     /// A command inside a machine.
     Exec,
+    /// An Ansible playbook from the project, run from the controller.
+    Playbook,
 }
 
 /// One check a runner reports.

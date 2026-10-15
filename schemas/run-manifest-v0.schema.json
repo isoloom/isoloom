@@ -2473,6 +2473,11 @@
           "type": "string",
           "const": "exec",
           "description": "A command inside a machine."
+        },
+        {
+          "type": "string",
+          "const": "playbook",
+          "description": "An Ansible playbook from the project, run from the controller."
         }
       ],
       "description": "What a check probes."

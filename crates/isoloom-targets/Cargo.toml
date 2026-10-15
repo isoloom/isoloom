@@ -17,6 +17,7 @@ isoloom-kubernetes.workspace = true
 isoloom-terraform.workspace = true
 isoloom-vagrant.workspace = true
 isoloom-external.workspace = true
+isoloom-manifest.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
 
@@ -24,6 +25,7 @@ indexmap.workspace = true
 isoloom-import.workspace = true
 isoloom-runtime.workspace = true
 serde_yaml_ng.workspace = true
+jsonschema.workspace = true
 
 # Unused today; kept while this crate moves onto the plan IR (Wave 1, unit 6).
 [package.metadata.cargo-machete]

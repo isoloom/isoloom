@@ -17,7 +17,7 @@ use crate::validate::Cidr;
 
 mod message;
 
-pub use message::{fill, lookup, on_target, render_message, render_message_at, render_message_on, with_published};
+pub use message::{fill, lookup, manifest_message, on_target, render_message, render_message_at, render_message_on, with_published};
 
 /// The format of the snapshot; bumped when a field changes meaning or goes away.
 pub const RESOLVED_VERSION: u32 = 2;

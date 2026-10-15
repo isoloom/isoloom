@@ -1,0 +1,155 @@
+//! The operations of a Compose run, when it counts as ready, and how a start that tripped over a
+//! previous run's leftovers is retried.
+
+use std::num::NonZeroU32;
+
+use isoloom_manifest::{Action, Argv, Condition, Failure, HostArgv, Lifecycle, NonEmpty, Park, Recovery, Retries, Step, StepId, Template, When};
+use isoloom_plan::{Environment, Lifetime, MachineShape};
+use isoloom_render::backend::RenderError;
+
+use super::machines::Member;
+use super::{bug, compose, in_project, program};
+use crate::docker::StartPlan;
+
+/// How long `up --wait` waits for the services to answer, once they started.
+const WAIT_TIMEOUT: &str = "600";
+
+/// A step running `argv` for at most `timeout_s`.
+fn run(id: &str, argv: HostArgv, timeout_s: u32) -> Result<Step, RenderError> {
+    let mut s = Step::argv(StepId::parse(id).map_err(bug)?, argv);
+    s.timeout_s = NonZeroU32::new(timeout_s);
+    Ok(s)
+}
+
+/// A step running `action`.
+fn act(id: &str, action: Action) -> Result<Step, RenderError> {
+    Ok(Step::action(StepId::parse(id).map_err(bug)?, action))
+}
+
+/// A clean-up: it runs whatever happened before it, and its failure is only logged.
+fn cleanup(mut s: Step) -> Step {
+    s.when = When::Always;
+    s.failure = Failure::Tolerate;
+    s
+}
+
+fn noted(mut s: Step, note: &str) -> Step {
+    s.note = Some(note.to_string());
+    s
+}
+
+/// The id of the step that runs a leaf `init:` job.
+pub(super) fn job_step(job: &str) -> String {
+    format!("job-{job}")
+}
+
+/// The machine a job belongs to.
+pub(super) fn owner<'a>(members: &'a [Member], job: &'a str) -> &'a str {
+    members.iter().find(|m| m.name == job).and_then(|m| m.of.as_deref()).unwrap_or(job)
+}
+
+/// Up, down, park, resume and status, as Docker Compose commands and the driver's actions.
+pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Lifecycle, RenderError> {
+    let stop = || run("stop", compose(&["stop"])?, 300);
+    Ok(Lifecycle {
+        up: NonEmpty::new(up(plan, members)?, "lifecycle.up").map_err(bug)?,
+        down: NonEmpty::new(down(env)?, "lifecycle.down").map_err(bug)?,
+        park: Some(Park {
+            pause: Some(vec![stop()?]),
+            shutdown: Some(vec![stop()?]),
+        }),
+        resume: vec![run("start", compose(&["start"])?, 600)?],
+        provision: None,
+        status: run("ps", compose(&["ps", "--all", "--format", "json"])?, 25)?,
+    })
+}
+
+/// Pin the host ports, check they are free, clear stale networks, start everything but the leaf
+/// jobs and wait for it, then run each leaf job attached.
+fn up(plan: &StartPlan, members: &[Member]) -> Result<Vec<Step>, RenderError> {
+    let mut args = vec!["up", "--detach", "--build", "--pull", "missing", "--wait", "--wait-timeout", WAIT_TIMEOUT];
+    args.extend(plan.wait.iter().map(String::as_str));
+    let mut steps = vec![
+        noted(act("pin-ports", Action::ComposePinPorts)?, "Picking the lab's host ports…"),
+        act("ports-free", Action::ComposeCheckPortsFree)?,
+        tolerated(act("stale-networks", Action::ComposeRemoveStaleNetworks)?),
+        noted(run("up", compose(&args)?, 1800)?, "Starting the lab's containers…"),
+    ];
+    for job in &plan.jobs {
+        let args = ["up", "--no-deps", "--exit-code-from", job, job];
+        let note = format!("Running {}'s set-up script…", owner(members, job));
+        steps.push(noted(run(&job_step(job), compose(&args)?, 600)?, &note));
+    }
+    Ok(steps)
+}
+
+fn tolerated(mut s: Step) -> Step {
+    s.failure = Failure::Tolerate;
+    s
+}
+
+/// Remove everything, the check runners included; the volumes the spec keeps survive (`down`
+/// without `--volumes`, then the others by name).
+fn down(env: &Environment) -> Result<Vec<Step>, RenderError> {
+    let containers = || env.machines.values().filter(|m| m.shape == MachineShape::Container);
+    let volumes = containers()
+        .flat_map(|m| &m.volumes)
+        .filter(|v| matches!(v.lifetime, Lifetime::Environment))
+        .map(|v| v.key.as_str());
+    let disks = containers().flat_map(|m| &m.disks).filter(|d| d.mount.is_some()).map(|d| d.key.as_str());
+    let removable: Vec<&str> = volumes.chain(disks).collect();
+    let kept = containers().flat_map(|m| &m.volumes).any(|v| matches!(v.lifetime, Lifetime::Persistent));
+    let mut args = vec!["--profile", "check", "down"];
+    if !kept {
+        args.push("--volumes");
+    }
+    args.push("--remove-orphans");
+    let mut down = run("down", compose(&args)?, 300)?;
+    down.when = When::Always;
+    let mut steps = vec![down];
+    if kept && !removable.is_empty() {
+        let mut rm: Vec<Template> = ["volume", "rm", "--force"].map(Template::text).into();
+        rm.extend(dedup(removable).into_iter().map(in_project));
+        steps.push(cleanup(run("volumes", HostArgv::Every(Argv::new(program("docker")?, rm)), 120)?));
+    }
+    steps.push(cleanup(act("containers", Action::ComposeRemoveContainers)?));
+    steps.push(cleanup(act("networks", Action::ComposeRemoveNetworks)?));
+    Ok(steps)
+}
+
+fn dedup(mut keys: Vec<&str>) -> Vec<&str> {
+    let mut seen = std::collections::BTreeSet::new();
+    keys.retain(|k| seen.insert(*k));
+    keys
+}
+
+/// `up` succeeded (every long-running service answers), then each leaf job exited 0.
+pub(super) fn ready(plan: &StartPlan, members: &[Member]) -> Result<Vec<Condition>, RenderError> {
+    let up = Condition::StepOk {
+        step: StepId::parse("up").map_err(bug)?,
+        means: Some("every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)".into()),
+    };
+    let jobs = plan.jobs.iter().map(|job| {
+        Ok(Condition::StepOk {
+            step: StepId::parse(&job_step(job)).map_err(bug)?,
+            means: Some(format!("{}'s set-up script ({job}) exited 0", owner(members, job))),
+        })
+    });
+    std::iter::once(Ok(up)).chain(jobs).collect()
+}
+
+/// A start that failed on a previous run's containers or networks (a name taken, a network left
+/// with another label) clears them and tries once more.
+pub(super) fn recovery() -> Result<Recovery, RenderError> {
+    Ok(Recovery {
+        stale_markers: ["is already in use by container", "network with name", "has incorrect label"]
+            .map(String::from)
+            .into(),
+        steps: vec![
+            cleanup(act("containers", Action::ComposeRemoveContainers)?),
+            cleanup(act("networks", Action::ComposeRemoveNetworks)?),
+        ],
+        retries: Retries::new(1).map_err(bug)?,
+        apply_retries: None,
+    })
+}

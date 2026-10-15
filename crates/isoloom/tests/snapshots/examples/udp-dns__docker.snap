@@ -8,6 +8,7 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/compose.yml
 ✓ .isoloom/docker/checks/client.sh
 ✓ .isoloom/docker/checks/dns.sh
+✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json
 
 ## .isoloom/docker/checks/client.sh
@@ -415,6 +416,525 @@ volumes:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
+
+## .isoloom/docker/run.json
+{
+  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "manifest_version": 0,
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "udp-dns",
+    "instance": null,
+    "message": "The DNS server answers at 10.66.10.53:53 (UDP and TCP), and on\n127.0.0.1:${published.dns.53.udp}/udp from this machine:\ndig @127.0.0.1 -p ${published.dns.53.udp} www.lab.test\n"
+  },
+  "target": "docker",
+  "driver": "compose",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "docker",
+      "probe": [
+        "docker",
+        "info",
+        "--format",
+        "{{.ServerVersion}}"
+      ]
+    },
+    {
+      "name": "docker-compose",
+      "probe": [
+        "docker",
+        "compose",
+        "version",
+        "--short"
+      ],
+      "min_version": "2.17.0"
+    }
+  ],
+  "identity": {
+    "compose": {
+      "project": "${run.name}",
+      "files": [
+        "compose.yml",
+        "${run.state_dir}/ports.yml"
+      ],
+      "pinned_ports_file": "${run.state_dir}/ports.yml"
+    }
+  },
+  "params": [
+    {
+      "name": "ISOLOOM_PUBLISH_ADDRESS",
+      "description": "The host address published ports listen on.",
+      "default": "127.0.0.1",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_PUBLISH_ADDRESS",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_PUBLISH_FIXED",
+      "description": "Set: each published port takes its `publish:` number instead of an ephemeral one.",
+      "values": [
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_PUBLISH_FIXED",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_DERIVED",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
+      "default": "1",
+      "values": [
+        "0",
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-client",
+            "check-dns"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [],
+  "networks": [
+    {
+      "name": "servers",
+      "cidr": "10.66.10.0/24",
+      "internet": false,
+      "native": "${run.name}_servers"
+    },
+    {
+      "name": "users",
+      "cidr": "10.66.20.0/24",
+      "internet": false,
+      "native": "${run.name}_users"
+    }
+  ],
+  "machines": [
+    {
+      "name": "isoloom-router",
+      "role": "infra",
+      "addresses": {
+        "servers": "10.66.10.254",
+        "users": "10.66.20.254"
+      },
+      "native": {
+        "service": "isoloom-router"
+      }
+    },
+    {
+      "name": "dns",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "servers": "10.66.10.53"
+      },
+      "native": {
+        "service": "dns"
+      },
+      "ports": [
+        {
+          "name": "dns",
+          "port": 53,
+          "protocol": "udp",
+          "http": false,
+          "publish": {
+            "mode": "ephemeral",
+            "preferred": 10053,
+            "address": "${params.ISOLOOM_PUBLISH_ADDRESS}"
+          }
+        },
+        {
+          "name": "dns",
+          "port": 53,
+          "protocol": "tcp",
+          "http": false
+        }
+      ]
+    },
+    {
+      "name": "dns-routes",
+      "role": "infra",
+      "of": "dns",
+      "addresses": {},
+      "native": {
+        "service": "dns-routes"
+      }
+    },
+    {
+      "name": "client",
+      "role": "access",
+      "arch": "amd64",
+      "addresses": {
+        "users": "10.66.20.10"
+      },
+      "native": {
+        "service": "client"
+      }
+    },
+    {
+      "name": "client-routes",
+      "role": "infra",
+      "of": "client",
+      "addresses": {},
+      "native": {
+        "service": "client-routes"
+      }
+    },
+    {
+      "name": "isoloom-check",
+      "role": "check",
+      "of": "client",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check"
+      }
+    },
+    {
+      "name": "isoloom-check-dns",
+      "role": "check",
+      "of": "dns",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check-dns"
+      }
+    },
+    {
+      "name": "isoloom-probe-amd64",
+      "role": "infra",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-probe-amd64"
+      }
+    }
+  ],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "pin-ports",
+        "note": "Picking the lab's host ports…",
+        "action": "compose.pin_ports"
+      },
+      {
+        "id": "ports-free",
+        "action": "compose.check_ports_free"
+      },
+      {
+        "id": "stale-networks",
+        "action": "compose.remove_stale_networks",
+        "failure": "tolerate"
+      },
+      {
+        "id": "up",
+        "note": "Starting the lab's containers…",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "up",
+          "--detach",
+          "--build",
+          "--pull",
+          "missing",
+          "--wait",
+          "--wait-timeout",
+          "600"
+        ],
+        "timeout_s": 1800
+      }
+    ],
+    "down": [
+      {
+        "id": "down",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "--profile",
+          "check",
+          "down",
+          "--volumes",
+          "--remove-orphans"
+        ],
+        "timeout_s": 300,
+        "when": "always"
+      },
+      {
+        "id": "containers",
+        "action": "compose.remove_containers",
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "networks",
+        "action": "compose.remove_networks",
+        "when": "always",
+        "failure": "tolerate"
+      }
+    ],
+    "park": {
+      "pause": [
+        {
+          "id": "stop",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "stop"
+          ],
+          "timeout_s": 300
+        }
+      ],
+      "shutdown": [
+        {
+          "id": "stop",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "stop"
+          ],
+          "timeout_s": 300
+        }
+      ]
+    },
+    "resume": [
+      {
+        "id": "start",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "start"
+        ],
+        "timeout_s": 600
+      }
+    ],
+    "status": {
+      "id": "ps",
+      "argv": [
+        "docker",
+        "compose",
+        "--project-name",
+        "${run.name}",
+        "--file",
+        "compose.yml",
+        "--file",
+        "${run.state_dir}/ports.yml",
+        "ps",
+        "--all",
+        "--format",
+        "json"
+      ],
+      "timeout_s": 25
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "up",
+      "means": "every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "dns_dns_udp",
+      "description": "dns's dns (port 53/udp).",
+      "role": "info",
+      "sensitive": false,
+      "format": "127.0.0.1:${value}",
+      "from": {
+        "kind": "published_port",
+        "machine": "dns",
+        "port": 53,
+        "protocol": "udp"
+      }
+    }
+  ],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [
+      {
+        "id": "isoloom-check",
+        "from": "from client",
+        "checks": [
+          {
+            "name": "checks/resolve.sh",
+            "kind": "script",
+            "wait_s": 0,
+            "derived": false
+          },
+          {
+            "name": "dns:53 from client",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          },
+          {
+            "name": "no internet from client",
+            "kind": "http",
+            "wait_s": 0,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-client",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "--profile",
+            "check",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "ISOLOOM_DERIVED",
+            "isoloom-check"
+          ],
+          "timeout_s": 135
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-client",
+            "action": "compose.remove_containers",
+            "with": {
+              "one_off": "true",
+              "service": "isoloom-check"
+            },
+            "failure": "tolerate"
+          }
+        ]
+      },
+      {
+        "id": "isoloom-check-dns",
+        "from": "from dns",
+        "checks": [
+          {
+            "name": "no internet from dns",
+            "kind": "http",
+            "wait_s": 0,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-dns",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "--profile",
+            "check",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "ISOLOOM_DERIVED",
+            "isoloom-check-dns"
+          ],
+          "timeout_s": 75
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-dns",
+            "action": "compose.remove_containers",
+            "with": {
+              "one_off": "true",
+              "service": "isoloom-check-dns"
+            },
+            "failure": "tolerate"
+          }
+        ]
+      }
+    ],
+    "teardown": []
+  },
+  "recovery": {
+    "stale_markers": [
+      "is already in use by container",
+      "network with name",
+      "has incorrect label"
+    ],
+    "steps": [
+      {
+        "id": "containers",
+        "action": "compose.remove_containers",
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "networks",
+        "action": "compose.remove_networks",
+        "when": "always",
+        "failure": "tolerate"
+      }
+    ],
+    "retries": 1
+  }
+}
 
 ## .isoloom/resolved.json
 {

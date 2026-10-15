@@ -31,8 +31,10 @@
 
 use std::fmt::Write as _;
 
+use isoloom_plan::checks::Position;
 use serde_yaml_ng::{Mapping, Value};
 
+use crate::file::ComposeFile;
 use crate::model::{Arch, Machine, Spec};
 
 pub(crate) const DIR: &str = "docker";
@@ -113,6 +115,14 @@ pub struct StartPlan {
     pub jobs: Vec<String>,
 }
 
+/// A service as the start plan reads it: its name, what it waits for, whether it runs once
+/// (`restart: "no"`). Services in a profile aren't started, so they aren't read.
+struct Started {
+    name: String,
+    deps: Vec<String>,
+    one_shot: bool,
+}
+
 /// The [`StartPlan`] of a Compose file: one-shots (`restart: "no"`) outside profiles that no
 /// other started service depends on are jobs; when there are none, `wait` is empty (start all).
 pub fn start_plan(compose_yaml: &str) -> Result<StartPlan, String> {
@@ -120,11 +130,6 @@ pub fn start_plan(compose_yaml: &str) -> Result<StartPlan, String> {
     let Some(Value::Mapping(services)) = doc.get("services") else {
         return Ok(StartPlan::default());
     };
-    let started: Vec<(&str, &Mapping)> = services
-        .iter()
-        .filter_map(|(k, v)| Some((k.as_str()?, v.as_mapping()?)))
-        .filter(|(_, v)| v.get("profiles").is_none())
-        .collect();
     let deps_of = |v: &Mapping| -> Vec<String> {
         match v.get("depends_on") {
             Some(Value::Mapping(d)) => d.keys().filter_map(|k| k.as_str().map(String::from)).collect(),
@@ -132,30 +137,60 @@ pub fn start_plan(compose_yaml: &str) -> Result<StartPlan, String> {
             _ => Vec::new(),
         }
     };
-    let one_shot = |v: &Mapping| v.get("restart").and_then(Value::as_str) == Some("no");
+    let started: Vec<Started> = services
+        .iter()
+        .filter_map(|(k, v)| Some((k.as_str()?, v.as_mapping()?)))
+        .filter(|(_, v)| v.get("profiles").is_none())
+        .map(|(name, v)| Started {
+            name: name.to_string(),
+            deps: deps_of(v),
+            one_shot: v.get("restart").and_then(Value::as_str) == Some("no"),
+        })
+        .collect();
+    Ok(plan_of(&started))
+}
+
+impl StartPlan {
+    /// The plan of a typed Compose file: what [`start_plan`] reads from its text.
+    pub fn of(file: &ComposeFile) -> StartPlan {
+        let started: Vec<Started> = file
+            .services
+            .iter()
+            .filter(|(_, s)| s.profiles.is_empty())
+            .map(|(name, s)| Started {
+                name: name.clone(),
+                deps: s.depends_on.keys().cloned().collect(),
+                one_shot: s.restart.as_deref() == Some("no"),
+            })
+            .collect();
+        plan_of(&started)
+    }
+}
+
+fn plan_of(started: &[Started]) -> StartPlan {
     // What the long-running services need, through chains of one-shots: `--wait` accepts those
     // exiting. The other one-shots are the jobs.
-    let mut needed: Vec<String> = Vec::new();
-    let mut todo: Vec<String> = started.iter().filter(|(_, v)| !one_shot(v)).flat_map(|(_, v)| deps_of(v)).collect();
+    let mut needed: Vec<&str> = Vec::new();
+    let mut todo: Vec<&str> = started.iter().filter(|s| !s.one_shot).flat_map(|s| s.deps.iter().map(String::as_str)).collect();
     while let Some(n) = todo.pop() {
         if needed.contains(&n) {
             continue;
         }
-        if let Some((_, v)) = started.iter().find(|(k, _)| *k == n) {
-            todo.extend(deps_of(v));
+        if let Some(s) = started.iter().find(|s| s.name == n) {
+            todo.extend(s.deps.iter().map(String::as_str));
         }
         needed.push(n);
     }
     let jobs: Vec<String> = started
         .iter()
-        .filter(|(n, v)| one_shot(v) && !needed.iter().any(|x| x == n))
-        .map(|(n, _)| n.to_string())
+        .filter(|s| s.one_shot && !needed.contains(&s.name.as_str()))
+        .map(|s| s.name.clone())
         .collect();
     if jobs.is_empty() {
-        return Ok(StartPlan::default());
+        return StartPlan::default();
     }
-    let wait = started.iter().map(|(n, _)| n.to_string()).filter(|n| !jobs.contains(n)).collect();
-    Ok(StartPlan { wait, jobs })
+    let wait = started.iter().map(|s| s.name.clone()).filter(|n| !jobs.contains(n)).collect();
+    StartPlan { wait, jobs }
 }
 
 /// The shell command that starts a Compose project with `compose` (e.g. `docker compose -f x`):
@@ -181,6 +216,21 @@ pub fn start_commands(compose: &str, jobs: &[String], wait_timeout: Option<u32>)
 /// machine (`docker compose exec -T <machine> sh -s < exec-<machine>.sh`).
 pub fn exec_runner(machine: &str) -> String {
     format!("exec-{machine}.sh")
+}
+
+/// The check runner service of a position: `isoloom-check` where a user stands (`default`),
+/// `isoloom-check-<position>` for the others.
+pub fn check_runner_service(pos: &Position, default: &Position) -> String {
+    if pos == default {
+        "isoloom-check".to_string()
+    } else {
+        format!("isoloom-check-{}", pos.id())
+    }
+}
+
+/// The service of a tool (`tools:`).
+pub fn tool_service(tool: &str) -> String {
+    format!("isoloom-tool-{tool}")
 }
 
 /// Init job service names for a machine.

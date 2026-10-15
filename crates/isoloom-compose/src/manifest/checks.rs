@@ -1,0 +1,125 @@
+//! The check runners of a Compose run: one `compose run` per position, plus a machine's own
+//! `exec` checks piped into it; each with the checks it reports and a time limit that covers
+//! their waits.
+
+use std::collections::BTreeMap;
+use std::num::NonZeroU32;
+
+use isoloom_manifest::{Action, Check, CheckKind, CheckRunner, Failure, Name, RelPath, SnakeName, Step, StepId, Template};
+use isoloom_plan::Environment;
+use isoloom_plan::checks::{self, Position, Probe, Resolved};
+use isoloom_render::backend::RenderError;
+
+use super::{bug, compose};
+use crate::docker::{STAND_IN, check_runner_service, exec_runner};
+use crate::file::ComposeFile;
+
+/// What a check runner's step may add to its checks' waits: the probes' own time (curl and nc
+/// cap a probe at 5 to 10 s) per check, and the runner's start.
+const PER_CHECK_S: u32 = 15;
+const START_S: u32 = 60;
+
+/// The runners, and the steps that read ISOLOOM_DERIVED.
+pub(super) struct Runners {
+    /// The runners, position by position.
+    pub runners: Vec<CheckRunner>,
+    /// The `compose run` steps, which pass ISOLOOM_DERIVED to their runner.
+    pub derived: Vec<StepId>,
+}
+
+/// The time limit of a runner of `checks`: their waits, plus 15 s each, plus 60 s.
+pub(super) fn timeout_s(checks: &[&Resolved]) -> u32 {
+    let waits: u32 = checks.iter().map(|c| c.wait).sum();
+    let count = u32::try_from(checks.len()).unwrap_or(u32::MAX);
+    waits.saturating_add(count.saturating_mul(PER_CHECK_S)).saturating_add(START_S)
+}
+
+/// Every position's runners, in the order `isoloom test` runs them.
+pub(super) fn runners(env: &Environment) -> Result<Runners, RenderError> {
+    let spec = env.spec();
+    let default = checks::default_position(spec);
+    let mut out = Runners {
+        runners: Vec::new(),
+        derived: Vec::new(),
+    };
+    for (pos, group) in checks::by_position(spec, &env.checks) {
+        let (execs, others): (Vec<&Resolved>, Vec<&Resolved>) = group.into_iter().partition(|c| matches!(c.probe, Probe::Exec { .. }));
+        let runner = compose_runner(&pos, &check_runner_service(&pos, &default), &others)?;
+        out.derived.push(runner.step.id.clone());
+        out.runners.push(runner);
+        if let (Position::Machine(m), false) = (&pos, execs.is_empty()) {
+            out.runners.push(exec_runner_of(&pos, m, &execs)?);
+        }
+    }
+    Ok(out)
+}
+
+fn compose_runner(pos: &Position, service: &str, group: &[&Resolved]) -> Result<CheckRunner, RenderError> {
+    let id = format!("check-{}", pos.id());
+    let args = ["--profile", "check", "run", "--rm", "--no-deps", "--env", "ISOLOOM_DERIVED", service];
+    let mut step = Step::argv(StepId::parse(&id).map_err(bug)?, compose(&args)?);
+    step.timeout_s = NonZeroU32::new(timeout_s(group));
+    let mut rm = Step::action(StepId::parse(&format!("rm-{id}")).map_err(bug)?, Action::ComposeRemoveContainers);
+    rm.failure = Failure::Tolerate;
+    if let isoloom_manifest::Run::Action { with, .. } = &mut rm.run {
+        *with = BTreeMap::from([(arg("service")?, Template::text(service)), (arg("one_off")?, Template::text("true"))]);
+    }
+    Ok(CheckRunner {
+        id: Name::parse(service).map_err(bug)?,
+        from: pos.label(),
+        checks: group.iter().map(|c| check(c)).collect(),
+        step,
+        on_timeout: vec![rm],
+    })
+}
+
+/// A machine's `exec` checks: their script piped into the machine itself.
+fn exec_runner_of(pos: &Position, machine: &str, execs: &[&Resolved]) -> Result<CheckRunner, RenderError> {
+    let id = format!("check-exec-{}", pos.id());
+    let mut step = Step::argv(StepId::parse(&id).map_err(bug)?, compose(&["exec", "-T", machine, "sh", "-s"])?);
+    step.stdin = Some(RelPath::parse(&format!("checks/{}", exec_runner(machine))).map_err(bug)?);
+    step.timeout_s = NonZeroU32::new(timeout_s(execs));
+    Ok(CheckRunner {
+        id: Name::parse(&format!("exec-{}", pos.id())).map_err(bug)?,
+        from: format!("inside {machine}"),
+        checks: execs.iter().map(|c| check(c)).collect(),
+        step,
+        on_timeout: Vec::new(),
+    })
+}
+
+fn arg(name: &str) -> Result<SnakeName, RenderError> {
+    SnakeName::parse(name).map_err(bug)
+}
+
+fn check(c: &Resolved) -> Check {
+    let kind = match c.probe {
+        Probe::Http { .. } => CheckKind::Http,
+        Probe::Tcp { .. } => CheckKind::Tcp,
+        Probe::Exec { .. } => CheckKind::Exec,
+        Probe::Script { .. } => CheckKind::Script,
+        Probe::Playbook { .. } => CheckKind::Playbook,
+    };
+    Check {
+        name: c.name.clone(),
+        kind,
+        wait_s: c.wait,
+        derived: c.derived,
+    }
+}
+
+/// Before the runners: the stand-in for a supplied access machine, and its routes, when the
+/// file has them (only the check profile starts them).
+pub(super) fn setup(file: &ComposeFile) -> Result<Vec<Step>, RenderError> {
+    let routes = format!("{STAND_IN}-routes");
+    let stand_ins: Vec<&str> = [STAND_IN, routes.as_str()].into_iter().filter(|s| file.services.contains_key(*s)).collect();
+    if stand_ins.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut args = vec!["--profile", "check", "up", "--detach", "--wait", "--no-deps"];
+    args.extend(stand_ins);
+    let mut step = Step::argv(StepId::parse("stand-ins").map_err(bug)?, compose(&args)?);
+    step.note = Some("Starting the access machine's stand-in…".into());
+    step.timeout_s = NonZeroU32::new(600);
+    Ok(vec![step])
+}

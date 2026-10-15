@@ -11,6 +11,7 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/appliances/r1/build/Dockerfile
 ✓ .isoloom/docker/appliances/r2/base.cfg
 ✓ .isoloom/docker/appliances/r2/build/Dockerfile
+✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json
 
 ## .isoloom/docker/appliances/r1/base.cfg
@@ -473,6 +474,443 @@ volumes:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
+
+## .isoloom/docker/run.json
+{
+  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "manifest_version": 0,
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "cisco-dynamips",
+    "instance": null,
+    "message": null
+  },
+  "target": "docker",
+  "driver": "compose",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "docker",
+      "probe": [
+        "docker",
+        "info",
+        "--format",
+        "{{.ServerVersion}}"
+      ]
+    },
+    {
+      "name": "docker-compose",
+      "probe": [
+        "docker",
+        "compose",
+        "version",
+        "--short"
+      ],
+      "min_version": "2.17.0"
+    }
+  ],
+  "identity": {
+    "compose": {
+      "project": "${run.name}",
+      "files": [
+        "compose.yml",
+        "${run.state_dir}/ports.yml"
+      ],
+      "pinned_ports_file": "${run.state_dir}/ports.yml"
+    }
+  },
+  "params": [
+    {
+      "name": "ISOLOOM_DERIVED",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
+      "default": "1",
+      "values": [
+        "0",
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-host-a"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [],
+  "networks": [
+    {
+      "name": "site-a",
+      "cidr": "10.93.1.0/24",
+      "internet": true,
+      "native": "${run.name}_site-a"
+    },
+    {
+      "name": "site-b",
+      "cidr": "10.93.2.0/24",
+      "internet": true,
+      "native": "${run.name}_site-b"
+    },
+    {
+      "name": "wan",
+      "cidr": "10.93.0.0/29",
+      "internet": false,
+      "native": "${run.name}_wan"
+    }
+  ],
+  "machines": [
+    {
+      "name": "r1",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "site-a": "10.93.1.1",
+        "wan": "10.93.0.2"
+      },
+      "native": {
+        "service": "r1"
+      }
+    },
+    {
+      "name": "r1-routes",
+      "role": "infra",
+      "of": "r1",
+      "addresses": {},
+      "native": {
+        "service": "r1-routes"
+      }
+    },
+    {
+      "name": "r2",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "site-b": "10.93.2.1",
+        "wan": "10.93.0.3"
+      },
+      "native": {
+        "service": "r2"
+      }
+    },
+    {
+      "name": "r2-routes",
+      "role": "infra",
+      "of": "r2",
+      "addresses": {},
+      "native": {
+        "service": "r2-routes"
+      }
+    },
+    {
+      "name": "host-a",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "site-a": "10.93.1.10"
+      },
+      "native": {
+        "service": "host-a"
+      }
+    },
+    {
+      "name": "host-a-routes",
+      "role": "infra",
+      "of": "host-a",
+      "addresses": {},
+      "native": {
+        "service": "host-a-routes"
+      }
+    },
+    {
+      "name": "host-b",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "site-b": "10.93.2.10"
+      },
+      "native": {
+        "service": "host-b"
+      },
+      "ports": [
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "http": true
+        }
+      ]
+    },
+    {
+      "name": "host-b-routes",
+      "role": "infra",
+      "of": "host-b",
+      "addresses": {},
+      "native": {
+        "service": "host-b-routes"
+      }
+    },
+    {
+      "name": "isoloom-check-host-a",
+      "role": "check",
+      "of": "host-a",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check-host-a"
+      }
+    },
+    {
+      "name": "isoloom-probe-amd64",
+      "role": "infra",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-probe-amd64"
+      }
+    }
+  ],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "pin-ports",
+        "note": "Picking the lab's host ports…",
+        "action": "compose.pin_ports"
+      },
+      {
+        "id": "ports-free",
+        "action": "compose.check_ports_free"
+      },
+      {
+        "id": "stale-networks",
+        "action": "compose.remove_stale_networks",
+        "failure": "tolerate"
+      },
+      {
+        "id": "up",
+        "note": "Starting the lab's containers…",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "up",
+          "--detach",
+          "--build",
+          "--pull",
+          "missing",
+          "--wait",
+          "--wait-timeout",
+          "600"
+        ],
+        "timeout_s": 1800
+      }
+    ],
+    "down": [
+      {
+        "id": "down",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "--profile",
+          "check",
+          "down",
+          "--volumes",
+          "--remove-orphans"
+        ],
+        "timeout_s": 300,
+        "when": "always"
+      },
+      {
+        "id": "containers",
+        "action": "compose.remove_containers",
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "networks",
+        "action": "compose.remove_networks",
+        "when": "always",
+        "failure": "tolerate"
+      }
+    ],
+    "park": {
+      "pause": [
+        {
+          "id": "stop",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "stop"
+          ],
+          "timeout_s": 300
+        }
+      ],
+      "shutdown": [
+        {
+          "id": "stop",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "stop"
+          ],
+          "timeout_s": 300
+        }
+      ]
+    },
+    "resume": [
+      {
+        "id": "start",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "start"
+        ],
+        "timeout_s": 600
+      }
+    ],
+    "status": {
+      "id": "ps",
+      "argv": [
+        "docker",
+        "compose",
+        "--project-name",
+        "${run.name}",
+        "--file",
+        "compose.yml",
+        "--file",
+        "${run.state_dir}/ports.yml",
+        "ps",
+        "--all",
+        "--format",
+        "json"
+      ],
+      "timeout_s": 25
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "up",
+      "means": "every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)"
+    }
+  ],
+  "outputs": [],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [
+      {
+        "id": "isoloom-check-host-a",
+        "from": "from host-a",
+        "checks": [
+          {
+            "name": "site A reaches site B through both routers",
+            "kind": "http",
+            "wait_s": 600,
+            "derived": false
+          },
+          {
+            "name": "host-b:80 blocked from host-a",
+            "kind": "tcp",
+            "wait_s": 0,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-host-a",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "--profile",
+            "check",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "ISOLOOM_DERIVED",
+            "isoloom-check-host-a"
+          ],
+          "timeout_s": 690
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-host-a",
+            "action": "compose.remove_containers",
+            "with": {
+              "one_off": "true",
+              "service": "isoloom-check-host-a"
+            },
+            "failure": "tolerate"
+          }
+        ]
+      }
+    ],
+    "teardown": []
+  },
+  "recovery": {
+    "stale_markers": [
+      "is already in use by container",
+      "network with name",
+      "has incorrect label"
+    ],
+    "steps": [
+      {
+        "id": "containers",
+        "action": "compose.remove_containers",
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "networks",
+        "action": "compose.remove_networks",
+        "when": "always",
+        "failure": "tolerate"
+      }
+    ],
+    "retries": 1
+  }
+}
 
 ## .isoloom/resolved.json
 {

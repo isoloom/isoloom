@@ -80,7 +80,27 @@ fn target_files(spec: &Spec, target: Target, instance: Option<u8>) -> Result<Vec
         return Err(GenerateError::NotPossible(target));
     }
     let backend = backend(target).ok_or(GenerateError::NoGenerator(target))?;
-    backend.render(&Environment::build(spec, target, instance)).map_err(GenerateError::from)
+    let env = Environment::build(spec, target, instance);
+    let mut files = backend.render(&env)?;
+    if let Some(manifest) = backend.run_manifest(&env)? {
+        files.push(run_manifest(spec, instance, target, manifest)?);
+    }
+    Ok(files)
+}
+
+/// A backend's run manifest as the file it is written to (`.isoloom/<target>/run.json`), its
+/// message filled from the resolved snapshot, checked across its fields.
+fn run_manifest(spec: &Spec, instance: Option<u8>, target: Target, mut manifest: isoloom_manifest::Manifest) -> Result<GeneratedFile, GenerateError> {
+    let refused = |e: isoloom_manifest::ManifestError| GenerateError::Unsupported {
+        target,
+        what: format!("the run manifest: {e}"),
+    };
+    manifest.lab.message = resolved::manifest_message(spec, instance, target);
+    manifest.validate().map_err(refused)?;
+    Ok(GeneratedFile {
+        path: format!("{OUTPUT_DIR}/{}/run.json", target.id()),
+        contents: isoloom_manifest::to_json(&manifest).map_err(refused)?,
+    })
 }
 
 /// Every target the spec allows and that has a generator: the files, and why the others

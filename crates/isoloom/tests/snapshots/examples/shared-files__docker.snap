@@ -10,6 +10,7 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/checks/writer.sh
 ✓ .isoloom/docker/checks/exec-reader.sh
 ✓ .isoloom/docker/checks/reader.sh
+✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json
 
 ## .isoloom/docker/checks/exec-reader.sh
@@ -441,6 +442,510 @@ volumes:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
+
+## .isoloom/docker/run.json
+{
+  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "manifest_version": 0,
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "shared-files",
+    "instance": null,
+    "message": null
+  },
+  "target": "docker",
+  "driver": "compose",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "docker",
+      "probe": [
+        "docker",
+        "info",
+        "--format",
+        "{{.ServerVersion}}"
+      ]
+    },
+    {
+      "name": "docker-compose",
+      "probe": [
+        "docker",
+        "compose",
+        "version",
+        "--short"
+      ],
+      "min_version": "2.17.0"
+    }
+  ],
+  "identity": {
+    "compose": {
+      "project": "${run.name}",
+      "files": [
+        "compose.yml",
+        "${run.state_dir}/ports.yml"
+      ],
+      "pinned_ports_file": "${run.state_dir}/ports.yml"
+    }
+  },
+  "params": [
+    {
+      "name": "ISOLOOM_DERIVED",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
+      "default": "1",
+      "values": [
+        "0",
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-writer",
+            "check-reader"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [],
+  "networks": [
+    {
+      "name": "app",
+      "cidr": "10.84.0.0/24",
+      "internet": true,
+      "native": "${run.name}_app"
+    }
+  ],
+  "machines": [
+    {
+      "name": "writer",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "app": "10.84.0.10"
+      },
+      "native": {
+        "service": "writer"
+      },
+      "volumes": [
+        {
+          "name": "shared",
+          "path": "/srv/shared",
+          "native": "${run.name}_shared"
+        },
+        {
+          "name": "data",
+          "path": "/srv/data",
+          "native": "${run.name}_writer-data"
+        }
+      ]
+    },
+    {
+      "name": "writer-init-1",
+      "role": "job",
+      "of": "writer",
+      "addresses": {},
+      "native": {
+        "service": "writer-init-1"
+      }
+    },
+    {
+      "name": "reader",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "app": "10.84.0.11"
+      },
+      "native": {
+        "service": "reader"
+      },
+      "volumes": [
+        {
+          "name": "shared",
+          "path": "/data/shared",
+          "native": "${run.name}_shared"
+        }
+      ]
+    },
+    {
+      "name": "isoloom-check-writer",
+      "role": "check",
+      "of": "writer",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check-writer"
+      }
+    },
+    {
+      "name": "isoloom-check-reader",
+      "role": "check",
+      "of": "reader",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check-reader"
+      }
+    }
+  ],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "pin-ports",
+        "note": "Picking the lab's host ports…",
+        "action": "compose.pin_ports"
+      },
+      {
+        "id": "ports-free",
+        "action": "compose.check_ports_free"
+      },
+      {
+        "id": "stale-networks",
+        "action": "compose.remove_stale_networks",
+        "failure": "tolerate"
+      },
+      {
+        "id": "up",
+        "note": "Starting the lab's containers…",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "up",
+          "--detach",
+          "--build",
+          "--pull",
+          "missing",
+          "--wait",
+          "--wait-timeout",
+          "600",
+          "writer",
+          "reader"
+        ],
+        "timeout_s": 1800
+      },
+      {
+        "id": "job-writer-init-1",
+        "note": "Running writer's set-up script…",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "up",
+          "--no-deps",
+          "--exit-code-from",
+          "writer-init-1",
+          "writer-init-1"
+        ],
+        "timeout_s": 600
+      }
+    ],
+    "down": [
+      {
+        "id": "down",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "--profile",
+          "check",
+          "down",
+          "--volumes",
+          "--remove-orphans"
+        ],
+        "timeout_s": 300,
+        "when": "always"
+      },
+      {
+        "id": "containers",
+        "action": "compose.remove_containers",
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "networks",
+        "action": "compose.remove_networks",
+        "when": "always",
+        "failure": "tolerate"
+      }
+    ],
+    "park": {
+      "pause": [
+        {
+          "id": "stop",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "stop"
+          ],
+          "timeout_s": 300
+        }
+      ],
+      "shutdown": [
+        {
+          "id": "stop",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "stop"
+          ],
+          "timeout_s": 300
+        }
+      ]
+    },
+    "resume": [
+      {
+        "id": "start",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "start"
+        ],
+        "timeout_s": 600
+      }
+    ],
+    "status": {
+      "id": "ps",
+      "argv": [
+        "docker",
+        "compose",
+        "--project-name",
+        "${run.name}",
+        "--file",
+        "compose.yml",
+        "--file",
+        "${run.state_dir}/ports.yml",
+        "ps",
+        "--all",
+        "--format",
+        "json"
+      ],
+      "timeout_s": 25
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "up",
+      "means": "every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)"
+    },
+    {
+      "kind": "step_ok",
+      "step": "job-writer-init-1",
+      "means": "writer's set-up script (writer-init-1) exited 0"
+    }
+  ],
+  "outputs": [],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [
+      {
+        "id": "isoloom-check-writer",
+        "from": "from writer",
+        "checks": [],
+        "step": {
+          "id": "check-writer",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "--profile",
+            "check",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "ISOLOOM_DERIVED",
+            "isoloom-check-writer"
+          ],
+          "timeout_s": 60
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-writer",
+            "action": "compose.remove_containers",
+            "with": {
+              "one_off": "true",
+              "service": "isoloom-check-writer"
+            },
+            "failure": "tolerate"
+          }
+        ]
+      },
+      {
+        "id": "exec-writer",
+        "from": "inside writer",
+        "checks": [
+          {
+            "name": "the writer's data disk is mounted",
+            "kind": "exec",
+            "wait_s": 0,
+            "derived": false
+          }
+        ],
+        "step": {
+          "id": "check-exec-writer",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "exec",
+            "-T",
+            "writer",
+            "sh",
+            "-s"
+          ],
+          "stdin": "checks/exec-writer.sh",
+          "timeout_s": 75
+        }
+      },
+      {
+        "id": "isoloom-check-reader",
+        "from": "from reader",
+        "checks": [],
+        "step": {
+          "id": "check-reader",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "--profile",
+            "check",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "ISOLOOM_DERIVED",
+            "isoloom-check-reader"
+          ],
+          "timeout_s": 60
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-reader",
+            "action": "compose.remove_containers",
+            "with": {
+              "one_off": "true",
+              "service": "isoloom-check-reader"
+            },
+            "failure": "tolerate"
+          }
+        ]
+      },
+      {
+        "id": "exec-reader",
+        "from": "inside reader",
+        "checks": [
+          {
+            "name": "the reader sees what the writer wrote",
+            "kind": "exec",
+            "wait_s": 0,
+            "derived": false
+          }
+        ],
+        "step": {
+          "id": "check-exec-reader",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "exec",
+            "-T",
+            "reader",
+            "sh",
+            "-s"
+          ],
+          "stdin": "checks/exec-reader.sh",
+          "timeout_s": 75
+        }
+      }
+    ],
+    "teardown": []
+  },
+  "recovery": {
+    "stale_markers": [
+      "is already in use by container",
+      "network with name",
+      "has incorrect label"
+    ],
+    "steps": [
+      {
+        "id": "containers",
+        "action": "compose.remove_containers",
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "networks",
+        "action": "compose.remove_networks",
+        "when": "always",
+        "failure": "tolerate"
+      }
+    ],
+    "retries": 1
+  }
+}
 
 ## .isoloom/resolved.json
 {

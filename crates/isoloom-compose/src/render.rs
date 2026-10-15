@@ -13,13 +13,14 @@ pub(crate) use machine::mac;
 use std::fmt::Write as _;
 
 use indexmap::IndexMap;
+use isoloom_manifest::Manifest;
 use isoloom_plan::{Environment, Feature, MachineShape};
 use isoloom_render::backend::{self, Backend, Files, RenderError};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, trunks};
 use isoloom_spec::model::{Arch, Target};
 
 use crate::appliances;
-use crate::docker::{DIR, ENVIRONMENT_LABEL, MANAGED_LABEL, PROBE_IMAGE, TOOLBOX_IMAGE, probe_service};
+use crate::docker::{DIR, ENVIRONMENT_LABEL, MANAGED_LABEL, PROBE_IMAGE, TOOLBOX_IMAGE, probe_service, tool_service};
 use crate::file::{Attachment, ComposeFile, Ipam, Network, Service, Subnet, Volume};
 use crate::sidecars;
 use crate::storage;
@@ -101,6 +102,14 @@ impl Backend for ComposeBackend {
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         render(self.0, env)
+    }
+
+    /// The `docker` target's manifest; a hosting service runs the file its own way.
+    fn run_manifest(&self, env: &Environment) -> Result<Option<Manifest>, RenderError> {
+        if self.0 != Target::Docker {
+            return Ok(None);
+        }
+        crate::manifest::docker(env, &compose_file(self.0, env)?.file).map(Some)
     }
 }
 
@@ -223,7 +232,7 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
         if let (Some(port), Some(host)) = (tool.port, tool.publish) {
             t.ports = vec![format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{host}:{port}")];
         }
-        services.insert(format!("isoloom-tool-{name}"), t);
+        services.insert(tool_service(name), t);
     }
 }
 

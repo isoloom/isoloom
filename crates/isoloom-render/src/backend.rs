@@ -4,6 +4,7 @@
 
 use std::fmt;
 
+use isoloom_manifest::Manifest;
 use isoloom_plan::{Capabilities, Environment, Refusal, refusal};
 use isoloom_spec::model::Target;
 
@@ -71,6 +72,13 @@ pub trait Backend: Sync {
     /// capabilities, without rendering.
     fn refusal(&self, env: &Environment) -> Option<String> {
         refusal(&env.requirements, &self.capabilities()).map(|r| r.to_string())
+    }
+
+    /// The run manifest the Isothrum runner executes (`.isoloom/<target>/run.json`), for a target
+    /// that has one; its `lab.message` is left to the caller, who fills it from the resolved
+    /// snapshot. `None` for the targets that have none yet.
+    fn run_manifest(&self, _env: &Environment) -> Result<Option<Manifest>, RenderError> {
+        Ok(None)
     }
 }
 

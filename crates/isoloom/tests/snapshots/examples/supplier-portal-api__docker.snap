@@ -9,6 +9,7 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/checks/networks.sh
 ✓ .isoloom/docker/checks/database.sh
 ✓ .isoloom/docker/checks/web.sh
+✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json
 
 ## .isoloom/docker/checks/database.sh
@@ -453,6 +454,573 @@ volumes:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
+
+## .isoloom/docker/run.json
+{
+  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "manifest_version": 0,
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "supplier-portal-api",
+    "instance": null,
+    "message": null
+  },
+  "target": "docker",
+  "driver": "compose",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "docker",
+      "probe": [
+        "docker",
+        "info",
+        "--format",
+        "{{.ServerVersion}}"
+      ]
+    },
+    {
+      "name": "docker-compose",
+      "probe": [
+        "docker",
+        "compose",
+        "version",
+        "--short"
+      ],
+      "min_version": "2.17.0"
+    }
+  ],
+  "identity": {
+    "compose": {
+      "project": "${run.name}",
+      "files": [
+        "compose.yml",
+        "${run.state_dir}/ports.yml"
+      ],
+      "pinned_ports_file": "${run.state_dir}/ports.yml"
+    }
+  },
+  "params": [
+    {
+      "name": "ISOLOOM_PUBLISH_ADDRESS",
+      "description": "The host address published ports listen on.",
+      "default": "127.0.0.1",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_PUBLISH_ADDRESS",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_DERIVED",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
+      "default": "1",
+      "values": [
+        "0",
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-networks",
+            "check-database",
+            "check-web"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "name": "API_URL",
+      "kind": "input",
+      "required": false,
+      "sensitive": true,
+      "machines": [
+        "database",
+        "database-init-1"
+      ],
+      "deliver": [
+        {
+          "via": "env",
+          "var": "API_URL",
+          "steps": [
+            "up"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LAUNCH_TOKEN",
+      "kind": "input",
+      "required": false,
+      "sensitive": true,
+      "machines": [
+        "database",
+        "database-init-1"
+      ],
+      "deliver": [
+        {
+          "via": "env",
+          "var": "LAUNCH_TOKEN",
+          "steps": [
+            "up"
+          ]
+        }
+      ]
+    }
+  ],
+  "networks": [
+    {
+      "name": "lab",
+      "cidr": "10.20.0.0/24",
+      "internet": true,
+      "native": "${run.name}_lab"
+    }
+  ],
+  "machines": [
+    {
+      "name": "database",
+      "role": "target",
+      "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
+      "addresses": {
+        "lab": "10.20.0.32"
+      },
+      "native": {
+        "service": "database"
+      },
+      "ports": [
+        {
+          "name": "mysql",
+          "port": 3207,
+          "protocol": "tcp",
+          "http": false
+        }
+      ]
+    },
+    {
+      "name": "database-init-1",
+      "role": "job",
+      "of": "database",
+      "addresses": {},
+      "native": {
+        "service": "database-init-1"
+      }
+    },
+    {
+      "name": "web",
+      "role": "target",
+      "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
+      "addresses": {
+        "lab": "10.20.0.31"
+      },
+      "native": {
+        "service": "web"
+      },
+      "ports": [
+        {
+          "name": "portal",
+          "port": 3206,
+          "protocol": "tcp",
+          "http": true,
+          "publish": {
+            "mode": "fixed",
+            "preferred": 3206,
+            "address": "${params.ISOLOOM_PUBLISH_ADDRESS}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "isoloom-check",
+      "role": "check",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check"
+      }
+    },
+    {
+      "name": "isoloom-check-database",
+      "role": "check",
+      "of": "database",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check-database"
+      }
+    },
+    {
+      "name": "isoloom-check-web",
+      "role": "check",
+      "of": "web",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check-web"
+      }
+    },
+    {
+      "name": "isoloom-probe-amd64",
+      "role": "infra",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-probe-amd64"
+      }
+    }
+  ],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "pin-ports",
+        "note": "Picking the lab's host ports…",
+        "action": "compose.pin_ports"
+      },
+      {
+        "id": "ports-free",
+        "action": "compose.check_ports_free"
+      },
+      {
+        "id": "stale-networks",
+        "action": "compose.remove_stale_networks",
+        "failure": "tolerate"
+      },
+      {
+        "id": "up",
+        "note": "Starting the lab's containers…",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "up",
+          "--detach",
+          "--build",
+          "--pull",
+          "missing",
+          "--wait",
+          "--wait-timeout",
+          "600"
+        ],
+        "timeout_s": 1800
+      }
+    ],
+    "down": [
+      {
+        "id": "down",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "--profile",
+          "check",
+          "down",
+          "--volumes",
+          "--remove-orphans"
+        ],
+        "timeout_s": 300,
+        "when": "always"
+      },
+      {
+        "id": "containers",
+        "action": "compose.remove_containers",
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "networks",
+        "action": "compose.remove_networks",
+        "when": "always",
+        "failure": "tolerate"
+      }
+    ],
+    "park": {
+      "pause": [
+        {
+          "id": "stop",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "stop"
+          ],
+          "timeout_s": 300
+        }
+      ],
+      "shutdown": [
+        {
+          "id": "stop",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "stop"
+          ],
+          "timeout_s": 300
+        }
+      ]
+    },
+    "resume": [
+      {
+        "id": "start",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "start"
+        ],
+        "timeout_s": 600
+      }
+    ],
+    "status": {
+      "id": "ps",
+      "argv": [
+        "docker",
+        "compose",
+        "--project-name",
+        "${run.name}",
+        "--file",
+        "compose.yml",
+        "--file",
+        "${run.state_dir}/ports.yml",
+        "ps",
+        "--all",
+        "--format",
+        "json"
+      ],
+      "timeout_s": 25
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "up",
+      "means": "every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "web_portal",
+      "description": "web's portal (port 3206).",
+      "role": "entry",
+      "sensitive": false,
+      "format": "http://127.0.0.1:${value}/",
+      "from": {
+        "kind": "published_port",
+        "machine": "web",
+        "port": 3206,
+        "protocol": "tcp"
+      }
+    }
+  ],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [
+      {
+        "id": "isoloom-check",
+        "from": "from the environment's networks",
+        "checks": [
+          {
+            "name": "build/check/check.sh",
+            "kind": "script",
+            "wait_s": 0,
+            "derived": false
+          }
+        ],
+        "step": {
+          "id": "check-networks",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "--profile",
+            "check",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "ISOLOOM_DERIVED",
+            "isoloom-check"
+          ],
+          "timeout_s": 75
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-networks",
+            "action": "compose.remove_containers",
+            "with": {
+              "one_off": "true",
+              "service": "isoloom-check"
+            },
+            "failure": "tolerate"
+          }
+        ]
+      },
+      {
+        "id": "isoloom-check-database",
+        "from": "from database",
+        "checks": [
+          {
+            "name": "web:3206 from database",
+            "kind": "http",
+            "wait_s": 30,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-database",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "--profile",
+            "check",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "ISOLOOM_DERIVED",
+            "isoloom-check-database"
+          ],
+          "timeout_s": 105
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-database",
+            "action": "compose.remove_containers",
+            "with": {
+              "one_off": "true",
+              "service": "isoloom-check-database"
+            },
+            "failure": "tolerate"
+          }
+        ]
+      },
+      {
+        "id": "isoloom-check-web",
+        "from": "from web",
+        "checks": [
+          {
+            "name": "database:3207 from web",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-web",
+          "argv": [
+            "docker",
+            "compose",
+            "--project-name",
+            "${run.name}",
+            "--file",
+            "compose.yml",
+            "--file",
+            "${run.state_dir}/ports.yml",
+            "--profile",
+            "check",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "ISOLOOM_DERIVED",
+            "isoloom-check-web"
+          ],
+          "timeout_s": 105
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-web",
+            "action": "compose.remove_containers",
+            "with": {
+              "one_off": "true",
+              "service": "isoloom-check-web"
+            },
+            "failure": "tolerate"
+          }
+        ]
+      }
+    ],
+    "teardown": []
+  },
+  "recovery": {
+    "stale_markers": [
+      "is already in use by container",
+      "network with name",
+      "has incorrect label"
+    ],
+    "steps": [
+      {
+        "id": "containers",
+        "action": "compose.remove_containers",
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "networks",
+        "action": "compose.remove_networks",
+        "when": "always",
+        "failure": "tolerate"
+      }
+    ],
+    "retries": 1
+  }
+}
 
 ## .isoloom/resolved.json
 {

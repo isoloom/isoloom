@@ -12,6 +12,7 @@ publish.workspace = true
 isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 isoloom-render.workspace = true
+isoloom-manifest.workspace = true
 serde_yaml_ng.workspace = true
 serde.workspace = true
 indexmap.workspace = true

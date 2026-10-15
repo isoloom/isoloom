@@ -11,7 +11,7 @@ use isoloom_render::{GeneratedFile, OUTPUT_DIR, router, trunks};
 use isoloom_spec::{validate, vlans};
 
 use crate::appliances;
-use crate::docker::{CHECK_IMAGE, DIR, ROOT, STAND_IN, TC_IMAGE, UTILITY_IMAGE, exec_runner, init_names, ready_condition};
+use crate::docker::{CHECK_IMAGE, DIR, ROOT, STAND_IN, TC_IMAGE, UTILITY_IMAGE, check_runner_service, exec_runner, init_names, ready_condition};
 use crate::file::{Attachment, Healthcheck, Service};
 use crate::render::mac;
 
@@ -316,11 +316,7 @@ pub(crate) fn check_runners(env: &Environment, services: &mut IndexMap<String, S
     let mut files = Vec::new();
     for (pos, group) in checks::by_position(spec, &env.checks) {
         let id = pos.id().to_string();
-        let runner = if pos == default_pos {
-            "isoloom-check".to_string()
-        } else {
-            format!("isoloom-check-{id}")
-        };
+        let runner = check_runner_service(&pos, &default_pos);
         // `exec` checks run inside the machine itself, not in the runner beside it (which shares
         // only its network): their own script, piped to `docker compose exec -T <machine> sh -s`.
         let (execs, group): (Vec<&Resolved>, Vec<&Resolved>) = group.into_iter().partition(|c| matches!(c.probe, Probe::Exec { .. }));
