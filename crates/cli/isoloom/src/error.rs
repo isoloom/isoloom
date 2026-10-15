@@ -19,21 +19,21 @@ pub(crate) enum CliError {
     },
     /// The spec can't be found or read.
     #[error(transparent)]
-    Spec(isoloom_spec::LoadError),
+    Spec(isoloom_spec::Error),
     /// The profile asked for (`--profile`, `ISOLOOM_PROFILE`) can't be read, or pins another
     /// target than the one asked for.
-    #[error("{0}")]
-    Profile(String),
+    #[error(transparent)]
+    Profile(isoloom_spec::Error),
     /// The defaults in effect can't be read (a defaults file, the image table, a `-s` value).
-    #[error("{0}")]
-    Defaults(String),
+    #[error(transparent)]
+    Defaults(isoloom_spec::Error),
     /// The instance asked for (`--instance`) can't be made of the spec.
-    #[error("instance {number}: {reason}")]
+    #[error("instance {number}: {error}")]
     Instance {
         /// The instance's number.
         number: u8,
         /// Why it can't be made.
-        reason: String,
+        error: isoloom_spec::Error,
     },
     /// No target has this id.
     #[error("unknown target `{0}`")]
@@ -116,12 +116,12 @@ pub(crate) enum CliError {
     Import(isoloom_import::Error),
 }
 
-impl From<isoloom_spec::LoadError> for CliError {
+impl From<isoloom_spec::Error> for CliError {
     /// A spec that doesn't load: its problems when it is invalid, else the reason it can't be
     /// read.
-    fn from(e: isoloom_spec::LoadError) -> CliError {
+    fn from(e: isoloom_spec::Error) -> CliError {
         match e {
-            isoloom_spec::LoadError::Invalid { file, problems } => CliError::InvalidSpec { file, problems },
+            isoloom_spec::Error::Invalid { file, problems } => CliError::InvalidSpec { file, problems },
             other => CliError::Spec(other),
         }
     }
@@ -198,12 +198,12 @@ mod tests {
 
     #[test]
     fn an_invalid_spec_keeps_its_problems_and_a_missing_one_its_reason() {
-        let invalid = isoloom_spec::LoadError::Invalid {
+        let invalid = isoloom_spec::Error::Invalid {
             file: "isoloom.yml".into(),
             problems: vec![],
         };
         assert!(matches!(CliError::from(invalid), CliError::InvalidSpec { .. }));
-        let missing = CliError::from(isoloom_spec::LoadError::NotFound(PathBuf::from("lab")));
+        let missing = CliError::from(isoloom_spec::Error::NotFound(PathBuf::from("lab")));
         assert_eq!(missing.to_string(), "no isoloom.yml in lab");
     }
 

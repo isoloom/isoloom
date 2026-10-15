@@ -6,6 +6,8 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::Error;
+
 /// The GPUs a machine is given. A container gets the host's GPUs through its runtime; a VM gets
 /// them passed through by its hypervisor (Proxmox) or sized with them (a cloud's GPU instance
 /// types).
@@ -122,22 +124,22 @@ fn count_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
     })
 }
 
-fn count(value: &serde_json::Value) -> Result<GpuCount, String> {
+fn count(value: &serde_json::Value) -> Result<GpuCount, Error> {
     match value {
         serde_json::Value::String(s) if s == GpuCount::ALL => Ok(GpuCount::All),
         serde_json::Value::Number(n) => n
             .as_u64()
             .and_then(|n| u32::try_from(n).ok())
             .map(GpuCount::Count)
-            .ok_or_else(|| format!("`gpus.count`: a whole number or `all`, not {n}")),
-        other => Err(format!("`gpus.count`: a whole number or `all`, not {other}")),
+            .ok_or_else(|| Error::GpuCount(n.to_string())),
+        other => Err(Error::GpuCount(other.to_string())),
     }
 }
 
 impl TryFrom<GpusInput> for Gpus {
-    type Error = String;
+    type Error = Error;
 
-    fn try_from(input: GpusInput) -> Result<Gpus, String> {
+    fn try_from(input: GpusInput) -> Result<Gpus, Error> {
         match input {
             GpusInput::Count(n) => Ok(Gpus {
                 count: Some(GpuCount::Count(n)),
@@ -147,7 +149,7 @@ impl TryFrom<GpusInput> for Gpus {
                 count: Some(GpuCount::All),
                 ..Gpus::default()
             }),
-            GpusInput::Word(w) => Err(format!("`gpus`: a number, `all` or a mapping, not `{w}`")),
+            GpusInput::Word(w) => Err(Error::GpusWord(w)),
             GpusInput::Full(f) => Ok(Gpus {
                 count: f.count.as_ref().map(count).transpose()?,
                 ids: f.ids,
@@ -207,9 +209,9 @@ pub struct DeviceFull {
 }
 
 impl TryFrom<DeviceInput> for Device {
-    type Error = String;
+    type Error = Error;
 
-    fn try_from(input: DeviceInput) -> Result<Device, String> {
+    fn try_from(input: DeviceInput) -> Result<Device, Error> {
         match input {
             DeviceInput::Full(DeviceFull { host, guest, permissions }) => Ok(Device { host, guest, permissions }),
             DeviceInput::Short(s) => {
@@ -221,7 +223,7 @@ impl TryFrom<DeviceInput> for Device {
                     permissions: parts.next(),
                 };
                 match parts.next() {
-                    Some(_) => Err(format!("`{s}`: a device is `host[:guest[:permissions]]`")),
+                    Some(_) => Err(Error::Device(s)),
                     None => Ok(device),
                 }
             }

@@ -9,6 +9,7 @@ use serde::de::{self, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
 use super::files::Mode;
+use crate::Error;
 use crate::model::Appliance;
 
 /// A custom machine's recipe.
@@ -141,35 +142,35 @@ fn build<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Build>, D::Error> {
 }
 
 impl TryFrom<AppInput> for App {
-    type Error = String;
+    type Error = Error;
 
-    fn try_from(a: AppInput) -> Result<App, String> {
+    fn try_from(a: AppInput) -> Result<App, Error> {
         if a.config.is_some() && a.appliance.is_none() {
-            return Err("`config` is an appliance's: it goes with `appliance`".into());
+            return Err(Error::ConfigWithoutAppliance);
         }
         let container = match (a.image, a.build, a.appliance) {
-            (Some(_), Some(_), _) => return Err("`image` and `build` are both given: a container comes from one".into()),
-            (_, Some(_), Some(_)) => return Err("an appliance comes from its `image` (or `firmware`), not a `build`".into()),
+            (Some(_), Some(_), _) => return Err(Error::ImageAndBuild),
+            (_, Some(_), Some(_)) => return Err(Error::ApplianceBuild),
             (image, None, Some(kind)) => Some(Recipe::Appliance(appliance(kind, image, a.config, a.firmware)?)),
-            (_, _, None) if a.firmware.is_some() => return Err("`firmware` is `cisco-dynamips`'s: it goes with `appliance: cisco-dynamips`".into()),
+            (_, _, None) if a.firmware.is_some() => return Err(Error::FirmwareWithoutDynamips),
             (Some(image), None, None) => Some(Recipe::Image(image)),
             (None, Some(b), None) => Some(Recipe::Build(b)),
             (None, None, None) => None,
         };
         if container.is_none() && a.steps.is_empty() {
-            return Err("an app needs a recipe: `image`, `build`, `steps` or `appliance`".into());
+            return Err(Error::NoRecipe);
         }
         Ok(App { container, steps: a.steps })
     }
 }
 
-fn appliance(kind: Appliance, image: Option<String>, config: Option<String>, firmware: Option<String>) -> Result<ApplianceRecipe, String> {
+fn appliance(kind: Appliance, image: Option<String>, config: Option<String>, firmware: Option<String>) -> Result<ApplianceRecipe, Error> {
     let dynamips = kind == Appliance::CiscoDynamips;
     match (dynamips, image.is_some(), firmware.is_some()) {
-        (true, true, _) => Err("`cisco-dynamips` boots its `firmware`; Isoloom builds its image, so no `image`".into()),
-        (true, false, false) => Err("`cisco-dynamips` needs the `firmware` it boots (the IOS `.bin`)".into()),
-        (false, _, true) => Err("`firmware` is `cisco-dynamips`'s; this appliance runs its `image`".into()),
-        (false, false, false) => Err("an appliance runs its `image` (`vrnetlab/cisco_iol:<version>`)".into()),
+        (true, true, _) => Err(Error::DynamipsImage),
+        (true, false, false) => Err(Error::DynamipsFirmware),
+        (false, _, true) => Err(Error::ApplianceFirmware),
+        (false, false, false) => Err(Error::ApplianceImage),
         (true, false, true) | (false, true, false) => Ok(ApplianceRecipe { kind, image, config, firmware }),
     }
 }
@@ -306,9 +307,9 @@ impl<'de> Deserialize<'de> for StepSchema {
 }
 
 impl TryFrom<StepSchema> for Step {
-    type Error = String;
+    type Error = Error;
 
-    fn try_from(written: StepSchema) -> Result<Step, String> {
+    fn try_from(written: StepSchema) -> Result<Step, Error> {
         match written {
             StepSchema::Reboot(RebootWord::Reboot) => Ok(Step::Reboot),
             StepSchema::Map(fields) => step(fields),
@@ -316,9 +317,9 @@ impl TryFrom<StepSchema> for Step {
     }
 }
 
-fn step(s: StepInput) -> Result<Step, String> {
+fn step(s: StepInput) -> Result<Step, Error> {
     if s.creates.is_some() && s.run.is_none() {
-        return Err("`creates` goes with `run`".into());
+        return Err(Error::CreatesWithoutRun);
     }
     let mut given: Vec<Step> = [
         s.run.map(|script| Step::Run { script, creates: s.creates }),
@@ -331,8 +332,8 @@ fn step(s: StepInput) -> Result<Step, String> {
     .collect();
     match given.len() {
         1 => Ok(given.remove(0)),
-        0 => Err("a step needs one of `run`, `copy`, `packages` and `playbook`".into()),
-        _ => Err("a step does one thing: one of `run`, `copy`, `packages` and `playbook` per step".into()),
+        0 => Err(Error::NoStep),
+        _ => Err(Error::SeveralSteps),
     }
 }
 

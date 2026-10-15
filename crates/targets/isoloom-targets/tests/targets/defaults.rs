@@ -35,7 +35,7 @@ fn later_layers_win_leaf_by_leaf() -> Outcome {
         source: "user".into(),
         value: yaml("vagrant: { provder: libvirt }\n")?,
     }]);
-    assert!(bad.unwrap_err().contains("user"));
+    assert!(bad.unwrap_err().to_string().contains("user"));
     Ok(())
 }
 

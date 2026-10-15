@@ -16,6 +16,7 @@ use super::names::{PortName, ServiceRef};
 use super::os::OsRef;
 use super::ports::Port;
 use super::process::{Command, EnvValue, Healthcheck};
+use crate::Error;
 use crate::model::{Disk, Dns, Mount, Resources, ScalarSchema, Tmpfs, Ulimit};
 
 /// What a machine is, besides its OS.
@@ -247,13 +248,13 @@ fn services<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Vec<Service
 }
 
 impl TryFrom<MachineInput> for Machine {
-    type Error = String;
+    type Error = Error;
 
-    fn try_from(m: MachineInput) -> Result<Machine, String> {
+    fn try_from(m: MachineInput) -> Result<Machine, Error> {
         let kind = match (m.service, m.app) {
-            (Some(_), Some(_)) => return Err("`service` and `app` are both given: a machine is a catalogue service or a custom app".into()),
+            (Some(_), Some(_)) => return Err(Error::ServiceAndApp),
             (Some(services), None) => Kind::Service(Services { services, with: m.with }),
-            (None, _) if !m.with.is_empty() => return Err("`with` sets a catalogue service's settings: it goes with `service`".into()),
+            (None, _) if !m.with.is_empty() => return Err(Error::WithWithoutService),
             (None, Some(app)) => Kind::App(app),
             (None, None) => Kind::Bare,
         };

@@ -5,6 +5,7 @@
 use std::fmt;
 
 use isoloom_spec::model::{MachineSecret, SecretSource, Spec};
+use isoloom_spec::syntax::Mode;
 
 /// Where a value file's contents come from.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,7 +62,7 @@ impl SecretFile {
             path: s.path(),
             uid: m.uid,
             gid: m.gid,
-            mode: m.mode,
+            mode: m.mode.map(Mode::bits),
         }
     }
 }

@@ -18,7 +18,7 @@ pub mod defaults;
 pub mod error;
 pub mod files;
 pub mod groups;
-pub mod home;
+pub mod host;
 pub mod images;
 pub mod instance;
 mod load;
@@ -39,7 +39,7 @@ pub mod validate;
 pub mod vlans;
 pub mod windows;
 
-pub use error::{LoadError, Result, Stage};
+pub use error::{Error, Result};
 pub use load::{SPEC_FILE, SPEC_FILES, find, load, load_profiled, load_with, parse};
 pub use model::{Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Port, Reach, Resources, Shape, Target, Tc, Vlan};
 pub use sizing::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB, Totals, totals};

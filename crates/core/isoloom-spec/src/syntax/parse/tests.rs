@@ -71,10 +71,3 @@ fn yaml_errors_have_their_line() {
     assert_eq!(p[0].code, Code::InvalidValue);
     assert!(p[0].span.is_some());
 }
-
-#[test]
-fn typos_find_their_field() {
-    assert_eq!(closest("netwrks", &["networks", "ports"]), Some("networks"));
-    assert_eq!(closest("zzz", &["networks"]), None);
-    assert_eq!(distance("kitten", "sitting"), 3);
-}

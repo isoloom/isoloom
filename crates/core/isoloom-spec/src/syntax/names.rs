@@ -10,7 +10,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::invalid::Invalid;
+use crate::Error;
 
 /// A newtype over `String` holding only values `$check` accepts; `$pattern` is the same rule as
 /// a JSON Schema pattern, `$rule` how an author fixes a value that breaks it.
@@ -29,19 +29,19 @@ macro_rules! name_type {
         }
 
         impl FromStr for $ty {
-            type Err = Invalid;
+            type Err = Error;
 
             /// The name, when it follows the rule.
             ///
             /// # Errors
             ///
-            /// [`Invalid::Name`] with the rule, as an author reads it.
-            fn from_str(value: &str) -> Result<$ty, Invalid> {
+            /// [`Error::Name`] with the rule, as an author reads it.
+            fn from_str(value: &str) -> Result<$ty, Error> {
                 let check: fn(&str) -> bool = $check;
                 if check(value) {
                     Ok($ty(value.to_string()))
                 } else {
-                    Err(Invalid::Name {
+                    Err(Error::Name {
                         what: $what,
                         value: value.to_string(),
                         rule: $rule,

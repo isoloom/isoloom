@@ -1,0 +1,7 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"machines:\\n  db:\\n    os: debian@12\\n    networks: { lab: 10 }\\n    service: postgres@16\\n    with: { database: books }\\n\"))"
+---
+error[unknown-reference] machines.db.service  (isoloom.yml:9:5)
+  no catalogue entry `postgres` yet: the catalogue arrives in Phase 4
+  fix: until then, a custom app: `app: { image: <ref> }` or `app: { steps: [...] }` with `os`

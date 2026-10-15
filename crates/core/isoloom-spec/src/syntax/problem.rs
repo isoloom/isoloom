@@ -188,6 +188,34 @@ impl fmt::Display for Problem {
 /// The problems of a spec, in file order.
 pub type Problems = Vec<Problem>;
 
+/// The known name closest to `word`, when it is close (a typo).
+pub(crate) fn closest<'a>(word: &str, known: &[&'a str]) -> Option<&'a str> {
+    known
+        .iter()
+        .map(|k| (distance(word, k), *k))
+        .filter(|(d, k)| *d <= 2.max(k.len() / 4))
+        .min_by_key(|(d, _)| *d)
+        .map(|(_, k)| k)
+}
+
+/// The edit distance between two words.
+fn distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    // One row of the table at a time: `row[j]` is the distance between what of `a` was read and
+    // the first `j` letters of `b`.
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut next = Vec::with_capacity(row.len());
+        next.push(i + 1);
+        for ((cb, diagonal), above) in b.iter().zip(&row).zip(row.iter().skip(1)) {
+            let left = next.last().copied().unwrap_or_default();
+            next.push((diagonal + usize::from(ca != *cb)).min(above + 1).min(left + 1));
+        }
+        row = next;
+    }
+    row.last().copied().unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,6 +236,15 @@ mod tests {
         assert_eq!(json["code"], "removed-field");
         assert_eq!((json["line"].as_u64(), json["column"].as_u64()), (Some(12), Some(5)));
         assert_eq!(p.section(), "machines");
+    }
+
+    #[test]
+    fn a_typo_finds_the_name_it_meant() {
+        assert_eq!(closest("netwrks", &["networks", "ports"]), Some("networks"));
+        assert_eq!(closest("dc1", &["dc01", "ws01"]), Some("dc01"));
+        assert_eq!(closest("zzz", &["networks"]), None);
+        assert_eq!(distance("kitten", "sitting"), 3);
+        assert_eq!((distance("", "abc"), distance("abc", "")), (3, 3));
     }
 
     #[test]

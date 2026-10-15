@@ -4,7 +4,9 @@
 
 use indexmap::IndexMap;
 use isoloom_spec::model::{self, DockerImpl, Generated, HttpCheck, MachineFile, MachineSecret, Protocol, SecretMount, VmImpl};
-use isoloom_spec::syntax::{self, Code, EnvValue, FieldPath, FileSource, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm};
+use isoloom_spec::syntax::{
+    self, Code, EnvValue, FieldPath, FileSource, HealthProbe, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm,
+};
 
 use super::Scope;
 use super::forms::{self, Container, Vm};
@@ -169,7 +171,11 @@ fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>
 /// healthcheck stays out (the spec's own checks report one that says nothing to try).
 fn healthcheck(at: &FieldPath, m: &syntax::Machine, h: &syntax::Healthcheck) -> (Option<model::Healthcheck>, Option<Problem>) {
     let mut unknown = None;
-    let http = h.http.as_ref().and_then(|page| {
+    let (test, page) = match &h.probe {
+        HealthProbe::Test(test) => (Some(test.clone()), None),
+        HealthProbe::Http(page) => (None, Some(page)),
+    };
+    let http = page.and_then(|page| {
         let port = match &page.port {
             PortRef::Number(n) => Some(n.get()),
             PortRef::Name(n) => {
@@ -183,11 +189,11 @@ fn healthcheck(at: &FieldPath, m: &syntax::Machine, h: &syntax::Healthcheck) -> 
         };
         port.map(|port| HttpCheck { port, path: page.path.clone() })
     });
-    if h.test.is_none() && http.is_none() {
+    if test.is_none() && http.is_none() {
         return (None, unknown);
     }
     let lowered = model::Healthcheck {
-        test: h.test.clone(),
+        test,
         http,
         interval: h.interval.clone(),
         timeout: h.timeout.clone(),
@@ -240,7 +246,7 @@ fn value_file(secret: &str, f: &syntax::File, windows: bool) -> MachineSecret {
         target: Some(f.path.clone()),
         uid: f.uid,
         gid: f.gid,
-        mode: (!windows).then(|| f.mode_or_default().bits()),
+        mode: (!windows).then(|| f.mode_or_default()),
     })
 }
 

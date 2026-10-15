@@ -1,0 +1,7 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"machines:\\n  web:\\n    os: debian@12\\n    networks: { lab: 10 }\\n    ports: [{ port: 80 }]\\n\"))"
+---
+error[invalid-value] machines.web.ports  (isoloom.yml:9:5)
+  ports are a map of named ports, not a list
+  fix: `ports: { p80: { port: 80 } }`

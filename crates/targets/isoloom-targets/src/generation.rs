@@ -87,7 +87,7 @@ pub fn project_copies(files: &[GeneratedFile], dir: &Path) -> Result<Vec<Generat
 fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Result<Spec, GenerateError> {
     let spec = lab.for_target(target);
     match instance {
-        Some(n) => isoloom_spec::instance::apply(&spec, n).map_err(|what| GenerateError::Unsupported { target, what }),
+        Some(n) => isoloom_spec::instance::apply(&spec, n).map_err(|e| GenerateError::Unsupported { target, what: e.to_string() }),
         None => Ok(spec),
     }
 }

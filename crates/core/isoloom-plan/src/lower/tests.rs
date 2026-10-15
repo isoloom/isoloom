@@ -26,7 +26,7 @@ fn a_flag_becomes_a_secret_file_read_from_its_input() {
     let web = &l.spec.machines["web"];
     let MachineSecret::Mount(m) = &web.secrets[0] else { panic!() };
     assert_eq!(
-        (m.source.as_str(), m.target.as_deref(), m.uid, m.mode),
+        (m.source.as_str(), m.target.as_deref(), m.uid, m.mode.map(isoloom_spec::syntax::Mode::bits)),
         ("input-flag", Some("/srv/archive/flag.txt"), Some(1000), Some(0o400))
     );
     assert!(web.inputs.is_empty() && web.environment.is_empty());

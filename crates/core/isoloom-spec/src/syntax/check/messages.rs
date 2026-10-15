@@ -4,6 +4,7 @@
 //! `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`.
 
 use super::super::Spec;
+use super::super::machine::Machine;
 use super::super::problem::{Code, FieldPath, Problem, Problems};
 use crate::placeholders::{self, Piece};
 
@@ -16,7 +17,7 @@ pub(super) fn check(spec: &Spec, out: &mut Problems) {
             Piece::Text(_) => {}
             Piece::Placeholder(inner) => {
                 let path = inner.trim();
-                if let Err(why) = resolve(spec, path) {
+                if let Some(why) = unresolved(spec, path) {
                     out.push(Problem::new(Code::UnknownReference, at.clone(), format!("`{{{{ {path} }}}}`: {why}")).fix(example(spec)));
                 }
             }
@@ -25,34 +26,39 @@ pub(super) fn check(spec: &Spec, out: &mut Problems) {
     }
 }
 
-/// Whether `path` names something the message can show, else why not.
-fn resolve(spec: &Spec, path: &str) -> Result<(), String> {
+/// Why `path` names nothing the message can show; `None` when it names something.
+fn unresolved(spec: &Spec, path: &str) -> Option<String> {
     let parts: Vec<&str> = path.split('.').collect();
     match parts.as_slice() {
         ["cloud", "outputs", name] => match &spec.cloud {
-            Some(c) if c.outputs.contains_key(*name) => Ok(()),
-            Some(_) => Err(format!("`cloud.outputs` has no `{name}`")),
-            None => Err("the spec has no `cloud:`".into()),
+            Some(c) if c.outputs.contains_key(*name) => None,
+            Some(_) => Some(format!("`cloud.outputs` has no `{name}`")),
+            None => Some("the spec has no `cloud:`".into()),
         },
-        ["machines", m, rest @ ..] => {
-            let machine = spec.machines.get(*m).ok_or_else(|| format!("no machine named `{m}`"))?;
-            match rest {
-                ["addresses", n] if machine.networks.contains_key(*n) => Ok(()),
-                ["addresses", n] => Err(format!("`{m}` isn't on a network named `{n}`")),
-                ["ports", p, field] => {
-                    let port = machine.ports.iter().find(|(k, _)| k.as_str() == *p).map(|(_, v)| v);
-                    match (port, *field) {
-                        (None, _) => Err(format!("`{m}` has no port named `{p}` (ports are named, never numbered)")),
-                        (Some(_), "port" | "published") => Ok(()),
-                        (Some(port), "url") if port.protocol.is_http() => Ok(()),
-                        (Some(_), "url") => Err(format!("`{p}` isn't an `http` or `https` port, so it has no URL")),
-                        (Some(_), other) => Err(format!("a port has `port`, `published` and `url`, not `{other}`")),
-                    }
-                }
-                _ => Err("a machine's paths are `ports.<name>.port`, `.published`, `.url` and `addresses.<network>`".into()),
+        ["machines", m, rest @ ..] => match spec.machines.get(*m) {
+            None => Some(format!("no machine named `{m}`")),
+            Some(machine) => unresolved_in(m, machine, rest),
+        },
+        _ => Some("not a path the message can show".into()),
+    }
+}
+
+/// Why `rest`, a path inside machine `m`, names nothing; `None` when it names something.
+fn unresolved_in(m: &str, machine: &Machine, rest: &[&str]) -> Option<String> {
+    match rest {
+        ["addresses", n] if machine.networks.contains_key(*n) => None,
+        ["addresses", n] => Some(format!("`{m}` isn't on a network named `{n}`")),
+        ["ports", p, field] => {
+            let port = machine.ports.iter().find(|(k, _)| k.as_str() == *p).map(|(_, v)| v);
+            match (port, *field) {
+                (None, _) => Some(format!("`{m}` has no port named `{p}` (ports are named, never numbered)")),
+                (Some(_), "port" | "published") => None,
+                (Some(port), "url") if port.protocol.is_http() => None,
+                (Some(_), "url") => Some(format!("`{p}` isn't an `http` or `https` port, so it has no URL")),
+                (Some(_), other) => Some(format!("a port has `port`, `published` and `url`, not `{other}`")),
             }
         }
-        _ => Err("not a path the message can show".into()),
+        _ => Some("a machine's paths are `ports.<name>.port`, `.published`, `.url` and `addresses.<network>`".into()),
     }
 }
 
@@ -61,6 +67,6 @@ fn example(spec: &Spec) -> String {
     let named = spec
         .machines
         .iter()
-        .find_map(|(m, machine)| machine.ports.keys().next().map(|p| format!("{{{{ machines.{m}.ports.{p}.published }}}}")));
+        .find_map(|(m, machine)| machine.ports.keys().next().map(|p| format!("`{{{{ machines.{m}.ports.{p}.published }}}}`")));
     named.unwrap_or_else(|| "`{{ machines.<machine>.ports.<name>.published }}` or `{{ machines.<machine>.addresses.<network> }}`".into())
 }

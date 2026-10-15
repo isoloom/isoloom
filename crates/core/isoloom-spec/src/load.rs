@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::error::{LoadError, Result, Stage};
+use crate::error::{Error, Result};
 use crate::{defaults, profile, syntax};
 
 /// The spec file names, at the root of a project: `isoloom.yml` (canonical) or `isoloom.yaml`.
@@ -16,15 +16,15 @@ pub const SPEC_FILE: &str = "isoloom.yml";
 ///
 /// # Errors
 ///
-/// [`LoadError::Invalid`] with every problem found, coded and placed (`file` names the spec file
+/// [`Error::Invalid`] with every problem found, coded and placed (`file` names the spec file
 /// in their first line).
-pub fn parse(yaml: &str) -> Result<syntax::Spec, LoadError> {
+pub fn parse(yaml: &str) -> Result<syntax::Spec> {
     parse_file(yaml, SPEC_FILE)
 }
 
 /// [`parse`], the problems naming the spec file `file`.
-fn parse_file(yaml: &str, file: &str) -> Result<syntax::Spec, LoadError> {
-    syntax::parse(yaml).map_err(|problems| LoadError::Invalid {
+fn parse_file(yaml: &str, file: &str) -> Result<syntax::Spec> {
+    syntax::parse(yaml).map_err(|problems| Error::Invalid {
         file: file.to_owned(),
         problems,
     })
@@ -34,13 +34,13 @@ fn parse_file(yaml: &str, file: &str) -> Result<syntax::Spec, LoadError> {
 ///
 /// # Errors
 ///
-/// [`LoadError::NotFound`] when `dir` has neither, [`LoadError::Ambiguous`] when it has both.
-pub fn find(dir: &Path) -> Result<PathBuf, LoadError> {
+/// [`Error::NotFound`] when `dir` has neither, [`Error::Ambiguous`] when it has both.
+pub fn find(dir: &Path) -> Result<PathBuf> {
     let found: Vec<PathBuf> = SPEC_FILES.iter().map(|f| dir.join(f)).filter(|p| p.is_file()).collect();
     match found.as_slice() {
         [one] => Ok(one.clone()),
-        [] => Err(LoadError::NotFound(dir.to_path_buf())),
-        _ => Err(LoadError::Ambiguous(dir.to_path_buf())),
+        [] => Err(Error::NotFound(dir.to_path_buf())),
+        _ => Err(Error::Ambiguous(dir.to_path_buf())),
     }
 }
 
@@ -48,8 +48,8 @@ pub fn find(dir: &Path) -> Result<PathBuf, LoadError> {
 ///
 /// # Errors
 ///
-/// [`LoadError`]: no spec file (or two), one that can't be read, or its problems.
-pub fn load(dir: &Path) -> Result<syntax::Spec, LoadError> {
+/// [`Error`]: no spec file (or two), one that can't be read, or its problems.
+pub fn load(dir: &Path) -> Result<syntax::Spec> {
     load_with(dir, &[])
 }
 
@@ -58,8 +58,8 @@ pub fn load(dir: &Path) -> Result<syntax::Spec, LoadError> {
 ///
 /// # Errors
 ///
-/// [`LoadError`], as [`load`], or an override that doesn't apply.
-pub fn load_with(dir: &Path, sets: &[String]) -> Result<syntax::Spec, LoadError> {
+/// [`Error`], as [`load`], or an override that doesn't apply.
+pub fn load_with(dir: &Path, sets: &[String]) -> Result<syntax::Spec> {
     load_profiled(dir, None, sets)
 }
 
@@ -68,22 +68,21 @@ pub fn load_with(dir: &Path, sets: &[String]) -> Result<syntax::Spec, LoadError>
 ///
 /// # Errors
 ///
-/// [`LoadError`], as [`load_with`], or a profile that names what the spec doesn't have.
-pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[String]) -> Result<syntax::Spec, LoadError> {
+/// [`Error`], as [`load_with`], or a profile that names what the spec doesn't have.
+pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[String]) -> Result<syntax::Spec> {
     let path = find(dir)?;
     let file = path.file_name().map_or_else(|| SPEC_FILE.to_owned(), |f| f.to_string_lossy().into_owned());
-    let text = std::fs::read_to_string(&path).map_err(|source| LoadError::Read { path, source })?;
+    let text = std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })?;
     let text = match profile {
         Some(p) => {
             let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text)?;
             let problems = p.check(&doc);
             if !problems.is_empty() {
-                return Err(LoadError::Profile { problems });
+                return Err(Error::ProfileMismatch { problems });
             }
             defaults::override_spec_with(&text, Some(&p.spec), sets)
         }
         None => defaults::override_spec(&text, sets),
-    }
-    .map_err(LoadError::at(Stage::Overrides))?;
+    }?;
     parse_file(&text, &file)
 }

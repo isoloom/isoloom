@@ -3,7 +3,7 @@
 //! no existing host on `external`. Each is a `refused` problem; the spec itself stays valid.
 
 use isoloom_spec::model::{Shape, Target};
-use isoloom_spec::syntax::{self, Code, FieldPath, NoForm, Problem, Step};
+use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Step};
 
 use super::forms::{self, Vm};
 use super::overrides;
@@ -31,22 +31,17 @@ pub(super) fn of(source: &syntax::Spec, target: Target) -> Vec<Problem> {
     out
 }
 
-/// A refusal at `no`'s field.
-fn refused(name: &str, no: &NoForm) -> Problem {
-    Problem::new(Code::Refused, no.path(name), no.reason.clone()).fix(no.fix.clone())
-}
-
 /// The form `target` needs that the machine lacks, if it lacks it.
 fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) -> Option<Problem> {
     let container = forms::container(m);
     let vm = forms::vm(m);
     match target.needs() {
-        Shape::Docker => container.err().map(|no| refused(name, &no)),
-        Shape::Vm => vm.err().map(|no| refused(name, &no)),
-        Shape::VmOrLxc if overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)) => container.err().map(|no| refused(name, &no)),
-        Shape::VmOrLxc => vm.err().map(|no| refused(name, &no)),
+        Shape::Docker => container.err().map(|no| no.refusal(name)),
+        Shape::Vm => vm.err().map(|no| no.refusal(name)),
+        Shape::VmOrLxc if overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)) => container.err().map(|no| no.refusal(name)),
+        Shape::VmOrLxc => vm.err().map(|no| no.refusal(name)),
         Shape::Either => match (container, vm) {
-            (Err(_), Err(no)) => Some(refused(name, &no)),
+            (Err(_), Err(no)) => Some(no.refusal(name)),
             _ => None,
         },
         Shape::External => (overrides::external(source, name).is_none() && !(m.access && m.os.is_none())).then(|| {

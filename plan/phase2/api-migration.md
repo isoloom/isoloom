@@ -36,3 +36,18 @@ From the spec unit, for every consumer (Isothrum's runner and compiler, the laun
     - the Compose label is `isoloom.port.<name>`;
     - Terraform's published outputs are keyed `<machine>/<name>`;
     - the minimum Compose version is 2.17.0.
+
+## Phase 1c, `isoloom-spec` (the 1c-spec unit)
+
+11. **One error for the crate, `isoloom_spec::Error`** (and `isoloom_spec::Result<T>`):
+    - `LoadError` is `Error` (`Error::Invalid { file, problems }`, `NotFound`, `Ambiguous`, `Read` as before); `Stage` and `LoadError::Expand` are gone (an override that doesn't apply is `Error::SetShape` / `SetKey`, YAML that doesn't read `Error::Yaml`).
+    - `os::OsError` and `syntax::Invalid` are gone: `os::resolve`, `OsRef`, `Mode` and the name types' `FromStr` return `Error` (`Error::UnknownOs`, `UnknownOsVersion`, `Mode`, `Name`).
+    - What returned `Result<_, String>` returns `Result<_, Error>`, each case its own variant with the same message: `profile::{path, load, parse}` and `Profile::pin` (`Error::Profile*`), `defaults::{resolve, parse_set, override_spec, override_spec_with}` (`Error::Layer`, `Defaults`, `Set*`), `instance::apply` (`Error::Instance*`), `images::Table::parse` (`Error::Images`). `.to_string()` gives the old text.
+    - `Profile::check` returns `Vec<profile::ProfileProblem>` (`Display` is the old line); `Error::ProfileMismatch { problems }` replaces `LoadError::Profile`.
+12. **The environment is passed in** (`host::Host`, from `std::env::vars_os()` at the program's edge):
+    - `defaults::load(&defaults::Sources { project, images_file, profile, sets, host })` replaces `defaults::load` and `defaults::load_profiled`;
+    - `defaults::user_file(&host)`; `home::home()` is `host.home()`.
+13. **`syntax::Healthcheck`** holds one `probe: HealthProbe::{Test(CommandLine), Http(HealthPage)}`; both or neither is refused when the spec is parsed (`invalid-value`, or `conflict` for both).
+14. **Gone, unused outside the crate:** `addresses`, `model::from_yaml` (now the crate's own test helper), `os::{fill_vm, canonical}`, `groups::expand_shared` (`groups::expand` is the authored spec's), `model::Ipv6Addresses::is_static`.
+15. **`model::SecretMount.mode`** is an `Option<syntax::Mode>` (`.bits()` gives the `u32`), written `"0440"` as before.
+16. **Changed shape, same meaning:** `clones::expand`, `groups::expand` and `vlans::flatten` refuse with a placed `syntax::Problem` (was a `"path: reason"` string); `syntax::NoForm::refusal(machine)` is the `refused` problem a target reports.

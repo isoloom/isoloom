@@ -1,0 +1,22 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "serde_json::to_string_pretty(&found).unwrap_or_else(|e| panic!(\"{e}\"))"
+---
+[
+  {
+    "code": "sensitive-value",
+    "path": "machines.web.environment.FLAG",
+    "line": 10,
+    "column": 20,
+    "reason": "`FLAG` is sensitive and would show in `docker inspect`",
+    "fix": "`files: [{ path: <path>, input: FLAG }]`, or `inputs: { FLAG: { sensitive: false } }`"
+  },
+  {
+    "code": "unknown-reference",
+    "path": "machines.web.dns.servers[0]",
+    "line": 11,
+    "column": 22,
+    "reason": "`wbe` is neither an address nor a machine",
+    "fix": "did you mean `web`?"
+  }
+]

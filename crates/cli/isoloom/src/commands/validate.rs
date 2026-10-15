@@ -30,7 +30,7 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
             let lab = isoloom_targets::Lab::new(spec);
             (name, if a.skip_files { lab.problems() } else { lab.problems_with_files(&a.dir) })
         }
-        Err(isoloom_spec::LoadError::Invalid { problems, .. }) => (String::new(), problems),
+        Err(isoloom_spec::Error::Invalid { problems, .. }) => (String::new(), problems),
         Err(e) => return Err(e.into()),
     };
     if a.json {

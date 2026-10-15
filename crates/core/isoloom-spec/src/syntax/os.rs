@@ -9,7 +9,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use std::str::FromStr;
 
-use crate::os::{Os, OsError, resolve};
+use crate::Error;
+use crate::os::{Os, resolve};
 
 /// A known OS, as a machine's `os` names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -36,14 +37,15 @@ impl OsRef {
 }
 
 impl FromStr for OsRef {
-    type Err = OsError;
+    type Err = Error;
 
     /// The OS `text` names: `<family>@<version>`, or the family alone for its pinned default.
     ///
     /// # Errors
     ///
-    /// [`OsError`], listing the known families or the family's versions.
-    fn from_str(text: &str) -> Result<OsRef, OsError> {
+    /// [`Error::UnknownOs`] listing the known families, or [`Error::UnknownOsVersion`] listing
+    /// the family's versions.
+    fn from_str(text: &str) -> Result<OsRef, Error> {
         resolve(text).map(OsRef)
     }
 }

@@ -10,6 +10,7 @@ use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
 use super::names::{InputName, PortName};
+use crate::Error;
 use crate::model::CommandLine;
 
 /// A machine's own command: a text the shell runs, or a list run as it is, and the directory
@@ -121,30 +122,87 @@ fn root() -> String {
     "/".into()
 }
 
+/// What a healthcheck tries: a command, or a page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HealthProbe {
+    /// A command run inside the machine: healthy when it exits with 0.
+    Test(CommandLine),
+    /// A page the machine serves: healthy when it answers with a 2xx or 3xx status.
+    Http(HealthPage),
+}
+
+/// When a machine counts as healthy, besides its ports answering: a command that succeeds, or
+/// a page that answers, tried at its own pace.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "HealthcheckInput")]
+pub struct Healthcheck {
+    /// What it tries.
+    pub probe: HealthProbe,
+    /// The time between two tries (`5s`, `1m30s`). Default: 5s.
+    pub interval: Option<String>,
+    /// How long one try may take. Default: 3s.
+    pub timeout: Option<String>,
+    /// Failed tries in a row before the machine counts as unhealthy. Default: 60.
+    pub retries: Option<u32>,
+    /// A grace period after start before the first try counts (`30s`). Default: 10s.
+    pub start_period: Option<String>,
+}
+
+// A healthcheck as written, what the schema shows: exactly one of `test` and `http`.
 /// When a machine counts as healthy, besides its ports answering: a command that succeeds, or
 /// a page that answers.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
+#[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct Healthcheck {
+struct HealthcheckInput {
     /// A command run inside the machine: healthy when it exits with 0 (exactly one of `test`
     /// and `http`).
     #[serde(default)]
-    pub test: Option<CommandLine>,
+    test: Option<CommandLine>,
     /// A page the machine serves: healthy when it answers with a 2xx or 3xx status.
     #[serde(default)]
-    pub http: Option<HealthPage>,
+    http: Option<HealthPage>,
     /// The time between two tries (`5s`, `1m30s`). Default: 5s.
     #[serde(default)]
-    pub interval: Option<String>,
+    interval: Option<String>,
     /// How long one try may take. Default: 3s.
     #[serde(default)]
-    pub timeout: Option<String>,
+    timeout: Option<String>,
     /// Failed tries in a row before the machine counts as unhealthy. Default: 60.
     #[serde(default)]
-    pub retries: Option<u32>,
+    retries: Option<u32>,
     /// A grace period after start before the first try counts (`30s`). Default: 10s.
     #[serde(default)]
-    pub start_period: Option<String>,
+    start_period: Option<String>,
+}
+
+impl TryFrom<HealthcheckInput> for Healthcheck {
+    type Error = Error;
+
+    fn try_from(h: HealthcheckInput) -> Result<Healthcheck, Error> {
+        let probe = match (h.test, h.http) {
+            (Some(test), None) => HealthProbe::Test(test),
+            (None, Some(page)) => HealthProbe::Http(page),
+            (Some(_), Some(_)) => return Err(Error::TestAndHttp),
+            (None, None) => return Err(Error::NoHealthProbe),
+        };
+        Ok(Healthcheck {
+            probe,
+            interval: h.interval,
+            timeout: h.timeout,
+            retries: h.retries,
+            start_period: h.start_period,
+        })
+    }
+}
+
+impl JsonSchema for Healthcheck {
+    fn schema_name() -> Cow<'static, str> {
+        "Healthcheck".into()
+    }
+
+    fn json_schema(g: &mut SchemaGenerator) -> Schema {
+        HealthcheckInput::json_schema(g)
+    }
 }
 
 /// An environment variable's value: a fixed text (a number or a boolean read as its text), or a
@@ -220,16 +278,16 @@ impl<'de> Deserialize<'de> for EnvInput {
 }
 
 impl TryFrom<EnvInput> for EnvValue {
-    type Error = &'static str;
+    type Error = Error;
 
-    fn try_from(written: EnvInput) -> Result<EnvValue, &'static str> {
+    fn try_from(written: EnvInput) -> Result<EnvValue, Error> {
         match written {
             EnvInput::Text(text) => Ok(EnvValue::Text(text)),
             EnvInput::Number(n) => Ok(EnvValue::Text(n.to_string())),
             EnvInput::Bool(b) => Ok(EnvValue::Text(b.to_string())),
             EnvInput::Reference(EnvReference { input: Some(i), secret: None }) => Ok(EnvValue::Input(i)),
             EnvInput::Reference(EnvReference { input: None, secret: Some(s) }) => Ok(EnvValue::Secret(s)),
-            EnvInput::Reference(_) => Err("write one of `{ input: NAME }`"),
+            EnvInput::Reference(_) => Err(Error::EnvReference),
         }
     }
 }
@@ -261,9 +319,24 @@ mod tests {
     #[test]
     fn a_healthcheck_names_its_port() {
         let by_name: Healthcheck = serde_yaml_ng::from_str("{ http: { port: site, path: /health } }").unwrap();
-        assert_eq!(by_name.http.unwrap().port, PortRef::Name("site".parse().unwrap()));
+        assert!(matches!(by_name.probe, HealthProbe::Http(HealthPage { port: PortRef::Name(ref n), .. }) if n.as_str() == "site"));
         let by_number: Healthcheck = serde_yaml_ng::from_str("{ http: { port: 8000 } }").unwrap();
-        assert!(matches!(by_number.http.unwrap().port, PortRef::Number(_)));
+        assert!(matches!(by_number.probe, HealthProbe::Http(HealthPage { port: PortRef::Number(_), .. })));
+    }
+
+    #[test]
+    fn a_healthcheck_tries_one_thing() {
+        let test: Healthcheck = serde_yaml_ng::from_str("{ test: [pg_isready], interval: 2s }").unwrap();
+        assert_eq!(
+            (test.probe, test.interval.as_deref()),
+            (HealthProbe::Test(CommandLine::Exec(vec!["pg_isready".into()])), Some("2s"))
+        );
+        let both = serde_yaml_ng::from_str::<Healthcheck>("{ test: x, http: { port: 80 } }")
+            .unwrap_err()
+            .to_string();
+        assert!(both.contains("`test` and `http` are both given"), "{both}");
+        let neither = serde_yaml_ng::from_str::<Healthcheck>("{ interval: 5s }").unwrap_err().to_string();
+        assert!(neither.contains("a healthcheck says what to try"), "{neither}");
     }
 
     #[test]

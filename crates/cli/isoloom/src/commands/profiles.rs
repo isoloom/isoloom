@@ -54,7 +54,7 @@ fn check(dir: &Path, name: &str) -> Checked {
         Err(_) => (None, None),
     };
     let problems = match profile {
-        Err(e) => vec![e],
+        Err(e) => vec![e.to_string()],
         Ok(p) => problems_of(dir, &p),
     };
     Checked {
@@ -68,12 +68,12 @@ fn check(dir: &Path, name: &str) -> Checked {
 /// What is wrong with the spec a profile makes, and with the target it pins.
 fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile) -> Vec<String> {
     let spec = match isoloom_spec::load_profiled(dir, Some(p), &[]) {
-        Err(isoloom_spec::LoadError::Invalid { problems, .. }) => return problems.iter().map(|e| format!("the spec it makes: {}", e.line())).collect(),
+        Err(isoloom_spec::Error::Invalid { problems, .. }) => return problems.iter().map(|e| format!("the spec it makes: {}", e.line())).collect(),
         Err(e) => return e.to_string().lines().map(str::to_owned).collect(),
         Ok(spec) => spec,
     };
-    let lab = match isoloom_spec::defaults::load_profiled(dir, None, Some(p), &[]) {
-        Err(e) => return vec![e],
+    let lab = match isoloom_spec::defaults::load(&crate::spec::defaults_of(dir, None, Some(p), &[])) {
+        Err(e) => return vec![e.to_string()],
         Ok(r) => isoloom_targets::Lab::new(spec).with_images(r.defaults.images),
     };
     let mut problems: Vec<String> = lab.problems().iter().map(|e| format!("the spec it makes: {}", e.line())).collect();

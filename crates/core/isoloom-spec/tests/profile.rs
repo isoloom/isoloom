@@ -4,6 +4,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use isoloom_spec::host::Host;
 use isoloom_spec::profile::{self, Profile};
 use isoloom_spec::{Target, defaults, load_profiled};
 
@@ -76,7 +77,14 @@ fn a_profile_is_a_defaults_layer_between_the_project_file_and_set() -> Outcome {
         "cloud: { linode: { region: us-east }, oci: { region: us-ashburn-1 } }\n",
     )?;
     let p = profile::load(&dir, "site")?;
-    let r = defaults::load_profiled(&dir, None, Some(&p), &["defaults.cloud.oci.region=eu-paris-1".into()])?;
+    let sets = ["defaults.cloud.oci.region=eu-paris-1".to_owned()];
+    let r = defaults::load(&defaults::Sources {
+        project: &dir,
+        images_file: None,
+        profile: Some(&p),
+        sets: &sets,
+        host: Host::default(),
+    })?;
     assert_eq!(
         r.defaults.cloud["linode"].region.as_deref(),
         Some("se-sto"),
@@ -94,9 +102,10 @@ fn a_profile_names_only_what_the_spec_has() -> Outcome {
         parse("spec:\n  machines: { webz: { resources: { cpus: 2 } } }\n  networks: { lan: { internet: false } }\ninputs: { REGISTRY: r.local, NOPE: x }\n")?;
     let problems = p.check(&spec_doc()?);
     assert_eq!(problems.len(), 3, "{problems:?}");
-    assert!(problems[0].contains("`spec.machines.webz`: the spec has no machine `webz`"), "{problems:?}");
-    assert!(problems[1].contains("`spec.networks.lan`: the spec has no network `lan`"), "{problems:?}");
-    assert!(problems[2].contains("input `NOPE`"), "{problems:?}");
+    let lines: Vec<String> = problems.iter().map(ToString::to_string).collect();
+    assert!(lines[0].contains("`spec.machines.webz`: the spec has no machine `webz`"), "{lines:?}");
+    assert!(lines[1].contains("`spec.networks.lan`: the spec has no network `lan`"), "{lines:?}");
+    assert!(lines[2].contains("input `NOPE`"), "{lines:?}");
 
     let dir = project("unknown", &[("bad", "spec:\n  machines: { webz: { resources: { cpus: 2 } } }\n")])?;
     let bad = profile::load(&dir, "bad")?;
@@ -107,7 +116,7 @@ fn a_profile_names_only_what_the_spec_has() -> Outcome {
 
 #[test]
 fn a_profile_file_is_strict() -> Outcome {
-    let refused = |text: &str| profile::parse("p", PathBuf::from("p.yml"), text).unwrap_err();
+    let refused = |text: &str| profile::parse("p", PathBuf::from("p.yml"), text).unwrap_err().to_string();
     let typo = refused("targt: docker\n");
     assert!(typo.contains("unknown field `targt`"), "{typo}");
     let target = refused("target: moon\n");
@@ -126,7 +135,7 @@ fn a_profile_pins_its_target() -> Outcome {
     assert_eq!(p.target, Some(Target::Proxmox));
     assert_eq!(p.pin(None)?.as_deref(), Some("proxmox"));
     assert_eq!(p.pin(Some("proxmox"))?.as_deref(), Some("proxmox"));
-    assert!(p.pin(Some("docker")).unwrap_err().contains("runs on `proxmox`, not `docker`"));
+    assert!(p.pin(Some("docker")).unwrap_err().to_string().contains("runs on `proxmox`, not `docker`"));
     let any = parse("description: no target\n")?;
     assert_eq!(any.pin(Some("docker"))?.as_deref(), Some("docker"));
     assert_eq!(any.pin(None)?, None);
@@ -139,11 +148,11 @@ fn profiles_are_listed_and_found_by_name() -> Outcome {
     std::fs::write(dir.join(profile::DIR).join("Not_A_Name.yml"), "{}\n")?;
     std::fs::write(dir.join(profile::DIR).join("notes.txt"), "")?;
     assert_eq!(profile::list(&dir), ["a-site", "b-site"]);
-    let missing = profile::load(&dir, "c-site").unwrap_err();
+    let missing = profile::load(&dir, "c-site").unwrap_err().to_string();
     assert!(missing.contains("no profile `c-site`") && missing.contains("a-site, b-site"), "{missing}");
-    assert!(profile::load(&dir, "../etc").unwrap_err().contains("kebab-case"));
+    assert!(profile::load(&dir, "../etc").unwrap_err().to_string().contains("kebab-case"));
     std::fs::write(dir.join(profile::DIR).join("a-site.yaml"), "{}\n")?;
-    assert!(profile::load(&dir, "a-site").unwrap_err().contains("keep one"));
+    assert!(profile::load(&dir, "a-site").unwrap_err().to_string().contains("keep one"));
     assert_eq!(profile::list(Path::new("/nonexistent")), Vec::<String>::new());
     Ok(())
 }

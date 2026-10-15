@@ -25,6 +25,7 @@
 //! A profile names only what the spec has: an unknown machine, network or input is an
 //! error, so a renamed machine can't leave a profile silently doing nothing.
 
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
@@ -33,6 +34,7 @@ use serde_yaml_ng::{Mapping, Value};
 
 use crate::defaults::Layer;
 use crate::model::Target;
+use crate::{Error, Result};
 
 /// The folder of profiles, next to the spec.
 pub const DIR: &str = "profiles";
@@ -78,9 +80,14 @@ pub fn valid_name(name: &str) -> bool {
 }
 
 /// The profile file for `name` in `project`: `profiles/<name>.yml` or `.yaml`, never both.
-pub fn path(project: &Path, name: &str) -> Result<PathBuf, String> {
+///
+/// # Errors
+///
+/// [`Error::ProfileName`] for a name that isn't kebab-case, [`Error::NoProfile`] (with the
+/// project's profiles) when there is no such file, [`Error::TwoProfiles`] when both exist.
+pub fn path(project: &Path, name: &str) -> Result<PathBuf> {
     if !valid_name(name) {
-        return Err(format!("profile `{name}`: a profile name is kebab-case (lowercase letters, digits, dashes)"));
+        return Err(Error::ProfileName(name.to_owned()));
     }
     let found: Vec<PathBuf> = ["yml", "yaml"]
         .iter()
@@ -89,16 +96,12 @@ pub fn path(project: &Path, name: &str) -> Result<PathBuf, String> {
         .collect();
     match found.as_slice() {
         [one] => Ok(one.clone()),
-        [] => {
-            let known = list(project);
-            let hint = if known.is_empty() {
-                format!("no profiles in {}", project.join(DIR).display())
-            } else {
-                format!("profiles here: {}", known.join(", "))
-            };
-            Err(format!("no profile `{name}` ({hint})"))
-        }
-        _ => Err(format!("both {DIR}/{name}.yml and {DIR}/{name}.yaml exist; keep one")),
+        [] => Err(Error::NoProfile {
+            name: name.to_owned(),
+            folder: project.join(DIR),
+            known: list(project),
+        }),
+        _ => Err(Error::TwoProfiles { name: name.to_owned() }),
     }
 }
 
@@ -123,21 +126,43 @@ pub fn list(project: &Path) -> Vec<String> {
 }
 
 /// Reads `profiles/<name>.yml` in `project`.
-pub fn load(project: &Path, name: &str) -> Result<Profile, String> {
+///
+/// # Errors
+///
+/// As [`path`], then [`Error::Read`] for a file that can't be read, then as [`parse`].
+pub fn load(project: &Path, name: &str) -> Result<Profile> {
     let path = path(project, name)?;
-    let text = std::fs::read_to_string(&path).map_err(|e| format!("can't read {}: {e}", path.display()))?;
+    let text = std::fs::read_to_string(&path).map_err(|source| Error::Read { path: path.clone(), source })?;
     parse(name, path, &text)
 }
 
 /// A profile from its text.
-pub fn parse(name: &str, path: PathBuf, text: &str) -> Result<Profile, String> {
-    let at = |e: String| format!("profile `{name}` ({}): {e}", path.display());
-    let file: File = serde_yaml_ng::from_str(text).map_err(|e| at(e.to_string()))?;
-    let mapping = |v: Option<Value>, key: &str| -> Result<Value, String> {
+///
+/// # Errors
+///
+/// [`Error::ProfileYaml`] for text that isn't YAML or a field a profile doesn't have,
+/// [`Error::ProfileMapping`] for a `spec` or `defaults` that isn't a mapping, and
+/// [`Error::ProfileInput`] for an input that isn't one value.
+pub fn parse(name: &str, path: PathBuf, text: &str) -> Result<Profile> {
+    let file: File = match serde_yaml_ng::from_str(text) {
+        Ok(file) => file,
+        Err(source) => {
+            return Err(Error::ProfileYaml {
+                name: name.to_owned(),
+                path,
+                source,
+            });
+        }
+    };
+    let mapping = |v: Option<Value>, key: &'static str| -> Result<Value> {
         match v {
             None | Some(Value::Null) => Ok(Value::Mapping(Mapping::new())),
             Some(m @ Value::Mapping(_)) => Ok(m),
-            Some(_) => Err(at(format!("`{key}` is a mapping"))),
+            Some(_) => Err(Error::ProfileMapping {
+                name: name.to_owned(),
+                path: path.clone(),
+                key,
+            }),
         }
     };
     let spec = mapping(file.spec, "spec")?;
@@ -148,7 +173,13 @@ pub fn parse(name: &str, path: PathBuf, text: &str) -> Result<Profile, String> {
             Value::String(s) => s,
             Value::Number(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            _ => return Err(at(format!("input `{k}` takes a single value (text, a number or a boolean)"))),
+            _ => {
+                return Err(Error::ProfileInput {
+                    name: name.to_owned(),
+                    path,
+                    input: k,
+                });
+            }
         };
         inputs.insert(k, value);
     }
@@ -181,7 +212,8 @@ impl Profile {
 
     /// What's wrong with the profile for this spec (the spec's YAML as written, before any
     /// override): machines, networks and inputs it names that the spec doesn't have.
-    pub fn check(&self, spec: &Value) -> Vec<String> {
+    #[must_use]
+    pub fn check(&self, spec: &Value) -> Vec<ProfileProblem> {
         let mut problems = Vec::new();
         let names = |section: &str| -> Vec<String> {
             spec.get(section)
@@ -195,11 +227,11 @@ impl Profile {
                 for k in m.keys() {
                     let k = k.as_str().unwrap_or_default();
                     if !known.iter().any(|n| n == k) {
-                        problems.push(format!(
-                            "profile `{}`: `spec.{section}.{k}`: the spec has no {} `{k}`",
-                            self.name,
-                            section.strip_suffix('s').unwrap_or(section)
-                        ));
+                        problems.push(ProfileProblem::Unknown {
+                            profile: self.name.clone(),
+                            section,
+                            name: k.to_owned(),
+                        });
                     }
                 }
             }
@@ -211,22 +243,63 @@ impl Profile {
             .unwrap_or_default();
         for k in self.inputs.keys() {
             if !declared.iter().any(|d| d == k) {
-                problems.push(format!("profile `{}`: input `{k}` isn't one of the spec's `inputs`", self.name));
+                problems.push(ProfileProblem::Input {
+                    profile: self.name.clone(),
+                    input: k.clone(),
+                });
             }
         }
         problems
     }
 
     /// The target to use: the profile's when none is asked for; an error when another is.
-    pub fn pin(&self, asked: Option<&str>) -> Result<Option<String>, String> {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ProfileTarget`] when another target than the profile's is asked for.
+    pub fn pin(&self, asked: Option<&str>) -> Result<Option<String>> {
         match (self.target, asked) {
             (Some(t), None) => Ok(Some(t.id().to_owned())),
-            (Some(t), Some(a)) if a != t.id() => Err(format!(
-                "profile `{}` runs on `{}`, not `{a}`: drop the target or choose another profile",
-                self.name,
-                t.id()
-            )),
+            (Some(t), Some(a)) if a != t.id() => Err(Error::ProfileTarget {
+                profile: self.name.clone(),
+                target: t,
+                asked: a.to_owned(),
+            }),
             (_, a) => Ok(a.map(str::to_owned)),
+        }
+    }
+}
+
+/// What a profile names that its spec doesn't have.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ProfileProblem {
+    /// A machine or a network of its `spec`.
+    Unknown {
+        /// The profile's name.
+        profile: String,
+        /// The section, `machines` or `networks`.
+        section: &'static str,
+        /// The name the spec doesn't have.
+        name: String,
+    },
+    /// One of its `inputs`.
+    Input {
+        /// The profile's name.
+        profile: String,
+        /// The input the spec doesn't declare.
+        input: String,
+    },
+}
+
+impl fmt::Display for ProfileProblem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProfileProblem::Unknown { profile, section, name } => {
+                let one = section.strip_suffix('s').unwrap_or(section);
+                write!(f, "profile `{profile}`: `spec.{section}.{name}`: the spec has no {one} `{name}`")
+            }
+            ProfileProblem::Input { profile, input } => write!(f, "profile `{profile}`: input `{input}` isn't one of the spec's `inputs`"),
         }
     }
 }

@@ -13,6 +13,8 @@
 //! version left out resolves to the family's pinned default ([`Family::default`]), recorded in
 //! the resolved snapshot.
 
+use crate::{Error, Result};
+
 /// An OS family: the versions Isoloom has images for, each with its image-table name, and the
 /// version an omitted one resolves to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,31 +115,6 @@ impl Os {
     }
 }
 
-/// Why an OS doesn't resolve. Each message lists what is known.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum OsError {
-    /// Neither a family nor an image-table name.
-    #[error("unknown OS `{text}`; write `<family>@<version>` with one of: {known}")]
-    UnknownFamily {
-        /// What the spec wrote.
-        text: String,
-        /// The families and their versions.
-        known: String,
-    },
-    /// A known family without that version.
-    #[error("{family} has no version `{version}`; use one of: {known} (`{family}` alone is {family}@{default})")]
-    UnknownVersion {
-        /// The family.
-        family: &'static str,
-        /// The version the spec wrote.
-        version: String,
-        /// The family's versions.
-        known: String,
-        /// The family's default version.
-        default: &'static str,
-    },
-}
-
 impl Family {
     /// The family's version `version`, resolved.
     fn get(&self, version: &str) -> Option<Os> {
@@ -156,16 +133,21 @@ impl Family {
 
 /// Resolves an OS as a spec writes it: `<family>@<version>`, or `<family>` for its default
 /// version.
-pub fn resolve(text: &str) -> Result<Os, OsError> {
+///
+/// # Errors
+///
+/// [`Error::UnknownOs`] listing the known families, or [`Error::UnknownOsVersion`] listing the
+/// family's versions.
+pub fn resolve(text: &str) -> Result<Os> {
     let (family, version) = text.split_once('@').map_or((text, None), |(f, v)| (f, Some(v)));
     let Some(f) = FAMILIES.iter().find(|f| f.name == family) else {
-        return Err(OsError::UnknownFamily {
+        return Err(Error::UnknownOs {
             text: text.to_owned(),
             known: FAMILIES.iter().map(|f| format!("{} ({})", f.name, f.known())).collect::<Vec<_>>().join(", "),
         });
     };
     let version = version.unwrap_or(f.default);
-    f.get(version).ok_or_else(|| OsError::UnknownVersion {
+    f.get(version).ok_or_else(|| Error::UnknownOsVersion {
         family: f.name,
         version: version.to_owned(),
         known: f.known(),

@@ -5,7 +5,7 @@
 use serde::de::DeserializeOwned;
 use serde_yaml_ng::{Mapping, Value};
 
-use super::problem::{Code, FieldPath, Problem, Problems};
+use super::problem::{Code, FieldPath, Problem, Problems, closest};
 use super::spans::Spans;
 use super::{Spec, old_keys};
 
@@ -222,34 +222,6 @@ fn unknown(at: &FieldPath, field: &str, known: &[&str]) -> Problem {
             known.iter().map(|k| format!("`{k}`")).collect::<Vec<_>>().join(", ")
         )),
     }
-}
-
-/// The known name closest to `word`, when it is close (a typo).
-fn closest<'a>(word: &str, known: &[&'a str]) -> Option<&'a str> {
-    known
-        .iter()
-        .map(|k| (distance(word, k), *k))
-        .filter(|(d, k)| *d <= 2.max(k.len() / 4))
-        .min_by_key(|(d, _)| *d)
-        .map(|(_, k)| k)
-}
-
-/// The edit distance between two words.
-fn distance(a: &str, b: &str) -> usize {
-    let b: Vec<char> = b.chars().collect();
-    // One row of the table at a time: `row[j]` is the distance between what of `a` was read and
-    // the first `j` letters of `b`.
-    let mut row: Vec<usize> = (0..=b.len()).collect();
-    for (i, ca) in a.chars().enumerate() {
-        let mut next = Vec::with_capacity(row.len());
-        next.push(i + 1);
-        for ((cb, diagonal), above) in b.iter().zip(&row).zip(row.iter().skip(1)) {
-            let left = next.last().copied().unwrap_or_default();
-            next.push((diagonal + usize::from(ca != *cb)).min(above + 1).min(left + 1));
-        }
-        row = next;
-    }
-    row.last().copied().unwrap_or_default()
 }
 
 #[cfg(test)]

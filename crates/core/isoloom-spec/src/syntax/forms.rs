@@ -5,7 +5,7 @@
 
 use super::app::{Recipe, Step};
 use super::machine::{Kind, Machine};
-use super::problem::FieldPath;
+use super::problem::{Code, FieldPath, Problem};
 
 /// How a machine is produced in one form.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +40,12 @@ impl NoForm {
             reason: reason.into(),
             fix: fix.into(),
         }
+    }
+
+    /// The `refused` problem of a target that needs the form, at the field for machine `name`.
+    #[must_use]
+    pub fn refusal(&self, name: &str) -> Problem {
+        Problem::new(Code::Refused, self.path(name), self.reason.clone()).fix(self.fix.clone())
     }
 
     /// The field's full path for machine `name`.

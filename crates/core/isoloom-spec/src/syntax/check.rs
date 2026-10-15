@@ -12,7 +12,7 @@ use super::Spec;
 use super::app::{Recipe, Step, has_extension};
 use super::machine::{Kind, Machine};
 use super::problem::{Code, FieldPath, Problem, Problems};
-use super::process::PortRef;
+use super::process::{HealthProbe, PortRef};
 
 /// The spec's problems, placed, in file order.
 #[must_use]
@@ -156,22 +156,11 @@ fn process(at: &FieldPath, m: &Machine, out: &mut Problems) {
             );
         }
     }
-    if let Some(h) = &m.healthcheck {
-        let at = at.key("healthcheck");
-        match (&h.test, &h.http) {
-            (Some(_), Some(_)) => out.push(Problem::new(Code::Conflict, at, "a healthcheck is a `test` or an `http` page, not both")),
-            (None, None) => {
-                out.push(Problem::new(Code::MissingField, at, "a healthcheck says what to try").fix("`{ test: <command> }` or `{ http: { port, path } }`"));
-            }
-            (None, Some(page)) => {
-                if let PortRef::Name(n) = &page.port
-                    && !m.ports.contains_key(n)
-                {
-                    out.push(port_reference(&at.key("http").key("port"), n.as_str(), m));
-                }
-            }
-            (Some(_), None) => {}
-        }
+    if let Some(HealthProbe::Http(page)) = m.healthcheck.as_ref().map(|h| &h.probe)
+        && let PortRef::Name(n) = &page.port
+        && !m.ports.contains_key(n)
+    {
+        out.push(port_reference(&at.key("healthcheck").key("http").key("port"), n.as_str(), m));
     }
 }
 

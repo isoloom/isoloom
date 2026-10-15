@@ -9,7 +9,7 @@ use crate::testing::{Outcome, between, example, file, from};
 fn problems(yaml: &str) -> Outcome<String> {
     let found = match parse(yaml) {
         Ok(spec) => Lab::new(spec).problems(),
-        Err(isoloom_spec::LoadError::Invalid { problems, .. }) => problems,
+        Err(isoloom_spec::Error::Invalid { problems, .. }) => problems,
         Err(e) => return Err(e.into()),
     };
     Ok(found.iter().map(isoloom_spec::syntax::Problem::line).collect::<Vec<_>>().join("\n"))

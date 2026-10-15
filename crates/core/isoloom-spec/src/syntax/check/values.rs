@@ -9,7 +9,7 @@ use super::super::Spec;
 use super::super::files::FileSource;
 use super::super::machine::Machine;
 use super::super::names::is_variable;
-use super::super::problem::{Code, FieldPath, Problem, Problems};
+use super::super::problem::{Code, FieldPath, Problem, Problems, closest};
 use super::super::process::EnvValue;
 
 /// A machine's environment, files and DNS servers.
@@ -124,11 +124,14 @@ fn dns(spec: &Spec, at: &FieldPath, m: &Machine, out: &mut Problems) {
         }
         let at = at.key("dns").key("servers").index(i);
         match spec.machines.get(server) {
-            None => out.push(Problem::new(
-                Code::UnknownReference,
-                at,
-                format!("`{server}` is neither an address nor a machine"),
-            )),
+            None => {
+                let p = Problem::new(Code::UnknownReference, at, format!("`{server}` is neither an address nor a machine"));
+                let machines: Vec<&str> = spec.machines.keys().map(String::as_str).collect();
+                out.push(match closest(server, &machines) {
+                    Some(name) => p.fix(format!("did you mean `{name}`?")),
+                    None => p,
+                });
+            }
             Some(other) if !other.networks.keys().any(|n| m.networks.contains_key(n)) => {
                 out.push(Problem::new(
                     Code::UnknownReference,

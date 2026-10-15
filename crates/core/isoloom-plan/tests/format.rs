@@ -1,7 +1,7 @@
 //! A lab's problems and the targets its machines' forms allow (the examples are checked in the
 //! `examples` test).
 
-use isoloom_spec::LoadError;
+use isoloom_spec::Error;
 use isoloom_spec::syntax::Code;
 use testing::{ids, lab, problems, refused};
 
@@ -81,11 +81,11 @@ fn a_machine_needs_an_os_unless_it_is_the_access_machine() {
 fn spec_file_is_isoloom_yml_or_yaml_but_not_both() {
     let dir = std::env::temp_dir().join(format!("isoloom-find-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    assert!(matches!(isoloom_spec::find(&dir), Err(LoadError::NotFound(_))));
+    assert!(matches!(isoloom_spec::find(&dir), Err(Error::NotFound(_))));
     std::fs::write(dir.join("isoloom.yaml"), "x").unwrap();
     assert!(isoloom_spec::find(&dir).unwrap().ends_with("isoloom.yaml"));
     std::fs::write(dir.join("isoloom.yml"), "x").unwrap();
-    assert!(matches!(isoloom_spec::find(&dir), Err(LoadError::Ambiguous(_))));
+    assert!(matches!(isoloom_spec::find(&dir), Err(Error::Ambiguous(_))));
     std::fs::remove_dir_all(dir).unwrap();
 }
 

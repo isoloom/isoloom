@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::machine::ScalarSchema;
+use crate::syntax::Mode;
 
 /// Where the runner (`isoloom run`) reads a secret's value: one store, written as a map with
 /// one key (`{ env: DB_PASSWORD }`). Another store is a new variant here and a reader of its
@@ -103,9 +104,9 @@ pub struct SecretMount {
     /// The file's mode, in octal (`0440`, or `"0440"`). Default `0444` in a container (as
     /// Compose and Kubernetes do), `0400` on a Linux VM, whose other users shouldn't read it.
     /// Not on Windows.
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "octal", serialize_with = "write_octal")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<ScalarSchema>")]
-    pub mode: Option<u32>,
+    pub mode: Option<Mode>,
 }
 
 /// Whether `p` is an absolute Windows path on a drive (`C:\app\db`, `C:/app/db`).
@@ -167,33 +168,4 @@ impl MachineSecret {
 #[must_use]
 pub fn secret_variable(name: &str) -> String {
     format!("ISOLOOM_SECRET_{}", name.to_ascii_uppercase().replace('-', "_"))
-}
-
-/// A mode written as octal digits: `0440` (which YAML reads as the number 440) or `"0440"`.
-fn octal<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<u32>, D::Error> {
-    let raw: Option<serde_json::Value> = Deserialize::deserialize(d)?;
-    let text = match raw {
-        None => return Ok(None),
-        Some(serde_json::Value::String(s)) => s,
-        Some(serde_json::Value::Number(n)) => n.to_string(),
-        Some(_) => return Err(serde::de::Error::custom("a mode is octal digits, like 0440")),
-    };
-    u32::from_str_radix(&text, 8)
-        .ok()
-        .filter(|m| *m <= 0o777)
-        .map(Some)
-        .ok_or_else(|| serde::de::Error::custom(format!("`{text}` isn't a file mode: octal digits up to 0777, like 0440")))
-}
-
-/// A mode as the spec writes it, `"0440"`, so the resolved spec reads back the same.
-#[expect(
-    clippy::ref_option,
-    clippy::trivially_copy_pass_by_ref,
-    reason = "serde's `serialize_with` calls this with a reference to the field, an `Option<u32>`"
-)]
-fn write_octal<S: serde::Serializer>(mode: &Option<u32>, s: S) -> Result<S::Ok, S::Error> {
-    match mode {
-        Some(m) => s.serialize_str(&format!("{m:04o}")),
-        None => s.serialize_none(),
-    }
 }

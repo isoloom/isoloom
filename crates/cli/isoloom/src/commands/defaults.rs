@@ -33,13 +33,14 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
 /// Every layer merged, each value with its source.
 fn in_effect(profile: &spec::Profile, dir: &Path, json: bool, console: &mut Console) -> Result<Verdict> {
     let profile = profile.load(dir)?;
-    let r = isoloom_spec::defaults::load_profiled(dir, None, profile.as_ref(), &[]).map_err(CliError::Defaults)?;
+    let host = spec::host();
+    let r = isoloom_spec::defaults::load(&spec::defaults_of(dir, None, profile.as_ref(), &[])).map_err(CliError::Defaults)?;
     let mut merged = isoloom_spec::defaults::builtin();
     isoloom_spec::defaults::merge(&mut merged, &r.merged);
     let project_file = dir.join(isoloom_spec::defaults::PROJECT_FILE);
     if json {
         let sources: serde_json::Map<String, serde_json::Value> = r.sources.iter().map(|(k, v)| (k.clone(), serde_json::json!(v))).collect();
-        let out = serde_json::json!({ "defaults": serde_json::to_value(&merged)?, "sources": sources, "user_file": isoloom_spec::defaults::user_file(), "project_file": project_file });
+        let out = serde_json::json!({ "defaults": serde_json::to_value(&merged)?, "sources": sources, "user_file": isoloom_spec::defaults::user_file(&host), "project_file": project_file });
         console.json(&out)?;
         return Ok(Verdict::Pass);
     }
@@ -48,7 +49,7 @@ fn in_effect(profile: &spec::Profile, dir: &Path, json: bool, console: &mut Cons
     }
     console.line(format_args!(
         "\nfiles: {} (yours), {} (the project's); environment ISOLOOM_<KEY>; -s defaults.<key>=<value>",
-        isoloom_spec::defaults::user_file().display(),
+        isoloom_spec::defaults::user_file(&host).display(),
         project_file.display()
     ))?;
     Ok(Verdict::Pass)

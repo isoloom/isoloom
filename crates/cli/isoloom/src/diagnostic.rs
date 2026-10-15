@@ -124,7 +124,16 @@ mod tests {
 
     #[test]
     fn a_message_of_several_lines_stays_under_its_error() {
-        let e = CliError::Profile("profile `x`:\nno machine `wbe`".to_owned());
-        assert_eq!(render(&e), "error: profile `x`:\n    no machine `wbe`\n");
+        let input = |input: &str| isoloom_spec::profile::ProfileProblem::Input {
+            profile: "x".into(),
+            input: input.into(),
+        };
+        let e = CliError::Profile(isoloom_spec::Error::ProfileMismatch {
+            problems: vec![input("A"), input("B")],
+        });
+        assert_eq!(
+            render(&e),
+            "error: profile `x`: input `A` isn't one of the spec's `inputs`\n    profile `x`: input `B` isn't one of the spec's `inputs`\n"
+        );
     }
 }

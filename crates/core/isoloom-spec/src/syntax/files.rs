@@ -3,15 +3,14 @@
 //! value, delivered at each start and never written into a generated file, an image layer or an
 //! environment variable.
 
-use std::borrow::Cow;
-use std::fmt;
+use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 
-use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
-use serde::{Deserialize, Deserializer};
+use schemars::{JsonSchema, json_schema};
+use serde::{Deserialize, Deserializer, Serialize};
 
-use super::invalid::Invalid;
 use super::names::{InputName, Text};
+use crate::Error;
 
 /// Where a file's contents come from.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,25 +62,32 @@ impl Mode {
 }
 
 impl FromStr for Mode {
-    type Err = Invalid;
+    type Err = Error;
 
     /// The mode `digits` (`"0444"`, or YAML's number `444`) names.
     ///
     /// # Errors
     ///
-    /// [`Invalid::Mode`] when they aren't octal digits up to `0777`.
-    fn from_str(digits: &str) -> Result<Mode, Invalid> {
+    /// [`Error::Mode`] when they aren't octal digits up to `0777`.
+    fn from_str(digits: &str) -> Result<Mode, Error> {
         u32::from_str_radix(digits, 8)
             .ok()
             .filter(|m| *m <= 0o777)
             .map(Mode)
-            .ok_or_else(|| Invalid::Mode(digits.to_owned()))
+            .ok_or_else(|| Error::Mode(digits.to_owned()))
     }
 }
 
-impl fmt::Display for Mode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for Mode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:04o}", self.0)
+    }
+}
+
+impl Serialize for Mode {
+    /// The mode as a spec writes it, `"0440"`, so what is written reads back the same.
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_str(self)
     }
 }
 
@@ -95,7 +101,7 @@ impl<'de> Deserialize<'de> for Mode {
 }
 
 impl JsonSchema for Mode {
-    fn schema_name() -> Cow<'static, str> {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
         "Mode".into()
     }
 
@@ -103,7 +109,7 @@ impl JsonSchema for Mode {
         true
     }
 
-    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
         json_schema!({ "type": ["string", "integer"], "pattern": "^0?[0-7]{1,3}$" })
     }
 }
@@ -167,9 +173,9 @@ struct FileInput {
 }
 
 impl TryFrom<FileInput> for File {
-    type Error = String;
+    type Error = Error;
 
-    fn try_from(f: FileInput) -> Result<File, String> {
+    fn try_from(f: FileInput) -> Result<File, Error> {
         let given: Vec<FileSource> = [
             f.source.map(FileSource::Source),
             f.content.map(FileSource::Content),
@@ -181,11 +187,8 @@ impl TryFrom<FileInput> for File {
         .collect();
         let source = match <[FileSource; 1]>::try_from(given) {
             Ok([one]) => one,
-            Err(given) if given.is_empty() => return Err("a file needs one of `source`, `content`, `input` and `secret`".into()),
-            Err(given) => {
-                let keys: Vec<&str> = given.iter().map(FileSource::key).collect();
-                return Err(format!("`{}` are all given: keep one source", keys.join("` and `")));
-            }
+            Err(given) if given.is_empty() => return Err(Error::NoFileSource),
+            Err(given) => return Err(Error::FileSources(given.iter().map(FileSource::key).collect())),
         };
         Ok(File {
             path: f.path,

@@ -29,7 +29,9 @@ use serde::Deserialize;
 use serde_yaml_ng::{Mapping, Value};
 
 use crate::files::GeneratedFile;
+use crate::host::Host;
 use crate::images::Table;
+use crate::{Error, Result};
 
 /// The project-level file, next to `isoloom.yml`.
 pub const PROJECT_FILE: &str = "isoloom.defaults.yml";
@@ -99,38 +101,53 @@ pub struct Resolved {
     pub sources: Vec<(String, String)>,
 }
 
-/// The user's defaults file.
+/// The user's defaults file, in Isoloom's home on `host`.
 #[must_use]
-pub fn user_file() -> PathBuf {
-    crate::home::home().join("defaults.yml")
+pub fn user_file(host: &Host) -> PathBuf {
+    host.home().join("defaults.yml")
 }
 
-/// Reads every layer for a project: the user's file, the project's, the environment, then
-/// `sets` (`defaults.cloud.aws.region=eu-west-1`, the prefix optional), and `images_file`
-/// (the `--images` table, between the files and `sets`).
-pub fn load(project: &Path, images_file: Option<&Path>, sets: &[String]) -> Result<Resolved, String> {
-    load_profiled(project, images_file, None, sets)
+/// What a project's defaults are read from: the project, the `--images` table, its profile, the
+/// command's `-s` and the host it runs on.
+#[derive(Debug, Clone)]
+pub struct Sources<'a> {
+    /// The project's folder.
+    pub project: &'a Path,
+    /// The `--images` table, between the files and `sets`.
+    pub images_file: Option<&'a Path>,
+    /// The profile, between the project's file and `--images`.
+    pub profile: Option<&'a crate::profile::Profile>,
+    /// The command's `-s` (`defaults.cloud.aws.region=eu-west-1`, the prefix optional).
+    pub sets: &'a [String],
+    /// The host: Isoloom's home, and the `ISOLOOM_*` variables.
+    pub host: Host,
 }
 
-/// [`load`] with a profile's layer between the project's file and `--images`.
-pub fn load_profiled(project: &Path, images_file: Option<&Path>, profile: Option<&crate::profile::Profile>, sets: &[String]) -> Result<Resolved, String> {
+/// Reads every layer for a project: the user's file, the project's, the profile, `--images`,
+/// the host's `ISOLOOM_*` variables, then the `-s` overrides.
+///
+/// # Errors
+///
+/// [`Error::Read`] for a file that can't be read (one that doesn't exist is no layer),
+/// [`Error::Layer`] for one that isn't YAML, [`Error::SetShape`] and [`Error::SetKey`] for a
+/// `-s` that isn't `key=value`, and [`Error::Defaults`] when the merged layers hold a key or a
+/// value the defaults don't have.
+pub fn load(from: &Sources) -> Result<Resolved> {
     let mut layers = Vec::new();
-    for (label, path) in [("user file", user_file()), ("project file", project.join(PROJECT_FILE))] {
-        match std::fs::read_to_string(&path) {
-            Ok(text) => layers.push(Layer {
+    for (label, path) in [("user file", user_file(&from.host)), ("project file", from.project.join(PROJECT_FILE))] {
+        if let Some(value) = read_layer(&path)? {
+            layers.push(Layer {
                 source: format!("{label} {}", path.display()),
-                value: serde_yaml_ng::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?,
-            }),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(format!("can't read {}: {e}", path.display())),
+                value,
+            });
         }
     }
-    if let Some(p) = profile {
+    if let Some(p) = from.profile {
         layers.push(p.layer());
     }
-    if let Some(f) = images_file {
-        let text = std::fs::read_to_string(f).map_err(|e| format!("can't read {}: {e}", f.display()))?;
-        let table: Value = serde_yaml_ng::from_str(&text).map_err(|e| format!("{}: {e}", f.display()))?;
+    if let Some(f) = from.images_file {
+        let text = std::fs::read_to_string(f).map_err(|source| Error::Read { path: f.to_path_buf(), source })?;
+        let table: Value = serde_yaml_ng::from_str(&text).map_err(|source| Error::Layer { path: f.to_path_buf(), source })?;
         let mut m = Mapping::new();
         m.insert(Value::String("images".into()), table);
         layers.push(Layer {
@@ -138,16 +155,13 @@ pub fn load_profiled(project: &Path, images_file: Option<&Path>, profile: Option
             value: Value::Mapping(m),
         });
     }
-    let env = from_env(std::env::vars());
-    if !env.is_empty() {
-        for (k, v) in env {
-            layers.push(Layer {
-                source: format!("environment ISOLOOM_{}", k.replace('.', "__").to_uppercase()),
-                value: at_path(&k, scalar(&v)),
-            });
-        }
+    for (k, v) in from_env(from.host.text_vars().into_iter()) {
+        layers.push(Layer {
+            source: format!("environment ISOLOOM_{}", k.replace('.', "__").to_uppercase()),
+            value: at_path(&k, scalar(&v)),
+        });
     }
-    for s in sets {
+    for s in from.sets {
         let (k, v) = parse_set(s)?;
         let Some(k) = k.strip_prefix("defaults.") else { continue };
         layers.push(Layer {
@@ -158,8 +172,27 @@ pub fn load_profiled(project: &Path, images_file: Option<&Path>, profile: Option
     resolve(&layers)
 }
 
+/// A layer's file, as YAML; none when it doesn't exist.
+fn read_layer(path: &Path) -> Result<Option<Value>> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => serde_yaml_ng::from_str(&text).map(Some).map_err(|source| Error::Layer {
+            path: path.to_path_buf(),
+            source,
+        }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(source) => Err(Error::Read {
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
 /// Merges layers in order; later ones win leaf by leaf.
-pub fn resolve(layers: &[Layer]) -> Result<Resolved, String> {
+///
+/// # Errors
+///
+/// [`Error::Defaults`] when the merged layers hold a key or a value the defaults don't have.
+pub fn resolve(layers: &[Layer]) -> Result<Resolved> {
     let mut merged = Value::Mapping(Mapping::new());
     let mut sources: Vec<(String, String)> = Vec::new();
     for layer in layers {
@@ -169,9 +202,9 @@ pub fn resolve(layers: &[Layer]) -> Result<Resolved, String> {
             sources.push((leaf, layer.source.clone()));
         }
     }
-    let defaults: Defaults = serde_yaml_ng::from_value(merged.clone()).map_err(|e| {
-        let where_ = layers.iter().map(|l| l.source.as_str()).collect::<Vec<_>>().join(", ");
-        format!("defaults ({where_}): {e}")
+    let defaults: Defaults = serde_yaml_ng::from_value(merged.clone()).map_err(|source| Error::Defaults {
+        sources: layers.iter().map(|l| l.source.as_str()).collect::<Vec<_>>().join(", "),
+        source,
     })?;
     Ok(Resolved { defaults, merged, sources })
 }
@@ -192,12 +225,14 @@ pub fn from_env(vars: impl Iterator<Item = (String, String)>) -> Vec<(String, St
 }
 
 /// `key=value` of a `-s`.
-pub fn parse_set(s: &str) -> Result<(&str, &str), String> {
-    let (k, v) = s
-        .split_once('=')
-        .ok_or_else(|| format!("`-s {s}`: expected key=value, like -s machines.web.vm.os=ubuntu@24.04"))?;
+///
+/// # Errors
+///
+/// [`Error::SetShape`] without an `=`, [`Error::SetKey`] when the key isn't a dotted path.
+pub fn parse_set(s: &str) -> Result<(&str, &str)> {
+    let (k, v) = s.split_once('=').ok_or_else(|| Error::SetShape { set: s.to_owned() })?;
     if k.is_empty() || k.split('.').any(str::is_empty) {
-        return Err(format!("`-s {s}`: the key is a dotted path, like cloud.aws.region"));
+        return Err(Error::SetKey { set: s.to_owned() });
     }
     Ok((k, v))
 }
@@ -251,13 +286,22 @@ pub fn leaves(v: &Value, prefix: &str) -> Vec<String> {
 
 /// The spec's YAML with `-s key=value` overrides applied (keys without the `defaults.` prefix),
 /// before it is parsed: `machines.web.vm.os=ubuntu@24.04`, `networks.lab.internet=false`.
-pub fn override_spec(yaml: &str, sets: &[String]) -> Result<String, String> {
+///
+/// # Errors
+///
+/// As [`override_spec_with`].
+pub fn override_spec(yaml: &str, sets: &[String]) -> Result<String> {
     override_spec_with(yaml, None, sets)
 }
 
 /// [`override_spec`] with `base` (a profile's `spec`) deep-merged first.
-pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> Result<String, String> {
-    let mut doc: Value = serde_yaml_ng::from_str(yaml).map_err(|e| e.to_string())?;
+///
+/// # Errors
+///
+/// [`Error::Yaml`] when the spec isn't YAML (or can't be written back), and the errors of
+/// [`parse_set`].
+pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> Result<String> {
+    let mut doc: Value = serde_yaml_ng::from_str(yaml)?;
     let mut any = false;
     if let Some(b) = base.filter(|b| b.as_mapping().is_some_and(|m| !m.is_empty())) {
         merge(&mut doc, b);
@@ -274,7 +318,7 @@ pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> 
     if !any {
         return Ok(yaml.to_owned());
     }
-    serde_yaml_ng::to_string(&doc).map_err(|e| e.to_string())
+    Ok(serde_yaml_ng::to_string(&doc)?)
 }
 
 /// Applies the defaults that change generated files: each cloud module's region default.

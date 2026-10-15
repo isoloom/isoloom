@@ -48,11 +48,32 @@ pub(crate) fn pinned(profile: &Profile, dir: &Path, asked: Option<&str>) -> Resu
     }
 }
 
+/// The host this command runs on: its environment, read once here, at the edge.
+pub(crate) fn host() -> isoloom_spec::host::Host {
+    isoloom_spec::host::Host::new(std::env::vars_os())
+}
+
+/// Where a project's defaults come from, on this host.
+pub(crate) fn defaults_of<'a>(
+    project: &'a Path,
+    images_file: Option<&'a Path>,
+    profile: Option<&'a isoloom_spec::profile::Profile>,
+    sets: &'a [String],
+) -> isoloom_spec::defaults::Sources<'a> {
+    isoloom_spec::defaults::Sources {
+        project,
+        images_file,
+        profile,
+        sets,
+        host: host(),
+    }
+}
+
 /// The lab with `-s` overrides and the image table applied, and the defaults in effect.
 pub(crate) fn with_settings(profile: &Profile, dir: &Path, images: Option<&Path>, sets: &[String]) -> Result<(Lab, Resolved)> {
     let profile = profile.load(dir)?;
     let spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
-    let settings = isoloom_spec::defaults::load_profiled(dir, images, profile.as_ref(), sets).map_err(CliError::Defaults)?;
+    let settings = isoloom_spec::defaults::load(&defaults_of(dir, images, profile.as_ref(), sets)).map_err(CliError::Defaults)?;
     let lab = Lab::new(spec).with_images(settings.defaults.images.clone());
     Ok((lab, settings))
 }
@@ -77,7 +98,7 @@ pub(crate) fn valid(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &
     let (lab, _) = with_settings(profile, dir, None, sets)?;
     let lab = checked(lab, dir)?;
     if let Some(number) = instance {
-        isoloom_spec::instance::apply(&lab.spec(), number).map_err(|reason| CliError::Instance { number, reason })?;
+        isoloom_spec::instance::apply(&lab.spec(), number).map_err(|error| CliError::Instance { number, error })?;
     }
     Ok(lab)
 }

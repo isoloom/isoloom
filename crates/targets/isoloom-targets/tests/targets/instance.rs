@@ -20,7 +20,7 @@ fn an_instance_gets_its_own_name_blocks_and_ports() -> Outcome {
     assert!(instance::apply(&spec, 100).is_err());
     let mut high = spec.clone();
     high.machines["web"].ports[0].publish = Some(65500);
-    assert!(instance::apply(&high, 1).unwrap_err().contains("65500"));
+    assert!(instance::apply(&high, 1).unwrap_err().to_string().contains("65500"));
     Ok(())
 }
 

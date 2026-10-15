@@ -13,7 +13,7 @@ fn a_family_and_version_map_onto_the_image_tables_name() {
         ("windows-server@2008r2", "windows-server-2008r2"),
         ("alpine@3.19", "alpine-3.19"),
     ] {
-        assert_eq!(resolve(text).map(|o| o.name), Ok(name), "{text}");
+        assert_eq!(resolve(text).ok().map(|o| o.name), Some(name), "{text}");
     }
 }
 
@@ -44,7 +44,7 @@ fn an_image_table_name_is_its_os_once_parsed_never_a_spelling() {
     for name in KNOWN_OS {
         let os = by_name(name).unwrap_or_else(|| panic!("{name}"));
         assert_eq!(os.name, *name);
-        assert_eq!(resolve(&os.id()), Ok(os), "{name} is {}", os.id());
+        assert_eq!(resolve(&os.id()).ok(), Some(os), "{name} is {}", os.id());
     }
     for name in ["debian-12", "windows-server-2019", "almalinux-9", "ubuntu-24.04"] {
         assert!(resolve(name).is_err(), "{name}");

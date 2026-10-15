@@ -55,9 +55,11 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() -> Outcome {
     assert!(own.contains("\"spec/box\"") && !own.contains("other/box"));
     assert!(isoloom_spec::images::Table::parse("bogus: 1\n").is_err());
     // The OS is written as a spec writes it.
-    let os = isoloom_spec::images::Table::parse("os:\n  debian-12: { vagrant: x }\n").unwrap_err();
+    let os = isoloom_spec::images::Table::parse("os:\n  debian-12: { vagrant: x }\n")
+        .unwrap_err()
+        .to_string();
     assert!(os.contains("os.debian-12: unknown OS `debian-12`"), "{os}");
-    let access = isoloom_spec::images::Table::parse("access:\n  vm: ubuntu-24.04\n").unwrap_err();
+    let access = isoloom_spec::images::Table::parse("access:\n  vm: ubuntu-24.04\n").unwrap_err().to_string();
     assert!(access.starts_with("access: unknown OS `ubuntu-24.04`"), "{access}");
     Ok(())
 }

@@ -50,9 +50,9 @@ pub use cidr6::{Cidr6, PREFIX as IPV6_PREFIX};
 pub use files::validate_files;
 pub use settings::CONTAINER_SYSCTLS;
 
-/// One thing wrong with a spec: the field's path and what to do about it.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("{at}: {message}")]
+/// One thing wrong with a lowered spec: the field's path and what to do about it. The plan
+/// places it at the field the author wrote, as a [`crate::syntax::Problem`].
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Problem {
     /// Where in the file, e.g. `machines.web.depends_on`.
     pub at: String,
@@ -74,6 +74,12 @@ impl Problem {
     #[must_use]
     pub fn section(&self) -> &str {
         self.at.split(['.', '[']).next().unwrap_or_default()
+    }
+}
+
+impl std::fmt::Display for Problem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.at, self.message)
     }
 }
 

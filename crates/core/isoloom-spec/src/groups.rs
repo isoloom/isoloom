@@ -263,6 +263,65 @@ pub fn problems(spec: &Spec) -> Vec<(String, String)> {
 mod tests {
     use super::*;
 
+    fn expanded(yaml: &str) -> Value {
+        let mut doc: Value = serde_yaml_ng::from_str(yaml).unwrap();
+        expand(&mut doc).unwrap();
+        doc
+    }
+
+    #[test]
+    fn a_machines_own_value_wins_over_its_groups_and_theirs_over_common() {
+        let doc = expanded(
+            "common: { resources: { cpus: 1, memory_mb: 512 }, privileged: true }\ngroups:\n  big: { members: [web], resources: { cpus: 4 } }\nmachines:\n  web: { resources: { memory_mb: 2048 } }\n  db: {}\n",
+        );
+        let web = &doc["machines"]["web"];
+        assert_eq!(
+            (web["resources"]["cpus"].as_u64(), web["resources"]["memory_mb"].as_u64()),
+            (Some(4), Some(2048))
+        );
+        assert_eq!(web["privileged"].as_bool(), Some(true));
+        assert_eq!(doc["machines"]["db"]["resources"]["cpus"].as_u64(), Some(1));
+    }
+
+    #[test]
+    fn the_most_specific_group_wins() {
+        let doc = expanded(
+            "groups:\n  inner: { members: [web], os: debian@12 }\n  outer: { members: [inner], os: alpine, privileged: true }\nmachines:\n  web: {}\n",
+        );
+        let web = &doc["machines"]["web"];
+        assert_eq!((web["os"].as_str(), web["privileged"].as_bool()), (Some("debian@12"), Some(true)));
+    }
+
+    #[test]
+    fn shared_fields_of_the_wrong_shape_are_refused_at_their_field() {
+        let mut common: Value = serde_yaml_ng::from_str("common: 5\nmachines: { a: {} }\n").unwrap();
+        assert_eq!(expand(&mut common).unwrap_err().path.as_str(), "common");
+        let mut group: Value = serde_yaml_ng::from_str("groups: { g: 5 }\nmachines: { a: {} }\n").unwrap();
+        assert_eq!(expand(&mut group).unwrap_err().path.as_str(), "groups.g");
+        let mut groups: Value = serde_yaml_ng::from_str("groups: [g]\nmachines: { a: {} }\n").unwrap();
+        assert_eq!(expand(&mut groups).unwrap_err().path.as_str(), "groups");
+    }
+
+    #[test]
+    fn a_groups_machines_follow_globs_and_nested_groups_in_spec_order() {
+        let spec = crate::testing::model(
+            "version: 1\nname: t\ngroups:\n  ws: { members: [ws*] }\n  all-hosts: { members: [ws, dc01] }\n  self: { members: [self, ws] }\nmachines:\n  dc01: {}\n  ws02: {}\n  ws01: {}\n",
+        )
+        .unwrap();
+        assert_eq!(members(&spec, "all-hosts"), ["dc01", "ws02", "ws01"]);
+        assert_eq!(members(&spec, "self"), ["ws02", "ws01"], "a group holding itself stops there");
+        assert_eq!(members(&spec, "nope"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn group_loops_count_groups_not_machines_of_the_same_name() {
+        let looped = crate::testing::model("version: 1\nname: t\ngroups:\n  a: { members: [b] }\n  b: { members: [a] }\nmachines:\n  m: {}\n").unwrap();
+        assert!(problems(&looped).iter().any(|(at, why)| at == "groups.a.members" && why.contains("loop")));
+        let named = crate::testing::model("version: 1\nname: t\ngroups:\n  m: { members: [m] }\nmachines:\n  m: {}\n").unwrap();
+        let found = problems(&named);
+        assert_eq!(found, [("groups.m".to_owned(), "`m` is already a machine's name".to_owned())]);
+    }
+
     #[test]
     fn globs_match_prefixes_suffixes_and_middles() {
         assert!(matches("ws*", "ws01") && !matches("ws*", "dc01"));

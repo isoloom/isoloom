@@ -1,0 +1,7 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"inputs: [CTF_FLAG_MAIN]\\nmachines:\\n  web:\\n    os: debian@12\\n    networks: { lab: 10 }\\n    inputs: [CTF_FLAG_MAIN]\\n\"))"
+---
+error[removed-field] machines.web.inputs  (isoloom.yml:10:5)
+  an input reaches a machine as a file or an environment value
+  fix: `files: [{ path: /ctf/flag, input: <NAME> }]`, or `environment: { <NAME>: { input: <NAME> } }` for a non-sensitive input

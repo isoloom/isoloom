@@ -34,7 +34,7 @@ fn a_valid_file_parses_with_its_fields() {
 #[test]
 fn a_file_has_one_text_source() {
     let at = "machines.m.files[0]";
-    assert_problem(&container("[{ path: /a, source: a, content: x }]"), at, "all given: keep one source");
+    assert_problem(&container("[{ path: /a, source: a, content: x }]"), at, "both given: keep one source");
     assert_problem(
         &container("[{ path: /a }]"),
         at,

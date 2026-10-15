@@ -7,6 +7,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 
 use crate::model::{DockerImpl, Spec, VmImage, VmImpl};
+use crate::{Error, Result};
 
 /// The runner's own image table, between the built-in one and the spec's `vm.image`:
 ///
@@ -70,8 +71,12 @@ impl Table {
     }
 
     /// Reads a table from YAML. Unknown fields are errors.
-    pub fn parse(yaml: &str) -> Result<Table, String> {
-        serde_yaml_ng::from_str(yaml).map_err(|e| e.to_string())
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Images`]: text that isn't YAML, an unknown field, or an OS no family names.
+    pub fn parse(yaml: &str) -> Result<Table> {
+        serde_yaml_ng::from_str(yaml).map_err(Error::Images)
     }
 
     /// The spec with this table applied: each VM's image from `os:` (unless the spec gives its

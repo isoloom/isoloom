@@ -205,6 +205,9 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 
 ## Phase 1c: the spec and the run manifest
 - **Run manifest schema:** the descriptions name environment variables as code (`` `ISOLOOM_PUBLISH_FIXED` ``, `` `TF_DATA_DIR` ``); the rules are unchanged.
+- **Spec problems:** a `dns.servers` name that is no machine suggests the closest machine ("did you mean `dc01`?"); a file with two sources reads "`source` and `input` are both given: keep one source"; the message's placeholder fix is written as code (`` `{{ machines.web.ports.web.published }}` ``).
+- **Spec problems, healthcheck:** a `healthcheck` with both `test` and `http` is a `conflict` ("`test` and `http` are both given: a healthcheck is a `test` or an `http` page"); one with neither is an `invalid-value` ("a healthcheck says what to try: `{ test: <command> }` or `{ http: { port, path } }`"), reported when the spec is read (it was a `missing-field` from the checks).
+- **Spec problems, `service:`:** a `service:` that is neither a name nor a list says "expected a catalogue service, `name[@version]`, or a list of them".
 
 ## Test hosts: the pinned commits
 - **`cargo xtask check-all`, SSH hosts:** before a run that copies Isothrum or the launcher, each SSH host (`linux`, `windows`) gets a bare mirror of this machine's Isoloom and Isothrum `main` in its home (`~/isoloom-mirrors/<repo>.git`, fetched from a git bundle each run), its global git config rewrites `https://github.com/isoloom/<repo>` to it (`url.file://<mirror>.insteadOf`, any other rewrite of that URL removed), and its legs run Cargo with `CARGO_NET_GIT_FETCH_WITH_CLI=true`. The host log says which `main` each mirror got. It replaces `~/.isoloom-lab/windows-vm/sync-mirrors.sh` (and its `C:/isoloom-mirrors`).
