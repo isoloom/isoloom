@@ -110,7 +110,7 @@ fn each_cloud_gives_the_machine_its_image() {
 }
 
 #[test]
-fn a_clone_takes_its_own_counted_machines_entry_not_anothers() {
+fn a_clone_takes_the_entry_of_its_own_counted_machine_only() {
     let s = testing::lab("version: 1\nname: t\nmachines:\n  w: { os: debian@12, count: 2 }\n  v: { os: debian@12, count: 2 }\noverrides: { vagrant: { machines: { w: { box: example/w } } } }\n")
         .source()
         .clone();
