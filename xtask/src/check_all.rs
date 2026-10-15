@@ -12,6 +12,12 @@
 //! - `linux-docker`: a pinned Rust container on this machine (`xtask/check-all/linux.Dockerfile`),
 //!   with the repositories mounted at their own paths.
 //!
+//! Each checkout builds in its own folders on the other hosts, so a run never tests another
+//! worktree's build ([`checkout`]): in the container, the Docker volumes
+//! `isoloom-check-all-<repo>-<key>-target` (and the launcher's `...-node-modules`), the key from
+//! the checkout's path; on the SSH hosts, `<dir>/<key>/`, the key from the run's checkouts. Only
+//! the downloads are shared (`isoloom-check-all-cache`).
+//!
 //! The SSH hosts' settings come from the environment, else from the hosts file
 //! (`~/.isoloom-lab/hosts.env`, or the one `ISOLOOM_HOSTS_ENV` names; see [`settings`]).
 //!
@@ -30,10 +36,14 @@
 //! `--deep` adds the slow gates to this Mac's part: every fuzz target for a minute (`cargo xtask
 //! fuzz`) and mutation testing of the core crates (`cargo xtask mutants`).
 //!
-//! `--clean` removes the hosts' build folders and copies (the remote folders, the Docker volumes
-//! and image).
+//! `--clean` removes the hosts' build folders and copies, every checkout's (the remote folders,
+//! the Docker volumes and image). `--prune-volumes` removes only those of checkouts no longer on
+//! this machine (a deleted worktree's): the Docker volumes (and the shared ones of earlier
+//! versions), and the folders of the SSH hosts `--hosts` names.
 
+mod checkout;
 mod collect;
+mod docker;
 mod gates;
 mod hosts;
 mod pack;
@@ -149,6 +159,10 @@ pub(crate) struct Args {
     /// Remove the hosts' build folders and copies instead.
     #[arg(long)]
     clean: bool,
+    /// Remove the build volumes (and the SSH hosts' folders, for those --hosts names) of the
+    /// checkouts no longer on this machine instead.
+    #[arg(long, conflicts_with = "clean")]
+    prune_volumes: bool,
     /// Run this host's part here and print it as `@@begin`/`@@result` lines (how the other hosts
     /// run theirs).
     #[arg(long, value_enum, hide = true)]
@@ -167,7 +181,7 @@ pub(crate) struct Args {
     target_root: Option<PathBuf>,
 }
 
-/// The three checkouts.
+/// The three checkouts, as they are on disk (each one's build folders are keyed by its path).
 #[derive(Debug, Clone)]
 pub(crate) struct Dirs {
     /// This Isoloom tree.
@@ -203,12 +217,13 @@ pub(crate) struct Run {
     pub ssh: settings::Hosts,
 }
 
-/// Runs the gates (or, with `--leg`, this host's part; with `--clean`, the clean-up).
+/// Runs the gates (or, with `--leg`, this host's part; with `--clean` or `--prune-volumes`, the
+/// clean-up).
 pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     let root = repo::root();
     let code = repo::code_dir(&root);
     let dirs = Dirs {
-        isoloom: a.isoloom.clone().unwrap_or(root),
+        isoloom: a.isoloom.clone().unwrap_or_else(|| repo::physical(&root)),
         isothrum: a
             .isothrum
             .clone()
@@ -225,6 +240,10 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     let ssh = settings::load()?;
     if a.clean {
         hosts::clean(&a.hosts, &dirs, &ssh);
+        return Ok(ExitCode::SUCCESS);
+    }
+    if a.prune_volumes {
+        hosts::prune(&a.hosts, &ssh);
         return Ok(ExitCode::SUCCESS);
     }
     let logs = a.logs.clone().unwrap_or_else(default_logs);
