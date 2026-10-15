@@ -148,12 +148,12 @@ fn moved_block(block: Cidr, taken: &[Cidr]) -> Cidr {
     } else {
         u32::from_be_bytes([10, second, third, fourth])
     };
-    let size = 1u32 << (32 - block.len);
+    let size = usize::try_from(1u32 << (32 - block.len)).unwrap_or(usize::MAX);
     // The mapped block, else the next free one of the same size scanning 10.240.0.0 upward
-    // within 10.0.0.0/8. A bounded, checked successor sequence: it can't overflow, and it
-    // ends at the top of the block so `find` terminates. Running out needs thousands of
-    // auto-moved networks: the mapped block is kept then, and validation reports the overlap.
-    let scan = std::iter::successors(Some(0x0af0_0000u32), move |&b| b.checked_add(size).filter(|&n| n <= 0x0aff_ffff));
+    // within 10.0.0.0/8: a range stepped by the block's size, so `find` always ends. Running
+    // out needs thousands of auto-moved networks: the mapped block is kept then, and
+    // validation reports the overlap.
+    let scan = (0x0af0_0000u32..0x0b00_0000).step_by(size);
     std::iter::once(first)
         .chain(scan)
         .map(|base| Cidr { base, len: block.len })
@@ -185,6 +185,12 @@ mod tests {
 
     fn ip(text: &str) -> Ipv4Addr {
         text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_moved_block_steps_by_its_own_size_past_the_blocks_taken() {
+        let taken = [block("10.16.0.0/28"), block("10.240.0.0/29")];
+        assert_eq!(moved_block(block("172.16.0.0/28"), &taken), block("10.240.0.16/28"));
     }
 
     #[test]

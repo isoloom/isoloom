@@ -42,10 +42,9 @@ fn set(s: &mut Value, path: &[&str], key: &str, v: Value) {
     }
 }
 
-/// The version, and the patterns of the environment's, networks', machines' and inputs' names.
+/// The patterns of the environment's, networks' and machines' names.
 fn names(s: &mut Value) {
     let kebab = "^[a-z][a-z0-9]*(-[a-z0-9]+)*$";
-    set(s, &["properties", "version"], "const", json!(1));
     set(s, &["properties", "name"], "pattern", json!("^[a-z0-9]+(-[a-z0-9]+)*$"));
     set(s, &["properties", "networks"], "propertyNames", json!({ "pattern": kebab }));
     set(s, &["properties", "machines"], "propertyNames", json!({ "pattern": kebab }));

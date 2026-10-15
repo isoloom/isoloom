@@ -36,14 +36,9 @@ pub fn parse(yaml: &str) -> Result<Spec, Problems> {
     let mut reader = Reader { problems: Vec::new() };
     let mut spec = reader.spec(top);
     spec.clones = clones;
-    // A typed problem inside an old key's field repeats it: the old key's fix says it all.
+    // A typed problem at or inside an old key's field repeats it: the old key's fix says it all.
     let old = problems.clone();
-    problems.extend(
-        reader
-            .problems
-            .into_iter()
-            .filter(|p| !old.iter().any(|o| p.path.within(&o.path) || o.path.within(&p.path))),
-    );
+    problems.extend(reader.problems.into_iter().filter(|p| !old.iter().any(|o| p.path.within(&o.path))));
     if problems.is_empty() {
         spec.spans = spans;
         return Ok(spec);
@@ -192,7 +187,7 @@ fn typed_problem(at: &FieldPath, e: &serde_path_to_error::Error<serde_yaml_ng::E
         let (field, expected) = rest.split_once('`').unwrap_or((rest, ""));
         let known: Vec<&str> = expected.split('`').skip(1).step_by(2).collect();
         // The path may already end at the unknown field.
-        let parent = if path.as_str().ends_with(&format!(".{field}")) || path.as_str() == field {
+        let parent = if path.as_str().ends_with(&format!(".{field}")) {
             path.parent().unwrap_or_default()
         } else {
             path

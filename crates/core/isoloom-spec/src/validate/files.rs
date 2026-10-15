@@ -159,11 +159,7 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
     /// What `validate_files` finds for the lowered spec `yaml` in a fresh project folder (named
     /// after `test`) holding `files`, each written empty; a name ending in `/` is a folder.
     fn found(test: &str, files: &[&str], yaml: &str) -> Outcome<Vec<String>> {
-        let dir = std::env::temp_dir().join(format!("isoloom-spec-files-{}-{test}", std::process::id()));
-        if dir.exists() {
-            fs::remove_dir_all(&dir)?;
-        }
-        fs::create_dir_all(&dir)?;
+        let dir = crate::testing::folder(&format!("files-{test}"))?;
         for f in files {
             let path = dir.join(f);
             if f.ends_with('/') {

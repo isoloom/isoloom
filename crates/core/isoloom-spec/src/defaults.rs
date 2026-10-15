@@ -257,9 +257,10 @@ pub fn merge(into: &mut Value, from: &Value) {
     match (into, from) {
         (Value::Mapping(a), Value::Mapping(b)) => {
             for (k, v) in b {
+                // A key both have merges (two mappings deeply, anything else replaced).
                 match a.get_mut(k) {
-                    Some(existing) if matches!((&*existing, v), (Value::Mapping(_), Value::Mapping(_))) => merge(existing, v),
-                    _ => {
+                    Some(existing) => merge(existing, v),
+                    None => {
                         a.insert(k.clone(), v.clone());
                     }
                 }
@@ -375,19 +376,10 @@ mod tests {
     use std::ffi::OsString;
 
     use super::*;
+    use crate::testing::folder;
 
     /// A test's outcome: a failed step is its report.
     type Outcome = std::result::Result<(), Box<dyn std::error::Error>>;
-
-    /// A fresh, empty folder for test `name`.
-    fn empty(name: &str) -> std::io::Result<PathBuf> {
-        let dir = std::env::temp_dir().join(format!("isoloom-defaults-{}-{name}", std::process::id()));
-        if dir.exists() {
-            std::fs::remove_dir_all(&dir)?;
-        }
-        std::fs::create_dir_all(&dir)?;
-        Ok(dir)
-    }
 
     /// A host with these environment variables.
     fn host(vars: &[(&str, &str)]) -> Host {
@@ -406,8 +398,8 @@ mod tests {
 
     #[test]
     fn layers_merge_in_order_and_each_leaf_names_the_last_that_set_it() -> Outcome {
-        let home = empty("layers-home")?;
-        let project = empty("layers-project")?;
+        let home = folder("defaults-layers-home")?;
+        let project = folder("defaults-layers-project")?;
         std::fs::write(home.join("defaults.yml"), "cloud: { aws: { region: from-user }, gcp: { region: from-user } }\n")?;
         std::fs::write(project.join(PROJECT_FILE), "cloud: { aws: { region: from-project } }\n")?;
         let home_text = home.to_string_lossy().into_owned();
@@ -441,7 +433,7 @@ mod tests {
 
     #[test]
     fn a_layer_file_that_cant_be_read_is_an_error_unlike_a_missing_one() -> Outcome {
-        let project = empty("unreadable")?;
+        let project = folder("defaults-unreadable")?;
         let sources = |folder| Sources {
             project: folder,
             images_file: None,

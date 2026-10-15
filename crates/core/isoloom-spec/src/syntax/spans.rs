@@ -80,14 +80,11 @@ impl Spans {
     /// machine is placed at the machine).
     #[must_use]
     pub fn find(&self, path: &FieldPath) -> Option<Span> {
-        let mut at = Some(path.clone());
-        while let Some(p) = at {
-            if let Some(s) = self.0.get(&p) {
-                return Some(*s);
-            }
-            at = p.parent();
-        }
-        None
+        // The path, then each enclosing field: one per separator, so the walk always ends.
+        let levels = path.as_str().matches(['.', '[']).count() + 1;
+        std::iter::successors(Some(path.clone()), FieldPath::parent)
+            .take(levels)
+            .find_map(|p| self.0.get(&p).copied())
     }
 
     /// `problem`, placed (unless it already is).
@@ -130,6 +127,7 @@ list:
         assert_eq!(at("machines.web.files[1].path"), Some((7, 9)));
         // A field that isn't written takes its nearest written parent's place.
         assert_eq!(at("machines.web.resources.cpus"), Some((3, 3)));
+        assert_eq!(at("machines.nope.deep"), Some((2, 1)));
         assert_eq!(at("checks"), None);
     }
 }

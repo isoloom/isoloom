@@ -76,6 +76,10 @@ fn files_name_declared_values_once_each() {
     ] {
         assert!(has(&found, code, path), "{path}: {found:?}");
     }
+    let declared = problems(
+        "secrets: { db: { env: DB_PASSWORD } }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 }, files: [{ path: /run/secrets/db, secret: db }] }\n",
+    );
+    assert_eq!(declared, []);
     let windows = problems(
         "inputs: [FLAG]\nmachines:\n  dc: { os: windows-server@2019, networks: { lab: 10 }, files: [{ path: 'C:\\flag.txt', input: FLAG, mode: \"0444\" }] }\n",
     );
@@ -120,6 +124,51 @@ fn the_message_uses_named_paths() {
         3,
         "{found:?}"
     );
+}
+
+#[test]
+fn each_unresolved_placeholder_says_why() {
+    let why = |spec: &crate::syntax::Spec| check(spec).into_iter().map(|p| p.reason).collect::<Vec<_>>();
+    assert_eq!(why(&with_message("site", "{{ machines.web.addresses.lab }}")), Vec::<String>::new());
+    assert_eq!(
+        why(&with_message("site", "{{ machines.web.addresses.wan }}")),
+        ["`{{ machines.web.addresses.wan }}`: `web` isn't on a network named `wan`"]
+    );
+    assert_eq!(
+        why(&with_message("site", "{{ cloud.outputs.site }}")),
+        ["`{{ cloud.outputs.site }}`: the spec has no `cloud:`"]
+    );
+    let cloud = |name: &str| {
+        let mut spec = parse("version: 1\nname: t\ncloud: { provider: aws, terraform: infra, outputs: { site: site_url } }\n").unwrap();
+        spec.message = Some(format!("{{{{ cloud.outputs.{name} }}}}"));
+        why(&spec)
+    };
+    assert_eq!(cloud("site"), Vec::<String>::new());
+    assert_eq!(cloud("db"), ["`{{ cloud.outputs.db }}`: `cloud.outputs` has no `db`"]);
+}
+
+#[test]
+fn an_override_names_a_declared_shared_volume() {
+    let found = problems(
+        "volumes: { data: {} }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 } }\noverrides:\n  docker: { volumes: { data: { external: lab-data }, ghost: { external: x } } }\n",
+    );
+    assert_eq!(found, [(Code::UnknownReference, "overrides.docker.volumes.ghost".to_owned())]);
+}
+
+#[test]
+fn a_group_override_reaches_globs_clones_and_nested_groups() {
+    let found = check(
+        &parse(
+            "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.1.0.0/24 }\ngroups:\n  servers: { members: [web*, cl, inner] }\n  inner: { members: [api] }\nmachines:\n  web1: { networks: { lab: 10 }, app: { build: b } }\n  cl: { count: 2, networks: { lab: 20 }, app: { build: b } }\n  api: { networks: { lab: 30 }, app: { build: b } }\n  other: { networks: { lab: 40 }, app: { build: b } }\noverrides:\n  vagrant: { machines: { servers: { box: x } } }\n",
+        )
+        .unwrap(),
+    );
+    let named: Vec<String> = found
+        .iter()
+        .filter(|p| p.path.as_str() == "overrides.vagrant.machines.servers")
+        .filter_map(|p| p.reason.split('`').nth(1).map(str::to_owned))
+        .collect();
+    assert_eq!(named, ["web1", "cl-01", "cl-02", "api"]);
 }
 
 #[test]

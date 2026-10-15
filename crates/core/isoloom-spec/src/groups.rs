@@ -323,6 +323,22 @@ mod tests {
     }
 
     #[test]
+    fn a_member_is_a_machine_a_glob_or_a_group_never_the_group_itself() {
+        let spec = crate::testing::model(
+            "version: 1\nname: t\ngroups:\n  g: { members: [g, ghost, ws*, h, web] }\n  h: { members: [web] }\nmachines:\n  web: {}\n  ws01: {}\n",
+        )
+        .unwrap();
+        assert_eq!(
+            problems(&spec),
+            [
+                ("groups.g.members[0]".to_owned(), "a group can't be its own member".to_owned()),
+                ("groups.g.members[1]".to_owned(), "`ghost` names no machine or group".to_owned()),
+                ("groups.g.members".to_owned(), "groups contain each other in a loop".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
     fn globs_match_prefixes_suffixes_and_middles() {
         assert!(matches("ws*", "ws01") && !matches("ws*", "dc01"));
         assert!(matches("*01", "ws01") && matches("w*1", "ws01") && !matches("w*2", "ws01"));

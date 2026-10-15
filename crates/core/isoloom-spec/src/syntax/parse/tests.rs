@@ -82,3 +82,20 @@ fn machines_are_a_map_or_left_out() {
         (Code::InvalidValue, "machines", "machines are a map of name to machine")
     );
 }
+
+#[test]
+fn an_unknown_field_suggests_the_closest_or_lists_them_all() {
+    let at = FieldPath::new("machines.web");
+    let fix = |field: &str, known: &[&str]| unknown(&at, field, known).fix;
+    assert_eq!(fix("portz", &["ports", "files"]).as_deref(), Some("did you mean `ports`?"));
+    assert_eq!(fix("zzz", &["ports", "files"]).as_deref(), Some("the fields here: `ports`, `files`"));
+    assert_eq!(fix("zzz", &[]), None);
+    assert_eq!(unknown(&at, "zzz", &[]).path.as_str(), "machines.web.zzz");
+}
+
+#[test]
+fn a_typed_problem_beside_an_old_key_is_kept() {
+    let p = problems("version: 1\nname: t\nmachines:\n  web:\n    docker: { image: nginx }\n  db:\n    os: debian@10\n");
+    let found: Vec<(Code, &str)> = p.iter().map(|p| (p.code, p.path.as_str())).collect();
+    assert_eq!(found, [(Code::RemovedField, "machines.web.docker"), (Code::InvalidValue, "machines.db.os")]);
+}

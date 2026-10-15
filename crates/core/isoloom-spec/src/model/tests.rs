@@ -38,3 +38,15 @@ fn a_cloud_message_has_its_outputs_filled_in() -> Result<(), String> {
     assert_eq!(s.cloud_message(&outputs).as_deref(), Some("Open https://x.example ({{ cloud.outputs.other }})"));
     Ok(())
 }
+
+#[test]
+fn a_field_at_its_default_is_left_out_when_written() {
+    let block = |addresses| super::Ipv6 {
+        cidr: "fd00:20::/64".into(),
+        addresses,
+        only: false,
+    };
+    let written = |v: super::Ipv6| serde_json::to_value(v).map(|j| j.get("addresses").cloned());
+    assert_eq!(written(block(super::Ipv6Addresses::Static)).ok(), Some(None));
+    assert_eq!(written(block(super::Ipv6Addresses::Auto)).ok(), Some(Some(serde_json::json!("auto"))));
+}

@@ -72,9 +72,7 @@ fn section_of(path: &str, all: &[Field]) -> String {
         }
     }
     let top = path.split(['.', '[']).next().unwrap_or(path);
-    let nested = all
-        .iter()
-        .any(|f| f.path.len() > top.len() && f.path.starts_with(top) && is_inside(&f.path, top));
+    let nested = all.iter().any(|f| is_inside(&f.path, top));
     if nested { top.to_owned() } else { String::new() }
 }
 

@@ -97,9 +97,7 @@ mod tests {
 
     /// A fresh folder for test `name`, holding `files` (name, text).
     fn folder(name: &str, files: &[(&str, &str)]) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("isoloom-load-{}-{name}", std::process::id()));
-        std::fs::remove_dir_all(&dir).ok();
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = crate::testing::folder(&format!("load-{name}")).unwrap();
         for (file, text) in files {
             std::fs::write(dir.join(file), text).unwrap();
         }

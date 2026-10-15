@@ -160,3 +160,15 @@ fn on_docker_a_networks_own_block_overlaps_no_other() {
         ["networks.b.docker.cidr: on Docker, overlaps network `lan`; choose another block"]
     );
 }
+
+#[test]
+fn an_impairment_below_zero_is_refused_before_it_runs() {
+    assert_eq!(
+        with("  b: { cidr: 10.1.0.0/24, tc: { delay: -5ms, jitter: -1ms, rate: -2mbit } }\n"),
+        [
+            "networks.b.tc.delay: `-5ms`: a delay can't be negative",
+            "networks.b.tc.jitter: `-1ms`: a jitter can't be negative",
+            "networks.b.tc.rate: `-2mbit`: a rate can't be negative",
+        ]
+    );
+}

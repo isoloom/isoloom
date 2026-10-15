@@ -18,6 +18,12 @@ fn a_machine_is_a_service_an_app_or_bare() {
 }
 
 #[test]
+fn a_service_is_a_name_or_a_list_of_names() {
+    let number = machine("{ os: debian@12, service: 5 }").unwrap_err();
+    assert!(number.contains("expected a catalogue service, `name[@version]`, or a list of them"), "{number}");
+}
+
+#[test]
 fn a_service_and_an_app_together_are_refused() {
     let both = machine("{ os: debian@12, service: nginx, app: { image: nginx } }").unwrap_err();
     assert!(both.contains("both given"), "{both}");

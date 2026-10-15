@@ -1,13 +1,7 @@
 {
   "rules": {
-    "clippy/allow_attributes_without_reason": {
-      "isoloom-spec": 1
-    },
-    "clippy/missing_errors_doc": {
-      "isoloom-spec": 13
-    },
     "exception/expect": {
-      "isoloom-spec": 4,
+      "isoloom-spec": 2,
       "xtask": 1
     }
   }
