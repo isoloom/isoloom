@@ -73,8 +73,9 @@ impl Module {
     /// infallible: the error is kept typed rather than assumed away).
     pub fn render(&self) -> Result<String, hcl::Error> {
         let mut out = self.preamble.clone();
-        for (i, s) in self.sections.iter().enumerate() {
-            if i > 0 || !out.is_empty() {
+        for s in &self.sections {
+            // A blank line after the preamble and between sections (each ends with a newline).
+            if !out.is_empty() {
                 out.push('\n');
             }
             match s {

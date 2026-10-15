@@ -269,3 +269,47 @@ fn windows_secrets_wait_for_their_delivery() {
     let sh = linux(&env, "win", &Step::Secrets).expect("the Linux form too");
     assert!(sh.starts_with("set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
 }
+
+#[test]
+fn a_vm_on_two_vlans_of_a_lan_builds_its_trunk_inside() {
+    const VLANS: &str = r"
+version: 1
+name: v
+networks:
+  office:
+    cidr: 10.70.0.0/16
+    vlans:
+      10: { cidr: 10.70.10.0/24 }
+      20: { cidr: 10.70.20.0/24 }
+machines:
+  admin: { os: debian@12, networks: { office.vlan10: 50, office.vlan20: 50 } }
+  staff: { os: debian@12, networks: { office.vlan10: 10 } }
+";
+    let env = testing::env(VLANS, Target::Vagrant);
+    let sh = linux(&env, "admin", &Step::Trunks).expect("admin carries a trunk");
+    assert!(
+        sh.starts_with("ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s"),
+        "{sh}"
+    );
+    assert!(sh.ends_with("ip link set office.20 up; }\n"), "{sh}");
+    assert_eq!(linux(&env, "staff", &Step::Trunks), None, "one VLAN is an interface, not a trunk");
+}
+
+#[test]
+fn a_vm_impairs_its_own_links_into_a_slow_network() {
+    const SLOW: &str = r"
+version: 1
+name: s
+networks:
+  near: { cidr: 10.75.1.0/24 }
+  far: { cidr: 10.75.2.0/24, tc: { delay: 80ms } }
+machines:
+  web: { os: debian@12, networks: { far: 10 } }
+  user: { os: debian@12, networks: { near: 10 } }
+";
+    let env = testing::env(SLOW, Target::Vagrant);
+    let sh = linux(&env, "web", &Step::Tc).expect("web is on a slow network");
+    assert!(sh.contains("/^10\\.75\\.2\\.10\\//") && sh.contains("root netem delay 80ms"), "{sh}");
+    assert_eq!(linux(&env, "user", &Step::Tc), None);
+    assert_eq!(linux(&env, "nobody", &Step::Tc), None);
+}

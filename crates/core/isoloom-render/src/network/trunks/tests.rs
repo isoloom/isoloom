@@ -90,7 +90,8 @@ fn the_switch_bridges_each_vlan_once_and_tags_every_trunk() {
     let ts = containers(&spec);
     let refs: Vec<&Trunk> = ts.iter().collect();
     let script = switch_script(&spec, &refs);
-    assert_eq!(script.matches("type bridge").count(), 2, "{script}");
+    assert_eq!(script.matches("ip link add br10 type bridge").count(), 1, "{script}");
+    assert_eq!(script.matches("ip link add br20 type bridge").count(), 1, "{script}");
     assert_eq!(script.matches("type vlan id").count(), 4, "{script}");
     let switch = switch_address(&spec, "office-vlan10");
     assert!(

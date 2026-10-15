@@ -273,31 +273,4 @@ pub fn timeout_s(checks: &[&Resolved]) -> u32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn resolved(name: &str, wait: u32) -> Resolved {
-        Resolved {
-            name: name.into(),
-            wait,
-            derived: false,
-            position: isoloom_plan::checks::Position::Networks,
-            probe: Probe::Script { path: "c.sh".into() },
-        }
-    }
-
-    #[test]
-    fn a_runner_gets_its_waits_plus_15_s_a_check_plus_60_s() {
-        let (a, b) = (resolved("a", 300), resolved("b", 600));
-        assert_eq!(timeout_s(&[&a, &b]), 300 + 600 + 2 * 15 + 60);
-        assert_eq!(timeout_s(&[]), 60);
-    }
-
-    #[test]
-    fn a_clean_up_runs_always_and_is_tolerated() {
-        let s = cleanup(run("halt", argv("vagrant", &["halt"]).unwrap(), 300).unwrap());
-        assert_eq!((s.when, s.failure), (When::Always, isoloom_manifest::Failure::Tolerate));
-        assert_eq!(s.timeout_s.map(NonZeroU32::get), Some(300));
-        assert!(program("sh").is_err(), "a shell is never a program");
-    }
-}
+mod tests;

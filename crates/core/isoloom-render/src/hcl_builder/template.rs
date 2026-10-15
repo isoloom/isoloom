@@ -185,6 +185,13 @@ mod tests {
     }
 
     #[test]
+    fn text_converts_into_a_template_of_it() {
+        assert_eq!(Template::from("a").into_expression(), hcl::Expression::String("a".into()));
+        assert_eq!(Template::from(String::from("b")).into_expression(), hcl::Expression::String("b".into()));
+        assert_eq!(hcl::Expression::from(Template::text("c")), hcl::Expression::String("c".into()));
+    }
+
+    #[test]
     fn plain_text_is_a_string() {
         assert_eq!(Template::text("a").with_text("b").into_expression(), hcl::Expression::String("ab".into()));
     }
