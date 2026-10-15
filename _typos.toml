@@ -3,6 +3,8 @@
 [default.extend-words]
 # Azure VM sizes (Standard_D2als_v6).
 als = "als"
+# The Rust crate `flate2`, named in the plan.
+flate = "flate"
 # The NFS server's command.
 exportfs = "exportfs"
 # Misspelled keys on purpose: the tests check they are refused.
