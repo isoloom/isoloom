@@ -222,3 +222,21 @@ fn a_dns_server_named_by_machine_is_its_address_on_a_network_both_share() {
     let docker = lower(lab.source(), Scope::Target(Target::Docker));
     assert!(docker.spec.machines["pc"].dns.as_ref().is_some_and(|d| d.servers[0] != "dns"));
 }
+
+#[test]
+fn the_controller_takes_its_vagrant_box_from_the_overrides() {
+    let controller = |overrides: &str| {
+        let yaml = format!("version: 1\nname: t\nmachines:\n  m: {{ os: debian@12 }}\n{overrides}");
+        lower(crate::testing::lab(&yaml).source(), Scope::Lab).spec.controller
+    };
+    assert_eq!(controller(""), None);
+    let boxed = controller("overrides: { vagrant: { controller: { box: corp/ansible, box_version: '2.1' } } }\n").and_then(|c| c.image);
+    assert_eq!(
+        boxed.map(|i| (i.vagrant, i.vagrant_version)),
+        Some((Some("corp/ansible".to_owned()), Some("2.1".to_owned())))
+    );
+    let pinned = controller("overrides: { vagrant: { controller: { box_version: '2.1' } } }\n").and_then(|c| c.image);
+    assert_eq!(pinned.map(|i| (i.vagrant, i.vagrant_version)), Some((None, Some("2.1".to_owned()))));
+    let sized = controller("controller: { resources: { memory_mb: 768 } }\n").expect("the spec's controller");
+    assert_eq!((sized.image, sized.resources.and_then(|r| r.memory_mb)), (None, Some(768)));
+}

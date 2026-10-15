@@ -110,7 +110,36 @@ impl Health {
 mod tests {
     use isoloom_spec::model::{CommandLine, Healthcheck, HttpCheck};
 
-    use super::{Health, HealthTest};
+    use super::{Health, HealthTest, Process};
+
+    #[test]
+    fn a_process_is_empty_until_one_of_its_parts_is_set() {
+        assert!(Process::default().is_empty());
+        let health = Health {
+            test: HealthTest::Command(CommandLine::Shell("true".into())),
+            interval: 1,
+            timeout: 1,
+            retries: 1,
+            start_period: 0,
+        };
+        let one_each = [
+            Process {
+                command: Some(CommandLine::Shell("app".into())),
+                ..Process::default()
+            },
+            Process {
+                working_dir: Some("/srv".into()),
+                ..Process::default()
+            },
+            Process {
+                health: Some(health),
+                ..Process::default()
+            },
+        ];
+        for p in one_each {
+            assert!(!p.is_empty(), "{p:?}");
+        }
+    }
 
     #[test]
     fn the_pace_defaults_to_the_port_probes() {

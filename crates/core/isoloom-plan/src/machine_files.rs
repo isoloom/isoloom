@@ -118,6 +118,20 @@ overrides:
     }
 
     #[test]
+    fn only_a_project_file_with_an_owner_or_a_mode_asks_for_owned_project_files() {
+        let owned = |files: &str| {
+            let env = testing::environment(
+                &format!("version: 1\nname: t\nmachines:\n  a: {{ app: {{ image: nginx }}, files: [{files}] }}\n"),
+                Target::Docker,
+            );
+            env.requirements.iter().any(|r| matches!(r, Requirement::OwnedProjectFile { .. }))
+        };
+        assert!(owned("{ path: /a, source: conf/a, mode: '0600' }"));
+        assert!(!owned("{ path: /a, content: x, mode: '0600' }"), "content is written with its mode");
+        assert!(!owned("{ path: /a, source: conf/a }"));
+    }
+
+    #[test]
     fn a_vm_places_its_files_after_the_project_and_before_its_scripts() {
         let steps = &env(Target::Vagrant).machines["a"].lifecycle;
         let at = |pick: fn(&Step) -> bool| steps.iter().position(pick).expect("planned");
