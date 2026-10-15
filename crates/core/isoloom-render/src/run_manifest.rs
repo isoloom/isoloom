@@ -204,22 +204,31 @@ pub fn port(label: &str, p: &model::Port, published: &[PublishedPort], address: 
 ///
 /// Fails on an output name the manifest refuses.
 pub fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
+    outputs_at(machines, &Template::text("127.0.0.1"))
+}
+
+/// [`outputs`], each shown at `host` (a server lab's router, `${outputs.ip}`).
+///
+/// # Errors
+///
+/// Fails on an output name the manifest refuses.
+pub fn outputs_at(machines: &[Machine], host: &Template) -> Result<Vec<Output>, ManifestError> {
     let shown = machines.iter().filter(|m| matches!(m.role, Role::Target | Role::Access | Role::Tool));
     shown
         .flat_map(|m| m.ports.iter().filter(|p| p.publish.is_some()).map(move |p| (m, p)))
-        .map(|(m, p)| output(m, p))
+        .map(|(m, p)| output(m, p, host))
         .collect()
 }
 
-fn output(m: &Machine, p: &Port) -> Result<Output, ManifestError> {
+fn output(m: &Machine, p: &Port, host: &Template) -> Result<Output, ManifestError> {
     let snake: String = format!("{}_{}", m.name, p.name)
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
         .collect();
-    let (role, before, after) = match (p.http, p.tls) {
-        (true, true) => (OutputRole::Entry, "https://127.0.0.1:", "/"),
-        (true, false) => (OutputRole::Entry, "http://127.0.0.1:", "/"),
-        (false, _) => (OutputRole::Info, "127.0.0.1:", ""),
+    let (role, scheme, after) = match (p.http, p.tls) {
+        (true, true) => (OutputRole::Entry, "https://", "/"),
+        (true, false) => (OutputRole::Entry, "http://", "/"),
+        (false, _) => (OutputRole::Info, "", ""),
     };
     let port = if p.protocol == Protocol::Udp {
         format!("{}/udp", p.port)
@@ -232,11 +241,11 @@ fn output(m: &Machine, p: &Port) -> Result<Output, ManifestError> {
         description: Some(format!("{what}.")),
         role,
         sensitive: false,
-        format: Some(Template::from_parts([
-            Part::Text(before.into()),
-            Part::Placeholder(Placeholder::Value),
-            Part::Text(after.into()),
-        ])),
+        format: Some(Template::from_parts(
+            std::iter::once(Part::Text(scheme.into()))
+                .chain(host.parts().iter().cloned())
+                .chain([Part::Text(":".into()), Part::Placeholder(Placeholder::Value), Part::Text(after.into())]),
+        )),
         from: OutputSource::PublishedPort {
             machine: m.name.clone(),
             port: p.name.clone(),

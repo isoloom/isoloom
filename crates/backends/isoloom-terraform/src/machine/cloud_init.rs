@@ -137,7 +137,6 @@ fn label(step: &Step) -> String {
         Step::Files { .. } => "files".into(),
         Step::Secrets => "waiting for its secrets".into(),
         Step::Inputs { .. } => "inputs".into(),
-        Step::Before { .. } => "before scripts".into(),
         Step::Command => "starting its command".into(),
         Step::Setup { .. } => "setup scripts".into(),
         Step::Egress => "closing the internet".into(),

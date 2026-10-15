@@ -219,7 +219,8 @@
     {
       "name": "app",
       "cidr": "10.80.0.0/24",
-      "internet": true
+      "internet": true,
+      "native": "i${run.slot}n0"
     }
   ],
   "machines": [
@@ -403,7 +404,7 @@
     },
     {
       "name": "web_web",
-      "description": "web's web (port 80), forwarded by the router.",
+      "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${outputs.ip}:${value}/",

@@ -7,11 +7,12 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, Check, CheckKind, CheckRunner, Condition, EnvName, HostArgv, Lifecycle, ManifestError, Name, NonEmpty, Part, Placeholder, Program,
+    Action, Argv, CheckRunner, Condition, EnvName, HostArgv, Lifecycle, ManifestError, Name, NonEmpty, Part, Placeholder, Program,
     ReadyGrammar, RelPath, Run, RunVar, SnakeName, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
-use isoloom_plan::checks::{Probe, Resolved, by_position};
+use isoloom_plan::checks::by_position;
+use isoloom_render::run_manifest::{check, noted, run, timeout_s};
 
 use crate::machine::{controller, vms};
 use crate::server::router::check_host;
@@ -28,10 +29,6 @@ const PLAYBOOKS_S: u32 = 7200;
 
 /// How long a machine may stay out of reach over SSH before the run fails.
 const UNREACHABLE_S: u32 = 600;
-
-/// What a check runner's step adds to its checks' waits: each probe's own time, and its start.
-const PER_CHECK_S: u32 = 15;
-const START_S: u32 = 60;
 
 fn id(text: &str) -> Result<StepId, ManifestError> {
     StepId::parse(text)
@@ -55,9 +52,7 @@ fn output(name: &str) -> Result<Template, ManifestError> {
 /// slot on the server, its key).
 fn terraform(step: &str, args: Vec<Template>, timeout: u32, note: &str) -> Result<Step, ManifestError> {
     let argv = HostArgv::Every(Argv::new(Program::parse("terraform")?, args));
-    let mut s = Step::argv(id(step)?, argv);
-    s.timeout_s = secs(timeout);
-    s.note = Some(note.into());
+    let mut s = noted(run(step, argv, timeout)?, note);
     let env: [(&str, Template); 6] = [
         ("TF_DATA_DIR", run_var("", RunVar::StateDir, "/.terraform")),
         ("TF_IN_AUTOMATION", Template::text("1")),
@@ -195,25 +190,3 @@ pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestErr
     Ok(out)
 }
 
-/// A runner's limit: its checks' waits, 15 s each, and 60 s.
-fn timeout_s(checks: &[&Resolved]) -> u32 {
-    let waits: u32 = checks.iter().map(|c| c.wait).sum();
-    let count = u32::try_from(checks.len()).unwrap_or(u32::MAX);
-    waits.saturating_add(count.saturating_mul(PER_CHECK_S)).saturating_add(START_S)
-}
-
-fn check(c: &Resolved) -> Check {
-    let kind = match c.probe {
-        Probe::Http { .. } => CheckKind::Http,
-        Probe::Tcp { .. } => CheckKind::Tcp,
-        Probe::Exec { .. } => CheckKind::Exec,
-        Probe::Script { .. } => CheckKind::Script,
-        Probe::Playbook { .. } => CheckKind::Playbook,
-    };
-    Check {
-        name: c.name.clone(),
-        kind,
-        wait_s: c.wait,
-        derived: c.derived,
-    }
-}

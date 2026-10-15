@@ -20,10 +20,10 @@ mod steps;
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    Argv, Checks, Driver, Generator, GeneratorName, HostArgv, HostOs, Identity, Lab, LabName, Manifest, ManifestError, ManifestVersion, PinnedImage, Program,
-    RelPath, SCHEMA_URL, StateOwner, Template, TerraformIdentity, Tool, ToolName, Version,
+    Checks, Driver, HostOs, Identity, Manifest, ManifestError, ManifestVersion, PinnedImage, RelPath, SCHEMA_URL, StateOwner, TerraformIdentity, Tool, Version,
 };
 use isoloom_plan::Environment;
+use isoloom_render::run_manifest::{argv, generator, lab, tool};
 use isoloom_spec::model::Target;
 
 use crate::Error;
@@ -45,18 +45,12 @@ pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
 
 fn build(env: &Environment) -> Result<Manifest, ManifestError> {
     let runners = steps::runners(env)?;
+    let machines = machines::machines(env)?;
     Ok(Manifest {
         schema: Some(SCHEMA_URL.to_owned()),
         manifest_version: ManifestVersion,
-        generator: Generator {
-            name: GeneratorName::Isoloom,
-            version: Version::parse(env!("CARGO_PKG_VERSION"))?,
-        },
-        lab: Lab {
-            name: LabName::parse(&env.name)?,
-            instance: env.instance.map(isoloom_manifest::Instance::new).transpose()?,
-            message: None,
-        },
+        generator: generator()?,
+        lab: lab(env)?,
         target: isoloom_manifest::Target::Proxmox,
         cloud: None,
         driver: Driver::Terraform,
@@ -70,10 +64,10 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
         params: slots::params(env, &runners)?,
         secrets: slots::secrets(env)?,
         networks: machines::networks(env)?,
-        machines: machines::machines(env)?,
+        outputs: machines::outputs(&machines)?,
+        machines,
         lifecycle: steps::lifecycle()?,
         ready: steps::ready(env)?,
-        outputs: machines::outputs(env)?,
         checks: Checks {
             protocol: isoloom_manifest::CheckProtocol::V1,
             setup: Vec::new(),
@@ -85,27 +79,8 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
     })
 }
 
-/// `program` with `args`, the same on every host.
-fn argv(program: &str, args: &[&str]) -> Result<HostArgv, ManifestError> {
-    Ok(HostArgv::Every(Argv::new(
-        Program::parse(program)?,
-        args.iter().map(|a| Template::text(a)).collect(),
-    )))
-}
-
 /// Terraform (from its image on macOS) and `ssh`.
 fn tools() -> Result<Vec<Tool>, ManifestError> {
-    let tool = |name: &str, probe: HostArgv| -> Result<Tool, ManifestError> {
-        Ok(Tool {
-            name: ToolName::parse(name)?,
-            probe,
-            min_version: None,
-            container: None,
-            container_hosts: BTreeSet::new(),
-            hosts: BTreeSet::new(),
-            providers: BTreeSet::new(),
-        })
-    };
     let mut terraform = tool("terraform", argv("terraform", &["version"])?)?;
     terraform.min_version = Some(Version::parse(TERRAFORM_MIN)?);
     terraform.container = Some(PinnedImage::parse(TERRAFORM_IMAGE)?);
