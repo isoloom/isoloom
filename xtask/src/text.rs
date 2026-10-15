@@ -1,24 +1,26 @@
 //! Bytes as text: hexadecimal for digests, base64 for PowerShell's encoded commands.
 
-use std::fmt::Write as _;
-
 /// Lowercase hexadecimal.
-pub fn hex(bytes: &[u8]) -> String {
-    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut out, b| {
-        let _ = write!(out, "{b:02x}");
-        out
-    })
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .flat_map(|b| [b >> 4, b & 15])
+        .filter_map(|nibble| char::from_digit(u32::from(nibble), 16))
+        .collect()
 }
 
 /// Standard base64, with padding.
-pub fn base64(bytes: &[u8]) -> String {
+pub(crate) fn base64(bytes: &[u8]) -> String {
     const ABC: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
-        let n = chunk.iter().enumerate().fold(0u32, |n, (i, b)| n | (u32::from(*b) << (16 - 8 * i)));
-        for i in 0..4 {
-            let sextet = (n >> (18 - 6 * i)) & 63;
-            out.push(if i <= chunk.len() { char::from(ABC[sextet as usize]) } else { '=' });
+        let n = chunk.iter().zip([16u32, 8, 0]).fold(0u32, |n, (b, shift)| n | (u32::from(*b) << shift));
+        for (i, shift) in [18u32, 12, 6, 0].into_iter().enumerate() {
+            let letter = usize::try_from((n >> shift) & 63).ok().and_then(|at| ABC.get(at));
+            out.push(match letter {
+                Some(l) if i <= chunk.len() => char::from(*l),
+                _ => '=',
+            });
         }
     }
     out

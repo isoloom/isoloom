@@ -9,7 +9,7 @@ use std::process::{Command, ExitCode};
 use sha2::{Digest, Sha256};
 
 use crate::check_all::TAURI_PACKAGES;
-use crate::{Res, process};
+use crate::{Res, process, repo};
 
 const CARGO_MACHETE: &str = "0.9.2";
 const TERRAFORM: &str = "1.16.6";
@@ -34,9 +34,9 @@ impl Ctx {
         c
     }
 
-    /// The first line `argv` prints, when it runs.
-    fn found(&self, argv: &[&str]) -> Option<String> {
-        let (program, args) = argv.split_first()?;
+    /// The first line `command` prints, when it runs.
+    fn found(&self, command: &[&str]) -> Option<String> {
+        let (program, args) = command.split_first()?;
         process::first_line(self.cmd(program).args(args))
     }
 }
@@ -84,7 +84,7 @@ fn tools() -> Vec<Tool> {
 }
 
 /// Checks each tool and installs the missing ones (unless `check`), then says what needs root.
-pub fn run(check: bool) -> Res<ExitCode> {
+pub(super) fn run(check: bool) -> Res<ExitCode> {
     let home = PathBuf::from(std::env::var_os("HOME").ok_or("HOME isn't set")?);
     let user_path = std::env::var_os("PATH").unwrap_or_default();
     let (bin, cargo_bin) = (home.join(".local/bin"), home.join(".cargo/bin"));
@@ -102,7 +102,8 @@ pub fn run(check: bool) -> Res<ExitCode> {
     // Every tool is reported, so no short-circuit: `all` would stop at the first missing one.
     let results: Vec<bool> = tools().iter().map(|t| ensure(&ctx, t, check)).collect();
     let ok = results.iter().all(|r| *r);
-    let _ = std::fs::remove_dir_all(&ctx.work);
+    // The downloads go; one left behind in the temporary folder is harmless.
+    repo::remove(&ctx.work).ok();
     root_notes(&ctx);
     if !std::env::split_paths(&user_path).any(|d| d == bin) {
         println!(
@@ -235,7 +236,7 @@ fn install_pwsh(ctx: &Ctx) -> Res<()> {
     let base = format!("https://github.com/PowerShell/PowerShell/releases/download/v{PWSH}");
     let archive = fetch_verified(ctx, &format!("{base}/{name}"), &format!("{base}/hashes.sha256"), &name)?;
     let dir = ctx.share.join("powershell").join(PWSH);
-    let _ = std::fs::remove_dir_all(&dir);
+    repo::remove(&dir)?;
     std::fs::create_dir_all(&dir)?;
     process::run(ctx.cmd("tar").arg("-xzf").arg(archive).arg("-C").arg(&dir))?;
     process::run(ctx.cmd("chmod").arg("+x").arg(dir.join("pwsh")))?;

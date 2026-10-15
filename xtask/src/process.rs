@@ -10,7 +10,7 @@ use std::sync::mpsc;
 use crate::Res;
 
 /// The command as one line, for messages and logs.
-pub fn describe(cmd: &Command) -> String {
+pub(crate) fn describe(cmd: &Command) -> String {
     let mut parts = vec![cmd.get_program().to_string_lossy().into_owned()];
     parts.extend(cmd.get_args().map(|a| a.to_string_lossy().into_owned()));
     parts.join(" ")
@@ -32,7 +32,7 @@ pub(crate) fn without_run_env(cmd: &mut Command) -> &mut Command {
 }
 
 /// Runs a command attached to the terminal; an error names it when it fails.
-pub fn run(cmd: &mut Command) -> Res<()> {
+pub(crate) fn run(cmd: &mut Command) -> Res<()> {
     let status = cmd.status().map_err(|e| format!("`{}` couldn't start: {e}", describe(cmd)))?;
     if status.success() {
         Ok(())
@@ -42,7 +42,7 @@ pub fn run(cmd: &mut Command) -> Res<()> {
 }
 
 /// A command's standard output, when it succeeds.
-pub fn output(cmd: &mut Command) -> Res<String> {
+pub(crate) fn output(cmd: &mut Command) -> Res<String> {
     let out = cmd
         .stderr(Stdio::inherit())
         .output()
@@ -56,7 +56,7 @@ pub fn output(cmd: &mut Command) -> Res<String> {
 
 /// Runs a command with its output captured: nothing on the terminal, and the end of what it
 /// said in the error when it fails.
-pub fn quiet(cmd: &mut Command) -> Res<()> {
+pub(crate) fn quiet(cmd: &mut Command) -> Res<()> {
     let out = cmd.output().map_err(|e| format!("`{}` couldn't start: {e}", describe(cmd)))?;
     if out.status.success() {
         return Ok(());
@@ -67,35 +67,39 @@ pub fn quiet(cmd: &mut Command) -> Res<()> {
 }
 
 /// The first line a command prints on success, or `None` (not installed, or it failed).
-pub fn first_line(cmd: &mut Command) -> Option<String> {
+pub(crate) fn first_line(cmd: &mut Command) -> Option<String> {
     let out = cmd.stdin(Stdio::null()).stderr(Stdio::null()).output().ok()?;
     let text = String::from_utf8_lossy(&out.stdout);
-    out.status.success().then(|| text.lines().next().unwrap_or("").trim().to_string())
+    out.status.success().then(|| text.lines().next().unwrap_or("").trim().to_owned())
 }
 
 /// Runs a command with its standard output and error read line by line, both handed to
 /// `on_line` as they come (a carriage return at a line's end dropped), and nothing on its
 /// standard input.
-pub fn stream(cmd: &mut Command, on_line: &mut dyn FnMut(&str)) -> std::io::Result<ExitStatus> {
+pub(crate) fn stream(cmd: &mut Command, on_line: &mut dyn FnMut(&str)) -> std::io::Result<ExitStatus> {
     let mut child = cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
     let (tx, rx) = mpsc::channel::<String>();
-    let readers: Vec<_> = [
-        child.stdout.take().map(|s| Box::new(s) as Box<dyn Read + Send>),
-        child.stderr.take().map(|s| Box::new(s) as Box<dyn Read + Send>),
-    ]
-    .into_iter()
-    .flatten()
-    .map(|pipe| {
-        let tx = tx.clone();
-        std::thread::spawn(move || send_lines(pipe, &tx))
-    })
-    .collect();
+    let mut pipes: Vec<Box<dyn Read + Send>> = Vec::new();
+    if let Some(out) = child.stdout.take() {
+        pipes.push(Box::new(out));
+    }
+    if let Some(err) = child.stderr.take() {
+        pipes.push(Box::new(err));
+    }
+    let readers: Vec<_> = pipes
+        .into_iter()
+        .map(|pipe| {
+            let tx = tx.clone();
+            std::thread::spawn(move || send_lines(pipe, &tx))
+        })
+        .collect();
     drop(tx);
     for line in rx {
         on_line(&line);
     }
+    // A reader ends with its pipe; one that panicked has nothing more to hand over.
     for r in readers {
-        let _ = r.join();
+        r.join().ok();
     }
     child.wait()
 }
@@ -105,7 +109,7 @@ fn send_lines(pipe: Box<dyn Read + Send>, tx: &mpsc::Sender<String>) {
     let mut buf = Vec::new();
     while matches!(reader.read_until(b'\n', &mut buf), Ok(n) if n > 0) {
         let text = String::from_utf8_lossy(&buf);
-        if tx.send(text.trim_end_matches(['\n', '\r']).to_string()).is_err() {
+        if tx.send(text.trim_end_matches(['\n', '\r']).to_owned()).is_err() {
             return;
         }
         buf.clear();
@@ -115,7 +119,7 @@ fn send_lines(pipe: Box<dyn Read + Send>, tx: &mpsc::Sender<String>) {
 /// The program to start for `name` with `path` as the search path. On Windows a tool npm or
 /// corepack installed is a `.cmd` shim, which `Command` doesn't look for: its full path is
 /// returned. Elsewhere, and for a name not found, `name` itself.
-pub fn program(name: &str, path: &OsStr) -> OsString {
+pub(crate) fn program(name: &str, path: &OsStr) -> OsString {
     if !cfg!(windows) || Path::new(name).extension().is_some() {
         return name.into();
     }

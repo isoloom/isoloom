@@ -13,7 +13,7 @@ use crate::process;
 
 /// One gate: its name and the command it runs in the repository's folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Gate {
+pub(super) struct Gate {
     /// Its name in the table.
     pub name: &'static str,
     /// The program and its arguments.
@@ -30,33 +30,30 @@ fn gate(name: &'static str, argv: &[&'static str]) -> Gate {
     }
 }
 
-/// Isoloom's gates: every one on the full profile, the tests on the others.
-pub fn isoloom(profile: Profile) -> Vec<Gate> {
+/// Isoloom's gates: every one on the full profile, the tests on the others. Clippy runs without
+/// `-D warnings`: a lint at deny fails it, and the lints still at warn are counted by the
+/// ratchet (`cargo xtask quality`), which fails when a count goes up.
+pub(super) fn isoloom(profile: Profile) -> Vec<Gate> {
     let mut gates = Vec::new();
     if profile == Profile::Full {
         gates.push(gate("fmt", &["cargo", "fmt", "--all", "--check"]));
         gates.push(gate("typos", &["typos"]));
         gates.push(gate("machete", &["cargo", "machete"]));
         let clippy = ["cargo", "clippy", "--workspace", "--all-targets"];
-        gates.push(gate("clippy", &[&clippy[..], &["--", "-D", "warnings"]].concat()));
-        gates.push(gate(
-            "clippy-linux",
-            &[&clippy[..], &["--target", "x86_64-unknown-linux-gnu", "--", "-D", "warnings"]].concat(),
-        ));
-        gates.push(gate(
-            "clippy-windows",
-            &[&clippy[..], &["--target", "x86_64-pc-windows-msvc", "--", "-D", "warnings"]].concat(),
-        ));
+        gates.push(gate("clippy", &clippy));
+        gates.push(gate("clippy-linux", &[&clippy[..], &["--target", "x86_64-unknown-linux-gnu"]].concat()));
+        gates.push(gate("clippy-windows", &[&clippy[..], &["--target", "x86_64-pc-windows-msvc"]].concat()));
         let mut doc = gate("doc", &["cargo", "doc", "--workspace", "--no-deps"]);
         doc.env.push(("RUSTDOCFLAGS", "-Dwarnings"));
         gates.push(doc);
+        gates.push(gate("quality", &["cargo", "xtask", "quality"]));
     }
     gates.push(gate("test", &["cargo", "test", "--workspace", "--no-fail-fast"]));
     gates
 }
 
 /// Isothrum's libraries (its root workspace; the desktop app is its own and moves out).
-pub fn isothrum(profile: Profile) -> Vec<Gate> {
+pub(super) fn isothrum(profile: Profile) -> Vec<Gate> {
     let mut gates = Vec::new();
     if profile == Profile::Full {
         gates.push(gate("fmt", &["cargo", "fmt", "--all", "--check"]));
@@ -67,7 +64,7 @@ pub fn isothrum(profile: Profile) -> Vec<Gate> {
 }
 
 /// How this host runs its gates: its search path, and where each repository builds.
-pub struct Leg<'a> {
+pub(super) struct Leg<'a> {
     host: Host,
     profile: Profile,
     dirs: &'a Dirs,
@@ -78,7 +75,7 @@ pub struct Leg<'a> {
 
 /// This host's part: `profile`'s gates of the checkouts in `dirs`, each repository building
 /// under `target_root` (else under `CARGO_TARGET_DIR`, else in its own `target`).
-pub fn leg<'a>(host: Host, profile: Profile, dirs: &'a Dirs, target_root: Option<&Path>) -> Leg<'a> {
+pub(super) fn leg<'a>(host: Host, profile: Profile, dirs: &'a Dirs, target_root: Option<&Path>) -> Leg<'a> {
     Leg {
         host,
         profile,
@@ -116,7 +113,7 @@ fn search_path(host: Host) -> OsString {
 
 impl Leg<'_> {
     /// Runs the gates of `repos`, each reported to `sink`.
-    pub fn run(&self, repos: &[Repo], sink: &mut dyn Sink) {
+    pub(super) fn run(&self, repos: &[Repo], sink: &mut dyn Sink) {
         let tool = |name: &str, arg: &str| {
             process::first_line(Command::new(process::program(name, &self.path)).arg(arg).env("PATH", &self.path)).unwrap_or_else(|| "none".into())
         };
@@ -186,15 +183,15 @@ impl Leg<'_> {
     /// The launcher's own gate, `pnpm check` (format, types, lint, the web tests, then the Rust
     /// format, lint and tests), after `pnpm install`. Every host runs it.
     fn launcher(&self, sink: &mut dyn Sink) {
-        let node = process::first_line(Command::new(process::program("node", &self.path)).arg("--version").env("PATH", &self.path));
-        let node = node.unwrap_or_else(|| "none".into());
-        if !node.starts_with("v24.") {
+        let found = process::first_line(Command::new(process::program("node", &self.path)).arg("--version").env("PATH", &self.path));
+        let version = found.unwrap_or_else(|| "none".into());
+        if !version.starts_with("v24.") {
             return not_run(
                 sink,
                 Repo::Launcher,
                 "check",
                 Status::Fail,
-                &format!("Node 24 needed, found {node} (ISOLOOM_NODE_BIN)"),
+                &format!("Node 24 needed, found {version} (ISOLOOM_NODE_BIN)"),
             );
         }
         if matches!(self.host, Host::Linux | Host::LinuxDocker)
@@ -205,8 +202,10 @@ impl Leg<'_> {
         }
         // The app embeds ../out at compile time; the tests don't need the real one (as in its CI).
         let out = self.dirs.launcher.join("out");
-        if !out.join("index.html").exists() {
-            let _ = std::fs::create_dir_all(&out).and_then(|()| std::fs::write(out.join("index.html"), "<!doctype html>\n"));
+        if !out.join("index.html").exists()
+            && let Err(e) = std::fs::create_dir_all(&out).and_then(|()| std::fs::write(out.join("index.html"), "<!doctype html>\n"))
+        {
+            sink.line(&format!("can't write {}: {e}", out.join("index.html").display()));
         }
         if self.gate(sink, Repo::Launcher, &gate("install", &["pnpm", "install", "--frozen-lockfile"])) {
             self.gate(sink, Repo::Launcher, &gate("check", &["pnpm", "check"]));
@@ -217,7 +216,7 @@ impl Leg<'_> {
 }
 
 /// The system packages the launcher's Tauri build needs on Linux.
-pub const TAURI_PACKAGES: &str = "libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf";
+pub(crate) const TAURI_PACKAGES: &str = "libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf";
 
 /// Records a gate that did not run, with the reason.
 fn not_run(sink: &mut dyn Sink, repo: Repo, gate: &str, status: Status, note: &str) {
@@ -238,7 +237,10 @@ mod tests {
     #[test]
     fn the_full_profile_adds_the_static_gates_before_the_tests() {
         let full: Vec<&str> = isoloom(Profile::Full).iter().map(|g| g.name).collect();
-        assert_eq!(full, ["fmt", "typos", "machete", "clippy", "clippy-linux", "clippy-windows", "doc", "test"]);
+        assert_eq!(
+            full,
+            ["fmt", "typos", "machete", "clippy", "clippy-linux", "clippy-windows", "doc", "quality", "test"]
+        );
         let platform: Vec<&str> = isoloom(Profile::Platform).iter().map(|g| g.name).collect();
         assert_eq!(platform, ["test"]);
         assert_eq!(isothrum(Profile::Full).len(), 3);
@@ -250,7 +252,7 @@ mod tests {
         let windows = gates.iter().find(|g| g.name == "clippy-windows").map(|g| g.argv.join(" "));
         assert_eq!(
             windows.as_deref(),
-            Some("cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc -- -D warnings")
+            Some("cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc")
         );
     }
 }

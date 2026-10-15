@@ -27,14 +27,14 @@ use std::process::{Command, ExitCode};
 
 use crate::{Res, process, repo};
 
-pub use config::{ALT_DIR, linked_configs, linked_isoloom};
+pub(crate) use config::{ALT_DIR, linked_configs, linked_isoloom};
 
 /// The repository the consumers pin Isoloom from.
-pub const GIT_URL: &str = "https://github.com/isoloom/isoloom";
+pub(crate) const GIT_URL: &str = "https://github.com/isoloom/isoloom";
 
 /// What to do with the consumers' links.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub enum Action {
+pub(crate) enum Action {
     /// Build against this checkout's crates.
     Link,
     /// Back to the git pins.
@@ -45,7 +45,7 @@ pub enum Action {
 
 /// The arguments of `cargo xtask dev-link`.
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// link, unlink or status.
     #[arg(value_enum)]
     action: Action,
@@ -54,7 +54,7 @@ pub struct Args {
 }
 
 /// Links, unlinks or reports each consumer; fails when one couldn't be linked.
-pub fn run(a: &Args) -> ExitCode {
+pub(crate) fn run(a: &Args) -> ExitCode {
     let root = repo::root();
     let consumers = if a.consumers.is_empty() {
         let code = repo::code_dir(&root);
@@ -130,7 +130,7 @@ fn link(root: &Path, c: &Path) -> Res<Vec<String>> {
         config::unlink(c)?;
         return Ok(vec!["no workspace pins Isoloom by git: nothing to link".into()]);
     }
-    let at = |ws: &str| if ws == "." || list.len() == 1 { ".".to_string() } else { ws.to_string() };
+    let at = |ws: &str| if ws == "." || list.len() == 1 { ".".to_owned() } else { ws.to_owned() };
     for ws in &list {
         config::guard(c, &config::config_path(&at(ws)))?;
     }

@@ -9,7 +9,7 @@ use super::Host;
 use super::protocol::{self, Event, GateResult, Status};
 
 /// What a host's part reports.
-pub trait Sink {
+pub(super) trait Sink {
     /// A gate starts.
     fn begin(&mut self, repo: &str, gate: &str);
     /// A line of its output.
@@ -19,7 +19,7 @@ pub trait Sink {
 }
 
 /// Prints the stream protocol on standard output, for the machine that started the run.
-pub struct Printer;
+pub(super) struct Printer;
 
 impl Sink for Printer {
     fn begin(&mut self, repo: &str, gate: &str) {
@@ -37,7 +37,7 @@ impl Sink for Printer {
 
 /// One host's results, each gate's output in its own log (`<host>-<repo>-<gate>.log`), the rest
 /// in the host's (`<host>.log`), and a progress line per gate on the terminal.
-pub struct Collector {
+pub(super) struct Collector {
     host: Host,
     logs: PathBuf,
     log: Option<File>,
@@ -47,7 +47,7 @@ pub struct Collector {
 
 impl Collector {
     /// A collector writing into the `logs` folder.
-    pub fn new(host: Host, logs: &Path) -> Collector {
+    pub(super) fn new(host: Host, logs: &Path) -> Collector {
         Collector {
             host,
             logs: logs.to_path_buf(),
@@ -57,7 +57,7 @@ impl Collector {
     }
 
     /// A line of a host's stream: a gate's start or end, or output.
-    pub fn feed(&mut self, raw: &str) {
+    pub(super) fn feed(&mut self, raw: &str) {
         match protocol::parse(raw) {
             Event::Begin { repo, gate } => self.begin(&repo, &gate),
             Event::Result(r) => self.result(r),
@@ -66,7 +66,7 @@ impl Collector {
     }
 
     /// The host couldn't run at all: one row for it.
-    pub fn host_failed(&mut self, status: Status, note: &str) {
+    pub(super) fn host_failed(&mut self, status: Status, note: &str) {
         println!("  {:<12} {}: {note}", self.host.id(), status.text());
         self.results.push(GateResult {
             repo: "-".into(),
@@ -78,12 +78,12 @@ impl Collector {
     }
 
     /// The host it collects for.
-    pub fn host(&self) -> Host {
+    pub(super) fn host(&self) -> Host {
         self.host
     }
 
     /// The host's own log.
-    pub fn host_log(&self) -> PathBuf {
+    pub(super) fn host_log(&self) -> PathBuf {
         self.logs.join(format!("{}.log", self.host.id()))
     }
 
@@ -91,8 +91,11 @@ impl Collector {
         if self.log.is_none() {
             self.log = OpenOptions::new().create(true).append(true).open(self.host_log()).ok();
         }
-        if let Some(f) = &mut self.log {
-            let _ = writeln!(f, "{line}");
+        // A log that can't be written is dropped; the results still reach the summary.
+        if let Some(f) = &mut self.log
+            && writeln!(f, "{line}").is_err()
+        {
+            self.log = None;
         }
     }
 }

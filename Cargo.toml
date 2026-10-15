@@ -47,32 +47,56 @@ toml = "1"
 tar = { version = "0.4", default-features = false }
 sha2 = "0.11"
 
-# Every crate inherits these (`[lints] workspace = true`); see .github/CONTRIBUTING.md. Every lint is at
-# "deny": a new exception is a local `#[allow]` with a one-line reason, never an entry here.
+# Every crate inherits these (`[lints] workspace = true`): the strictest set (PLAN 1c). A lint is at
+# "deny" once its count is zero; while it isn't, it is at "warn", and `cargo xtask quality` counts
+# its warnings per crate against quality-baseline.json, where a count can only go down. An
+# exception is a local `#[expect(lint, reason = "...")]`, which the ratchet counts too; never an
+# entry here.
 [workspace.lints.rust]
 # No exception: a profile's inputs reach the tools through `Command::envs`, not `set_var`.
 unsafe_code = "forbid"
+unused = { level = "deny", priority = -1 }
 missing_docs = "deny"
+unreachable_pub = "warn"
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
 bare_urls = "deny"
 
 [workspace.lints.clippy]
+all = { level = "deny", priority = -2 }
 pedantic = { level = "deny", priority = -1 }
-# Pedantic lints left out on purpose:
-must_use_candidate = "allow"         # nearly every getter qualifies; `#[must_use]` goes where ignoring is a bug.
-missing_errors_doc = "allow"         # errors are typed enums whose variants document themselves.
-missing_panics_doc = "allow"         # panics are denied outside tests (`expect_used`, `panic`).
-doc_markdown = "allow"               # prose names products (Docker, VirtualBox, OpenTofu) and keys, not code.
-similar_names = "allow"              # `src`/`dst`, `cidr`/`cidrs` read fine.
-too_many_lines = "deny"              # pedantic; threshold 60 in clippy.toml
-cognitive_complexity = "deny"        # nursery; threshold 15 in clippy.toml
-# Restriction lints (tests may unwrap, expect and panic: see clippy.toml).
+# Pedantic, counted until they reach zero.
+doc_markdown = "warn"
+missing_errors_doc = "warn"
+must_use_candidate = "warn"
+similar_names = "warn"
+# Limits (pedantic or nursery; thresholds in clippy.toml): functions 60 lines, 5 parameters,
+# cognitive complexity 15.
+too_many_lines = "deny"
+too_many_arguments = "deny"
+cognitive_complexity = "deny"
+fn_params_excessive_bools = "deny"
+struct_excessive_bools = "deny"
+# Exceptions carry a reason and fail once unneeded: `#[expect(lint, reason = "...")]`.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+# Restriction lints (tests may unwrap, expect, panic, print and index: see clippy.toml).
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
-dbg_macro = "deny"
 todo = "deny"
-print_stdout = "deny"                # libraries; the command line allows it (its output is its interface).
-too_many_arguments = "deny"          # threshold 5 in clippy.toml
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "warn"
+indexing_slicing = "warn"
+string_slice = "warn"
+as_conversions = "warn"
+wildcard_imports = "deny"
+shadow_unrelated = "warn"
+let_underscore_must_use = "warn"
+clone_on_ref_ptr = "deny"
+rc_buffer = "deny"
+str_to_string = "warn"
+get_unwrap = "deny"

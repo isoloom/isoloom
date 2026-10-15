@@ -14,7 +14,7 @@ use crate::{dev_link, process, repo};
 const DOCKER_VOLUME: &str = "isoloom-check-all-linux-docker";
 
 /// Runs `host`'s part, its results into `out`.
-pub fn run_host(host: Host, run: &Run, out: &mut Collector) {
+pub(super) fn run_host(host: Host, run: &Run, out: &mut Collector) {
     match host {
         Host::Mac => mac(run, out),
         Host::Linux => remote::linux(run, out),
@@ -31,12 +31,12 @@ fn mac(run: &Run, out: &mut Collector) {
 }
 
 /// The repositories as a `--repos` value.
-pub fn repos_arg(run: &Run) -> String {
+pub(super) fn repos_arg(run: &Run) -> String {
     run.repos.iter().map(|r| r.id()).collect::<Vec<_>>().join(",")
 }
 
 /// `CARGO_BUILD_JOBS` for the other hosts: this one's, else 4.
-pub fn jobs() -> String {
+pub(super) fn jobs() -> String {
     std::env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| "4".into())
 }
 
@@ -44,7 +44,7 @@ pub fn jobs() -> String {
 fn docker_image(out: &mut Collector) -> Result<String, String> {
     let dockerfile = repo::root().join("xtask/check-all/linux.Dockerfile");
     let text = std::fs::read(&dockerfile).map_err(|e| format!("{}: {e}", dockerfile.display()))?;
-    let digest = crate::text::hex(&Sha256::digest(&text)[..6]);
+    let digest = crate::text::hex(Sha256::digest(&text).get(..6).unwrap_or_default());
     let image = format!("isoloom-check-all-linux:{digest}");
     if process::quiet(Command::new("docker").args(["image", "inspect", &image])).is_ok() {
         return Ok(image);
@@ -57,7 +57,7 @@ fn docker_image(out: &mut Collector) -> Result<String, String> {
         .ok()
         .filter(std::process::ExitStatus::success)
         .map(|_| image)
-        .ok_or_else(|| "image build failed (see linux-docker.log)".to_string())
+        .ok_or_else(|| "image build failed (see linux-docker.log)".to_owned())
 }
 
 /// The repositories mounted at their own paths, so dev-link's absolute paths hold, and the
@@ -72,7 +72,7 @@ fn mounts(dirs: &Dirs) -> Vec<String> {
         }
     }
     paths.dedup();
-    paths.iter().flat_map(|p| ["-v".to_string(), format!("{0}:{0}", repo::slashed(p))]).collect()
+    paths.iter().flat_map(|p| ["-v".to_owned(), format!("{0}:{0}", repo::slashed(p))]).collect()
 }
 
 fn linux_docker(run: &Run, out: &mut Collector) {
@@ -134,7 +134,7 @@ fn linux_docker(run: &Run, out: &mut Collector) {
 }
 
 /// Removes the hosts' build folders and copies.
-pub fn clean(hosts: &[Host], dirs: &Dirs) {
+pub(super) fn clean(hosts: &[Host], dirs: &Dirs) {
     for host in hosts {
         let done = match host {
             Host::Linux => remote::clean_linux(),
@@ -150,7 +150,7 @@ pub fn clean(hosts: &[Host], dirs: &Dirs) {
 }
 
 fn clean_docker() -> crate::Res<String> {
-    let volumes = [DOCKER_VOLUME.to_string(), format!("{DOCKER_VOLUME}-node-modules")];
+    let volumes = [DOCKER_VOLUME.to_owned(), format!("{DOCKER_VOLUME}-node-modules")];
     process::quiet(Command::new("docker").args(["volume", "rm"]).args(&volumes))?;
     let images = process::output(Command::new("docker").args(["image", "ls", "-q", "isoloom-check-all-linux"]))?;
     let mut ids: Vec<&str> = images.lines().collect();

@@ -1,14 +1,13 @@
 //! The table printed at the end: every host's gates, their results and times, then the end of
 //! each failed gate's log.
 
-use std::fmt::Write as _;
 use std::path::Path;
 
 use super::Host;
 use super::protocol::{GateResult, Status};
 
 /// One host's part, done.
-pub struct HostRun {
+pub(super) struct HostRun {
     /// The host.
     pub host: Host,
     /// Its gates' outcomes.
@@ -19,7 +18,7 @@ pub struct HostRun {
 
 impl HostRun {
     /// A host whose part stopped unexpectedly.
-    pub fn lost(host: Host) -> HostRun {
+    pub(super) fn lost(host: Host) -> HostRun {
         HostRun {
             host,
             results: vec![GateResult {
@@ -35,41 +34,43 @@ impl HostRun {
 }
 
 /// `m:ss`.
-pub fn duration(secs: u64) -> String {
+pub(super) fn duration(secs: u64) -> String {
     format!("{}:{:02}", secs / 60, secs % 60)
 }
 
 /// The summary table, with the logs folder last.
-pub fn table(runs: &[HostRun], logs: &Path) -> String {
-    let mut out = String::new();
-    let _ = writeln!(out, "\n{:<12} {:<9} {:<15} {:<12} {:>6}  NOTE", "HOST", "REPO", "GATE", "RESULT", "TIME");
+pub(super) fn table(runs: &[HostRun], logs: &Path) -> String {
+    let mut lines = vec![
+        String::new(),
+        format!("{:<12} {:<9} {:<15} {:<12} {:>6}  NOTE", "HOST", "REPO", "GATE", "RESULT", "TIME"),
+    ];
     for run in runs {
+        let host = run.host.id();
         for r in &run.results {
             let line = format!(
-                "{:<12} {:<9} {:<15} {:<12} {:>6}  {}",
-                run.host.id(),
+                "{host:<12} {:<9} {:<15} {:<12} {:>6}  {}",
                 r.repo,
                 r.gate,
                 r.status.text(),
                 duration(r.secs),
                 r.note
             );
-            let _ = writeln!(out, "{}", line.trim_end());
+            lines.push(line.trim_end().to_owned());
         }
-        let _ = writeln!(out, "{:<12} {:<9} {:<15} {:<12} {:>6}", run.host.id(), "total", "", "", duration(run.secs));
+        lines.push(format!("{host:<12} {:<9} {:<15} {:<12} {:>6}", "total", "", "", duration(run.secs)));
     }
-    let _ = writeln!(out, "logs: {}", logs.display());
-    out
+    lines.push(format!("logs: {}", logs.display()));
+    lines.iter().map(|l| format!("{l}\n")).collect::<Vec<_>>().concat()
 }
 
 /// Whether any gate failed.
-pub fn any_failed(runs: &[HostRun]) -> bool {
+pub(super) fn any_failed(runs: &[HostRun]) -> bool {
     runs.iter().flat_map(|r| &r.results).any(|r| r.status == Status::Fail)
 }
 
 /// The last 20 lines of each failed gate's log.
-pub fn failure_tails(runs: &[HostRun], logs: &Path) -> String {
-    let mut out = String::new();
+pub(super) fn failure_tails(runs: &[HostRun], logs: &Path) -> String {
+    let mut lines = Vec::new();
     for run in runs {
         for r in run.results.iter().filter(|r| r.status == Status::Fail) {
             let name = if r.repo == "-" {
@@ -78,14 +79,16 @@ pub fn failure_tails(runs: &[HostRun], logs: &Path) -> String {
                 format!("{}-{}-{}.log", run.host.id(), r.repo, r.gate)
             };
             let Ok(text) = std::fs::read_to_string(logs.join(&name)) else { continue };
-            let lines: Vec<&str> = text.lines().collect();
-            let _ = writeln!(out, "\n--- {} (last 20 lines of {})", name.trim_end_matches(".log"), logs.join(&name).display());
-            for l in &lines[lines.len().saturating_sub(20)..] {
-                let _ = writeln!(out, "{l}");
-            }
+            let all: Vec<&str> = text.lines().collect();
+            lines.push(format!(
+                "\n--- {} (last 20 lines of {})",
+                name.trim_end_matches(".log"),
+                logs.join(&name).display()
+            ));
+            lines.extend(all.iter().skip(all.len().saturating_sub(20)).map(|l| (*l).to_owned()));
         }
     }
-    out
+    lines.iter().map(|l| format!("{l}\n")).collect::<Vec<_>>().concat()
 }
 
 #[cfg(test)]

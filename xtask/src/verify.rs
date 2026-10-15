@@ -9,7 +9,7 @@
 //!
 //! Each file goes to its format's validator (`docker compose config`, terraform and tflint,
 //! `vagrant validate`, kubeconform and helm, cloud-init, hadolint, ansible-lint, shellcheck,
-//! PSScriptAnalyzer); the runner that does this is `tools/verify/runner`, handed to the image
+//! `PSScriptAnalyzer`); the runner that does this is `tools/verify/runner`, handed to the image
 //! with the tree. Written to `$VERIFY_OUT` (default `target/verify`): `results.jsonl`,
 //! `new.jsonl` (the failures the baseline doesn't know), `stale.jsonl` (baseline entries no
 //! failure matches any more) and `summary.txt`, also printed. `--update-baseline` rewrites the
@@ -34,7 +34,7 @@ use crate::{Res, generate_all, process, repo};
 
 /// The arguments of `cargo xtask verify`.
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// Rewrite the baseline with today's failures.
     #[arg(long)]
     update_baseline: bool,
@@ -46,7 +46,7 @@ pub struct Args {
 const SKIPPED: [&str; 4] = [".terraform", ".vagrant", ".git", "__pycache__"];
 
 /// Runs the validators; the exit status says how it went.
-pub fn run(a: &Args) -> ExitCode {
+pub(crate) fn run(a: &Args) -> ExitCode {
     verify(a).unwrap_or_else(|e| {
         eprintln!("verify: {e}");
         ExitCode::from(2)
@@ -111,7 +111,7 @@ fn image(root: &Path) -> Res<String> {
 
 /// The POSIX `cksum` of `data`: a CRC-32 (polynomial 0x04C11DB7, most significant bit first)
 /// over the data and then its length.
-pub fn cksum(data: &[u8]) -> u32 {
+pub(crate) fn cksum(data: &[u8]) -> u32 {
     fn feed(crc: u32, byte: u8) -> u32 {
         (0..8).fold(crc ^ (u32::from(byte) << 24), |c, _| {
             if c & 0x8000_0000 == 0 { c << 1 } else { (c << 1) ^ 0x04C1_1DB7 }
@@ -149,9 +149,9 @@ fn add_tree(tar: &mut tar::Builder<File>, dir: &Path, name: &Path) -> Res<()> {
 fn run_image(image: &str, tree: &Path, root: &Path, out: &Path, update: bool) -> Res<i32> {
     let work = out.join(".work");
     for stale in ["results.jsonl", "new.jsonl", "stale.jsonl", "summary.txt", "baseline.json"] {
-        let _ = std::fs::remove_file(out.join(stale));
+        repo::remove(&out.join(stale))?;
     }
-    let _ = std::fs::remove_dir_all(&work);
+    repo::remove(&work)?;
     std::fs::create_dir_all(&work)?;
     let mut input = tar::Builder::new(File::create(work.join("in.tar"))?);
     input.follow_symlinks(false);
@@ -176,8 +176,10 @@ fn run_image(image: &str, tree: &Path, root: &Path, out: &Path, update: bool) ->
     docker.args([image, "sh", "-c", script, "verify", if update { "--update" } else { "" }]);
     docker.stdin(File::open(work.join("in.tar"))?).stdout(File::create(work.join("out.tar"))?);
     let status = docker.status()?;
+    // What the runner wrote comes back whole or not at all: no summary is the failure `finish`
+    // reports.
     if let Ok(results) = File::open(work.join("out.tar")) {
-        let _ = tar::Archive::new(results).unpack(out);
+        tar::Archive::new(results).unpack(out).ok();
     }
     Ok(status.code().unwrap_or(2))
 }
@@ -190,7 +192,7 @@ fn finish(out: &Path, root: &Path, update: bool, status: i32) -> Res<ExitCode> {
         std::fs::copy(out.join("baseline.json"), root.join("tools/verify/baseline.json"))?;
         eprintln!("verify: baseline rewritten (tools/verify/baseline.json)");
     }
-    let _ = std::fs::remove_dir_all(out.join(".work"));
+    repo::remove(&out.join(".work"))?;
     match status {
         0 => Ok(ExitCode::SUCCESS),
         3 => Ok(ExitCode::FAILURE),

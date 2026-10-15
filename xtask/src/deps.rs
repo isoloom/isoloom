@@ -97,7 +97,7 @@ fn allowed(from: Level, to: Level) -> bool {
 
 /// Every edge between workspace crates that breaks the rule, and every crate the rule can't
 /// place, from `cargo metadata --no-deps` output.
-pub fn violations(metadata: &Value) -> Vec<String> {
+pub(crate) fn violations(metadata: &Value) -> Vec<String> {
     let root = metadata["workspace_root"].as_str().unwrap_or("").replace('\\', "/");
     let packages = metadata["packages"].as_array().cloned().unwrap_or_default();
     let mut problems = Vec::new();
@@ -107,7 +107,7 @@ pub fn violations(metadata: &Value) -> Vec<String> {
         let manifest = p["manifest_path"].as_str().unwrap_or("").replace('\\', "/");
         let dir = manifest.trim_end_matches("/Cargo.toml").trim_start_matches(&root).trim_start_matches('/');
         match level(name, dir) {
-            Ok(l) => levels.push((name.to_string(), l)),
+            Ok(l) => levels.push((name.to_owned(), l)),
             Err(e) => problems.push(e),
         }
     }

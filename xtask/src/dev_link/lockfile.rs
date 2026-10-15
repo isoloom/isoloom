@@ -13,7 +13,7 @@ fn is_git_source(source: &str, url: &str) -> bool {
 }
 
 /// Whether the lockfile pins a crate of `url` by git.
-pub fn pins_git(lockfile: &str, url: &str) -> bool {
+pub(super) fn pins_git(lockfile: &str, url: &str) -> bool {
     packages(lockfile).iter().any(|p| p.source.as_deref().is_some_and(|s| is_git_source(s, url)))
 }
 
@@ -28,11 +28,11 @@ fn packages(lockfile: &str) -> Vec<Package> {
     let list = doc.get("package").and_then(toml::Value::as_array).cloned().unwrap_or_default();
     list.iter()
         .filter_map(|p| {
-            let field = |k: &str| p.get(k).and_then(toml::Value::as_str).map(str::to_string);
+            let field = |k: &str| p.get(k).and_then(toml::Value::as_str).map(str::to_owned);
             let dependencies = p.get("dependencies").and_then(toml::Value::as_array).map_or_else(Vec::new, |deps| {
                 deps.iter()
                     .filter_map(toml::Value::as_str)
-                    .filter_map(|d| d.split_whitespace().next().map(str::to_string))
+                    .filter_map(|d| d.split_whitespace().next().map(str::to_owned))
                     .collect()
             });
             Some(Package {
@@ -46,7 +46,7 @@ fn packages(lockfile: &str) -> Vec<Package> {
 
 /// The crates of `url`, pinned by git, that the workspace's own packages (those without a
 /// source) depend on directly, sorted.
-pub fn direct_git_crates(lockfile: &str, url: &str) -> Vec<String> {
+pub(super) fn direct_git_crates(lockfile: &str, url: &str) -> Vec<String> {
     let all = packages(lockfile);
     let git: BTreeSet<&str> = all
         .iter()
@@ -58,13 +58,13 @@ pub fn direct_git_crates(lockfile: &str, url: &str) -> Vec<String> {
         .filter(|p| p.source.is_none())
         .flat_map(|p| p.dependencies.iter().map(String::as_str))
         .collect();
-    git.intersection(&direct).map(|s| (*s).to_string()).collect()
+    git.intersection(&direct).map(|s| (*s).to_owned()).collect()
 }
 
 /// The `package.name` of a Cargo.toml.
-pub fn package_name(manifest: &Path) -> Option<String> {
+pub(super) fn package_name(manifest: &Path) -> Option<String> {
     let doc = std::fs::read_to_string(manifest).ok()?.parse::<toml::Table>().ok()?;
-    doc.get("package")?.get("name")?.as_str().map(str::to_string)
+    doc.get("package")?.get("name")?.as_str().map(str::to_owned)
 }
 
 #[cfg(test)]

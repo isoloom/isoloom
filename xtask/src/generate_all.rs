@@ -18,7 +18,7 @@ use crate::{Res, process, repo};
 
 /// The arguments of `cargo xtask generate-all`.
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// Where the tree goes (replaced).
     out: PathBuf,
     /// The spec folders (default: every example).
@@ -26,7 +26,7 @@ pub struct Args {
 }
 
 /// Builds the tree.
-pub fn run(a: &Args) -> Res<ExitCode> {
+pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     let root = repo::root();
     let isoloom = binary(&root)?;
     let specs = if a.specs.is_empty() { examples(&root)? } else { a.specs.clone() };
@@ -35,7 +35,7 @@ pub fn run(a: &Args) -> Res<ExitCode> {
 }
 
 /// The isoloom binary: `$ISOLOOM`, else built now (its path from cargo's own report).
-pub fn binary(root: &Path) -> Res<PathBuf> {
+pub(crate) fn binary(root: &Path) -> Res<PathBuf> {
     if let Some(bin) = std::env::var_os("ISOLOOM") {
         return Ok(PathBuf::from(bin));
     }
@@ -47,13 +47,14 @@ pub fn binary(root: &Path) -> Res<PathBuf> {
     report
         .lines()
         .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
-        .filter(|m| m["reason"] == "compiler-artifact" && m["target"]["name"] == "isoloom")
-        .find_map(|m| m["executable"].as_str().map(PathBuf::from))
+        .filter(|m| m.get("reason").and_then(serde_json::Value::as_str) == Some("compiler-artifact"))
+        .filter(|m| m.get("target").and_then(|t| t.get("name")).and_then(serde_json::Value::as_str) == Some("isoloom"))
+        .find_map(|m| m.get("executable").and_then(serde_json::Value::as_str).map(PathBuf::from))
         .ok_or_else(|| "cargo built no isoloom binary".into())
 }
 
 /// Every example folder, sorted.
-pub fn examples(root: &Path) -> Res<Vec<PathBuf>> {
+pub(crate) fn examples(root: &Path) -> Res<Vec<PathBuf>> {
     let mut out: Vec<PathBuf> = std::fs::read_dir(root.join("examples"))?
         .flatten()
         .map(|e| e.path())
@@ -64,7 +65,7 @@ pub fn examples(root: &Path) -> Res<Vec<PathBuf>> {
 }
 
 /// Copies each spec folder into `out` and generates it there.
-pub fn generate(isoloom: &Path, specs: &[PathBuf], out: &Path) -> Res<()> {
+pub(crate) fn generate(isoloom: &Path, specs: &[PathBuf], out: &Path) -> Res<()> {
     if out.exists() {
         std::fs::remove_dir_all(out)?;
     }

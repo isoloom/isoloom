@@ -6,7 +6,7 @@
 //! - `linux`: a Linux host over SSH: `ISOLOOM_LINUX_HOST` (10.0.0.10), `ISOLOOM_LINUX_USER`
 //!   (florianamette), sources and build folders under `ISOLOOM_LINUX_DIR` (~/isoloom-check-all).
 //! - `windows`: a Windows host over SSH, MSVC toolchain: `ISOLOOM_WIN_HOST` (10.0.0.40),
-//!   `ISOLOOM_WIN_USER` (florianamette), `ISOLOOM_WIN_DIR` (C:/isoloom-check-all);
+//!   `ISOLOOM_WIN_USER` (florianamette), `ISOLOOM_WIN_DIR` (`C:/isoloom-check-all`);
 //!   `cargo xtask host-setup` prepares it.
 //! - `linux-docker`: a pinned Rust container on this machine (`xtask/check-all/linux.Dockerfile`),
 //!   with the repositories mounted at their own paths.
@@ -40,12 +40,12 @@ use std::time::Instant;
 
 use crate::{Res, repo};
 
-pub use gates::TAURI_PACKAGES;
-pub use protocol::{GateResult, Status};
+pub(crate) use gates::TAURI_PACKAGES;
+pub(crate) use protocol::{GateResult, Status};
 
 /// A repository check-all knows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub enum Repo {
+pub(crate) enum Repo {
     /// This repository.
     Isoloom,
     /// The runner and the lab-model compiler.
@@ -56,7 +56,7 @@ pub enum Repo {
 
 impl Repo {
     /// Its name in the table and the logs.
-    pub fn id(self) -> &'static str {
+    pub(crate) fn id(self) -> &'static str {
         match self {
             Repo::Isoloom => "isoloom",
             Repo::Isothrum => "isothrum",
@@ -65,7 +65,7 @@ impl Repo {
     }
 
     /// Its folder name in the copies on the other hosts.
-    pub fn folder(self) -> &'static str {
+    pub(crate) fn folder(self) -> &'static str {
         match self {
             Repo::Launcher => "cyber-ctf-launcher",
             other => other.id(),
@@ -75,7 +75,7 @@ impl Repo {
 
 /// A host the gates run on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub enum Host {
+pub(crate) enum Host {
     /// This Mac, natively.
     Mac,
     /// The Linux host, over SSH.
@@ -88,7 +88,7 @@ pub enum Host {
 
 impl Host {
     /// Its name in the table and the logs.
-    pub fn id(self) -> &'static str {
+    pub(crate) fn id(self) -> &'static str {
         match self {
             Host::Mac => "mac",
             Host::Linux => "linux",
@@ -105,7 +105,7 @@ impl Host {
 
 /// Which gates a host runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub enum Profile {
+pub(crate) enum Profile {
     /// Every gate: format, lints, docs, the ratchet, the tests.
     Full,
     /// The gates whose result depends on the platform: the tests.
@@ -114,7 +114,7 @@ pub enum Profile {
 
 /// The arguments of `cargo xtask check-all`.
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// The repositories, comma separated.
     #[arg(long, value_enum, value_delimiter = ',', default_value = "isoloom,isothrum,launcher")]
     repos: Vec<Repo>,
@@ -147,7 +147,7 @@ pub struct Args {
 
 /// The three checkouts.
 #[derive(Debug, Clone)]
-pub struct Dirs {
+pub(crate) struct Dirs {
     /// This Isoloom tree.
     pub isoloom: PathBuf,
     /// Isothrum's checkout.
@@ -158,7 +158,7 @@ pub struct Dirs {
 
 impl Dirs {
     /// The checkout of `repo`.
-    pub fn of(&self, repo: Repo) -> &Path {
+    pub(crate) fn of(&self, repo: Repo) -> &Path {
         match repo {
             Repo::Isoloom => &self.isoloom,
             Repo::Isothrum => &self.isothrum,
@@ -168,7 +168,7 @@ impl Dirs {
 }
 
 /// What every host's part shares: the repositories, where they are, and the logs folder.
-pub struct Run {
+pub(crate) struct Run {
     /// The repositories asked for.
     pub repos: Vec<Repo>,
     /// Their checkouts.
@@ -178,7 +178,7 @@ pub struct Run {
 }
 
 /// Runs the gates (or, with `--leg`, this host's part; with `--clean`, the clean-up).
-pub fn run(a: &Args) -> Res<ExitCode> {
+pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     let root = repo::root();
     let code = repo::code_dir(&root);
     let dirs = Dirs {

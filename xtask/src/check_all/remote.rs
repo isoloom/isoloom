@@ -11,7 +11,7 @@ use super::{Repo, Run, Status};
 use crate::{Res, process, text};
 
 fn env_or(name: &str, default: &str) -> String {
-    std::env::var(name).ok().filter(|v| !v.is_empty()).unwrap_or_else(|| default.to_string())
+    std::env::var(name).ok().filter(|v| !v.is_empty()).unwrap_or_else(|| default.to_owned())
 }
 
 fn linux_target() -> String {
@@ -72,10 +72,10 @@ fn packed(run: &Run, out: &mut Collector, repo: Repo, root: &str) -> Res<std::pa
 }
 
 /// The Linux host's part.
-pub fn linux(run: &Run, out: &mut Collector) {
+pub(super) fn linux(run: &Run, out: &mut Collector) {
     let target = linux_target();
     let home = match process::output(ssh(&target).arg("cd && pwd")) {
-        Ok(home) => home.trim().to_string(),
+        Ok(home) => home.trim().to_owned(),
         Err(_) => return out.host_failed(Status::Unreachable, "not reachable (set ISOLOOM_LINUX_USER and authorize the key)"),
     };
     let root = std::env::var("ISOLOOM_LINUX_DIR").unwrap_or_else(|_| format!("{home}/isoloom-check-all"));
@@ -108,7 +108,7 @@ fn copy_linux(run: &Run, out: &mut Collector, repo: Repo, root: &str) -> Res<()>
 }
 
 /// The Windows host's part.
-pub fn windows(run: &Run, out: &mut Collector) {
+pub(super) fn windows(run: &Run, out: &mut Collector) {
     let dir = win_dir();
     if process::quiet(&mut win_ps(&format!("New-Item -ItemType Directory -Force '{dir}/incoming' | Out-Null"))).is_err() {
         return out.host_failed(Status::Unreachable, "not reachable (set ISOLOOM_WIN_USER and authorize the key)");
@@ -152,14 +152,14 @@ fn copy_windows(run: &Run, out: &mut Collector, repo: Repo, dir: &str) -> Res<()
 }
 
 /// Removes the Linux host's folder.
-pub fn clean_linux() -> Res<String> {
+pub(super) fn clean_linux() -> Res<String> {
     let dir = std::env::var("ISOLOOM_LINUX_DIR").unwrap_or_else(|_| "$HOME/isoloom-check-all".into());
     process::quiet(ssh(&linux_target()).arg(format!("rm -rf {dir}")))?;
     Ok(format!("removed {dir}"))
 }
 
 /// Removes the Windows host's folder.
-pub fn clean_windows() -> Res<String> {
+pub(super) fn clean_windows() -> Res<String> {
     let dir = win_dir();
     process::quiet(&mut win_ps(&format!("if (Test-Path '{dir}') {{ Remove-Item -Recurse -Force '{dir}' }}")))?;
     Ok(format!("removed {dir}"))

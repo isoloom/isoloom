@@ -6,13 +6,17 @@
 //! - `verify`: the official validators on every generated file, in the pinned image;
 //! - `generate-all`: every example generated into one tree, for `verify`;
 //! - `dev-link`: the consumers built against this checkout, without touching their pins;
-//! - `host-setup`: a test host's tools, installed once.
+//! - `host-setup`: a test host's tools, installed once;
+//! - `quality`: the ratchet, the clean-code counts per crate against `quality-baseline.json`.
 //!
 //! Each task is a module; `process` runs the tools they drive, `repo` finds the checkouts. `deps`
 //! is the test that keeps the workspace's dependencies one way.
 
-// The tasks report on the terminal: printing is their interface, not stray debugging output.
-#![allow(clippy::print_stdout)]
+#![expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "the tasks report on the terminal: printing is their interface, not stray debugging output"
+)]
 
 mod check_all;
 #[cfg(test)]
@@ -21,6 +25,7 @@ mod dev_link;
 mod generate_all;
 mod host_setup;
 mod process;
+mod quality;
 mod repo;
 mod text;
 mod verify;
@@ -55,6 +60,9 @@ enum Task {
     DevLink(dev_link::Args),
     /// Install what a Linux or Windows test host needs (`--check` only reports).
     HostSetup(host_setup::Args),
+    /// The ratchet: every clean-code count per crate against quality-baseline.json; fails when
+    /// one goes up (`--update` writes them when they only went down).
+    Quality(quality::Args),
 }
 
 fn main() -> ExitCode {
@@ -74,5 +82,6 @@ fn run(cli: Cli) -> Res<ExitCode> {
         Task::GenerateAll(a) => generate_all::run(&a),
         Task::DevLink(a) => Ok(dev_link::run(&a)),
         Task::HostSetup(a) => host_setup::run(&a),
+        Task::Quality(a) => quality::run(&a),
     }
 }

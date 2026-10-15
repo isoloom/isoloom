@@ -1,0 +1,171 @@
+{
+  "rules": {
+    "clippy/allow_attributes": {
+      "isoloom-compose": 3,
+      "isoloom-import": 3,
+      "isoloom-spec": 6
+    },
+    "clippy/allow_attributes_without_reason": {
+      "isoloom": 5,
+      "isoloom-compose": 5,
+      "isoloom-import": 4,
+      "isoloom-kubernetes": 1,
+      "isoloom-manifest": 3,
+      "isoloom-plan": 2,
+      "isoloom-render": 5,
+      "isoloom-spec": 16,
+      "isoloom-targets": 35,
+      "isoloom-terraform": 11,
+      "isoloom-vagrant": 1
+    },
+    "clippy/as_conversions": {
+      "isoloom-import": 2,
+      "isoloom-spec": 4,
+      "isoloom-targets": 2,
+      "isoloom-terraform": 4,
+      "isoloom-vagrant": 1
+    },
+    "clippy/doc_markdown": {
+      "isoloom": 2,
+      "isoloom-ansible": 1,
+      "isoloom-compose": 7,
+      "isoloom-import": 3,
+      "isoloom-kubernetes": 48,
+      "isoloom-manifest": 16,
+      "isoloom-plan": 6,
+      "isoloom-render": 25,
+      "isoloom-spec": 41,
+      "isoloom-targets": 5,
+      "isoloom-terraform": 105,
+      "isoloom-vagrant": 40
+    },
+    "clippy/indexing_slicing": {
+      "isoloom-compose": 28,
+      "isoloom-import": 13,
+      "isoloom-manifest": 4,
+      "isoloom-plan": 19,
+      "isoloom-render": 19,
+      "isoloom-spec": 39,
+      "isoloom-targets": 14,
+      "isoloom-terraform": 83,
+      "isoloom-vagrant": 9
+    },
+    "clippy/let_underscore_must_use": {
+      "isoloom": 10,
+      "isoloom-compose": 13,
+      "isoloom-import": 1,
+      "isoloom-kubernetes": 8,
+      "isoloom-plan": 5,
+      "isoloom-render": 85,
+      "isoloom-spec": 16,
+      "isoloom-targets": 32,
+      "isoloom-terraform": 12,
+      "isoloom-vagrant": 5
+    },
+    "clippy/missing_errors_doc": {
+      "isoloom-ansible": 1,
+      "isoloom-compose": 6,
+      "isoloom-import": 3,
+      "isoloom-kubernetes": 3,
+      "isoloom-manifest": 13,
+      "isoloom-plan": 1,
+      "isoloom-render": 6,
+      "isoloom-spec": 24,
+      "isoloom-targets": 7,
+      "isoloom-terraform": 8,
+      "isoloom-vagrant": 4
+    },
+    "clippy/must_use_candidate": {
+      "isoloom-compose": 17,
+      "isoloom-import": 2,
+      "isoloom-kubernetes": 24,
+      "isoloom-manifest": 24,
+      "isoloom-plan": 78,
+      "isoloom-render": 104,
+      "isoloom-spec": 123,
+      "isoloom-targets": 11,
+      "isoloom-terraform": 92,
+      "isoloom-vagrant": 20
+    },
+    "clippy/print_stderr": {
+      "isoloom": 7
+    },
+    "clippy/shadow_unrelated": {
+      "isoloom": 7,
+      "isoloom-compose": 5,
+      "isoloom-import": 9,
+      "isoloom-kubernetes": 5,
+      "isoloom-manifest": 5,
+      "isoloom-plan": 6,
+      "isoloom-render": 7,
+      "isoloom-spec": 47,
+      "isoloom-targets": 33,
+      "isoloom-terraform": 16,
+      "isoloom-vagrant": 3
+    },
+    "clippy/similar_names": {
+      "isoloom-plan": 2,
+      "isoloom-targets": 2,
+      "isoloom-terraform": 1
+    },
+    "clippy/str_to_string": {
+      "isoloom": 13,
+      "isoloom-ansible": 1,
+      "isoloom-compose": 46,
+      "isoloom-import": 38,
+      "isoloom-kubernetes": 44,
+      "isoloom-manifest": 24,
+      "isoloom-plan": 39,
+      "isoloom-render": 40,
+      "isoloom-spec": 112,
+      "isoloom-targets": 40,
+      "isoloom-terraform": 53,
+      "isoloom-vagrant": 12
+    },
+    "clippy/string_slice": {
+      "isoloom": 2,
+      "isoloom-compose": 1,
+      "isoloom-import": 6,
+      "isoloom-kubernetes": 3,
+      "isoloom-manifest": 4,
+      "isoloom-plan": 3,
+      "isoloom-render": 10,
+      "isoloom-spec": 28,
+      "isoloom-targets": 51,
+      "isoloom-vagrant": 3
+    },
+    "dup/clone": {
+      "isoloom": 7,
+      "isoloom-compose": 2,
+      "isoloom-import": 1,
+      "isoloom-kubernetes": 3,
+      "isoloom-manifest": 2,
+      "isoloom-plan": 2,
+      "isoloom-render": 2,
+      "isoloom-spec": 6,
+      "isoloom-targets": 14,
+      "isoloom-terraform": 70,
+      "isoloom-vagrant": 4
+    },
+    "exception/expect": {
+      "isoloom-spec": 11,
+      "xtask": 1
+    },
+    "machete/ignored": {
+      "isoloom-import": 1,
+      "isoloom-render": 1,
+      "isoloom-targets": 1
+    },
+    "rustc/unreachable_pub": {
+      "isoloom": 66,
+      "isoloom-compose": 1,
+      "isoloom-import": 14,
+      "isoloom-kubernetes": 9,
+      "isoloom-plan": 1,
+      "isoloom-render": 2,
+      "isoloom-spec": 2,
+      "isoloom-terraform": 158,
+      "isoloom-vagrant": 42
+    }
+  }
+}

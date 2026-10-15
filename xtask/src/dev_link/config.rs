@@ -2,7 +2,6 @@
 //! lockfile of its own beside it), listed in the consumer's `.git/info/exclude` between two
 //! marker lines.
 
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -18,10 +17,10 @@ const BLOCK_BEGIN: &str = "# >>> isoloom dev-link (cargo xtask dev-link)";
 const BLOCK_PREFIX: &str = "# >>> isoloom dev-link";
 const BLOCK_END: &str = "# <<< isoloom dev-link";
 /// The folder beside a config that holds its lockfile.
-pub const ALT_DIR: &str = "isoloom-dev-link";
+pub(crate) const ALT_DIR: &str = "isoloom-dev-link";
 
 /// The config's path in a consumer for a workspace configured at `at`.
-pub fn config_path(at: &str) -> String {
+pub(super) fn config_path(at: &str) -> String {
     if at == "." {
         ".cargo/config.toml".into()
     } else {
@@ -34,8 +33,8 @@ fn written_by_us(text: &str) -> bool {
 }
 
 /// The Isoloom checkout a config points at (its `# isoloom:` line).
-pub fn linked_isoloom(config: &str) -> Option<String> {
-    config.lines().find_map(|l| l.strip_prefix("# isoloom: ")).map(str::to_string)
+pub(crate) fn linked_isoloom(config: &str) -> Option<String> {
+    config.lines().find_map(|l| l.strip_prefix("# isoloom: ")).map(str::to_owned)
 }
 
 fn exclude_file(c: &Path) -> Res<PathBuf> {
@@ -58,7 +57,7 @@ fn block_lines(text: &str) -> Vec<String> {
         } else if line == BLOCK_END {
             inside = false;
         } else if inside {
-            out.push(line.to_string());
+            out.push(line.to_owned());
         }
     }
     out
@@ -99,17 +98,17 @@ fn linked_paths(c: &Path) -> Vec<String> {
 }
 
 /// The dev-link configs present in checkout `dir` (paths relative to it).
-pub fn linked_configs(dir: &Path) -> Vec<String> {
+pub(crate) fn linked_configs(dir: &Path) -> Vec<String> {
     linked_paths(dir)
         .iter()
         .filter(|p| p.ends_with("config.toml"))
-        .map(|p| p.trim_start_matches('/').to_string())
+        .map(|p| p.trim_start_matches('/').to_owned())
         .filter(|p| std::fs::read_to_string(dir.join(p)).is_ok_and(|t| written_by_us(&t)))
         .collect()
 }
 
 /// Adds `paths` to consumer `c`'s dev-link block.
-pub fn add_excludes(c: &Path, paths: &[String]) -> Res<()> {
+pub(super) fn add_excludes(c: &Path, paths: &[String]) -> Res<()> {
     if paths.is_empty() {
         return Ok(());
     }
@@ -128,7 +127,7 @@ pub fn add_excludes(c: &Path, paths: &[String]) -> Res<()> {
 
 /// Fails when `rel` in consumer `c` is a file dev-link must not touch: committed, or written by
 /// someone else.
-pub fn guard(c: &Path, rel: &str) -> Res<()> {
+pub(super) fn guard(c: &Path, rel: &str) -> Res<()> {
     if process::quiet(Command::new("git").arg("-C").arg(c).args(["ls-files", "--error-unmatch", "--", rel])).is_ok() {
         return Err(format!("{rel} is committed in {}: add the [patch] there by hand", c.display()).into());
     }
@@ -140,7 +139,7 @@ pub fn guard(c: &Path, rel: &str) -> Res<()> {
 }
 
 /// Removes what dev-link wrote in consumer `c`; the exclude entries stay.
-pub fn unlink(c: &Path) -> Res<()> {
+pub(super) fn unlink(c: &Path) -> Res<()> {
     for path in linked_paths(c) {
         let full = c.join(path.trim_start_matches('/'));
         if path.ends_with("/config.toml") {
@@ -150,15 +149,16 @@ pub fn unlink(c: &Path) -> Res<()> {
         } else if path.trim_end_matches('/').ends_with(ALT_DIR) && full.is_dir() {
             std::fs::remove_dir_all(&full)?;
         }
+        // The folder goes once empty; one that still holds files stays (an error left unread).
         if let Some(parent) = full.parent() {
-            let _ = std::fs::remove_dir(parent);
+            std::fs::remove_dir(parent).ok();
         }
     }
     Ok(())
 }
 
 /// One workspace's link: where its config goes and the crates it patches.
-pub struct Linked<'a> {
+pub(super) struct Linked<'a> {
     /// This Isoloom checkout.
     pub root: &'a Path,
     /// Where the config goes, relative to the consumer (`.` for its root).
@@ -171,35 +171,35 @@ pub struct Linked<'a> {
 
 /// The config's text; `base` is the folder it goes in.
 fn config_text(l: &Linked, base: &Path) -> String {
-    let mut out = format!(
+    let patches: Vec<String> = l
+        .patches
+        .iter()
+        .map(|(name, dir)| format!("{name} = {{ path = \"{}\" }}\n", repo::slashed(dir)))
+        .collect();
+    format!(
         "{MARKER}\n# Local only (in .git/info/exclude); `cargo xtask dev-link unlink` removes it.\n# isoloom: {}\n# workspace: {}\n\n\
-         # The Isoloom crates this workspace pins by git come from the local checkout instead.\n[patch.\"{GIT_URL}\"]\n",
+         # The Isoloom crates this workspace pins by git come from the local checkout instead.\n[patch.\"{GIT_URL}\"]\n{}\n\
+         # The linked resolution has its own lockfile, so the committed Cargo.lock keeps the git pin.\n[resolver]\n\
+         lockfile-path = \"{}/.cargo/{ALT_DIR}/Cargo.lock\"\n",
         repo::slashed(l.root),
-        l.workspace
-    );
-    for (name, dir) in l.patches {
-        let _ = writeln!(out, "{name} = {{ path = \"{}\" }}", repo::slashed(dir));
-    }
-    let _ = write!(
-        out,
-        "\n# The linked resolution has its own lockfile, so the committed Cargo.lock keeps the git pin.\n[resolver]\nlockfile-path = \"{}/.cargo/{ALT_DIR}/Cargo.lock\"\n",
+        l.workspace,
+        patches.concat(),
         repo::slashed(base)
-    );
-    out
+    )
 }
 
 /// Writes workspace `l`'s config and its lockfile in consumer `c`; the paths to exclude.
-pub fn write(c: &Path, l: &Linked) -> Res<Vec<String>> {
+pub(super) fn write(c: &Path, l: &Linked) -> Res<Vec<String>> {
     let base = if l.at == "." { c.to_path_buf() } else { c.join(l.at) };
     std::fs::create_dir_all(base.join(".cargo").join(ALT_DIR))?;
     std::fs::copy(c.join(l.workspace).join("Cargo.lock"), base.join(".cargo").join(ALT_DIR).join("Cargo.lock"))?;
     std::fs::write(base.join(".cargo/config.toml"), config_text(l, &base))?;
-    let rel = if l.at == "." { "/.cargo".to_string() } else { format!("/{}/.cargo", l.at) };
+    let rel = if l.at == "." { "/.cargo".to_owned() } else { format!("/{}/.cargo", l.at) };
     Ok(vec![format!("{rel}/config.toml"), format!("{rel}/{ALT_DIR}/")])
 }
 
 /// Each linked config of consumer `c`, with the checkout and crates it points at.
-pub fn status(c: &Path) -> Vec<String> {
+pub(super) fn status(c: &Path) -> Vec<String> {
     let lines: Vec<String> = linked_configs(c)
         .iter()
         .filter_map(|rel| {
@@ -225,14 +225,14 @@ mod tests {
     fn the_block_is_replaced_and_the_rest_kept() {
         let text = "*.log\n# >>> isoloom dev-link (scripts/dev-link.sh)\n/.cargo/config.toml\n# <<< isoloom dev-link\n.env\n";
         assert_eq!(block_lines(text), ["/.cargo/config.toml"]);
-        let new = with_block(text, &["/a/.cargo/config.toml".to_string()]);
+        let new = with_block(text, &["/a/.cargo/config.toml".to_owned()]);
         assert_eq!(new, format!("*.log\n.env\n{BLOCK_BEGIN}\n/a/.cargo/config.toml\n{BLOCK_END}\n"));
         assert_eq!(block_lines(&new), ["/a/.cargo/config.toml"]);
     }
 
     #[test]
     fn the_config_patches_each_crate_and_keeps_its_own_lockfile() {
-        let patches = [("isoloom-spec".to_string(), PathBuf::from("/code/isoloom/crates/core/isoloom-spec"))];
+        let patches = [("isoloom-spec".to_owned(), PathBuf::from("/code/isoloom/crates/core/isoloom-spec"))];
         let l = Linked {
             root: Path::new("/code/isoloom"),
             at: ".",

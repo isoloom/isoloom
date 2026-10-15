@@ -3,9 +3,10 @@ too-many-lines-threshold = 60
 cognitive-complexity-threshold = 15
 too-many-arguments-threshold = 5
 
-# Tests may unwrap, expect, panic and print: a failing test is the report.
+# Tests may unwrap, expect, panic, print and index: a failing test is the report.
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-panic-in-tests = true
 allow-print-in-tests = true
 allow-dbg-in-tests = false
+allow-indexing-slicing-in-tests = true

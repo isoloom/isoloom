@@ -4,7 +4,7 @@
 
 /// How a gate ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Status {
+pub(crate) enum Status {
     /// It passed.
     Pass,
     /// It failed, or the host couldn't run it.
@@ -17,7 +17,7 @@ pub enum Status {
 
 impl Status {
     /// As the table prints it: failures in capitals.
-    pub fn text(self) -> &'static str {
+    pub(crate) fn text(self) -> &'static str {
         match self {
             Status::Pass => "pass",
             Status::Fail => "FAIL",
@@ -35,7 +35,7 @@ impl Status {
 
 /// One gate's outcome on a host.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GateResult {
+pub(crate) struct GateResult {
     /// The repository (`-` for the host as a whole).
     pub repo: String,
     /// The gate (`-` for the host as a whole).
@@ -50,7 +50,7 @@ pub struct GateResult {
 
 /// One line of a host's stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Event {
+pub(super) enum Event {
     /// A gate starts.
     Begin {
         /// Its repository.
@@ -65,39 +65,39 @@ pub enum Event {
 }
 
 /// The line that starts a gate.
-pub fn begin_line(repo: &str, gate: &str) -> String {
+pub(super) fn begin_line(repo: &str, gate: &str) -> String {
     format!("@@begin\t{repo}\t{gate}")
 }
 
 /// The line that ends a gate.
-pub fn result_line(r: &GateResult) -> String {
+pub(super) fn result_line(r: &GateResult) -> String {
     format!("@@result\t{}\t{}\t{}\t{}\t{}", r.repo, r.gate, r.status.text(), r.secs, r.note)
 }
 
 /// What a line of the stream says (a carriage return at its end dropped, for Windows).
-pub fn parse(line: &str) -> Event {
+pub(super) fn parse(line: &str) -> Event {
     let line = line.trim_end_matches('\r');
     let mut fields = line.split('\t');
     match fields.next() {
         Some("@@begin") => {
-            let repo = fields.next().unwrap_or("-").to_string();
-            let gate = fields.next().unwrap_or("-").to_string();
+            let repo = fields.next().unwrap_or("-").to_owned();
+            let gate = fields.next().unwrap_or("-").to_owned();
             Event::Begin { repo, gate }
         }
         Some("@@result") => {
             let parts: Vec<&str> = fields.collect();
             match parts.as_slice() {
                 [repo, gate, status, secs, note @ ..] => Event::Result(GateResult {
-                    repo: (*repo).to_string(),
-                    gate: (*gate).to_string(),
+                    repo: (*repo).to_owned(),
+                    gate: (*gate).to_owned(),
                     status: Status::parse(status).unwrap_or(Status::Fail),
                     secs: secs.parse().unwrap_or(0),
                     note: note.join("\t"),
                 }),
-                _ => Event::Line(line.to_string()),
+                _ => Event::Line(line.to_owned()),
             }
         }
-        _ => Event::Line(line.to_string()),
+        _ => Event::Line(line.to_owned()),
     }
 }
 

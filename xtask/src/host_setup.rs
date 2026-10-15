@@ -19,14 +19,14 @@ use crate::{Res, repo};
 
 /// The arguments of `cargo xtask host-setup`.
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// Report what is there and what is missing; change nothing.
     #[arg(long)]
     check: bool,
 }
 
 /// Sets up (or checks) this host.
-pub fn run(a: &Args) -> Res<ExitCode> {
+pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     match std::env::consts::OS {
         "linux" => linux::run(a.check),
         "windows" => windows(a.check),
