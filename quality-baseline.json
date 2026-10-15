@@ -1,12 +1,10 @@
 {
   "rules": {
     "clippy/allow_attributes": {
-      "isoloom-import": 3,
       "isoloom-spec": 6
     },
     "clippy/allow_attributes_without_reason": {
       "isoloom": 5,
-      "isoloom-import": 4,
       "isoloom-manifest": 3,
       "isoloom-plan": 2,
       "isoloom-render": 5,
@@ -14,13 +12,11 @@
       "isoloom-targets": 35
     },
     "clippy/as_conversions": {
-      "isoloom-import": 2,
       "isoloom-spec": 3,
       "isoloom-targets": 2
     },
     "clippy/doc_markdown": {
       "isoloom": 1,
-      "isoloom-import": 2,
       "isoloom-manifest": 9,
       "isoloom-plan": 1,
       "isoloom-render": 3,
@@ -28,7 +24,6 @@
       "isoloom-targets": 2
     },
     "clippy/indexing_slicing": {
-      "isoloom-import": 13,
       "isoloom-manifest": 4,
       "isoloom-plan": 19,
       "isoloom-render": 19,
@@ -37,14 +32,12 @@
     },
     "clippy/let_underscore_must_use": {
       "isoloom": 10,
-      "isoloom-import": 1,
       "isoloom-plan": 5,
       "isoloom-render": 85,
       "isoloom-spec": 14,
       "isoloom-targets": 32
     },
     "clippy/missing_errors_doc": {
-      "isoloom-import": 3,
       "isoloom-manifest": 13,
       "isoloom-plan": 1,
       "isoloom-render": 6,
@@ -52,7 +45,6 @@
       "isoloom-targets": 2
     },
     "clippy/must_use_candidate": {
-      "isoloom-import": 2,
       "isoloom-manifest": 24,
       "isoloom-plan": 78,
       "isoloom-render": 103,
@@ -64,7 +56,6 @@
     },
     "clippy/shadow_unrelated": {
       "isoloom": 7,
-      "isoloom-import": 9,
       "isoloom-manifest": 5,
       "isoloom-plan": 6,
       "isoloom-render": 4,
@@ -77,7 +68,6 @@
     },
     "clippy/str_to_string": {
       "isoloom": 11,
-      "isoloom-import": 38,
       "isoloom-manifest": 24,
       "isoloom-plan": 39,
       "isoloom-render": 40,
@@ -86,7 +76,6 @@
     },
     "clippy/string_slice": {
       "isoloom": 2,
-      "isoloom-import": 6,
       "isoloom-manifest": 4,
       "isoloom-plan": 1,
       "isoloom-render": 10,
@@ -107,13 +96,10 @@
       "xtask": 1
     },
     "machete/ignored": {
-      "isoloom-import": 1,
-      "isoloom-render": 1,
       "isoloom-targets": 1
     },
     "rustc/unreachable_pub": {
       "isoloom": 66,
-      "isoloom-import": 14,
       "isoloom-plan": 1,
       "isoloom-render": 2
     }

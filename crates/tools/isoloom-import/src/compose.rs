@@ -2,10 +2,14 @@
 //! goes into the draft; everything else becomes a note (belongs in the image, not expressible
 //! yet, left out...), so nothing is dropped silently.
 
+mod environment;
 mod keys;
 mod lenient;
+mod limits;
 mod networks;
-mod values;
+mod ports;
+mod text;
+mod volumes;
 mod write;
 
 use std::collections::BTreeSet;
@@ -13,11 +17,14 @@ use std::collections::BTreeSet;
 use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
 
-pub use super::label;
-use super::{Draft, ImportError, LEFT_OUT, NoteKind, Notes};
+use crate::draft::{Draft, LEFT_OUT, NoteKind, Notes};
+use crate::naming::{label, unique};
+use crate::{Error, Result};
 use lenient::{Duplicate, lenient_yaml};
 use networks::Networks;
-use values::{PortKey, VolumeMount, flat, str_of, volume_mount};
+use ports::PortKey;
+use text::{flat, str_of};
+use volumes::{VolumeMount, volume_mount};
 
 /// The network Compose attaches services to when they name none.
 const DEFAULT_NETWORK: &str = "default";
@@ -65,14 +72,21 @@ struct Import<'a> {
 
 /// Drafts a spec from Compose YAML. `fallback_name` names the environment when the file
 /// doesn't (usually its folder); `source` is how the file is named in the draft's header.
-pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Draft, ImportError> {
-    let (doc, dups) = lenient_yaml(compose_yaml)?;
-    let root = doc.as_mapping().ok_or(ImportError::ComposeNotMapping)?;
+///
+/// # Errors
+///
+/// [`Error::ComposeYaml`] when the text isn't YAML, [`Error::ComposeNotMapping`] or
+/// [`Error::NoServices`] when it isn't a Compose file with services, and
+/// [`Error::NoBlockLeft`] or [`Error::NetworkFull`] when a network or a machine can't be
+/// addressed.
+pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Draft> {
+    let (doc, dups) = lenient_yaml(compose_yaml).map_err(Error::ComposeYaml)?;
+    let root = doc.as_mapping().ok_or(Error::ComposeNotMapping)?;
     let services = root
         .get("services")
         .and_then(Value::as_mapping)
         .filter(|s| !s.is_empty())
-        .ok_or(ImportError::NoServices)?;
+        .ok_or(Error::NoServices)?;
     let mut notes = Notes::default();
     note_duplicates(&mut notes, dups);
     let name = root.get("name").and_then(str_of).map_or_else(|| label(fallback_name), |n| label(&n));
@@ -81,11 +95,11 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
     // Networks: declared ones, then the default network for services that name none.
     let declared: Mapping = root.get("networks").and_then(Value::as_mapping).cloned().unwrap_or_default();
     for (k, def) in &declared {
-        import.nets.declare(k.as_str().unwrap_or_default(), def, &mut import.notes)?;
+        import.nets.declare(&str_of(k).unwrap_or_default(), def, &mut import.notes)?;
     }
     let mut machines = Vec::new();
     for (svc_key, svc) in services {
-        if let Some(m) = import.service(svc_key.as_str().unwrap_or_default(), svc)? {
+        if let Some(m) = import.service(&str_of(svc_key).unwrap_or_default(), svc)? {
             machines.push(m);
         }
     }
@@ -151,7 +165,7 @@ fn volume_users(services: &Mapping) -> IndexMap<String, usize> {
     users
 }
 
-/// depends_on needs something to wait for. A UDP port has no handshake to wait for.
+/// `depends_on` needs something to wait for. A UDP port has no handshake to wait for.
 fn prune_depends_on(machines: &mut [Machine], notes: &mut Notes) {
     let with_ports: BTreeSet<String> = machines
         .iter()
@@ -175,13 +189,24 @@ fn prune_depends_on(machines: &mut [Machine], notes: &mut Notes) {
     }
 }
 
+/// Each service's machine name: its name as a DNS label, numbered when two services give the
+/// same one (`a_b` and `a-b`).
+fn machine_names(services: &Mapping) -> IndexMap<String, String> {
+    let mut names: IndexMap<String, String> = IndexMap::new();
+    for key in services.keys().filter_map(str_of) {
+        let name = unique(&label(&key), |n| names.values().any(|taken| taken == n));
+        names.insert(key, name);
+    }
+    names
+}
+
 impl<'a> Import<'a> {
     fn new(services: &'a Mapping, notes: Notes) -> Self {
         Import {
             services,
             notes,
-            nets: Networks::new(),
-            names: services.keys().filter_map(|k| k.as_str()).map(|k| (k.to_string(), label(k))).collect(),
+            nets: Networks::default(),
+            names: machine_names(services),
             one_shot: one_shot_services(services),
             volume_users: volume_users(services),
             spec_inputs: BTreeSet::new(),
@@ -189,7 +214,7 @@ impl<'a> Import<'a> {
     }
 
     /// A service as a machine, or none when it's left out.
-    fn service(&mut self, name: &str, svc: &Value) -> Result<Option<Machine>, ImportError> {
+    fn service(&mut self, name: &str, svc: &Value) -> Result<Option<Machine>> {
         let svc = Service {
             name,
             at: format!("services.{name}"),
@@ -199,7 +224,7 @@ impl<'a> Import<'a> {
             return Ok(None);
         }
         let mut m = Machine {
-            name: self.names[name].clone(),
+            name: self.names.get(name).cloned().unwrap_or_else(|| label(name)),
             ..Machine::default()
         };
         if m.name != name {
@@ -248,7 +273,7 @@ impl<'a> Import<'a> {
             .services
             .iter()
             .filter(|(_, other)| other.get("environment").is_some_and(|e| flat(e).contains(svc.name)))
-            .filter_map(|(k, _)| k.as_str().map(String::from))
+            .filter_map(|(k, _)| str_of(k))
             .collect();
         let refs = if users.is_empty() {
             String::new()
@@ -265,8 +290,8 @@ impl<'a> Import<'a> {
         match svc.keys.get("networks") {
             Some(Value::Sequence(list)) => wanted.extend(list.iter().filter_map(str_of).map(|n| (n, None))),
             Some(Value::Mapping(map)) => {
-                for (n, opts) in map {
-                    let n = n.as_str().unwrap_or_default().to_string();
+                for (key, opts) in map {
+                    let n = str_of(key).unwrap_or_default();
                     let ip = opts.get("ipv4_address").and_then(str_of);
                     if opts.get("aliases").is_some() {
                         self.notes
@@ -275,7 +300,7 @@ impl<'a> Import<'a> {
                     wanted.push((n, ip));
                 }
             }
-            _ => wanted.push((DEFAULT_NETWORK.to_string(), None)),
+            _ => wanted.push((DEFAULT_NETWORK.to_owned(), None)),
         }
         if matches!(svc.keys.get("network_mode").and_then(str_of).as_deref(), Some(mode) if mode != "bridge") {
             self.notes.add(
@@ -283,17 +308,17 @@ impl<'a> Import<'a> {
                 NoteKind::ByDesign,
                 "a machine has its own addresses; attached to the default network instead",
             );
-            wanted = vec![(DEFAULT_NETWORK.to_string(), None)];
+            wanted = vec![(DEFAULT_NETWORK.to_owned(), None)];
         }
         wanted
     }
 
     /// Puts the machine on network `n`, at the address it asked for when that's usable.
-    fn join(&mut self, svc: &Service, m: &mut Machine, n: &str, ip: Option<&str>) -> Result<(), ImportError> {
+    fn join(&mut self, svc: &Service, m: &mut Machine, n: &str, ip: Option<&str>) -> Result<()> {
         let net = self.nets.get(n, &mut self.notes)?;
-        let asked = ip.and_then(|ip| ip.parse::<std::net::Ipv4Addr>().ok()).map(|ip| ip.octets()[3]);
-        let (octet, moved) = net.take(asked).ok_or_else(|| ImportError::NetworkFull {
-            network: n.to_string(),
+        let asked = ip.and_then(|text| text.parse::<std::net::Ipv4Addr>().ok()).map(|addr| addr.octets()[3]);
+        let (octet, moved) = net.take(asked).ok_or_else(|| Error::NetworkFull {
+            network: n.to_owned(),
             machine: m.name.clone(),
         })?;
         m.networks.push((net.name.clone(), octet));

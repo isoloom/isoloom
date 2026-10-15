@@ -171,19 +171,3 @@ fn every_cloud_driver_splits_the_set_up_at_a_reboot() {
         assert!(at(tf, "sh last.sh") < at(tf, "/var/lib/isoloom/ready"), "{cloud}");
     }
 }
-
-#[test]
-fn importing_a_vagrant_reboot_keeps_it_as_a_step() {
-    let recorded: serde_json::Value = serde_json::from_str(
-        r#"{"settings":{},"children":{"vm":{"settings":{"box":"bento/debian-12"},"children":{},"calls":[
-          {"name":"define","args":["web"],"block":{"settings":{},"children":{"vm":{"settings":{},"children":{},"calls":[
-            {"name":"network","args":["private_network",{"ip":"192.168.40.10"}],"block":null},
-            {"name":"provision","args":["shell",{"path":"kernel.sh","reboot":true}],"block":null},
-            {"name":"provision","args":["shell",{"path":"web.sh"}],"block":null}]}},"calls":[]}}]}},"calls":[]}"#,
-    )
-    .unwrap();
-    let d = isoloom_import::vagrant::draft(&recorded, "lab", "Vagrantfile").unwrap();
-    let spec = Lab::new(parse(&d.yaml).expect("the draft parses"));
-    assert_eq!(spec.spec().machines["web"].vm.as_ref().unwrap().provision, ["kernel.sh", "reboot", "web.sh"]);
-    assert_eq!(spec.problems(), vec![], "{}", d.yaml);
-}

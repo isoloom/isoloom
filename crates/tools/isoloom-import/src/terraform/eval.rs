@@ -5,8 +5,8 @@ use hcl::eval::{Context, Evaluate};
 use hcl::{Block, Body, Expression, Value};
 use serde_json::{Value as Json, json};
 
-use super::Instance;
-use crate::{NoteKind, Notes};
+use super::instance::Instance;
+use crate::draft::{NoteKind, Notes};
 
 /// An expression as JSON when it's a value, else its text (an unresolved reference).
 fn expr_json(e: &Expression) -> Json {
@@ -16,7 +16,7 @@ fn expr_json(e: &Expression) -> Json {
         Expression::Number(n) => serde_json::to_value(n).unwrap_or(Json::Null),
         Expression::String(s) => json!(s),
         Expression::Array(a) => Json::Array(a.iter().map(expr_json).collect()),
-        Expression::Object(o) => Json::Object(o.iter().map(|(k, v)| (k.to_string().trim_matches('"').to_string(), expr_json(v))).collect()),
+        Expression::Object(o) => Json::Object(o.iter().map(|(k, v)| (k.to_string().trim_matches('"').to_owned(), expr_json(v))).collect()),
         other => json!(hcl::format::to_string(other).unwrap_or_default()),
     }
 }
@@ -25,10 +25,10 @@ fn expr_json(e: &Expression) -> Json {
 fn body_json(body: &Body) -> Json {
     let mut out = serde_json::Map::new();
     for a in body.attributes() {
-        out.insert(a.key().to_string(), expr_json(a.expr()));
+        out.insert(a.key().to_owned(), expr_json(a.expr()));
     }
     for b in body.blocks() {
-        let entry = out.entry(b.identifier().to_string()).or_insert_with(|| Json::Array(Vec::new()));
+        let entry = out.entry(b.identifier().to_owned()).or_insert_with(|| Json::Array(Vec::new()));
         if let Json::Array(list) = entry {
             list.push(body_json(b.body()));
         }
@@ -52,7 +52,7 @@ fn context(bodies: &[Body]) -> Context<'static> {
         if let (Some(name), Some(d)) = (b.labels().first(), b.body().attributes().find(|a| a.key() == "default"))
             && let Ok(v) = d.expr().evaluate(&Context::new())
         {
-            vars.insert(name.as_str().to_string(), v);
+            vars.insert(name.as_str().to_owned(), v);
         }
     }
     let mut ctx = Context::new();
@@ -62,17 +62,17 @@ fn context(bodies: &[Body]) -> Context<'static> {
         let mut c = ctx.clone();
         c.declare_var("local", Value::Object(locals.clone()));
         if let Ok(v) = a.expr().evaluate(&c) {
-            locals.insert(a.key().to_string(), v);
+            locals.insert(a.key().to_owned(), v);
         }
     }
     ctx.declare_var("local", Value::Object(locals));
-    ctx.declare_var("path", Value::Object([("module".to_string(), Value::from("."))].into_iter().collect()));
+    ctx.declare_var("path", Value::Object([("module".to_owned(), Value::from("."))].into_iter().collect()));
     ctx
 }
 
 /// The `for_each` instance with this key and value.
 fn each(key: String, value: Value) -> Expansion {
-    let each: hcl::Map<String, Value> = [("key".to_string(), Value::from(key.clone())), ("value".to_string(), value)]
+    let each: hcl::Map<String, Value> = [("key".to_owned(), Value::from(key.clone())), ("value".to_owned(), value)]
         .into_iter()
         .collect();
     (Some(key), Some(("each", Value::Object(each))))
@@ -107,7 +107,7 @@ fn expansions(b: &Block, ctx: &Context, at: &str, notes: &mut Notes) -> Option<V
             Some(
                 (0..n.as_u64().unwrap_or(0))
                     .map(|i| {
-                        let count: hcl::Map<String, Value> = [("index".to_string(), Value::from(i))].into_iter().collect();
+                        let count: hcl::Map<String, Value> = [("index".to_owned(), Value::from(i))].into_iter().collect();
                         (Some(i.to_string()), Some(("count", Value::Object(count))))
                     })
                     .collect(),
@@ -129,7 +129,7 @@ pub(super) fn instances(bodies: &[Body], notes: &mut Notes) -> Vec<Instance> {
         let (Some(kind), Some(name)) = (b.labels().first(), b.labels().get(1)) else {
             continue;
         };
-        let (kind, name) = (kind.as_str().to_string(), name.as_str().to_string());
+        let (kind, name) = (kind.as_str().to_owned(), name.as_str().to_owned());
         let Some(expansions) = expansions(b, &ctx, &format!("resource {kind}.{name}"), notes) else {
             continue;
         };
@@ -139,7 +139,9 @@ pub(super) fn instances(bodies: &[Body], notes: &mut Notes) -> Vec<Instance> {
                 c.declare_var(n, v);
             }
             let mut body = b.body().clone();
-            let _ = body.evaluate_in_place(&c); // what can't be resolved stays as text
+            // An expression that can't be evaluated without running Terraform (another
+            // resource's attribute) stays as its text, which `resolve` follows: expected.
+            body.evaluate_in_place(&c).unwrap_or(());
             out.push(Instance {
                 kind: kind.clone(),
                 name: name.clone(),

@@ -13,7 +13,7 @@ pub fn run(file: Option<PathBuf>, dest: &Dest) -> Res<ExitCode> {
     }
     let recorded = record_vagrantfile(&file)?;
     let (folder, fallback, source) = source_of(&file)?;
-    let draft = isoloom_import::vagrant::draft(&recorded, &fallback, &source)?;
+    let draft = isoloom_import::vagrant::draft(&isoloom_import::vagrant::Recording::try_from(recorded)?, &fallback, &source)?;
     write_draft(&draft, folder, dest)
 }
 

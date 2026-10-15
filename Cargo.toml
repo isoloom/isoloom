@@ -37,7 +37,8 @@ serde_yaml_ng = "0.10"
 indexmap = { version = "2", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 schemars = { version = "1", features = ["indexmap2"] }
-hcl-rs = "0.19"
+# The `hcl-rs` package, by the name of its library, so `cargo machete` matches its uses.
+hcl = { package = "hcl-rs", version = "0.19" }
 thiserror = "2"
 insta = { version = "1", features = ["yaml"] }
 proptest = { version = "1", default-features = false, features = ["std"] }

@@ -4,17 +4,18 @@ use std::cell::RefCell;
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::values::{flat, str_of};
+use super::text::{flat, str_of};
 
 /// A key set twice in one mapping: where, which key, and the value kept (the last).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Duplicate {
-    pub at: String,
-    pub key: String,
-    pub kept: String,
+    pub(super) at: String,
+    pub(super) key: String,
+    pub(super) kept: String,
 }
 
 /// Reads YAML the way Compose does: a key set twice in one mapping keeps its last value
-/// (serde_yaml_ng refuses the file instead). Every such key is recorded with where it was.
+/// (`serde_yaml_ng` refuses the file instead). Every such key is recorded with where it was.
 pub(super) fn lenient_yaml(text: &str) -> Result<(Value, Vec<Duplicate>), serde_yaml_ng::Error> {
     use serde::de::DeserializeSeed;
     let dups = RefCell::new(Vec::new());
@@ -122,5 +123,30 @@ impl<'de> serde::de::Visitor<'de> for Lenient<'_> {
             tag: serde_yaml_ng::value::Tag::new(tag),
             value,
         })))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_key_set_twice_keeps_its_last_value_and_is_recorded_once() -> Result<(), serde_yaml_ng::Error> {
+        let (value, dups) = lenient_yaml("a: { x: 1, x: 2, x: 3 }\nb: [1]\n")?;
+        assert_eq!(value.get("a").and_then(|a| a.get("x")).and_then(Value::as_u64), Some(3));
+        assert_eq!(
+            dups,
+            [Duplicate {
+                at: "a".to_owned(),
+                key: "x".to_owned(),
+                kept: "3".to_owned()
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn text_that_isnt_yaml_is_refused() {
+        assert!(lenient_yaml("a: [").is_err());
     }
 }

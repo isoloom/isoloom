@@ -23,7 +23,6 @@ indexmap.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-isoloom-import.workspace = true
 insta.workspace = true
 serde_yaml_ng.workspace = true
 jsonschema.workspace = true

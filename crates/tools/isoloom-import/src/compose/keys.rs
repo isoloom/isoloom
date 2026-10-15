@@ -3,11 +3,14 @@
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::super::{LEFT_OUT, NoteKind, label};
-use super::values::{
-    VolumeMount, container_ports, cpus, env_entries, flat, input_name, memory_mb, other_protocols, published_ports, str_of, variables, volume_mount,
-};
+use super::environment::{env_entries, input_name, variables};
+use super::limits::{cpus, memory_mb};
+use super::ports::{container_ports, other_protocols, published_ports};
+use super::text::{flat, str_of};
+use super::volumes::{VolumeMount, volume_mount};
 use super::{Import, Machine, Service};
+use crate::draft::{LEFT_OUT, NoteKind};
+use crate::naming::label;
 
 impl Import<'_> {
     /// One key of a service (networks were read before).
@@ -95,11 +98,11 @@ impl Import<'_> {
     /// Fixed build args carry over; the ones read from the shell are noted.
     fn build_args(&mut self, svc: &Service, b: &Mapping, m: &mut Machine) {
         let args: Vec<(String, String)> = match b.get("args") {
-            Some(Value::Mapping(a)) => a.iter().filter_map(|(k, val)| Some((k.as_str()?.to_string(), str_of(val)?))).collect(),
+            Some(Value::Mapping(a)) => a.iter().filter_map(|(k, val)| Some((k.as_str()?.to_owned(), str_of(val)?))).collect(),
             Some(Value::Sequence(a)) => a
                 .iter()
                 .filter_map(str_of)
-                .filter_map(|item| item.split_once('=').map(|(k, val)| (k.to_string(), val.to_string())))
+                .filter_map(|item| item.split_once('=').map(|(k, val)| (k.to_owned(), val.to_owned())))
                 .collect(),
             _ => Vec::new(),
         };
@@ -160,7 +163,7 @@ impl Import<'_> {
         for (key, value) in env_entries(v) {
             let from_shell: Vec<String> = match &value {
                 None => input_name(&key).into_iter().collect(),
-                Some(v) => variables(v).iter().filter_map(|v| input_name(v)).collect(),
+                Some(text) => variables(text).iter().filter_map(|name| input_name(name)).collect(),
             };
             if from_shell.is_empty() {
                 fixed.push(format!("{key}={}", value.unwrap_or_default()));
@@ -235,17 +238,17 @@ fn build_context(v: &Value) -> (String, Vec<String>) {
     let (context, extra) = match v {
         Value::Mapping(b) => (
             b.get("context").and_then(str_of).unwrap_or_else(|| ".".into()),
-            b.iter()
-                .filter_map(|(k, v)| Some((k.as_str()?, v)))
+            b.keys()
+                .filter_map(Value::as_str)
                 // The context, the Dockerfile, its stage and fixed build args carry over.
-                .filter(|(k, _)| !matches!(*k, "context" | "dockerfile" | "target" | "args"))
-                .map(|(k, _)| k.to_string())
+                .filter(|k| !matches!(*k, "context" | "dockerfile" | "target" | "args"))
+                .map(str::to_owned)
                 .collect::<Vec<_>>(),
         ),
         other => (str_of(other).unwrap_or_else(|| ".".into()), Vec::new()),
     };
-    let context = context.trim_start_matches("./").trim_end_matches('/').to_string();
-    (if context.is_empty() { ".".to_string() } else { context }, extra)
+    let context = context.trim_start_matches("./").trim_end_matches('/').to_owned();
+    (if context.is_empty() { ".".to_owned() } else { context }, extra)
 }
 
 /// The Dockerfile, when it isn't the default one, as a path in the project.
@@ -265,4 +268,32 @@ fn dockerfile(context: &str, b: &Mapping) -> Option<String> {
         }
     }
     Some(parts.join("/"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mapping(yaml: &str) -> Result<Mapping, String> {
+        serde_yaml_ng::from_str(yaml).map_err(|e| e.to_string())
+    }
+
+    #[test]
+    fn a_dockerfile_is_a_path_in_the_project() -> Result<(), String> {
+        assert_eq!(dockerfile("src", &mapping("{ dockerfile: ../docker/web }")?), Some("docker/web".to_owned()));
+        assert_eq!(
+            dockerfile(".", &mapping("{ dockerfile: build.Dockerfile }")?),
+            Some("build.Dockerfile".to_owned())
+        );
+        assert_eq!(dockerfile("web", &mapping("{ dockerfile: Dockerfile }")?), None, "the default one");
+        Ok(())
+    }
+
+    #[test]
+    fn a_build_keeps_its_context_and_lists_the_settings_it_drops() -> Result<(), String> {
+        let build = Value::Mapping(mapping("{ context: ./web/, network: host, target: prod }")?);
+        assert_eq!(build_context(&build), ("web".to_owned(), vec!["network".to_owned()]));
+        assert_eq!(build_context(&Value::String("./".to_owned())), (".".to_owned(), vec![]));
+        Ok(())
+    }
 }

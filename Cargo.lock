@@ -623,7 +623,9 @@ version = "0.10.1"
 dependencies = [
  "hcl-rs",
  "indexmap",
+ "isoloom-plan",
  "isoloom-spec",
+ "proptest",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -709,7 +711,6 @@ dependencies = [
  "insta",
  "isoloom-ansible",
  "isoloom-compose",
- "isoloom-import",
  "isoloom-kubernetes",
  "isoloom-manifest",
  "isoloom-plan",
