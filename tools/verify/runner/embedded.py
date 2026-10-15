@@ -27,6 +27,8 @@ UNKNOWN = "it is built from values known only after apply"
 # The document, base64-encoded so the console prints it on one line, and shown even when it
 # is built from a sensitive value (the console hides those).
 SHOW = "base64encode(try(nonsensitive(local.isoloom_verify), local.isoloom_verify))\n"
+# `.terraform/`, `.terraform.lock.hcl` and the like, left out of the copy.
+TERRAFORM_FILES = shutil.ignore_patterns(".terraform*")
 
 
 def decoded(out: str) -> tuple[str | None, str]:
@@ -91,7 +93,10 @@ def check(ctx: Ctx, module: Path, valid: bool) -> list[Result]:
     project = project_of(module)
     with tempfile.TemporaryDirectory(prefix="evaluate-") as tmp:
         copy = Path(tmp) / project.name / module.relative_to(project)
-        shutil.copytree(project, Path(tmp) / project.name, symlinks=True)
+        # Without Terraform's own files: other modules' `terraform init` writes them while this
+        # copy is made (a lock file half written, a working folder going away), and the
+        # evaluation's own `init` makes the ones it needs.
+        shutil.copytree(project, Path(tmp) / project.name, symlinks=True, ignore=TERRAFORM_FILES)
         (copy / OVERRIDE).write_text(hcl.evaluation_override("\n".join(sources.values())), encoding="utf-8")
         for tf, text in sources.items():
             (copy / tf.name).write_text(hcl.without_validations(text), encoding="utf-8")

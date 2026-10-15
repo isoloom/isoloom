@@ -114,3 +114,6 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 
 ## Launcher standard 0.6: machine, servers, cloud and onboarding (launcher repository)
 - **Copy buttons:** the Proxmox setup's "Copy" of the launcher's public key now says so in a toast when the clipboard refuses (it stayed silent); every copy button in the launcher behaves the same way.
+
+## Phase 1c: the 3d tooling
+- **`cargo xtask verify`:** the copy of a project made to evaluate a module's cloud-config leaves Terraform's own files out (`.terraform*`), so another module's `terraform init` running at the same time no longer breaks the copy.
