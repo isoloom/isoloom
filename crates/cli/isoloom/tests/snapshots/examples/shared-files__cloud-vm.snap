@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -209,7 +210,7 @@ resource "terraform_data" "writer" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/write.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/write.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -279,7 +280,7 @@ resource "terraform_data" "reader" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/look.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/look.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -584,7 +585,7 @@ resource "terraform_data" "writer" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/write.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/write.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -708,7 +709,7 @@ resource "terraform_data" "reader" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/look.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/look.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -1143,7 +1144,7 @@ resource "terraform_data" "writer" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/write.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/write.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -1225,7 +1226,7 @@ resource "terraform_data" "reader" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/look.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/look.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -1508,7 +1509,7 @@ resource "terraform_data" "writer" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/write.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/write.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -1571,7 +1572,7 @@ resource "terraform_data" "reader" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/look.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/look.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -2021,7 +2022,7 @@ resource "terraform_data" "writer" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/write.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/write.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -2078,7 +2079,7 @@ resource "terraform_data" "reader" {
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh steps/look.sh'\\'''",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/look.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }

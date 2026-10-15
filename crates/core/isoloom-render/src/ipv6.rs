@@ -106,10 +106,11 @@ mod tests {
 
     #[test]
     fn rules_only_between_two_ipv6_networks() {
-        let spec = isoloom_spec::parse(
+        let source = isoloom_spec::parse(
             "version: 1\nname: r\nnetworks:\n  a: { cidr: 10.1.0.0/24, ipv6: { cidr: \"fd00:1::/64\" } }\n  b: { cidr: 10.2.0.0/24, ipv6: { cidr: \"fd00:2::/64\" } }\n  c: { cidr: 10.3.0.0/24 }\nmachines: {}\n",
         )
         .unwrap();
+        let spec = isoloom_plan::Lab::new(source).spec();
         assert_eq!(forward_rules(&spec, "a", "b", &[]), vec!["ip6 saddr fd00:1::/64 ip6 daddr fd00:2::/64 accept"]);
         assert_eq!(forward_rules(&spec, "a", "b", &[80]).len(), 2);
         assert_eq!(forward_rules(&spec, "a", "c", &[]), Vec::<String>::new());

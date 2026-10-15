@@ -15,34 +15,35 @@ reach:
 
 machines:
   gateway:
+    os: debian@12
     networks: { dmz: 10, internal: 10 }
-    ports: [{ port: 80 }, { port: 22 }]
-    docker:
-      build: build/gateway
-    vm:
-      os: debian@12
-      provision: [provision/gateway.yml]
+    ports: { web: 80, ssh: 22 }
+    app:
+      build: build/gateway                          # the container form: its own Dockerfile
+      steps: [{ playbook: provision/gateway.yml }]  # the VM form: its playbook
+
   app:
+    os: debian@12
     networks: { internal: 20 }
-    ports: [{ port: 8080 }]
-    docker:
+    ports: { api: 8080 }
+    app:
       build: build/app
-    vm:
-      os: debian@12
-      provision: [provision/app.yml]
+      steps: [{ playbook: provision/app.yml }]
+
+  # A published image on containers, a Debian VM its playbook sets up (`service: postgres@16`
+  # in Phase 4).
   db:
+    os: debian@12
     networks: { internal: 30 }
-    ports: [{ port: 5432 }]
-    docker:
+    ports: { postgres: 5432 }
+    app:
       image: "postgres:16"
-    vm:
-      os: debian@12
-      provision: [provision/db.yml]
+      steps: [{ playbook: provision/db.yml }]
+
   user:
+    os: kali
     access: true
     networks: { access: 10 }
-    vm:
-      os: kali@rolling
 
 checks:
   - checks/dmz-reachable.sh

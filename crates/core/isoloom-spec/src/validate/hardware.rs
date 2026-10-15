@@ -12,7 +12,7 @@ pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
     if m.nested_virtualization && m.vm.is_none() {
         p.add(
             format!("{at}.nested_virtualization"),
-            "VMs run inside a VM, not a container: give the machine a `vm:` (and run it on a VM target)",
+            "VMs run inside a VM, not a container: run it on a VM target",
         );
     }
     if let Some(g) = &m.gpus {
@@ -91,7 +91,7 @@ mod tests {
     use crate::validate::validate;
 
     fn problems(machine: &str) -> Vec<String> {
-        let spec = crate::parse(&format!(
+        let spec = crate::model::from_yaml(&format!(
             "version: 1\nname: hw\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, {machine} }}\n"
         ))
         .unwrap();

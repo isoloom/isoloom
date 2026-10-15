@@ -170,7 +170,7 @@ pub struct Lab {
     #[schemars(required, schema_with = "nullable_instance")]
     pub instance: Option<Instance>,
     /// The spec's `message:`, its placeholders rewritten to manifest ones (`{{
-    /// machines.web.ports.0.publish }}` becomes `${published.web.80}`). The runner fills it once
+    /// machines.web.ports.site.published }}` becomes `${published.web.site}`). The runner fills it once
     /// the run is ready; a sensitive output is never substituted.
     #[serde(default)]
     pub message: Option<Template>,

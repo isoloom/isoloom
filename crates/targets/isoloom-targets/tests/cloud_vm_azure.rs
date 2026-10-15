@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use isoloom_spec::{Spec, Target, load};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 fn example(name: &str) -> Spec {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
@@ -14,7 +14,7 @@ fn example(name: &str) -> Spec {
 }
 
 fn azure(spec: &Spec) -> String {
-    generate(spec, Target::CloudVm)
+    generate(&Lab::new(spec.clone()), Target::CloudVm)
         .unwrap()
         .into_iter()
         .find(|f| f.path == ".isoloom/cloud-vm/azure/main.tf")
@@ -58,10 +58,8 @@ fn azure_gives_a_machine_on_several_networks_an_interface_on_each() {
     let mut spec = example("pivot-dmz");
     // Kali has no Azure image yet: the user lands on Debian here (as the AWS test does).
     for m in spec.machines.values_mut() {
-        if let Some(vm) = &mut m.vm
-            && vm.os == "kali"
-        {
-            vm.os = "debian-12".into();
+        if m.os.is_some_and(|os| os.name() == "kali") {
+            m.os = Some("debian@12".parse().unwrap());
         }
     }
     let tf = azure(&spec);

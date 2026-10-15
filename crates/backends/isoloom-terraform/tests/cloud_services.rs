@@ -3,7 +3,6 @@
 
 pub mod testing;
 
-use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::CloudServicesBackend;
@@ -25,7 +24,7 @@ cloud:
 
 /// The script or variables file `name` written for `SPEC`.
 fn file(name: &str) -> Outcome<String> {
-    let files = CloudServicesBackend.render(&Environment::build(&spec(SPEC)?, Target::CloudServices, None))?;
+    let files = CloudServicesBackend.render(&testing::planned(&spec(SPEC)?, Target::CloudServices))?;
     Ok(testing::file(&files, &format!(".isoloom/cloud-services/{name}"))?.to_owned())
 }
 

@@ -5,8 +5,8 @@
 
 use std::path::PathBuf;
 
-fn render(spec: &isoloom_spec::Spec) -> Vec<(String, String)> {
-    let (files, _skipped) = isoloom_targets::generate_all(spec);
+fn render(lab: &isoloom_targets::Lab) -> Vec<(String, String)> {
+    let (files, _skipped) = isoloom_targets::generate_all(lab);
     files.into_iter().map(|f| (f.path, f.contents)).collect()
 }
 
@@ -17,10 +17,10 @@ fn every_example_renders_the_same_twice() {
     dirs.sort();
     let mut rendered = 0;
     for dir in dirs {
-        let spec = isoloom_spec::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
-        let first = render(&spec);
+        let lab = isoloom_targets::Lab::new(isoloom_spec::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())));
+        let first = render(&lab);
         rendered += first.len();
-        let second = render(&spec);
+        let second = render(&lab);
         assert_eq!(first.len(), second.len(), "{}: a different number of files", dir.display());
         for (a, b) in first.iter().zip(&second) {
             assert_eq!(a.0, b.0, "{}: files in a different order", dir.display());

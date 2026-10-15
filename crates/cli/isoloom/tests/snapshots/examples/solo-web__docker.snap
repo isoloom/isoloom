@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -131,7 +132,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: solo-web
     restart: unless-stopped
@@ -308,6 +309,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true,
@@ -491,16 +493,15 @@ volumes:
   ],
   "outputs": [
     {
-      "name": "web_80",
-      "description": "web's port 80.",
+      "name": "web_web",
+      "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
       "format": "http://127.0.0.1:${value}/",
       "from": {
         "kind": "published_port",
         "machine": "web",
-        "port": 80,
-        "protocol": "tcp"
+        "port": "web"
       }
     }
   ],
@@ -583,7 +584,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "solo-web",
   "instance": null,
   "inputs": [],
@@ -617,14 +618,15 @@ volumes:
       "docker_addresses": {
         "app": "10.80.0.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": 8080
+          "protocol": "http",
+          "publish": 8080,
+          "published": 8080,
+          "url": "http://127.0.0.1:8080/"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -658,7 +660,9 @@ volumes:
   "published": [
     {
       "machine": "web",
+      "name": "web",
       "port": 80,
+      "protocol": "http",
       "host_port": 8080
     }
   ],
@@ -688,7 +692,7 @@ volumes:
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on web",
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

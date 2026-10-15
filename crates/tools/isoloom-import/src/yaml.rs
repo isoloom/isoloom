@@ -23,19 +23,59 @@ pub(super) struct Header<'a> {
     pub name: &'a str,
 }
 
-/// One entry of a machine's `ports` list.
+/// One entry of a machine's `ports` map.
 pub(super) struct PortEntry {
     pub port: u16,
     pub udp: bool,
     pub publish: Option<u16>,
 }
 
+/// The names of well-known ports; any other is `p<port>`.
+const KNOWN: &[(u16, &str)] = &[
+    (22, "ssh"),
+    (25, "smtp"),
+    (53, "dns"),
+    (69, "tftp"),
+    (80, "http"),
+    (123, "ntp"),
+    (161, "snmp"),
+    (389, "ldap"),
+    (443, "https"),
+    (445, "smb"),
+    (514, "syslog"),
+    (3306, "mysql"),
+    (3389, "rdp"),
+    (5432, "postgres"),
+    (5672, "amqp"),
+    (6379, "redis"),
+    (8080, "http-alt"),
+    (9200, "elasticsearch"),
+    (27017, "mongodb"),
+];
+
 impl PortEntry {
+    /// The port's name: a well-known one, `-udp` for UDP, never one `taken` already.
+    fn name(&self, taken: &[String]) -> String {
+        let base = KNOWN
+            .iter()
+            .find(|(p, _)| *p == self.port)
+            .map_or_else(|| format!("p{}", self.port), |(_, n)| (*n).to_owned());
+        let base = if self.udp { format!("{base}-udp") } else { base };
+        let mut name = base.clone();
+        let mut n = 2;
+        while taken.contains(&name) {
+            name = format!("{base}-{n}");
+            n += 1;
+        }
+        name
+    }
+
     fn flow(&self) -> String {
         let udp = if self.udp { ", protocol: udp" } else { "" };
         match self.publish {
             Some(h) => format!("{{ port: {}{udp}, publish: {h} }}", self.port),
-            None => format!("{{ port: {}{udp} }}", self.port),
+            None if self.udp => format!("{{ port: {}{udp} }}", self.port),
+            None => self.port.to_string(),
         }
     }
 }
@@ -87,11 +127,17 @@ impl DraftYaml {
         self.line(format!("    networks: {{ {joins} }}"));
     }
 
-    /// The machine's `ports`, when it has any.
+    /// The machine's `ports`, each named, when it has any.
     pub fn ports(&mut self, ports: impl IntoIterator<Item = PortEntry>) {
-        let ports: Vec<String> = ports.into_iter().map(|s| s.flow()).collect();
-        if !ports.is_empty() {
-            self.line(format!("    ports: [{}]", ports.join(", ")));
+        let mut names: Vec<String> = Vec::new();
+        let mut entries: Vec<String> = Vec::new();
+        for p in ports {
+            let name = p.name(&names);
+            entries.push(format!("{name}: {}", p.flow()));
+            names.push(name);
+        }
+        if !entries.is_empty() {
+            self.line(format!("    ports: {{ {} }}", entries.join(", ")));
         }
     }
 
@@ -109,9 +155,9 @@ impl DraftYaml {
         }
     }
 
-    /// The machine's `vm:` key and its `os`.
-    pub fn vm_os(&mut self, os: &str) {
-        self.line(format!("    vm:\n      os: {os}"));
+    /// The machine's `os`.
+    pub fn os(&mut self, os: &str) {
+        self.line(format!("    os: {os}"));
     }
 
     pub fn finish(self) -> String {

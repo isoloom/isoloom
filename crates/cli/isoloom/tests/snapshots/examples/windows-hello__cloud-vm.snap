@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -383,7 +384,7 @@ output "checks" {
 }
 
 output "published" {
-  value = { "web01/80" = "${aws_instance.web01.public_ip}:8082" }
+  value = { "web01/web" = "${aws_instance.web01.public_ip}:8082" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what
@@ -830,7 +831,7 @@ output "checks" {
 }
 
 output "published" {
-  value = { "web01/80" = "${azurerm_public_ip.web01.ip_address}:8082" }
+  value = { "web01/web" = "${azurerm_public_ip.web01.ip_address}:8082" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

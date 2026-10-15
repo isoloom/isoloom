@@ -73,7 +73,8 @@ fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Ta
     }
 }
 
-/// The configuration steps a VM doesn't run yet (Phase 3 renders them as shell and PowerShell).
+/// The configuration steps a VM doesn't run yet: the configuration backends that render them as
+/// shell and PowerShell come with the resource model (PLAN, Phase 4).
 fn vm_steps(name: &str, m: &syntax::Machine) -> Vec<Problem> {
     let Some(app) = m.app() else { return Vec::new() };
     app.steps
@@ -86,7 +87,7 @@ fn vm_steps(name: &str, m: &syntax::Machine) -> Vec<Problem> {
             Problem::new(
                 Code::Refused,
                 at,
-                format!("a `{what}` step on a VM arrives in Phase 3; containers build it today"),
+                format!("a `{what}` step on a VM comes with the configuration backends (Phase 4); containers build it today"),
             )
             .fix("write it as a `run:` script for now, or use a container target")
         })

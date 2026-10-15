@@ -212,7 +212,7 @@ impl<'a> Import<'a> {
             self.key(&svc, k.as_str().unwrap_or_default(), v, &mut m);
         }
         if m.image.is_none() && m.build.is_none() {
-            self.notes.add(svc.at, NoteKind::Changed, "no image or build; add one to `docker:`");
+            self.notes.add(svc.at, NoteKind::Changed, "no image or build; add one to `app:`");
         }
         Ok(Some(m))
     }
@@ -224,7 +224,7 @@ impl<'a> Import<'a> {
             self.notes.add(
                 &svc.at,
                 NoteKind::Changed,
-                "left out: it runs once and exits (others wait for it to complete); one-shot work is a `docker.init` job of the machine it prepares",
+                "left out: it runs once and exits (others wait for it to complete); one-shot work is a `setup` script of the machine it prepares",
             );
             return true;
         }

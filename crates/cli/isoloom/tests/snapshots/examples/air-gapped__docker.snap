@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -247,7 +248,7 @@ services:
       store:
         condition: service_healthy
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: air-gapped
     restart: unless-stopped
@@ -431,6 +432,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true
@@ -754,7 +756,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "air-gapped",
   "instance": null,
   "inputs": [],
@@ -788,14 +790,12 @@ volumes:
       "docker_addresses": {
         "lab": "10.62.0.20"
       },
-      "ports": [
-        {
+      "ports": {
+        "redis": {
           "port": 6379,
-          "name": "redis",
-          "http": false,
-          "publish": null
+          "protocol": "tcp"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -828,14 +828,12 @@ volumes:
       "docker_addresses": {
         "lab": "10.62.0.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [
         "store"
       ],
@@ -896,7 +894,7 @@ volumes:
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on store, app",
+      "external": "overrides.external.machines.store: the external target reaches machines that exist already, and `store` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

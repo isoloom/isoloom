@@ -72,6 +72,13 @@ pub fn container(m: &Machine) -> Result<Form<'_>, NoForm> {
             "run it on a VM target (`vagrant`, `proxmox`, `cloud-vm`)",
         ));
     }
+    if let Some(field) = m.hardware.vm_only() {
+        return Err(NoForm::new(
+            format!("hardware.{field}"),
+            "only a VM gives it: a container has no kernel or firmware of its own",
+            "use a VM target, or leave it out for the container form",
+        ));
+    }
     match &m.kind {
         Kind::Service(s) if s.services.len() > 1 => Err(NoForm::new(
             "service",
@@ -104,6 +111,13 @@ pub fn container(m: &Machine) -> Result<Form<'_>, NoForm> {
 pub fn vm(m: &Machine) -> Result<Form<'_>, NoForm> {
     if m.access && m.os.is_none() && matches!(m.kind, Kind::Bare) {
         return Ok(Form::Supplied);
+    }
+    if !m.hardware.devices.is_empty() {
+        return Err(NoForm::new(
+            "hardware.devices",
+            "the host's devices go to a container on the host's own Docker; a VM has its own",
+            "use a container target, or leave them out for the VM form",
+        ));
     }
     match &m.kind {
         Kind::App(a) if a.steps.is_empty() => match &a.container {
@@ -147,26 +161,36 @@ mod tests {
 
     #[test]
     fn each_recipe_gives_its_forms() {
-        let m = machine("{ os: debian@12 }");
-        assert_eq!((container(&m), vm(&m)), (Ok(Form::Os), Ok(Form::Os)));
-        let m = machine("{ app: { build: build/web } }");
-        assert!(matches!(container(&m), Ok(Form::Recipe(_))));
-        assert_eq!(vm(&m).unwrap_err().path("web").as_str(), "machines.web.app.build");
-        let m = machine("{ os: debian@12, app: { steps: [{ run: a.sh }, reboot] } }");
-        assert_eq!(container(&m).unwrap_err().path("web").as_str(), "machines.web.app.steps[1]");
-        assert_eq!(vm(&m), Ok(Form::Steps));
-        assert!(reboots(&m));
-        let m = machine("{ os: debian@12, app: { image: redis:7, steps: [reboot] } }");
-        assert!(matches!(container(&m), Ok(Form::Recipe(_))) && vm(&m).is_ok());
+        let os_only = machine("{ os: debian@12 }");
+        assert_eq!((container(&os_only), vm(&os_only)), (Ok(Form::Os), Ok(Form::Os)));
+        let built = machine("{ app: { build: build/web } }");
+        assert!(matches!(container(&built), Ok(Form::Recipe(_))));
+        assert_eq!(vm(&built).unwrap_err().path("web").as_str(), "machines.web.app.build");
+        let rebooting = machine("{ os: debian@12, app: { steps: [{ run: a.sh }, reboot] } }");
+        assert_eq!(container(&rebooting).unwrap_err().path("web").as_str(), "machines.web.app.steps[1]");
+        assert_eq!(vm(&rebooting), Ok(Form::Steps));
+        assert!(reboots(&rebooting));
+        let both = machine("{ os: debian@12, app: { image: redis:7, steps: [reboot] } }");
+        assert!(matches!(container(&both), Ok(Form::Recipe(_))) && vm(&both).is_ok());
+    }
+
+    #[test]
+    fn hardware_only_one_form_has_rules_out_the_other() {
+        let tpm = machine("{ os: debian@12, hardware: { tpm: required } }");
+        assert_eq!(container(&tpm).unwrap_err().field, "hardware.tpm");
+        assert_eq!(vm(&tpm), Ok(Form::Os));
+        let fuse = machine("{ os: debian@12, hardware: { devices: [/dev/fuse] } }");
+        assert_eq!(vm(&fuse).unwrap_err().field, "hardware.devices");
+        assert_eq!(container(&fuse), Ok(Form::Os));
     }
 
     #[test]
     fn windows_and_access_machines() {
-        let m = machine("{ os: windows-server@2019, app: { steps: [{ run: iis.ps1 }] } }");
-        assert_eq!(container(&m).unwrap_err().field, "os");
-        let m = machine("{ access: true }");
-        assert_eq!((container(&m), vm(&m)), (Ok(Form::Supplied), Ok(Form::Supplied)));
-        let m = machine("{ access: true, os: kali }");
-        assert_eq!(container(&m), Ok(Form::Os));
+        let windows = machine("{ os: windows-server@2019, app: { steps: [{ run: iis.ps1 }] } }");
+        assert_eq!(container(&windows).unwrap_err().field, "os");
+        let supplied = machine("{ access: true }");
+        assert_eq!((container(&supplied), vm(&supplied)), (Ok(Form::Supplied), Ok(Form::Supplied)));
+        let kali = machine("{ access: true, os: kali }");
+        assert_eq!(container(&kali), Ok(Form::Os));
     }
 }

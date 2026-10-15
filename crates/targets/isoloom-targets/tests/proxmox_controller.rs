@@ -6,11 +6,11 @@
 use std::path::PathBuf;
 
 use isoloom_spec::{Target, load};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
-fn example(name: &str) -> isoloom_spec::Spec {
+fn example(name: &str) -> Lab {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
-    load(&dir).expect("example parses")
+    Lab::new(load(&dir).expect("example parses"))
 }
 
 #[test]

@@ -33,7 +33,7 @@
       "role": "entry",
       "sensitive": false,
       "format": "http://127.0.0.1:${value}/",
-      "from": { "kind": "published_port", "machine": "web", "port": 80, "protocol": "tcp" }
+      "from": { "kind": "published_port", "machine": "web", "port": "site" }
     }
   ],
   "checks": { "protocol": "isoloom-check/1", "setup": [], "runners": [], "teardown": [] }

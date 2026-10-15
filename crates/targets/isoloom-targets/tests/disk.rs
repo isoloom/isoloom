@@ -4,7 +4,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
 use isoloom_spec::{Target, parse};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 fn vagrantfile(disk: &str) -> String {
     let spec = parse(&format!(
@@ -13,13 +13,14 @@ name: disks
 networks: {{ lab: {{ cidr: 10.77.0.0/24 }} }}
 machines:
   box:
+    os: debian@12
     networks: {{ lab: 10 }}
     resources: {{ cpus: 1, memory_mb: 1024{disk} }}
-    vm: {{ os: debian@12, provision: [setup.sh] }}
+    app: {{ steps: [{{ run: setup.sh }}] }}
 "
     ))
     .unwrap();
-    generate(&spec, Target::Vagrant)
+    generate(&Lab::new(spec), Target::Vagrant)
         .unwrap()
         .into_iter()
         .find(|f| f.path.ends_with("Vagrantfile"))

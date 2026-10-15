@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ external
@@ -205,4 +206,4 @@ ansible_become=true
   }
 }
 
-## .isoloom/resolved.json: identical in the `vagrant` snapshot
+## .isoloom/resolved.json: identical in the `hybrid` snapshot

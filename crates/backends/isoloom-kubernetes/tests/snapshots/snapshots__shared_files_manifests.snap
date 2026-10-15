@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom-kubernetes/tests/snapshots.rs
+source: crates/backends/isoloom-kubernetes/tests/snapshots.rs
+assertion_line: 106
 expression: "manifests(\"shared-files\")"
 ---
 === .isoloom/kubernetes/kustomization.yaml
@@ -16,6 +17,7 @@ generatorOptions:
 configMapGenerator:
 - name: isoloom-scripts
   files:
+  - steps__look.sh=../../steps/look.sh
   - steps__write.sh=../../steps/write.sh
 
 === .isoloom/kubernetes/environment.yaml
@@ -59,7 +61,7 @@ spec:
         - name: isoloom-probe
           mountPath: /probe
       - name: seed-shared
-        image: alpine:3.20
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
         imagePullPolicy: IfNotPresent
         command:
         - /.isoloom-probe/busybox
@@ -77,7 +79,7 @@ spec:
           readOnly: true
       containers:
       - name: writer
-        image: alpine:3.20
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
         imagePullPolicy: IfNotPresent
         command:
         - sleep
@@ -88,7 +90,7 @@ spec:
         - name: disk-data
           mountPath: /srv/data
       - name: init
-        image: alpine:3.20
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
         imagePullPolicy: IfNotPresent
         command:
         - sh
@@ -177,7 +179,7 @@ spec:
           mountPath: /probe
       containers:
       - name: reader
-        image: alpine:3.20
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
         imagePullPolicy: IfNotPresent
         command:
         - sleep
@@ -185,12 +187,28 @@ spec:
         volumeMounts:
         - name: vol-shared
           mountPath: /data/shared
+      - name: init
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - sh /isoloom/scripts/steps__look.sh && exec sleep infinity
+        volumeMounts:
+        - name: vol-shared
+          mountPath: /data/shared
+        - name: scripts
+          mountPath: /isoloom/scripts
       nodeSelector:
         kubernetes.io/arch: amd64
       volumes:
       - name: vol-shared
         persistentVolumeClaim:
           claimName: shared
+      - name: scripts
+        configMap:
+          name: isoloom-scripts
+          defaultMode: 493
       - name: isoloom-probe
         emptyDir: {}
 ---

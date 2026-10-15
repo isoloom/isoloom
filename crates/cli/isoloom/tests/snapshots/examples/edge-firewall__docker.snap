@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -477,7 +478,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
@@ -563,10 +564,9 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
-  isoloom-access:
-    image: alpine:3.20
-    profiles:
-    - check
+  user:
+    image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+    platform: linux/amd64
     entrypoint:
     - sleep
     - infinity
@@ -581,15 +581,14 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
-  isoloom-access-routes:
+    restart: unless-stopped
+  user-routes:
     image: alpine:3.20
-    profiles:
-    - check
     entrypoint:
     - /bin/sh
     - -c
     - ip route replace 10.70.10.0/24 via 10.70.0.5 && ip route replace 10.70.20.0/24 via 10.70.0.5 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
-    network_mode: service:isoloom-access
+    network_mode: service:user
     cap_add:
     - NET_ADMIN
     healthcheck:
@@ -600,7 +599,7 @@ services:
       timeout: 2s
       retries: 30
     depends_on:
-      isoloom-access:
+      user:
         condition: service_started
     labels:
       isoloom.managed: 'true'
@@ -613,7 +612,7 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
-    network_mode: service:isoloom-access
+    network_mode: service:user
     volumes:
     - ./checks/user.sh:/isoloom/run.sh:ro
     - ../..:/isoloom/project:ro
@@ -630,10 +629,10 @@ services:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
-      isoloom-access:
-        condition: service_started
-      isoloom-access-routes:
+      user-routes:
         condition: service_healthy
+      user:
+        condition: service_started
     labels:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
@@ -659,6 +658,8 @@ services:
       cache:
         condition: service_healthy
       cache-routes:
+        condition: service_healthy
+      user-routes:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -686,6 +687,8 @@ services:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
+      user-routes:
+        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
@@ -711,6 +714,8 @@ services:
       cache:
         condition: service_healthy
       cache-routes:
+        condition: service_healthy
+      user-routes:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -899,6 +904,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true
@@ -943,28 +949,29 @@ volumes:
       }
     },
     {
-      "name": "isoloom-access",
+      "name": "user",
       "role": "access",
+      "arch": "amd64",
       "addresses": {
         "outside": "10.70.0.10"
       },
       "native": {
-        "service": "isoloom-access"
+        "service": "user"
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "user-routes",
       "role": "infra",
-      "of": "isoloom-access",
+      "of": "user",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "user-routes"
       }
     },
     {
       "name": "isoloom-check",
       "role": "check",
-      "of": "isoloom-access",
+      "of": "user",
       "addresses": {},
       "native": {
         "service": "isoloom-check"
@@ -1162,31 +1169,7 @@ volumes:
   "outputs": [],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [
-      {
-        "id": "stand-ins",
-        "note": "Starting the access machine's stand-in…",
-        "argv": [
-          "docker",
-          "compose",
-          "--project-name",
-          "${run.name}",
-          "--file",
-          "compose.yml",
-          "--file",
-          "${run.state_dir}/ports.yml",
-          "--profile",
-          "check",
-          "up",
-          "--detach",
-          "--wait",
-          "--no-deps",
-          "isoloom-access",
-          "isoloom-access-routes"
-        ],
-        "timeout_s": 600
-      }
-    ],
+    "setup": [],
     "runners": [
       {
         "id": "isoloom-check",
@@ -1446,7 +1429,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "edge-firewall",
   "instance": null,
   "inputs": [],
@@ -1517,14 +1500,12 @@ volumes:
         "dmz": "10.70.10.1",
         "lan": "10.70.20.1"
       },
-      "ports": [
-        {
+      "ports": {
+        "status": {
           "port": 8080,
-          "name": "status",
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1560,14 +1541,12 @@ volumes:
       "docker_addresses": {
         "dmz": "10.70.10.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1605,14 +1584,12 @@ volumes:
       "docker_addresses": {
         "lan": "10.70.20.20"
       },
-      "ports": [
-        {
+      "ports": {
+        "redis": {
           "port": 6379,
-          "name": "redis",
-          "http": false,
-          "publish": null
+          "protocol": "tcp"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1637,6 +1614,7 @@ volumes:
       "access": true,
       "supplied": false,
       "shapes": [
+        "docker",
         "vm"
       ],
       "role": "target",
@@ -1649,7 +1627,7 @@ volumes:
       "docker_addresses": {
         "outside": "10.70.0.10"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1722,7 +1700,7 @@ volumes:
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on fw, web, cache",
+      "external": "overrides.external.machines.fw: the external target reaches machines that exist already, and `fw` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

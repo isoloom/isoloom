@@ -61,7 +61,7 @@ mod tests {
         let yaml = format!(
             "version: 1\nname: lab\n{dns}\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, docker: {{ image: nginx }} }}\n"
         );
-        let spec: Spec = crate::parse(&yaml).unwrap();
+        let spec: Spec = crate::model::from_yaml(&yaml).unwrap();
         crate::validate::validate(&spec).into_iter().map(|p| p.to_string()).collect()
     }
 

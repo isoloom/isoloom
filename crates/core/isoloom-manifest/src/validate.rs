@@ -5,7 +5,6 @@
 use std::collections::BTreeSet;
 
 use crate::lifecycle::Condition;
-use crate::machine::Protocol;
 use crate::outputs::OutputSource;
 use crate::slots::Delivery;
 use crate::template::Placeholder;
@@ -97,6 +96,15 @@ impl Manifest {
         if let Some(dup) = self.machines.iter().find(|m| !seen.insert(&m.name)) {
             return Err(ManifestError::DuplicateMachine { name: dup.name.to_string() });
         }
+        for m in &self.machines {
+            let mut names = BTreeSet::new();
+            if let Some(dup) = m.ports.iter().find(|p| !names.insert(&p.name)) {
+                return Err(ManifestError::DuplicatePort {
+                    machine: m.name.to_string(),
+                    port: dup.name.to_string(),
+                });
+            }
+        }
         for (i, m) in self.machines.iter().enumerate() {
             if let Some(of) = &m.of {
                 self.machine_exists(&format!("machines[{i}].of"), of.as_str())?;
@@ -108,8 +116,8 @@ impl Manifest {
             }
         }
         for (i, o) in self.outputs.iter().enumerate() {
-            if let OutputSource::PublishedPort { machine, port, protocol } = &o.from {
-                self.published(&format!("outputs[{i}].from"), machine.as_str(), port.get(), *protocol)?;
+            if let OutputSource::PublishedPort { machine, port } = &o.from {
+                self.published(&format!("outputs[{i}].from"), machine.as_str(), port.as_str())?;
             }
         }
         Ok(())
@@ -119,7 +127,7 @@ impl Manifest {
         for (at, template) in self.templates() {
             for p in template.placeholders() {
                 match p {
-                    Placeholder::Published { machine, port, protocol } => self.published(&at, machine.as_str(), port.get(), *protocol)?,
+                    Placeholder::Published { machine, port } => self.published(&at, machine.as_str(), port.as_str())?,
                     Placeholder::Param(name) if !self.params.iter().any(|x| &x.name == name) => {
                         return Err(ManifestError::UnknownParam { at, name: name.to_string() });
                     }
@@ -150,21 +158,20 @@ impl Manifest {
         }
     }
 
-    /// Whether `machine` publishes `port` over `protocol`.
-    fn published(&self, at: &str, machine: &str, port: u16, protocol: Protocol) -> Result<(), ManifestError> {
+    /// Whether `machine` publishes its port named `port`.
+    fn published(&self, at: &str, machine: &str, port: &str) -> Result<(), ManifestError> {
         let found = self
             .machines
             .iter()
             .filter(|m| m.name.as_str() == machine)
             .flat_map(|m| &m.ports)
-            .any(|p| p.port.get() == port && p.protocol == protocol && p.publish.is_some());
+            .any(|p| p.name.as_str() == port && p.publish.is_some());
         if found {
             return Ok(());
         }
-        let udp = if protocol == Protocol::Udp { ".udp" } else { "" };
         Err(ManifestError::UnknownPublished {
             at: at.to_string(),
-            port: format!("{machine}.{port}{udp}"),
+            port: format!("{machine}.{port}"),
         })
     }
 }

@@ -1,4 +1,4 @@
-//! Writing the Compose draft: the shared parts through [`DraftYaml`], the `docker:` block here.
+//! Writing the Compose draft: the shared parts through [`DraftYaml`], the `app:` block here.
 
 use std::collections::BTreeSet;
 
@@ -24,7 +24,7 @@ pub(super) fn draft_yaml(env: &Environment, machines: &[Machine]) -> String {
         tool: "compose",
         source: env.source,
         review: "Review it with the notes the\n# import printed: what Compose said that this file doesn't (yet), and why.",
-        next: "add `vm:` to each machine for the VM targets, and `checks` that prove the behavior.",
+        next: "add `os` and `app.steps` to each machine for the VM targets, and `checks` that prove the behavior.",
         name: env.name,
     });
     let nets = env.nets.nets.values();
@@ -33,7 +33,10 @@ pub(super) fn draft_yaml(env: &Environment, machines: &[Machine]) -> String {
         y.network(&n.name, width, &n.cidr_text, n.internet);
     }
     if !env.inputs.is_empty() {
-        y.line(format!("\ninputs: [{}]", env.inputs.iter().cloned().collect::<Vec<_>>().join(", ")));
+        // Compose gave them to the containers as environment variables: not sensitive, so they
+        // may stay environment values (a secret belongs in a file: `files: [{ path, input }]`).
+        let each: Vec<String> = env.inputs.iter().map(|i| format!("{i}: {{ sensitive: false }}")).collect();
+        y.line(format!("\ninputs: {{ {} }}", each.join(", ")));
     }
     y.machines();
     for m in machines {
@@ -51,7 +54,8 @@ fn machine(y: &mut DraftYaml, m: &Machine) {
         publish: m.publish.get(key).copied(),
     }));
     if !m.inputs.is_empty() {
-        y.line(format!("    inputs: [{}]", m.inputs.iter().cloned().collect::<Vec<_>>().join(", ")));
+        let each: Vec<String> = m.inputs.iter().map(|i| format!("{i}: {{ input: {i} }}")).collect();
+        y.line(format!("    environment: {{ {} }}", each.join(", ")));
     }
     y.resources(m.cpus, m.memory_mb);
     if !m.depends_on.is_empty() {
@@ -64,23 +68,27 @@ fn machine(y: &mut DraftYaml, m: &Machine) {
     docker(y, m);
 }
 
-/// The `docker:` block: the build when there is one, else the image (empty when neither).
+/// The `app:` block: the build when there is one (in full when it has a Dockerfile, a stage or
+/// arguments), else the image (empty when neither).
 fn docker(y: &mut DraftYaml, m: &Machine) {
     match (&m.build, &m.image) {
+        (Some(b), _) if m.dockerfile.is_none() && m.target.is_none() && m.args.is_empty() => {
+            y.line(format!("    app:\n      build: {}", yaml_str(b)));
+        }
         (Some(b), _) => {
-            y.line(format!("    docker:\n      build: {}", yaml_str(b)));
+            y.line(format!("    app:\n      build:\n        context: {}", yaml_str(b)));
             if let Some(f) = &m.dockerfile {
-                y.line(format!("      dockerfile: {}", yaml_str(f)));
+                y.line(format!("        dockerfile: {}", yaml_str(f)));
             }
             if let Some(t) = &m.target {
-                y.line(format!("      target: {}", yaml_str(t)));
+                y.line(format!("        target: {}", yaml_str(t)));
             }
             if !m.args.is_empty() {
                 let args = m.args.iter().map(|(k, v)| format!("{k}: {}", yaml_str(v))).collect::<Vec<_>>().join(", ");
-                y.line(format!("      args: {{ {args} }}"));
+                y.line(format!("        args: {{ {args} }}"));
             }
         }
-        (None, Some(img)) => y.line(format!("    docker:\n      image: {}", yaml_str(img))),
-        (None, None) => y.line("    docker:\n      image: \"\""),
+        (None, Some(img)) => y.line(format!("    app:\n      image: {}", yaml_str(img))),
+        (None, None) => y.line("    app:\n      image: \"\""),
     }
 }

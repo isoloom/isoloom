@@ -143,7 +143,7 @@ fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
 fn environment(r: &mut Ruby, env: &Environment) {
     let compose = format!("ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f {COMPOSE}");
     let start = docker::start_commands(&compose, &docker::leaf_jobs(env.spec()), Some(900));
-    let secrets = isoloom_render::secrets::host_environment(&isoloom_render::secrets::of_containers(env));
+    let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
     let files = docker::host_environment(env);
     let script = format!("{secrets}cd /opt/isoloom && {files}{start} && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready");
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));

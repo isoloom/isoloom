@@ -52,9 +52,11 @@ pub(super) fn clone(vm_id: Expression) -> Block {
 /// Why a machine's own image can't be used, if it can't: a Windows machine boots its OS's
 /// template.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
-    vms(env)
-        .find(|(_, mp)| mp.is_windows() && has_own(mp))
-        .map(|(name, _)| format!("machine `{name}` sets `vm.image.proxmox`: a Windows machine boots its OS's template (the module's `template_<os>` variable)"))
+    vms(env).find(|(_, mp)| mp.is_windows() && has_own(mp)).map(|(name, _)| {
+        format!(
+            "machine `{name}` sets `overrides.proxmox.machines.{name}.image`: a Windows machine boots its OS's template (the module's `template_<os>` variable)"
+        )
+    })
 }
 
 /// One download per machine with a cloud image of its own, named after the machine.
@@ -71,6 +73,6 @@ pub(super) fn downloads(env: &Environment, m: &mut Module) {
             .add_attribute(("file_name", slotted(&format!("-{name}.img"))))
             .add_attribute(("overwrite_unmanaged", boolean(true)))
             .build();
-        m.commented(&format!("Machine `{name}`'s own cloud image (`vm.image.proxmox`)."), block);
+        m.commented(&format!("Machine `{name}`'s own cloud image (`overrides.proxmox`)."), block);
     }
 }

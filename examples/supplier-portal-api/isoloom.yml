@@ -1,37 +1,43 @@
 # yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
-# The Supplier portal API lab: one lab, two implementations per machine (containers or
-# native VMs), so it runs on every target.
+# The Supplier portal API lab: one lab, a recipe per form for each machine (containers or
+# native VMs), so it runs on every target. The launch token reaches the database as a file,
+# never as an environment variable; the API's URL isn't secret, so it is one.
 version: 1
 name: supplier-portal-api
 
 networks:
   lab: { cidr: 10.20.0.0/24 }
 
-inputs: [API_URL, LAUNCH_TOKEN]
+inputs:
+  API_URL: { sensitive: false, description: "The API the portal calls." }
+  LAUNCH_TOKEN: { description: "A token issued at launch, stored by the database's seed." }
 
 machines:
   database:
+    os: debian@12
     networks: { lab: 32 }
-    ports: [{ port: 3207, name: mysql }]
-    inputs: [API_URL, LAUNCH_TOKEN]
+    ports: { mysql: 3207 }
+    environment:
+      API_URL: { input: API_URL }
+    files:
+      - { path: /run/lab/launch-token, input: LAUNCH_TOKEN }
     resources: { cpus: 1, memory_mb: 1024 }
-    docker:
+    app:
       image: mysql:8.0
-      init: [build/database/seed.sh]
-    vm:
-      os: debian@12
-      provision: [provision/database.sh]
+      steps: [{ run: provision/database.sh }]
+    setup: [build/database/seed.sh]   # reads the token from /run/lab/launch-token
 
   web:
+    os: debian@12
     networks: { lab: 31 }
-    ports: [{ port: 3206, name: portal, http: true, publish: 3206, fixed: true }]
+    ports:
+      # The app's pages call localhost:3206 themselves: that host port or nothing.
+      portal: { port: 3206, protocol: http, publish: { host: 3206, fixed: true } }
     depends_on: [database]
     resources: { cpus: 1, memory_mb: 1024 }
-    docker:
+    app:
       build: build/web
-    vm:
-      os: debian@12
-      provision: [provision/web.sh]
+      steps: [{ run: provision/web.sh }]
 
 checks:
   - build/check/check.sh

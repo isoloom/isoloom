@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ hybrid
@@ -845,7 +846,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: mixed-office
     restart: unless-stopped
@@ -877,7 +878,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "mixed-office",
   "instance": null,
   "inputs": [],
@@ -910,14 +911,12 @@ volumes:
       "docker_addresses": {
         "office": "10.192.58.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "smb": {
           "port": 445,
-          "name": null,
-          "http": false,
-          "publish": null
+          "protocol": "tcp"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -950,14 +949,15 @@ volumes:
       "docker_addresses": {
         "office": "10.192.58.20"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": 8083
+          "protocol": "http",
+          "publish": 8083,
+          "published": 8083,
+          "url": "http://127.0.0.1:8083/"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -992,7 +992,9 @@ volumes:
   "published": [
     {
       "machine": "intranet",
+      "name": "web",
       "port": 80,
+      "protocol": "http",
       "host_port": 8083
     }
   ],
@@ -1011,15 +1013,15 @@ volumes:
       "cloud-vm"
     ],
     "refused": {
-      "esxi": "machine `files01` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+      "esxi": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
     },
     "not_possible": {
-      "docker": "needs `docker:` on files01",
-      "hosted": "needs `docker:` on files01",
-      "docker-vm": "needs `docker:` on files01",
-      "cloud-docker": "needs `docker:` on files01",
-      "kubernetes": "needs `docker:` on files01",
-      "external": "needs `external:` on files01, intranet",
+      "docker": "machines.files01.os: Windows has no container form in 1.0",
+      "hosted": "machines.files01.os: Windows has no container form in 1.0",
+      "docker-vm": "machines.files01.os: Windows has no container form in 1.0",
+      "cloud-docker": "machines.files01.os: Windows has no container form in 1.0",
+      "kubernetes": "machines.files01.os: Windows has no container form in 1.0",
+      "external": "overrides.external.machines.files01: the external target reaches machines that exist already, and `files01` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

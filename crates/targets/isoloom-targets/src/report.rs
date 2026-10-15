@@ -37,13 +37,10 @@ pub fn graph_d2(r: &Value) -> String {
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
         let mut label = m.clone();
         let ports: Vec<String> = v["ports"]
-            .as_array()
+            .as_object()
             .into_iter()
             .flatten()
-            .map(|s| match s["name"].as_str() {
-                Some(n) => format!("{} {n}", port_text(s)),
-                None => port_text(s),
-            })
+            .map(|(n, s)| format!("{} {n}", port_text(s)))
             .collect();
         if !ports.is_empty() {
             label.push_str("\\n");
@@ -94,7 +91,7 @@ pub fn graph_dot(r: &Value) -> String {
     }
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
         let mut label = m.clone();
-        let ports: Vec<String> = v["ports"].as_array().into_iter().flatten().map(port_text).collect();
+        let ports: Vec<String> = v["ports"].as_object().into_iter().flatten().map(|(_, s)| port_text(s)).collect();
         if !ports.is_empty() {
             let _ = write!(label, "\\n:{}", ports.join(" :"));
         }
@@ -214,7 +211,7 @@ pub fn hyperv_ports_note(r: &Value) -> Option<String> {
         .into_iter()
         .flatten()
         .flat_map(|(m, v)| {
-            v["ports"].as_array().into_iter().flatten().filter_map(move |s| {
+            v["ports"].as_object().into_iter().flatten().map(|(_, s)| s).filter_map(move |s| {
                 s["publish"]
                     .as_u64()
                     .map(|p| format!("127.0.0.1:{p} ({m}:{})", s["port"].as_u64().unwrap_or(0)))
@@ -254,9 +251,10 @@ fn addressing(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
 
 /// A port as shown: `53`, or `53/udp` for a UDP one.
 fn port_text(s: &Value) -> String {
-    match s["protocol"].as_str() {
-        Some(p) if p != "tcp" => format!("{}/{p}", s["port"]),
-        _ => s["port"].to_string(),
+    if s["protocol"] == "udp" {
+        format!("{}/udp", s["port"])
+    } else {
+        s["port"].to_string()
     }
 }
 
@@ -269,7 +267,7 @@ fn ports(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
     let nets: Vec<String> = r["networks"].as_object().into_iter().flatten().map(|(n, _)| n.clone()).collect();
     for (m, v) in r["machines"].as_object().into_iter().flatten() {
         let own: Vec<&str> = v["addresses"].as_object().into_iter().flatten().map(|(n, _)| n.as_str()).collect();
-        for s in v["ports"].as_array().into_iter().flatten() {
+        for (name, s) in v["ports"].as_object().into_iter().flatten() {
             let port = s["port"].as_u64().unwrap_or(0);
             let mut from: Vec<String> = Vec::new();
             for n in &nets {
@@ -288,8 +286,12 @@ fn ports(r: &Value) -> (Vec<String>, Vec<Vec<String>>) {
             rows.push(vec![
                 m.clone(),
                 port_text(s),
-                s["name"].as_str().unwrap_or("").to_string(),
-                if s["http"].as_bool() == Some(true) { "yes".into() } else { String::new() },
+                name.clone(),
+                if s["protocol"] == "http" || s["protocol"] == "https" {
+                    "yes".into()
+                } else {
+                    String::new()
+                },
                 s["publish"].as_u64().map(|p| format!("127.0.0.1:{p}")).unwrap_or_default(),
                 from.join(", "),
             ]);

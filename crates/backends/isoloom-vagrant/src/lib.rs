@@ -13,19 +13,20 @@
 //! # Example
 //!
 //! ```
-//! use isoloom_plan::Environment;
+//! use isoloom_plan::{Environment, Lab};
 //! use isoloom_render::backend::Backend;
 //! use isoloom_spec::model::Target;
 //! use isoloom_vagrant::{VagrantBackend, provider_refusal};
 //!
-//! let spec = isoloom_spec::parse(
+//! let lab = Lab::new(isoloom_spec::parse(
 //!     "version: 1
 //! name: hello
 //! networks: { lan: { cidr: 10.9.0.0/24 } }
 //! machines:
-//!   web: { networks: { lan: 10 }, ports: [{ port: 80 }], vm: { os: debian@12 } }
+//!   web: { networks: { lan: 10 }, ports: { web: 80 }, os: debian@12 }
 //! ",
-//! )?;
+//! )?);
+//! let spec = lab.for_target(Target::Vagrant);
 //! let env = Environment::build(&spec, Target::Vagrant, None);
 //! let files = VagrantBackend.render(&env)?;
 //! let vagrantfile = files.iter().find(|f| f.path == ".isoloom/vagrant/Vagrantfile").ok_or("no Vagrantfile")?;

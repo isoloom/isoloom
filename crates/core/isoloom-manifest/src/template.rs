@@ -3,14 +3,12 @@
 //! `${secrets.…}` can't be held at all.
 
 use std::borrow::Cow;
-use std::fmt;
-use std::num::NonZeroU16;
+use std::fmt::{self, Display, Formatter};
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::ManifestError;
-use crate::machine::Protocol;
 use crate::names::{EnvName, Name, SnakeName};
 
 /// A value the runner knows about the run itself (`${run.…}`).
@@ -62,14 +60,12 @@ pub enum Placeholder {
     Param(EnvName),
     /// `${outputs.name}`: an output, once it can be read.
     Output(SnakeName),
-    /// `${published.<machine>.<port>[.udp]}`: the host port a machine's port got.
+    /// `${published.<machine>.<port>}`: the host port a machine's port, by its name, got.
     Published {
         /// The machine.
         machine: Name,
-        /// Its port.
-        port: NonZeroU16,
-        /// The port's protocol (`.udp` in the placeholder).
-        protocol: Protocol,
+        /// The port's name.
+        port: Name,
     },
     /// `${machine}`: the machine of a `lifecycle.provision.machine` step.
     Machine,
@@ -122,36 +118,22 @@ impl Placeholder {
     }
 }
 
-/// `<machine>.<port>[.udp]`, after `published.`.
+/// `<machine>.<port>`, after `published.`: a port's name has no dot.
 fn published(rest: &str) -> Option<Placeholder> {
-    let (rest, protocol) = match rest.strip_suffix(".udp") {
-        Some(r) => (r, Protocol::Udp),
-        None => (rest, Protocol::Tcp),
-    };
     let (machine, port) = rest.rsplit_once('.')?;
-    if !port.chars().all(|c| c.is_ascii_digit()) || port.starts_with('0') {
-        return None;
-    }
     Some(Placeholder::Published {
         machine: Name::parse(machine).ok()?,
-        port: port.parse().ok()?,
-        protocol,
+        port: Name::parse(port).ok()?,
     })
 }
 
-impl fmt::Display for Placeholder {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for Placeholder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Placeholder::Run(v) => write!(f, "run.{}", v.key()),
             Placeholder::Param(n) => write!(f, "params.{n}"),
             Placeholder::Output(n) => write!(f, "outputs.{n}"),
-            Placeholder::Published { machine, port, protocol } => {
-                write!(f, "published.{machine}.{port}")?;
-                if *protocol == Protocol::Udp {
-                    f.write_str(".udp")?;
-                }
-                Ok(())
-            }
+            Placeholder::Published { machine, port } => write!(f, "published.{machine}.{port}"),
             Placeholder::Machine => f.write_str("machine"),
             Placeholder::Value => f.write_str("value"),
         }
@@ -245,8 +227,8 @@ impl From<Placeholder> for Template {
     }
 }
 
-impl fmt::Display for Template {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for Template {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for part in &self.parts {
             match part {
                 Part::Text(t) => f.write_str(&t.replace('$', "$$"))?,
@@ -269,16 +251,13 @@ impl<'de> Deserialize<'de> for Template {
     }
 }
 
-/// A port from 1 to 65535, as a regular expression.
-const PORT: &str = "(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])";
-
 /// The template grammar as a regular expression: literal text, `$$`, and the known placeholders.
 pub(crate) fn grammar() -> String {
     let roots = [
         "run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts)".to_string(),
         "params\\.[A-Za-z_][A-Za-z0-9_]*".to_string(),
         "outputs\\.[a-z][a-z0-9_]*".to_string(),
-        format!("published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.{PORT}(?:\\.udp)?"),
+        "published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[A-Za-z0-9][A-Za-z0-9_-]*".to_owned(),
         "machine".to_string(),
         "value".to_string(),
     ];
@@ -292,7 +271,7 @@ impl JsonSchema for Template {
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
         json_schema!({
-            "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>[.udp]`, `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
+            "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
             "type": "string",
             "pattern": grammar(),
         })
@@ -316,7 +295,7 @@ mod tests {
             t.parts(),
             [Part::Placeholder(Placeholder::Run(RunVar::StateDir)), Part::Text("/ports.yml".into())]
         );
-        let t = round_trip("http://localhost:${published.web.80}/ and ${published.dns.53.udp}");
+        let t = round_trip("http://localhost:${published.web.site}/ and ${published.dns.dns-udp}");
         assert_eq!(t.placeholders().count(), 2);
         round_trip("{{.ServerVersion}}");
         round_trip("costs $$5");
@@ -333,7 +312,7 @@ mod tests {
     fn malformed_templates_say_why() {
         assert_eq!(Template::parse("$5").unwrap_err().code(), "lone_dollar");
         assert_eq!(Template::parse("${run.name").unwrap_err().code(), "unclosed_placeholder");
-        for unknown in ["${run.title}", "${env.HOME}", "${published.web.0}", "${published.web.65536}", "${outputs.Web}"] {
+        for unknown in ["${run.title}", "${env.HOME}", "${published.web}", "${published.web.-x}", "${outputs.Web}"] {
             assert_eq!(Template::parse(unknown).unwrap_err().code(), "unknown_placeholder", "{unknown}");
         }
     }

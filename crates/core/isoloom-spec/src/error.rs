@@ -57,6 +57,22 @@ pub enum LoadError {
         /// The problems, one per field.
         problems: Vec<String>,
     },
+    /// The spec's problems: every one found, coded and placed, in file order.
+    #[error("{}", render(file, problems))]
+    Invalid {
+        /// The spec file the problems are placed in (`isoloom.yml`).
+        file: String,
+        /// The problems.
+        problems: Vec<crate::syntax::Problem>,
+    },
+}
+
+/// What a load returns.
+pub type Result<T, E = LoadError> = std::result::Result<T, E>;
+
+/// Problems as an author reads them, one after the other.
+fn render(file: &str, problems: &[crate::syntax::Problem]) -> String {
+    problems.iter().map(|p| p.render(file)).collect::<Vec<_>>().join("\n")
 }
 
 impl LoadError {

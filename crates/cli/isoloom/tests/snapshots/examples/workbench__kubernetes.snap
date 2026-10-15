@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ kubernetes
@@ -312,7 +313,7 @@ spec:
 # images: each machine's image (images built from the project must be pushed where the
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
-  bench: alpine:3.20
+  bench: alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
   web: nginx:1.27-alpine
 
 ## .isoloom/kubernetes/checks/bench.sh
@@ -479,7 +480,7 @@ spec:
       hostname: bench
       containers:
       - name: bench
-        image: alpine:3.20
+        image: alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
         imagePullPolicy: IfNotPresent
         command:
         - sleep

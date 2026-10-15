@@ -222,7 +222,7 @@
               "type": "null"
             }
           ],
-          "description": "The spec's `message:`, its placeholders rewritten to manifest ones (`{{ machines.web.ports.0.publish }}` becomes `${published.web.80}`). The runner fills it once the run is ready; a sensitive output is never substituted.",
+          "description": "The spec's `message:`, its placeholders rewritten to manifest ones (`{{ machines.web.ports.site.published }}` becomes `${published.web.site}`). The runner fills it once the run is ready; a sensitive output is never substituted.",
           "default": null
         }
       },
@@ -243,9 +243,9 @@
       "maximum": 99
     },
     "Template": {
-      "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>[.udp]`, `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
+      "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
       "type": "string",
-      "pattern": "^(?:[^$]|\\$\\$|\\$\\{(?:run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts)|params\\.[A-Za-z_][A-Za-z0-9_]*|outputs\\.[a-z][a-z0-9_]*|published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(?:\\.udp)?|machine|value)\\})*$"
+      "pattern": "^(?:[^$]|\\$\\$|\\$\\{(?:run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts)|params\\.[A-Za-z_][A-Za-z0-9_]*|outputs\\.[a-z][a-z0-9_]*|published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[A-Za-z0-9][A-Za-z0-9_-]*|machine|value)\\})*$"
     },
     "Target": {
       "oneOf": [
@@ -1532,15 +1532,8 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Name"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Its name in the spec (`portal`), when it has one."
+          "$ref": "#/$defs/Name",
+          "description": "Its name in the spec (`portal`): unique on its machine, how placeholders and outputs name it (`${published.web.portal}`)."
         },
         "port": {
           "type": "integer",
@@ -1574,6 +1567,7 @@
         }
       },
       "required": [
+        "name",
         "port",
         "protocol",
         "http"
@@ -2263,15 +2257,8 @@
               "description": "The machine."
             },
             "port": {
-              "type": "integer",
-              "format": "uint16",
-              "minimum": 1,
-              "maximum": 65535,
-              "description": "Its port."
-            },
-            "protocol": {
-              "$ref": "#/$defs/Protocol",
-              "description": "The port's protocol."
+              "$ref": "#/$defs/Name",
+              "description": "The port's name."
             },
             "kind": {
               "type": "string",
@@ -2281,8 +2268,7 @@
           "required": [
             "kind",
             "machine",
-            "port",
-            "protocol"
+            "port"
           ],
           "description": "The host port a machine's port got."
         },

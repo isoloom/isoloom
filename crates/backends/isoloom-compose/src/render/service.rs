@@ -203,7 +203,7 @@ fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut V
 
 /// The interface names the image expects, set outright (Compose 2.36+, Docker 28.1+): the order
 /// Docker attaches networks in isn't theirs to rely on.
-fn appliance_networks(spec: &isoloom_spec::Spec, name: &str, ports: &[Port]) -> IndexMap<String, Option<Attachment>> {
+fn appliance_networks(spec: &isoloom_spec::model::Spec, name: &str, ports: &[Port]) -> IndexMap<String, Option<Attachment>> {
     let mgmt = Attachment {
         interface_name: Some("eth0".into()),
         priority: Some(1000),
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn a_from_line_keeps_its_stage_name_and_other_lines_stay() {
         let env = crate::testing::environment(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n",
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n",
         );
         let dockerfile = "FROM ubuntu:24.04 AS base\nRUN true\nFROM ubuntu:24.04\n";
         assert_eq!(pull_from(&env, dockerfile), dockerfile);
@@ -331,10 +331,11 @@ mod tests {
 
     #[test]
     fn appliance_interfaces_attach_in_order_from_the_highest_priority() {
-        let spec = isoloom_spec::parse(
-            "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  r: { networks: { a: 1, b: 1 }, docker: { image: iol, appliance: cisco-iol } }\n",
+        let spec = isoloom_plan::Lab::parse(
+            "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  r: { networks: { a: 1, b: 1 }, app: { image: iol, appliance: cisco-iol } }\n",
         )
-        .expect("parses");
+        .expect("parses")
+        .for_target(isoloom_spec::model::Target::Docker);
         let ports = appliances::ports(&spec, "r", &spec.machines["r"], &|n, o| isoloom_render::address(&spec, n, o));
         let nets = appliance_networks(&spec, "r", &ports);
         let order: Vec<(&str, Option<u32>)> = nets.iter().map(|(n, a)| (n.as_str(), a.as_ref().and_then(|a| a.priority))).collect();

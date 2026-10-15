@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -231,7 +232,7 @@ output "ready_file" {
 }
 
 output "published" {
-  value = { "web/80" = "${aws_instance.web.public_ip}:8080" }
+  value = { "web/web" = "${aws_instance.web.public_ip}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what
@@ -513,7 +514,7 @@ output "ready_file" {
 }
 
 output "published" {
-  value = { "web/80" = "${azurerm_public_ip.web.ip_address}:8080" }
+  value = { "web/web" = "${azurerm_public_ip.web.ip_address}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what
@@ -801,7 +802,7 @@ output "ready_file" {
 }
 
 output "published" {
-  value = { "web/80" = "${digitalocean_droplet.web.ipv4_address}:8080" }
+  value = { "web/web" = "${digitalocean_droplet.web.ipv4_address}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what
@@ -1060,7 +1061,7 @@ output "ready_file" {
 }
 
 output "published" {
-  value = { "web/80" = "${google_compute_instance.web.network_interface[0].access_config[0].nat_ip}:8080" }
+  value = { "web/web" = "${google_compute_instance.web.network_interface[0].access_config[0].nat_ip}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what
@@ -1289,7 +1290,7 @@ output "ready_file" {
 }
 
 output "published" {
-  value = { "web/80" = "${one(linode_instance.web.ipv4)}:8080" }
+  value = { "web/web" = "${one(linode_instance.web.ipv4)}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what
@@ -1734,7 +1735,7 @@ output "ready_file" {
 }
 
 output "published" {
-  value = { "web/80" = "${oci_core_instance.web.public_ip}:8080" }
+  value = { "web/web" = "${oci_core_instance.web.public_ip}:8080" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

@@ -100,7 +100,8 @@ fn healthcheck(at: &str, h: &Healthcheck, p: &mut Problems) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, validate};
+    use crate::model::from_yaml as parse;
+    use crate::validate;
 
     fn problems(machine: &str) -> Vec<String> {
         let yaml = format!("version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, {machine} }}\n");

@@ -94,7 +94,7 @@ networks:
 machines:
   web:
     networks: { lan: 10 }
-    docker: { image: nginx }
+    app: { image: nginx }
     files:
       - { path: /etc/app.ini, content: \"home=$HOME\\n\", uid: 101, gid: 102, mode: '0600' }
       - { path: /etc/nginx/conf.d/site.conf, source: conf/site.conf }

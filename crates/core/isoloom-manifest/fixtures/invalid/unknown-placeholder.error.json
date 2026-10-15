@@ -1,5 +1,5 @@
 {
   "code": "field",
-  "message": "lifecycle.up[0].argv[9]: `${env.HOME}`: `${env.HOME}` isn't a placeholder; the roots are run.name, run.dir, run.state_dir, run.provider, run.ssh_key, run.known_hosts, params.<NAME>, outputs.<name>, published.<machine>.<port>[.udp], machine and value",
+  "message": "lifecycle.up[0].argv[9]: `${env.HOME}`: `${env.HOME}` isn't a placeholder; the roots are run.name, run.dir, run.state_dir, run.provider, run.ssh_key, run.known_hosts, params.<NAME>, outputs.<name>, published.<machine>.<port>, machine and value",
   "schema": true
 }

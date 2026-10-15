@@ -84,7 +84,7 @@ fn nitro_tpm(ami: &str) -> Block {
         .add_attribute(("condition", condition))
         .add_attribute((
             "error_message",
-            string("The machine asks for a TPM (vm.tpm), and this AMI has no NitroTPM support."),
+            string("The machine asks for a TPM (hardware.tpm), and this AMI has no NitroTPM support."),
         ))
         .build();
     Block::builder("lifecycle").add_block(precondition).build()

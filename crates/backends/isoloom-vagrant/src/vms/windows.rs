@@ -1,7 +1,7 @@
 //! What a Windows guest needs from Vagrant beyond its box: how Vagrant reaches it (WinRM, or
 //! Windows' own OpenSSH through `config.winssh`), the guest OS ESXi registers it as, and a
 //! virtual TPM 2.0 on the providers that give one (VirtualBox, libvirt, Hyper-V). A machine that
-//! requires a TPM (`vm.tpm: true`) is refused on the others; one Windows 11 merely expects runs
+//! requires a TPM (`hardware.tpm: required`) is refused on the others; one Windows 11 merely expects runs
 //! there without (the built-in Windows 11 box installs without one).
 
 use isoloom_plan::{Environment, MachineShape};
@@ -97,7 +97,7 @@ pub(crate) fn tpm_refusal(env: &Environment, provider: Provider<'_>) -> Option<S
         .iter()
         .find(|(_, mp)| mp.shape == MachineShape::Vm && mp.tpm == Some(Tpm::Required))?;
     Some(format!(
-        "machine `{name}` asks for a virtual TPM (`vm.tpm: true`): Vagrant's {} provider gives none (VirtualBox, libvirt and Hyper-V do)",
+        "machine `{name}` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's {} provider gives none (VirtualBox, libvirt and Hyper-V do)",
         provider.id()
     ))
 }

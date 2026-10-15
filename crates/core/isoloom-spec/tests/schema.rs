@@ -39,9 +39,11 @@ fn every_example_is_valid_against_the_schema() {
 fn the_schema_catches_what_editors_should_flag() {
     let v = validator();
     for bad in [
-        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, dockr: { image: x } } }\n",
-        "version: 2\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, docker: { image: x } } }\n",
-        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, vm: { os: windows-95 } } }\n",
+        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, ap: { image: x } } }\n",
+        "version: 2\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, app: { image: x } } }\n",
+        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, docker: { image: x } } }\n",
+        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, os: windows-95 } }\n",
+        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, os: debian@12, ports: [{ port: 80 }] } }\n",
     ] {
         let doc: serde_json::Value = serde_yaml_ng::from_str(bad).unwrap();
         assert!(!v.is_valid(&doc), "should be flagged: {bad}");

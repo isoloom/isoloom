@@ -101,7 +101,7 @@ pub fn requirements(spec: &Spec) -> Vec<Requirement> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Environment, Feature};
+    use crate::{Environment, Feature, Lab};
     use isoloom_spec::model::Target;
 
     const SPEC: &str = "
@@ -109,17 +109,19 @@ version: 1
 name: t
 networks:
   lan: { cidr: 10.20.0.0/24 }
-  corp: { cidr: 192.168.50.0/24, external: corp-net }
+  corp: { cidr: 192.168.50.0/24 }
   home: { cidr: 10.0.0.0/24, bridged: { interface: en0, dhcp: true } }
 machines:
-  a: { networks: { lan: 10, corp: 20, home: 0 }, docker: { image: nginx } }
+  a: { networks: { lan: 10, corp: 20, home: 0 }, app: { image: nginx } }
+overrides:
+  docker: { networks: { corp: { external: corp-net } } }
 ";
 
     #[test]
     fn outside_networks_stay_apart_from_the_environment_s_own() {
-        let spec = isoloom_spec::parse(SPEC).unwrap();
-        assert_eq!(isoloom_spec::validate(&spec), vec![]);
-        let env = Environment::build(&spec, Target::Docker, None);
+        let lab = Lab::new(isoloom_spec::parse(SPEC).unwrap());
+        assert_eq!(lab.problems(), vec![]);
+        let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None);
         assert_eq!(env.networks.keys().collect::<Vec<_>>(), ["lan"]);
         assert_eq!(env.spec().networks.len(), 1);
         assert_eq!(env.outside["corp"].join, Join::Existing("corp-net".into()));

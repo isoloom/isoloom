@@ -7,7 +7,7 @@
   "lab": {
     "name": "minimal",
     "instance": null,
-    "message": "Open http://localhost:${published.web.81}/"
+    "message": "Open http://localhost:${published.web.admin}/"
   },
   "target": "docker",
   "driver": "compose",
@@ -136,8 +136,7 @@
       "from": {
         "kind": "published_port",
         "machine": "web",
-        "port": 80,
-        "protocol": "tcp"
+        "port": "site"
       }
     }
   ],

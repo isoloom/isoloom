@@ -36,19 +36,19 @@
 //!
 //! ```
 //! use isoloom_kubernetes::KubernetesBackend;
-//! use isoloom_plan::Environment;
+//! use isoloom_plan::{Environment, Lab};
 //! use isoloom_render::backend::Backend;
 //! use isoloom_spec::model::Target;
 //!
-//! let spec = isoloom_spec::parse(
+//! let lab = Lab::new(isoloom_spec::parse(
 //!     "version: 1
 //! name: hello
 //! networks: { lan: { cidr: 10.9.0.0/24 } }
 //! machines:
-//!   web: { networks: { lan: 10 }, ports: [{ port: 80 }], docker: { image: nginx } }
+//!   web: { networks: { lan: 10 }, ports: { web: 80 }, app: { image: nginx } }
 //! ",
-//! )?;
-//! let env = Environment::build(&spec, Target::Kubernetes, None);
+//! )?);
+//! let env = Environment::build(&lab.for_target(Target::Kubernetes), Target::Kubernetes, None);
 //! let files = KubernetesBackend.render(&env)?;
 //! let manifests = files.iter().find(|f| f.path == ".isoloom/kubernetes/environment.yaml").ok_or("no manifests")?;
 //! assert!(manifests.contents.contains("kind: Deployment"));

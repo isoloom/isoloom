@@ -7,7 +7,7 @@ use std::path::Path;
 
 use isoloom_spec::defaults::{self, BUILTIN_REGIONS, Layer, apply_to_files, from_env, override_spec, resolve, set_region};
 use isoloom_spec::{Target, load, parse};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 fn yaml(text: &str) -> serde_yaml_ng::Value {
     serde_yaml_ng::from_str(text).unwrap()
@@ -68,14 +68,14 @@ fn sets_override_the_spec_before_it_is_parsed() {
     let out = override_spec(
         &text,
         &[
-            "machines.web.vm.os=ubuntu@24.04".into(),
+            "machines.web.os=ubuntu@24.04".into(),
             "networks.app.internet=true".into(),
             "defaults.cloud.aws.region=eu-west-1".into(),
         ],
     )
     .unwrap();
     let spec = parse(&out).unwrap();
-    assert_eq!(spec.machines["web"].vm.as_ref().unwrap().os, "ubuntu-24.04");
+    assert_eq!(spec.machines["web"].os.map(isoloom_spec::syntax::OsRef::name), Some("ubuntu-24.04"));
     assert!(spec.networks["app"].internet);
     // Without spec overrides the text is untouched (comments and all).
     assert_eq!(override_spec(&text, &["defaults.cloud.aws.region=eu-west-1".into()]).unwrap(), text);
@@ -83,8 +83,8 @@ fn sets_override_the_spec_before_it_is_parsed() {
 
 #[test]
 fn builtin_regions_are_what_the_generators_write_and_can_be_replaced() {
-    let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/solo-web")).unwrap();
-    let files = generate(&spec, Target::CloudVm).unwrap();
+    let lab = Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/solo-web")).unwrap());
+    let files = generate(&lab, Target::CloudVm).unwrap();
     for (cloud, region) in BUILTIN_REGIONS {
         let Some(f) = files.iter().find(|f| f.path == format!(".isoloom/cloud-vm/{cloud}/main.tf")) else {
             continue;

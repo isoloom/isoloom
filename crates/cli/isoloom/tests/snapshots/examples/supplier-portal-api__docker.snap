@@ -264,6 +264,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait
 # Checks: isoloom test docker (or: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check, and isoloom-check-<machine>)
 # Stop:   docker compose -f .isoloom/docker/compose.yml down -v
+# Secrets and inputs, delivered as files: set LAUNCH_TOKEN for `up` (each value, never in the file).
 
 name: supplier-portal-api
 services:
@@ -276,9 +277,12 @@ services:
         ipv4_address: 10.20.0.32
     environment:
       API_URL: ${API_URL:-}
-      LAUNCH_TOKEN: ${LAUNCH_TOKEN:-}
     volumes:
     - isoloom-probe-amd64:/.isoloom-probe:ro
+    secrets:
+    - source: input-launch-token
+      target: /run/lab/launch-token
+      mode: '0400'
     healthcheck:
       test:
       - CMD
@@ -312,9 +316,12 @@ services:
     network_mode: service:database
     environment:
       API_URL: ${API_URL:-}
-      LAUNCH_TOKEN: ${LAUNCH_TOKEN:-}
     volumes:
     - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro
+    secrets:
+    - source: input-launch-token
+      target: /run/lab/launch-token
+      mode: '0400'
     depends_on:
       database:
         condition: service_healthy
@@ -456,6 +463,9 @@ volumes:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
+secrets:
+  input-launch-token:
+    environment: LAUNCH_TOKEN
 
 ## .isoloom/docker/run.json
 {
@@ -561,7 +571,8 @@ volumes:
           "via": "env",
           "var": "API_URL",
           "steps": [
-            "up"
+            "up",
+            "start"
           ]
         }
       ]
@@ -580,7 +591,8 @@ volumes:
           "via": "env",
           "var": "LAUNCH_TOKEN",
           "steps": [
-            "up"
+            "up",
+            "start"
           ]
         }
       ]
@@ -853,8 +865,7 @@ volumes:
       "from": {
         "kind": "published_port",
         "machine": "web",
-        "port": 3206,
-        "protocol": "tcp"
+        "port": "portal"
       }
     }
   ],
@@ -1027,7 +1038,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "supplier-portal-api",
   "instance": null,
   "inputs": [
@@ -1064,18 +1075,15 @@ volumes:
       "docker_addresses": {
         "lab": "10.20.0.32"
       },
-      "ports": [
-        {
+      "ports": {
+        "mysql": {
           "port": 3207,
-          "name": "mysql",
-          "http": false,
-          "publish": null
+          "protocol": "tcp"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [
-        "API_URL",
-        "LAUNCH_TOKEN"
+        "API_URL"
       ],
       "volumes": {},
       "resources": {
@@ -1107,15 +1115,16 @@ volumes:
       "docker_addresses": {
         "lab": "10.20.0.31"
       },
-      "ports": [
-        {
+      "ports": {
+        "portal": {
           "port": 3206,
-          "name": "portal",
-          "http": true,
+          "protocol": "http",
           "publish": 3206,
+          "published": 3206,
+          "url": "http://127.0.0.1:3206/",
           "fixed": true
         }
-      ],
+      },
       "depends_on": [
         "database"
       ],
@@ -1152,7 +1161,9 @@ volumes:
   "published": [
     {
       "machine": "web",
+      "name": "portal",
       "port": 3206,
+      "protocol": "http",
       "host_port": 3206
     }
   ],
@@ -1182,7 +1193,7 @@ volumes:
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on database, web",
+      "external": "overrides.external.machines.database: the external target reaches machines that exist already, and `database` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

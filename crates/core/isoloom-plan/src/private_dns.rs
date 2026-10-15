@@ -74,10 +74,11 @@ mod tests {
     use super::*;
 
     fn spec(dns: &str) -> Spec {
-        isoloom_spec::parse(&format!(
-            "version: 1\nname: lab\n{dns}\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, aliases: [www], docker: {{ image: nginx }} }}\n  db: {{ networks: {{ lan: 20 }}, docker: {{ image: postgres }} }}\n  box: {{ docker: {{ image: alpine }} }}\n"
+        let source = isoloom_spec::parse(&format!(
+            "version: 1\nname: lab\n{dns}\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, aliases: [www], app: {{ image: nginx }} }}\n  db: {{ networks: {{ lan: 20 }}, app: {{ image: postgres }} }}\n  box: {{ app: {{ image: alpine }} }}\n"
         ))
-        .unwrap()
+        .unwrap();
+        crate::Lab::new(source).spec()
     }
 
     #[test]

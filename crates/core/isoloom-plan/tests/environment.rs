@@ -5,7 +5,7 @@
 use std::net::Ipv4Addr;
 
 use isoloom_plan::lifecycle::SharedRole;
-use isoloom_plan::{Capabilities, Environment, Feature, MachineShape, Requirement, Step, VolumeKind, refusal};
+use isoloom_plan::{Capabilities, Environment, Feature, Lab, MachineShape, Requirement, Step, VolumeKind, refusal};
 use isoloom_spec::model::Target;
 
 const SPEC: &str = r"
@@ -20,25 +20,37 @@ volumes:
   shared: { owner: db }
 machines:
   web:
+    os: debian@12
     networks: { front: 10 }
     aliases: [www]
     depends_on: [db]
-    ports: [{ port: 80, publish: 8080 }]
+    ports: { web: { port: 80, publish: 8080 } }
     volumes: { shared: /srv/data }
-    docker: { image: nginx }
-    vm: { os: debian@12, provision: [web.sh] }
+    app: { image: nginx, steps: [{ run: web.sh }] }
   db:
+    os: debian@12
     networks: { back: 20, front: 20 }
-    ports: [{ port: 5432 }]
+    ports: { postgres: 5432 }
     volumes: { shared: /var/data, own: /var/lib/db }
-    docker: { image: postgres }
-    vm: { os: debian@12, provision: [setup.sh] }
+    app: { image: postgres, steps: [{ run: setup.sh }] }
 ";
 
+/// The plan of `yaml` (the authored format) for `target`, the spec valid.
+fn plan(yaml: &str, target: Target) -> Environment {
+    let lab = Lab::new(isoloom_spec::parse(yaml).expect("parses"));
+    assert_eq!(lab.problems(), [], "valid");
+    Environment::build(&lab.for_target(target), target, None)
+}
+
+/// The plan of `yaml` for `target` even when validation would refuse it: what the plan asks of a
+/// backend, whatever else is wrong.
+fn plan_anyway(yaml: &str, target: Target) -> Environment {
+    let lab = Lab::new(isoloom_spec::parse(yaml).expect("parses"));
+    Environment::build(&lab.for_target(target), target, None)
+}
+
 fn env(target: Target) -> Environment {
-    let spec = isoloom_spec::parse(SPEC).expect("parses");
-    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-    Environment::build(&spec, target, None)
+    plan(SPEC, target)
 }
 
 #[test]
@@ -111,8 +123,7 @@ fn machines_start_after_what_they_wait_for() {
 
 #[test]
 fn a_backend_refuses_what_it_lacks_the_capability_for() {
-    let spec = isoloom_spec::parse(&format!("{SPEC}provision:\n  - ansible: site.yml\n")).expect("parses");
-    let env = Environment::build(&spec, Target::Docker, None);
+    let env = plan(&format!("{SPEC}provision:\n  - ansible: site.yml\n"), Target::Docker);
     assert_eq!(env.requirements, [Requirement::EnvironmentProvisioning, Requirement::MachineAliases]);
     let none = Capabilities::default();
     let why = refusal(&env.requirements, &none).expect("refused");
@@ -133,11 +144,10 @@ fn what_is_required_and_nothing_more_is_refused() {
 
 #[test]
 fn gateways_ulimits_and_tc_are_required_in_that_order() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: gw, tc: { delay: 50ms } }\nmachines:\n  gw:\n    networks: { lan: 1 }\n    docker: { image: alpine }\n  web:\n    networks: { lan: 10 }\n    ulimits: { nofile: 1024 }\n    docker: { image: nginx }\n",
-    )
-    .expect("parses");
-    let env = Environment::build(&spec, Target::Kubernetes, None);
+    let env = plan_anyway(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: gw, tc: { delay: 50ms } }\nmachines:\n  gw:\n    networks: { lan: 1 }\n    app: { image: alpine }\n  web:\n    networks: { lan: 10 }\n    ulimits: { nofile: 1024 }\n    app: { image: nginx }\n",
+        Target::Kubernetes,
+    );
     assert_eq!(
         env.requirements,
         [
@@ -152,17 +162,16 @@ fn gateways_ulimits_and_tc_are_required_in_that_order() {
 
 #[test]
 fn a_machine_process_is_required_and_planned_as_steps() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [web.sh] }\n    command: [serve]\n    before: [flag.sh]\n    healthcheck: { test: 'true', interval: 1m }\n",
-    )
-    .expect("parses");
-    let env = Environment::build(&spec, Target::Vagrant, None);
+    let env = plan(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: web.sh }] }\n    command: [serve]\n    setup: [seed.sh]\n    healthcheck: { test: 'true', interval: 1m }\n",
+        Target::Vagrant,
+    );
     assert_eq!(env.requirements, [Requirement::MachineProcess { machine: "web".into() }]);
     let why = refusal(&env.requirements, &Capabilities::default()).expect("refused");
     assert!(why.to_string().contains("an existing host runs what it already runs"), "{why}");
     let steps = &env.machines["web"].lifecycle;
     assert!(
-        steps.ends_with(&[Step::Before { paths: vec!["flag.sh".into()] }, Step::Command, Step::Ready]),
+        steps.ends_with(&[Step::Command, Step::Setup { paths: vec!["seed.sh".into()] }, Step::Ready]),
         "{steps:?}"
     );
     assert_eq!(env.machines["web"].process.health.as_ref().map(|h| h.interval), Some(60));
@@ -170,11 +179,10 @@ fn a_machine_process_is_required_and_planned_as_steps() {
 
 #[test]
 fn secrets_come_before_what_reads_them_on_linux_and_windows() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nsecrets:\n  db: { env: DB }\nmachines:\n  web:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [web.sh] }\n    files: [{ path: /etc/a, content: x }]\n    secrets: [db]\n    command: [serve]\n  win:\n    networks: { lan: 11 }\n    vm: { os: windows-server@2022 }\n    secrets: [db]\n",
-    )
-    .expect("parses");
-    let env = Environment::build(&spec, Target::Vagrant, None);
+    let env = plan(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nsecrets:\n  db: { env: DB }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: web.sh }] }\n    files: [{ path: /etc/a, content: x }, { path: /run/secrets/db, secret: db }]\n    command: [serve]\n  win:\n    os: windows-server@2022\n    networks: { lan: 11 }\n    files: [{ path: 'C:\\\\secrets\\\\db', secret: db }]\n",
+        Target::Vagrant,
+    );
     let steps = &env.machines["web"].lifecycle;
     let at = |want: fn(&Step) -> bool| steps.iter().position(want).expect("planned");
     let secrets = at(|s| *s == Step::Secrets);

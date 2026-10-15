@@ -22,7 +22,7 @@ pub fn requirements(machines: &IndexMap<String, MachinePlan>) -> Option<Requirem
 pub(crate) fn no_own_boot(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
     write!(
         f,
-        "machine `{machine}` boots its own way (`vm.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it"
+        "machine `{machine}` boots its own way (`hardware.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it"
     )
 }
 
@@ -46,24 +46,26 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use super::*;
-    use crate::Environment;
+    use crate::{Environment, Lab};
 
     const SPEC: &str = "
 version: 1
 name: t
 networks: { lan: { cidr: 10.0.0.0/24 } }
 machines:
-  web: { networks: { lan: 10 }, docker: { image: nginx }, vm: { os: debian@12, provision: [s.sh], boot: { order: [network, hd], network: { file: pxelinux.0 } } } }
+  web: { networks: { lan: 10 }, os: debian@12, hardware: { boot: { order: [network, hd], network: { file: pxelinux.0 } } }, app: { image: nginx, steps: [{ run: s.sh }] } }
 ";
 
     #[test]
     fn only_a_vm_requires_its_own_boot() {
-        let spec = isoloom_spec::parse(SPEC).unwrap();
-        let vm = Environment::build(&spec, Target::Vagrant, None);
+        let lab = Lab::new(isoloom_spec::parse(SPEC).unwrap());
+        let vm = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
         assert!(vm.requirements.contains(&Requirement::OwnBoot { machine: "web".into() }));
         assert_eq!(network_boots(&vm.machines)["lan"].file.as_deref(), Some("pxelinux.0"));
-        let container = Environment::build(&spec, Target::Docker, None);
-        assert!(!container.requirements.iter().any(|r| matches!(r, Requirement::OwnBoot { .. })));
-        assert!(network_boots(&container.machines).is_empty());
+        // A boot is VM-only hardware: the machine has no container form, so a container target
+        // refuses it at the field.
+        let refused = lab.refusal(Target::Docker).expect("a container target refuses it");
+        assert_eq!(refused.path.as_str(), "machines.web.hardware.boot");
+        assert!(lab.for_target(Target::Docker).machines["web"].docker.is_none());
     }
 }

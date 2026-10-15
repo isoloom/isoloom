@@ -16,20 +16,20 @@ networks:
 
 machines:
   web:
+    os: debian@12
     networks: { office: 10 }
     aliases: [www]
-    ports: [{ port: 80, http: true }]
-    docker: { image: "nginx:1.27" }
-    vm:
-      os: debian@12
-      provision: [provision/web.sh]
-  # A client: it reaches the web server by its names in the zone.
+    ports: { web: { port: 80, protocol: http } }
+    app:
+      image: "nginx:1.27"
+      steps: [{ run: provision/web.sh }]
+  # A client: it reaches the web server by its names in the zone. Debian with curl, built the
+  # same way as a container or a VM.
   client:
+    os: debian@12
     networks: { office: 20 }
-    docker: { image: "debian:12-slim", idle: true }
-    vm:
-      os: debian@12
-      provision: [provision/client.sh]
+    app:
+      steps: [{ run: provision/client.sh }]
 
 checks:
   - name: the web server answers at its alias in the private zone

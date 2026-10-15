@@ -225,39 +225,38 @@ pub(super) fn windows_healthy(env: &Environment, machine: &str) -> Option<String
 
 #[cfg(test)]
 mod tests {
-    use isoloom_plan::Environment;
-    use isoloom_plan::lifecycle::Step;
+    use isoloom_plan::{Environment, Lab, lifecycle::Step};
     use isoloom_spec::model::Target;
 
     const SPEC: &str = r"
 version: 1
 name: own-process
-inputs: [FLAG]
+inputs: { FLAG: { sensitive: false } }
 networks:
   lan: { cidr: 10.84.0.0/24 }
 machines:
   web:
     networks: { lan: 10 }
-    inputs: [FLAG]
-    environment: { MODE: lab }
-    ports: [{ port: 8000 }]
-    vm: { os: debian@12, provision: [setup.sh] }
-    command: [python3, -m, http.server, '8000']
-    working_dir: /srv/site
-    before: [flag.sh]
+    os: debian@12
+    environment: { MODE: lab, FLAG: { input: FLAG } }
+    ports: { web: 8000 }
+    app: { steps: [{ run: setup.sh }] }
+    command: { run: [python3, -m, http.server, '8000'], cwd: /srv/site }
+    setup: [flag.sh]
     healthcheck: { http: { port: 8000, path: /health }, interval: 2s, retries: 30, start_period: 0s }
   win:
     networks: { lan: 11 }
-    vm: { os: windows-server@2022, provision: [setup.ps1] }
+    os: windows-server@2022
+    app: { steps: [{ run: setup.ps1 }] }
     command: 'python -m http.server 80'
-    before: [flag.ps1]
+    setup: [flag.ps1]
     healthcheck: { test: [python, check.py] }
 ";
 
     fn env() -> Environment {
-        let spec = isoloom_spec::parse(SPEC).expect("the test spec parses");
-        assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-        Environment::build(&spec, Target::Vagrant, None)
+        let lab = Lab::parse(SPEC).expect("the test spec parses");
+        assert_eq!(lab.problems(), [], "the test spec is valid");
+        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)
     }
 
     fn step(env: &Environment, machine: &str, pick: impl Fn(&Step) -> bool) -> Step {
@@ -271,31 +270,34 @@ machines:
     }
 
     #[test]
-    fn the_before_steps_then_the_command_run_as_services() {
+    fn the_command_runs_as_a_service_and_the_setup_steps_once_after_it() {
         let env = env();
         let lifecycle = &env.machines["web"].lifecycle;
         let at = |s: &Step| lifecycle.iter().position(|x| x == s).expect("planned");
-        let before = step(&env, "web", |s| matches!(s, Step::Before { .. }));
-        assert!(at(&before) < at(&Step::Command) && at(&Step::Command) < at(&Step::Ready));
+        let setup = step(&env, "web", |s| matches!(s, Step::Setup { .. }));
+        assert!(at(&Step::Command) < at(&setup) && at(&setup) < at(&Step::Ready));
         assert!(
             lifecycle.contains(&Step::Inputs { persist: true }),
-            "the services read the inputs at every boot"
+            "the service reads the inputs at every boot"
         );
-        let sh = super::super::linux(&env, "web", &before).expect("renders");
+        let sh = super::super::linux(&env, "web", &setup).expect("renders");
         assert!(
             sh.contains(
                 "set -a; . /var/lib/isoloom/inputs.env; set +a\nexport MODE='lab'\nmkdir -p '/srv/site' && cd '/srv/site'\nsh '/opt/isoloom/flag.sh'\n"
             ),
             "{sh}"
         );
-        assert!(sh.contains("Type=oneshot") && sh.contains("systemctl restart isoloom-before.service"), "{sh}");
-        parses(&sh);
-        let sh = super::super::linux(&env, "web", &Step::Command).expect("renders");
         assert!(
-            sh.contains("exec 'python3' '-m' 'http.server' '8000'\n") && sh.contains("Requires=isoloom-before.service"),
-            "{sh}"
+            sh.starts_with("[ -f /var/lib/isoloom/setup.done ] || (\n") && sh.contains("touch /var/lib/isoloom/setup.done\n)"),
+            "once: {sh}"
         );
         parses(&sh);
+        let command = super::super::linux(&env, "web", &Step::Command).expect("renders");
+        assert!(
+            command.contains("exec 'python3' '-m' 'http.server' '8000'\n") && !command.contains("isoloom-before"),
+            "{command}"
+        );
+        parses(&command);
     }
 
     #[test]
@@ -309,21 +311,21 @@ machines:
     }
 
     #[test]
-    fn windows_runs_them_as_startup_tasks() {
+    fn windows_runs_the_command_as_a_startup_task_and_the_setup_once() {
         let env = env();
-        let before = step(&env, "win", |s| matches!(s, Step::Before { .. }));
-        let ps = super::super::windows(&env, "win", &before).expect("renders");
+        let setup = step(&env, "win", |s| matches!(s, Step::Setup { .. }));
+        let once = super::super::windows(&env, "win", &setup).expect("renders");
         assert!(
-            ps.contains("C:\\isoloom\\flag.ps1") && !ps.contains("Register-ScheduledTask"),
-            "the command's task runs it: {ps}"
+            once.contains("flag.ps1") && once.contains("C:\\isoloom\\setup.done") && !once.contains("Register-ScheduledTask"),
+            "run once, not a startup task: {once}"
         );
-        let ps = super::super::windows(&env, "win", &Step::Command).expect("renders");
+        let command = super::super::windows(&env, "win", &Step::Command).expect("renders");
         assert!(
-            ps.contains("before.ps1") && ps.contains("python -m http.server 80") && ps.contains("-TaskName 'isoloom-command'"),
-            "{ps}"
+            !command.contains("before.ps1") && command.contains("python -m http.server 80") && command.contains("-TaskName 'isoloom-command'"),
+            "{command}"
         );
-        let ps = super::super::windows(&env, "win", &Step::Ready).expect("renders");
-        assert!(ps.contains("& 'python' 'check.py' | Out-Null; $LASTEXITCODE -eq 0"), "{ps}");
-        assert!(ps.contains("Set-Content C:\\isoloom\\ready ready"), "{ps}");
+        let ready = super::super::windows(&env, "win", &Step::Ready).expect("renders");
+        assert!(ready.contains("& 'python' 'check.py' | Out-Null; $LASTEXITCODE -eq 0"), "{ready}");
+        assert!(ready.contains("Set-Content C:\\isoloom\\ready ready"), "{ready}");
     }
 }

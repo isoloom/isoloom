@@ -56,7 +56,7 @@ fn sysctls(m: &Machine, at: &dyn Fn(&str) -> String, p: &mut Problems) {
         } else if m.docker.is_some() && !CONTAINER_SYSCTLS.iter().any(|pre| k.starts_with(pre)) {
             p.add(
                 at(k),
-                "a container can only set the namespaced ones (net.*, kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*): leave `docker:` out to make the machine VM-only",
+                "a container can only set the namespaced ones (net.*, kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*): run it on a VM target, which sets any",
             );
         }
         if v.trim().is_empty() || v.contains('\n') {

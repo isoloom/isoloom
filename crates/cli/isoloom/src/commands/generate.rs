@@ -16,7 +16,7 @@ pub struct Args {
     /// it to the runner. See <https://www.isoloom.com/en/docs/images>
     #[arg(long, value_name = "FILE")]
     images: Option<PathBuf>,
-    /// Override a value for this command: `-s machines.web.vm.os=ubuntu@24.04` on the spec,
+    /// Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec,
     /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
     #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
     sets: Vec<String>,
@@ -25,16 +25,16 @@ pub struct Args {
 pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
     let dir = &a.dir;
     let target = spec::pinned(profile, dir, a.target.as_deref())?;
-    let (spec, settings) = spec::load_settings(profile, dir, a.images.as_deref(), &a.sets)?;
-    if spec::report_invalid(&spec) {
+    let (lab, settings) = spec::load_settings(profile, dir, a.images.as_deref(), &a.sets)?;
+    if spec::report_invalid(dir, &lab) {
         return Ok(ExitCode::FAILURE);
     }
     let (files, skipped) = match &target {
-        Some(id) => match isoloom_targets::generate(&spec, target::by_id(id)?) {
+        Some(id) => match isoloom_targets::generate(&lab, target::by_id(id)?) {
             Ok(f) => (f, vec![]),
             Err(e) => (vec![], vec![e]),
         },
-        None => isoloom_targets::generate_all(&spec),
+        None => isoloom_targets::generate_all(&lab),
     };
     let files = generated::finish(files, &settings.defaults, dir)?;
     for f in &files {

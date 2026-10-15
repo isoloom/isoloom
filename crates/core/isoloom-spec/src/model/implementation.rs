@@ -238,6 +238,7 @@ pub struct VmImage {
 pub struct Controller {
     /// The box to use instead of Isoloom's (Vagrant): a specific Ansible version, a mirror.
     #[serde(default)]
+    #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
     pub image: Option<VmImage>,
     /// CPUs, memory (and disk on Proxmox), for many forks against a large environment.
     #[serde(default)]

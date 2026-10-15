@@ -14,17 +14,17 @@ networks:
 
 machines:
   web:
+    os: debian@12
     networks: { app: 10 }
-    ports: [{ port: 80, http: true }]
+    ports: { web: { port: 80, protocol: http } }
     environment: { APP_MODE: production }
     sysctls: { net.core.somaxconn: 4096 }
     ulimits: { nofile: { soft: 8192, hard: 16384 } }
     disks: { cache: { size_gb: 50, fs: xfs, mount: /var/cache/web } }
-    docker: { image: "nginx:1.27-alpine" }
-    vm:
-      os: debian@12
-      provision: [provision/web.sh]
-      tpm: true
+    hardware: { tpm: required }
+    app:
+      image: "nginx:1.27-alpine"
+      steps: [{ run: provision/web.sh }]
 
 checks:
   - name: the machine's environment has APP_MODE

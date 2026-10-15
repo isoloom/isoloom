@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -392,7 +393,6 @@ resource "terraform_data" "guest" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.50 admin'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/guest.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -495,7 +495,6 @@ resource "terraform_data" "admin" {
       "IF=$(ip -o link | grep -i \"${lower(aws_network_interface.admin_office_vlan20.mac_address)}\" | awk -F': ' '{print $2}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q 10.70.20.50/ || sudo ip addr add 10.70.20.50/24 dev \"$IF\")",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.10 guest'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/guest.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -1085,7 +1084,6 @@ resource "terraform_data" "guest" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.50 admin'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/guest.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -1240,7 +1238,6 @@ resource "terraform_data" "admin" {
       "IF=$(ip -o link | grep -i \"${lower(replace(azurerm_network_interface.admin_office_vlan20.mac_address, "-", ":"))}\" | awk -F': ' '{print $2}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q 10.70.20.50/ || sudo ip addr add 10.70.20.50/24 dev \"$IF\")",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.10 guest'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/guest.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -2121,7 +2118,6 @@ resource "terraform_data" "guest" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.50 admin'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/guest.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -2220,7 +2216,6 @@ resource "terraform_data" "admin" {
       "IF=$(ip -o link | grep -i \"${"42:01:0a:46:14:32"}\" | awk -F': ' '{print $2}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q 10.70.20.50/ || sudo ip addr add 10.70.20.50/24 dev \"$IF\")",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.10 guest'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/guest.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -3241,7 +3236,6 @@ resource "terraform_data" "guest" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.50 admin'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/guest.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -3313,7 +3307,6 @@ resource "terraform_data" "admin" {
       "IF=$(ip -o link | grep -i \"${lower(data.oci_core_vnic.admin_office_vlan20.mac_address)}\" | awk -F': ' '{print $2}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q 10.70.20.50/ || sudo ip addr add 10.70.20.50/24 dev \"$IF\")",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.10 guest'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/guest.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }

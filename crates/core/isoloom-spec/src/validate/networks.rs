@@ -107,10 +107,7 @@ fn switch(spec: &Spec, lan: &str, sw: &str, switched: &[(&str, &str)], p: &mut P
         return false;
     };
     if !m.docker.as_ref().and_then(|d| d.appliance).is_some_and(crate::appliance::is_switch) {
-        p.add(
-            &at,
-            format!("`{sw}` isn't a switch: give it `docker.appliance: cisco-iol-l2` or `cisco-vios-l2`"),
-        );
+        p.add(&at, format!("`{sw}` isn't a switch: give it `app.appliance: cisco-iol-l2` or `cisco-vios-l2`"));
     }
     if let Some((other, _)) = switched.iter().find(|(_, s)| *s == sw) {
         p.add(&at, format!("`{sw}` already switches LAN `{other}`: a switch serves one LAN"));

@@ -7,8 +7,8 @@ use std::hint::black_box;
 use std::path::Path;
 
 use criterion::Criterion;
-use isoloom_spec::{Spec, Target};
-use isoloom_targets::{Environment, GENERATED_TARGETS, backend};
+use isoloom_spec::Target;
+use isoloom_targets::{Environment, GENERATED_TARGETS, Lab, backend};
 
 /// The examples measured: containers and VMs side by side (hello-stack), a router between three
 /// networks (segmented), Windows machines in a domain (corp-ad-basics).
@@ -18,21 +18,27 @@ const EXAMPLES: [&str; 3] = ["hello-stack", "segmented", "corp-ad-basics"];
 struct Example {
     name: &'static str,
     text: String,
-    spec: Spec,
+    lab: Lab,
     targets: Vec<Target>,
 }
 
 fn example(name: &'static str) -> Result<Example, String> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name).join("isoloom.yml");
     let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let spec = isoloom_spec::parse(&text).map_err(|e| format!("{name}: {e}"))?;
-    let targets = isoloom_spec::effective(&spec).into_iter().filter(|t| GENERATED_TARGETS.contains(t)).collect();
-    Ok(Example { name, text, spec, targets })
+    let lab = Lab::new(isoloom_spec::parse(&text).map_err(|e| format!("{name}: {e}"))?);
+    let targets = lab.possible().into_iter().filter(|t| GENERATED_TARGETS.contains(t)).collect();
+    Ok(Example { name, text, lab, targets })
 }
 
 fn measure(c: &mut Criterion, e: &Example) {
     c.bench_function(&format!("parse/{}", e.name), |b| b.iter(|| isoloom_spec::parse(black_box(&e.text))));
-    let lower = || e.targets.iter().map(|t| Environment::build(black_box(&e.spec), *t, None)).collect::<Vec<_>>();
+    // Lowering the authored spec for the target, then planning it.
+    let lower = || {
+        e.targets
+            .iter()
+            .map(|t| Environment::build(&black_box(&e.lab).for_target(*t), *t, None))
+            .collect::<Vec<_>>()
+    };
     c.bench_function(&format!("lower/{}", e.name), |b| b.iter(lower));
     let plans: Vec<(Target, Environment)> = e.targets.iter().copied().zip(lower()).collect();
     let render = || {

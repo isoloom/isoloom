@@ -5,18 +5,21 @@
 
 use std::path::Path;
 
-use isoloom_spec::{Target, groups, load, parse, validate};
-use isoloom_targets::generate;
+use isoloom_spec::{Target, groups, load, parse};
+use isoloom_targets::{Lab, generate};
 
 const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n";
 
 #[test]
 fn shared_fields_fold_into_machines_with_the_right_precedence() {
-    let spec = parse(&format!(
-        "{BASE}common:\n  resources: {{ cpus: 1, memory_mb: 512 }}\n  vm: {{ os: debian@12, provision: [base.sh] }}\ngroups:\n  servers:\n    members: [srv*, db]\n    resources: {{ memory_mb: 4096 }}\n  big:\n    members: [servers]\n    resources: {{ cpus: 8 }}\n  pinned:\n    members: [db]\n    vm: {{ os: ubuntu@24.04 }}\nmachines:\n  srv1: {{ networks: {{ lab: 11 }}, vm: {{}} }}\n  db: {{ networks: {{ lab: 12 }}, resources: {{ memory_mb: 8192 }}, vm: {{ provision: [p.sh] }} }}\n  user: {{ access: true, networks: {{ lab: 20 }} }}\n"
-    ))
-    .unwrap();
-    assert_eq!(validate(&spec), vec![]);
+    let lab = Lab::new(
+        parse(&format!(
+            "{BASE}common:\n  resources: {{ cpus: 1, memory_mb: 512 }}\n  os: debian@12\n  app: {{ steps: [{{ run: base.sh }}] }}\ngroups:\n  servers:\n    members: [srv*, db]\n    resources: {{ memory_mb: 4096 }}\n  big:\n    members: [servers]\n    resources: {{ cpus: 8 }}\n  pinned:\n    members: [db]\n    os: ubuntu@24.04\nmachines:\n  srv1: {{ networks: {{ lab: 11 }} }}\n  db: {{ networks: {{ lab: 12 }}, resources: {{ memory_mb: 8192 }}, app: {{ steps: [{{ run: p.sh }}] }} }}\n  user: {{ access: true, networks: {{ lab: 20 }} }}\n"
+        ))
+        .unwrap(),
+    );
+    assert_eq!(lab.problems(), vec![]);
+    let spec = lab.spec();
     // srv1: in `servers`, hence in `big` too: big's cpus, servers' memory, common's os and steps.
     let srv = &spec.machines["srv1"];
     assert_eq!(srv.resources.unwrap().cpus, Some(8));
@@ -30,8 +33,8 @@ fn shared_fields_fold_into_machines_with_the_right_precedence() {
     assert_eq!(db.resources.unwrap().cpus, Some(8));
     assert_eq!(db.vm.as_ref().unwrap().os, "ubuntu-24.04");
     assert_eq!(db.vm.as_ref().unwrap().provision, vec!["p.sh"]);
-    // The access machine declares no `vm:`, so common's `vm:` doesn't make it one.
-    assert!(spec.machines["user"].vm.is_none());
+    // `common:` reaches the access machine like any other: it is a Debian VM with the base step.
+    assert_eq!(spec.machines["user"].vm.as_ref().unwrap().os, "debian-12");
     assert_eq!(spec.machines["user"].resources.unwrap().cpus, Some(1));
     assert_eq!(groups::members(&spec, "big"), ["srv1", "db"]);
     assert_eq!(groups::members(&spec, "pinned"), ["db"]);
@@ -39,8 +42,14 @@ fn shared_fields_fold_into_machines_with_the_right_precedence() {
 
 #[test]
 fn group_problems_name_the_field() {
-    let p = |yaml: &str| -> Vec<String> { validate(&parse(yaml).unwrap()).into_iter().map(|p| p.to_string()).collect() };
-    let m = "machines:\n  a: { networks: { lab: 5 }, docker: { image: x } }\n";
+    let p = |yaml: &str| -> Vec<String> {
+        Lab::new(parse(yaml).unwrap())
+            .problems()
+            .iter()
+            .map(isoloom_spec::syntax::Problem::line)
+            .collect()
+    };
+    let m = "machines:\n  a: { networks: { lab: 5 }, app: { image: x } }\n";
     assert_eq!(
         p(&format!("{BASE}groups:\n  linux: {{ members: [a] }}\n{m}")),
         ["groups.linux: Isoloom fills this group itself; choose another name"]
@@ -58,25 +67,25 @@ fn group_problems_name_the_field() {
             .iter()
             .any(|e| e.contains("loop"))
     );
-    // A field a machine must own can't be shared: the schema says so at parse time.
+    // A field a machine must own can't be shared: parsing says so.
     let err = parse(&format!("{BASE}common: {{ networks: {{ lab: 5 }} }}\n{m}")).unwrap_err().to_string();
-    assert!(err.contains("unknown field `networks`"), "{err}");
+    assert!(err.contains("`networks` is each machine's own"), "{err}");
 }
 
 #[test]
 fn groups_become_inventory_groups_and_snapshot_entries() {
-    let ad = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/corp-ad-basics")).unwrap();
-    assert_eq!(ad.machines["dc01"].resources.unwrap().memory_mb, Some(4096));
-    assert_eq!(groups::members(&ad, "domain"), ["dc01", "ws-01", "ws-02"]);
+    let ad = Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/corp-ad-basics")).unwrap());
+    assert_eq!(ad.source().machines["dc01"].resources.unwrap().memory_mb, Some(4096));
+    assert_eq!(groups::members(&ad.spec(), "domain"), ["dc01", "ws-01", "ws-02"]);
     let r = isoloom_targets::resolved::resolve(&ad);
     assert_eq!(
         isoloom_targets::resolved::lookup(&r, "groups.domain").unwrap(),
         &serde_json::json!(["dc01", "ws-01", "ws-02"])
     );
-    // ansible-pair: `vm: {}` completed by common's os; the group lands in the inventory.
-    let pair = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/ansible-pair")).unwrap();
-    assert_eq!(pair.machines["web"].vm.as_ref().unwrap().os, "debian-12");
-    assert_eq!(pair.machines["cache"].resources.unwrap().memory_mb, Some(1024));
+    // ansible-pair: the machines' os from common's; the group lands in the inventory.
+    let pair = Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/ansible-pair")).unwrap());
+    assert_eq!(pair.spec().machines["web"].vm.as_ref().unwrap().os, "debian-12");
+    assert_eq!(pair.source().machines["cache"].resources.unwrap().memory_mb, Some(1024));
     let vf = generate(&pair, Target::Vagrant)
         .unwrap()
         .into_iter()

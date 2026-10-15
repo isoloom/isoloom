@@ -165,6 +165,13 @@ impl Problem {
         out
     }
 
+    /// The problem on one line, its field then its reason (`machines.web.app.build: a Dockerfile
+    /// builds a container only`): what a listing of targets shows.
+    #[must_use]
+    pub fn line(&self) -> String {
+        format!("{}: {}", self.path, self.reason)
+    }
+
     /// The top-level section the problem is in: `machines` for `machines.web.app`.
     #[must_use]
     pub fn section(&self) -> &str {

@@ -340,7 +340,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 name: shared-files
 services:
   writer:
-    image: alpine:3.20
+    image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     platform: linux/amd64
     entrypoint:
     - sleep
@@ -357,7 +357,7 @@ services:
       isoloom.environment: shared-files
     restart: unless-stopped
   writer-init-1:
-    image: alpine:3.20
+    image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     user: root
     entrypoint:
     - /bin/sh
@@ -375,7 +375,7 @@ services:
       isoloom.environment: shared-files
     restart: no
   reader:
-    image: alpine:3.20
+    image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     platform: linux/amd64
     entrypoint:
     - sleep
@@ -390,6 +390,23 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
     restart: unless-stopped
+  reader-init-1:
+    image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+    user: root
+    entrypoint:
+    - /bin/sh
+    - /isoloom/init/look.sh
+    network_mode: service:reader
+    volumes:
+    - ../../steps/look.sh:/isoloom/init/look.sh:ro
+    - shared:/data/shared
+    depends_on:
+      reader:
+        condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: shared-files
+    restart: no
   isoloom-check-writer:
     image: curlimages/curl:8.11.1
     profiles:
@@ -402,6 +419,8 @@ services:
     - ./checks/writer.sh:/isoloom/run.sh:ro
     depends_on:
       writer-init-1:
+        condition: service_completed_successfully
+      reader-init-1:
         condition: service_completed_successfully
       writer:
         condition: service_started
@@ -420,6 +439,8 @@ services:
     - ./checks/reader.sh:/isoloom/run.sh:ro
     depends_on:
       writer-init-1:
+        condition: service_completed_successfully
+      reader-init-1:
         condition: service_completed_successfully
       reader:
         condition: service_started
@@ -579,6 +600,15 @@ volumes:
       ]
     },
     {
+      "name": "reader-init-1",
+      "role": "job",
+      "of": "reader",
+      "addresses": {},
+      "native": {
+        "service": "reader-init-1"
+      }
+    },
+    {
       "name": "isoloom-check-writer",
       "role": "check",
       "of": "writer",
@@ -655,6 +685,26 @@ volumes:
           "--exit-code-from",
           "writer-init-1",
           "writer-init-1"
+        ],
+        "timeout_s": 600
+      },
+      {
+        "id": "job-reader-init-1",
+        "note": "Running reader's set-up script…",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "up",
+          "--no-deps",
+          "--exit-code-from",
+          "reader-init-1",
+          "reader-init-1"
         ],
         "timeout_s": 600
       }
@@ -775,6 +825,11 @@ volumes:
       "kind": "step_ok",
       "step": "job-writer-init-1",
       "means": "writer's set-up script (writer-init-1) exited 0"
+    },
+    {
+      "kind": "step_ok",
+      "step": "job-reader-init-1",
+      "means": "reader's set-up script (reader-init-1) exited 0"
     }
   ],
   "outputs": [],
@@ -952,7 +1007,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "shared-files",
   "instance": null,
   "inputs": [],
@@ -986,7 +1041,7 @@ volumes:
       "docker_addresses": {
         "app": "10.84.0.10"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {
@@ -1021,7 +1076,7 @@ volumes:
       "docker_addresses": {
         "app": "10.84.0.11"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {
@@ -1082,7 +1137,7 @@ volumes:
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on writer, reader",
+      "external": "overrides.external.machines.writer: the external target reaches machines that exist already, and `writer` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

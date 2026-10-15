@@ -13,66 +13,63 @@ for each item of a list.
 - [`reach`](#reach)
 - [`dns`](#dns)
 - [`secrets`](#secrets)
-- [`machines`](#machines)
-- [`machines.*.docker`](#machinesdocker)
-- [`machines.*.vm`](#machinesvm)
-- [`machines.*.external`](#machinesexternal)
-- [`cloud`](#cloud)
 - [`volumes`](#volumes)
-- [`constraints`](#constraints)
+- [`machines`](#machines)
 - [`provision`](#provision)
 - [`controller`](#controller)
 - [`checks`](#checks)
+- [`overrides`](#overrides)
 - [`tools`](#tools)
+- [`constraints`](#constraints)
+- [`cloud`](#cloud)
 
 ## Top level
 
 ### `version`
 
-The version of the `isoloom.yml` format the file is written in: `1`, the only one so far.
+The version of the `isoloom.yml` format the file is written in: `1`.
 
 - **Type:** integer
 - **Allowed:** `1`
 
 ### `name`
 
-The environment's id, in kebab case (`supplier-portal`): it names its containers, VMs, networks and cloud resources, and the environment in `isoloom status`.
+The environment's id, in kebab case (`supplier-portal`): it names its containers, VMs, networks and cloud resources.
 
 - **Type:** string
 - **Limits:** matches `^[a-z0-9]+(-[a-z0-9]+)*$`
 
 ### `inputs`
 
-Names of the values a runner provides at launch (a token, a licence key): from the environment of `isoloom run`, or a profile's `inputs`. A machine receives the ones its own `inputs` lists. Never baked into images.
+Values given at each start (a flag, a launch token): a list of names, or a map of name to `{ sensitive, description }`. An input is sensitive unless it says otherwise: it reaches a machine as a file (`files: [{ path, input }]`), never as an environment variable.
 
-- **Type:** list of strings
-- **Limits:** each item matches `^[A-Za-z_][A-Za-z0-9_]*$`
+- **Type:** list of strings or map of name to mapping
 
 ### `common`
 
-Machine fields shared by every machine (a machine's own value wins). `docker:` and `vm:` here only complete an implementation a machine declares itself.
+Machine fields every machine shares (a machine's own value wins).
 
 - **Type:** mapping
-- **Holds:** `arch`, `privileged`, `read_only`, `tmpfs`, `shm_size`, `dns`, `environment`, `sysctls`, `ulimits`, `inputs`, `resources`, `depends_on`, `volumes`, `docker`, `vm`, each as on a machine
+- **Holds:** `os`, `service`, `with`, `app`, `command`, `setup`, `healthcheck`, `depends_on`, `environment`, `files`, `volumes`, `disks`, `tmpfs`, `resources`, `hardware`, `dns`, `privileged`, `read_only`, `shm_size`, `sysctls`, `ulimits`, `rate_limit`, each as on a machine
 
 ### `groups`
 
-Named sets of machines sharing fields (over `common:`, under the machine's own; the most specific group wins). They also become Ansible inventory groups, and `isoloom exec` targets.
+Named sets of machines sharing fields, also Ansible inventory groups and `overrides` keys.
 
 - **Type:** map of name to mapping
-- **Holds:** `members`, `arch`, `privileged`, `read_only`, `tmpfs`, `shm_size`, `dns`, `environment`, `sysctls`, `ulimits`, `inputs`, `resources`, `depends_on`, `volumes`, `docker`, `vm`, each as on a machine
-
-### `targets`
-
-Narrows the targets derived from the implementations (e.g. not tested on Proxmox yet).
-
-- **Type:** list of strings
+- **Holds:** `os`, `service`, `with`, `app`, `command`, `setup`, `healthcheck`, `depends_on`, `environment`, `files`, `volumes`, `disks`, `tmpfs`, `resources`, `hardware`, `dns`, `privileged`, `read_only`, `shm_size`, `sysctls`, `ulimits`, `rate_limit`, `members`, each as on a machine
 
 ### `message`
 
-Shown once the environment is up (`isoloom run`, `isoloom message`): how to start, in Markdown. `{{ machines.web.addresses.front }}`-style placeholders take any value of the resolved snapshot (`isoloom inspect` shows the paths).
+Shown once the environment is up, in Markdown, with `{{ path }}` placeholders: `machines.<m>.ports.<name>.port`, `.published`, `.url`, `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`, each checked at validation.
 
 - **Type:** string
+
+### `targets`
+
+Narrows the targets the machines' forms allow.
+
+- **Type:** list of strings
 
 ## `networks`
 
@@ -102,19 +99,6 @@ Whether machines on it may reach the internet (default true).
 A machine of the environment that routes this network (an edge firewall): it takes the gateway address, and its own configuration decides what crosses it. Isoloom adds no router of its own here, so `reach` and `internet` on this network become expected behavior for the checks to verify.
 
 - **Type:** string
-
-### `networks.*.docker`
-
-How the Docker target lays this network out, when it differs from the other targets.
-
-- **Type:** mapping
-
-### `networks.*.docker.cidr`
-
-The block to use on Docker instead of `cidr` (same size, inside 10.0.0.0/8). Without it, a network outside 10.0.0.0/8 is moved into 10.0.0.0/8 automatically, since Docker's own pools, Docker Desktop and home networks use 172.16.0.0/12 and 192.168.0.0/16.
-
-- **Type:** string
-- **Limits:** matches `^10\.\d{1,3}\.\d{1,3}\.\d{1,3}/(2[4-9])$`
 
 ### `networks.*.vlans`
 
@@ -199,12 +183,6 @@ IPv6 only: the network carries no IPv4. Its `cidr` still numbers the machines (t
 
 - **Type:** boolean
 
-### `networks.*.external`
-
-An existing network, by its name on the target (a Docker network, a Proxmox bridge, an ESXi port group): the machines join it, and Isoloom never creates or deletes it. `cidr` is its block, and the machines keep fixed addresses in it.
-
-- **Type:** string
-
 ### `networks.*.bridged`
 
 Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed addresses in `cidr`, or DHCP from the LAN).
@@ -272,7 +250,7 @@ The destination ports allowed. Empty (the default): every port.
 
 ### `dns`
 
-The environment's names in a private DNS zone: off unless `private: true`. See `EnvironmentDns`.
+The environment's names in a private DNS zone: off unless `private: true`.
 
 - **Type:** mapping
 
@@ -292,7 +270,7 @@ The private zone's domain (`lab.internal`). By default `<name>.internal`, after 
 
 ### `secrets`
 
-Secrets, by kebab-case name: where `isoloom run` reads each value on the runner (`env`, `file`, `vault`, `sops`). A machine lists the ones it gets in its own `secrets`, as files. Values never reach a generated file, the resolved snapshot or a log.
+Secrets, by kebab-case name: the store each value is read from at each start (`env`, `file`, `vault`, `sops`). A machine gets one as a file (`files: [{ path, secret }]`).
 
 - **Type:** map of name to mapping
 
@@ -320,6 +298,26 @@ The secret's path in Vault and the field holding the value, as `<path>#<field>`,
 
 - **Type:** string
 
+## `volumes`
+
+### `volumes`
+
+Volumes shared between machines, by name: `{ owner, persistent }`.
+
+- **Type:** map of name to mapping
+
+### `volumes.*.owner`
+
+The machine that holds the data (serves it over NFS on the VM targets). Default: the first machine that mounts it.
+
+- **Type:** string
+
+### `volumes.*.persistent`
+
+Keep its data when the environment is torn down: `isoloom down` leaves it, and the next `run` finds it again; `isoloom down --volumes` removes it. Docker and Kubernetes; a VM's storage goes with the VM.
+
+- **Type:** boolean
+
 ## `machines`
 
 ### `machines`
@@ -329,130 +327,443 @@ The environment's machines, by name, started in the order written (after their `
 - **Type:** map of name to mapping
 - **Limits:** names match `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`
 
-### `machines.*.networks`
-
-Network name -> last octet of the machine's address on it. Every machine has one, but a LAN's `switch`, whose ports the LAN gives it. A list (`lan: [10, 11, 12]`) gives the machine several addresses on the network: the first is its primary one, the one its name resolves to, and the others are on the same interface.
-
-- **Type:** map of name to integer or list of integers
-
-### `machines.*.count`
-
-How many of this machine (2 to 99): clones named `<name>-01`, `<name>-02`, ..., each one address further along on every network. Where the spec names this machine, it means every clone. Expanded before anything else reads the spec.
-
-- **Type:** integer
-
-### `machines.*.aliases`
-
-More DNS names the machine answers to besides its own (a fully qualified name an application has baked in, like `api.example.com`), on every network it is on.
-
-- **Type:** list of strings
-
 ### `machines.*.os`
 
-The machine's OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default version (`debian` is `debian@12`). `vm.os` defaults to it, and a machine with neither `docker:` nor `vm:` runs as a VM of this OS (`vm: { os }`).
+The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default. Required, except for a machine whose only recipe is `app.image`, `app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has no container form in 1.0.
 
 - **Type:** string
 - **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
 
-### `machines.*.arch`
+### `machines.*.service`
 
-The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
+A catalogue service, `name[@version]` (`postgres@16`), or a list of them. Not with `app`.
 
-- **Type:** string
-- **Default:** `amd64`
-- **Allowed:**
-  - `amd64`: x86-64 (amd64), the default.
-  - `arm64`: 64-bit ARM (aarch64).
+- **Type:** string or list of strings
 
-### `machines.*.rate_limit`
+### `machines.*.with`
 
-A bandwidth cap on each of the machine's network links, in both directions, as `tc` writes a rate (`10mbit`, `512kbit`): a machine on a slow line, while `networks.*.tc` slows a whole network down on its router.
+The service's settings, from its entry's settings schema. Only with `service`.
 
-- **Type:** string
+- **Type:** mapping
 
-### `machines.*.privileged`
+### `machines.*.app`
 
-The machine needs kernel-level access (nested containers, loading kernel modules, raw devices). A container runs privileged; a VM already has it (its workload is root). VMs inside a VM need `nested_virtualization`.
+A custom app: its own image, its own Dockerfile, a network appliance, or portable steps. Not with `service`.
 
-- **Type:** boolean
-- **Default:** `false`
+- **Type:** mapping
 
-### `machines.*.nested_virtualization`
+### `machines.*.app.image`
 
-The machine runs VMs of its own: its VM gets the CPU's virtualization extensions (each hypervisor's nested virtualization). A VM only: a container can't, so the machine needs a `vm:`. Targets whose VMs can't nest refuse it.
-
-- **Type:** boolean
-
-### `machines.*.gpus`
-
-GPUs for the machine: a count (`1`), `all`, or `{ count, ids, driver, capabilities, options }`. A container gets the host's (Docker, Kubernetes); a VM gets them passed through (Proxmox, by `ids`) or sized with them (a cloud's GPU instance type). Other targets refuse it.
-
-- **Type:** integer or string or mapping
-
-### `machines.*.gpus.count`
-
-How many GPUs (a number, or `all`). Default: one, unless `ids` names them.
-
-- **Type:** integer or string
-
-### `machines.*.gpus.ids`
-
-Which GPUs, by the host's ids (a device index or UUID; a PCI address or a resource mapping on Proxmox). Not with `count`.
-
-- **Type:** list of strings
-
-### `machines.*.gpus.driver`
-
-The GPUs' vendor driver (`nvidia`, `amd`, `intel`). Default: `nvidia`.
+A published image, by tag or digest (`example/clamd:1.4`): the container form. Not with `build`.
 
 - **Type:** string
 
-### `machines.*.gpus.capabilities`
+### `machines.*.app.build`
 
-What the container may use the GPUs for (`compute`, `utility`, `video`, `graphics`).
+The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form; translating it to a VM is never attempted, so add `os` and `steps` for a VM form.
 
-- **Type:** list of strings
+- **Type:** string or mapping
 
-### `machines.*.gpus.options`
+### `machines.*.app.build.context`
 
-Options for the container runtime's GPU driver (Compose only).
+The build context: a folder of the project.
+
+- **Type:** string
+
+### `machines.*.app.build.dockerfile`
+
+The Dockerfile, anywhere in the project (default `<context>/Dockerfile`).
+
+- **Type:** string
+
+### `machines.*.app.build.target`
+
+The stage of a multi-stage Dockerfile to build, when not its last.
+
+- **Type:** string
+
+### `machines.*.app.build.args`
+
+Build arguments (the Dockerfile's `ARG`s), fixed values.
 
 - **Type:** map of name to string
 
-### `machines.*.devices`
+### `machines.*.app.steps`
 
-The host's devices given to the machine: `/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest, permissions }` (`r`, `w`, `m`). A container on the user's own Docker host only: a VM has its own devices (a GPU reaches a VM through `gpus`).
+Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's official image on containers, set-up steps on VMs. With `image` or `build`, the VM form's recipe.
 
 - **Type:** list of strings or mappings
 
-### `machines.*.devices[].host`
+### `machines.*.app.steps[].run`
 
-The device's path on the host.
-
-- **Type:** string
-
-### `machines.*.devices[].guest`
-
-Its path inside the machine. Default: the host's path.
+A project script (`.sh`; `.ps1` on Windows).
 
 - **Type:** string
 
-### `machines.*.devices[].permissions`
+### `machines.*.app.steps[].creates`
 
-`r`, `w` and `m`, in any combination. Default: `rwm`.
+With `run`: a path whose existence means the step already ran.
 
 - **Type:** string
 
-### `machines.*.read_only`
+### `machines.*.app.steps[].copy`
 
-The machine's root filesystem is read-only (hardening): nothing can be written outside its declared `volumes`. Applies to containers; a VM's root stays writable.
+A project file or folder copied into the machine.
+
+- **Type:** mapping
+
+### `machines.*.app.steps[].copy.from`
+
+A file or folder of the project (a folder ends with `/`).
+
+- **Type:** string
+
+### `machines.*.app.steps[].copy.to`
+
+Where it goes in the machine (absolute).
+
+- **Type:** string
+
+### `machines.*.app.steps[].copy.owner`
+
+The owner, a user name (default root).
+
+- **Type:** string
+
+### `machines.*.app.steps[].copy.mode`
+
+The mode, octal (default: as in the project).
+
+- **Type:** value
+- **Limits:** matches `^0?[0-7]{1,3}$`
+
+### `machines.*.app.steps[].packages`
+
+Packages to install with the OS's installer (`apt-get`, `apk`, `dnf`).
+
+- **Type:** list of strings
+
+### `machines.*.app.steps[].playbook`
+
+An Ansible playbook of the project, run in the machine (`ansible-playbook -c local`).
+
+- **Type:** string
+
+### `machines.*.app.appliance`
+
+A network appliance Isoloom wires (a router or switch OS in a container): with `image`, or `firmware` for `cisco-dynamips`.
+
+- **Type:** string
+- **Allowed:**
+  - `cisco-iol`: Cisco IOL (IOS on Linux, from Cisco Modeling Labs) as vrnetlab packages it (`vrnetlab/cisco_iol:<version>`): a router.
+  - `cisco-iol-l2`: Cisco IOL-L2 (`vrnetlab/cisco_iol:L2-<version>`): a switch.
+  - `cisco-vios`: Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router.
+  - `cisco-vios-l2`: Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch.
+  - `cisco-csr1000v`: Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm).
+  - `cisco-c8000v`: Cisco Catalyst 8000v (IOS XE) in QEMU (`vrnetlab/cisco_c8000v:<version>`, needs /dev/kvm).
+  - `cisco-dynamips`: A classic Cisco 7200 router emulated by Dynamips, booting the IOS `.bin` in `firmware`.
+
+### `machines.*.app.config`
+
+An appliance's own configuration (a project file), added to the one Isoloom generates.
+
+- **Type:** string
+
+### `machines.*.app.firmware`
+
+The firmware `cisco-dynamips` boots (the IOS `.bin`, a project file).
+
+- **Type:** string
+
+### `machines.*.networks`
+
+Network name → the last octet of the machine's address on it, or a list of them (the first is its primary address). Every machine has one, but a LAN's `switch`.
+
+- **Type:** map of name to integer or list of integers
+
+### `machines.*.aliases`
+
+More DNS names it answers to besides its own (`api.example.com`), on every network.
+
+- **Type:** list of strings
+
+### `machines.*.count`
+
+How many of this machine (2 to 99): clones `<name>-01`, `<name>-02`, ..., each one address further along on every network. Where the spec names this machine, it means every clone.
+
+- **Type:** integer
+
+### `machines.*.access`
+
+The machine the user lands on (at most one). Without `os`, the runner supplies it.
 
 - **Type:** boolean
 - **Default:** `false`
 
+### `machines.*.ports`
+
+Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant }`. Messages and checks reach them as `machines.<m>.ports.<name>.published`.
+
+- **Type:** map of name to integer or mapping
+
+### `machines.*.ports.*.port`
+
+The port the machine listens on (1 to 65535). On a catalogue service's machine, its entry gives it (change it through `with.port`).
+
+- **Type:** integer
+- **Limits:** from 1 to 65535
+
+### `machines.*.ports.*.protocol`
+
+`tcp` (the default), `udp`, or TCP that speaks `http`, `https` or `tls`: probes and derived checks speak it.
+
+- **Type:** string
+- **Default:** `tcp`
+- **Allowed:**
+  - `tcp`: TCP, the default: probed by connecting.
+  - `udp`: UDP (DNS, SNMP, TFTP): nothing waits for it and no derived check probes it.
+  - `http`: HTTP over TCP: derived checks request a page.
+  - `https`: HTTPS over TCP: derived checks request a page over TLS, certificates unchecked.
+  - `tls`: TLS over TCP (not HTTP): probes speak TLS, certificates unchecked.
+
+### `machines.*.ports.*.publish`
+
+Reachable from the user's machine (loopback only): `true` for a free host port (preferably the same number), a number for the preferred host port, or `{ host, fixed: true }` for that host port or nothing.
+
+- **Type:** boolean or integer or mapping
+
+### `machines.*.ports.*.publish.host`
+
+The host port.
+
+- **Type:** integer
+- **Limits:** from 1 to 65535
+
+### `machines.*.ports.*.publish.fixed`
+
+`true`: that port or nothing; `false` (the default): preferred.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `machines.*.ports.*.dormant`
+
+Only answers once something wakes it: nothing waits for it.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `machines.*.command`
+
+Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default: the image's own; an `os`-only or steps-only machine stays up idle. Not with `service`.
+
+- **Type:** string or list of strings or mapping
+
+### `machines.*.command.run`
+
+A text run by the shell, or a list of arguments run as they are.
+
+- **Type:** string or list of strings
+
+### `machines.*.command.cwd`
+
+The directory the command, the healthcheck and the `setup` scripts run in (absolute).
+
+- **Type:** string
+
+### `machines.*.setup`
+
+Project scripts run once, in order, once the machine is up (as root, with its network, volumes, files and privileges): `.sh`, or `.ps1` on Windows. A machine is ready once they have run.
+
+- **Type:** list of strings
+
+### `machines.*.healthcheck`
+
+When it counts as healthy beyond its ports answering: `{ test }` or `{ http: { port, path } }` (a port's name or number), with `interval`, `timeout`, `retries` and `start_period`.
+
+- **Type:** mapping
+
+### `machines.*.healthcheck.test`
+
+A command run inside the machine: healthy when it exits with 0 (exactly one of `test` and `http`).
+
+- **Type:** string or list of strings
+
+### `machines.*.healthcheck.http`
+
+A page the machine serves: healthy when it answers with a 2xx or 3xx status.
+
+- **Type:** mapping
+
+### `machines.*.healthcheck.http.port`
+
+The port it is served on: a declared port's name or a number.
+
+- **Type:** integer or string
+
+### `machines.*.healthcheck.http.path`
+
+The page's path. Default: `/`.
+
+- **Type:** string
+- **Default:** `/`
+
+### `machines.*.healthcheck.interval`
+
+The time between two tries (`5s`, `1m30s`). Default: 5s.
+
+- **Type:** string
+
+### `machines.*.healthcheck.timeout`
+
+How long one try may take. Default: 3s.
+
+- **Type:** string
+
+### `machines.*.healthcheck.retries`
+
+Failed tries in a row before the machine counts as unhealthy. Default: 60.
+
+- **Type:** integer
+
+### `machines.*.healthcheck.start_period`
+
+A grace period after start before the first try counts (`30s`). Default: 10s.
+
+- **Type:** string
+
+### `machines.*.depends_on`
+
+Machines that must be ready (ports answering, healthcheck passed, setup run) first.
+
+- **Type:** list of strings
+
+### `machines.*.environment`
+
+Environment variables: a text, a number or a boolean, or `{ input: NAME }` for a non-sensitive input. Secrets and sensitive inputs reach a machine as `files`.
+
+- **Type:** map of name to string or number or boolean or mapping
+
+### `machines.*.environment.*.input`
+
+A non-sensitive input, by name.
+
+- **Type:** string
+- **Limits:** matches `^(?!ISOLOOM_)[A-Za-z_][A-Za-z0-9_]*$`
+
+### `machines.*.environment.*.secret`
+
+Not allowed: a secret reaches a machine as a file (`files: [{ path, secret }]`).
+
+- **Type:** string
+
+### `machines.*.files`
+
+Files placed on the machine, each from a project `source`, inline `content`, an `input` or a `secret`, with its owner and mode.
+
+- **Type:** list of mappings
+
+### `machines.*.files[].path`
+
+Where the file goes: an absolute path (`/etc/app/app.ini`), or a drive path (`C:\app\flag.txt`) on Windows. Its folders are created when missing.
+
+- **Type:** string
+
+### `machines.*.files[].source`
+
+A file of the project to copy (`config/app.ini`). Exactly one of `source`, `content`, `input` and `secret`.
+
+- **Type:** string
+
+### `machines.*.files[].content`
+
+The file's text, written in the spec.
+
+- **Type:** string
+
+### `machines.*.files[].input`
+
+An input's name: the file holds its value, given at each start, before the machine's process starts. Never in a generated file, an image or an environment variable.
+
+- **Type:** string
+- **Limits:** matches `^(?!ISOLOOM_)[A-Za-z_][A-Za-z0-9_]*$`
+
+### `machines.*.files[].secret`
+
+A secret's name: the file holds its value, read from its store at each start.
+
+- **Type:** string
+
+### `machines.*.files[].uid`
+
+The user id that owns the file (default 0, root). Not on Windows.
+
+- **Type:** integer
+
+### `machines.*.files[].gid`
+
+The group id that owns the file (default 0, root). Not on Windows.
+
+- **Type:** integer
+
+### `machines.*.files[].mode`
+
+Its permissions in octal (`"0444"`): default `0644` for `source` and `content`, `0400` for `input` and `secret` (only root reads it; widen it for an app's own user). Not on Windows, where a value file is readable by SYSTEM and Administrators.
+
+- **Type:** value
+- **Limits:** matches `^0?[0-7]{1,3}$`
+
+### `machines.*.volumes`
+
+Data kept until the environment is destroyed: a name → an absolute path, or `{ path, subpath }` for one folder of a shared volume.
+
+- **Type:** map of name to string or mapping
+
+### `machines.*.volumes.*.path`
+
+The absolute path in the machine.
+
+- **Type:** string
+- **Limits:** matches `^/`
+
+### `machines.*.volumes.*.subpath`
+
+One folder of a shared volume (`www`, `logs/app`), relative to the volume's root, instead of all of it. Created when missing. The volume's owner holds all of it.
+
+- **Type:** string
+
+### `machines.*.disks`
+
+Data disks beside its own, by name: `{ size_gb, fs, mount }`.
+
+- **Type:** map of name to mapping
+
+### `machines.*.disks.*.size_gb`
+
+Its size in GB (1 to 16384).
+
+- **Type:** integer
+
+### `machines.*.disks.*.fs`
+
+Its filesystem: `ext4` (the default on Linux), `xfs`, `ntfs` (the default on Windows), or `raw` for a block device left unformatted.
+
+- **Type:** string
+- **Allowed:**
+  - `ext4`: Linux's usual filesystem.
+  - `xfs`: XFS, for large files.
+  - `ntfs`: Windows' filesystem.
+  - `raw`: No filesystem: a block device the machine formats or uses itself.
+
+### `machines.*.disks.*.mount`
+
+Where it is mounted: an absolute path on Linux and in containers, a drive letter (`E:`) on Windows. Required unless the disk is `raw`.
+
+- **Type:** string
+
 ### `machines.*.tmpfs`
 
-Memory-backed (tmpfs) mounts inside the machine, for scratch space that never touches disk: a path (`/tmp`), or a path with a size and a mode (`{ path: /run, size: 64m, mode: "1777" }`). A VM sets these up in its own provisioning (fstab).
+Memory-backed mounts: a path, or `{ path, size, mode }`.
 
 - **Type:** list of strings or mappings
 
@@ -474,15 +785,216 @@ Its permissions, in octal (`"1777"`, `"0700"`). Quote it: YAML reads `0700` unqu
 
 - **Type:** string
 
-### `machines.*.shm_size`
+### `machines.*.resources`
 
-The size of `/dev/shm` (shared memory), e.g. `256m` or `1g`, for workloads that need more than the small default (browsers, some databases). A VM sizes it in its own provisioning.
+CPUs, memory and disk (default 1, 1024 MB, 20 GB).
+
+- **Type:** mapping
+
+### `machines.*.resources.cpus`
+
+CPUs (default 1).
+
+- **Type:** integer
+
+### `machines.*.resources.memory_mb`
+
+Memory in MB (default 1024).
+
+- **Type:** integer
+
+### `machines.*.resources.disk_gb`
+
+Disk in GB, for a VM (default 20).
+
+- **Type:** integer
+
+### `machines.*.hardware`
+
+What it asks of the hardware: `arch`, `tpm`, `gpus`, `devices`, `nested_virtualization`, `boot`.
+
+- **Type:** mapping
+
+### `machines.*.hardware.arch`
+
+The CPU architecture: `amd64` (the default) or `arm64`.
+
+- **Type:** string
+- **Default:** `amd64`
+- **Allowed:**
+  - `amd64`: x86-64 (amd64), the default.
+  - `arm64`: 64-bit ARM (aarch64).
+
+### `machines.*.hardware.tpm`
+
+A virtual TPM 2.0: `auto` (the default: Windows 11 gets one where the target can), `required` (a VM only) or `none`.
+
+- **Type:** string
+- **Allowed:**
+  - `auto`: Windows 11 gets one wherever the target can give one, and runs without where it can't; every other OS gets none.
+  - `required`: The machine needs one: a target that gives none refuses it. A VM only.
+  - `none`: None, even on Windows 11.
+
+### `machines.*.hardware.gpus`
+
+GPUs: a count (`1`), `all`, or `{ count, ids, driver, capabilities, options }`. A container gets the host's; a VM gets them passed through or sized with them.
+
+- **Type:** integer or string or mapping
+
+### `machines.*.hardware.gpus.count`
+
+How many GPUs (a number, or `all`). Default: one, unless `ids` names them.
+
+- **Type:** integer or string
+
+### `machines.*.hardware.gpus.ids`
+
+Which GPUs, by the host's ids (a device index or UUID; a PCI address or a resource mapping on Proxmox). Not with `count`.
+
+- **Type:** list of strings
+
+### `machines.*.hardware.gpus.driver`
+
+The GPUs' vendor driver (`nvidia`, `amd`, `intel`). Default: `nvidia`.
+
+- **Type:** string
+
+### `machines.*.hardware.gpus.capabilities`
+
+What the container may use the GPUs for (`compute`, `utility`, `video`, `graphics`).
+
+- **Type:** list of strings
+
+### `machines.*.hardware.gpus.options`
+
+Options for the container runtime's GPU driver (Compose only).
+
+- **Type:** map of name to string
+
+### `machines.*.hardware.devices`
+
+The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest, permissions }`). A container only.
+
+- **Type:** list of strings or mappings
+
+### `machines.*.hardware.devices[].host`
+
+The device's path on the host.
+
+- **Type:** string
+
+### `machines.*.hardware.devices[].guest`
+
+Its path inside the machine. Default: the host's path.
+
+- **Type:** string
+
+### `machines.*.hardware.devices[].permissions`
+
+`r`, `w` and `m`, in any combination. Default: `rwm`.
+
+- **Type:** string
+
+### `machines.*.hardware.nested_virtualization`
+
+The machine runs VMs of its own: its VM gets the CPU's virtualization extensions. A VM only.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `machines.*.hardware.boot`
+
+How it boots, when not the way its image does: its own kernel, firmware, boot order or network boot. A VM only.
+
+- **Type:** mapping
+
+### `machines.*.hardware.boot.kernel`
+
+A kernel to boot directly, instead of the image's boot loader.
+
+- **Type:** string
+
+### `machines.*.hardware.boot.initrd`
+
+The initial RAM disk booted with `kernel`.
+
+- **Type:** string
+
+### `machines.*.hardware.boot.cmdline`
+
+The command line passed to `kernel` (`console=ttyS0 root=/dev/vda1`).
+
+- **Type:** string
+
+### `machines.*.hardware.boot.dtb`
+
+A device tree blob for `kernel` (ARM boards).
+
+- **Type:** string
+
+### `machines.*.hardware.boot.firmware`
+
+The firmware the VM boots through: `bios`, or `uefi` (on libvirt, with its file in `loader`; Proxmox and QEMU bring their own).
+
+- **Type:** string
+- **Allowed:**
+  - `bios`: A legacy BIOS (SeaBIOS).
+  - `uefi`: UEFI (OVMF).
+
+### `machines.*.hardware.boot.loader`
+
+A UEFI firmware file the VM boots through (OVMF's `OVMF_CODE.fd`).
+
+- **Type:** string
+
+### `machines.*.hardware.boot.nvram`
+
+The file that keeps the firmware's variables between boots (with `loader`).
+
+- **Type:** string
+
+### `machines.*.hardware.boot.firmware_format`
+
+The format of the UEFI firmware files the hypervisor loads: `raw` (QEMU's own, as Homebrew ships them) or `qcow2` (some distributions'). Vagrant's QEMU provider needs it to load them; libvirt reads the format from the file itself.
+
+- **Type:** string
+- **Allowed:**
+  - `raw`: A raw image (QEMU's `edk2-*-code.fd`).
+  - `qcow2`: A qcow2 image.
+
+### `machines.*.hardware.boot.order`
+
+The devices to boot from, in order (`[network, hd]` tries a network boot first).
+
+- **Type:** list of strings
+
+### `machines.*.hardware.boot.network`
+
+A network boot served on the machine's first network: its TFTP folder and the file DHCP hands out. `order` must list `network`.
+
+- **Type:** mapping
+
+### `machines.*.hardware.boot.network.tftp_root`
+
+The folder the network's TFTP server serves, on the hypervisor's host.
+
+- **Type:** string
+
+### `machines.*.hardware.boot.network.file`
+
+The boot file DHCP hands out (`pxelinux.0`), from the TFTP folder.
+
+- **Type:** string
+
+### `machines.*.hardware.boot.network.server`
+
+The address of the TFTP server holding `file`, when it isn't the host's own.
 
 - **Type:** string
 
 ### `machines.*.dns`
 
-How the machine resolves names: which DNS servers to use, search domains, and its own domain. Useful to point a Linux box at the lab's domain controller. A VM sets its resolver in its own provisioning (resolv.conf).
+How it resolves names: `servers` (addresses, or machines sharing a network), `search`, `domain`, `options`.
 
 - **Type:** mapping
 
@@ -510,21 +1022,35 @@ Resolver options, as resolv.conf's `options` line writes them: `name` or `name:v
 
 - **Type:** list of strings
 
-### `machines.*.environment`
+### `machines.*.privileged`
 
-Environment variables with fixed values: a container's environment; on a VM, every service's (systemd's default environment) and every login's (`/etc/environment`).
+Kernel-level access (nested containers, kernel modules, raw devices).
 
-- **Type:** map of name to string or number or boolean
+- **Type:** boolean
+- **Default:** `false`
+
+### `machines.*.read_only`
+
+A read-only root filesystem (containers).
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `machines.*.shm_size`
+
+The size of `/dev/shm` (`256m`, `1g`).
+
+- **Type:** string
 
 ### `machines.*.sysctls`
 
-Kernel parameters, e.g. `net.core.somaxconn: 1024`. A container can only set the ones the kernel keeps per network or IPC namespace (`net.*`, `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`); a VM sets any (`/etc/sysctl.d`).
+Kernel parameters (`net.core.somaxconn: 4096`).
 
 - **Type:** map of name to string or number or boolean
 
 ### `machines.*.ulimits`
 
-Process limits, by name (`nofile`, `nproc`, `memlock`...): one value for both, or `{ soft, hard }`. A container's ulimits; on a VM, every service's (systemd) and every login's (`limits.d`). Kubernetes has none per container.
+Process limits by name: one value, or `{ soft, hard }`.
 
 - **Type:** map of name to integer or mapping
 
@@ -540,849 +1066,17 @@ The ceiling a process may raise its soft limit to.
 
 - **Type:** integer
 
-### `machines.*.ports`
+### `machines.*.rate_limit`
 
-The ports the machine answers on, each with its protocol, an HTTP probe and whether it is published or dormant: what is published, opened by `reach`, waited for and checked.
+A bandwidth cap on each of its links, as `tc` writes a rate (`10mbit`).
 
-- **Type:** list of mappings
-
-### `machines.*.ports[].port`
-
-The port the machine listens on (what the other machines and the checks connect to).
-
-- **Type:** integer
-
-### `machines.*.ports[].name`
-
-A name for the port (`web`, `api`): how outputs and messages refer to it. Default: its port.
-
-- **Type:** string
-
-### `machines.*.ports[].http`
-
-It speaks HTTP: derived checks request a page instead of only connecting.
-
-- **Type:** boolean
-- **Default:** `false`
-
-### `machines.*.ports[].tls`
-
-It speaks TLS (HTTPS for an `http` port): probes and checks use TLS, certificates unchecked (lab services sign their own).
-
-- **Type:** boolean
-
-### `machines.*.ports[].publish`
-
-Reachable from the user's machine on this port (loopback only), besides the environment's own networks.
-
-- **Type:** integer
-
-### `machines.*.ports[].fixed`
-
-Keep `publish` as the host port on local Docker too (normally a free one is picked, so labs never collide): for apps whose pages call `localhost:<that port>` themselves. The environment can't start while another holds that port.
-
-- **Type:** boolean
-
-### `machines.*.ports[].dormant`
-
-Only answers later, once something wakes it (the bind shell an exploit opens): declared, published and opened by `reach` like any port, but nothing waits for it (healthcheck, readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.
-
-- **Type:** boolean
-
-### `machines.*.ports[].protocol`
-
-`tcp` (default) or `udp` (DNS, SNMP, TFTP, syslog): published, forwarded and opened as UDP. UDP has no handshake, so nothing waits for it (healthcheck, readiness probe, `depends_on`) and no derived check probes it: a check of your own says how (`exec: dig`). A port served over both is two entries, one per protocol.
-
-- **Type:** string
-- **Allowed:**
-  - `tcp`: TCP, the default.
-  - `udp`: UDP.
-
-### `machines.*.inputs`
-
-The spec's `inputs` this machine receives, by name: only these reach it.
-
-- **Type:** list of strings
-
-### `machines.*.secrets`
-
-The secrets this machine gets, as files (never environment variables): a name from the top-level `secrets` (`/run/secrets/<name>`), or `{ source, target, uid, gid, mode }`. Delivered by `isoloom run` when the machine starts.
-
-- **Type:** list of strings or mappings
-
-### `machines.*.secrets[].source`
-
-The secret, from the top-level `secrets`.
-
-- **Type:** string
-
-### `machines.*.secrets[].target`
-
-The file's path in the machine: absolute, or a name under `/run/secrets/`. Default: `/run/secrets/<source>`. On Windows, a drive path (`C:\app\db-password`) too; a path from `/` is on drive C: (`/run/secrets/db` is `C:\run\secrets\db`).
-
-- **Type:** string
-
-### `machines.*.secrets[].uid`
-
-The file's owner, a user id (default 0, root). Not on Windows, where the file is readable by SYSTEM and Administrators only.
-
-- **Type:** integer
-
-### `machines.*.secrets[].gid`
-
-The file's group, a group id (default 0, root).
-
-- **Type:** integer
-
-### `machines.*.secrets[].mode`
-
-The file's mode, in octal (`0440`, or `"0440"`). Default `0444` in a container (as Compose and Kubernetes do), `0400` on a Linux VM, whose other users shouldn't read it. Not on Windows.
-
-- **Type:** string or number or boolean
-
-### `machines.*.resources`
-
-CPUs, memory and disk for the machine (a VM's size, a container's limits). Default: 1 CPU, 1024 MB, 20 GB.
-
-- **Type:** mapping
-
-### `machines.*.resources.cpus`
-
-CPUs (default 1).
-
-- **Type:** integer
-
-### `machines.*.resources.memory_mb`
-
-Memory in MB (default 1024).
-
-- **Type:** integer
-
-### `machines.*.resources.disk_gb`
-
-Disk in GB, for a VM (default 20).
-
-- **Type:** integer
-
-### `machines.*.command`
-
-The machine's own command, instead of its image's (`CMD`; the image's entrypoint still runs it). A text runs in the shell, a list as it is. On a VM it runs as a service (systemd, OpenRC on Alpine; a startup task on Windows), restarted when it fails.
-
-- **Type:** string or list of strings
-
-### `machines.*.working_dir`
-
-The directory the command, the `before` steps and the healthcheck run in (an absolute path). Default: the image's `WORKDIR`; on a VM, the project folder (`/opt/isoloom`).
-
-- **Type:** string
-
-### `machines.*.before`
-
-Scripts in the project run inside the machine before its command, at every start, with its inputs and volumes (a per-player flag written where the app reads it). `.sh` (`.ps1` on a Windows VM). On a container they replace the image's entrypoint, so a container machine with `before` restates its whole process in `command`.
-
-- **Type:** list of strings
-
-### `machines.*.healthcheck`
-
-When the machine counts as healthy beyond its ports answering: a command or a page, with its pace. Checked beside the port probe, never instead of it.
-
-- **Type:** mapping
-
-### `machines.*.healthcheck.test`
-
-A command run inside the machine: healthy when it exits with 0 (exactly one of `test` and `http`). The image's or the VM's own tools run it (`pg_isready`, `redis-cli ping`).
-
-- **Type:** string or list of strings
-
-### `machines.*.healthcheck.http`
-
-A page the machine serves: healthy when it answers with a 2xx or 3xx status.
-
-- **Type:** mapping
-
-### `machines.*.healthcheck.http.port`
-
-The port the page is served on.
-
-- **Type:** integer
-
-### `machines.*.healthcheck.http.path`
-
-The page's path. Default: `/`.
-
-- **Type:** string
-- **Default:** `/`
-
-### `machines.*.healthcheck.interval`
-
-The time between two tries (`5s`, `1m`, `1m30s`). Default: 5s.
-
-- **Type:** string
-
-### `machines.*.healthcheck.timeout`
-
-How long one try may take before it counts as failed. Default: 3s.
-
-- **Type:** string
-
-### `machines.*.healthcheck.retries`
-
-Failed tries in a row before the machine counts as unhealthy (a VM's set-up then fails). Default: 60.
-
-- **Type:** integer
-
-### `machines.*.healthcheck.start_period`
-
-A grace period after start before the first try counts (`30s`). Default: 10s.
-
-- **Type:** string
-
-### `machines.*.depends_on`
-
-Machines that must be ready (their ports answering) before this one starts.
-
-- **Type:** list of strings
-
-### `machines.*.volumes`
-
-Data that survives restarts and re-creation of the machine, until the environment is destroyed: a name -> an absolute path in the machine. On the container targets a volume starts with the image's files at that path (Docker's named volumes; Kubernetes seeds its claim from the image while it is empty), so init jobs can add to them. A shared volume's user may take one folder of it: `{ path: /srv/www, subpath: www }`.
-
-- **Type:** map of name to string or mapping
-
-### `machines.*.volumes.*.path`
-
-The absolute path in the machine.
-
-- **Type:** string
-- **Limits:** matches `^/`
-
-### `machines.*.volumes.*.subpath`
-
-One folder of a shared volume (`www`, `logs/app`), relative to the volume's root, instead of all of it. Created when missing. The volume's owner holds all of it.
-
-- **Type:** string
-
-### `machines.*.files`
-
-Files placed at a path on the machine (a configuration the image doesn't carry), from the project or written inline, with their owner and mode: on every target.
-
-- **Type:** list of mappings
-
-### `machines.*.files[].path`
-
-Where the file goes in the machine: an absolute path (`/etc/app/app.ini`). Its folders are created when missing.
-
-- **Type:** string
-
-### `machines.*.files[].source`
-
-The file to copy, from the project folder (`config/app.ini`). Give this or `content`.
-
-- **Type:** string
-
-### `machines.*.files[].content`
-
-The file's text, written in the spec. Give this or `source`.
-
-- **Type:** string
-
-### `machines.*.files[].uid`
-
-The user id that owns the file (default 0, root). Linux machines only.
-
-- **Type:** integer
-
-### `machines.*.files[].gid`
-
-The group id that owns the file (default 0, root). Linux machines only.
-
-- **Type:** integer
-
-### `machines.*.files[].mode`
-
-The file's permissions, in octal (`0600`, `0755`; default `0644`), quoted or not: the digits are kept as written. Linux machines only.
-
-- **Type:** string or number or boolean
-
-### `machines.*.disks`
-
-Data disks beside the machine's own, by name (kebab-case, at most 12 characters: the filesystem's label): `{ size_gb: 50, fs: xfs, mount: /data }`. A VM gets an empty disk of that size, formatted and mounted at boot; a container gets a volume at the mount. The disks go with the machine.
-
-- **Type:** map of name to mapping
-
-### `machines.*.disks.*.size_gb`
-
-Its size in GB (1 to 16384).
-
-- **Type:** integer
-
-### `machines.*.disks.*.fs`
-
-Its filesystem: `ext4` (the default on Linux), `xfs`, `ntfs` (the default on Windows), or `raw` for a block device left unformatted.
-
-- **Type:** string
-- **Allowed:**
-  - `ext4`: Linux's usual filesystem.
-  - `xfs`: XFS, for large files.
-  - `ntfs`: Windows' filesystem.
-  - `raw`: No filesystem: a block device the machine formats or uses itself.
-
-### `machines.*.disks.*.mount`
-
-Where it is mounted: an absolute path on Linux and in containers, a drive letter (`E:`) on Windows. Required unless the disk is `raw`.
-
-- **Type:** string
-
-### `machines.*.access`
-
-The machine the user lands on. It may have no implementation: the runner supplies it.
-
-- **Type:** boolean
-- **Default:** `false`
-
-## `machines.*.docker`
-
-### `machines.*.docker`
-
-How a container produces this machine: an image or a build, and what only a container has (init jobs, appliances). A machine with `docker:` can run on the container targets.
-
-- **Type:** mapping
-
-### `machines.*.docker.image`
-
-A published image (exactly one of `image` and `build`).
-
-- **Type:** string
-
-### `machines.*.docker.build`
-
-A folder of the project, built into the machine's image as its build context (exactly one of `image` and `build`).
-
-- **Type:** string
-
-### `machines.*.docker.dockerfile`
-
-The Dockerfile, a file anywhere in the project (default: `Dockerfile` in `build`): an image of your own around a vendored project's source, without moving that source.
-
-- **Type:** string
-
-### `machines.*.docker.target`
-
-The stage of a multi-stage Dockerfile to build (`FROM ... AS <target>`), when not its last: the lab's image beside the release one, from one Dockerfile.
-
-- **Type:** string
-
-### `machines.*.docker.args`
-
-Build arguments (`ARG`s of the Dockerfile), fixed values.
-
-- **Type:** map of name to string
-
-### `machines.*.docker.init`
-
-One-shot jobs (scripts or folders in the project) run before the machine counts as ready.
-
-- **Type:** list of strings
-
-### `machines.*.docker.idle`
-
-The image runs no service of its own (a stock Linux image whose command is a shell that exits at once): keep the container running idle, as a machine to work from.
-
-- **Type:** boolean
-- **Default:** `false`
-
-### `machines.*.docker.appliance`
-
-The image is a network appliance Isoloom knows how to wire (a router or switch OS in a container): its management port, interface order and startup configuration are set the way the image expects, its addresses go into that configuration. Docker only.
-
-- **Type:** string
-- **Allowed:**
-  - `cisco-iol`: Cisco IOL (IOS on Linux, from Cisco Modeling Labs) as vrnetlab packages it (`vrnetlab/cisco_iol:<version>`): a router.
-  - `cisco-iol-l2`: Cisco IOL-L2 (`vrnetlab/cisco_iol:L2-<version>`): a switch.
-  - `cisco-vios`: Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router.
-  - `cisco-vios-l2`: Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch.
-  - `cisco-csr1000v`: Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm).
-  - `cisco-c8000v`: Cisco Catalyst 8000v (IOS XE) in QEMU (`vrnetlab/cisco_c8000v:<version>`, needs /dev/kvm).
-  - `cisco-dynamips`: A classic Cisco 7200 router emulated by Dynamips, booting the IOS `.bin` in `firmware`.
-
-### `machines.*.docker.config`
-
-An appliance's own configuration (a file in the project), added to the one Isoloom generates (hostname, credentials, interfaces and their addresses).
-
-- **Type:** string
-
-### `machines.*.docker.firmware`
-
-The firmware an emulator boots (a file in the project): the IOS `.bin` of a Dynamips router. Isoloom builds the emulator's container itself, so no `image` then.
-
-- **Type:** string
-
-### `machines.*.docker.lxc`
-
-On Proxmox, a machine with no `vm:` may run as an LXC container from its `image` (an OCI image, Proxmox VE 9.1 or later) instead of ruling the `proxmox` target out. Opt-in: an LXC container is no Docker container (no Docker runtime, no healthcheck, no named volumes), so the author says the image runs as one. Ignored by every other target.
-
-- **Type:** boolean
-
-## `machines.*.vm`
-
-### `machines.*.vm`
-
-How a VM produces this machine (services installed natively, no Docker inside).
-
-- **Type:** mapping
-
-### `machines.*.vm.os`
-
-The OS, as `<family>@<version>` (`debian@12`) or a family alone for its pinned default; each target maps it to an image. Once parsed, it holds the image table's name for the OS (`KNOWN_OS`, see `crate::os::canonical`). Defaults to the machine's `os`, which it must agree with when both are set. May come from `common:` or a group (`vm: {}` in the machine).
-
-- **Type:** string
-- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
-
-### `machines.*.vm.provision`
-
-Steps run inside the VM, in order: `.sh` on Linux (and Ansible playbooks, `.yml`), `.ps1` on Windows. On Linux, the step `reboot` restarts the machine and goes on with the next step once it is back (a new kernel, a changed boot configuration).
-
-- **Type:** list of strings
-
-### `machines.*.vm.image`
-
-The image to use instead of the built-in one for `os`, per target.
-
-- **Type:** mapping
-
-### `machines.*.vm.image.vagrant`
-
-A Vagrant box name (e.g. `StefanScherer/windows_2019`).
-
-- **Type:** string
-
-### `machines.*.vm.image.vagrant_version`
-
-The box version to pin.
-
-- **Type:** string
-
-### `machines.*.vm.image.qemu`
-
-The box Vagrant's QEMU provider boots instead (libvirt format), when `vagrant` has none (e.g. `peru/windows-server-2019-standard-x64-eval`).
-
-- **Type:** string
-
-### `machines.*.vm.image.hyperv`
-
-The box Vagrant's Hyper-V provider boots instead, when `vagrant` has no Hyper-V build (its latest version that has one).
-
-- **Type:** string
-
-### `machines.*.vm.image.winrm`
-
-How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
-
-- **Type:** string
-- **Allowed:**
-  - `plaintext`: HTTP on 5985, basic auth (the default for the common Windows boxes).
-  - `ssl`: HTTPS on 5986, NTLM (certificate not verified).
-
-### `machines.*.vm.image.winssh`
-
-This Windows box answers OpenSSH (Windows' own `sshd`, PowerShell as its shell) instead of WinRM: Vagrant connects with `config.winssh` and the playbooks over SSH, as the box's `vagrant` account. Not with `winrm`.
-
-- **Type:** boolean
-
-### `machines.*.vm.image.box_url`
-
-Where Vagrant downloads the `vagrant` box from, when it isn't on Vagrant Cloud: a URL, or a `.box` file in the project (list its folder in `.isoloomignore`, or the project copied into every VM carries it).
-
-- **Type:** string
-
-### `machines.*.vm.image.box_server_url`
-
-The box server Vagrant looks the `vagrant` box up on, instead of Vagrant Cloud (a private registry).
-
-- **Type:** string
-
-### `machines.*.vm.image.proxmox`
-
-The Proxmox image: a cloud image's URL (the server downloads it), or the id of a template VM on the node (cloned).
-
-- **Type:** string
-
-### `machines.*.vm.image.aws`
-
-The AWS image: an AMI id (`ami-0123...`) in the module's region.
-
-- **Type:** string
-
-### `machines.*.vm.image.azure`
-
-The Azure image: a managed image's or gallery image version's resource id.
-
-- **Type:** string
-
-### `machines.*.vm.image.gcp`
-
-The Google Cloud image: `projects/<project>/global/images/<image>` (or `.../family/<f>`).
-
-- **Type:** string
-
-### `machines.*.vm.image.digitalocean`
-
-The DigitalOcean image: a slug or a custom image's id.
-
-- **Type:** string
-
-### `machines.*.vm.image.linode`
-
-The Linode image: `linode/<distribution>` or `private/<id>`.
-
-- **Type:** string
-
-### `machines.*.vm.image.oci`
-
-The Oracle Cloud image: its OCID (`ocid1.image...`).
-
-- **Type:** string
-
-### `machines.*.vm.tpm`
-
-A virtual TPM 2.0 (BitLocker, Windows Hello, measured boot). Unset, a Windows 11 machine gets one wherever the target can give one, and runs without where it can't (its built-in images install without one). `true` requires one: a target that gives none refuses the environment. `false` gives none.
-
-- **Type:** boolean
-
-### `machines.*.vm.boot`
-
-How it boots, when not the way its image does: its own kernel, firmware, boot order or network boot.
-
-- **Type:** mapping
-
-### `machines.*.vm.boot.kernel`
-
-A kernel to boot directly, instead of the image's boot loader.
-
-- **Type:** string
-
-### `machines.*.vm.boot.initrd`
-
-The initial RAM disk booted with `kernel`.
-
-- **Type:** string
-
-### `machines.*.vm.boot.cmdline`
-
-The command line passed to `kernel` (`console=ttyS0 root=/dev/vda1`).
-
-- **Type:** string
-
-### `machines.*.vm.boot.dtb`
-
-A device tree blob for `kernel` (ARM boards).
-
-- **Type:** string
-
-### `machines.*.vm.boot.firmware`
-
-The firmware the VM boots through: `bios`, or `uefi` (on libvirt, with its file in `loader`; Proxmox and QEMU bring their own).
-
-- **Type:** string
-- **Allowed:**
-  - `bios`: A legacy BIOS (SeaBIOS).
-  - `uefi`: UEFI (OVMF).
-
-### `machines.*.vm.boot.loader`
-
-A UEFI firmware file the VM boots through (OVMF's `OVMF_CODE.fd`).
-
-- **Type:** string
-
-### `machines.*.vm.boot.nvram`
-
-The file that keeps the firmware's variables between boots (with `loader`).
-
-- **Type:** string
-
-### `machines.*.vm.boot.firmware_format`
-
-The format of the UEFI firmware files the hypervisor loads: `raw` (QEMU's own, as Homebrew ships them) or `qcow2` (some distributions'). Vagrant's QEMU provider needs it to load them; libvirt reads the format from the file itself.
-
-- **Type:** string
-- **Allowed:**
-  - `raw`: A raw image (QEMU's `edk2-*-code.fd`).
-  - `qcow2`: A qcow2 image.
-
-### `machines.*.vm.boot.order`
-
-The devices to boot from, in order (`[network, hd]` tries a network boot first).
-
-- **Type:** list of strings
-
-### `machines.*.vm.boot.network`
-
-A network boot served on the machine's first network: its TFTP folder and the file DHCP hands out. `order` must list `network`.
-
-- **Type:** mapping
-
-### `machines.*.vm.boot.network.tftp_root`
-
-The folder the network's TFTP server serves, on the hypervisor's host.
-
-- **Type:** string
-
-### `machines.*.vm.boot.network.file`
-
-The boot file DHCP hands out (`pxelinux.0`), from the TFTP folder.
-
-- **Type:** string
-
-### `machines.*.vm.boot.network.server`
-
-The address of the TFTP server holding `file`, when it isn't the host's own.
-
-- **Type:** string
-
-## `machines.*.external`
-
-### `machines.*.external`
-
-Where this machine already exists (the `external` target): Isoloom creates nothing and reaches it over SSH to provision, check and connect.
-
-- **Type:** mapping
-
-### `machines.*.external.address`
-
-An address or hostname reachable from where Isoloom runs.
-
-- **Type:** string
-
-### `machines.*.external.user`
-
-The SSH user (default `root`).
-
-- **Type:** string
-
-### `machines.*.external.port`
-
-The SSH port (default 22).
-
-- **Type:** integer
-
-### `machines.*.external.key`
-
-A private key file (default: the SSH agent and config).
-
-- **Type:** string
-
-## `cloud`
-
-### `cloud`
-
-An environment of cloud services rather than machines (IAM users and roles, functions, buckets, queues...): a Terraform module in the project, applied into the user's own cloud account. A spec has either `cloud:` or machines.
-
-- **Type:** mapping
-
-### `cloud.provider`
-
-The cloud the module deploys into (its credentials come from the environment, as Terraform expects).
-
-- **Type:** string
-- **Allowed:**
-  - `aws`: Amazon Web Services.
-  - `azure`: Microsoft Azure.
-  - `gcp`: Google Cloud.
-
-### `cloud.terraform`
-
-A Terraform root module in the project (a folder holding `.tf` files), used as is.
-
-- **Type:** string
-
-### `cloud.vars`
-
-The module's variables: any value (a string, number, boolean, list or map). A string holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list: required at `run`, kept for `down`.
-
-- **Type:** mapping
-
-### `cloud.outputs`
-
-What the environment exposes, by name: a module output each. Checks and the message use them as `{{ cloud.outputs.<name> }}`.
-
-- **Type:** map of name to string
-
-### `cloud.hourly_usd`
-
-About what the environment costs per hour while it exists, in US dollars: the author's estimate, for whoever runs it. `isoloom run` says it before applying, and the resolved snapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a budget. Isoloom doesn't bill or stop anything by it.
-
-- **Type:** number
-
-### `cloud.before`
-
-Steps run on this machine before Terraform applies the module (a key pair the module reads, a build): scripts in the project, run in order from the module's copy, with the spec's inputs and `env` in their environment. They run at every `run`: make them idempotent.
-
-- **Type:** list of strings
-
-### `cloud.env`
-
-Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`). Not for credentials: those come from the user's own environment.
-
-- **Type:** map of name to string
-
-### `cloud.apply_retries`
-
-How many times to apply again when an apply fails (a module that only converges on a second apply), 0 to 5. 0 by default.
-
-- **Type:** integer
-
-### `cloud.requires`
-
-What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`) that must be on the PATH, or a shell command that must succeed (`python3 -c 'import boto3'`). `isoloom doctor` and `isoloom run` check them.
-
-- **Type:** list of strings
-
-## `volumes`
-
-### `volumes`
-
-Volumes shared between machines: a machine volume with one of these names is this volume, wherever it mounts it. One declared here can also outlive `isoloom down` (`persistent: true`) or be one that exists already (`external: <name>`).
-
-- **Type:** map of name to mapping
-
-### `volumes.*.owner`
-
-The machine that holds the data (serves it over NFS on the VM targets). Default: the first machine that mounts it.
-
-- **Type:** string
-
-### `volumes.*.persistent`
-
-Keep its data when the environment is torn down: `isoloom down` leaves it, and the next `run` finds it again; `isoloom down --volumes` removes it. Docker and Kubernetes; a VM's storage goes with the VM.
-
-- **Type:** boolean
-
-### `volumes.*.external`
-
-An existing volume, by its name on the platform (a Docker volume, a Kubernetes claim in the environment's namespace): Isoloom mounts it and never creates or removes it.
-
-- **Type:** string
-
-### `volumes.*.virtiofs`
-
-On Proxmox, the volume as a folder of the server, shared into each VM that mounts it (virtiofs) instead of over NFS from its owner: `virtiofs: {}` takes the defaults. Every other target ignores it.
-
-- **Type:** mapping
-
-### `volumes.*.virtiofs.mapping`
-
-An existing directory mapping of the cluster, by its id (Datacenter, Resource Mappings, Directory mappings). By default Isoloom creates one, `iso<slot>-<volume>`, for the folder `<virtiofs_root>/<environment>/<volume>` on the node.
-
-- **Type:** string
-
-### `volumes.*.virtiofs.cache`
-
-How the guests cache the folder: `auto` (the default: metadata kept a short while, so another VM's changes show within a second), `always`, `metadata` or `never` (every access goes to the server: slowest, always current).
-
-- **Type:** string
-- **Allowed:**
-  - `auto`: Metadata and lookups kept a short while, or until they change: Proxmox's default.
-  - `always`: Everything kept: fastest, but another VM's changes may not show.
-  - `metadata`: Metadata kept, data read each time.
-  - `never`: Nothing kept: every access goes to the server.
-
-### `volumes.*.virtiofs.direct_io`
-
-Reads and writes that bypass the guest's page cache when a program asks for it (`O_DIRECT`), for databases that manage their own cache. Off by default.
-
-- **Type:** boolean
-
-### `volumes.*.virtiofs.xattr`
-
-Pass extended attributes through (SELinux labels, file capabilities). Off by default.
-
-- **Type:** boolean
-
-### `volumes.*.virtiofs.acl`
-
-Pass POSIX ACLs through (`setfacl`), which implies `xattr`. Off by default.
-
-- **Type:** boolean
-
-## `constraints`
-
-### `constraints`
-
-What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time servers. Usually set by a profile, one customer's network at a time.
-
-- **Type:** mapping
-
-### `constraints.proxy`
-
-The HTTP proxy outbound traffic goes through: set for the machines' containers (and their builds) and on every Linux VM (shell, apt, dnf, Docker), never for Isoloom's own checks.
-
-- **Type:** mapping
-
-### `constraints.proxy.http`
-
-The proxy for `http://` URLs, e.g. `http://proxy.corp:3128`.
-
-- **Type:** string
-
-### `constraints.proxy.https`
-
-The proxy for `https://` URLs (default: `http`'s).
-
-- **Type:** string
-
-### `constraints.proxy.no_proxy`
-
-Names, domains (`.corp`) and blocks reached directly. The environment's own machine names and network blocks, and localhost, are always added.
-
-- **Type:** list of strings
-
-### `constraints.registries`
-
-Registry mirrors, by the registry they stand for: `docker.io: registry.corp/dockerhub` pulls `redis:7` as `registry.corp/dockerhub/library/redis:7`. Every image of the environment is rewritten, Isoloom's own included; images built from the project aren't pulled, so they stay as they are (their `FROM` lines are the Dockerfile's business).
-
-- **Type:** map of name to string
-
-### `constraints.mirrors`
-
-Package mirrors the machines install from instead of the public archives: apt's for Debian and Ubuntu VMs, and a Python package index.
-
-- **Type:** mapping
-
-### `constraints.mirrors.debian`
-
-Replaces `deb.debian.org/debian` in the Debian VMs' apt sources (`debian-security`, a separate archive, is left as it is).
-
 - **Type:** string
-
-### `constraints.mirrors.ubuntu`
-
-Replaces `archive.ubuntu.com/ubuntu` (and its country and security hosts) in the Ubuntu VMs' apt sources.
-
-- **Type:** string
-
-### `constraints.mirrors.pypi`
-
-A Python package index: `PIP_INDEX_URL` for the machines, `/etc/pip.conf` on the VMs.
-
-- **Type:** string
-
-### `constraints.mirrors.npm`
-
-An npm registry: `NPM_CONFIG_REGISTRY` for the machines, `/etc/npmrc` on the VMs.
-
-- **Type:** string
-
-### `constraints.ntp`
-
-The time servers (names or addresses) the Linux VMs synchronise their clocks with, where the place forbids the public pools.
-
-- **Type:** list of strings
 
 ## `provision`
 
 ### `provision`
 
-Provisioning across machines, once every machine is up: Ansible playbooks run from a controller on the environment's networks, with an inventory Isoloom writes.
+The environment's own Ansible, run from Isoloom's Linux controller once every machine is up.
 
 - **Type:** list of mappings
 
@@ -1426,108 +1120,9 @@ The Ansible Galaxy requirements to install first (collections, roles); by defaul
 
 ### `controller`
 
-The controller Isoloom adds for `provision:` (and checks run from it): a small VM, sized and boxed like a machine. By default 1 CPU, 512 MB and a minimal Alpine box on Vagrant.
+The controller added for `provision:` and playbook checks: `{ resources, keep_running }`.
 
 - **Type:** mapping
-
-### `controller.image`
-
-The box to use instead of Isoloom's (Vagrant): a specific Ansible version, a mirror.
-
-- **Type:** mapping
-
-### `controller.image.vagrant`
-
-A Vagrant box name (e.g. `StefanScherer/windows_2019`).
-
-- **Type:** string
-
-### `controller.image.vagrant_version`
-
-The box version to pin.
-
-- **Type:** string
-
-### `controller.image.qemu`
-
-The box Vagrant's QEMU provider boots instead (libvirt format), when `vagrant` has none (e.g. `peru/windows-server-2019-standard-x64-eval`).
-
-- **Type:** string
-
-### `controller.image.hyperv`
-
-The box Vagrant's Hyper-V provider boots instead, when `vagrant` has no Hyper-V build (its latest version that has one).
-
-- **Type:** string
-
-### `controller.image.winrm`
-
-How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.
-
-- **Type:** string
-- **Allowed:**
-  - `plaintext`: HTTP on 5985, basic auth (the default for the common Windows boxes).
-  - `ssl`: HTTPS on 5986, NTLM (certificate not verified).
-
-### `controller.image.winssh`
-
-This Windows box answers OpenSSH (Windows' own `sshd`, PowerShell as its shell) instead of WinRM: Vagrant connects with `config.winssh` and the playbooks over SSH, as the box's `vagrant` account. Not with `winrm`.
-
-- **Type:** boolean
-
-### `controller.image.box_url`
-
-Where Vagrant downloads the `vagrant` box from, when it isn't on Vagrant Cloud: a URL, or a `.box` file in the project (list its folder in `.isoloomignore`, or the project copied into every VM carries it).
-
-- **Type:** string
-
-### `controller.image.box_server_url`
-
-The box server Vagrant looks the `vagrant` box up on, instead of Vagrant Cloud (a private registry).
-
-- **Type:** string
-
-### `controller.image.proxmox`
-
-The Proxmox image: a cloud image's URL (the server downloads it), or the id of a template VM on the node (cloned).
-
-- **Type:** string
-
-### `controller.image.aws`
-
-The AWS image: an AMI id (`ami-0123...`) in the module's region.
-
-- **Type:** string
-
-### `controller.image.azure`
-
-The Azure image: a managed image's or gallery image version's resource id.
-
-- **Type:** string
-
-### `controller.image.gcp`
-
-The Google Cloud image: `projects/<project>/global/images/<image>` (or `.../family/<f>`).
-
-- **Type:** string
-
-### `controller.image.digitalocean`
-
-The DigitalOcean image: a slug or a custom image's id.
-
-- **Type:** string
-
-### `controller.image.linode`
-
-The Linode image: `linode/<distribution>` or `private/<id>`.
-
-- **Type:** string
-
-### `controller.image.oci`
-
-The Oracle Cloud image: its OCID (`ocid1.image...`).
-
-- **Type:** string
 
 ### `controller.resources`
 
@@ -1564,7 +1159,7 @@ Keep it running once provisioning is done (to use it as a jump host). By default
 
 ### `checks`
 
-Black-box checks that prove the behavior on every target: scripts, or declared probes (`http`, `tcp`, `exec`, `script`) run from a machine of the environment. Isoloom adds derived checks of its own from `ports` and `reach`.
+Black-box checks that prove the behaviour on every target.
 
 - **Type:** list of strings or mappings
 
@@ -1652,11 +1247,414 @@ How long to keep retrying until the check passes, as seconds (`90`) or a duratio
 
 - **Type:** integer or string
 
+## `overrides`
+
+### `overrides`
+
+Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `proxmox`, `aws`, ...).
+
+- **Type:** mapping
+
+### `overrides.docker`
+
+Every target that runs the Compose file: `docker`, `hosted`, `docker-vm`, `cloud-docker`.
+
+- **Type:** mapping
+
+### `overrides.docker.networks`
+
+Networks by name: their block on Docker, or an existing Docker network.
+
+- **Type:** map of name to mapping
+
+### `overrides.docker.networks.*.cidr`
+
+The block to use on Docker instead of `cidr` (same size, inside 10.0.0.0/8). Without it, a network outside 10.0.0.0/8 moves into it (Docker Desktop and home networks use 172.16.0.0/12 and 192.168.0.0/16).
+
+- **Type:** string
+- **Limits:** matches `^10\.\d{1,3}\.\d{1,3}\.\d{1,3}/(2[4-9])$`
+
+### `overrides.docker.networks.*.external`
+
+An existing Docker network, by name: the machines join it, and Isoloom never creates or removes it.
+
+- **Type:** string
+
+### `overrides.docker.volumes`
+
+Volumes by name: an existing Docker volume.
+
+- **Type:** map of name to mapping
+
+### `overrides.docker.volumes.*.external`
+
+Its name on the platform (a Docker volume, a Kubernetes claim in the environment's namespace): mounted, never created or removed.
+
+- **Type:** string
+
+### `overrides.kubernetes`
+
+The `kubernetes` target.
+
+- **Type:** mapping
+
+### `overrides.kubernetes.volumes`
+
+Volumes by name: an existing claim.
+
+- **Type:** map of name to mapping
+
+### `overrides.kubernetes.volumes.*.external`
+
+Its name on the platform (a Docker volume, a Kubernetes claim in the environment's namespace): mounted, never created or removed.
+
+- **Type:** string
+
+### `overrides.vagrant`
+
+The `vagrant` target, and the VMs of `hybrid`.
+
+- **Type:** mapping
+
+### `overrides.vagrant.machines`
+
+Machines (or groups) by name: the box each boots.
+
+- **Type:** map of name to mapping
+
+### `overrides.vagrant.machines.*.box`
+
+The box (`StefanScherer/windows_2019`), instead of the built-in one for its OS.
+
+- **Type:** string
+
+### `overrides.vagrant.machines.*.box_version`
+
+The box version to pin.
+
+- **Type:** string
+
+### `overrides.vagrant.machines.*.box_url`
+
+Where Vagrant downloads the box from when it isn't on Vagrant Cloud: a URL, or a `.box` file in the project.
+
+- **Type:** string
+
+### `overrides.vagrant.machines.*.box_server_url`
+
+The box server to look the box up on, instead of Vagrant Cloud.
+
+- **Type:** string
+
+### `overrides.vagrant.machines.*.boxes`
+
+Other boxes for the providers the box has no build for.
+
+- **Type:** mapping
+
+### `overrides.vagrant.machines.*.boxes.qemu`
+
+The box the QEMU provider boots (libvirt format).
+
+- **Type:** string
+
+### `overrides.vagrant.machines.*.boxes.hyperv`
+
+The box the Hyper-V provider boots.
+
+- **Type:** string
+
+### `overrides.vagrant.machines.*.winrm`
+
+How this Windows box answers WinRM: `plaintext` (HTTP on 5985, the default) or `ssl` (HTTPS on 5986).
+
+- **Type:** string
+- **Allowed:**
+  - `plaintext`: HTTP on 5985, basic auth (the default for the common Windows boxes).
+  - `ssl`: HTTPS on 5986, NTLM (certificate not verified).
+
+### `overrides.vagrant.machines.*.winssh`
+
+This Windows box answers OpenSSH instead of WinRM. Not with `winrm`.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `overrides.vagrant.controller`
+
+The controller's box.
+
+- **Type:** mapping
+
+### `overrides.vagrant.controller.box`
+
+The box, instead of Isoloom's (a specific Ansible version, a mirror).
+
+- **Type:** string
+
+### `overrides.vagrant.controller.box_version`
+
+The box version to pin.
+
+- **Type:** string
+
+### `overrides.proxmox`
+
+The `proxmox` target.
+
+- **Type:** mapping
+
+### `overrides.proxmox.machines`
+
+Machines (or groups) by name: their image, or an LXC container.
+
+- **Type:** map of name to mapping
+
+### `overrides.proxmox.machines.*.image`
+
+The image: a cloud image's URL, or a template VM's id on the node.
+
+- **Type:** string
+
+### `overrides.proxmox.machines.*.lxc`
+
+Run its container image as an LXC container (Proxmox VE 9.1 or later) instead of a VM: lighter, but no Docker runtime, healthcheck or named volumes.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `overrides.proxmox.volumes`
+
+Volumes by name: a folder of the server shared into each VM (virtiofs).
+
+- **Type:** map of name to mapping
+
+### `overrides.proxmox.volumes.*.virtiofs`
+
+A folder of the server, shared into each VM that mounts the volume, instead of NFS from its owner: `virtiofs: {}` takes the defaults.
+
+- **Type:** mapping
+
+### `overrides.proxmox.volumes.*.virtiofs.mapping`
+
+An existing directory mapping of the cluster, by its id (Datacenter, Resource Mappings, Directory mappings). By default Isoloom creates one, `iso<slot>-<volume>`, for the folder `<virtiofs_root>/<environment>/<volume>` on the node.
+
+- **Type:** string
+
+### `overrides.proxmox.volumes.*.virtiofs.cache`
+
+How the guests cache the folder: `auto` (the default: metadata kept a short while, so another VM's changes show within a second), `always`, `metadata` or `never` (every access goes to the server: slowest, always current).
+
+- **Type:** string
+- **Allowed:**
+  - `auto`: Metadata and lookups kept a short while, or until they change: Proxmox's default.
+  - `always`: Everything kept: fastest, but another VM's changes may not show.
+  - `metadata`: Metadata kept, data read each time.
+  - `never`: Nothing kept: every access goes to the server.
+
+### `overrides.proxmox.volumes.*.virtiofs.direct_io`
+
+Reads and writes that bypass the guest's page cache when a program asks for it (`O_DIRECT`), for databases that manage their own cache. Off by default.
+
+- **Type:** boolean
+
+### `overrides.proxmox.volumes.*.virtiofs.xattr`
+
+Pass extended attributes through (SELinux labels, file capabilities). Off by default.
+
+- **Type:** boolean
+
+### `overrides.proxmox.volumes.*.virtiofs.acl`
+
+Pass POSIX ACLs through (`setfacl`), which implies `xattr`. Off by default.
+
+- **Type:** boolean
+
+### `overrides.proxmox.networks`
+
+Networks by name: an existing bridge.
+
+- **Type:** map of name to mapping
+
+### `overrides.proxmox.networks.*.external`
+
+Its name on the target (a Proxmox bridge, an ESXi port group): the machines join it, and Isoloom never creates or removes it.
+
+- **Type:** string
+
+### `overrides.esxi`
+
+The `esxi` target.
+
+- **Type:** mapping
+
+### `overrides.esxi.networks`
+
+Networks by name: an existing port group.
+
+- **Type:** map of name to mapping
+
+### `overrides.esxi.networks.*.external`
+
+Its name on the target (a Proxmox bridge, an ESXi port group): the machines join it, and Isoloom never creates or removes it.
+
+- **Type:** string
+
+### `overrides.aws`
+
+`cloud-vm` on AWS.
+
+- **Type:** mapping
+
+### `overrides.aws.machines`
+
+Machines (or groups) by name: their image on this cloud.
+
+- **Type:** map of name to mapping
+
+### `overrides.aws.machines.*.image`
+
+The image: an AMI id on AWS, a resource id on Azure, `projects/…/images/…` on Google Cloud, a slug or id on DigitalOcean, `linode/…` on Linode, an OCID on Oracle Cloud.
+
+- **Type:** string
+
+### `overrides.azure`
+
+`cloud-vm` on Azure.
+
+- **Type:** mapping
+
+### `overrides.azure.machines`
+
+Machines (or groups) by name: their image on this cloud.
+
+- **Type:** map of name to mapping
+
+### `overrides.azure.machines.*.image`
+
+The image: an AMI id on AWS, a resource id on Azure, `projects/…/images/…` on Google Cloud, a slug or id on DigitalOcean, `linode/…` on Linode, an OCID on Oracle Cloud.
+
+- **Type:** string
+
+### `overrides.gcp`
+
+`cloud-vm` on Google Cloud.
+
+- **Type:** mapping
+
+### `overrides.gcp.machines`
+
+Machines (or groups) by name: their image on this cloud.
+
+- **Type:** map of name to mapping
+
+### `overrides.gcp.machines.*.image`
+
+The image: an AMI id on AWS, a resource id on Azure, `projects/…/images/…` on Google Cloud, a slug or id on DigitalOcean, `linode/…` on Linode, an OCID on Oracle Cloud.
+
+- **Type:** string
+
+### `overrides.digitalocean`
+
+`cloud-vm` on DigitalOcean.
+
+- **Type:** mapping
+
+### `overrides.digitalocean.machines`
+
+Machines (or groups) by name: their image on this cloud.
+
+- **Type:** map of name to mapping
+
+### `overrides.digitalocean.machines.*.image`
+
+The image: an AMI id on AWS, a resource id on Azure, `projects/…/images/…` on Google Cloud, a slug or id on DigitalOcean, `linode/…` on Linode, an OCID on Oracle Cloud.
+
+- **Type:** string
+
+### `overrides.linode`
+
+`cloud-vm` on Linode.
+
+- **Type:** mapping
+
+### `overrides.linode.machines`
+
+Machines (or groups) by name: their image on this cloud.
+
+- **Type:** map of name to mapping
+
+### `overrides.linode.machines.*.image`
+
+The image: an AMI id on AWS, a resource id on Azure, `projects/…/images/…` on Google Cloud, a slug or id on DigitalOcean, `linode/…` on Linode, an OCID on Oracle Cloud.
+
+- **Type:** string
+
+### `overrides.oci`
+
+`cloud-vm` on Oracle Cloud.
+
+- **Type:** mapping
+
+### `overrides.oci.machines`
+
+Machines (or groups) by name: their image on this cloud.
+
+- **Type:** map of name to mapping
+
+### `overrides.oci.machines.*.image`
+
+The image: an AMI id on AWS, a resource id on Azure, `projects/…/images/…` on Google Cloud, a slug or id on DigitalOcean, `linode/…` on Linode, an OCID on Oracle Cloud.
+
+- **Type:** string
+
+### `overrides.external`
+
+The `external` target: machines that already exist.
+
+- **Type:** mapping
+
+### `overrides.external.machines`
+
+Machines by name: where each already exists.
+
+- **Type:** map of name to mapping
+
+### `overrides.external.machines.*.ssh`
+
+Its SSH endpoint: `{ address, user, port, key }`.
+
+- **Type:** mapping
+
+### `overrides.external.machines.*.ssh.address`
+
+An address or hostname reachable from where Isoloom runs.
+
+- **Type:** string
+
+### `overrides.external.machines.*.ssh.user`
+
+The SSH user (default `root`).
+
+- **Type:** string
+
+### `overrides.external.machines.*.ssh.port`
+
+The SSH port (default 22).
+
+- **Type:** integer
+
+### `overrides.external.machines.*.ssh.key`
+
+A private key file (default: the SSH agent and config).
+
+- **Type:** string
+
 ## `tools`
 
 ### `tools`
 
-Observers beside the environment, on every network, that aren't machines of it (not in `reach`, `resources` or the derived checks): a toolbox to look from (`shell`), or any container image.
+Observers beside the environment, on every network: a toolbox (`shell`), or any container image.
 
 - **Type:** map of name to mapping
 
@@ -1683,3 +1681,143 @@ A port the tool serves (its web UI), reachable from every network.
 The port on the host's loopback (`127.0.0.1`) that forwards to the tool's `port`, so a browser on the host can open its web UI.
 
 - **Type:** integer
+
+## `constraints`
+
+### `constraints`
+
+What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time servers.
+
+- **Type:** mapping
+
+### `constraints.proxy`
+
+The HTTP proxy outbound traffic goes through: set for the machines' containers (and their builds) and on every Linux VM (shell, apt, dnf, Docker), never for Isoloom's own checks.
+
+- **Type:** mapping
+
+### `constraints.proxy.http`
+
+The proxy for `http://` URLs, e.g. `http://proxy.corp:3128`.
+
+- **Type:** string
+
+### `constraints.proxy.https`
+
+The proxy for `https://` URLs (default: `http`'s).
+
+- **Type:** string
+
+### `constraints.proxy.no_proxy`
+
+Names, domains (`.corp`) and blocks reached directly. The environment's own machine names and network blocks, and localhost, are always added.
+
+- **Type:** list of strings
+
+### `constraints.registries`
+
+Registry mirrors, by the registry they stand for: `docker.io: registry.corp/dockerhub` pulls `redis:7` as `registry.corp/dockerhub/library/redis:7`. Every image of the environment is rewritten, Isoloom's own included; images built from the project aren't pulled, so they stay as they are (their `FROM` lines are the Dockerfile's business).
+
+- **Type:** map of name to string
+
+### `constraints.mirrors`
+
+Package mirrors the machines install from instead of the public archives: apt's for Debian and Ubuntu VMs, and a Python package index.
+
+- **Type:** mapping
+
+### `constraints.mirrors.debian`
+
+Replaces `deb.debian.org/debian` in the Debian VMs' apt sources (`debian-security`, a separate archive, is left as it is).
+
+- **Type:** string
+
+### `constraints.mirrors.ubuntu`
+
+Replaces `archive.ubuntu.com/ubuntu` (and its country and security hosts) in the Ubuntu VMs' apt sources.
+
+- **Type:** string
+
+### `constraints.mirrors.pypi`
+
+A Python package index: `PIP_INDEX_URL` for the machines, `/etc/pip.conf` on the VMs.
+
+- **Type:** string
+
+### `constraints.mirrors.npm`
+
+An npm registry: `NPM_CONFIG_REGISTRY` for the machines, `/etc/npmrc` on the VMs.
+
+- **Type:** string
+
+### `constraints.ntp`
+
+The time servers (names or addresses) the Linux VMs synchronise their clocks with, where the place forbids the public pools.
+
+- **Type:** list of strings
+
+## `cloud`
+
+### `cloud`
+
+An environment of cloud services rather than machines: a Terraform module applied into the user's own cloud account.
+
+- **Type:** mapping
+
+### `cloud.provider`
+
+The cloud the module deploys into (its credentials come from the environment, as Terraform expects).
+
+- **Type:** string
+- **Allowed:**
+  - `aws`: Amazon Web Services.
+  - `azure`: Microsoft Azure.
+  - `gcp`: Google Cloud.
+
+### `cloud.terraform`
+
+A Terraform root module in the project (a folder holding `.tf` files), used as is.
+
+- **Type:** string
+
+### `cloud.vars`
+
+The module's variables: any value (a string, number, boolean, list or map). A string holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list: required at `run`, kept for `down`.
+
+- **Type:** mapping
+
+### `cloud.outputs`
+
+What the environment exposes, by name: a module output each. Checks and the message use them as `{{ cloud.outputs.<name> }}`.
+
+- **Type:** map of name to string
+
+### `cloud.hourly_usd`
+
+About what the environment costs per hour while it exists, in US dollars: the author's estimate, for whoever runs it. `isoloom run` says it before applying, and the resolved snapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a budget. Isoloom doesn't bill or stop anything by it.
+
+- **Type:** number
+
+### `cloud.before`
+
+Steps run on this machine before Terraform applies the module (a key pair the module reads, a build): scripts in the project, run in order from the module's copy, with the spec's inputs and `env` in their environment. They run at every `run`: make them idempotent.
+
+- **Type:** list of strings
+
+### `cloud.env`
+
+Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`). Not for credentials: those come from the user's own environment.
+
+- **Type:** map of name to string
+
+### `cloud.apply_retries`
+
+How many times to apply again when an apply fails (a module that only converges on a second apply), 0 to 5. 0 by default.
+
+- **Type:** integer
+
+### `cloud.requires`
+
+What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`) that must be on the PATH, or a shell command that must succeed (`python3 -c 'import boto3'`). `isoloom doctor` and `isoloom run` check them.
+
+- **Type:** list of strings

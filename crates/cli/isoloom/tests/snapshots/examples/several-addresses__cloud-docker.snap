@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ cloud-docker (needs `docker:` on web, decoy, client)
+✗ cloud-docker (machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app))
 
 # isoloom generate --target cloud-docker (exit 1)
-· cloud-docker: not possible for this spec (see `isoloom targets`)
+· cloud-docker: machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)

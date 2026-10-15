@@ -21,7 +21,7 @@ fn every_example_on_every_target_generates_within_the_budget() {
     let mut files = 0;
     for dir in &dirs {
         let spec = isoloom_spec::load(dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
-        files += isoloom_targets::generate_all(&spec).0.len();
+        files += isoloom_targets::generate_all(&isoloom_targets::Lab::new(spec)).0.len();
     }
     let took = start.elapsed();
     assert!(files > 0, "no example generated anything");

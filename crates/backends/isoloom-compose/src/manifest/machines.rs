@@ -132,7 +132,7 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Mac
         });
         out.addresses = addresses(mp)?;
         out.volumes = volumes(mp)?;
-        out.ports = m.ports.iter().map(|p| port(p, &mp.ports)).collect::<Result<_, _>>()?;
+        out.ports = m.ports.iter().map(|p| port(&m.port_label(p), p, &mp.ports)).collect::<Result<_, _>>()?;
     } else if member.name == STAND_IN {
         // It stands in at the addresses of the machine its hostname names.
         let stood_for = file.services.get(STAND_IN).and_then(|s| s.hostname.as_deref());
@@ -198,10 +198,11 @@ fn publish_address() -> Result<Template> {
     Ok(Template::from(Placeholder::Param(name)))
 }
 
-fn port(p: &model::Port, published: &[PublishedPort]) -> Result<Port> {
+/// A port of the lab's, named `label` (the spec's name).
+fn port(label: &str, p: &model::Port, published: &[PublishedPort]) -> Result<Port> {
     let publish = published
         .iter()
-        .find(|x| x.port == p.port && x.protocol == p.protocol)
+        .find(|x| x.name == label)
         .map(|x| {
             Ok::<_, Error>(Publish {
                 mode: if x.fixed { PublishMode::Fixed } else { PublishMode::Ephemeral },
@@ -211,7 +212,7 @@ fn port(p: &model::Port, published: &[PublishedPort]) -> Result<Port> {
         })
         .transpose()?;
     Ok(Port {
-        name: p.name.as_deref().map(Name::parse).transpose()?,
+        name: Name::parse(label)?,
         port: NonZeroU16::new(p.port).ok_or_else(|| {
             Error::from(ManifestError::OutOfRange {
                 what: "a port",
@@ -227,13 +228,16 @@ fn port(p: &model::Port, published: &[PublishedPort]) -> Result<Port> {
     })
 }
 
+/// The name of a tool's port (its web UI).
+const TOOL_PORT: &str = "web";
+
 /// A tool's port, always published on its own `publish` number.
 fn tool_port(tool: &model::Tool) -> Result<Option<Port>> {
     let (Some(port), Some(publish)) = (tool.port.and_then(NonZeroU16::new), tool.publish) else {
         return Ok(None);
     };
     Ok(Some(Port {
-        name: None,
+        name: Name::parse(TOOL_PORT)?,
         port,
         protocol: Protocol::Tcp,
         http: false,
@@ -257,9 +261,7 @@ pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>> {
 }
 
 fn output(m: &Machine, p: &Port) -> Result<Output> {
-    let label = p.name.as_ref().map_or_else(|| p.port.to_string(), ToString::to_string);
-    let udp = if p.protocol == Protocol::Udp { "_udp" } else { "" };
-    let snake: String = format!("{}_{label}{udp}", m.name)
+    let snake: String = format!("{}_{}", m.name, p.name)
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
         .collect();
@@ -268,11 +270,12 @@ fn output(m: &Machine, p: &Port) -> Result<Output> {
         (true, false) => (OutputRole::Entry, "http://127.0.0.1:", "/"),
         (false, _) => (OutputRole::Info, "127.0.0.1:", ""),
     };
-    let port = if udp.is_empty() { p.port.to_string() } else { format!("{}/udp", p.port) };
-    let what = match &p.name {
-        Some(n) => format!("{}'s {n} (port {port})", m.name),
-        None => format!("{}'s port {port}", m.name),
+    let port = if p.protocol == Protocol::Udp {
+        format!("{}/udp", p.port)
+    } else {
+        p.port.to_string()
     };
+    let what = format!("{}'s {} (port {port})", m.name, p.name);
     Ok(Output {
         name: SnakeName::parse(&snake)?,
         description: Some(format!("{what}.")),
@@ -285,8 +288,7 @@ fn output(m: &Machine, p: &Port) -> Result<Output> {
         ])),
         from: OutputSource::PublishedPort {
             machine: m.name.clone(),
-            port: p.port,
-            protocol: p.protocol,
+            port: p.name.clone(),
         },
     })
 }
@@ -303,7 +305,12 @@ mod tests {
     #[test]
     fn a_service_this_backend_did_not_add_is_refused() {
         let env = environment(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n",
+            "version: 1
+name: t
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web: { networks: { lan: 10 }, app: { image: nginx } }
+",
         );
         let mut file = crate::render::compose_file(Target::Docker, &env).expect("renders").file;
         assert!(super::classify(&env, &file).is_ok());

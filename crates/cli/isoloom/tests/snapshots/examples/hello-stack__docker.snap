@@ -476,7 +476,7 @@ services:
       cache-routes:
         condition: service_healthy
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: hello-stack
     restart: unless-stopped
@@ -625,7 +625,7 @@ volumes:
   "lab": {
     "name": "hello-stack",
     "instance": null,
-    "message": "The page answers at http://localhost:${published.web.80}/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
+    "message": "The page answers at http://127.0.0.1:${published.web.web}/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
   },
   "target": "docker",
   "driver": "compose",
@@ -786,6 +786,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true,
@@ -996,16 +997,15 @@ volumes:
   ],
   "outputs": [
     {
-      "name": "web_80",
-      "description": "web's port 80.",
+      "name": "web_web",
+      "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
       "format": "http://127.0.0.1:${value}/",
       "from": {
         "kind": "published_port",
         "machine": "web",
-        "port": 80,
-        "protocol": "tcp"
+        "port": "web"
       }
     }
   ],
@@ -1258,7 +1258,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "hello-stack",
   "instance": null,
   "inputs": [],
@@ -1292,14 +1292,12 @@ volumes:
       "docker_addresses": {
         "app": "10.60.0.20"
       },
-      "ports": [
-        {
+      "ports": {
+        "redis": {
           "port": 6379,
-          "name": "redis",
-          "http": false,
-          "publish": null
+          "protocol": "tcp"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {
@@ -1334,14 +1332,15 @@ volumes:
       "docker_addresses": {
         "app": "10.60.0.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": 8080
+          "protocol": "http",
+          "publish": 8080,
+          "published": 8080,
+          "url": "http://127.0.0.1:8080/"
         }
-      ],
+      },
       "depends_on": [
         "cache"
       ],
@@ -1378,7 +1377,9 @@ volumes:
   "published": [
     {
       "machine": "web",
+      "name": "web",
       "port": 80,
+      "protocol": "http",
       "host_port": 8080
     }
   ],
@@ -1408,7 +1409,7 @@ volumes:
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on cache, web",
+      "external": "overrides.external.machines.cache: the external target reaches machines that exist already, and `cache` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {
@@ -1549,5 +1550,5 @@ volumes:
       }
     ]
   },
-  "message": "The page answers at http://localhost:8080/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
+  "message": "The page answers at http://127.0.0.1:8080/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
 }

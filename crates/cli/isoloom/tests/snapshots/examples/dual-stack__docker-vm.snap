@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker-vm
@@ -577,7 +578,7 @@ resource "proxmox_virtual_environment_vm" "env" {
     type  = "host"
   }
   memory {
-    dedicated = 1536
+    dedicated = 2048
   }
   disk {
     datastore_id = var.datastore

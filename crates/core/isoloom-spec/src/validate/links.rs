@@ -26,13 +26,13 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
         let Some(d) = m.docker.as_ref().filter(|d| d.lxc) else { continue };
         let at = format!("machines.{name}.docker.lxc");
         if d.image.is_none() {
-            p.add(&at, "an LXC container runs a published image: set `docker.image` (not `build` or `firmware`)");
+            p.add(&at, "an LXC container runs a published image: `app.image` (not `build` or `firmware`)");
         }
         if d.appliance.is_some() {
             p.add(&at, "a network appliance is wired the way Docker attaches networks: drop `lxc`");
         }
         if m.vm.is_some() {
-            p.add(&at, "the machine has `vm:`, which Proxmox runs instead: drop `lxc`");
+            p.add(&at, "the machine also has a VM form, which Proxmox runs instead: drop `lxc`");
         }
     }
 }

@@ -23,16 +23,18 @@ networks:
   lab: { cidr: 10.20.0.0/24 }
 machines:
   database:
+    os: debian@12
     networks: { lab: 32 }
-    ports: [{ port: 5432, name: postgres }]
-    docker: { image: "postgres:16" }                            # as a container
-    vm: { os: debian@12, provision: [provision/database.sh] }   # as a VM (native, no Docker)
+    ports: { postgres: 5432 }
+    app:
+      image: "postgres:16"                     # as a container
+      steps: [{ run: provision/database.sh }]  # as a VM (native, no Docker)
   web:
+    os: debian@12
     networks: { lab: 31 }
-    ports: [{ port: 80, http: true, publish: 8080 }]
+    ports: { web: { port: 80, protocol: http, publish: 8080 } }
     depends_on: [database]
-    docker: { build: build/web }
-    vm: { os: debian@12, provision: [provision/web.sh] }
+    app: { build: build/web, steps: [{ run: provision/web.sh }] }
 checks:                  # plus the checks Isoloom derives from ports and reach
   - { from: web, tcp: "database:5432" }
 ```

@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom-kubernetes/tests/snapshots.rs
+source: crates/backends/isoloom-kubernetes/tests/snapshots.rs
+assertion_line: 78
 expression: "joined(&files, |p| p.ends_with(\"environment.yaml\"))"
 ---
 === .isoloom/kubernetes/environment.yaml
@@ -47,11 +48,6 @@ spec:
       - name: web
         image: python:3-alpine
         imagePullPolicy: IfNotPresent
-        command:
-        - /bin/sh
-        - -c
-        - set -e; sh /isoloom/scripts/flag.sh; exec "$@"
-        - isoloom-before
         args:
         - python3
         - -m
@@ -72,6 +68,24 @@ spec:
           timeoutSeconds: 3
           successThreshold: 1
           failureThreshold: 30
+        env:
+        - name: FLAG
+          valueFrom:
+            secretKeyRef:
+              name: isoloom-inputs
+              key: FLAG
+              optional: true
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
+      - name: init
+        image: python:3-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/flag && echo $FLAG ); do sleep 2; done && sh /isoloom/scripts/flag.sh && exec sleep infinity
         env:
         - name: FLAG
           valueFrom:
@@ -243,11 +257,6 @@ spec:
       - name: web
         image: '{{ index .Values.images "web" }}'
         imagePullPolicy: IfNotPresent
-        command:
-        - /bin/sh
-        - -c
-        - set -e; sh /isoloom/scripts/flag.sh; exec "$@"
-        - isoloom-before
         args:
         - python3
         - -m
@@ -268,6 +277,24 @@ spec:
           timeoutSeconds: 3
           successThreshold: 1
           failureThreshold: 30
+        env:
+        - name: FLAG
+          valueFrom:
+            secretKeyRef:
+              name: isoloom-inputs
+              key: FLAG
+              optional: true
+        volumeMounts:
+        - name: isoloom-probe
+          mountPath: /.isoloom-probe
+          readOnly: true
+      - name: init
+        image: '{{ index .Values.images "web" }}'
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/flag && echo $FLAG ); do sleep 2; done && sh /isoloom/scripts/flag.sh && exec sleep infinity
         env:
         - name: FLAG
           valueFrom:

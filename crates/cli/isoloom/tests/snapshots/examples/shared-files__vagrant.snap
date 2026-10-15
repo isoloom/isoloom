@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ vagrant
@@ -591,7 +592,14 @@ Vagrant.configure("2") do |config|
       systemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server
       exportfs -ra
     SH
-    m.vm.provision "shell", name: "steps/write.sh", inline: "cd /opt/isoloom && sh -c 'sh steps/write.sh'"
+    m.vm.provision "shell", name: "setup", inline: <<~'SH'
+      [ -f /var/lib/isoloom/setup.done ] || (
+      set -e
+      mkdir -p '/opt/isoloom' && cd '/opt/isoloom'
+      sh '/opt/isoloom/steps/write.sh'
+      mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done
+      )
+    SH
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/writer.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
@@ -737,7 +745,14 @@ Vagrant.configure("2") do |config|
       grep -qF '10.84.0.10:/srv/shared ' /etc/fstab || printf '%s\n' '10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0' >> /etc/fstab
       i=0; until mountpoint -q '/data/shared' || mount '/data/shared' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo 'volume shared: writer doesn'\''t serve it (NFS)' >&2; exit 1; fi; sleep 5; done
     SH
-    m.vm.provision "shell", name: "steps/look.sh", inline: "cd /opt/isoloom && sh -c 'sh steps/look.sh'"
+    m.vm.provision "shell", name: "setup", inline: <<~'SH'
+      [ -f /var/lib/isoloom/setup.done ] || (
+      set -e
+      mkdir -p '/opt/isoloom' && cd '/opt/isoloom'
+      sh '/opt/isoloom/steps/look.sh'
+      mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done
+      )
+    SH
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/reader.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end

@@ -20,6 +20,7 @@ mod shared;
 mod storage;
 mod target;
 mod virtiofs;
+mod yaml;
 
 pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
 pub(crate) use checks::is_yaml_file;
@@ -40,6 +41,7 @@ pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, 
 pub use storage::{Disk, Filesystem, Mount, MountPart, Tmpfs, TmpfsMount};
 pub use target::{Shape, Target};
 pub use virtiofs::{MAX_VIRTIOFS, Virtiofs, VirtiofsCache, mapping_id};
+pub use yaml::from_yaml;
 
 use indexmap::IndexMap;
 use schemars::JsonSchema;

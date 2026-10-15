@@ -20,23 +20,23 @@ networks:
 
 machines:
   sw1:
-    docker:
+    app:
       image: "vrnetlab/cisco_iol:L2-17.12.01"
       appliance: cisco-iol-l2
       config: configs/sw1.cfg
 
   files:
     networks: { office.vlan10: 10, office.vlan20: 10 }
-    ports: [{ port: 80, http: true }]
-    docker: { image: "nginx:1.27-alpine" }
+    ports: { web: { port: 80, protocol: http } }
+    app: { image: "nginx:1.27-alpine" }
 
   staff:
+    os: alpine                           # its OS alone: Alpine's own image, kept running
     networks: { office.vlan10: 20 }
-    docker: { image: "alpine:3.20", idle: true }
 
   guest:
+    os: alpine
     networks: { office.vlan20: 20 }
-    docker: { image: "alpine:3.20", idle: true }
 
 checks:
   - name: staff reach the file server through the switch (VLAN 10, tagged on its trunk)

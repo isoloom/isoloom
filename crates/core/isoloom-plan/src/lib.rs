@@ -25,7 +25,7 @@ pub mod secrets;
 pub mod storage;
 
 pub use environment::{Build, Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Size, Volume, VolumeKind};
-pub use lab::Lab;
+pub use lab::{Lab, problems_in};
 pub use lifecycle::{MachineLifecycle, Step};
 pub use outside::{Join, OutsideAddress, OutsideNetwork};
 pub use private_dns::PrivateDns;

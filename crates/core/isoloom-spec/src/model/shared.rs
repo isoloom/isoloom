@@ -171,11 +171,13 @@ pub struct SharedVolume {
     /// An existing volume, by its name on the platform (a Docker volume, a Kubernetes claim in
     /// the environment's namespace): Isoloom mounts it and never creates or removes it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
     pub external: Option<String>,
     /// On Proxmox, the volume as a folder of the server, shared into each VM that mounts it
     /// (virtiofs) instead of over NFS from its owner: `virtiofs: {}` takes the defaults. Every
     /// other target ignores it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
     pub virtiofs: Option<Virtiofs>,
 }
 

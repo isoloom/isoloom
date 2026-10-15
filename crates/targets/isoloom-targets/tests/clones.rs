@@ -6,17 +6,21 @@
 use std::path::Path;
 
 use isoloom_plan::checks;
-use isoloom_spec::{load, parse, validate};
+use isoloom_spec::{load, parse};
+use isoloom_targets::Lab;
 
 const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  office: { cidr: 10.9.1.0/24 }\n";
 
 #[test]
 fn a_count_becomes_numbered_clones_with_consecutive_addresses() {
-    let spec = parse(&format!(
-        "{BASE}groups:\n  fleet: {{ members: [ws], resources: {{ cpus: 2 }} }}\nmachines:\n  dc:\n    networks: {{ lab: 5 }}\n    ports: [{{ port: 389 }}]\n    docker: {{ image: dc }}\n  ws:\n    count: 3\n    networks: {{ lab: 20, office: 50 }}\n    depends_on: [dc]\n    ports: [{{ port: 22 }}]\n    docker: {{ image: ws, idle: true }}\n  user:\n    access: true\n    networks: {{ lab: 90 }}\n    depends_on: [ws]\nchecks:\n  - {{ name: the dc answers, from: ws, tcp: dc:389 }}\n"
-    ))
-    .unwrap();
-    assert_eq!(validate(&spec), vec![]);
+    let lab = Lab::new(
+        parse(&format!(
+            "{BASE}groups:\n  fleet: {{ members: [ws], resources: {{ cpus: 2 }} }}\nmachines:\n  dc:\n    networks: {{ lab: 5 }}\n    ports: {{ ldap: 389 }}\n    app: {{ image: dc }}\n  ws:\n    count: 3\n    networks: {{ lab: 20, office: 50 }}\n    depends_on: [dc]\n    ports: {{ ssh: 22 }}\n    app: {{ image: ws }}\n  user:\n    access: true\n    networks: {{ lab: 90 }}\n    depends_on: [ws]\nchecks:\n  - {{ name: the dc answers, from: ws, tcp: dc:389 }}\n"
+        ))
+        .unwrap(),
+    );
+    assert_eq!(lab.problems(), vec![]);
+    let spec = lab.spec();
     let names: Vec<&String> = spec.machines.keys().collect();
     assert_eq!(names, ["dc", "ws-01", "ws-02", "ws-03", "user"]);
     assert_eq!(spec.machines["ws-01"].networks["lab"], 20);
@@ -34,26 +38,26 @@ fn a_count_becomes_numbered_clones_with_consecutive_addresses() {
 
 #[test]
 fn counts_that_make_no_sense_are_refused() {
-    let m = |extra: &str| format!("{BASE}machines:\n  a:\n    networks: {{ lab: 250 }}\n    {extra}\n    docker: {{ image: x }}\n");
+    let m = |extra: &str| format!("{BASE}machines:\n  a:\n    networks: {{ lab: 250 }}\n    {extra}\n    app: {{ image: x }}\n");
     assert!(parse(&m("count: 1")).unwrap_err().to_string().contains("2 to 99"));
     assert!(parse(&m("count: 100")).unwrap_err().to_string().contains("2 to 99"));
     assert!(parse(&m("count: 2\n    access: true")).unwrap_err().to_string().contains("access machine"));
     // Addresses that run past the block are caught by the usual address validation, on the clone.
-    let spec = parse(&m("count: 5")).unwrap();
-    let problems: Vec<String> = validate(&spec).into_iter().map(|p| p.at).collect();
+    let lab = Lab::new(parse(&m("count: 5")).unwrap());
+    let problems: Vec<String> = lab.problems().into_iter().map(|p| p.path.to_string()).collect();
     assert!(problems.iter().any(|p| p.starts_with("machines.a-05.networks")), "{problems:?}");
     let gw = parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24, gateway: fw }\nmachines:\n  fw:\n    count: 2\n    networks: { lab: 1 }\n    docker: { image: x }\n",
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24, gateway: fw }\nmachines:\n  fw:\n    count: 2\n    networks: { lab: 1 }\n    app: { image: x }\n",
     );
     assert!(gw.unwrap_err().to_string().contains("a gateway is one machine"));
 }
 
 #[test]
 fn the_example_fleet_is_in_its_group_and_the_snapshot() {
-    let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/corp-ad-basics")).unwrap();
-    assert_eq!(spec.clones["ws"], ["ws-01", "ws-02"]);
-    assert_eq!(isoloom_spec::groups::members(&spec, "domain"), ["dc01", "ws-01", "ws-02"]);
-    let r = isoloom_targets::resolved::resolve(&spec);
+    let lab = Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/corp-ad-basics")).unwrap());
+    assert_eq!(lab.source().clones["ws"], ["ws-01", "ws-02"]);
+    assert_eq!(isoloom_spec::groups::members(&lab.spec(), "domain"), ["dc01", "ws-01", "ws-02"]);
+    let r = isoloom_targets::resolved::resolve(&lab);
     assert_eq!(
         isoloom_targets::resolved::lookup(&r, "clones.ws").unwrap(),
         &serde_json::json!(["ws-01", "ws-02"])

@@ -129,8 +129,7 @@
       "from": {
         "kind": "published_port",
         "machine": "web",
-        "port": 80,
-        "protocol": "tcp"
+        "port": "site"
       }
     }
   ],

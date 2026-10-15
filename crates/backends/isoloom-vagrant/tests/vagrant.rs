@@ -15,12 +15,14 @@ type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
 /// An example of the project, which must be valid, planned for Vagrant.
 fn plan(example: &str) -> Outcome<Environment> {
-    let spec = isoloom_spec::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example))?;
-    let problems = isoloom_spec::validate(&spec);
+    let lab = isoloom_plan::Lab::new(isoloom_spec::load(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example),
+    )?);
+    let problems = lab.problems();
     if !problems.is_empty() {
         return Err(format!("{example} isn't valid: {problems:?}").into());
     }
-    Ok(Environment::build(&spec, Target::Vagrant, None))
+    Ok(Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None))
 }
 
 /// The files the Vagrant backend renders for an example, from its plan.
@@ -39,7 +41,8 @@ fn vagrantfile(example: &str) -> Outcome<String> {
 
 /// A spec written in a test, planned for Vagrant.
 fn parsed(yaml: &str) -> Outcome<Environment> {
-    Ok(Environment::build(&isoloom_spec::parse(yaml)?, Target::Vagrant, None))
+    let lab = isoloom_plan::Lab::parse(yaml).map_err(|problems| format!("{problems:?}"))?;
+    Ok(Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None))
 }
 
 #[test]
@@ -95,7 +98,7 @@ fn a_renderable_example_has_no_refusal() -> Outcome {
 #[test]
 fn appliances_are_refused_from_the_capabilities() -> Outcome {
     let env = parsed(
-        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  sw:\n    networks: { lab: 10 }\n    docker: { image: x, appliance: cisco-iol }\n    vm: { os: debian@12 }\n",
+        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  sw:\n    networks: { lab: 10 }\n    os: debian@12\n    app: { appliance: cisco-iol, image: x, steps: [{ run: s.sh }] }\n",
     )?;
     let why = VagrantBackend.refusal(&env).ok_or("not refused")?;
     assert!(why.contains("network appliance"), "{why}");
@@ -105,9 +108,11 @@ fn appliances_are_refused_from_the_capabilities() -> Outcome {
 
 #[test]
 fn a_machine_without_a_box_is_refused_without_rendering() -> Outcome {
-    let mut spec = isoloom_spec::parse(
-        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  m:\n    networks: { lab: 10 }\n    vm: { os: debian@12 }\n",
-    )?;
+    let lab = isoloom_plan::Lab::parse(
+        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  m:\n    networks: { lab: 10 }\n    os: debian@12\n",
+    )
+    .map_err(|problems| format!("{problems:?}"))?;
+    let mut spec = lab.for_target(Target::Vagrant);
     // Parsing refuses an OS it doesn't know; a spec built in code can still name one.
     spec.machines.get_mut("m").and_then(|m| m.vm.as_mut()).ok_or("a VM")?.os = "plan9".into();
     let env = Environment::build(&spec, Target::Vagrant, None);

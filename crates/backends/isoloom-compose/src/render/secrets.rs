@@ -4,7 +4,6 @@
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_spec::model::{SecretSource, secret_variable};
 
 use crate::file::{ComposeFile, Secret, ServiceSecret};
 
@@ -28,15 +27,10 @@ pub(super) fn of_file(env: &Environment) -> IndexMap<String, Secret> {
     let containers: Vec<&MachinePlan> = env.machines.values().filter(|m| m.shape == MachineShape::Container).collect();
     env.spec()
         .secrets
-        .iter()
-        .filter(|(name, _)| containers.iter().any(|m| m.secrets.iter().any(|s| &s.name == *name)))
-        .map(|(name, source)| {
-            // An input's file reads the input's own variable; a secret, the one `isoloom run`
-            // fills from its store.
-            let environment = match source {
-                SecretSource::Input { input } => input.clone(),
-                _ => secret_variable(name),
-            };
+        .keys()
+        .filter(|name| containers.iter().any(|m| m.secrets.iter().any(|s| &s.name == *name)))
+        .map(|name| {
+            let environment = isoloom_render::secrets::compose_variable(env.spec(), name);
             (name.clone(), Secret { environment })
         })
         .collect()

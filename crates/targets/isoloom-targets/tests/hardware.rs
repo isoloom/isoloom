@@ -3,26 +3,30 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // a failing test is the report.
 
-use isoloom_spec::{Spec, Target, parse};
-use isoloom_targets::{GenerateError, generate};
+use isoloom_spec::{Target, parse};
+use isoloom_targets::{GenerateError, Lab, generate};
 
-/// One machine with `extra` set, as a container and as a VM.
-fn spec(extra: &str) -> Spec {
-    parse(&format!(
-        "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, docker: {{ image: nginx }}, vm: {{ os: debian@12, provision: [a.sh] }}, {extra} }}\n"
-    ))
-    .unwrap()
+/// One machine with `hardware` set, as a container (an image) and as a VM (its OS and a step).
+fn spec(hardware: &str) -> Lab {
+    Lab::new(
+        parse(&format!(
+            "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lab: 10 }}, app: {{ image: nginx, steps: [{{ run: a.sh }}] }}, hardware: {{ {hardware} }} }}\n"
+        ))
+        .unwrap(),
+    )
 }
 
-/// One VM-only machine with `extra` set.
-fn vm(extra: &str) -> Spec {
-    parse(&format!(
-        "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, vm: {{ os: debian@12, provision: [a.sh] }}, {extra} }}\n"
-    ))
-    .unwrap()
+/// One machine with `hardware` set, its OS and a step (a VM on the VM targets).
+fn vm(hardware: &str) -> Lab {
+    Lab::new(
+        parse(&format!(
+            "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lab: 10 }}, app: {{ steps: [{{ run: a.sh }}] }}, hardware: {{ {hardware} }} }}\n"
+        ))
+        .unwrap(),
+    )
 }
 
-fn file(spec: &Spec, target: Target, path: &str) -> String {
+fn file(spec: &Lab, target: Target, path: &str) -> String {
     let files = generate(spec, target).unwrap_or_else(|e| panic!("{target:?}: {e}"));
     files
         .into_iter()
@@ -31,7 +35,7 @@ fn file(spec: &Spec, target: Target, path: &str) -> String {
         .contents
 }
 
-fn refusal(spec: &Spec, target: Target) -> String {
+fn refusal(spec: &Lab, target: Target) -> String {
     match generate(spec, target) {
         Err(GenerateError::Unsupported { what, .. }) => what,
         other => panic!("{target:?}: {other:?}"),
@@ -70,7 +74,7 @@ fn kubernetes_asks_the_device_plugin_for_a_count() {
 }
 
 /// Each cloud's module of `cloud-vm` for `spec`, by its folder (`None`: that cloud refuses).
-fn cloud_module(spec: &Spec, cloud: &str) -> Option<String> {
+fn cloud_module(spec: &Lab, cloud: &str) -> Option<String> {
     let files = generate(spec, Target::CloudVm).unwrap();
     files.into_iter().find(|f| f.path.contains(&format!("/{cloud}/main.tf"))).map(|f| f.contents)
 }
@@ -94,7 +98,10 @@ fn vms_nest_on_vagrant_proxmox_and_three_clouds() {
     assert!(module("gcp").unwrap().contains("enable_nested_virtualization = true"));
     assert!(module("oci").unwrap().contains("are_virtual_instructions_enabled = true"));
     assert!(module("azure").is_none() && module("linode").is_none());
-    assert!(refusal(&spec("nested_virtualization: true"), Target::Docker).contains("which a container can't"));
+    assert_eq!(
+        refusal(&spec("nested_virtualization: true"), Target::Docker),
+        "machines.a.hardware.nested_virtualization: only a VM gives it: a container has no kernel or firmware of its own"
+    );
 }
 
 #[test]

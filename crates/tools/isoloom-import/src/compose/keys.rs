@@ -215,7 +215,7 @@ impl Import<'_> {
                 kat.clone(),
                 NoteKind::InImage,
                 format!(
-                    "project files mounted in: copy them into the image, or run scripts as `docker.init` jobs: {}",
+                    "project files mounted in: copy them into the image, or run scripts as `setup` scripts: {}",
                     binds.join(", ")
                 ),
             );

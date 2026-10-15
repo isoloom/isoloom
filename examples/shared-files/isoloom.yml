@@ -3,7 +3,8 @@
 # finds it at its own path. One Docker volume for both containers; on VMs the writer serves its
 # directory over NFS and the reader mounts it (at boot too), started once the writer serves it.
 # The writer also has a data disk of its own: a named volume on Docker, a claim on Kubernetes,
-# an empty disk formatted and mounted at boot on the VM targets.
+# an empty disk formatted and mounted at boot on the VM targets. Each machine's `setup` script
+# runs once it is up, with its volumes, the same way as a container or a VM.
 version: 1
 name: shared-files
 
@@ -15,16 +16,17 @@ volumes:
 
 machines:
   writer:
+    os: debian@12
     networks: { app: 10 }
     volumes: { shared: /srv/shared }
     disks: { data: { size_gb: 50, mount: /srv/data } }
-    docker: { image: "alpine:3.20", idle: true, init: [steps/write.sh] }
-    vm: { os: debian@12, provision: [steps/write.sh] }
+    setup: [steps/write.sh]
+
   reader:
+    os: debian@12
     networks: { app: 11 }
     volumes: { shared: /data/shared }
-    docker: { image: "alpine:3.20", idle: true }
-    vm: { os: debian@12, provision: [steps/look.sh] }
+    setup: [steps/look.sh]
 
 checks:
   - name: the reader sees what the writer wrote

@@ -33,9 +33,10 @@ machines:
   web:
     networks: { servers: 10 }
     rate_limit: 10mbit
-    ports: [{ port: 80, publish: 8080 }]
-    vm: { os: debian@12, provision: [s.sh] }
-  admin: { networks: { office.vlan10: 50, office.vlan20: 50 }, vm: { os: debian@12, provision: [s.sh] } }
+    ports: { web: { port: 80, publish: 8080 } }
+    os: debian@12
+    app: { steps: [{ run: s.sh }] }
+  admin: { networks: { office.vlan10: 50, office.vlan20: 50 }, os: debian@12, app: { steps: [{ run: s.sh }] } }
 ";
 
 #[test]
@@ -76,14 +77,14 @@ fn the_firewall_enforces_reach_and_the_published_ports() -> Outcome {
 #[test]
 fn an_arm64_machine_is_an_emulated_aarch64_vm() -> Outcome {
     let tf = render(
-        "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, arch: arm64, vm: { os: debian@12, provision: [s.sh] } }\n",
+        "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, hardware: { arch: arm64 }, os: debian@12, app: { steps: [{ run: s.sh }] } }\n",
     )?;
     assert!(tf.contains("debian-12-genericcloud-arm64.qcow2"), "{tf}");
     assert!(tf.contains("architecture = \"aarch64\""), "{tf}");
     assert!(tf.contains("bios"), "{tf}");
     assert!(tf.contains("\"serial0\""), "{tf}");
     let why = refusal(
-        "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, arch: arm64, vm: { os: rocky@9, provision: [s.sh] } }\n",
+        "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, hardware: { arch: arm64 }, os: rocky@9, app: { steps: [{ run: s.sh }] } }\n",
     )?.expect("refused");
     assert!(why.contains("no arm64 Proxmox image for `rocky-9`"), "{why}");
     Ok(())
@@ -94,8 +95,9 @@ name: lxc
 networks:
   lab: { cidr: 10.9.0.0/24 }
 machines:
-  web: { networks: { lab: 10 }, ports: [{ port: 80 }], environment: { MODE: lab }, docker: { image: 'nginx:1.27', lxc: true } }
-  box: { networks: { lab: 11 }, depends_on: [web], vm: { os: debian@12, provision: [s.sh] } }
+  web: { networks: { lab: 10 }, ports: { web: 80 }, environment: { MODE: lab }, app: { image: 'nginx:1.27' } }
+  box: { networks: { lab: 11 }, depends_on: [web], os: debian@12, app: { steps: [{ run: s.sh }] } }
+overrides: { proxmox: { machines: { web: { lxc: true } } } }
 ";
 
 #[test]
@@ -120,8 +122,8 @@ fn an_lxc_machine_is_a_container_from_its_oci_image() -> Outcome {
 
 #[test]
 fn lxc_is_opt_in_and_refuses_what_a_container_cannot_carry() -> Outcome {
-    let spec = isoloom_spec::parse(&LXC.replace(", lxc: true", ""))?;
-    assert!(!isoloom_spec::effective(&spec).contains(&Target::Proxmox));
+    let vm_only = isoloom_plan::Lab::parse(&LXC.replace("overrides: { proxmox: { machines: { web: { lxc: true } } } }\n", "")).map_err(|p| format!("{p:?}"))?;
+    assert!(!vm_only.possible().contains(&Target::Proxmox));
     let volumes = refusal(&LXC.replace("environment: { MODE: lab }", "volumes: { data: /data }"))?.expect("refused");
     assert!(volumes.contains("`volumes`"), "{volumes}");
     let disks = refusal(&LXC.replace("environment: { MODE: lab }", "disks: { data: { size_gb: 2, mount: /data } }"))?.expect("refused");

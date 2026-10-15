@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -137,7 +138,7 @@ services:
       isoloom-probe-arm64:
         condition: service_completed_successfully
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: arm-lab
     restart: unless-stopped
@@ -314,6 +315,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true,
@@ -497,16 +499,15 @@ volumes:
   ],
   "outputs": [
     {
-      "name": "web_80",
-      "description": "web's port 80.",
+      "name": "web_web",
+      "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
       "format": "http://127.0.0.1:${value}/",
       "from": {
         "kind": "published_port",
         "machine": "web",
-        "port": 80,
-        "protocol": "tcp"
+        "port": "web"
       }
     }
   ],
@@ -589,7 +590,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "arm-lab",
   "instance": null,
   "inputs": [],
@@ -622,14 +623,15 @@ volumes:
       "docker_addresses": {
         "lab": "10.60.0.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": 8085
+          "protocol": "http",
+          "publish": 8085,
+          "published": 8085,
+          "url": "http://127.0.0.1:8085/"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -661,7 +663,9 @@ volumes:
   "published": [
     {
       "machine": "web",
+      "name": "web",
       "port": 80,
+      "protocol": "http",
       "host_port": 8085
     }
   ],
@@ -684,11 +688,11 @@ volumes:
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "vagrant": "needs `vm:` on web",
-      "proxmox": "needs `docker.lxc` or `vm:` on web",
-      "esxi": "needs `vm:` on web",
-      "cloud-vm": "needs `vm:` on web",
-      "external": "needs `external:` on web",
+      "vagrant": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
+      "proxmox": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
+      "esxi": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
+      "cloud-vm": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {}

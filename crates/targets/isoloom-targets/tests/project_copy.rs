@@ -10,13 +10,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use isoloom_spec::{Target, load};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
-fn example(name: &str) -> isoloom_spec::Spec {
-    load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).expect("example parses")
+fn example(name: &str) -> Lab {
+    Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).expect("example parses"))
 }
 
-fn file(spec: &isoloom_spec::Spec, target: Target, suffix: &str) -> String {
+fn file(spec: &Lab, target: Target, suffix: &str) -> String {
     generate(spec, target)
         .unwrap()
         .into_iter()

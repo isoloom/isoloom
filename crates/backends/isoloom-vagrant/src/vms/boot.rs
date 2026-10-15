@@ -86,19 +86,20 @@ pub(crate) fn refusal(env: &Environment, provider: Provider<'_>) -> Option<Strin
         .filter(|(_, mp)| mp.shape == MachineShape::Vm)
         .find_map(|(n, mp)| Some((n, mp.boot.as_ref()?)))?;
     match provider {
-        Provider::Libvirt => (b.firmware == Some(Firmware::Uefi) && b.loader.is_none())
-            .then(|| format!("machine `{name}` sets `vm.boot.firmware: uefi`: libvirt boots UEFI from the firmware file in `vm.boot.loader`; give it")),
+        Provider::Libvirt => (b.firmware == Some(Firmware::Uefi) && b.loader.is_none()).then(|| {
+            format!("machine `{name}` sets `hardware.boot.firmware: uefi`: libvirt boots UEFI from the firmware file in `hardware.boot.loader`; give it")
+        }),
         Provider::Qemu => {
             let beyond = b.beyond_firmware_format();
             (!beyond.is_empty()).then(|| {
                 format!(
-                    "machine `{name}` sets `vm.boot.{}`: Vagrant's QEMU provider boots the box's disk through its own firmware (only `firmware_format` applies); the libvirt provider boots it",
-                    beyond.join("`, `vm.boot.")
+                    "machine `{name}` sets `hardware.boot.{}`: Vagrant's QEMU provider boots the box's disk through its own firmware (only `firmware_format` applies); the libvirt provider boots it",
+                    beyond.join("`, `hardware.boot.")
                 )
             })
         }
         other => Some(format!(
-            "machine `{name}` boots its own way (`vm.boot`): Vagrant's {} provider boots the box as it is; the libvirt provider boots it",
+            "machine `{name}` boots its own way (`hardware.boot`): Vagrant's {} provider boots the box as it is; the libvirt provider boots it",
             other.id()
         )),
     }
@@ -111,7 +112,7 @@ mod tests {
 
     fn env(boot: &str) -> Environment {
         environment(&format!(
-            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, vm: {{ os: debian@12, provision: [s.sh], boot: {boot} }} }}\n"
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, os: debian@12, app: {{ steps: [{{ run: s.sh }}] }}, hardware: {{ boot: {boot} }} }}\n"
         ))
     }
 
@@ -120,14 +121,14 @@ mod tests {
         let kernel = env("{ kernel: /boot/vmlinuz, firmware_format: raw }");
         assert_eq!(refusal(&kernel, Provider::Libvirt), None);
         let qemu = refusal(&kernel, Provider::Qemu).unwrap_or_default();
-        assert!(qemu.contains("`vm.boot.kernel`") && !qemu.contains("firmware_format`:"), "{qemu}");
+        assert!(qemu.contains("`hardware.boot.kernel`") && !qemu.contains("firmware_format`:"), "{qemu}");
         assert_eq!(refusal(&env("{ firmware_format: qcow2, firmware: uefi }"), Provider::Qemu), None);
     }
 
     #[test]
     fn libvirt_boots_uefi_from_the_loader_it_is_given() {
         let uefi = refusal(&env("{ firmware: uefi }"), Provider::Libvirt).unwrap_or_default();
-        assert!(uefi.contains("`vm.boot.loader`"), "{uefi}");
+        assert!(uefi.contains("`hardware.boot.loader`"), "{uefi}");
     }
 
     #[test]

@@ -9,26 +9,26 @@ networks:
   app: { cidr: 10.60.0.0/24, internet: false }
 
 machines:
+  # A recipe per form: the official Redis image on containers, a Debian 12 VM its step sets up.
+  # `setup` seeds the greeting once the cache answers, the same way on both.
   cache:
-    os: debian@12     # a VM of Debian 12 where a VM runs it (`vm.os` defaults to it)
+    os: debian@12
     networks: { app: 20 }
-    ports: [{ port: 6379, name: redis }]
+    ports: { redis: 6379 }
     volumes: { data: /data }
-    docker:
+    app:
       image: "redis:7-alpine"
-      init: [build/cache/seed.sh]
-    vm:
-      provision: [provision/cache.sh]
+      steps: [{ run: provision/cache.sh }]
+    setup: [build/cache/seed.sh]
 
   web:
     os: debian@12
     networks: { app: 10 }
-    ports: [{ port: 80, http: true, publish: 8080 }]
+    ports: { web: { port: 80, protocol: http, publish: 8080 } }
     depends_on: [cache]
-    docker:
+    app:
       build: build/web
-    vm:
-      provision: [provision/web.sh]
+      steps: [{ run: provision/web.sh }]
 
 checks:
   - checks/cache-seeded.sh
@@ -60,6 +60,6 @@ checks:
     expect: 405
 
 message: |
-  The page answers at http://localhost:{{ machines.web.ports.0.publish }}/ (and at
+  The page answers at {{ machines.web.ports.web.url }} (and at
   http://web/ from inside). The cache at {{ machines.cache.addresses.app }}:6379 holds the
   greeting seeded at start; nothing here reaches the internet.

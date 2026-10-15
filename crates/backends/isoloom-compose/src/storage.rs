@@ -126,8 +126,8 @@ name: store
 networks: { lan: { cidr: 10.9.0.0/24 } }
 volumes: { data: { persistent: true } }
 machines:
-  db: { networks: { lan: 10 }, docker: { image: postgres }, volumes: { data: /var/lib/postgresql/data } }
-  web: { networks: { lan: 11 }, docker: { image: nginx }, tmpfs: [/run, { path: /cache, size: 64m, mode: '1777' }] }
+  db: { networks: { lan: 10 }, app: { image: postgres }, volumes: { data: /var/lib/postgresql/data } }
+  web: { networks: { lan: 11 }, app: { image: nginx }, tmpfs: [/run, { path: /cache, size: 64m, mode: '1777' }] }
 ";
 
     #[test]

@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ docker (needs `docker:` on web, cache)
+✗ docker (environment-level provisioning (`provision:`) runs on VM targets for now)
 
 # isoloom generate --target docker (exit 1)
-· docker: not possible for this spec (see `isoloom targets`)
+· docker: environment-level provisioning (`provision:`) runs on VM targets for now

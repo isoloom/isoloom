@@ -123,7 +123,7 @@ mod tests {
         let yaml = format!(
             "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nsecrets: {{ db: {{ env: DB }} }}\nmachines:\n  m:\n    networks: {{ lan: 10 }}\n{machine}"
         );
-        let spec = crate::parse(&yaml).expect("parses");
+        let spec = crate::model::from_yaml(&yaml).expect("parses");
         crate::validate(&spec).iter().map(ToString::to_string).collect()
     }
 

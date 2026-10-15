@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -102,7 +103,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 name: workbench
 services:
   bench:
-    image: alpine:3.20
+    image: alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
     platform: linux/amd64
     entrypoint:
     - sleep
@@ -139,7 +140,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: workbench
     restart: unless-stopped
@@ -295,6 +296,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true
@@ -552,7 +554,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "workbench",
   "instance": null,
   "inputs": [],
@@ -573,11 +575,12 @@ volumes:
       "access": false,
       "supplied": false,
       "shapes": [
-        "docker"
+        "docker",
+        "vm"
       ],
       "role": "target",
       "arch": "amd64",
-      "os": null,
+      "os": "alpine-3.19",
       "windows": false,
       "addresses": {
         "lan": "10.90.0.10"
@@ -585,7 +588,7 @@ volumes:
       "docker_addresses": {
         "lan": "10.90.0.10"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -597,7 +600,9 @@ volumes:
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "alpine",
+      "os_version": "3.19"
     },
     "web": {
       "access": false,
@@ -615,14 +620,12 @@ volumes:
       "docker_addresses": {
         "lan": "10.90.0.11"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -671,11 +674,11 @@ volumes:
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "vagrant": "needs `vm:` on bench, web",
-      "proxmox": "needs `docker.lxc` or `vm:` on bench, web",
-      "esxi": "needs `vm:` on bench, web",
-      "cloud-vm": "needs `vm:` on bench, web",
-      "external": "needs `external:` on bench, web",
+      "vagrant": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
+      "proxmox": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
+      "esxi": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
+      "cloud-vm": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
+      "external": "overrides.external.machines.bench: the external target reaches machines that exist already, and `bench` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {}

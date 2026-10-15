@@ -14,19 +14,21 @@ use crate::testing::environment;
 const SPEC: &str = "
 version: 1
 name: core
-inputs: [TOKEN]
+inputs: { TOKEN: { sensitive: false } }
 networks:
   lab: { cidr: 10.9.0.0/24, internet: false }
 machines:
   a:
     networks: { lab: 10 }
-    ports: [{ port: 80 }]
-    inputs: [TOKEN]
-    vm: { os: debian@12, provision: [one.sh, reboot, two.sh] }
+    ports: { web: 80 }
+    environment: { TOKEN: { input: TOKEN } }
+    os: debian@12
+    app: { steps: [{ run: one.sh }, reboot, { run: two.sh }] }
   b:
     networks: { lab: 11 }
     depends_on: [a]
-    vm: { os: debian@12, provision: [b.sh] }
+    os: debian@12
+    app: { steps: [{ run: b.sh }] }
 ";
 
 fn env() -> Environment {
@@ -97,7 +99,10 @@ fn cloud_init_runs_the_rest_at_the_next_boot() {
 
 #[test]
 fn a_machine_waiting_for_secrets_announces_its_address_first() {
-    let spec = format!("{SPEC}secrets:\n  db: {{ env: DB }}\n").replace("    inputs: [TOKEN]\n", "    inputs: [TOKEN]\n    secrets: [db]\n");
+    let spec = format!("{SPEC}secrets:\n  db: {{ env: DB }}\n").replace(
+        "    environment: { TOKEN: { input: TOKEN } }\n",
+        "    environment: { TOKEN: { input: TOKEN } }\n    files: [{ path: /run/secrets/db, secret: db }]\n",
+    );
     let env = environment(&spec, Target::CloudVm);
     let machine = |name| provisioner(&env, name, reference("aws_instance.a.public_ip"), Hooks::default());
     let a = machine("a");

@@ -19,7 +19,7 @@ pub fn step(m: &Machine) -> Option<Step> {
 /// A target that ships the project only when it is read asks this.
 pub fn reads_project(lifecycle: &[Step]) -> bool {
     lifecycle.iter().any(|s| match s {
-        Step::Run { .. } | Step::Before { .. } => true,
+        Step::Run { .. } | Step::Before { .. } | Step::Setup { .. } => true,
         Step::Files { files } => files.iter().any(|f| f.source.is_some()),
         _ => false,
     })
@@ -56,6 +56,7 @@ pub fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -
 mod tests {
     use isoloom_spec::model::Target;
 
+    use crate::Lab;
     use crate::environment::Environment;
     use crate::lifecycle::Step;
     use crate::requirements::Requirement;
@@ -68,18 +69,19 @@ networks:
 machines:
   a:
     networks: { lan: 10 }
-    docker: { image: nginx }
-    vm: { os: debian@12, provision: [setup.sh] }
-    external: { address: 192.0.2.10 }
+    os: debian@12
+    app: { image: nginx, steps: [{ run: setup.sh }] }
     files:
       - { path: /etc/a.ini, content: x }
       - { path: /etc/b.ini, source: conf/b.ini, mode: '0600' }
+overrides:
+  external: { machines: { a: { ssh: { address: 192.0.2.10 } } } }
 ";
 
     fn env(target: Target) -> Environment {
-        let spec = isoloom_spec::parse(SPEC).expect("parses");
-        assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-        Environment::build(&spec, target, None)
+        let lab = Lab::new(isoloom_spec::parse(SPEC).expect("parses"));
+        assert!(lab.problems().is_empty(), "{:?}", lab.problems());
+        Environment::build(&lab.for_target(target), target, None)
     }
 
     #[test]

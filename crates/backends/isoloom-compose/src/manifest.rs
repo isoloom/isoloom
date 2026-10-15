@@ -113,14 +113,34 @@ fn identity() -> Result<Identity> {
     }))
 }
 
-/// Docker's engine and Compose v2 (`--wait-timeout` needs 2.17).
+/// The first Compose that copies a secret read from the environment into the container with
+/// its `uid`, `gid` and `mode`: docker/compose 5c1484e, "apply uid/gid when creating secret from
+/// environment" (2022-12-15), first released in v2.14.1. An input or a secret delivered as a
+/// file relies on it (a `file:` secret is bind-mounted, and Compose ignores its owner and mode).
+const ENVIRONMENT_SECRETS: &str = "2.14.1";
+
+/// The first Compose with `up --wait-timeout`, which the start steps pass: v2.17.0.
+const WAIT_TIMEOUT: &str = "2.17.0";
+
+/// The lowest Compose the run needs: the later of [`ENVIRONMENT_SECRETS`] and [`WAIT_TIMEOUT`].
+fn compose_min_version() -> Result<Version> {
+    let numeric = |v: &str| v.split('.').filter_map(|p| p.parse::<u32>().ok()).collect::<Vec<_>>();
+    let later = if numeric(ENVIRONMENT_SECRETS) > numeric(WAIT_TIMEOUT) {
+        ENVIRONMENT_SECRETS
+    } else {
+        WAIT_TIMEOUT
+    };
+    Ok(Version::parse(later)?)
+}
+
+/// Docker's engine and Compose v2, at the version the run needs ([`compose_min_version`]).
 fn tools() -> Result<Vec<Tool>> {
     let probe = |args: &[&str]| -> Result<HostArgv> { Ok(HostArgv::Every(Argv::new(program("docker")?, args.iter().map(|a| Template::text(a)).collect()))) };
-    let tool = |name: &str, check: HostArgv, min: Option<&str>| -> Result<Tool> {
+    let tool = |name: &str, check: HostArgv, min: Option<Version>| -> Result<Tool> {
         Ok(Tool {
             name: ToolName::parse(name)?,
             probe: check,
-            min_version: min.map(Version::parse).transpose()?,
+            min_version: min,
             container: None,
             container_hosts: BTreeSet::new(),
             hosts: BTreeSet::new(),
@@ -129,7 +149,7 @@ fn tools() -> Result<Vec<Tool>> {
     };
     Ok(vec![
         tool("docker", probe(&["info", "--format", "{{.ServerVersion}}"])?, None)?,
-        tool("docker-compose", probe(&["compose", "version", "--short"])?, Some("2.17.0"))?,
+        tool("docker-compose", probe(&["compose", "version", "--short"])?, Some(compose_min_version()?))?,
     ])
 }
 
@@ -146,4 +166,19 @@ fn networks(env: &Environment) -> Result<Vec<Network>> {
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compose_is_new_enough_to_copy_environment_secrets_with_their_owner_and_mode() {
+        let min = compose_min_version().unwrap();
+        assert_eq!(min.as_str(), WAIT_TIMEOUT);
+        let numeric = |v: &str| v.split('.').map(|p| p.parse::<u32>().unwrap()).collect::<Vec<_>>();
+        assert!(numeric(min.as_str()) >= numeric(ENVIRONMENT_SECRETS));
+        let compose = tools().unwrap().into_iter().find(|t| t.name.as_str() == "docker-compose").unwrap();
+        assert_eq!(compose.min_version, Some(min));
+    }
 }

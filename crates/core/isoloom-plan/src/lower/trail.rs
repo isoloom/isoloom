@@ -60,7 +60,7 @@ impl Trail {
             .filter(|(lowered, _)| within(lowered))
             .max_by_key(|(lowered, _)| lowered.len());
         match best {
-            Some((lowered, written)) => FieldPath::new(format!("{written}{}", rename_inside(&path[lowered.len()..]))),
+            Some((lowered, written)) => FieldPath::new(format!("{written}{}", rename_inside(path.get(lowered.len()..).unwrap_or_default()))),
             None => FieldPath::new(rename(path)),
         }
     }
@@ -98,7 +98,9 @@ fn rename(path: &str) -> String {
 /// A machine field's written path.
 fn machine_field(m: &str, rest: &str) -> String {
     let at = format!("machines.{m}");
-    let (head, tail) = rest.split_once(['.', '[']).map_or((rest, ""), |(h, _)| (h, &rest[h.len()..]));
+    let (head, tail) = rest
+        .split_once(['.', '['])
+        .map_or((rest, ""), |(h, _)| (h, rest.get(h.len()..).unwrap_or_default()));
     let image = |key: &str| -> String {
         match key {
             "vagrant" => format!("overrides.vagrant.machines.{m}.box"),

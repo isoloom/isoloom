@@ -68,10 +68,10 @@ fn lacking(env: &Environment, c: Container) -> Option<&'static str> {
             !mp.files.is_empty() || !mp.secrets.is_empty(),
             "`files` or `secrets` (nothing delivers them into it)",
         ),
-        (!mp.inputs.is_empty(), "`inputs`"),
+        (!mp.inputs.is_empty(), "inputs in its `environment`"),
         (!mp.settings.sysctls.is_empty() || !mp.settings.ulimits.is_empty(), "`sysctls` or `ulimits`"),
         (m.read_only || !m.tmpfs.is_empty() || m.shm_size.is_some(), "`read_only`, `tmpfs` or `shm_size`"),
-        (init, "`docker.init` jobs"),
+        (init, "`setup` jobs"),
         (!mp.process.is_empty(), "a `command`, `before` steps or a `healthcheck` of its own"),
         (mp.hardware.gpus.is_some() || !mp.hardware.devices.is_empty(), "`gpus` or `devices`"),
         (!mp.addresses6.is_empty() || !mp.outside.is_empty(), "IPv6 or a network outside the environment"),
@@ -99,8 +99,8 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
     containers(env).find_map(|c| {
         lacking(env, c).map(|what| {
             format!(
-                "machine `{}` runs as an LXC container (`docker.lxc`), which can't have {what}: give it a `vm:`",
-                c.name
+                "machine `{}` runs as an LXC container (`overrides.proxmox.machines.{}.lxc`), which can't have {what}: run it as a VM (leave `lxc` out)",
+                c.name, c.name
             )
         })
     })
@@ -133,7 +133,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .add_attribute(("file_name", slotted(&format!("-{name}.tar"))))
             .add_attribute(("overwrite_unmanaged", boolean(true)))
             .build();
-        m.commented(&format!("Machine `{name}`: an LXC container (`docker.lxc`), from its image."), image);
+        m.commented(&format!("Machine `{name}`: an LXC container (`overrides.proxmox`), from its image."), image);
         m.block(container(env, c));
         firewall::guest(env, name, Guest::Container, m);
     }

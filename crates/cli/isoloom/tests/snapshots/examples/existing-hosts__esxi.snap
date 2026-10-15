@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ esxi
@@ -575,4 +576,4 @@ resource "local_file" "isoloom_project" {
   content  = join("", [for f in local.project_ignored : "${replace("${basename(local.root)}/${f}", "/[\\\\*?\\[]/", "\\$0")}\n"])
 }
 
-## .isoloom/resolved.json: identical in the `vagrant` snapshot
+## .isoloom/resolved.json: identical in the `hybrid` snapshot

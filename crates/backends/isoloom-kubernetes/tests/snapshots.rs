@@ -5,7 +5,7 @@ use std::error::Error;
 use std::path::Path;
 
 use isoloom_kubernetes::KubernetesBackend;
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
@@ -13,25 +13,40 @@ use isoloom_spec::model::Target;
 /// A test's outcome: a failed step is its report.
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
-/// The environment of `spec`, which must be valid, planned for Kubernetes.
-fn planned(spec: &isoloom_spec::Spec) -> Outcome<Environment> {
-    let problems = isoloom_spec::validate(spec);
+/// The environment of `spec` (the authored format), which must be valid, planned for Kubernetes.
+fn planned(spec: isoloom_spec::Spec) -> Outcome<Environment> {
+    let lab = Lab::new(spec);
+    let problems = lab.problems();
     if !problems.is_empty() {
         return Err(format!("the spec isn't valid: {problems:?}").into());
     }
-    Ok(Environment::build(spec, Target::Kubernetes, None))
+    Ok(Environment::build(&lab.for_target(Target::Kubernetes), Target::Kubernetes, None))
 }
 
-/// An example of the project, planned for Kubernetes.
-fn plan(example: &str) -> Outcome<Environment> {
-    planned(&isoloom_spec::load(
+/// An example of the project, as written.
+fn load(example: &str) -> Outcome<isoloom_spec::Spec> {
+    Ok(isoloom_spec::load(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example),
     )?)
 }
 
+/// An example of the project, planned for Kubernetes.
+fn plan(example: &str) -> Outcome<Environment> {
+    planned(load(example)?)
+}
+
+/// `tuned-web` without its TPM, which makes it a VM only: its container form, which Kubernetes
+/// still refuses.
+fn tuned_web_container() -> Outcome<Environment> {
+    let mut tuned = load("tuned-web")?;
+    let web = tuned.machines.get_mut("web").ok_or("no web machine")?;
+    web.hardware.tpm = isoloom_spec::syntax::Tpm::Auto;
+    planned(tuned)
+}
+
 /// A spec written in a test, planned for Kubernetes.
 fn parsed(yaml: &str) -> Outcome<Environment> {
-    planned(&isoloom_spec::parse(yaml)?)
+    planned(isoloom_spec::parse(yaml)?)
 }
 
 /// The files the backend renders for an example, from its plan.
@@ -109,14 +124,14 @@ fn shared_files_chart() -> Outcome {
 
 #[test]
 fn tuned_web_is_refused_for_its_ulimits() -> Outcome {
-    let err = KubernetesBackend.render(&plan("tuned-web")?).err().ok_or("rendered")?;
+    let err = KubernetesBackend.render(&tuned_web_container()?).err().ok_or("rendered")?;
     insta::assert_snapshot!(err.to_string());
     Ok(())
 }
 
 #[test]
 fn the_refusal_comes_from_the_plan_without_rendering() -> Outcome {
-    let why = KubernetesBackend.refusal(&plan("tuned-web")?).ok_or("not refused")?;
+    let why = KubernetesBackend.refusal(&tuned_web_container()?).ok_or("not refused")?;
     assert_eq!(why, "machine `web` sets `ulimits`: Kubernetes has no per-container process limits");
     assert!(KubernetesBackend.refusal(&plan("hello-stack")?).is_none());
     Ok(())
@@ -136,14 +151,14 @@ networks: { app: { cidr: 10.60.0.0/24 } }
 machines:
   web:
     networks: { app: 10 }
-    ports: [{ port: 80 }]
+    ports: { web: 80 }
     environment: { GREETING: 'hi {{ there }}' }
-    docker: { image: nginx }
+    app: { image: nginx }
   db:
     networks: { app: 20 }
-    ports: [{ port: 5432 }]
+    ports: { db: 5432 }
     depends_on: [web]
-    docker: { build: db }
+    app: { build: db }
 constraints:
   registries: { docker.io: registry.corp/hub }
 ";
@@ -206,7 +221,7 @@ fn braces_survive_a_double_quoted_string() -> Outcome {
 }
 
 /// A spec with one machine, `web`, on one network, `lan`, and `extra` lines for the machine.
-const BASE: &str = "version: 1\nname: r\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lan: 10 }\n    docker: { image: nginx }\n";
+const BASE: &str = "version: 1\nname: r\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lan: 10 }\n    app: { image: nginx }\n";
 
 /// What rendering `yaml` reports, as every backend reports it.
 fn refusal(yaml: &str) -> Outcome<String> {
@@ -253,8 +268,8 @@ fn a_gateway_machine_is_refused_in_kubernetes_words() -> Outcome {
 fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() -> Outcome {
     let spec = MIRRORED
         .replace(
-            "docker: { build: db }",
-            "docker: { build: db, dockerfile: db/Dockerfile.dev, args: { V: \"1 2\" } }",
+            "app: { build: db }",
+            "app: { build: { context: db, dockerfile: db/Dockerfile.dev, args: { V: \"1 2\" } } }",
         )
         .replace("constraints:", "message: Open the shop.\nconstraints:");
     let files = KubernetesBackend.render(&parsed(&spec)?)?;
@@ -275,7 +290,7 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() -> Outcome {
 #[test]
 fn a_secret_with_an_owner_is_copied_into_memory_with_it() -> Outcome {
     let env = parsed(
-        "version: 1\nname: s\nsecrets: { db-password: { env: DB_PASSWORD }, api-key: { env: API_KEY } }\nnetworks: { lan: { cidr: 10.20.0.0/24 } }\nmachines:\n  db:\n    networks: { lan: 10 }\n    docker: { image: postgres }\n    secrets:\n      - { source: db-password, target: /run/secrets/pw, uid: 999, gid: 998, mode: '0400' }\n      - api-key\n",
+        "version: 1\nname: s\nsecrets: { db-password: { env: DB_PASSWORD }, api-key: { env: API_KEY } }\nnetworks: { lan: { cidr: 10.20.0.0/24 } }\nmachines:\n  db:\n    networks: { lan: 10 }\n    app: { image: postgres }\n    files:\n      - { path: /run/secrets/pw, secret: db-password, uid: 999, gid: 998, mode: '0400' }\n      - { path: /run/secrets/api-key, secret: api-key }\n",
     )?;
     let files = KubernetesBackend.render(&env)?;
     let manifests = file(&files, "kubernetes/environment.yaml")?;

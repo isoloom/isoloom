@@ -86,7 +86,9 @@ mod tests {
 
     #[test]
     fn an_appliance_is_refused_from_the_capabilities_without_rendering() {
-        let env = environment("  r: { networks: { lab: 1 }, docker: { image: x, appliance: cisco-iol }, external: { address: 10.0.0.1 } }\n");
+        let env = environment(
+            "  r: { networks: { lab: 1 }, app: { image: x, appliance: cisco-iol } }\noverrides: { external: { machines: { r: { ssh: { address: 10.0.0.1 } } } } }\n",
+        );
         let refusal = ExternalBackend.refusal(&env).expect("refused");
         assert!(refusal.contains("network appliance"), "{refusal}");
         assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })));
@@ -95,14 +97,16 @@ mod tests {
     #[test]
     fn rendering_twice_gives_the_same_files() {
         let env = environment(
-            "  a: { networks: { lab: 5 }, vm: { os: debian@12 }, external: { address: 10.0.0.5 } }\n  b: { networks: { lab: 6 }, vm: { os: debian@12 }, external: { address: 10.0.0.6 } }\n",
+            "  a: { networks: { lab: 5 }, os: debian@12 }\n  b: { networks: { lab: 6 }, os: debian@12 }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } }, b: { ssh: { address: 10.0.0.6 } } } } }\n",
         );
         assert_eq!(render(&env).expect("renders"), render(&env).expect("renders again"));
     }
 
     #[test]
     fn the_inventory_reaches_each_host_at_its_own_address_and_port() {
-        let env = environment("  a: { networks: { lab: 5 }, vm: { os: debian@12 }, external: { address: h.example, port: 2200 } }\n");
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: debian@12 }\noverrides: { external: { machines: { a: { ssh: { address: h.example, port: 2200 } } } } }\n",
+        );
         let files = render(&env).expect("renders");
         let inventory = files.iter().find(|f| f.path == ".isoloom/external/inventory.ini").expect("the inventory");
         assert!(

@@ -15,7 +15,7 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
         let b = mp.boot.as_ref()?;
         let field = first_set(b, HOST_FILES.into_iter().chain([Field::FirmwareFormat, Field::Order, Field::Network]))?;
         Some(format!(
-            "machine `{name}` sets `vm.boot.{field}`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it"
+            "machine `{name}` sets `hardware.boot.{field}`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it"
         ))
     })
 }

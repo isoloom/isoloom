@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ proxmox (needs `docker.lxc` or `vm:` on r1, r2, host-a, host-b)
+✗ proxmox (machines.r1.app.appliance: an appliance's packaging exists only as a container)
 
 # isoloom generate --target proxmox (exit 1)
-· proxmox: not possible for this spec (see `isoloom targets`)
+· proxmox: machines.r1.app.appliance: an appliance's packaging exists only as a container

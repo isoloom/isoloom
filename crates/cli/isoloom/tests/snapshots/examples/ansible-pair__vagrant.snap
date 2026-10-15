@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ vagrant
@@ -14,7 +15,7 @@ source: crates/isoloom/tests/example_snapshots.rs
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "ansible-pair",
   "instance": null,
   "inputs": [],
@@ -35,6 +36,7 @@ source: crates/isoloom/tests/example_snapshots.rs
       "access": false,
       "supplied": false,
       "shapes": [
+        "docker",
         "vm"
       ],
       "role": "target",
@@ -47,14 +49,12 @@ source: crates/isoloom/tests/example_snapshots.rs
       "docker_addresses": {
         "lab": "10.63.0.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -74,6 +74,7 @@ source: crates/isoloom/tests/example_snapshots.rs
       "access": false,
       "supplied": false,
       "shapes": [
+        "docker",
         "vm"
       ],
       "role": "target",
@@ -86,14 +87,12 @@ source: crates/isoloom/tests/example_snapshots.rs
       "docker_addresses": {
         "lab": "10.63.0.20"
       },
-      "ports": [
-        {
+      "ports": {
+        "redis": {
           "port": 6379,
-          "name": "redis",
-          "http": false,
-          "publish": null
+          "protocol": "tcp"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -133,6 +132,11 @@ source: crates/isoloom/tests/example_snapshots.rs
   "published": [],
   "targets": {
     "possible": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes",
       "vagrant",
       "proxmox",
       "esxi",
@@ -144,15 +148,16 @@ source: crates/isoloom/tests/example_snapshots.rs
       "esxi",
       "cloud-vm"
     ],
-    "refused": {},
+    "refused": {
+      "docker": "environment-level provisioning (`provision:`) runs on VM targets for now",
+      "hosted": "environment-level provisioning (`provision:`) runs on VM targets for now",
+      "docker-vm": "environment-level provisioning (`provision:`) runs on VM targets for now",
+      "cloud-docker": "environment-level provisioning (`provision:`) runs on VM targets for now",
+      "kubernetes": "environment-level provisioning (`provision:`) runs on VM targets for now"
+    },
     "not_possible": {
-      "docker": "needs `docker:` on web, cache",
-      "hosted": "needs `docker:` on web, cache",
-      "docker-vm": "needs `docker:` on web, cache",
-      "cloud-docker": "needs `docker:` on web, cache",
-      "kubernetes": "needs `docker:` on web, cache",
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on web, cache",
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

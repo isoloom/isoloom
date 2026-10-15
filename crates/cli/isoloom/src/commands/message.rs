@@ -22,18 +22,18 @@ pub struct Args {
 }
 
 pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
-    let spec = spec::load_valid(profile, &a.dir, a.instance, &a.sets)?;
+    let lab = spec::load_valid(profile, &a.dir, a.instance, &a.sets)?;
     // Where it runs decides the addresses (Docker blocks on the Compose targets).
     let on = match a.target.as_deref() {
         Some(id) => Some(target::by_id(id)?),
-        None => match isoloom_spec::effective(&spec).as_slice() {
+        None => match lab.possible().as_slice() {
             [one] => Some(*one),
             _ => None,
         },
     };
     let message = match on {
-        Some(t) => isoloom_targets::resolved::render_message_on(&spec, a.instance, t)?,
-        None => isoloom_targets::resolved::render_message(&spec, a.instance)?,
+        Some(t) => isoloom_targets::resolved::render_message_on(&lab, a.instance, t)?,
+        None => isoloom_targets::resolved::render_message(&lab, a.instance)?,
     };
     match message {
         Some(m) => println!("{}", m.trim_end()),

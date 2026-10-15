@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -452,7 +453,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: cisco-switch
     restart: unless-stopped
@@ -482,7 +483,7 @@ services:
       isoloom.environment: cisco-switch
     restart: unless-stopped
   staff:
-    image: alpine:3.20
+    image: alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
     platform: linux/amd64
     entrypoint:
     - sleep
@@ -499,7 +500,7 @@ services:
       isoloom.environment: cisco-switch
     restart: unless-stopped
   guest:
-    image: alpine:3.20
+    image: alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
     platform: linux/amd64
     entrypoint:
     - sleep
@@ -751,6 +752,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true
@@ -1171,7 +1173,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "cisco-switch",
   "instance": null,
   "inputs": [],
@@ -1209,7 +1211,7 @@ volumes:
       "windows": false,
       "addresses": {},
       "docker_addresses": {},
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1241,14 +1243,12 @@ volumes:
         "office-vlan10": "10.92.10.10",
         "office-vlan20": "10.92.20.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1266,11 +1266,12 @@ volumes:
       "access": false,
       "supplied": false,
       "shapes": [
-        "docker"
+        "docker",
+        "vm"
       ],
       "role": "target",
       "arch": "amd64",
-      "os": null,
+      "os": "alpine-3.19",
       "windows": false,
       "addresses": {
         "office-vlan10": "10.92.10.20"
@@ -1278,7 +1279,7 @@ volumes:
       "docker_addresses": {
         "office-vlan10": "10.92.10.20"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1290,17 +1291,20 @@ volumes:
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "alpine",
+      "os_version": "3.19"
     },
     "guest": {
       "access": false,
       "supplied": false,
       "shapes": [
-        "docker"
+        "docker",
+        "vm"
       ],
       "role": "target",
       "arch": "amd64",
-      "os": null,
+      "os": "alpine-3.19",
       "windows": false,
       "addresses": {
         "office-vlan20": "10.92.20.20"
@@ -1308,7 +1312,7 @@ volumes:
       "docker_addresses": {
         "office-vlan20": "10.92.20.20"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1320,7 +1324,9 @@ volumes:
       "gateway_of": [],
       "routes": [],
       "default_gateway": null,
-      "offline": true
+      "offline": true,
+      "os_family": "alpine",
+      "os_version": "3.19"
     }
   },
   "start_order": [
@@ -1357,15 +1363,15 @@ volumes:
       "cloud-docker"
     ],
     "refused": {
-      "kubernetes": "machine `sw1` is a network appliance (`docker.appliance`), which runs on the Docker targets"
+      "kubernetes": "machine `sw1` is a network appliance (`app.appliance`), which runs on the Docker targets"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "vagrant": "needs `vm:` on sw1, files, staff, guest",
-      "proxmox": "needs `docker.lxc` or `vm:` on sw1, files, staff, guest",
-      "esxi": "needs `vm:` on sw1, files, staff, guest",
-      "cloud-vm": "needs `vm:` on sw1, files, staff, guest",
-      "external": "needs `external:` on sw1, files, staff, guest",
+      "vagrant": "machines.sw1.app.appliance: an appliance's packaging exists only as a container",
+      "proxmox": "machines.sw1.app.appliance: an appliance's packaging exists only as a container",
+      "esxi": "machines.sw1.app.appliance: an appliance's packaging exists only as a container",
+      "cloud-vm": "machines.sw1.app.appliance: an appliance's packaging exists only as a container",
+      "external": "overrides.external.machines.sw1: the external target reaches machines that exist already, and `sw1` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {}

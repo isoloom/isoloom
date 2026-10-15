@@ -6,10 +6,15 @@
 use std::path::Path;
 
 use isoloom_plan::checks::{self, HttpExpect, Line, Position, Probe, TcpExpect};
-use isoloom_spec::{load, parse, validate};
+use isoloom_spec::{load, parse};
+use isoloom_targets::Lab;
 
-fn example(name: &str) -> isoloom_spec::Spec {
-    load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).expect("example parses")
+fn example(name: &str) -> Lab {
+    Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).expect("example parses"))
+}
+
+fn lab(yaml: &str) -> Lab {
+    Lab::new(parse(yaml).expect("parses"))
 }
 
 fn names(plan: &[checks::Resolved], from: &str) -> Vec<String> {
@@ -22,7 +27,7 @@ fn names(plan: &[checks::Resolved], from: &str) -> Vec<String> {
 #[test]
 fn derived_checks_follow_reach_and_shared_networks() {
     // segmented: access -> front (all ports), front -> back on 6379 only.
-    let derived = checks::derived(&example("segmented"));
+    let derived = checks::derived(&example("segmented").spec());
     // web's dormant 4444 isn't expected to answer from the user (only once exploited).
     assert_eq!(names(&derived, "user"), ["cache:6379 blocked from user", "web:80 from user"]);
     assert_eq!(names(&derived, "web"), ["cache:6379 from web"]);
@@ -51,7 +56,7 @@ fn a_closed_path_to_a_multihomed_machine_is_not_asserted() {
     // edge-firewall: fw is on outside (.2), dmz (.1) and lan (.1). From web (dmz), fw's dmz address
     // answers; its outside and lan addresses would be reached through fw itself, so nothing is
     // promised about them. From the user (outside), the lan cache is unreachable everywhere.
-    let derived = checks::derived(&example("edge-firewall"));
+    let derived = checks::derived(&example("edge-firewall").spec());
     assert_eq!(names(&derived, "web"), ["fw:8080 on dmz from web", "cache:6379 from web"]);
     assert_eq!(
         names(&derived, "user"),
@@ -67,7 +72,7 @@ fn a_closed_path_to_a_multihomed_machine_is_not_asserted() {
 
 #[test]
 fn windows_machines_are_not_vantage_points() {
-    let derived = checks::derived(&example("corp-ad-basics"));
+    let derived = checks::derived(&example("corp-ad-basics").spec());
     assert!(derived.iter().all(|c| c.position != Position::Machine("dc01".into())));
     assert!(derived.iter().all(|c| c.position != Position::Machine("ws-01".into())));
     // The access machine (no implementation) still is: the runner supplies it.
@@ -78,14 +83,14 @@ fn windows_machines_are_not_vantage_points() {
 
 /// Windows only: a domain controller on two networks and a workstation, no `checks:` of their
 /// own.
-const WINDOWS_ONLY: &str = "version: 1\nname: win\nnetworks:\n  corp: { cidr: 10.9.0.0/24 }\n  vault: { cidr: 10.9.1.0/24 }\nmachines:\n  dc: { networks: { corp: 10, vault: 10 }, ports: [{ port: 389 }], vm: { os: windows-server@2022, provision: [p.ps1] } }\n  ws: { networks: { corp: 20 }, ports: [{ port: 443, http: true, tls: true }], vm: { os: windows-server@2025, provision: [p.ps1] } }\n";
+const WINDOWS_ONLY: &str = "version: 1\nname: win\nnetworks:\n  corp: { cidr: 10.9.0.0/24 }\n  vault: { cidr: 10.9.1.0/24 }\nmachines:\n  dc: { os: windows-server@2022, networks: { corp: 10, vault: 10 }, ports: { ldap: 389 }, app: { steps: [{ run: p.ps1 }] } }\n  ws: { os: windows-server@2025, networks: { corp: 20 }, ports: { web: { port: 443, protocol: https } }, app: { steps: [{ run: p.ps1 }] } }\n";
 
 #[test]
 fn without_a_machine_to_run_them_derived_checks_stand_on_the_networks() {
     // With an offline network too: nothing stands there to say the internet doesn't answer.
-    let spec = parse(&WINDOWS_ONLY.replace("10.9.1.0/24 }", "10.9.1.0/24, internet: false }")).unwrap();
-    assert_eq!(validate(&spec), vec![]);
-    let derived = checks::derived(&spec);
+    let spec = lab(&WINDOWS_ONLY.replace("10.9.1.0/24 }", "10.9.1.0/24, internet: false }"));
+    assert_eq!(spec.problems(), vec![]);
+    let derived = checks::derived(&spec.spec());
     // Every service at each of its addresses; nothing blocked or offline to assert from there.
     let names: Vec<&str> = derived.iter().map(|c| c.name.as_str()).collect();
     assert_eq!(
@@ -103,7 +108,7 @@ fn without_a_machine_to_run_them_derived_checks_stand_on_the_networks() {
     assert!(matches!(&derived[2].probe, Probe::Http { url, expect: HttpExpect::Any, .. } if url.https));
 
     // windows-hello: its page, besides the author's script.
-    let plan = checks::plan(&example("windows-hello"));
+    let plan = checks::plan(&example("windows-hello").spec());
     let derived: Vec<&str> = plan.iter().filter(|c| c.derived).map(|c| c.name.as_str()).collect();
     assert_eq!(derived, ["web01:80 from the networks"]);
 }
@@ -112,7 +117,7 @@ fn without_a_machine_to_run_them_derived_checks_stand_on_the_networks() {
 fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() {
     use isoloom_spec::Target;
     use isoloom_targets::generate;
-    let spec = parse(WINDOWS_ONLY).unwrap();
+    let spec = lab(WINDOWS_ONLY);
     let file = |files: &[isoloom_targets::GeneratedFile], path: &str| files.iter().find(|f| f.path == path).map(|f| f.contents.clone());
 
     // Vagrant: a controller VM with the runner (there was none: no playbooks, no checks).
@@ -125,7 +130,7 @@ fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() {
     assert!(runner.contains("_http_any 'https://10.9.0.20:443/'"), "{runner}");
 
     // AWS and Azure (a Windows machine on one network there): a controller, and the runner on it.
-    let one_net = parse(&WINDOWS_ONLY.replace("corp: 10, vault: 10", "vault: 10")).unwrap();
+    let one_net = lab(&WINDOWS_ONLY.replace("corp: 10, vault: 10", "vault: 10"));
     let files = generate(&one_net, Target::CloudVm).unwrap();
     let runner = file(&files, ".isoloom/cloud-vm/checks/networks.sh").expect("the networks' runner");
     assert!(runner.contains("_retry 30 _tcp '10.9.1.10' 389"), "{runner}");
@@ -145,7 +150,7 @@ fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() {
 fn hybrid_checks_from_the_controller_when_only_containers_could() {
     use isoloom_spec::Target;
     use isoloom_targets::generate;
-    let runner = |spec: &isoloom_spec::Spec, dir: &str, target| {
+    let runner = |spec: &Lab, dir: &str, target| {
         generate(spec, target)
             .unwrap()
             .into_iter()
@@ -163,20 +168,19 @@ fn hybrid_checks_from_the_controller_when_only_containers_could() {
     assert!(!vagrant.contains("from the networks"), "{vagrant}");
 }
 
-const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, ports: [{ port: 80, http: true }], docker: { image: nginx } }\n  user: { access: true, networks: { lab: 20 } }\n";
+const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, ports: { web: { port: 80, protocol: http } }, app: { image: nginx } }\n  user: { access: true, networks: { lab: 20 } }\n";
 
 fn problems(yaml: &str) -> Vec<String> {
-    validate(&parse(yaml).expect("parses")).into_iter().map(|p| p.to_string()).collect()
+    lab(yaml).problems().iter().map(isoloom_spec::syntax::Problem::line).collect()
 }
 
 #[test]
 fn declared_checks_resolve_to_positions_probes_and_defaults() {
-    let spec = parse(&format!(
+    let spec = lab(&format!(
         "{BASE}checks:\n  - checks/a.sh\n  - {{ http: http://web/ }}\n  - {{ name: sealed, from: web, tcp: db:5432, expect: blocked }}\n  - {{ from: web, exec: id, expect: root, wait: 9 }}\n"
-    ))
-    .unwrap();
-    assert_eq!(validate(&spec), vec![]);
-    let plan = checks::plan(&spec);
+    ));
+    assert_eq!(spec.problems(), vec![]);
+    let plan = checks::plan(&spec.spec());
     let own: Vec<&checks::Resolved> = plan.iter().filter(|c| !c.derived).collect();
     // A script and a check without `from` stand where the access machine stands.
     assert_eq!(own[0].position, Position::Machine("user".into()));
@@ -197,7 +201,7 @@ fn declared_checks_resolve_to_positions_probes_and_defaults() {
 
 #[test]
 fn derived_checks_follow_the_declared_ones() {
-    let spec = parse(&format!("{BASE}checks:\n  - {{ http: http://web/ }}\n")).unwrap();
+    let spec = lab(&format!("{BASE}checks:\n  - {{ http: http://web/ }}\n")).spec();
     let plan = checks::plan(&spec);
     let first_derived = plan.iter().position(|c| c.derived).unwrap();
     assert!(plan[..first_derived].iter().all(|c| !c.derived) && plan[first_derived..].iter().all(|c| c.derived));
@@ -254,12 +258,15 @@ fn a_check_that_is_off_names_its_field() {
     }
     // A typo in a declared check is reported as such, not as "no variant matched".
     let err = parse(&format!("{BASE}checks:\n  - {{ htp: http://web/ }}\n")).unwrap_err().to_string();
-    assert!(err.contains("unknown field `htp`"), "{err}");
+    assert!(
+        err.contains("error[unknown-field] checks[0].htp") && err.contains("did you mean `http`?"),
+        "{err}"
+    );
 }
 
 #[test]
 fn runner_scripts_print_lines_the_cli_reads_back() {
-    let spec = example("segmented");
+    let spec = example("segmented").spec();
     let plan = checks::plan(&spec);
     let groups = checks::by_position(&spec, &plan);
     // The default position (the access machine) comes first, then machines in spec order.
@@ -322,17 +329,16 @@ fn tcp_checks_read_a_greeting_and_send_a_line() {
     let late = serve(false, 1500, |_| "220 mail ESMTP ready\r\n".into());
     let pong = serve(true, 0, |l| if l == "PING" { "+PONG\r\n".into() } else { format!("-ERR unknown '{l}'\r\n") });
     let silent = serve(false, 0, |_| String::new());
-    let spec = parse(&format!(
+    let spec = lab(&format!(
         "{BASE}checks:\n  \
          - {{ name: banner, tcp: '127.0.0.1:{banner}', contains: SSH-2.0 }}\n  \
          - {{ name: late, tcp: '127.0.0.1:{late}', contains: ESMTP, wait: 0 }}\n  \
          - {{ name: ping, tcp: '127.0.0.1:{pong}', send: PING, contains: +PONG }}\n  \
          - {{ name: wrong, tcp: '127.0.0.1:{pong}', send: PING, contains: HELLO, wait: 0 }}\n  \
          - {{ name: silent, tcp: '127.0.0.1:{silent}', contains: x, wait: 0 }}\n"
-    ))
-    .unwrap();
-    assert_eq!(validate(&spec), vec![]);
-    let plan: Vec<checks::Resolved> = checks::plan(&spec).into_iter().filter(|c| !c.derived).collect();
+    ));
+    assert_eq!(spec.problems(), vec![]);
+    let plan: Vec<checks::Resolved> = checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect();
     let host = |h: &checks::Host, _: &Position| h.to_string();
     let run = |p: &str| format!("sh {p}");
     let render = checks::Render {
@@ -370,12 +376,12 @@ fn exec_checks_run_inside_the_machine_on_docker_and_kubernetes() {
         None,
         "a VM runs exec checks on the machine itself"
     );
-    let with_docker = parse(&format!("{BASE}checks:\n  - {{ from: web, exec: id, expect: uid }}\n")).unwrap();
+    let with_docker = lab(&format!("{BASE}checks:\n  - {{ from: web, exec: id, expect: uid }}\n"));
     assert_eq!(isoloom_targets::refusal(&with_docker, isoloom_spec::Target::Docker), None);
     assert_eq!(isoloom_targets::refusal(&with_docker, isoloom_spec::Target::Kubernetes), None);
     // From where no container of its own stands, there's nothing to run it inside (`validate`
     // says so first, and `refusal` reports the spec's problem).
-    let from_user = parse(&format!("{BASE}checks:\n  - {{ exec: id }}\n")).unwrap();
+    let from_user = lab(&format!("{BASE}checks:\n  - {{ exec: id }}\n"));
     let why = isoloom_targets::refusal(&from_user, isoloom_spec::Target::Docker).expect("refused");
     assert!(why.contains("say which with `from`"), "{why}");
     // Its own runner, piped into the machine; the runner beside it doesn't run it.
@@ -392,7 +398,7 @@ fn exec_checks_run_inside_the_machine_on_docker_and_kubernetes() {
 /// A TLS service's derived check goes over HTTPS.
 #[test]
 fn a_tls_service_is_probed_over_https() {
-    let spec = parse(&BASE.replace("http: true }", "http: true, tls: true }")).unwrap();
+    let spec = lab(&BASE.replace("protocol: http }", "protocol: https }")).spec();
     let plan = checks::plan(&spec);
     let derived = plan
         .iter()
@@ -477,7 +483,7 @@ fn which(tool: &str) -> Option<String> {
 #[cfg(unix)]
 fn http_checks_follow_redirects_when_asked() {
     let u = format!("http://127.0.0.1:{}", redirecting_server());
-    let spec = parse(&format!(
+    let spec = lab(&format!(
         "{BASE}checks:\n  \
          - {{ name: first, http: '{u}/old', expect: 302, wait: 0 }}\n  \
          - {{ name: unfollowed, http: '{u}/old', wait: 0 }}\n  \
@@ -487,10 +493,9 @@ fn http_checks_follow_redirects_when_asked() {
          - {{ name: login, http: '{u}/login', method: post, body: 'user=a', follow: true, contains: welcome, wait: 0 }}\n  \
          - {{ name: empty post, http: '{u}/login', method: POST, follow: true, wait: 0 }}\n  \
          - {{ name: unfollowed post, http: '{u}/login', method: POST, body: 'user=a', expect: 302, wait: 0 }}\n"
-    ))
-    .unwrap();
-    assert_eq!(validate(&spec), vec![]);
-    let plan: Vec<checks::Resolved> = checks::plan(&spec).into_iter().filter(|c| !c.derived).collect();
+    ));
+    assert_eq!(spec.problems(), vec![]);
+    let plan: Vec<checks::Resolved> = checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect();
     assert!(matches!(&plan[2].probe, Probe::Http { request, .. } if request.follow));
     let host = |h: &checks::Host, _: &Position| h.to_string();
     let run = |p: &str| format!("sh {p}");

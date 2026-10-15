@@ -16,17 +16,17 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
         let b = mp.boot.as_ref()?;
         if let Some(field) = first_set(b, HOST_FILES.into_iter().chain([Field::Network])) {
             return Some(format!(
-                "machine `{name}` sets `vm.boot.{field}`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it"
+                "machine `{name}` sets `hardware.boot.{field}`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it"
             ));
         }
         if mp.is_windows() && b.firmware.is_some() {
-            return Some(format!("machine `{name}` sets `vm.boot.firmware`: a Windows machine boots its template's UEFI on Proxmox"));
+            return Some(format!("machine `{name}` sets `hardware.boot.firmware`: a Windows machine boots its template's UEFI on Proxmox"));
         }
         if b.order.contains(&BootDevice::Cdrom) {
             return Some(format!("machine `{name}` boots from `cdrom`: its Proxmox VM has no CD-ROM drive"));
         }
         (b.firmware_format.is_some() && b.firmware != Some(Firmware::Uefi)).then(|| {
-            format!("machine `{name}` sets `vm.boot.firmware_format`: on Proxmox it is the EFI disk's, with `firmware: uefi`")
+            format!("machine `{name}` sets `hardware.boot.firmware_format`: on Proxmox it is the EFI disk's, with `firmware: uefi`")
         })
     })
 }

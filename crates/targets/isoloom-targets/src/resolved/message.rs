@@ -1,57 +1,76 @@
 //! The spec's `message`, its `{{ path }}` placeholders filled from the resolved snapshot, as it
 //! reads on the target the environment runs on, and as the run manifest holds it.
 
-use std::num::NonZeroU16;
-
 use isoloom_manifest::{Name, Part, Placeholder, Template};
 use serde_json::Value;
 
-use super::resolve_with;
-use crate::model::{Protocol as SpecProtocol, Spec, Target};
+use super::{Lab, resolve_with};
+use crate::model::Target;
 
-/// The spec's `message` with its `{{ path }}` placeholders filled from the snapshot; an error
+/// The lab's `message` with its `{{ path }}` placeholders filled from the snapshot; an error
 /// names a placeholder that points at nothing.
-pub fn render_message(spec: &Spec, instance: Option<u8>) -> Result<Option<String>, String> {
-    let Some(m) = &spec.message else { return Ok(None) };
-    let snapshot = resolve_with(spec, instance);
-    fill(m, &snapshot).map(Some)
+///
+/// # Errors
+///
+/// A placeholder that points at nothing in the snapshot, or a `{{` without its `}}`.
+pub fn render_message(lab: &Lab, instance: Option<u8>) -> Result<Option<String>, String> {
+    let Some(m) = &lab.source().message else { return Ok(None) };
+    fill(m, &resolve_with(lab, instance)).map(Some)
 }
 
 /// The message as it reads where the environment runs on `target`: on the targets that run
 /// the Compose file, machines are at their Docker addresses, so `machines.<m>.addresses` is
 /// filled with those (see [`on_target`]).
-pub fn render_message_on(spec: &Spec, instance: Option<u8>, target: Target) -> Result<Option<String>, String> {
-    render_message_at(spec, instance, target, &[])
+///
+/// # Errors
+///
+/// As [`render_message`].
+pub fn render_message_on(lab: &Lab, instance: Option<u8>, target: Target) -> Result<Option<String>, String> {
+    render_message_at(lab, instance, target, &[])
 }
 
-/// [`render_message_on`] with the host ports the environment really got, as (machine, port,
-/// protocol, host port): local Docker publishes on free ports unless `ISOLOOM_PUBLISH_FIXED` is set, so
-/// `{{ machines.web.ports.0.publish }}` must say where it answers (see [`with_published`]).
-pub fn render_message_at(spec: &Spec, instance: Option<u8>, target: Target, published: &[(String, u16, SpecProtocol, u16)]) -> Result<Option<String>, String> {
-    let Some(m) = &spec.message else { return Ok(None) };
-    fill(m, &with_published(on_target(resolve_with(spec, instance), target), published)).map(Some)
+/// [`render_message_on`] with the host ports the environment really got, as (machine, port
+/// name, host port): local Docker publishes on free ports unless `ISOLOOM_PUBLISH_FIXED` is set,
+/// so `{{ machines.web.ports.site.published }}` must say where it answers (see
+/// [`with_published`]).
+///
+/// # Errors
+///
+/// As [`render_message`].
+pub fn render_message_at(lab: &Lab, instance: Option<u8>, target: Target, published: &[(String, String, u16)]) -> Result<Option<String>, String> {
+    let Some(m) = &lab.source().message else { return Ok(None) };
+    fill(m, &with_published(on_target(resolve_with(lab, instance), target), published)).map(Some)
 }
 
-/// The snapshot with the host ports the environment really got, as (machine, port, protocol,
-/// host port): each port's `publish` and the `published` list's `host_port`.
-pub fn with_published(mut snapshot: Value, published: &[(String, u16, SpecProtocol, u16)]) -> Value {
-    // A port without `protocol` in the snapshot is TCP.
-    let same = |v: &Value, port: u16, proto: SpecProtocol| v["port"] == port && v["protocol"].as_str().unwrap_or("tcp") == proto.id();
-    for (machine, port, proto, host) in published {
-        let ports = snapshot.pointer_mut(&format!("/machines/{machine}/ports")).and_then(Value::as_array_mut);
-        for s in ports.into_iter().flatten().filter(|s| same(s, *port, *proto)) {
-            s["publish"] = (*host).into();
+/// The snapshot with the host ports the environment really got, as (machine, port name, host
+/// port): each port's `published` and `url`, and the `published` list's `host_port`.
+#[must_use]
+pub fn with_published(mut snapshot: Value, published: &[(String, String, u16)]) -> Value {
+    for (machine, name, host) in published {
+        if let Some(p) = snapshot.pointer_mut(&format!("/machines/{machine}/ports/{name}")) {
+            p["published"] = (*host).into();
+            if let Some(url) = p.get("url").and_then(Value::as_str).map(|u| with_port(u, *host)) {
+                p["url"] = url.into();
+            }
         }
         let listed = snapshot.get_mut("published").and_then(Value::as_array_mut);
         for p in listed
             .into_iter()
             .flatten()
-            .filter(|p| p["machine"] == machine.as_str() && same(p, *port, *proto))
+            .filter(|p| p["machine"] == machine.as_str() && p["name"] == name.as_str())
         {
             p["host_port"] = (*host).into();
         }
     }
     snapshot
+}
+
+/// URL `url` (`http://127.0.0.1:8080/`) on host port `host` instead.
+fn with_port(url: &str, host: u16) -> String {
+    match url.rsplit_once(':') {
+        Some((head, _)) => format!("{head}:{host}/"),
+        None => url.to_string(),
+    }
 }
 
 /// The snapshot as seen on `target`: on the Compose targets (Docker, a hosting service, Docker
@@ -128,46 +147,45 @@ pub fn fill(text: &str, snapshot: &Value) -> Result<String, String> {
 
 /// The message as the run manifest holds it on `target`: what is known when the files are
 /// generated filled in, and each published port's host port left to the runner (`{{
-/// machines.web.ports.0.publish }}` becomes `${published.web.80}`). `None` without a message, or
-/// when a placeholder points at nothing (the snapshot's message is null then too).
-pub fn manifest_message(spec: &Spec, instance: Option<u8>, target: Target) -> Option<Template> {
-    let text = spec.message.as_ref()?;
-    let snapshot = on_target(resolve_with(spec, instance), target);
-    let parts = pieces(text).ok()?.into_iter().map(|p| match p {
-        Piece::Text(t) => Ok(Part::Text(t.to_string())),
-        Piece::Path(path) => match published(&snapshot, path) {
-            Some(port) => Ok(Part::Placeholder(port)),
-            None => shown(&snapshot, path).map(Part::Text),
-        },
-    });
-    parts.collect::<Result<Vec<Part>, String>>().ok().map(Template::from_parts)
+/// machines.web.ports.site.published }}` becomes `${published.web.site}`, and its `.url` the
+/// page at it). `None` without a message, or when a placeholder points at nothing (the
+/// snapshot's message is null then too).
+#[must_use]
+pub fn manifest_message(lab: &Lab, instance: Option<u8>, target: Target) -> Option<Template> {
+    let text = lab.source().message.as_ref()?;
+    let snapshot = on_target(resolve_with(lab, instance), target);
+    let mut parts = Vec::new();
+    for piece in pieces(text).ok()? {
+        match piece {
+            Piece::Text(t) => parts.push(Part::Text(t.to_string())),
+            Piece::Path(path) => match published(&snapshot, path) {
+                Some(found) => parts.extend(found),
+                None => parts.push(Part::Text(shown(&snapshot, path).ok()?)),
+            },
+        }
+    }
+    Some(Template::from_parts(parts))
 }
 
-/// The published port a path names (`machines.<m>.ports.<i>.publish`,
-/// `published.<i>.host_port`), as the manifest's placeholder for its host port.
-fn published(snapshot: &Value, path: &str) -> Option<Placeholder> {
+/// What a path to a published port reads as in the manifest: its host port
+/// (`machines.<m>.ports.<name>.published`) or its page (`.url`) with the host port left to the
+/// runner.
+fn published(snapshot: &Value, path: &str) -> Option<Vec<Part>> {
     let keys: Vec<&str> = path.split('.').filter(|k| !k.is_empty()).collect();
-    let (machine, port) = match keys.as_slice() {
-        ["machines", m, "ports", i, "publish"] => {
-            let port = snapshot.pointer(&format!("/machines/{m}/ports/{i}"))?;
-            port.get("publish").filter(|p| !p.is_null())?;
-            ((*m).to_string(), port)
-        }
-        ["published", i, "host_port"] => {
-            let port = snapshot.pointer(&format!("/published/{i}"))?;
-            (port["machine"].as_str()?.to_string(), port)
-        }
-        _ => return None,
+    let ["machines", m, "ports", name, field @ ("published" | "url")] = keys.as_slice() else {
+        return None;
     };
-    Some(Placeholder::Published {
-        machine: Name::parse(&machine).ok()?,
-        port: u16::try_from(port["port"].as_u64()?).ok().and_then(NonZeroU16::new)?,
-        protocol: if port["protocol"].as_str() == Some("udp") {
-            isoloom_manifest::Protocol::Udp
-        } else {
-            isoloom_manifest::Protocol::Tcp
-        },
-    })
+    let port = snapshot.pointer(&format!("/machines/{m}/ports/{name}"))?;
+    port.get("published").filter(|p| !p.is_null())?;
+    let host = Part::Placeholder(Placeholder::Published {
+        machine: Name::parse(m).ok()?,
+        port: Name::parse(name).ok()?,
+    });
+    if *field == "published" {
+        return Some(vec![host]);
+    }
+    let scheme = if port["protocol"] == "https" { "https" } else { "http" };
+    Some(vec![Part::Text(format!("{scheme}://127.0.0.1:")), host, Part::Text("/".into())])
 }
 
 /// A dotted path into the snapshot (`machines.web.addresses`, `checks.positions.0.runner`).

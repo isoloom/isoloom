@@ -15,31 +15,30 @@ reach:
 
 machines:
   dns:
+    os: debian@12
     networks: { servers: 53 }
+    # One port number over both protocols: two ports, each with its own name.
     ports:
-      - { port: 53, protocol: udp, name: dns, publish: 10053 }
-      - { port: 53, name: dns }
-    docker:
+      dns-udp: { port: 53, protocol: udp, publish: 10053 }
+      dns: 53
+    app:
       build: build/dns
-    vm:
-      os: debian@12
-      provision: [provision/dns.sh]
+      steps: [{ run: provision/dns.sh }]
 
+  # Where the user stands: Debian with nslookup and dig, built the same way as a container or
+  # a VM.
   client:
+    os: debian@12
     access: true
     networks: { users: 10 }
     depends_on: [dns]
-    docker:
-      image: "alpine:3.20"
-      idle: true
-    vm:
-      os: debian@12
-      provision: [provision/client.sh]
+    app:
+      steps: [{ run: provision/client.sh }]
 
 checks:
   - checks/resolve.sh
 
 message: |
   The DNS server answers at {{ machines.dns.addresses.servers }}:53 (UDP and TCP), and on
-  127.0.0.1:{{ machines.dns.ports.0.publish }}/udp from this machine:
-  dig @127.0.0.1 -p {{ machines.dns.ports.0.publish }} www.lab.test
+  127.0.0.1:{{ machines.dns.ports.dns-udp.published }}/udp from this machine:
+  dig @127.0.0.1 -p {{ machines.dns.ports.dns-udp.published }} www.lab.test

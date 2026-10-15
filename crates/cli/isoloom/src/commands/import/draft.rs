@@ -35,7 +35,7 @@ pub fn write_draft(draft: &isoloom_import::Draft, folder: PathBuf, dest: &Dest) 
         std::fs::write(&target, &draft.yaml)?;
         println!("✓ wrote {}", target.display());
     }
-    let report = report(draft)?;
+    let report = report(draft);
     if dest.stdout {
         eprint!("{report}");
     } else {
@@ -45,7 +45,7 @@ pub fn write_draft(draft: &isoloom_import::Draft, folder: PathBuf, dest: &Dest) 
 }
 
 /// The draft's notes by kind, then whether it validates.
-fn report(draft: &isoloom_import::Draft) -> Res<String> {
+fn report(draft: &isoloom_import::Draft) -> String {
     let mut report = String::new();
     for kind in isoloom_import::NoteKind::ALL {
         let notes: Vec<_> = draft.notes.iter().filter(|n| n.kind == kind).collect();
@@ -57,16 +57,17 @@ fn report(draft: &isoloom_import::Draft) -> Res<String> {
             let _ = writeln!(report, "  {}: {}", n.at, n.text);
         }
     }
-    let problems = isoloom_spec::parse(&draft.yaml)
-        .map(|s| isoloom_spec::validate(&s))
-        .map_err(|e| e.to_string())?;
+    let problems = match isoloom_spec::syntax::parse(&draft.yaml) {
+        Ok(spec) => isoloom_targets::Lab::new(spec).problems(),
+        Err(problems) => problems,
+    };
     if problems.is_empty() {
         report.push_str("\n✓ the draft is valid\n");
     } else {
         report.push_str("\nThe draft needs fixing before it validates:\n");
         for p in &problems {
-            let _ = writeln!(report, "  {p}");
+            let _ = writeln!(report, "  {}", p.line());
         }
     }
-    Ok(report)
+    report
 }

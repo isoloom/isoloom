@@ -17,13 +17,13 @@ networks:
 machines:
   web:
     networks: { lab: 10 }
-    ports: [{ port: 80, publish: 8080 }, { port: 53, protocol: udp, publish: 5353 }]
+    ports: { web: { port: 80, publish: 8080 }, dns: { port: 53, protocol: udp, publish: 5353 } }
     resources: { cpus: 2, memory_mb: 4096, disk_gb: 30 }
-    docker: { image: nginx }
+    app: { image: nginx }
   db:
     networks: { lab: 11 }
-    ports: [{ port: 5432, publish: 15432 }]
-    docker: { image: postgres }
+    ports: { db: { port: 5432, publish: 15432 } }
+    app: { image: postgres }
 ";
 
 /// A plan of `yaml` on `cloud-docker`.
@@ -62,7 +62,7 @@ fn the_set_up_waits_for_cloud_init_then_starts_compose_with_the_inputs() {
 #[test]
 fn arm64_is_refused_from_the_plan() {
     let e = env(
-        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    docker: { image: nginx }\n",
+        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    hardware: { arch: arm64 }\n    app: { image: nginx }\n",
     );
     let why = refusal(&e).unwrap();
     assert_eq!(why, "machine `w`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)");

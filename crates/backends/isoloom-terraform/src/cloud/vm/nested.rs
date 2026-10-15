@@ -46,11 +46,14 @@ mod tests {
     fn a_nesting_size_has_enough_memory() {
         let sizes = [(8192, "small"), (16384, "large")];
         let env = |extra: &str| {
-            let spec = isoloom_spec::parse(&format!(
-                "version: 1\nname: n\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, vm: {{ os: debian@12, provision: [a.sh] }}, {extra} }}\n"
-            ))
-            .unwrap();
-            Environment::build(&spec, isoloom_spec::model::Target::CloudVm, None)
+            let lab = isoloom_plan::Lab::new(
+                isoloom_spec::parse(&format!(
+                    "version: 1\nname: n\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, os: debian@12, app: {{ steps: [{{ run: a.sh }}] }}, hardware: {{ {extra} }} }}\n"
+                ))
+                .unwrap(),
+            );
+            let t = isoloom_spec::model::Target::CloudVm;
+            Environment::build(&lab.for_target(t), t, None)
         };
         let nests = env("nested_virtualization: true");
         let mp = &nests.machines["a"];

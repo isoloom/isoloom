@@ -10,25 +10,28 @@ use crate::testing::environment;
 const SPEC: &str = r"
 version: 1
 name: t
-inputs: [TOKEN]
+inputs: { TOKEN: { sensitive: false } }
 networks:
   front: { cidr: 10.84.0.0/24 }
   back: { cidr: 10.85.0.0/24, gateway: fw, internet: false }
 machines:
   fw:
     networks: { front: 2, back: 1 }
-    vm: { os: debian@12, provision: [fw.sh] }
+    os: debian@12
+    app: { steps: [{ run: fw.sh }] }
   app:
     networks: { back: 10 }
-    inputs: [TOKEN]
+    environment: { TOKEN: { input: TOKEN } }
     depends_on: [dc]
-    ports: [{ port: 80 }]
-    vm: { os: debian@12, provision: [a.sh, reboot, site.yml] }
+    ports: { web: 80 }
+    os: debian@12
+    app: { steps: [{ run: a.sh }, reboot, { playbook: site.yml }] }
   dc:
     networks: { front: 20 }
-    ports: [{ port: 389 }]
-    inputs: [TOKEN]
-    vm: { os: windows-server@2019, provision: [dc.ps1] }
+    ports: { ldap: 389 }
+    environment: { TOKEN: { input: TOKEN } }
+    os: windows-server@2019
+    app: { steps: [{ run: dc.ps1 }] }
 ";
 
 fn env() -> Environment {
@@ -37,8 +40,8 @@ fn env() -> Environment {
 
 #[test]
 fn the_test_spec_is_valid() {
-    let spec = isoloom_spec::parse(SPEC).expect("the test spec parses");
-    assert_eq!(isoloom_spec::validate(&spec), Vec::new());
+    let lab = isoloom_plan::Lab::parse(SPEC).expect("the test spec parses");
+    assert_eq!(lab.problems(), Vec::new());
 }
 
 /// What `write` writes, as the Vagrantfile has it.

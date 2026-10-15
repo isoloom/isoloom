@@ -4,18 +4,24 @@
 
 use std::path::Path;
 
-use isoloom_spec::{Target, derive, load, parse, validate};
-use isoloom_targets::generate;
+use isoloom_spec::{Target, load, parse};
+use isoloom_targets::{Lab, generate};
 
-fn example() -> isoloom_spec::Spec {
-    load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/existing-hosts")).unwrap()
+/// The `existing-hosts` example.
+fn example() -> Lab {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/existing-hosts");
+    Lab::new(load(&dir).unwrap())
+}
+
+fn lab(yaml: &str) -> Lab {
+    Lab::new(parse(yaml).unwrap())
 }
 
 #[test]
 fn a_spec_with_addresses_on_every_machine_gets_the_external_target() {
     let spec = example();
-    assert_eq!(validate(&spec), vec![]);
-    let ids: Vec<&str> = derive(&spec).into_iter().map(Target::id).collect();
+    assert_eq!(spec.problems(), vec![]);
+    let ids: Vec<&str> = spec.possible().into_iter().map(Target::id).collect();
     assert!(ids.contains(&"external") && ids.contains(&"vagrant"), "{ids:?}");
     let files = generate(&spec, Target::External).unwrap();
     let inv = &files.iter().find(|f| f.path == ".isoloom/external/inventory.ini").unwrap().contents;
@@ -34,30 +40,38 @@ fn a_spec_with_addresses_on_every_machine_gets_the_external_target() {
 #[test]
 fn external_blocks_are_checked_and_optional() {
     let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n";
-    let spec = parse(&format!(
-        "{base}  a: {{ networks: {{ lab: 5 }}, docker: {{ image: x }}, external: {{ address: '' }} }}\n"
-    ))
-    .unwrap();
-    assert!(validate(&spec)[0].at.ends_with("external.address"));
-    let spec = parse(&format!(
-        "{base}  a: {{ networks: {{ lab: 5 }}, docker: {{ image: x }}, external: {{ address: 10.0.0.5, port: 0 }} }}\n"
-    ))
-    .unwrap();
-    assert!(validate(&spec).iter().any(|p| p.at.ends_with("external.port")));
+    let spec = lab(&format!(
+        "{base}  a: {{ networks: {{ lab: 5 }}, app: {{ image: x }} }}\noverrides: {{ external: {{ machines: {{ a: {{ ssh: {{ address: '' }} }} }} }} }}\n"
+    ));
+    // The problem is placed at the machine's `ssh` block (the lowered field's leaf isn't kept).
+    let first = spec.problems()[0].line();
+    assert!(first.starts_with("overrides.external.machines.a.ssh: an address"), "{first}");
+    let bad_port = lab(&format!(
+        "{base}  a: {{ networks: {{ lab: 5 }}, app: {{ image: x }} }}\noverrides: {{ external: {{ machines: {{ a: {{ ssh: {{ address: 10.0.0.5, port: 0 }} }} }} }} }}\n"
+    ));
+    assert!(
+        bad_port.problems().iter().any(|p| p.line() == "overrides.external.machines.a.ssh: 1 to 65535"),
+        "{:?}",
+        bad_port.problems()
+    );
     // One machine without an address: no external target, and it says so.
-    let spec = parse(&format!("{base}  a: {{ networks: {{ lab: 5 }}, docker: {{ image: x }}, external: {{ address: 10.0.0.5 }} }}\n  b: {{ networks: {{ lab: 6 }}, docker: {{ image: x }} }}\n")).unwrap();
-    assert!(!derive(&spec).contains(&Target::External));
-    assert_eq!(isoloom_spec::targets::missing(&spec, isoloom_spec::Shape::External), ["b"]);
+    let missing = lab(&format!(
+        "{base}  a: {{ networks: {{ lab: 5 }}, app: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, app: {{ image: x }} }}\noverrides: {{ external: {{ machines: {{ a: {{ ssh: {{ address: 10.0.0.5 }} }} }} }} }}\n"
+    ));
+    assert!(!missing.possible().contains(&Target::External));
+    assert_eq!(
+        missing.refusal(Target::External).map(|p| p.path.to_string()).as_deref(),
+        Some("overrides.external.machines.b")
+    );
 }
 
 #[test]
 fn existing_hosts_behind_a_gateway_machine_are_still_generated() {
-    let spec = parse(
-        "version: 1\nname: gw\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { wan: 2, lan: 1 }\n    vm: { os: debian@12, provision: [fw.sh] }\n    external: { address: 192.168.1.2 }\n  pc:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [pc.sh] }\n    external: { address: 192.168.1.10 }\n",
-    )
-    .unwrap();
-    assert_eq!(validate(&spec), vec![]);
-    assert!(derive(&spec).contains(&Target::External));
+    let spec = lab(
+        "version: 1\nname: gw\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    os: debian@12\n    networks: { wan: 2, lan: 1 }\n    app: { steps: [{ run: fw.sh }] }\n  pc:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: pc.sh }] }\noverrides:\n  external:\n    machines:\n      fw: { ssh: { address: 192.168.1.2 } }\n      pc: { ssh: { address: 192.168.1.10 } }\n",
+    );
+    assert_eq!(spec.problems(), vec![]);
+    assert!(spec.possible().contains(&Target::External));
     assert_eq!(isoloom_targets::refusal(&spec, Target::External), None);
     assert!(generate(&spec, Target::External).is_ok());
 }

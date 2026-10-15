@@ -6,11 +6,14 @@
 use std::path::Path;
 
 use isoloom_spec::load;
+use isoloom_targets::Lab;
 use isoloom_targets::report::{REPORTS, graph_d2, graph_dot, hyperv_ports_note, report};
 use isoloom_targets::resolved::resolve;
 
 fn snapshot(name: &str) -> serde_json::Value {
-    resolve(&load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).unwrap())
+    resolve(&Lab::new(
+        load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).unwrap(),
+    ))
 }
 
 #[test]
@@ -45,7 +48,7 @@ fn reports_cover_addresses_services_wiring_and_resources() {
     assert!(services.starts_with("| machine | port | name | http | published | reachable from |"));
     // The cache answers on 6379 from its own network and from front (reach rule), not from access.
     assert!(services.contains("| cache | 6379 | redis |  |  | front, back |"), "{services}");
-    assert!(services.contains("| web | 80 |  | yes |  | front, access |"), "{services}");
+    assert!(services.contains("| web | 80 | web | yes |  | front, access |"), "{services}");
     let wiring = report("wiring", &r, false).unwrap();
     assert!(
         wiring.contains("isoloom-segmented-front") && wiring.contains("net.isoloom.com/front=member") && wiring.contains("10.61.10.254"),

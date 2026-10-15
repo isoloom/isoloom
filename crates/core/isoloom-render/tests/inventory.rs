@@ -11,9 +11,9 @@ use isoloom_spec::model::Target;
 
 fn env(example: &str, target: Target) -> Environment {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);
-    let spec = isoloom_spec::load(&dir).expect("the example loads");
-    assert!(isoloom_spec::validate(&spec).is_empty(), "the example is valid");
-    Environment::build(&spec, target, None)
+    let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).expect("the example loads"));
+    assert_eq!(lab.problems(), [], "the example is valid");
+    Environment::build(&lab.for_target(target), target, None)
 }
 
 /// AWS's image users, as the cloud-vm module names them.

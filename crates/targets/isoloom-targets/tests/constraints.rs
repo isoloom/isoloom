@@ -6,9 +6,9 @@
 use std::path::Path;
 
 use isoloom_spec::model::Constraints;
-use isoloom_spec::{Spec, Target, load, parse, validate};
+use isoloom_spec::{Target, load, parse};
 use isoloom_targets::constraints::rewrite_image;
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 const CONSTRAINTS: &str = "
 constraints:
@@ -20,15 +20,15 @@ constraints:
 
 /// The segmented example (a built web image, a pulled cache image, Isoloom's router and
 /// checks), with CONSTRAINTS.
-fn constrained() -> Spec {
+fn constrained() -> Lab {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/segmented");
     let text = std::fs::read_to_string(dir.join("isoloom.yml")).unwrap();
-    let spec = parse(&format!("{text}{CONSTRAINTS}")).unwrap();
-    assert_eq!(validate(&spec), vec![]);
-    spec
+    let lab = Lab::new(parse(&format!("{text}{CONSTRAINTS}")).unwrap());
+    assert_eq!(lab.problems(), vec![]);
+    lab
 }
 
-fn file(spec: &Spec, target: Target, suffix: &str) -> String {
+fn file(spec: &Lab, target: Target, suffix: &str) -> String {
     generate(spec, target)
         .unwrap()
         .into_iter()
@@ -142,9 +142,10 @@ fn every_linux_vm_runs_the_preamble_first() {
 #[test]
 fn without_constraints_nothing_changes() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/segmented");
-    let plain = load(&dir).unwrap();
-    let mut empty = plain.clone();
-    empty.constraints = Some(Constraints::default());
+    let source = load(&dir).unwrap();
+    let mut with_empty = source.clone();
+    with_empty.constraints = Some(Constraints::default());
+    let (plain, empty) = (Lab::new(source), Lab::new(with_empty));
     for t in [Target::Docker, Target::Kubernetes, Target::Vagrant, Target::Proxmox, Target::CloudVm] {
         let a: Vec<_> = generate(&plain, t)
             .unwrap()
@@ -164,17 +165,19 @@ fn without_constraints_nothing_changes() {
 fn constraints_are_validated() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/segmented");
     let text = std::fs::read_to_string(dir.join("isoloom.yml")).unwrap();
-    let spec = parse(&format!(
-        "{text}
+    let lab = Lab::new(
+        parse(&format!(
+            "{text}
 constraints:
   proxy: {{ http: proxy.corp:3128, no_proxy: [\"a, b\"] }}
   registries: {{ \"https://docker.io\": \"https://registry.corp\" }}
   mirrors: {{ npm: registry.npmjs.org }}
   ntp: [\"\"]
 "
-    ))
-    .unwrap();
-    let at: Vec<String> = validate(&spec).into_iter().map(|p| p.at).collect();
+        ))
+        .unwrap(),
+    );
+    let at: Vec<String> = lab.problems().into_iter().map(|p| p.path.to_string()).collect();
     for expected in [
         "constraints.proxy.http",
         "constraints.proxy.no_proxy[0]",

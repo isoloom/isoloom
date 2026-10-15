@@ -7,11 +7,11 @@ use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmBackend, CloudVmModule, ProxmoxBackend};
-use testing::{Outcome, example, file, spec};
+use testing::{Outcome, example, file, planned, spec};
 
 /// Example `name`'s plan for `target`.
 fn env(name: &str, target: Target) -> Outcome<Environment> {
-    Ok(Environment::build(&example(name)?, target, None))
+    Ok(planned(&example(name)?, target))
 }
 
 /// The module at `suffix` that `backend` renders for example `name`.
@@ -122,8 +122,7 @@ fn rendering_twice_gives_the_same_files() -> Outcome {
 }
 
 /// One arm64 machine: Proxmox runs it (an emulated aarch64 VM); every cloud refuses it.
-const ARM64: &str =
-    "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    vm: { os: debian@12 }\n";
+const ARM64: &str = "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    hardware: { arch: arm64 }\n    os: debian@12\n";
 
 #[test]
 fn refusals_come_from_the_plan_and_match_rendering() -> Outcome {
@@ -133,7 +132,7 @@ fn refusals_come_from_the_plan_and_match_rendering() -> Outcome {
          digitalocean: machine `w`: arm64 on DigitalOcean comes later (it has no arm64 droplets); \
          linode: machine `w`: arm64 on Linode comes later (it has no arm64 plans); \
          oci: machine `w`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images))";
-    let e = Environment::build(&isoloom_spec::parse(ARM64)?, CloudVmBackend.target(), None);
+    let e = planned(&spec(ARM64)?, CloudVmBackend.target());
     assert_eq!(CloudVmBackend.refusal(&e).as_deref(), Some(why));
     let err = CloudVmBackend.render(&e).expect_err("refused");
     assert!(err.to_string().ends_with(why), "{err}");
@@ -147,20 +146,20 @@ fn proxmox_windows_hello() -> Outcome {
     Ok(())
 }
 
-/// A spec of one machine, its `vm:` as given.
-fn one_vm(vm: &str) -> Outcome<isoloom_spec::Spec> {
+/// A spec of one machine, `w`, with `fields` (its OS, steps and hardware).
+fn one_vm(fields: &str) -> Outcome<isoloom_plan::Lab> {
     spec(&format!(
-        "version: 1\nname: t\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  w:\n    networks: {{ lab: 10 }}\n    vm: {vm}\n"
+        "version: 1\nname: t\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  w: {{ networks: {{ lab: 10 }}, {fields} }}\n"
     ))
 }
 
 #[test]
 fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() -> Outcome {
-    let tpm = one_vm("{ os: debian@12, provision: [a.sh], tpm: true }")?;
-    let proxmox = ProxmoxBackend.render(&Environment::build(&tpm, Target::Proxmox, None))?;
+    let tpm = one_vm("os: debian@12, app: { steps: [{ run: a.sh }] }, hardware: { tpm: required }")?;
+    let proxmox = ProxmoxBackend.render(&planned(&tpm, Target::Proxmox))?;
     let proxmox = file(&proxmox, "proxmox/main.tf")?;
     assert!(proxmox.contains("tpm_state {"), "{proxmox}");
-    let cloud = Environment::build(&tpm, Target::CloudVm, None);
+    let cloud = planned(&tpm, Target::CloudVm);
     let clouds = CloudVmBackend.render(&cloud)?;
     assert!(file(&clouds, "cloud-vm/aws/main.tf")?.contains("tpm_support == \"v2.0\""));
     assert!(file(&clouds, "cloud-vm/azure/main.tf")?.contains("vtpm_enabled"));
@@ -168,12 +167,15 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() -> Outco
     assert!(file(&clouds, "cloud-vm/oci/main.tf")?.contains("is_trusted_platform_module_enabled"));
     let digitalocean = CloudVmModule::new(Cloud::DigitalOcean).refusal(&cloud).expect("refused");
     assert!(
-        digitalocean.contains("asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none"),
+        digitalocean.contains("asks for a virtual TPM (`hardware.tpm: required`): DigitalOcean gives none"),
         "{digitalocean}"
     );
     // Windows with a TPM: AWS refuses it, which drops only its module; Azure's trusted launch is
     // written.
-    let windows = Environment::build(&one_vm("{ os: windows-server@2022, provision: [a.ps1], tpm: true }")?, Target::CloudVm, None);
+    let windows = planned(
+        &one_vm("os: windows-server@2022, app: { steps: [{ run: a.ps1 }] }, hardware: { tpm: required }")?,
+        Target::CloudVm,
+    );
     let aws = CloudVmModule::new(Cloud::Aws).refusal(&windows).expect("refused");
     assert!(aws.contains("NitroTPM"), "{aws}");
     assert_eq!(CloudVmBackend.refusal(&windows), None);
@@ -182,7 +184,7 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() -> Outco
     let azure = file(&rendered, "cloud-vm/azure/main.tf")?;
     assert!(azure.contains("vtpm_enabled"), "{azure}");
     // Windows 11 merely expects one: the clouds leave it out instead of refusing.
-    let wanted = Environment::build(&one_vm("{ os: windows@11, provision: [a.ps1] }")?, Target::CloudVm, None);
+    let wanted = planned(&one_vm("os: windows@11, app: { steps: [{ run: a.ps1 }] }")?, Target::CloudVm);
     assert_eq!(wanted.machines["w"].tpm, Some(isoloom_spec::windows::Tpm::Wanted));
     assert!(isoloom_plan::refusal(&wanted.requirements, &CloudVmBackend.capabilities()).is_none());
     Ok(())
@@ -190,7 +192,7 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() -> Outco
 
 #[test]
 fn proxmox_refuses_what_its_windows_machines_cant_have_yet() -> Outcome {
-    let e = Environment::build(&one_vm("{ os: windows-server@2022, provision: [a.yml] }")?, Target::Proxmox, None);
+    let e = planned(&one_vm("os: windows-server@2022, app: { steps: [{ playbook: a.yml }] }")?, Target::Proxmox);
     let why = ProxmoxBackend.refusal(&e).expect("refused");
     assert!(why.starts_with("machine `w`: Windows provisioning steps are PowerShell scripts"), "{why}");
     Ok(())
@@ -215,7 +217,7 @@ fn each_cloud_refuses_on_its_own() -> Outcome {
 
 #[test]
 fn a_cloud_refuses_from_the_plan_without_rendering() -> Outcome {
-    let e = Environment::build(&isoloom_spec::parse(ARM64)?, Target::CloudVm, None);
+    let e = planned(&spec(ARM64)?, Target::CloudVm);
     for (cloud, why) in [
         (Cloud::Azure, "machine `w`: arm64 on Azure comes later (Arm-based sizes and arm64 images)"),
         (

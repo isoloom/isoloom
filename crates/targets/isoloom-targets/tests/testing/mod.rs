@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Lab};
 use isoloom_spec::model::Target;
 
 /// A test's outcome: a failure is the report.
@@ -16,9 +16,9 @@ pub type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 ///
 /// When the example doesn't load, or isn't valid.
 pub fn example(name: &str, target: Target) -> Outcome<Environment> {
-    let spec = isoloom_spec::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name))?;
-    match isoloom_spec::validate(&spec) {
-        problems if problems.is_empty() => Ok(Environment::build(&spec, target, None)),
+    let lab = Lab::new(isoloom_spec::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name))?);
+    match lab.problems() {
+        problems if problems.is_empty() => Ok(Environment::build(&lab.for_target(target), target, None)),
         problems => Err(format!("example `{name}` isn't valid: {problems:?}").into()),
     }
 }

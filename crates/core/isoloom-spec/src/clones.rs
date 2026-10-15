@@ -5,7 +5,8 @@
 //!   ws:
 //!     count: 5                 # ws-01 .. ws-05
 //!     networks: { office: 50 } # .50 .. .54
-//!     vm: { os: windows@11, provision: [provision/ws.ps1] }
+//!     os: windows@11
+//!     app: { steps: [{ run: provision/ws.ps1 }] }
 //! ```
 //!
 //! The clones are ordinary machines named `<name>-01`, `<name>-02`, ..., each one address

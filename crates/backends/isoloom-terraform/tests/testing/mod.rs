@@ -4,10 +4,9 @@
 use std::error::Error;
 use std::path::Path;
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
-use isoloom_spec::Spec;
 use isoloom_spec::model::Target;
 
 /// A test's outcome: a failure is the report.
@@ -18,18 +17,18 @@ pub type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 /// # Errors
 ///
 /// When it doesn't load, or isn't valid.
-pub fn example(name: &str) -> Outcome<Spec> {
+pub fn example(name: &str) -> Outcome<Lab> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
-    valid(isoloom_spec::load(&dir)?)
+    valid(Lab::new(isoloom_spec::load(&dir)?))
 }
 
-/// The spec `yaml`, checked valid.
+/// The spec `yaml` (the authored format), checked valid.
 ///
 /// # Errors
 ///
 /// When it doesn't parse, or isn't valid.
-pub fn spec(yaml: &str) -> Outcome<Spec> {
-    valid(isoloom_spec::parse(yaml)?)
+pub fn spec(yaml: &str) -> Outcome<Lab> {
+    valid(parsed(yaml)?)
 }
 
 /// The plan of `yaml`, a valid spec, for `target`.
@@ -38,7 +37,13 @@ pub fn spec(yaml: &str) -> Outcome<Spec> {
 ///
 /// When the spec doesn't parse, or isn't valid.
 pub fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
-    Ok(Environment::build(&spec(yaml)?, target, None))
+    Ok(planned(&spec(yaml)?, target))
+}
+
+/// The plan of `lab` for `target`: its spec lowered for the target, then planned.
+#[must_use]
+pub fn planned(lab: &Lab, target: Target) -> Environment {
+    Environment::build(&lab.for_target(target), target, None)
 }
 
 /// Why `backend` refuses `yaml` (a spec, valid or not), if it does.
@@ -47,14 +52,19 @@ pub fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
 ///
 /// When the spec doesn't parse.
 pub fn refusal(backend: &dyn Backend, yaml: &str) -> Outcome<Option<String>> {
-    Ok(backend.refusal(&Environment::build(&isoloom_spec::parse(yaml)?, backend.target(), None)))
+    Ok(backend.refusal(&planned(&parsed(yaml)?, backend.target())))
 }
 
-/// `spec`, when validation finds nothing wrong with it.
-fn valid(spec: Spec) -> Outcome<Spec> {
-    let problems = isoloom_spec::validate(&spec);
+/// The lab of `yaml`, valid or not.
+fn parsed(yaml: &str) -> Outcome<Lab> {
+    Lab::parse(yaml).map_err(|problems| format!("the spec doesn't parse: {problems:?}").into())
+}
+
+/// `lab`, when nothing is wrong with its spec.
+fn valid(lab: Lab) -> Outcome<Lab> {
+    let problems = lab.problems();
     if problems.is_empty() {
-        Ok(spec)
+        Ok(lab)
     } else {
         Err(format!("the spec isn't valid: {problems:?}").into())
     }

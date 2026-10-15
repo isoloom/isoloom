@@ -3,6 +3,8 @@
 
 use std::path::Path;
 
+use isoloom_targets::Lab;
+
 use crate::Res;
 use crate::error::CliError;
 
@@ -25,10 +27,38 @@ impl Profile {
     }
 }
 
-/// The spec in `dir`, with the profile.
-pub fn load_spec(profile: &Profile, dir: &Path) -> Res<isoloom_spec::Spec> {
+/// The spec file's name in `dir` (`isoloom.yml`), as problems name it.
+fn file_name(dir: &Path) -> String {
+    isoloom_spec::find(dir)
+        .ok()
+        .and_then(|p| p.file_name().map(|f| f.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| isoloom_spec::SPEC_FILE.to_owned())
+}
+
+/// Prints problems as an author reads them, each under a `✗`.
+fn print_problems(file: &str, problems: &[isoloom_spec::syntax::Problem]) {
+    for p in problems {
+        eprintln!("✗ {}", p.render(file));
+    }
+}
+
+/// A spec that didn't load: its problems printed, then the command's error; any other error as
+/// it is.
+fn loaded(dir: &Path, r: Result<isoloom_spec::Spec, isoloom_spec::LoadError>) -> Res<isoloom_spec::Spec> {
+    match r {
+        Ok(spec) => Ok(spec),
+        Err(isoloom_spec::LoadError::Invalid { problems, .. }) => {
+            print_problems(&file_name(dir), &problems);
+            Err(CliError::SpecInvalid.into())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// The lab in `dir`, with the profile.
+pub fn load_lab(profile: &Profile, dir: &Path) -> Res<Lab> {
     let profile = profile.load(dir)?;
-    Ok(isoloom_spec::load_profiled(dir, profile.as_ref(), &[])?)
+    Ok(Lab::new(loaded(dir, isoloom_spec::load_profiled(dir, profile.as_ref(), &[]))?))
 }
 
 /// The target to use: the profile's when none is asked for.
@@ -39,50 +69,45 @@ pub fn pinned(profile: &Profile, dir: &Path, asked: Option<&str>) -> Res<Option<
     })
 }
 
-/// The spec with `-s` overrides and the image table applied, and the defaults in effect.
-pub fn load_settings(profile: &Profile, dir: &Path, images: Option<&Path>, sets: &[String]) -> Res<(isoloom_spec::Spec, isoloom_spec::defaults::Resolved)> {
+/// The lab with `-s` overrides and the image table applied, and the defaults in effect.
+pub fn load_settings(profile: &Profile, dir: &Path, images: Option<&Path>, sets: &[String]) -> Res<(Lab, isoloom_spec::defaults::Resolved)> {
     let profile = profile.load(dir)?;
-    let spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
+    let spec = loaded(dir, isoloom_spec::load_profiled(dir, profile.as_ref(), sets))?;
     let settings = isoloom_spec::defaults::load_profiled(dir, images, profile.as_ref(), sets)?;
-    let spec = settings.defaults.images.apply(&spec);
-    Ok((spec, settings))
+    let lab = Lab::new(spec).with_images(settings.defaults.images.clone());
+    Ok((lab, settings))
 }
 
-/// Prints the spec's problems and returns true when it has any. Generators assume a validated
-/// spec (they `expect` valid CIDRs and declared networks): a spec that parses but is invalid
-/// must fail with the field and reason, not a panic.
-pub fn report_invalid(spec: &isoloom_spec::Spec) -> bool {
-    let problems = isoloom_spec::validate(spec);
-    for p in &problems {
-        eprintln!("✗ {p}");
-    }
+/// Prints the lab's problems and returns true when it has any. Generators assume a validated
+/// spec: a spec that parses but is invalid must fail with the field and reason, not a panic.
+pub fn report_invalid(dir: &Path, lab: &Lab) -> bool {
+    let problems = lab.problems();
+    print_problems(&file_name(dir), &problems);
     if !problems.is_empty() {
         eprintln!("fix the spec first (`isoloom validate`)");
     }
     !problems.is_empty()
 }
 
-/// The spec with `-s` overrides, validated (its problems printed, then an error), as the
-/// instance when one is named.
-pub fn load_valid(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<isoloom_spec::Spec> {
-    let (spec, _) = load_settings(profile, dir, None, sets)?;
-    let problems = isoloom_spec::validate(&spec);
+/// The lab with `-s` overrides, validated (its problems printed, then an error), checked that
+/// instance `instance` can be made when one is asked.
+pub fn load_valid(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<Lab> {
+    let (lab, _) = load_settings(profile, dir, None, sets)?;
+    let problems = lab.problems();
     if !problems.is_empty() {
-        for p in &problems {
-            eprintln!("✗ {p}");
-        }
+        print_problems(&file_name(dir), &problems);
         return Err(CliError::SpecInvalid.into());
     }
-    Ok(match instance {
-        Some(n) => isoloom_spec::instance::apply(&spec, n)?,
-        None => spec,
-    })
+    if let Some(n) = instance {
+        isoloom_spec::instance::apply(&lab.spec(), n)?;
+    }
+    Ok(lab)
 }
 
 /// The resolved snapshot of a project (as an instance when asked), after validation.
 pub fn snapshot_of(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &[String]) -> Res<serde_json::Value> {
-    let spec = load_valid(profile, dir, instance, sets)?;
-    Ok(isoloom_targets::resolved::resolve_with(&spec, instance))
+    let lab = load_valid(profile, dir, instance, sets)?;
+    Ok(isoloom_targets::resolved::resolve_with(&lab, instance))
 }
 
 #[cfg(test)]

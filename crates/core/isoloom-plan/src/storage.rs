@@ -129,10 +129,13 @@ mod tests {
 
     #[test]
     fn a_disk_takes_its_os_default_filesystem_and_a_key_of_its_machine() {
-        let spec = isoloom_spec::parse(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db: { networks: { lan: 10 }, vm: { os: debian@12 }, disks: { data: { size_gb: 5, mount: /data }, blk: { size_gb: 1, fs: raw } } }\n  win: { networks: { lan: 11 }, vm: { os: windows-server@2022 }, disks: { logs: { size_gb: 2, mount: 'E:' } } }\n",
-        )
-        .unwrap();
+        let lab = crate::Lab::new(
+            isoloom_spec::parse(
+                "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db: { networks: { lan: 10 }, os: debian@12, disks: { data: { size_gb: 5, mount: /data }, blk: { size_gb: 1, fs: raw } } }\n  win: { networks: { lan: 11 }, os: windows-server@2022, disks: { logs: { size_gb: 2, mount: 'E:' } } }\n",
+            )
+            .unwrap(),
+        );
+        let spec = lab.spec();
         let db = disks("db", &spec.machines["db"]);
         assert_eq!((db[0].key.as_str(), db[0].fs, db[0].bytes()), ("db-data", Filesystem::Ext4, 5 << 30));
         assert!(db[1].is_raw());

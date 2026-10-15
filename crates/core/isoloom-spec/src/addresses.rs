@@ -14,7 +14,7 @@ use serde_yaml_ng::{Mapping, Value};
 pub const FIELD: &str = "more_addresses";
 
 fn key(s: &str) -> Value {
-    Value::String(s.to_string())
+    Value::String(s.to_owned())
 }
 
 /// Splits every machine's address lists in place: the first stays in `networks`, the others
@@ -69,8 +69,8 @@ fn split_machine(name: &str, m: &mut Mapping) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    fn spec(machines: &str) -> Result<crate::Spec, crate::LoadError> {
-        crate::parse(&format!(
+    fn spec(machines: &str) -> Result<crate::model::Spec, crate::LoadError> {
+        crate::model::from_yaml(&format!(
             "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n{machines}"
         ))
     }

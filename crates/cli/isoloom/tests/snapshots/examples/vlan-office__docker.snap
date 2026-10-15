@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -453,7 +454,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
     restart: unless-stopped
@@ -482,8 +483,51 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
     restart: unless-stopped
-  guest:
+  staff:
+    image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+    platform: linux/amd64
+    entrypoint:
+    - sleep
+    - infinity
+    hostname: staff
+    networks:
+      office-vlan10:
+        ipv4_address: 10.70.10.10
+    extra_hosts:
+    - intranet:10.70.99.10
+    - guest:10.70.20.10
+    - admin:10.70.10.50
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
+    restart: unless-stopped
+  staff-routes:
     image: alpine:3.20
+    entrypoint:
+    - /bin/sh
+    - -c
+    - ip route replace 10.70.20.0/24 via 10.70.10.254 && ip route replace 10.70.99.0/24 via 10.70.10.254 && (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:staff
+    cap_add:
+    - NET_ADMIN
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - ip route show 10.70.20.0/24 | grep -q via && ! ip route | grep -q '^default'
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      staff:
+        condition: service_started
+      isoloom-router:
+        condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
+    restart: unless-stopped
+  guest:
+    image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     platform: linux/amd64
     entrypoint:
     - sleep
@@ -526,7 +570,7 @@ services:
       isoloom.environment: vlan-office
     restart: unless-stopped
   admin:
-    image: alpine:3.20
+    image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     platform: linux/amd64
     entrypoint:
     - sleep
@@ -570,51 +614,6 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
     restart: unless-stopped
-  isoloom-access:
-    image: alpine:3.20
-    profiles:
-    - check
-    entrypoint:
-    - sleep
-    - infinity
-    hostname: staff
-    networks:
-      office-vlan10:
-        ipv4_address: 10.70.10.10
-    extra_hosts:
-    - intranet:10.70.99.10
-    - guest:10.70.20.10
-    - admin:10.70.10.50
-    labels:
-      isoloom.managed: 'true'
-      isoloom.environment: vlan-office
-  isoloom-access-routes:
-    image: alpine:3.20
-    profiles:
-    - check
-    entrypoint:
-    - /bin/sh
-    - -c
-    - ip route replace 10.70.20.0/24 via 10.70.10.254 && ip route replace 10.70.99.0/24 via 10.70.10.254 && (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
-    network_mode: service:isoloom-access
-    cap_add:
-    - NET_ADMIN
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - ip route show 10.70.20.0/24 | grep -q via && ! ip route | grep -q '^default'
-      interval: 2s
-      timeout: 2s
-      retries: 30
-    depends_on:
-      isoloom-access:
-        condition: service_started
-      isoloom-router:
-        condition: service_healthy
-    labels:
-      isoloom.managed: 'true'
-      isoloom.environment: vlan-office
-    restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -622,7 +621,7 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
-    network_mode: service:isoloom-access
+    network_mode: service:staff
     volumes:
     - ./checks/staff.sh:/isoloom/run.sh:ro
     depends_on:
@@ -630,14 +629,14 @@ services:
         condition: service_healthy
       intranet-routes:
         condition: service_healthy
+      staff-routes:
+        condition: service_healthy
       guest-routes:
         condition: service_healthy
       admin-routes:
         condition: service_healthy
-      isoloom-access:
+      staff:
         condition: service_started
-      isoloom-access-routes:
-        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
@@ -655,6 +654,8 @@ services:
       intranet:
         condition: service_healthy
       intranet-routes:
+        condition: service_healthy
+      staff-routes:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
@@ -677,6 +678,8 @@ services:
       intranet:
         condition: service_healthy
       intranet-routes:
+        condition: service_healthy
+      staff-routes:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
@@ -701,6 +704,8 @@ services:
       intranet:
         condition: service_healthy
       intranet-routes:
+        condition: service_healthy
+      staff-routes:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
@@ -890,6 +895,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true
@@ -903,6 +909,26 @@ volumes:
       "addresses": {},
       "native": {
         "service": "intranet-routes"
+      }
+    },
+    {
+      "name": "staff",
+      "role": "access",
+      "arch": "amd64",
+      "addresses": {
+        "office-vlan10": "10.70.10.10"
+      },
+      "native": {
+        "service": "staff"
+      }
+    },
+    {
+      "name": "staff-routes",
+      "role": "infra",
+      "of": "staff",
+      "addresses": {},
+      "native": {
+        "service": "staff-routes"
       }
     },
     {
@@ -947,28 +973,9 @@ volumes:
       }
     },
     {
-      "name": "isoloom-access",
-      "role": "access",
-      "addresses": {
-        "office-vlan10": "10.70.10.10"
-      },
-      "native": {
-        "service": "isoloom-access"
-      }
-    },
-    {
-      "name": "isoloom-access-routes",
-      "role": "infra",
-      "of": "isoloom-access",
-      "addresses": {},
-      "native": {
-        "service": "isoloom-access-routes"
-      }
-    },
-    {
       "name": "isoloom-check",
       "role": "check",
-      "of": "isoloom-access",
+      "of": "staff",
       "addresses": {},
       "native": {
         "service": "isoloom-check"
@@ -1166,31 +1173,7 @@ volumes:
   "outputs": [],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [
-      {
-        "id": "stand-ins",
-        "note": "Starting the access machine's stand-in…",
-        "argv": [
-          "docker",
-          "compose",
-          "--project-name",
-          "${run.name}",
-          "--file",
-          "compose.yml",
-          "--file",
-          "${run.state_dir}/ports.yml",
-          "--profile",
-          "check",
-          "up",
-          "--detach",
-          "--wait",
-          "--no-deps",
-          "isoloom-access",
-          "isoloom-access-routes"
-        ],
-        "timeout_s": 600
-      }
-    ],
+    "setup": [],
     "runners": [
       {
         "id": "isoloom-check",
@@ -1426,7 +1409,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "vlan-office",
   "instance": null,
   "inputs": [],
@@ -1486,14 +1469,12 @@ volumes:
       "docker_addresses": {
         "servers": "10.70.99.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1522,6 +1503,7 @@ volumes:
       "access": true,
       "supplied": false,
       "shapes": [
+        "docker",
         "vm"
       ],
       "role": "target",
@@ -1534,7 +1516,7 @@ volumes:
       "docker_addresses": {
         "office-vlan10": "10.70.10.10"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1576,7 +1558,7 @@ volumes:
       "docker_addresses": {
         "office-vlan20": "10.70.20.10"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1620,7 +1602,7 @@ volumes:
         "office-vlan10": "10.70.10.50",
         "office-vlan20": "10.70.20.50"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1699,7 +1681,7 @@ volumes:
     "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on intranet, guest, admin",
+      "external": "overrides.external.machines.intranet: the external target reaches machines that exist already, and `intranet` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

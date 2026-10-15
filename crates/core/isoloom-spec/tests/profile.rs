@@ -15,10 +15,10 @@ networks:
   app: { cidr: 10.60.0.0/24 }
 machines:
   web:
+    os: debian@12
     networks: { app: 10 }
-    ports: [{ port: 80 }]
-    docker: { image: nginx }
-    vm: { os: debian@12 }
+    ports: { web: 80 }
+    app: { image: nginx }
 ";
 
 /// A project holding SPEC and the given profiles.

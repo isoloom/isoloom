@@ -34,7 +34,9 @@ mod tests {
 
     #[test]
     fn the_ssh_defaults_are_filled_and_an_unset_key_is_null() {
-        let env = environment("  a: { networks: { lab: 5 }, vm: { os: debian@12 }, external: { address: h.example, port: 2200 } }\n");
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: debian@12 }\noverrides: { external: { machines: { a: { ssh: { address: h.example, port: 2200 } } } } }\n",
+        );
         assert_eq!(
             super::json(&env),
             "{\n  \"a\": {\n    \"address\": \"h.example\",\n    \"user\": \"root\",\n    \"port\": 2200,\n    \"key\": null\n  }\n}\n"
@@ -43,7 +45,7 @@ mod tests {
 
     #[test]
     fn a_machine_without_an_external_address_is_left_out() {
-        let env = environment("  a: { networks: { lab: 5 }, vm: { os: debian@12 } }\n");
+        let env = environment("  a: { networks: { lab: 5 }, os: debian@12 }\n");
         assert_eq!(super::json(&env), "{}\n");
     }
 }

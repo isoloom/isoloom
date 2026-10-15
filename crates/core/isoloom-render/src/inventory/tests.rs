@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)] // test helpers: a failing test is the report.
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Lab};
 use isoloom_spec::model::Target;
 
 use super::*;
@@ -16,25 +16,29 @@ groups:
 machines:
   web:
     networks: { back: 10, lab: 10 }
-    vm: { os: debian@12 }
-    external: { address: web.example.org, user: ops, port: 2222, key: ~/my keys/id }
+    os: debian@12
   dc:
     networks: { lab: 20 }
-    vm: { os: windows-server@2022, image: { vagrant: some/box, winrm: ssl } }
-    external: { address: 192.168.1.20 }
+    os: windows-server@2022
   box:
     networks: { lab: 30 }
-    docker: { image: alpine }
+    app: { image: alpine }
 provision:
   - ansible: site.yml
     groups: { dcs: [dc], boxes: [box] }
     host_vars:
       web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
+overrides:
+  vagrant: { machines: { dc: { box: some/box, winrm: ssl } } }
+  external:
+    machines:
+      web: { ssh: { address: web.example.org, user: ops, port: 2222, key: ~/my keys/id } }
+      dc: { ssh: { address: 192.168.1.20 } }
 ";
 
 fn env(spec: &str, target: Target) -> Environment {
-    let spec = isoloom_spec::parse(spec).expect("parses");
-    Environment::build(&spec, target, None)
+    let lab = Lab::new(isoloom_spec::parse(spec).expect("parses"));
+    Environment::build(&lab.for_target(target), target, None)
 }
 
 fn section<'a>(inv: &'a str, name: &str) -> &'a str {
@@ -92,7 +96,7 @@ fn windows_hosts_get_their_winrm_and_the_windows_vars() {
 
 #[test]
 fn no_windows_vars_without_a_windows_host() {
-    let linux_only = "version: 1\nname: l\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian@12 }\n";
+    let linux_only = "version: 1\nname: l\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    os: debian@12\n";
     let inv = render(&env(linux_only, Target::Vagrant), &Access::vagrant());
     assert_eq!(
         inv,

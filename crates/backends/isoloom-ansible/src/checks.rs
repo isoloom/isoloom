@@ -38,7 +38,7 @@ mod tests {
     #[test]
     fn a_host_runs_its_probes_and_leaves_its_scripts_out() {
         let env = environment(
-            "  a: { networks: { lab: 5 }, access: true, vm: { os: debian@12 }, external: { address: 10.0.0.5 } }\n  b: { networks: { lab: 6 }, ports: [{ port: 80 }], vm: { os: debian@12 }, external: { address: 10.0.0.6 } }\nchecks:\n  - { name: b answers, from: a, tcp: 'b:80' }\n  - { name: own, from: a, script: checks/own.sh }\n",
+            "  a: { networks: { lab: 5 }, access: true, os: debian@12 }\n  b: { networks: { lab: 6 }, ports: { web: 80 }, os: debian@12 }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } }, b: { ssh: { address: 10.0.0.6 } } } } }\nchecks:\n  - { name: b answers, from: a, tcp: 'b:80' }\n  - { name: own, from: a, script: checks/own.sh }\n",
         );
         let runners = super::runners(&env);
         let paths: Vec<&str> = runners.iter().map(|(p, _)| p.as_str()).collect();

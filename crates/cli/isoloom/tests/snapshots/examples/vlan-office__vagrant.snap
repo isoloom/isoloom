@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ vagrant
@@ -1268,7 +1269,6 @@ Vagrant.configure("2") do |config|
       /etc/isoloom/routes.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "provision/guest.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/guest.sh'"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/guest.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
@@ -1479,7 +1479,6 @@ Vagrant.configure("2") do |config|
       /etc/isoloom/routes.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "provision/guest.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/guest.sh'"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/admin.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end

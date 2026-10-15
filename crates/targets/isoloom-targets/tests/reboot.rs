@@ -1,31 +1,35 @@
-//! The `reboot` step of a Linux machine's `vm.provision`: the machine restarts and the steps
-//! after it run once it's back, on every VM target, each its own way.
+//! The `reboot` step of a Linux machine's `app.steps`: the machine restarts and the steps after
+//! it run once it's back, on every VM target, each its own way.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
-use isoloom_spec::{Target, parse, validate};
-use isoloom_targets::generate;
+use isoloom_spec::{Target, parse};
+use isoloom_targets::{Lab, generate};
 
 /// A Linux machine on two networks, with an input, restarting twice between its steps.
 const SPEC: &str = r"
 version: 1
 name: boots
-inputs: [TOKEN]
+inputs: { TOKEN: { sensitive: false } }
 networks:
   front: { cidr: 10.70.0.0/24 }
   back: { cidr: 10.70.1.0/24 }
 machines:
   box:
+    os: debian@12
     networks: { front: 10, back: 10 }
-    inputs: [TOKEN]
-    vm:
-      os: debian@12
-      provision: [kernel.sh, reboot, middle.sh, reboot, last.sh]
+    environment: { TOKEN: { input: TOKEN } }
+    app:
+      steps: [{ run: kernel.sh }, reboot, { run: middle.sh }, reboot, { run: last.sh }]
 ";
 
+fn lab(yaml: &str) -> Lab {
+    Lab::new(parse(yaml).unwrap())
+}
+
 fn file(target: Target, suffix: &str) -> String {
-    let spec = parse(SPEC).unwrap();
-    assert_eq!(validate(&spec), vec![]);
+    let spec = lab(SPEC);
+    assert_eq!(spec.problems(), vec![]);
     generate(&spec, target)
         .unwrap()
         .into_iter()
@@ -40,25 +44,24 @@ fn at(text: &str, what: &str) -> usize {
 
 #[test]
 fn a_windows_machine_restarts_from_the_playbooks() {
-    let spec = parse(
-        "version: 1\nname: w\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines:\n  dc:\n    networks: { lab: 10 }\n    vm: { os: windows-server@2022, provision: [a.ps1, reboot, b.ps1] }\n",
-    )
-    .unwrap();
-    let problems = validate(&spec);
+    let spec = lab(
+        "version: 1\nname: w\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ run: a.ps1 }, reboot, { run: b.ps1 }] }\n",
+    );
+    let problems = spec.problems();
     assert_eq!(problems.len(), 1, "{problems:?}");
-    assert_eq!(problems[0].at, "machines.dc.vm.provision[1]");
-    assert!(problems[0].message.contains("win_reboot"), "{}", problems[0].message);
+    assert_eq!(problems[0].path.as_str(), "machines.dc.app.steps[1]");
+    assert!(problems[0].reason.contains("restarts from its own script"), "{}", problems[0].reason);
 }
 
 #[test]
 fn reboot_is_a_step_not_a_file() {
-    let spec = parse(SPEC).unwrap();
+    let spec = lab(SPEC);
     let dir = std::env::temp_dir().join(format!("isoloom-reboot-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     for f in ["kernel.sh", "middle.sh", "last.sh"] {
         std::fs::write(dir.join(f), "true\n").unwrap();
     }
-    let problems = isoloom_spec::validate_files(&spec, &dir);
+    let problems = spec.problems_with_files(&dir);
     std::fs::remove_dir_all(&dir).unwrap();
     assert_eq!(problems, vec![]);
 }
@@ -110,7 +113,7 @@ fn proxmox_runs_what_follows_a_reboot_at_the_next_boot() {
 
 #[test]
 fn proxmox_without_a_reboot_is_unchanged() {
-    let spec = parse(&SPEC.replace("reboot, ", "")).unwrap();
+    let spec = lab(&SPEC.replace("reboot, ", ""));
     let tf = generate(&spec, Target::Proxmox)
         .unwrap()
         .into_iter()
@@ -152,10 +155,9 @@ fn the_clouds_reconnect_after_each_reboot() {
 #[test]
 fn every_cloud_driver_splits_the_set_up_at_a_reboot() {
     // One machine on one network: every cloud takes it, DigitalOcean included.
-    let spec = parse(
-        "version: 1\nname: solo\nnetworks: { lab: { cidr: 10.71.0.0/24 } }\nmachines:\n  box:\n    networks: { lab: 10 }\n    vm: { os: debian@12, provision: [kernel.sh, reboot, last.sh] }\n",
-    )
-    .unwrap();
+    let spec = lab(
+        "version: 1\nname: solo\nnetworks: { lab: { cidr: 10.71.0.0/24 } }\nmachines:\n  box:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ run: kernel.sh }, reboot, { run: last.sh }] }\n",
+    );
     let files = generate(&spec, Target::CloudVm).unwrap();
     for cloud in ["aws", "azure", "gcp", "linode", "oci", "digitalocean"] {
         let tf = &files
@@ -181,7 +183,7 @@ fn importing_a_vagrant_reboot_keeps_it_as_a_step() {
     )
     .unwrap();
     let d = isoloom_import::vagrant::draft(&recorded, "lab", "Vagrantfile").unwrap();
-    let spec = parse(&d.yaml).expect("the draft parses");
-    assert_eq!(spec.machines["web"].vm.as_ref().unwrap().provision, ["kernel.sh", "reboot", "web.sh"]);
-    assert_eq!(validate(&spec), vec![], "{}", d.yaml);
+    let spec = Lab::new(parse(&d.yaml).expect("the draft parses"));
+    assert_eq!(spec.spec().machines["web"].vm.as_ref().unwrap().provision, ["kernel.sh", "reboot", "web.sh"]);
+    assert_eq!(spec.problems(), vec![], "{}", d.yaml);
 }

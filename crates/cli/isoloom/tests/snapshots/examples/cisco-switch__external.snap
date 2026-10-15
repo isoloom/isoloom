@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ external (needs `external:` on sw1, files, staff, guest)
+✗ external (overrides.external.machines.sw1: the external target reaches machines that exist already, and `sw1` names no host)
 
 # isoloom generate --target external (exit 1)
-· external: not possible for this spec (see `isoloom targets`)
+· external: overrides.external.machines.sw1: the external target reaches machines that exist already, and `sw1` names no host

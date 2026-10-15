@@ -66,10 +66,10 @@ mod tests {
 
     fn env(home: &str) -> Environment {
         let yaml = format!(
-            "version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.20.0.0/24 }}\n  home: {home}\nmachines:\n  a: {{ networks: {{ lan: 10, home: 0 }}, vm: {{ os: debian@12 }} }}\n"
+            "version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.20.0.0/24 }}\n  home: {home}\nmachines:\n  a: {{ networks: {{ lan: 10, home: 0 }}, os: debian@12 }}\n"
         );
-        let spec = isoloom_spec::parse(&yaml).unwrap();
-        Environment::build(&spec, Target::Vagrant, None)
+        let lab = isoloom_plan::Lab::new(isoloom_spec::parse(&yaml).unwrap());
+        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)
     }
 
     fn rendered(env: &Environment) -> String {
@@ -92,11 +92,13 @@ mod tests {
     fn a_vlan_or_a_fixed_address_outside_a_24_is_refused() {
         let vlan = env("{ cidr: 10.0.0.0/24, bridged: { dhcp: true, vlan: 20 } }");
         assert!(refusal(&vlan, "a", &vlan.machines["a"]).unwrap().contains("VLAN"));
-        let spec = isoloom_spec::parse(
-            "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.20.0.0/24 }\n  home: { cidr: 10.0.0.0/26, bridged: {} }\nmachines:\n  a: { networks: { lan: 10, home: 20 }, vm: { os: debian@12 } }\n",
-        )
-        .unwrap();
-        let fixed = Environment::build(&spec, Target::Vagrant, None);
+        let lab = isoloom_plan::Lab::new(
+            isoloom_spec::parse(
+                "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.20.0.0/24 }\n  home: { cidr: 10.0.0.0/26, bridged: {} }\nmachines:\n  a: { networks: { lan: 10, home: 20 }, os: debian@12 }\n",
+            )
+            .unwrap(),
+        );
+        let fixed = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
         assert!(rendered(&fixed).contains(r#"ip: "10.0.0.20""#));
         assert!(refusal(&fixed, "a", &fixed.machines["a"]).unwrap().contains("/24"));
     }

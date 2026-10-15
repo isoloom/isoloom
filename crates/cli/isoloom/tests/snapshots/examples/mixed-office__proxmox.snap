@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ proxmox
@@ -634,7 +635,7 @@ output "address" {
 
 # Published services, from the router's uplink address.
 output "published" {
-  value = { "intranet/80" = "${local.router_address}:8083" }
+  value = { "intranet/web" = "${local.router_address}:8083" }
 }
 
 # The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.

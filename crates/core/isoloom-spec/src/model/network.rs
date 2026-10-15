@@ -26,6 +26,7 @@ pub struct Network {
     pub gateway: Option<String>,
     /// How the Docker target lays this network out, when it differs from the other targets.
     #[serde(default)]
+    #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
     pub docker: Option<NetworkDocker>,
     /// The VLANs this LAN is split into, by id (1-4094), each with its own block inside the
     /// LAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming
@@ -58,6 +59,7 @@ pub struct Network {
     /// ESXi port group): the machines join it, and Isoloom never creates or deletes it. `cidr`
     /// is its block, and the machines keep fixed addresses in it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
     pub external: Option<String>,
     /// Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed
     /// addresses in `cidr`, or DHCP from the LAN).

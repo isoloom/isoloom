@@ -45,11 +45,13 @@ mod tests {
 
     #[test]
     fn existing_and_bridged_networks_are_devices_on_their_bridge() {
-        let spec = isoloom_spec::parse(
-            "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.20.0.0/24 }\n  corp: { cidr: 10.50.0.0/24, external: vmbr1 }\n  home: { cidr: 192.168.1.0/24, bridged: { dhcp: true, default_route: true, vlan: 20 } }\nmachines:\n  a: { networks: { lan: 10, corp: 5, home: 0 }, vm: { os: debian@12 } }\n",
-        )
-        .unwrap();
-        let env = Environment::build(&spec, Target::Proxmox, None);
+        let lab = isoloom_plan::Lab::new(
+            isoloom_spec::parse(
+                "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.20.0.0/24 }\n  corp: { cidr: 10.50.0.0/24 }\n  home: { cidr: 192.168.1.0/24, bridged: { dhcp: true, default_route: true, vlan: 20 } }\nmachines:\n  a: { networks: { lan: 10, corp: 5, home: 0 }, os: debian@12 }\noverrides: { proxmox: { networks: { corp: { external: vmbr1 } } } }\n",
+            )
+            .unwrap(),
+        );
+        let env = Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None);
         let mp = &env.machines["a"];
         let mut body = isoloom_render::hcl_builder::Module::new("");
         for (device, ip) in interfaces(&env, mp) {

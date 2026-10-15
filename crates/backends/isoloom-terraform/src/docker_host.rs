@@ -167,7 +167,7 @@ fn commands(env: &Environment, auto_stop: AutoStop) -> Vec<Expression> {
         cmds.push(string(up));
     } else {
         cmds.push(string(
-            Shell::Sudo.command(&format!("{}{up}", isoloom_render::secrets::host_environment(&secrets))),
+            Shell::Sudo.command(&format!("{}{up}", isoloom_render::secrets::host_environment(env.spec(), &secrets))),
         ));
     }
     cmds.extend(root(&Step::Ready));

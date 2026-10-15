@@ -49,6 +49,14 @@ fn environment(spec: &Spec, at: &FieldPath, m: &Machine, out: &mut Problems) {
                         "`files: [{{ path: <path>, input: {name} }}]`, or `inputs: {{ {name}: {{ sensitive: false }} }}`"
                     )),
                 ),
+                Some(_) if name.as_str() != var => out.push(
+                    Problem::new(
+                        Code::Refused,
+                        at,
+                        format!("an input keeps its own name in the environment for now: this variable would be `{name}`, not `{var}`"),
+                    )
+                    .fix(format!("`{name}: {{ input: {name} }}`, and read `{name}` in the app")),
+                ),
                 Some(_) => {}
             },
         }

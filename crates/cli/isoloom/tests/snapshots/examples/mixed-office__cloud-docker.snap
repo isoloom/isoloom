@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ cloud-docker (needs `docker:` on files01)
+✗ cloud-docker (machines.files01.os: Windows has no container form in 1.0)
 
 # isoloom generate --target cloud-docker (exit 1)
-· cloud-docker: not possible for this spec (see `isoloom targets`)
+· cloud-docker: machines.files01.os: Windows has no container form in 1.0

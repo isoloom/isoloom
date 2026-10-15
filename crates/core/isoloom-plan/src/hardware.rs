@@ -122,12 +122,13 @@ mod tests {
     use super::*;
 
     fn spec() -> Spec {
-        isoloom_spec::parse(
+        let source = isoloom_spec::parse(
             "version: 1\nname: hw\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  \
-             a: { networks: { lan: 10 }, gpus: 1, devices: [/dev/fuse], docker: { image: x }, vm: { os: debian@12, provision: [a.sh] } }\n  \
-             b: { networks: { lan: 11 }, nested_virtualization: true, vm: { os: debian@12, provision: [a.sh] } }\n",
+             a: { networks: { lan: 10 }, hardware: { gpus: 1, devices: [/dev/fuse] }, os: debian@12, app: { image: x, steps: [{ run: a.sh }] } }\n  \
+             b: { networks: { lan: 11 }, hardware: { nested_virtualization: true }, os: debian@12, app: { steps: [{ run: a.sh }] } }\n",
         )
-        .unwrap()
+        .unwrap();
+        crate::Lab::new(source).spec()
     }
 
     fn needs(shape: MachineShape) -> Vec<(String, Need)> {

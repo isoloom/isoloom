@@ -6,11 +6,11 @@
 use std::path::Path;
 
 use isoloom_spec::{Target, load, parse};
-use isoloom_targets::{GeneratedFile, generate, project_copies};
+use isoloom_targets::{GeneratedFile, Lab, generate, project_copies};
 
 fn example(name: &str) -> (std::path::PathBuf, Vec<GeneratedFile>) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
-    let files = generate(&load(&dir).unwrap(), Target::Kubernetes).unwrap();
+    let files = generate(&Lab::new(load(&dir).unwrap()), Target::Kubernetes).unwrap();
     (dir, files)
 }
 
@@ -78,14 +78,14 @@ fn inputs_and_constraints_reach_the_values() {
     let spec = parse(
         "version: 1
 name: shop
-inputs: [API_KEY]
+inputs: { API_KEY: { sensitive: false } }
 networks: { app: { cidr: 10.60.0.0/24 } }
 machines:
   web:
     networks: { app: 10 }
-    ports: [{ port: 80 }]
-    inputs: [API_KEY]
-    docker: { image: nginx }
+    ports: { web: 80 }
+    environment: { API_KEY: { input: API_KEY } }
+    app: { image: nginx }
 message: |
   Open {{ machines.web.addresses.app }}.
 constraints:
@@ -93,7 +93,7 @@ constraints:
 ",
     )
     .unwrap();
-    let files = generate(&spec, Target::Kubernetes).unwrap();
+    let files = generate(&Lab::new(spec), Target::Kubernetes).unwrap();
     let values: serde_yaml_ng::Value = serde_yaml_ng::from_str(get(&files, "chart/values.yaml")).unwrap();
     assert_eq!(values["images"]["web"].as_str(), Some("registry.corp/hub/library/nginx"));
     assert_eq!(values["inputs"]["API_KEY"].as_str(), Some(""));

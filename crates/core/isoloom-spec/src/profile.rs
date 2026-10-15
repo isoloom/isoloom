@@ -11,7 +11,7 @@
 //! target: proxmox                     # the target this profile runs on
 //! spec:                               # merged into the spec, as -s would
 //!   networks: { lan: { internet: false } }
-//!   machines: { web: { vm: { cpus: 4, memory: 8192 } } }
+//!   machines: { web: { resources: { cpus: 4, memory_mb: 8192 } } }
 //! defaults:                           # a layer of the defaults (see `defaults`)
 //!   cloud: { aws: { region: eu-west-3 } }
 //! inputs:                             # launch-time values, unless the environment sets them

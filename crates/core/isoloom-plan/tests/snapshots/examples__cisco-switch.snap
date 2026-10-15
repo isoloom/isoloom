@@ -1,0 +1,142 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: cisco-switch
+networks:
+  office-vlan10:
+    cidr: 10.92.10.0/24
+    internet: false
+    gateway: ~
+    docker: ~
+    switch: sw1
+  office-vlan20:
+    cidr: 10.92.20.0/24
+    internet: false
+    gateway: ~
+    docker: ~
+    switch: sw1
+reach: []
+inputs: []
+machines:
+  sw1:
+    networks: {}
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "vrnetlab/cisco_iol:L2-17.12.01"
+      build: ~
+      init: []
+      idle: false
+      appliance: cisco-iol-l2
+      config: configs/sw1.cfg
+    vm: ~
+  files:
+    networks:
+      office-vlan10: 10
+      office-vlan20: 10
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: web
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "nginx:1.27-alpine"
+      build: ~
+      init: []
+      idle: false
+    vm: ~
+  staff:
+    networks:
+      office-vlan10: 20
+    os: alpine@3.19
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1"
+      build: ~
+      init: []
+      idle: true
+    vm:
+      os: alpine-3.19
+      provision: []
+      image: ~
+  guest:
+    networks:
+      office-vlan20: 20
+    os: alpine@3.19
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1"
+      build: ~
+      init: []
+      idle: true
+    vm:
+      os: alpine-3.19
+      provision: []
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: "staff reach the file server through the switch (VLAN 10, tagged on its trunk)"
+    from: staff
+    http: "http://10.92.10.10/"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: 200
+    wait: 180
+  - name: "guests too, on VLAN 20"
+    from: guest
+    http: "http://10.92.20.10/"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: 200
+    wait: 180
+targets: ~

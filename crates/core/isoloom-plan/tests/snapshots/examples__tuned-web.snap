@@ -1,0 +1,93 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: tuned-web
+networks:
+  app:
+    cidr: 10.83.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  web:
+    networks:
+      app: 10
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    environment:
+      APP_MODE: production
+    sysctls:
+      net.core.somaxconn: "4096"
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 16384
+    ports:
+      - port: 80
+        name: web
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    disks:
+      cache:
+        size_gb: 50
+        fs: xfs
+        mount: /var/cache/web
+    access: false
+    docker: ~
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+      tpm: true
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: "the machine's environment has APP_MODE"
+    from: web
+    http: ~
+    tcp: ~
+    exec: printenv APP_MODE
+    script: ~
+    expect: production
+    wait: ~
+  - name: the accept queue is 4096 deep
+    from: web
+    http: ~
+    tcp: ~
+    exec: cat /proc/sys/net/core/somaxconn
+    script: ~
+    expect: "4096"
+    wait: ~
+  - name: a process may open 8192 files (16384 at most)
+    from: web
+    http: ~
+    tcp: ~
+    exec: "sh -c 'echo $(ulimit -Sn)/$(ulimit -Hn)'"
+    script: ~
+    expect: 8192/16384
+    wait: ~
+  - name: the cache disk is mounted
+    from: web
+    http: ~
+    tcp: ~
+    exec: "grep -q ' /var/cache/web ' /proc/mounts && echo mounted"
+    script: ~
+    expect: mounted
+    wait: ~
+targets: ~

@@ -188,7 +188,7 @@ pub enum Requirement {
         /// The machine.
         machine: String,
     },
-    /// A VM asks for a virtual TPM (`vm.tpm: true`).
+    /// A VM asks for a virtual TPM (`hardware.tpm: required`).
     Tpm {
         /// The first machine that does.
         machine: String,
@@ -319,7 +319,7 @@ impl fmt::Display for Requirement {
             Requirement::ExecWithoutContainer { check } => write!(f, "`exec` check \"{check}\" {IN_A_CONTAINER}"),
             Requirement::NetworkAppliance { machine } => write!(
                 f,
-                "machine `{machine}` is a network appliance (`docker.appliance`), which runs on the Docker targets"
+                "machine `{machine}` is a network appliance (`app.appliance`), which runs on the Docker targets"
             ),
             Requirement::Gateway { .. } => f.write_str("networks with a `gateway` machine in hybrid environments come later"),
             Requirement::VolumeAcrossShapes { volume } => write!(
@@ -397,7 +397,7 @@ fn refused_secrets(r: &Requirement, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 fn no_tpm(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
     write!(
         f,
-        "machine `{machine}` asks for a virtual TPM (`vm.tpm: true`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+        "machine `{machine}` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
     )
 }
 

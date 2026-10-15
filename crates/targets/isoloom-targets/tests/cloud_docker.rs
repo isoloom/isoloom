@@ -8,6 +8,7 @@ pub mod testing;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
+use isoloom_targets::Lab;
 use isoloom_targets::composite::CloudDockerBackend;
 
 fn env(example: &str) -> Environment {
@@ -36,11 +37,13 @@ fn a_machine_needing_a_controller_is_refused_by_capabilities() {
 
 #[test]
 fn arm64_is_refused_by_the_clouds() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    docker: { image: nginx }\n",
-    )
-    .unwrap();
-    let e = Environment::build(&spec, Target::CloudDocker, None);
+    let lab = Lab::new(
+        isoloom_spec::parse(
+            "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    hardware: { arch: arm64 }\n    app: { image: nginx }\n",
+        )
+        .unwrap(),
+    );
+    let e = Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None);
     let why = CloudDockerBackend.refusal(&e).unwrap();
     assert_eq!(why, "machine `w`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)");
     assert!(CloudDockerBackend.render(&e).unwrap_err().to_string().ends_with(&why));

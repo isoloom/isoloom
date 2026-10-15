@@ -12,7 +12,7 @@ use std::fmt::Write as _;
 
 use isoloom_plan::secrets::VM_DEFAULT_MODE;
 use isoloom_plan::{Environment, MachineShape, SecretFile};
-use isoloom_spec::model::secret_variable;
+use isoloom_spec::model::{SecretSource, Spec, secret_variable};
 
 use crate::boot;
 use crate::shell::quote;
@@ -87,16 +87,27 @@ pub fn step(machine: &str, files: &[SecretFile]) -> String {
     format!("set -e\n{}{service}", wait(machine))
 }
 
+/// The variable the Compose file reads secret `name` from: an input's file, the input's own
+/// variable; a secret, `ISOLOOM_SECRET_<NAME>`.
+#[must_use]
+pub fn compose_variable(spec: &Spec, name: &str) -> String {
+    match spec.secrets.get(name) {
+        Some(SecretSource::Input { input }) => input.clone(),
+        _ => secret_variable(name),
+    }
+}
+
 /// On a Docker host, before `docker compose up`: the wait, then each secret of `names` in the
-/// variable the Compose file reads it from (`ISOLOOM_SECRET_<NAME>`), its last line breaks kept.
+/// variable the Compose file reads it from ([`compose_variable`]), its last line breaks kept.
 /// Nothing when there are none.
-pub fn host_environment(names: &[String]) -> String {
+#[must_use]
+pub fn host_environment(spec: &Spec, names: &[String]) -> String {
     if names.is_empty() {
         return String::new();
     }
     let mut sh = wait("the Docker host");
     for name in names {
-        let var = secret_variable(name);
+        let var = compose_variable(spec, name);
         let _ = writeln!(sh, "{var}=\"$(cat {KEPT_DIR}/{name}; printf x)\"; {var}=\"${{{var}%x}}\"; export {var}");
     }
     sh

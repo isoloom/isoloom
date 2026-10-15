@@ -2,13 +2,13 @@
 //!
 //! ```yaml
 //! machines:
-//!   web: { os: debian@12, ... }        # a VM of Debian 12
+//!   web: { os: debian@12, ... }        # Debian 12, as a VM or its container image
 //!   dc01:
 //!     os: windows-server               # the family alone: its pinned default, 2022
-//!     vm: { provision: [dc.ps1] }      # `vm.os` defaults to the machine's `os`
+//!     app: { steps: [{ run: dc.ps1 }] }
 //! ```
 //!
-//! Those are the only spellings. Once the spec is parsed, each `vm.os` holds the image table's
+//! Those are the only spellings. Once the spec is lowered, each `vm.os` holds the image table's
 //! name for its OS (`debian@12` is `debian-12`), the name every target reads ([`canonical`]). A
 //! version left out resolves to the family's pinned default ([`Family::default`]), recorded in
 //! the resolved snapshot. The machine's `os` reaches its `vm:` on the YAML, before `common:` and

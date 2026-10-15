@@ -40,8 +40,9 @@ pub(super) fn image_res(mp: &MachinePlan) -> String {
 pub(super) fn refusal(env: &Environment) -> Option<String> {
     vms(env).filter(|(_, mp)| is_arm(mp)).find_map(|(name, mp)| {
         let o = mp.os.as_deref().unwrap_or_default();
-        (mp.is_windows() || (image_url(o).is_none() && !super::image::has_own(mp)))
-            .then(|| format!("machine `{name}`: no arm64 Proxmox image for `{o}` (Debian 11 to 13, Ubuntu 20.04 to 24.04, or `vm.image.proxmox`)"))
+        (mp.is_windows() || (image_url(o).is_none() && !super::image::has_own(mp))).then(|| {
+            format!("machine `{name}`: no arm64 Proxmox image for `{o}` (Debian 11 to 13, Ubuntu 20.04 to 24.04, or `overrides.proxmox.machines.{name}.image`)")
+        })
     })
 }
 

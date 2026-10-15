@@ -9,6 +9,7 @@ use std::process::Command;
 
 const ENV_VALUE: &str = "env-sentinel-7f3a9c";
 const FILE_VALUE: &str = "file-sentinel-41b2e8";
+const INPUT_VALUE: &str = "input-sentinel-93d1c6";
 
 const SPEC: &str = "
 version: 1
@@ -17,12 +18,16 @@ networks: { lan: { cidr: 10.70.0.0/24 } }
 secrets:
   db-password: { env: SECRET_LAB_DB_PASSWORD }
   api-key: { file: api.key }
+inputs: [SECRET_LAB_FLAG]
 machines:
   app:
     networks: { lan: 10 }
-    ports: [{ port: 80 }]
-    docker: { image: nginx:alpine }
-    secrets: [db-password, { source: api-key, target: /etc/app/api.key, mode: 0400 }]
+    ports: { web: 80 }
+    app: { image: nginx:alpine }
+    files:
+      - { path: /run/secrets/db-password, secret: db-password }
+      - { path: /etc/app/api.key, secret: api-key, mode: 0400 }
+      - { path: /ctf/flag, input: SECRET_LAB_FLAG, mode: 0444 }
 ";
 
 /// VMs, one of them a container on hybrid.
@@ -35,15 +40,18 @@ secrets:
   api-key: { file: api.key }
 machines:
   app:
+    os: debian@12
     networks: { lan: 10 }
-    ports: [{ port: 80 }]
-    docker: { image: nginx:alpine }
-    vm: { os: debian@12, provision: [db.sh] }
-    secrets: [db-password, { source: api-key, target: /etc/app/api.key, mode: 0400 }]
+    ports: { web: 80 }
+    app: { image: nginx:alpine, steps: [{ run: db.sh }] }
+    files:
+      - { path: /run/secrets/db-password, secret: db-password }
+      - { path: /etc/app/api.key, secret: api-key, mode: 0400 }
   db:
+    os: debian@12
     networks: { lan: 20 }
-    vm: { os: debian@12, provision: [db.sh] }
-    secrets: [{ source: db-password, uid: 999, mode: 0400 }]
+    app: { steps: [{ run: db.sh }, reboot] }   # a reboot: a VM only
+    files: [{ path: /run/secrets/db-password, secret: db-password, uid: 999, mode: 0400 }]
 ";
 
 /// A Windows machine, delivered to over WinRM, with its own process.
@@ -56,10 +64,13 @@ secrets:
   api-key: { file: api.key }
 machines:
   win:
+    os: windows-server@2022
     networks: { lan: 10 }
-    ports: [{ port: 80 }]
-    vm: { os: windows-server@2022, provision: [setup.ps1] }
-    secrets: [db-password, { source: api-key, target: 'C:\\app\\api.key' }]
+    ports: { web: 80 }
+    app: { steps: [{ run: setup.ps1 }] }
+    files:
+      - { path: 'C:\\run\\secrets\\db-password', secret: db-password }
+      - { path: 'C:\\app\\api.key', secret: api-key }
     command: [app.exe]
 ";
 
@@ -94,6 +105,7 @@ fn generated(spec: &str, tag: &str) -> Vec<(PathBuf, String)> {
         .args(["generate", dir.to_str().unwrap()])
         .env("ISOLOOM_HOME", dir.join("home"))
         .env("SECRET_LAB_DB_PASSWORD", ENV_VALUE)
+        .env("SECRET_LAB_FLAG", INPUT_VALUE)
         .output()
         .unwrap();
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
@@ -105,7 +117,7 @@ fn generated(spec: &str, tag: &str) -> Vec<(PathBuf, String)> {
     }
     for (path, text) in &generated {
         assert!(
-            !text.contains(ENV_VALUE) && !text.contains(FILE_VALUE),
+            !text.contains(ENV_VALUE) && !text.contains(FILE_VALUE) && !text.contains(INPUT_VALUE),
             "{} holds a secret's value",
             path.display()
         );

@@ -49,6 +49,14 @@ fn sensitive_values_stay_out_of_the_environment() {
 }
 
 #[test]
+fn an_input_keeps_its_name_in_the_environment() {
+    let found = problems(
+        "inputs: { API_URL: { sensitive: false } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    environment: { URL: { input: API_URL } }\n",
+    );
+    assert_eq!(found, [(Code::Refused, "machines.web.environment.URL".to_owned())]);
+}
+
+#[test]
 fn files_name_declared_values_once_each() {
     let found = problems(
         "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    files: [{ path: /a, input: FLAG }, { path: /a, secret: db }, { path: rel, content: x }]\n",
@@ -133,7 +141,7 @@ fn with_message(port: &str, message: &str) -> crate::syntax::Spec {
         "version: 1\nname: t\nnetworks:\n  lab: {{ cidr: 10.1.0.0/24 }}\nmachines:\n  web: {{ os: debian@12, networks: {{ lab: 10 }}, ports: {{ {port}: {{ port: 80, protocol: http, publish: 8080 }} }} }}\n"
     );
     let mut spec = parse(&yaml).unwrap();
-    spec.message = Some(message.to_string());
+    spec.message = Some(message.to_owned());
     spec
 }
 

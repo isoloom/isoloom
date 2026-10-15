@@ -73,7 +73,7 @@ pub(crate) fn refused(f: &mut fmt::Formatter<'_>, machine: &str, network: &str, 
         MachineShape::Vm => write!(f, "{at}, which this target doesn't give a VM yet"),
         MachineShape::Container => write!(
             f,
-            "{at}: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); give the machine a `vm:` and run it on a VM target"
+            "{at}: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)"
         ),
         MachineShape::Supplied | MachineShape::External => {
             write!(f, "{at}: an existing host keeps the addresses it has, which Isoloom doesn't change")
@@ -86,20 +86,21 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use super::*;
-    use crate::Environment;
+    use crate::{Environment, Lab};
 
     const SPEC: &str = "
 version: 1
 name: t
 networks: { lan: { cidr: 10.0.0.0/24 }, dmz: { cidr: 10.0.1.0/24 } }
 machines:
-  web: { networks: { lan: [10, 11, 12], dmz: 10 }, docker: { image: nginx }, vm: { os: debian@12, provision: [s.sh] } }
+  web: { networks: { lan: [10, 11, 12], dmz: 10 }, os: debian@12, app: { image: nginx, steps: [{ run: s.sh }] } }
 ";
 
     #[test]
     fn a_vm_adds_them_on_the_interface_of_its_primary_address() {
-        let spec = isoloom_spec::parse(SPEC).unwrap();
-        let env = Environment::build(&spec, Target::Vagrant, None);
+        let lab = Lab::new(isoloom_spec::parse(SPEC).unwrap());
+        let build = |t| Environment::build(&lab.for_target(t), t, None);
+        let env = build(Target::Vagrant);
         let web = &env.machines["web"];
         assert_eq!(
             web.more_addresses["lan"],
@@ -110,12 +111,7 @@ machines:
         let Step::MoreAddresses { addresses } = step else { unreachable!() };
         assert_eq!(addresses[0].primary, "10.0.0.10".parse::<Ipv4Addr>().unwrap());
         assert_eq!(addresses[0].prefix, 24);
-        let need = |t| {
-            Environment::build(&spec, t, None)
-                .requirements
-                .into_iter()
-                .find(|r| matches!(r, Requirement::MoreAddresses { .. }))
-        };
+        let need = |t| build(t).requirements.into_iter().find(|r| matches!(r, Requirement::MoreAddresses { .. }));
         let vm = need(Target::Vagrant).unwrap();
         assert!(matches!(vm, Requirement::MoreAddresses { shape: MachineShape::Vm, .. }));
         let container = need(Target::Docker).unwrap();

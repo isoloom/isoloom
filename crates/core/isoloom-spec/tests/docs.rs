@@ -81,7 +81,7 @@ fn every_spec_in_the_docs_validates() {
             let at = format!("{}:{line}", shown(&page));
             match isoloom_spec::parse(&body) {
                 Err(e) => problems.push(format!("{at}: {e}")),
-                Ok(spec) => problems.extend(isoloom_spec::validate(&spec).iter().map(|p| format!("{at}: {p}"))),
+                Ok(spec) => problems.extend(isoloom_spec::syntax::check(&spec).iter().map(|p| format!("{at}: {p}"))),
             }
         }
     }

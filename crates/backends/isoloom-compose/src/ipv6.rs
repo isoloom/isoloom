@@ -94,7 +94,7 @@ networks:
   dual: { cidr: 10.1.0.0/24, ipv6: { cidr: \"fd00:1::/64\" } }
   only: { cidr: 10.2.0.0/24, internet: false, ipv6: { cidr: \"fd00:2::/64\", only: true } }
 machines:
-  web: { networks: { dual: 10, only: 10 }, docker: { image: nginx } }
+  web: { networks: { dual: 10, only: 10 }, app: { image: nginx } }
 ";
 
     #[test]

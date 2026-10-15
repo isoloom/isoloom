@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ vagrant
@@ -12,7 +13,7 @@ source: crates/isoloom/tests/example_snapshots.rs
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "windows-hello",
   "instance": null,
   "inputs": [],
@@ -45,14 +46,15 @@ source: crates/isoloom/tests/example_snapshots.rs
       "docker_addresses": {
         "lab": "10.192.57.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": 8082
+          "protocol": "http",
+          "publish": 8082,
+          "published": 8082,
+          "url": "http://127.0.0.1:8082/"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -86,7 +88,9 @@ source: crates/isoloom/tests/example_snapshots.rs
   "published": [
     {
       "machine": "web01",
+      "name": "web",
       "port": 80,
+      "protocol": "http",
       "host_port": 8082
     }
   ],
@@ -105,13 +109,13 @@ source: crates/isoloom/tests/example_snapshots.rs
     ],
     "refused": {},
     "not_possible": {
-      "docker": "needs `docker:` on web01",
-      "hosted": "needs `docker:` on web01",
-      "docker-vm": "needs `docker:` on web01",
-      "cloud-docker": "needs `docker:` on web01",
-      "kubernetes": "needs `docker:` on web01",
+      "docker": "machines.web01.os: Windows has no container form in 1.0",
+      "hosted": "machines.web01.os: Windows has no container form in 1.0",
+      "docker-vm": "machines.web01.os: Windows has no container form in 1.0",
+      "cloud-docker": "machines.web01.os: Windows has no container form in 1.0",
+      "kubernetes": "machines.web01.os: Windows has no container form in 1.0",
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on web01",
+      "external": "overrides.external.machines.web01: the external target reaches machines that exist already, and `web01` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

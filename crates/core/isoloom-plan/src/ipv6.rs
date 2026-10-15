@@ -143,7 +143,7 @@ mod tests {
     use super::*;
 
     fn spec() -> Spec {
-        isoloom_spec::parse(
+        let source = isoloom_spec::parse(
             "version: 1
 name: v6
 networks:
@@ -152,11 +152,12 @@ networks:
   c: { cidr: 10.3.0.0/24 }
 reach: [{ from: a, to: b }]
 machines:
-  x: { networks: { a: 10 }, docker: { image: alpine } }
-  y: { networks: { b: 20, c: 5 }, docker: { image: alpine } }
+  x: { networks: { a: 10 }, app: { image: alpine } }
+  y: { networks: { b: 20, c: 5 }, app: { image: alpine } }
 ",
         )
-        .unwrap()
+        .unwrap();
+        crate::Lab::new(source).spec()
     }
 
     #[test]

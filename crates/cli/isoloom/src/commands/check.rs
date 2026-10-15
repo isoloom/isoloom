@@ -12,18 +12,18 @@ pub struct Args {
     /// The image table the files were generated with (see `generate --images`).
     #[arg(long, value_name = "FILE")]
     images: Option<PathBuf>,
-    /// Override a value for this command: `-s machines.web.vm.os=ubuntu@24.04` on the spec,
+    /// Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec,
     /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
     #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
     sets: Vec<String>,
 }
 
 pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
-    let (spec, settings) = spec::load_settings(profile, &a.dir, a.images.as_deref(), &a.sets)?;
-    if spec::report_invalid(&spec) {
+    let (lab, settings) = spec::load_settings(profile, &a.dir, a.images.as_deref(), &a.sets)?;
+    if spec::report_invalid(&a.dir, &lab) {
         return Ok(ExitCode::FAILURE);
     }
-    let (files, _) = isoloom_targets::generate_all(&spec);
+    let (files, _) = isoloom_targets::generate_all(&lab);
     let files = generated::finish(files, &settings.defaults, &a.dir)?;
     let mut stale = 0;
     for f in &files {

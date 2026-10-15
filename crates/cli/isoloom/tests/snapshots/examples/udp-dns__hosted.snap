@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ hosted
@@ -8,7 +9,10 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/compose.yml
 ✓ .isoloom/docker/checks/client.sh
 ✓ .isoloom/docker/checks/dns.sh
+✓ .isoloom/docker/build/client/Dockerfile
 ✓ .isoloom/resolved.json
+
+## .isoloom/docker/build/client/Dockerfile: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/client.sh: identical in the `docker` snapshot
 

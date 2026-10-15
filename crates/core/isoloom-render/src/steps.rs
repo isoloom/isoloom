@@ -337,8 +337,8 @@ fn mask_of(cidr: &str) -> std::net::Ipv4Addr {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_plan::Environment;
     use isoloom_plan::lifecycle::Step;
+    use isoloom_plan::{Environment, Lab};
     use isoloom_spec::model::Target;
 
     const SPEC: &str = r"
@@ -356,20 +356,23 @@ machines:
     networks: { front: 10, back: 10 }
     aliases: [store]
     volumes: { shared: /srv/shared }
-    vm: { os: debian@12, provision: [steps/write.sh] }
+    os: debian@12
+    app: { steps: [{ run: steps/write.sh }] }
   reader:
     networks: { back: 11 }
     volumes: { shared: /data/shared }
-    vm: { os: debian@12, provision: [steps/look.sh] }
+    os: debian@12
+    app: { steps: [{ run: steps/look.sh }] }
   web:
     networks: { front: 12 }
-    vm: { os: debian@12, provision: [steps/web.sh] }
+    os: debian@12
+    app: { steps: [{ run: steps/web.sh }] }
 ";
 
     fn env() -> Environment {
-        let spec = isoloom_spec::parse(SPEC).expect("the test spec parses");
-        assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-        Environment::build(&spec, Target::Vagrant, None)
+        let lab = Lab::new(isoloom_spec::parse(SPEC).expect("the test spec parses"));
+        assert!(lab.problems().is_empty(), "{:?}", lab.problems());
+        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)
     }
 
     fn rendered(env: &Environment, machine: &str, pick: impl Fn(&Step) -> bool) -> String {

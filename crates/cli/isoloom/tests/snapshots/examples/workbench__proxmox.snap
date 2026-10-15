@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ proxmox (needs `docker.lxc` or `vm:` on bench, web)
+✗ proxmox (machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM)
 
 # isoloom generate --target proxmox (exit 1)
-· proxmox: not possible for this spec (see `isoloom targets`)
+· proxmox: machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM

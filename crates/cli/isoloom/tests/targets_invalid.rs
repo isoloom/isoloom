@@ -31,12 +31,12 @@ fn assert_reports(name: &str, yaml: &str, problem: &str) {
 
 #[test]
 fn an_invalid_cidr_is_reported() {
-    let yaml = "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/33 }\nmachines:\n  web: { networks: { app: 10 }, docker: { image: nginx } }\n";
+    let yaml = "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/33 }\nmachines:\n  web: { networks: { app: 10 }, app: { image: nginx } }\n";
     assert_reports("cidr", yaml, "networks.app.cidr");
 }
 
 #[test]
 fn an_undeclared_network_is_reported() {
-    let yaml = "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n";
+    let yaml = "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n";
     assert_reports("network", yaml, "no network named `lan`");
 }

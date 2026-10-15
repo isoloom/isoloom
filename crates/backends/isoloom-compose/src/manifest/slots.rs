@@ -1,7 +1,7 @@
 //! What a Compose run is given at run time: the params the Compose file reads (where published
 //! ports listen, whether their host ports are fixed, whether derived checks run) and the slots
 //! of the values it must never hold (inputs, secrets, project files), each delivered to the
-//! steps that create the containers using it.
+//! steps that create or start the containers using it.
 
 use std::collections::BTreeSet;
 
@@ -132,8 +132,10 @@ fn spec_source(s: &SpecSource) -> Option<SecretSource> {
     })
 }
 
-/// Who gets a value: some machines and their `init:` jobs, through the steps that create them
-/// (`up`, and the leaf jobs run on their own).
+/// Who gets a value: some machines and their `init:` jobs, through the steps that create or
+/// start them: `up`, `start` (resume: Compose writes a secret's file again from its variable
+/// each time it starts the container, and refuses to start without it; Compose 5.5.1), and the
+/// leaf jobs run on their own.
 struct Reach {
     machines: Vec<Name>,
     steps: StepSelection,
@@ -145,7 +147,7 @@ fn reach(machines: &[&str], members: &[Member], plan: &StartPlan) -> Result<Reac
         .filter(|m| m.role == Role::Job && m.of.as_deref().is_some_and(|o| machines.contains(&o)));
     let names = machines.iter().copied().chain(jobs.map(|j| j.name.as_str()));
     let leaf_jobs = plan.jobs.iter().filter(|j| machines.contains(&owner(members, j))).map(|j| job_step(j));
-    let steps = std::iter::once("up".to_owned()).chain(leaf_jobs);
+    let steps = ["up", "start"].into_iter().map(str::to_owned).chain(leaf_jobs);
     Ok(Reach {
         machines: names.map(Name::parse).collect::<Result<_, _>>()?,
         steps: StepSelection::Only(NonEmpty::new(steps.map(|s| StepId::parse(&s)).collect::<Result<_, _>>()?, "the steps")?),

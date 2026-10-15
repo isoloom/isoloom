@@ -1,0 +1,101 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: supplier-portal-api
+networks:
+  lab:
+    cidr: 10.20.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs:
+  - API_URL
+  - LAUNCH_TOKEN
+secrets:
+  input-launch-token:
+    input: LAUNCH_TOKEN
+machines:
+  database:
+    networks:
+      lab: 32
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 3207
+        name: mysql
+        http: false
+        publish: ~
+    inputs:
+      - API_URL
+    secrets:
+      - source: input-launch-token
+        target: /run/lab/launch-token
+        mode: "0400"
+    resources:
+      cpus: 1
+      memory_mb: 1024
+      disk_gb: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "mysql:8.0"
+      build: ~
+      init:
+        - build/database/seed.sh
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/database.sh
+      image: ~
+  web:
+    networks:
+      lab: 31
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 3206
+        name: portal
+        http: true
+        publish: 3206
+        fixed: true
+    inputs: []
+    resources:
+      cpus: 1
+      memory_mb: 1024
+      disk_gb: ~
+    depends_on:
+      - database
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/web
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - build/check/check.sh
+targets: ~

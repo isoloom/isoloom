@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ vagrant (needs `vm:` on web)
+✗ vagrant (machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM)
 
 # isoloom generate --target vagrant (exit 1)
-· vagrant: not possible for this spec (see `isoloom targets`)
+· vagrant: machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM

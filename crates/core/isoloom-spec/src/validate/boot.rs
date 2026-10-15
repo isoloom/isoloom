@@ -193,7 +193,8 @@ fn shared_networks(spec: &Spec, p: &mut Problems) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, validate};
+    use crate::model::from_yaml as parse;
+    use crate::validate;
 
     fn problems(machine: &str) -> Vec<String> {
         let spec = parse(&format!(

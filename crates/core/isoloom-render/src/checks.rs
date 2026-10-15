@@ -22,11 +22,11 @@ mod tests {
 
     #[test]
     fn a_machine_is_reached_at_its_address_and_a_literal_as_written() {
-        let spec = isoloom_spec::parse(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, vm: { os: debian@12 } }\n",
+        let lab = isoloom_plan::Lab::parse(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
         )
         .expect("parses");
-        let env = Environment::build(&spec, Target::Vagrant, None);
+        let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
         let web = Host::Machine {
             name: "web".into(),
             network: "lan".into(),

@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -348,7 +349,7 @@ services:
       isoloom.environment: cisco-iol
     restart: unless-stopped
   host-a:
-    image: alpine:3.20
+    image: alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
     platform: linux/amd64
     entrypoint:
     - sleep
@@ -416,7 +417,7 @@ services:
       isoloom-probe-amd64:
         condition: service_completed_successfully
     labels:
-      isoloom.port.80: http:80
+      isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
     restart: unless-stopped
@@ -691,6 +692,7 @@ volumes:
       },
       "ports": [
         {
+          "name": "web",
           "port": 80,
           "protocol": "tcp",
           "http": true
@@ -963,7 +965,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "cisco-iol",
   "instance": null,
   "inputs": [],
@@ -1016,7 +1018,7 @@ volumes:
         "site-a": "10.91.1.1",
         "wan": "10.91.0.2"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1055,7 +1057,7 @@ volumes:
         "site-b": "10.91.2.1",
         "wan": "10.91.0.3"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1080,11 +1082,12 @@ volumes:
       "access": false,
       "supplied": false,
       "shapes": [
-        "docker"
+        "docker",
+        "vm"
       ],
       "role": "target",
       "arch": "amd64",
-      "os": null,
+      "os": "alpine-3.19",
       "windows": false,
       "addresses": {
         "site-a": "10.91.1.10"
@@ -1092,7 +1095,7 @@ volumes:
       "docker_addresses": {
         "site-a": "10.91.1.10"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1104,7 +1107,9 @@ volumes:
       "gateway_of": [],
       "routes": [],
       "default_gateway": "10.91.1.1",
-      "offline": false
+      "offline": false,
+      "os_family": "alpine",
+      "os_version": "3.19"
     },
     "host-b": {
       "access": false,
@@ -1122,14 +1127,12 @@ volumes:
       "docker_addresses": {
         "site-b": "10.91.2.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -1179,15 +1182,15 @@ volumes:
       "cloud-docker"
     ],
     "refused": {
-      "kubernetes": "machine `r1` is a network appliance (`docker.appliance`), which runs on the Docker targets"
+      "kubernetes": "machine `r1` is a network appliance (`app.appliance`), which runs on the Docker targets"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
-      "vagrant": "needs `vm:` on r1, r2, host-a, host-b",
-      "proxmox": "needs `docker.lxc` or `vm:` on r1, r2, host-a, host-b",
-      "esxi": "needs `vm:` on r1, r2, host-a, host-b",
-      "cloud-vm": "needs `vm:` on r1, r2, host-a, host-b",
-      "external": "needs `external:` on r1, r2, host-a, host-b",
+      "vagrant": "machines.r1.app.appliance: an appliance's packaging exists only as a container",
+      "proxmox": "machines.r1.app.appliance: an appliance's packaging exists only as a container",
+      "esxi": "machines.r1.app.appliance: an appliance's packaging exists only as a container",
+      "cloud-vm": "machines.r1.app.appliance: an appliance's packaging exists only as a container",
+      "external": "overrides.external.machines.r1: the external target reaches machines that exist already, and `r1` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {}

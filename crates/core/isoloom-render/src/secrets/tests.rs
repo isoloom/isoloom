@@ -115,11 +115,33 @@ fn the_wait_passes_once_delivered() {
 #[cfg(unix)]
 #[test]
 fn a_docker_host_reads_each_kept_value_into_its_variable() {
-    assert_eq!(host_environment(&[]), "");
+    let spec = isoloom_spec::model::Spec {
+        version: 1,
+        name: "t".into(),
+        networks: indexmap::IndexMap::new(),
+        reach: Vec::new(),
+        dns: None,
+        inputs: Vec::new(),
+        secrets: indexmap::IndexMap::new(),
+        machines: indexmap::IndexMap::new(),
+        cloud: None,
+        volumes: indexmap::IndexMap::new(),
+        constraints: None,
+        common: None,
+        groups: indexmap::IndexMap::new(),
+        provision: Vec::new(),
+        controller: None,
+        checks: Vec::new(),
+        targets: None,
+        message: None,
+        tools: indexmap::IndexMap::new(),
+        clones: indexmap::IndexMap::new(),
+    };
+    assert_eq!(host_environment(&spec, &[]), "");
     let names = vec!["db-password".to_string()];
     let script = format!(
         "mkdir -p {KEPT_DIR} && printf 'v\\n\\n' > {KEPT_DIR}/db-password && touch {DELIVERED}\n{}printf '%s|' \"$ISOLOOM_SECRET_DB_PASSWORD\"",
-        host_environment(&names)
+        host_environment(&spec, &names)
     );
     let (out, dir) = run(&script, "", "host");
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));

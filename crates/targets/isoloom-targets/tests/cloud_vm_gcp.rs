@@ -6,12 +6,12 @@
 use std::path::Path;
 
 use isoloom_spec::{Target, load};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 fn gcp(name: &str) -> Option<String> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
-    let spec = load(&dir).expect("example parses");
-    let files = generate(&spec, Target::CloudVm).expect("cloud-vm generates");
+    let lab = Lab::new(load(&dir).expect("example parses"));
+    let files = generate(&lab, Target::CloudVm).expect("cloud-vm generates");
     files.into_iter().find(|f| f.path.ends_with("cloud-vm/gcp/main.tf")).map(|f| f.contents)
 }
 
@@ -72,8 +72,8 @@ fn gcp_puts_a_machine_on_several_networks_with_an_interface_in_each_vpc() {
 fn gcp_declines_windows() {
     // windows-hello is Windows-only: AWS builds it, the GCP driver declines it for now.
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/windows-hello");
-    let spec = load(&dir).expect("parses");
-    let files = generate(&spec, Target::CloudVm).expect("cloud-vm generates");
+    let lab = Lab::new(load(&dir).expect("parses"));
+    let files = generate(&lab, Target::CloudVm).expect("cloud-vm generates");
     assert!(files.iter().any(|f| f.path.ends_with("cloud-vm/aws/main.tf")));
     assert!(
         !files.iter().any(|f| f.path.ends_with("cloud-vm/gcp/main.tf")),

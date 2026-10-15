@@ -11,7 +11,7 @@ use testing::{Outcome, example};
 
 /// Example `name`'s plan on `cloud-vm`.
 fn env(name: &str) -> Outcome<Environment> {
-    Ok(Environment::build(&example(name)?, Target::CloudVm, None))
+    Ok(testing::planned(&example(name)?, Target::CloudVm))
 }
 
 /// `cloud`'s module for example `name`.
@@ -113,10 +113,8 @@ fn a_refusal_matches_rendering_and_drops_only_that_cloud() -> Outcome {
 
 #[test]
 fn an_os_without_an_image_is_refused() -> Outcome {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    vm: { os: rocky@9 }\n",
-    )?;
-    let e = Environment::build(&spec, Target::CloudVm, None);
+    let spec = testing::spec("version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    os: rocky@9\n")?;
+    let e = testing::planned(&spec, Target::CloudVm);
     let linode = CloudVmModule::new(Cloud::Linode).refusal(&e).expect("refused");
     assert_eq!(linode, "machine `w`: no Linode image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04)");
     // Oracle Cloud runs Debian on Ubuntu, but no other OS: it would no longer be the spec's.

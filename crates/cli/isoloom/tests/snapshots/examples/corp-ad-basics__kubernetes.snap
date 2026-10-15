@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ kubernetes (needs `docker:` on dc01, ws-01, ws-02)
+✗ kubernetes (machines.dc01.os: Windows has no container form in 1.0)
 
 # isoloom generate --target kubernetes (exit 1)
-· kubernetes: not possible for this spec (see `isoloom targets`)
+· kubernetes: machines.dc01.os: Windows has no container form in 1.0

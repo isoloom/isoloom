@@ -23,19 +23,21 @@
 //!
 //! ```
 //! use isoloom_ansible::ExternalBackend;
-//! use isoloom_plan::Environment;
+//! use isoloom_plan::{Environment, Lab};
 //! use isoloom_render::backend::Backend;
 //! use isoloom_spec::model::Target;
 //!
-//! let spec = isoloom_spec::parse(
+//! let lab = Lab::new(isoloom_spec::parse(
 //!     "version: 1
 //! name: home-lab
 //! networks: { lan: { cidr: 10.9.0.0/24 } }
 //! machines:
-//!   web: { networks: { lan: 5 }, vm: { os: debian@12 }, external: { address: 192.168.1.20 } }
+//!   web: { networks: { lan: 5 }, os: debian@12 }
+//! overrides:
+//!   external: { machines: { web: { ssh: { address: 192.168.1.20 } } } }
 //! ",
-//! )?;
-//! let env = Environment::build(&spec, Target::External, None);
+//! )?);
+//! let env = Environment::build(&lab.for_target(Target::External), Target::External, None);
 //! let files = ExternalBackend.render(&env)?;
 //! let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
 //! assert_eq!(paths, [".isoloom/external/inventory.ini", ".isoloom/external/machines.json"]);

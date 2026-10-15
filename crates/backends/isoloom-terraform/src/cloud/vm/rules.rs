@@ -178,7 +178,9 @@ impl Rules {
             return Some(why);
         }
         if let Some((name, _)) = vms(env).find(|(_, mp)| mp.tpm == Some(Tpm::Required)).filter(|_| !self.tpm) {
-            return Some(format!("machine `{name}` asks for a virtual TPM (`vm.tpm: true`): {cloud} gives none"));
+            return Some(format!(
+                "machine `{name}` asks for a virtual TPM (`hardware.tpm: required`): {cloud} gives none"
+            ));
         }
         vms(env).find_map(|(name, mp)| {
             let os = mp.os.as_deref().unwrap_or_default();

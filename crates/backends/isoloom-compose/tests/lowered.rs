@@ -1,5 +1,6 @@
 //! The Compose file of specs written in the new syntax, through lowering: a flag delivered as a
-//! file from its input, and an image built from portable steps.
+//! file from its input (and its value to the steps that need it), and an image built from
+//! portable steps.
 
 use std::error::Error;
 use std::path::Path;
@@ -12,18 +13,20 @@ use isoloom_spec::model::Target;
 /// A test's outcome: a failed step is its report.
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
-/// The files Compose renders for a design example of `plan/phase2/spec-examples`.
-fn render(name: &str) -> Outcome<Vec<GeneratedFile>> {
+/// The Docker plan of a design example of `plan/phase2/spec-examples`.
+fn plan(name: &str) -> Outcome<Environment> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../plan/phase2/spec-examples")
         .join(name)
         .join("isoloom.yml");
     let source = isoloom_spec::syntax::parse(&std::fs::read_to_string(path)?).map_err(|problems| format!("{name} doesn't parse: {problems:?}"))?;
     let lowered = lower(&source, Scope::Target(Target::Docker));
-    Ok(isoloom_compose::render(
-        Target::Docker,
-        &Environment::build(&lowered.spec, Target::Docker, None),
-    )?)
+    Ok(Environment::build(&lowered.spec, Target::Docker, None))
+}
+
+/// The files Compose renders for a design example.
+fn render(name: &str) -> Outcome<Vec<GeneratedFile>> {
+    Ok(isoloom_compose::render(Target::Docker, &plan(name)?)?)
 }
 
 /// The text of the file at `path` among `files`.
@@ -43,6 +46,27 @@ fn a_flag_is_a_secret_file_read_from_its_input_never_the_environment() -> Outcom
     );
     assert!(!c.contains("FLAG: ${FLAG"), "{c}");
     assert!(c.contains("isoloom.port.site"), "{c}");
+    Ok(())
+}
+
+/// Compose writes the file again from the variable each time it starts the container, and won't
+/// start it without the variable: the value goes to `start` (resume) as well as `up`.
+#[test]
+fn a_flag_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
+    let backend = isoloom_compose::ComposeBackend(Target::Docker);
+    let manifest = isoloom_render::backend::Backend::run_manifest(&backend, &plan("help-desk")?)?.ok_or("no run manifest")?;
+    let slot = manifest.secrets.iter().find(|s| s.name.to_string() == "FLAG").ok_or("no FLAG slot")?;
+    let [
+        isoloom_manifest::Delivery::Env {
+            var,
+            steps: isoloom_manifest::StepSelection::Only(steps),
+        },
+    ] = slot.deliver.as_slice()
+    else {
+        return Err(format!("{:?}", slot.deliver).into());
+    };
+    assert_eq!(var.to_string(), "FLAG");
+    assert_eq!(steps.iter().map(ToString::to_string).collect::<Vec<_>>(), ["up", "start"]);
     Ok(())
 }
 

@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ vagrant
@@ -9,7 +10,164 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/vagrant/checks/web.sh
 ✓ .isoloom/resolved.json
 
-## .isoloom/resolved.json: identical in the `docker` snapshot
+## .isoloom/resolved.json
+{
+  "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
+  "resolved_version": 3,
+  "name": "tuned-web",
+  "instance": null,
+  "inputs": [],
+  "networks": {
+    "app": {
+      "cidr": "10.83.0.0/24",
+      "docker_cidr": "10.83.0.0/24",
+      "internet": true,
+      "gateway": null,
+      "gateway_address": "10.83.0.1",
+      "router": null,
+      "controller": "10.83.0.253"
+    }
+  },
+  "reach": [],
+  "machines": {
+    "web": {
+      "access": false,
+      "supplied": false,
+      "shapes": [
+        "vm"
+      ],
+      "role": "target",
+      "arch": "amd64",
+      "os": "debian-12",
+      "windows": false,
+      "addresses": {
+        "app": "10.83.0.10"
+      },
+      "docker_addresses": {
+        "app": "10.83.0.10"
+      },
+      "ports": {
+        "web": {
+          "port": 80,
+          "protocol": "http"
+        }
+      },
+      "depends_on": [],
+      "inputs": [],
+      "volumes": {},
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024,
+        "disk_gb": 20
+      },
+      "gateway_of": [],
+      "routes": [],
+      "default_gateway": null,
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
+    }
+  },
+  "start_order": [
+    "web"
+  ],
+  "clones": {},
+  "tools": {},
+  "groups": {},
+  "router": null,
+  "controller": {
+    "role": "infra",
+    "keep_running": false,
+    "addresses": {
+      "app": "10.83.0.253"
+    }
+  },
+  "published": [],
+  "targets": {
+    "possible": [
+      "vagrant",
+      "proxmox",
+      "esxi",
+      "cloud-vm"
+    ],
+    "generated": [
+      "vagrant",
+      "proxmox",
+      "cloud-vm"
+    ],
+    "refused": {
+      "esxi": "machine `web` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+    },
+    "not_possible": {
+      "docker": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",
+      "hosted": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",
+      "docker-vm": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",
+      "cloud-docker": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",
+      "kubernetes": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",
+      "hybrid": "only when some machines are containers and others are VMs",
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
+      "cloud-services": "left out by `targets:`"
+    },
+    "clouds": {
+      "cloud-vm": {
+        "generated": [
+          "aws",
+          "azure",
+          "gcp",
+          "oci"
+        ],
+        "refused": {
+          "digitalocean": "machine `web` asks for a virtual TPM (`hardware.tpm: required`): DigitalOcean gives none",
+          "linode": "machine `web` asks for a virtual TPM (`hardware.tpm: required`): Linode gives none"
+        }
+      }
+    }
+  },
+  "checks": {
+    "default_position": "networks",
+    "positions": [
+      {
+        "position": "web",
+        "machine": "web",
+        "runner": "isoloom-check-web",
+        "checks": [
+          {
+            "name": "the machine's environment has APP_MODE",
+            "derived": false,
+            "kind": "exec",
+            "target": "printenv APP_MODE",
+            "expect": "production",
+            "wait": 0
+          },
+          {
+            "name": "the accept queue is 4096 deep",
+            "derived": false,
+            "kind": "exec",
+            "target": "cat /proc/sys/net/core/somaxconn",
+            "expect": "4096",
+            "wait": 0
+          },
+          {
+            "name": "a process may open 8192 files (16384 at most)",
+            "derived": false,
+            "kind": "exec",
+            "target": "sh -c 'echo $(ulimit -Sn)/$(ulimit -Hn)'",
+            "expect": "8192/16384",
+            "wait": 0
+          },
+          {
+            "name": "the cache disk is mounted",
+            "derived": false,
+            "kind": "exec",
+            "target": "grep -q ' /var/cache/web ' /proc/mounts && echo mounted",
+            "expect": "mounted",
+            "wait": 0
+          }
+        ]
+      }
+    ]
+  }
+}
 
 ## .isoloom/vagrant/Vagrantfile
 # Generated by isoloom from isoloom.yml. Don't edit: change isoloom.yml and run

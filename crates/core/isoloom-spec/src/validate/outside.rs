@@ -62,7 +62,7 @@ fn own_settings(at: &str, name: &str, net: &Network, p: &mut Problems) {
     if net.docker.is_some() {
         p.add(
             format!("{at}.docker"),
-            format!("`{name}` keeps its own block on Docker: leave `docker.cidr` out"),
+            format!("`{name}` keeps its own block on Docker: leave its `cidr` out of `overrides.docker`"),
         );
     }
     if net.switch.is_some() {
@@ -119,7 +119,8 @@ pub(super) fn dhcp_address(spec: &Spec, net: &str, octet: u8, at: &str, p: &mut 
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, validate};
+    use crate::model::from_yaml as parse;
+    use crate::validate;
 
     fn problems(yaml: &str) -> Vec<String> {
         validate(&parse(yaml).unwrap()).into_iter().map(|p| p.to_string()).collect()

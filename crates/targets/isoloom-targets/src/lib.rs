@@ -19,7 +19,7 @@ pub use isoloom_spec::validate::docker_cidrs;
 
 use isoloom_plan::checks;
 use isoloom_render::{address, router, start_order};
-use isoloom_spec::{groups, images, instance, model, targets, validate};
+use isoloom_spec::{groups, images, instance, model, validate};
 
 /// The network appliances' management network (see `docker.appliance`).
 pub const APPLIANCE_MGMT_CIDR: &str = isoloom_spec::appliance::MGMT_CIDR;
@@ -30,8 +30,9 @@ pub fn is_switch_appliance(kind: crate::model::Appliance) -> bool {
 
 use std::net::Ipv4Addr;
 
+pub use isoloom_plan::Lab;
+
 use crate::model::{Spec, Target};
-use crate::targets::effective;
 
 /// Targets that have a generator today.
 pub const GENERATED_TARGETS: &[Target] = &[
@@ -50,19 +51,26 @@ pub const GENERATED_TARGETS: &[Target] = &[
 ];
 
 /// The files for one target.
-pub fn generate(spec: &Spec, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
-    let mut files = target_files(spec, target, None)?;
+///
+/// # Errors
+///
+/// [`GenerateError`]: the target isn't possible for the lab, has no generator, or refuses it.
+pub fn generate(lab: &Lab, target: Target) -> Result<Vec<GeneratedFile>, GenerateError> {
+    let mut files = target_files(lab, target, None)?;
     // The resolved snapshot goes with every target (the same file each time).
-    files.push(resolved::file(spec));
+    files.push(resolved::file(lab));
     Ok(files)
 }
 
-/// The files for one target as instance `n` of the spec (see [`crate::instance`]): names
+/// The files for one target as instance `n` of the lab (see [`crate::instance`]): names
 /// suffixed, Docker blocks and published ports moved, everything under `.isoloom-<n>/`.
-pub fn generate_instance(spec: &Spec, target: Target, n: u8) -> Result<Vec<GeneratedFile>, GenerateError> {
-    let applied = crate::instance::apply(spec, n).map_err(|what| GenerateError::Unsupported { target, what })?;
-    let mut files = target_files(&applied, target, Some(n))?;
-    files.push(resolved::file_with(&applied, Some(n)));
+///
+/// # Errors
+///
+/// [`GenerateError`], as [`generate`], or when the instance can't be made.
+pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<GeneratedFile>, GenerateError> {
+    let mut files = target_files(lab, target, Some(n))?;
+    files.push(resolved::file_with(lab, Some(n)));
     Ok(files
         .into_iter()
         .map(|f| {
@@ -72,30 +80,43 @@ pub fn generate_instance(spec: &Spec, target: Target, n: u8) -> Result<Vec<Gener
         .collect())
 }
 
+/// The lab as `target` runs it: lowered for it, as instance `n` when one is asked.
+fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> Result<Spec, GenerateError> {
+    let spec = lab.for_target(target);
+    match instance {
+        Some(n) => crate::instance::apply(&spec, n).map_err(|what| GenerateError::Unsupported { target, what }),
+        None => Ok(spec),
+    }
+}
+
 /// A target's own files, without the snapshot (which asks every backend whether it would
-/// refuse the spec, so it can't be part of what a backend renders): the plan for the target,
+/// refuse the lab, so it can't be part of what a backend renders): the plan for the target,
 /// rendered by its backend.
-fn target_files(spec: &Spec, target: Target, instance: Option<u8>) -> Result<Vec<GeneratedFile>, GenerateError> {
-    if !effective(spec).contains(&target) {
+fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> Result<Vec<GeneratedFile>, GenerateError> {
+    if let Some(refused) = lab.refusal(target) {
+        return Err(GenerateError::Unsupported { target, what: refused.line() });
+    }
+    if !lab.possible().contains(&target) {
         return Err(GenerateError::NotPossible(target));
     }
     let backend = backend(target).ok_or(GenerateError::NoGenerator(target))?;
-    let env = Environment::build(spec, target, instance);
+    let spec = lowered(lab, target, instance)?;
+    let env = Environment::build(&spec, target, instance);
     let mut files = backend.render(&env)?;
     if let Some(manifest) = backend.run_manifest(&env)? {
-        files.push(run_manifest(spec, instance, target, manifest)?);
+        files.push(run_manifest(lab, instance, target, manifest)?);
     }
     Ok(files)
 }
 
 /// A backend's run manifest as the file it is written to (`.isoloom/<target>/run.json`), its
 /// message filled from the resolved snapshot, checked across its fields.
-fn run_manifest(spec: &Spec, instance: Option<u8>, target: Target, mut manifest: isoloom_manifest::Manifest) -> Result<GeneratedFile, GenerateError> {
+fn run_manifest(lab: &Lab, instance: Option<u8>, target: Target, mut manifest: isoloom_manifest::Manifest) -> Result<GeneratedFile, GenerateError> {
     let refused = |e: isoloom_manifest::ManifestError| GenerateError::Unsupported {
         target,
         what: format!("the run manifest: {e}"),
     };
-    manifest.lab.message = resolved::manifest_message(spec, instance, target);
+    manifest.lab.message = resolved::manifest_message(lab, instance, target);
     manifest.validate().map_err(refused)?;
     Ok(GeneratedFile {
         path: format!("{OUTPUT_DIR}/{}/run.json", target.id()),
@@ -103,17 +124,18 @@ fn run_manifest(spec: &Spec, instance: Option<u8>, target: Target, mut manifest:
     })
 }
 
-/// Every target the spec allows and that has a generator: the files, and why the others
+/// Every target the lab allows and that has a generator: the files, and why the others
 /// weren't generated.
-pub fn generate_all(spec: &Spec) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
+#[must_use]
+pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
     let mut files = Vec::new();
     let mut skipped = Vec::new();
-    for target in effective(spec) {
+    for target in lab.possible() {
         if !GENERATED_TARGETS.contains(&target) {
             skipped.push(GenerateError::NoGenerator(target));
             continue;
         }
-        match generate(spec, target) {
+        match generate(lab, target) {
             Ok(f) => {
                 // Outputs share files (docker-vm runs the Compose file): each once.
                 for file in f {
@@ -135,14 +157,22 @@ pub fn generate_all(spec: &Spec) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
 ///
 /// Safe on a spec that hasn't been validated: an invalid spec is refused by every target, with
 /// its first problem as the reason, instead of reaching a generator that assumes validity.
-pub fn refusal(spec: &Spec, target: Target) -> Option<String> {
-    if let Some(problem) = first_problem(spec) {
-        return Some(problem);
+#[must_use]
+pub fn refusal(lab: &Lab, target: Target) -> Option<String> {
+    if let Some(problem) = lab.problems().first() {
+        return Some(format!("the spec is invalid: {}", problem.line()));
     }
-    if !effective(spec).contains(&target) {
+    if let Some(refused) = lab.refusal(target) {
+        return Some(refused.line());
+    }
+    if !lab.possible().contains(&target) {
         return None;
     }
-    backend(target)?.refusal(&Environment::build(spec, target, None))
+    let spec = lab.for_target(target);
+    if let Some(p) = validate::validate(&spec).first() {
+        return Some(format!("the spec is invalid on {}: {p}", target.id()));
+    }
+    backend(target)?.refusal(&Environment::build(&spec, target, None))
 }
 
 /// A cloud refused by a multi-cloud target: the cloud's folder under the target's, and why it
@@ -154,11 +184,12 @@ pub type CloudRefusal = (&'static str, String);
 /// cloud refusing drops only its module, so the target is generated as long as one cloud
 /// accepts the environment. `None` for every other target, and for a `cloud-vm` that isn't
 /// generated (its refusal says why).
-pub fn cloud_refusals(spec: &Spec, target: Target) -> Option<(Vec<&'static str>, Vec<CloudRefusal>)> {
-    if target != Target::CloudVm || !effective(spec).contains(&target) || refusal(spec, target).is_some() {
+#[must_use]
+pub fn cloud_refusals(lab: &Lab, target: Target) -> Option<(Vec<&'static str>, Vec<CloudRefusal>)> {
+    if target != Target::CloudVm || !lab.possible().contains(&target) || refusal(lab, target).is_some() {
         return None;
     }
-    let env = Environment::build(spec, target, None);
+    let env = Environment::build(&lab.for_target(target), target, None);
     let (mut generated, mut refused) = (Vec::new(), Vec::new());
     for (cloud, why) in isoloom_terraform::CloudVmBackend.refusals(&env) {
         match why {
@@ -182,16 +213,15 @@ pub fn cloud_refusals(spec: &Spec, target: Target) -> Option<(Vec<&'static str>,
 /// `libvirt` (on `qemu` with UEFI and `firmware_format` only). `isoloom run vagrant` asks it
 /// for the provider in the defaults before starting; a tool offering a provider can ask before
 /// it does.
-pub fn refusal_on(spec: &Spec, target: Target, provider: Option<&str>) -> Option<String> {
-    refusal(spec, target).or_else(|| match (target, provider) {
-        (Target::Vagrant, Some(p)) => isoloom_vagrant::provider_refusal(spec, p).or_else(|| isoloom_vagrant::disk_refusal(spec, p)),
+#[must_use]
+pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Option<String> {
+    refusal(lab, target).or_else(|| match (target, provider) {
+        (Target::Vagrant, Some(p)) => {
+            let spec = lab.for_target(target);
+            isoloom_vagrant::provider_refusal(&spec, p).or_else(|| isoloom_vagrant::disk_refusal(&spec, p))
+        }
         _ => None,
     })
-}
-
-/// The spec's first validation problem, as `refusal` reports it.
-fn first_problem(spec: &Spec) -> Option<String> {
-    crate::validate::validate(spec).first().map(|p| format!("the spec is invalid: {p}"))
 }
 
 /// The spec as the Docker target lays it out: every network on its Docker block.

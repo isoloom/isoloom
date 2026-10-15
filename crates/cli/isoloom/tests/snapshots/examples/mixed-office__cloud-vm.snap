@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -416,7 +417,7 @@ output "checks" {
 }
 
 output "published" {
-  value = { "intranet/80" = "${azurerm_public_ip.intranet.ip_address}:8083" }
+  value = { "intranet/web" = "${azurerm_public_ip.intranet.ip_address}:8083" }
 }
 
 # The project's files the machines don't get: version control and the tools' state, and what

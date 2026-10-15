@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker-vm
@@ -339,32 +340,32 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.name = "edge-firewall · docker"
-    v.cpus = 3
-    v.memory = 2560
+    v.cpus = 4
+    v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
     v.vmx["displayName"] = "edge-firewall · docker"
-    v.vmx["numvcpus"] = "3"
-    v.vmx["memsize"] = "2560"
+    v.vmx["numvcpus"] = "4"
+    v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
     v.name = "edge-firewall · docker"
-    v.cpus = 3
-    v.memory = 2560
+    v.cpus = 4
+    v.memory = 3072
   end
   config.vm.provider "utm" do |v|
     v.name = "edge-firewall · docker"
-    v.cpus = 3
-    v.memory = 2560
+    v.cpus = 4
+    v.memory = 3072
   end
   config.vm.provider "qemu" do |v|
-    v.smp = "cpus=3"
-    v.memory = "2560M"
+    v.smp = "cpus=4"
+    v.memory = "3072M"
   end
   config.vm.provider "libvirt" do |v, o|
     o.vm.box = "generic/debian12"
-    v.cpus = 3
-    v.memory = 2560
+    v.cpus = 4
+    v.memory = 3072
   end
   config.vm.provider "vmware_esxi" do |v|
     v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -374,8 +375,8 @@ Vagrant.configure("2") do |config|
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
     v.guest_name = "edge-firewall-docker"
-    v.guest_numvcpus = 3
-    v.guest_memsize = 2560
+    v.guest_numvcpus = 4
+    v.guest_memsize = 3072
   end
   config.vm.provision "shell", name: "docker", inline: "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh"
   config.vm.provision "isoloom_project", name: "project", generated: true
@@ -575,11 +576,11 @@ resource "proxmox_virtual_environment_vm" "env" {
     enabled = true
   }
   cpu {
-    cores = 3
+    cores = 4
     type  = "host"
   }
   memory {
-    dedicated = 2560
+    dedicated = 3072
   }
   disk {
     datastore_id = var.datastore

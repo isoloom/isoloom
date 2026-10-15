@@ -83,7 +83,7 @@ pub enum ManifestError {
     },
     /// A placeholder outside the grammar.
     #[error(
-        "`{template}`: `${{{placeholder}}}` isn't a placeholder; the roots are run.name, run.dir, run.state_dir, run.provider, run.ssh_key, run.known_hosts, params.<NAME>, outputs.<name>, published.<machine>.<port>[.udp], machine and value"
+        "`{template}`: `${{{placeholder}}}` isn't a placeholder; the roots are run.name, run.dir, run.state_dir, run.provider, run.ssh_key, run.known_hosts, params.<NAME>, outputs.<name>, published.<machine>.<port>, machine and value"
     )]
     UnknownPlaceholder {
         /// The template as written.
@@ -197,6 +197,14 @@ pub enum ManifestError {
         /// The name.
         name: String,
     },
+    /// A port name used twice on one machine.
+    #[error("machine `{machine}`: port `{port}` appears twice; a port's name is unique on its machine")]
+    DuplicatePort {
+        /// The machine.
+        machine: String,
+        /// The port's name.
+        port: String,
+    },
     /// A reference to a machine that doesn't exist.
     #[error("{at}: no machine `{machine}` in this manifest")]
     UnknownMachine {
@@ -274,6 +282,7 @@ impl ManifestError {
             ManifestError::UnknownStep { .. } => "unknown_step",
             ManifestError::ReadyNotUp { .. } => "ready_not_up",
             ManifestError::DuplicateMachine { .. } => "duplicate_machine",
+            ManifestError::DuplicatePort { .. } => "duplicate_port",
             ManifestError::UnknownMachine { .. } => "unknown_machine",
             ManifestError::UnknownPublished { .. } => "unknown_published",
             ManifestError::UnknownParam { .. } => "unknown_param",

@@ -4,13 +4,17 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
 use isoloom_spec::{Target, parse};
-use isoloom_targets::{generate, refusal, refusal_on};
+use isoloom_targets::{Lab, generate, refusal, refusal_on};
 
 /// Three Debian VMs on one network, the first sized.
-const THREE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    resources: { disk_gb: 40 }\n    vm: { os: debian@12, provision: [p.sh] }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian@12, provision: [p.sh] }\n  c:\n    networks: { lab: 12 }\n    vm: { os: debian@12, provision: [p.sh] }\n";
+const THREE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10 }\n    resources: { disk_gb: 40 }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    networks: { lab: 11 }\n    app: { steps: [{ run: p.sh }] }\n  c:\n    os: debian@12\n    networks: { lab: 12 }\n    app: { steps: [{ run: p.sh }] }\n";
+
+fn lab(spec: &str) -> Lab {
+    Lab::new(parse(spec).unwrap())
+}
 
 fn vagrantfile(spec: &str) -> String {
-    generate(&parse(spec).unwrap(), Target::Vagrant).unwrap().remove(0).contents
+    generate(&lab(spec), Target::Vagrant).unwrap().remove(0).contents
 }
 
 /// The `config.vm.define "<vm>"` block, up to its `end`.
@@ -34,7 +38,7 @@ fn connects_to(block: &str) -> u16 {
 
 #[test]
 fn qemu_links_three_vms_through_a_hub() {
-    let spec = parse(THREE).unwrap();
+    let spec = lab(THREE);
     assert_eq!(refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
     let vf = vagrantfile(THREE);
     // Every VM connects to its own port of the network's hub.
@@ -67,13 +71,13 @@ fn qemu_links_three_vms_through_a_hub() {
 
 #[test]
 fn qemu_keeps_the_pair_for_two_vms_and_refuses_a_vm_on_two_networks() {
-    let two = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian@12, provision: [p.sh] }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian@12, provision: [p.sh] }\n";
+    let two = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    networks: { lab: 11 }\n    app: { steps: [{ run: p.sh }] }\n";
     let vf = vagrantfile(two);
     assert!(provider_block(&vf, "a", "qemu").contains("v.socket_opts = \"listen=127.0.0.1:"));
     assert!(!vf.contains("IsoloomQemu"), "no hub, no disk size: no helper");
 
-    let routed = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  dmz: { cidr: 10.8.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10, dmz: 10 }\n    vm: { os: debian@12, provision: [p.sh] }\n";
-    let spec = parse(routed).unwrap();
+    let routed = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  dmz: { cidr: 10.8.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10, dmz: 10 }\n    app: { steps: [{ run: p.sh }] }\n";
+    let spec = lab(routed);
     let why = refusal_on(&spec, Target::Vagrant, Some("qemu")).expect("a VM on two networks");
     assert!(why.contains("`a` is on 2 networks, and QEMU gives a VM one"), "{why}");
     // Only QEMU: Vagrant on another provider, or whatever the provider, runs it.
@@ -96,7 +100,7 @@ fn qemu_sizes_the_disk_only_above_the_box() {
 
 #[test]
 fn utm_refuses_vms_on_a_network() {
-    let spec = parse(THREE).unwrap();
+    let spec = lab(THREE);
     let why = refusal_on(&spec, Target::Vagrant, Some("utm")).expect("UTM has no private networks");
     assert!(why.contains("`a` is on a network, and vagrant_utm gives a VM no private network"), "{why}");
     // Every machine is on a network (validation asks it), so UTM runs no environment's VMs yet;
@@ -106,7 +110,7 @@ fn utm_refuses_vms_on_a_network() {
 
 #[test]
 fn vmware_runs_a_machine_with_nested_virtualization() {
-    let spec = "version: 1\nname: t\nmachines:\n  a:\n    nested_virtualization: true\n    vm: { os: debian@12, provision: [p.sh] }\n  b:\n    vm: { os: debian@12, provision: [p.sh] }\n";
+    let spec = "version: 1\nname: t\nmachines:\n  a:\n    os: debian@12\n    hardware: { nested_virtualization: true }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    app: { steps: [{ run: p.sh }] }\n";
     let vf = vagrantfile(spec);
     assert!(provider_block(&vf, "a", "vmware_desktop").contains("v.vmx[\"vhv.enable\"] = \"TRUE\""));
     assert!(!provider_block(&vf, "b", "vmware_desktop").contains("vhv.enable"));

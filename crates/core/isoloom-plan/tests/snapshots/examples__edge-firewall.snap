@@ -1,0 +1,174 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: edge-firewall
+networks:
+  outside:
+    cidr: 10.70.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+  dmz:
+    cidr: 10.70.10.0/24
+    internet: true
+    gateway: fw
+    docker: ~
+  lan:
+    cidr: 10.70.20.0/24
+    internet: false
+    gateway: fw
+    docker: ~
+reach:
+  - from: outside
+    to: dmz
+    ports:
+      - 80
+  - from: dmz
+    to: lan
+    ports:
+      - 6379
+inputs: []
+machines:
+  fw:
+    networks:
+      outside: 5
+      dmz: 1
+      lan: 1
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 8080
+        name: status
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/fw
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/fw.sh
+      image: ~
+  web:
+    networks:
+      dmz: 10
+    aliases:
+      - www.edge.test
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: web
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/web
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+  cache:
+    networks:
+      lan: 20
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 6379
+        name: redis
+        http: false
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "redis:7-alpine"
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/cache.sh
+      image: ~
+  user:
+    networks:
+      outside: 10
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: true
+    docker:
+      image: "debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858"
+      build: ~
+      init: []
+      idle: true
+    vm:
+      os: debian-12
+      provision: []
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the web page answers through the firewall
+    from: user
+    http: ~
+    tcp: ~
+    exec: ~
+    script: checks/web-through-firewall.sh
+    expect: ~
+    wait: ~
+  - name: the web server answers by its other name
+    from: user
+    http: "http://www.edge.test/"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: ~
+    wait: ~
+targets: ~

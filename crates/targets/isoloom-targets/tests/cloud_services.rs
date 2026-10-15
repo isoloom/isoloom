@@ -4,14 +4,19 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
-use isoloom_spec::{Target, parse, validate};
-use isoloom_targets::generate;
+use isoloom_spec::{Target, parse};
+use isoloom_targets::{Lab, generate};
 
-fn spec(fields: &str) -> isoloom_spec::Spec {
-    parse(&format!("version: 1\nname: t\ncloud:\n  provider: aws\n  terraform: tf\n{fields}")).expect("parses")
+fn spec(fields: &str) -> Lab {
+    Lab::new(parse(&format!("version: 1\nname: t\ncloud:\n  provider: aws\n  terraform: tf\n{fields}")).expect("parses"))
 }
 
-fn script(spec: &isoloom_spec::Spec, name: &str) -> String {
+/// The lab's problems, each as `path: reason`.
+fn problems(lab: &Lab) -> Vec<String> {
+    lab.problems().iter().map(isoloom_spec::syntax::Problem::line).collect()
+}
+
+fn script(spec: &Lab, name: &str) -> String {
     let files = generate(spec, Target::CloudServices).unwrap();
     let path = format!(".isoloom/cloud-services/{name}");
     files.into_iter().find(|f| f.path == path).unwrap_or_else(|| panic!("no {path}")).contents
@@ -69,7 +74,7 @@ fn before_steps_env_and_retries_reach_the_scripts() {
     for f in ["down.sh", "outputs.sh"] {
         assert!(script(&s, f).contains("export AWS_REGION='us-east-1'\n"), "{f}");
     }
-    assert!(validate(&s).is_empty(), "{:?}", validate(&s));
+    assert!(problems(&s).is_empty(), "{:?}", problems(&s));
 }
 
 #[test]
@@ -85,7 +90,7 @@ fn new_keys_are_validated() {
     let bad = spec(
         "  env: { 'AWS-REGION': x, 1X: y, here: z, PATH: /bin, TF_DATA_DIR: d, ISOLOOM_PROJECT: p, TF_VAR_isoloom_instance: i }\n  apply_retries: 9\n  requires: [' ']\n",
     );
-    let found: Vec<String> = validate(&bad).iter().map(ToString::to_string).collect();
+    let found = problems(&bad);
     for want in [
         "cloud.env.AWS-REGION",
         "cloud.env.1X",
@@ -108,7 +113,7 @@ fn a_before_step_must_exist_in_the_project() {
     std::fs::create_dir_all(dir.join("tf")).unwrap();
     std::fs::write(dir.join("tf/main.tf"), "").unwrap();
     let s = spec("  before: [keys.sh, ../out.sh]\n");
-    let found: Vec<String> = isoloom_spec::validate_files(&s, &dir).iter().map(ToString::to_string).collect();
+    let found: Vec<String> = s.problems_with_files(&dir).iter().map(isoloom_spec::syntax::Problem::line).collect();
     assert!(found.iter().any(|p| p.contains("cloud.before[0]") && p.contains("doesn't exist")), "{found:?}");
     assert!(
         found.iter().any(|p| p.contains("cloud.before[1]") && p.contains("inside the project")),

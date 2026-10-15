@@ -267,7 +267,7 @@ fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine) -> Option<VmImpl> 
                     Step::Run { script, .. } => Some(script.clone()),
                     Step::Reboot => Some(model::REBOOT_STEP.to_string()),
                     Step::Playbook(p) => Some(p.clone()),
-                    // Configuration steps on a VM arrive in Phase 3: refused there.
+                    // Configuration steps on a VM come in Phase 4: refused there.
                     _ => None,
                 })
                 .collect()

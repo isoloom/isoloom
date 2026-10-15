@@ -6,15 +6,15 @@
 use std::path::Path;
 
 use isoloom_spec::{Target, instance, load};
-use isoloom_targets::{generate, generate_instance};
+use isoloom_targets::{Lab, generate, generate_instance};
 
-fn example(name: &str) -> isoloom_spec::Spec {
-    load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).expect("example parses")
+fn example(name: &str) -> Lab {
+    Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).expect("example parses"))
 }
 
 #[test]
 fn an_instance_gets_its_own_name_blocks_and_ports() {
-    let spec = example("hello-stack");
+    let spec = example("hello-stack").spec();
     let two = instance::apply(&spec, 2).unwrap();
     assert_eq!(two.name, "hello-stack-2");
     // The Docker block moves by the instance number in the second octet; the spec's own

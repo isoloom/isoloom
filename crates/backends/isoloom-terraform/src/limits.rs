@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn the_first_limit_the_environment_runs_into_refuses_it() {
         let env = environment(
-            "version: 1\nname: l\nnetworks:\n  lab: { cidr: 10.9.0.0/24, tc: { delay: 10ms } }\nmachines:\n  a: { networks: { lab: 10 }, vm: { os: debian@12, provision: [a.sh] } }\n",
+            "version: 1\nname: l\nnetworks:\n  lab: { cidr: 10.9.0.0/24, tc: { delay: 10ms } }\nmachines:\n  a: { networks: { lab: 10 }, os: debian@12, app: { steps: [{ run: a.sh }] } }\n",
             Target::CloudVm,
         );
         let limits = Limits {

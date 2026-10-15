@@ -4,7 +4,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
 use isoloom_spec::{Target, parse};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 const LAB: &str = r"version: 1
 name: oci-test
@@ -12,13 +12,15 @@ networks:
   lab: { cidr: 10.60.0.0/24 }
 machines:
   web:
+    os: ubuntu@24.04
     networks: { lab: 10 }
-    ports: [{ port: 80, http: true, publish: 8080 }]
-    vm: { os: ubuntu@24.04, provision: [p.sh] }
+    ports: { web: { port: 80, protocol: http, publish: 8080 } }
+    app: { steps: [{ run: p.sh }] }
   db:
+    os: ubuntu@24.04
     networks: { lab: 11 }
-    ports: [{ port: 5432, name: postgres }]
-    vm: { os: ubuntu@24.04, provision: [p.sh] }
+    ports: { postgres: 5432 }
+    app: { steps: [{ run: p.sh }] }
 ";
 
 const MULTI_NET: &str = r"version: 1
@@ -28,14 +30,15 @@ networks:
   back:  { cidr: 10.61.20.0/24 }
 machines:
   web:
+    os: ubuntu@24.04
     networks: { front: 10, back: 10 }
-    ports: [{ port: 80 }]
-    vm: { os: ubuntu@24.04, provision: [p.sh] }
+    ports: { web: 80 }
+    app: { steps: [{ run: p.sh }] }
 ";
 
 fn oci_tf(yaml: &str) -> String {
-    let spec = parse(yaml).expect("parses");
-    let files = generate(&spec, Target::CloudVm).expect("cloud-vm generates");
+    let lab = Lab::new(parse(yaml).expect("parses"));
+    let files = generate(&lab, Target::CloudVm).expect("cloud-vm generates");
     files
         .into_iter()
         .find(|f| f.path.ends_with("cloud-vm/oci/main.tf"))

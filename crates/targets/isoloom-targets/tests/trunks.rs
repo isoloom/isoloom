@@ -5,10 +5,10 @@
 use std::path::Path;
 
 use isoloom_spec::{Target, load};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 fn compose() -> String {
-    let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/vlan-office")).unwrap();
+    let spec = Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/vlan-office")).unwrap());
     generate(&spec, Target::Docker)
         .unwrap()
         .into_iter()

@@ -126,8 +126,8 @@ mod tests {
     use super::CloudServicesBackend;
 
     fn env(yaml: &str) -> Environment {
-        let spec = isoloom_spec::parse(yaml).unwrap();
-        Environment::build(&spec, Target::CloudServices, None)
+        let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).unwrap());
+        Environment::build(&lab.for_target(Target::CloudServices), Target::CloudServices, None)
     }
 
     #[test]

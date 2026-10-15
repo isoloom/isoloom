@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ kubernetes
@@ -337,12 +338,6 @@ spec:
               name: isoloom-inputs
               key: API_URL
               optional: true
-        - name: LAUNCH_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: isoloom-inputs
-              key: LAUNCH_TOKEN
-              optional: true
         resources:
           limits:
             cpu: '1'
@@ -351,6 +346,10 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
+        - name: isoloom-secrets
+          mountPath: /run/lab/launch-token
+          readOnly: true
+          subPath: input-launch-token
       - name: init
         image: '{{ index .Values.images "database" }}'
         imagePullPolicy: IfNotPresent
@@ -365,16 +364,14 @@ spec:
               name: isoloom-inputs
               key: API_URL
               optional: true
-        - name: LAUNCH_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: isoloom-inputs
-              key: LAUNCH_TOKEN
-              optional: true
         volumeMounts:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
+        - name: isoloom-secrets
+          mountPath: /run/lab/launch-token
+          readOnly: true
+          subPath: input-launch-token
         - name: scripts
           mountPath: /isoloom/scripts
       nodeSelector:
@@ -386,6 +383,13 @@ spec:
           defaultMode: 493
       - name: isoloom-probe
         emptyDir: {}
+      - name: isoloom-secrets
+        secret:
+          secretName: isoloom-secrets
+          items:
+          - key: input-launch-token
+            path: input-launch-token
+            mode: 256
 ---
 apiVersion: v1
 kind: Service
@@ -1085,6 +1089,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
 #   docker build -t isoloom/supplier-portal-api-web build/web
 # Inputs (optional, unset ones are empty): kubectl -n isoloom-supplier-portal-api create secret generic isoloom-inputs --from-literal=API_URL=… --from-literal=LAUNCH_TOKEN=…
+# Secrets: `isoloom run kubernetes` creates isoloom-secrets from their stores; by hand, once the namespace exists (the pods wait for it):
+#   kubectl -n isoloom-supplier-portal-api create secret generic isoloom-secrets --from-file=input-launch-token=<file>
 
 apiVersion: v1
 kind: Namespace
@@ -1141,12 +1147,6 @@ spec:
               name: isoloom-inputs
               key: API_URL
               optional: true
-        - name: LAUNCH_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: isoloom-inputs
-              key: LAUNCH_TOKEN
-              optional: true
         resources:
           limits:
             cpu: '1'
@@ -1155,6 +1155,10 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
+        - name: isoloom-secrets
+          mountPath: /run/lab/launch-token
+          readOnly: true
+          subPath: input-launch-token
       - name: init
         image: mysql:8.0
         imagePullPolicy: IfNotPresent
@@ -1169,16 +1173,14 @@ spec:
               name: isoloom-inputs
               key: API_URL
               optional: true
-        - name: LAUNCH_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: isoloom-inputs
-              key: LAUNCH_TOKEN
-              optional: true
         volumeMounts:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
+        - name: isoloom-secrets
+          mountPath: /run/lab/launch-token
+          readOnly: true
+          subPath: input-launch-token
         - name: scripts
           mountPath: /isoloom/scripts
       nodeSelector:
@@ -1190,6 +1192,13 @@ spec:
           defaultMode: 493
       - name: isoloom-probe
         emptyDir: {}
+      - name: isoloom-secrets
+        secret:
+          secretName: isoloom-secrets
+          items:
+          - key: input-launch-token
+            path: input-launch-token
+            mode: 256
 ---
 apiVersion: v1
 kind: Service

@@ -5,14 +5,23 @@
 
 use std::path::Path;
 
-use isoloom_spec::{Target, load, parse, validate};
-use isoloom_targets::{generate, refusal};
+use isoloom_spec::{Target, parse};
+use isoloom_targets::{Lab, generate, refusal};
+
+/// The `slow-link` example.
+fn slow_link() -> Lab {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/slow-link");
+    Lab::new(isoloom_spec::load(&dir).unwrap())
+}
 
 #[test]
 fn the_router_applies_netem_on_its_interface_into_the_network() {
-    let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/slow-link")).unwrap();
-    assert_eq!(validate(&spec), vec![]);
-    assert_eq!(spec.networks["far"].tc.as_ref().unwrap().netem(), "delay 80ms 10ms loss 1% rate 10mbit");
+    let spec = slow_link();
+    assert_eq!(spec.problems(), vec![]);
+    assert_eq!(
+        spec.source().networks["far"].tc.as_ref().unwrap().netem(),
+        "delay 80ms 10ms loss 1% rate 10mbit"
+    );
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(compose.contains("iproute2"), "{compose}");
     assert!(
@@ -35,9 +44,13 @@ fn the_router_applies_netem_on_its_interface_into_the_network() {
 fn impairment_is_checked() {
     let p = |nets: &str, reach: &str| -> Vec<String> {
         let yaml = format!(
-            "version: 1\nname: t\nnetworks:\n{nets}{reach}machines:\n  a: {{ networks: {{ x: 5 }}, ports: [{{ port: 80 }}], docker: {{ image: x }} }}\n  b: {{ networks: {{ y: 5 }}, docker: {{ image: x }} }}\n"
+            "version: 1\nname: t\nnetworks:\n{nets}{reach}machines:\n  a: {{ networks: {{ x: 5 }}, ports: {{ web: 80 }}, app: {{ image: x }} }}\n  b: {{ networks: {{ y: 5 }}, app: {{ image: x }} }}\n"
         );
-        validate(&parse(&yaml).unwrap()).into_iter().map(|p| p.to_string()).collect()
+        Lab::new(parse(&yaml).unwrap())
+            .problems()
+            .iter()
+            .map(isoloom_spec::syntax::Problem::line)
+            .collect()
     };
     let reach = "reach: [{ from: y, to: x, ports: [80] }]\n";
     assert_eq!(
@@ -59,7 +72,7 @@ fn impairment_is_checked() {
 
 #[test]
 fn machines_apply_netem_on_their_own_interface() {
-    let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/slow-link")).unwrap();
+    let spec = slow_link();
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     // `web` is on `far`: its network sidecar has `tc` (netshoot) and shapes its interface there.
     let sidecar = compose.split("\n  web-routes:\n").nth(1).expect("web has a network sidecar");

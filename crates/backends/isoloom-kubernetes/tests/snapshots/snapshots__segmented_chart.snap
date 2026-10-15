@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom-kubernetes/tests/snapshots.rs
+source: crates/backends/isoloom-kubernetes/tests/snapshots.rs
+assertion_line: 101
 expression: "chart(\"segmented\")"
 ---
 === .isoloom/kubernetes/chart/Chart.yaml
@@ -21,6 +22,7 @@ appVersion: 0.1.0
 images:
   cache: redis:7-alpine
   web: isoloom/segmented-web
+  user: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 
 === .isoloom/kubernetes/chart/values.schema.json
 {
@@ -40,11 +42,16 @@ images:
         "web": {
           "type": "string",
           "minLength": 1
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
         "cache",
-        "web"
+        "web",
+        "user"
       ],
       "additionalProperties": false
     }
@@ -257,6 +264,34 @@ spec:
   - name: p4444
     port: 4444
     targetPort: 4444
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      isoloom.com/machine: user
+  template:
+    metadata:
+      labels:
+        isoloom.com/machine: user
+        net.isoloom.com/access: member
+    spec:
+      hostname: user
+      containers:
+      - name: user
+        image: '{{ index .Values.images "user" }}'
+        imagePullPolicy: IfNotPresent
+        command:
+        - sleep
+        - infinity
+      nodeSelector:
+        kubernetes.io/arch: amd64
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

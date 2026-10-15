@@ -147,12 +147,13 @@ mod tests {
     use super::*;
 
     fn env(spec: &str) -> Environment {
-        let spec = isoloom_spec::parse(spec).unwrap();
-        assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-        Environment::build(&spec, isoloom_spec::model::Target::CloudVm, None)
+        let lab = isoloom_plan::Lab::new(isoloom_spec::parse(spec).unwrap());
+        assert_eq!(lab.problems(), [], "the spec is valid");
+        let t = isoloom_spec::model::Target::CloudVm;
+        Environment::build(&lab.for_target(t), t, None)
     }
 
-    const EDGE: &str = "version: 1\nname: e\nnetworks:\n  out: { cidr: 10.70.0.0/24 }\n  dmz: { cidr: 10.70.10.0/24, gateway: fw }\nmachines:\n  fw: { networks: { out: 5, dmz: 1 }, vm: { os: debian@12, provision: [fw.sh] } }\n  web: { networks: { dmz: 10 }, vm: { os: debian@12, provision: [web.sh] } }\n";
+    const EDGE: &str = "version: 1\nname: e\nnetworks:\n  out: { cidr: 10.70.0.0/24 }\n  dmz: { cidr: 10.70.10.0/24, gateway: fw }\nmachines:\n  fw: { networks: { out: 5, dmz: 1 }, os: debian@12, app: { steps: [{ run: fw.sh }] } }\n  web: { networks: { dmz: 10 }, os: debian@12, app: { steps: [{ run: web.sh }] } }\n";
 
     #[test]
     fn the_gateway_moves_to_the_router_address_everywhere() {

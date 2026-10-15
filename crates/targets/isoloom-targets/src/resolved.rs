@@ -8,44 +8,60 @@
 
 use serde_json::{Map, Value, json};
 
-use super::{GENERATED_TARGETS, GeneratedFile, address, cloud_refusals, docker_cidrs, on_docker, refusal, router, start_order};
+use super::{GENERATED_TARGETS, GeneratedFile, Lab, address, cloud_refusals, docker_cidrs, on_docker, refusal, router, start_order};
 use crate::checks::{self, HttpExpect, Position, Probe, Resolved, TcpExpect};
 use crate::images;
-use crate::model::{Machine, Port, Protocol, Spec, Target};
-use crate::targets::{effective, missing, mixed};
+use crate::model::{Machine, Spec, Target};
 use crate::validate::Cidr;
 
 mod message;
+mod ports;
 
 pub use message::{fill, lookup, manifest_message, on_target, render_message, render_message_at, render_message_on, with_published};
 
-/// The format of the snapshot; bumped when a field changes meaning or goes away.
-pub const RESOLVED_VERSION: u32 = 2;
+/// The format of the snapshot; bumped when a field changes meaning or goes away (3: a machine's
+/// `ports` keyed by name, each with its `protocol`, `published` and `url`).
+pub const RESOLVED_VERSION: u32 = 3;
 
 /// Where the snapshot is written, relative to the project folder.
 pub const PATH: &str = ".isoloom/resolved.json";
 
 /// The snapshot as a generated file.
-pub fn file(spec: &Spec) -> GeneratedFile {
-    file_with(spec, None)
+#[must_use]
+pub fn file(lab: &Lab) -> GeneratedFile {
+    file_with(lab, None)
 }
 
-/// The snapshot of an instance of the spec (the spec already as that instance).
-pub fn file_with(spec: &Spec, instance: Option<u8>) -> GeneratedFile {
+/// The snapshot of instance `instance` of the lab.
+#[must_use]
+pub fn file_with(lab: &Lab, instance: Option<u8>) -> GeneratedFile {
     // `{:#}` is serde_json's pretty printer (two-space indent), and a `Value` always prints.
     GeneratedFile {
         path: PATH.to_string(),
-        contents: format!("{:#}\n", resolve_with(spec, instance)),
+        contents: format!("{:#}\n", resolve_with(lab, instance)),
     }
 }
 
 /// The snapshot as JSON (validated specs only).
-pub fn resolve(spec: &Spec) -> Value {
-    resolve_with(spec, None)
+#[must_use]
+pub fn resolve(lab: &Lab) -> Value {
+    resolve_with(lab, None)
 }
 
-/// The snapshot of an instance (`None`: the spec as written).
-pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
+/// The lab as the snapshot reads it: every form, no target's own facts, as instance `instance`
+/// when one is asked (as written when it can't be made: generating it says why).
+pub(crate) fn lab_spec(lab: &Lab, instance: Option<u8>) -> Spec {
+    let spec = lab.spec();
+    match instance {
+        Some(n) => crate::instance::apply(&spec, n).unwrap_or(spec),
+        None => spec,
+    }
+}
+
+/// The snapshot of an instance (`None`: the lab as written).
+#[must_use]
+pub fn resolve_with(lab: &Lab, instance: Option<u8>) -> Value {
+    let spec = &lab_spec(lab, instance);
     let docker = on_docker(spec);
     let routed = router::needed(spec);
     let mut out = json!({
@@ -63,8 +79,8 @@ pub fn resolve_with(spec: &Spec, instance: Option<u8>) -> Value {
         "groups": spec.groups.keys().map(|g| (g.clone(), json!(crate::groups::members(spec, g)))).collect::<Map<_, _>>(),
         "router": router_value(spec, routed),
         "controller": controller(spec),
-        "published": published(spec),
-        "targets": targets(spec),
+        "published": ports::published(spec),
+        "targets": targets(lab),
         "checks": checks_section(spec),
     });
     if let Value::Object(map) = &mut out {
@@ -144,7 +160,7 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Value {
         "windows": m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os)),
         "addresses": addresses(spec, m),
         "docker_addresses": addresses(docker, m),
-        "ports": m.ports.iter().map(port).collect::<Vec<_>>(),
+        "ports": ports::of(m),
         "depends_on": m.depends_on,
         "inputs": m.inputs,
         "volumes": m.volumes,
@@ -196,25 +212,6 @@ fn addresses(on: &Spec, m: &Machine) -> Map<String, Value> {
     m.networks.iter().map(|(n, o)| (n.clone(), json!(address(on, n, *o).to_string()))).collect()
 }
 
-/// A port; the flags only when set, the protocol only when not TCP.
-fn port(s: &Port) -> Value {
-    let mut v = json!({ "port": s.port, "name": s.name, "http": s.http, "publish": s.publish });
-    for (key, set) in [("tls", s.tls), ("fixed", s.fixed), ("dormant", s.dormant)] {
-        if set {
-            v[key] = json!(true);
-        }
-    }
-    with_protocol(v, s.protocol)
-}
-
-/// `v` with a `protocol` field when it isn't TCP (a snapshot entry without one is TCP).
-fn with_protocol(mut v: Value, protocol: Protocol) -> Value {
-    if !protocol.is_tcp() {
-        v["protocol"] = json!(protocol.id());
-    }
-    v
-}
-
 /// The tools, with their addresses on every network (in the spec's blocks and on Docker's).
 fn tools(spec: &Spec, docker: &Spec) -> Map<String, Value> {
     spec.tools
@@ -254,32 +251,19 @@ fn controller(spec: &Spec) -> Value {
     })
 }
 
-/// Every published service: its machine, port and host port.
-fn published(spec: &Spec) -> Vec<Value> {
-    spec.machines
-        .iter()
-        .flat_map(|(name, m)| {
-            m.ports.iter().filter_map(move |s| {
-                s.publish
-                    .map(|host| with_protocol(json!({ "machine": name, "port": s.port, "host_port": host }), s.protocol))
-            })
-        })
-        .collect()
-}
-
 /// Targets: possible by the implementations, narrowed by `targets:`, then what the
 /// generators actually produce and why they refuse the rest.
-fn targets(spec: &Spec) -> Value {
-    let possible = effective(spec);
+fn targets(lab: &Lab) -> Value {
+    let possible = lab.possible();
     let mut generated = Vec::new();
     let mut refused = Map::new();
     let mut not_possible = Map::new();
     for t in Target::ALL {
         if !possible.contains(&t) {
-            not_possible.insert(t.id().into(), json!(not_possible_reason(spec, t)));
+            not_possible.insert(t.id().into(), json!(not_possible_reason(lab, t)));
         } else if !GENERATED_TARGETS.contains(&t) {
             refused.insert(t.id().into(), json!("no generator yet"));
-        } else if let Some(why) = refusal(spec, t) {
+        } else if let Some(why) = refusal(lab, t) {
             refused.insert(t.id().into(), json!(why));
         } else {
             generated.push(t.id());
@@ -290,29 +274,30 @@ fn targets(spec: &Spec) -> Value {
         "generated": generated,
         "refused": refused,
         "not_possible": not_possible,
-        "clouds": clouds(spec),
+        "clouds": clouds(lab),
     })
 }
 
 /// Per generated multi-cloud target (`cloud-vm`), the clouds whose module is written and each
 /// refused cloud with its reason: a cloud's refusal drops its module, not the target.
-fn clouds(spec: &Spec) -> Map<String, Value> {
+fn clouds(lab: &Lab) -> Map<String, Value> {
     Target::ALL
         .into_iter()
         .filter_map(|t| {
-            let (generated, refused) = cloud_refusals(spec, t)?;
+            let (generated, refused) = cloud_refusals(lab, t)?;
             let refused: Map<String, Value> = refused.into_iter().map(|(c, why)| (c.to_string(), json!(why))).collect();
             Some((t.id().to_string(), json!({ "generated": generated, "refused": refused })))
         })
         .collect()
 }
 
-/// Why a target isn't possible for the spec.
-fn not_possible_reason(spec: &Spec, t: Target) -> String {
-    let lacking = missing(spec, t.needs());
-    if !lacking.is_empty() {
-        format!("needs `{}:` on {}", t.needs().key(), lacking.join(", "))
-    } else if t == Target::Hybrid && !mixed(spec) {
+/// Why a target isn't possible for the lab: the first machine it has no form for, at the field
+/// that rules it out.
+#[must_use]
+pub fn not_possible_reason(lab: &Lab, t: Target) -> String {
+    if let Some(missing) = isoloom_plan::lower::missing_form(lab.source(), t) {
+        missing.line()
+    } else if t == Target::Hybrid && !isoloom_spec::targets::mixed(&lab.spec()) {
         "only when some machines are containers and others are VMs".to_string()
     } else {
         "left out by `targets:`".to_string()

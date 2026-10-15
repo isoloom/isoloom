@@ -6,12 +6,12 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
 use isoloom_spec::{Target, parse};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 const LINODE: &str = ".isoloom/cloud-vm/linode/main.tf";
 
 fn tf(spec: &isoloom_spec::Spec) -> Option<String> {
-    generate(spec, Target::CloudVm)
+    generate(&Lab::new(spec.clone()), Target::CloudVm)
         .unwrap()
         .into_iter()
         .find(|f| f.path == LINODE)
@@ -28,13 +28,15 @@ networks:
   lab: { cidr: 10.60.0.0/24 }
 machines:
   web:
+    os: debian@12
     networks: { lab: 10 }
-    ports: [{ port: 80, http: true, publish: 8080 }]
-    vm: { os: debian@12, provision: [p.sh] }
+    ports: { web: { port: 80, protocol: http, publish: 8080 } }
+    app: { steps: [{ run: p.sh }] }
   db:
+    os: ubuntu@24.04
     networks: { lab: 11 }
-    ports: [{ port: 5432, name: postgres }]
-    vm: { os: ubuntu@24.04, provision: [p.sh] }
+    ports: { postgres: 5432 }
+    app: { steps: [{ run: p.sh }] }
 ",
     )
     .expect("spec parses");
@@ -71,13 +73,15 @@ reach:
   - { from: a, to: b, ports: [5432] }
 machines:
   web:
+    os: debian@12
     networks: { a: 10 }
-    ports: [{ port: 80 }]
-    vm: { os: debian@12, provision: [p.sh] }
+    ports: { web: 80 }
+    app: { steps: [{ run: p.sh }] }
   db:
+    os: debian@12
     networks: { b: 10 }
-    ports: [{ port: 5432 }]
-    vm: { os: debian@12, provision: [p.sh] }
+    ports: { db: 5432 }
+    app: { steps: [{ run: p.sh }] }
 ",
     )
     .expect("spec parses");
@@ -101,9 +105,10 @@ networks:
   b: { cidr: 10.61.0.0/24 }
 machines:
   web:
+    os: debian@12
     networks: { a: 10, b: 10 }
-    ports: [{ port: 80 }]
-    vm: { os: debian@12, provision: [p.sh] }
+    ports: { web: 80 }
+    app: { steps: [{ run: p.sh }] }
 ",
     )
     .expect("spec parses");

@@ -1,12 +1,9 @@
 //! What a run gives back (the entry URL, addresses, credentials), and the checks that prove it
 //! behaves as its spec says.
 
-use std::num::NonZeroU16;
-
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::machine::Protocol;
 use crate::names::{Identifier, Name, SnakeName};
 use crate::step::Step;
 use crate::template::Template;
@@ -35,10 +32,8 @@ pub enum OutputSource {
     PublishedPort {
         /// The machine.
         machine: Name,
-        /// Its port.
-        port: NonZeroU16,
-        /// The port's protocol.
-        protocol: Protocol,
+        /// The port's name.
+        port: Name,
     },
     /// A Terraform output of the module.
     TerraformOutput {

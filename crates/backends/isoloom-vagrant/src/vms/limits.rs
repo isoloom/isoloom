@@ -20,7 +20,7 @@ fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
     let vm = m.vm.as_ref()?;
     if images::vagrant(vm).is_none() {
         return Some(format!(
-            "machine `{name}`: no Vagrant box for `{}` yet; give one with `vm.image.vagrant`",
+            "machine `{name}`: no Vagrant box for `{}` yet; give one with `overrides.vagrant.machines.{name}.box`",
             vm.os
         ));
     }

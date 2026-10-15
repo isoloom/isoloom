@@ -75,19 +75,20 @@ fn check(dir: &Path, name: &str) -> Checked {
 
 fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile) -> Vec<String> {
     let spec = match isoloom_spec::load_profiled(dir, Some(p), &[]) {
+        Err(isoloom_spec::LoadError::Invalid { problems, .. }) => return problems.iter().map(|e| format!("the spec it makes: {}", e.line())).collect(),
         Err(e) => return e.to_string().lines().map(str::to_string).collect(),
         Ok(spec) => spec,
     };
-    let spec = match isoloom_spec::defaults::load_profiled(dir, None, Some(p), &[]).map(|r| r.defaults.images.apply(&spec)) {
+    let lab = match isoloom_spec::defaults::load_profiled(dir, None, Some(p), &[]) {
         Err(e) => return vec![e],
-        Ok(spec) => spec,
+        Ok(r) => isoloom_targets::Lab::new(spec).with_images(r.defaults.images),
     };
-    let mut problems: Vec<String> = isoloom_spec::validate(&spec).iter().map(|e| format!("the spec it makes: {e}")).collect();
+    let mut problems: Vec<String> = lab.problems().iter().map(|e| format!("the spec it makes: {}", e.line())).collect();
     if let Some(t) = p.target
         && problems.is_empty()
-        && !isoloom_spec::effective(&spec).contains(&t)
+        && !lab.possible().contains(&t)
     {
-        let why = isoloom_targets::refusal(&spec, t).unwrap_or_else(|| "not one of its targets".into());
+        let why = isoloom_targets::refusal(&lab, t).unwrap_or_else(|| "not one of its targets".into());
         problems.push(format!("can't run on `{}`: {why}", t.id()));
     }
     problems

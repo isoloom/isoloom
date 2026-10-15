@@ -35,10 +35,11 @@ mod tests {
 
     #[test]
     fn every_container_counts_and_docker_takes_a_gigabyte() {
-        let spec = isoloom_spec::parse(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, docker: { image: nginx } }\n  b: { networks: { lan: 11 }, resources: { cpus: 3, memory_mb: 2048 }, docker: { image: nginx } }\n",
+        let spec = isoloom_plan::Lab::parse(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, app: { image: nginx } }\n  b: { networks: { lan: 11 }, resources: { cpus: 3, memory_mb: 2048 }, app: { image: nginx } }\n",
         )
-        .expect("parses");
+        .expect("parses")
+        .for_target(Target::DockerVm);
         let env = Environment::build(&spec, Target::DockerVm, None);
         assert_eq!(Size::of(&env), Size { cpus: 4, memory_mb: 3584 });
     }

@@ -48,9 +48,9 @@ networks:
   dual: { cidr: 10.2.0.0/24, ipv6: { cidr: \"fd00:2::/64\" } }
   six: { cidr: 10.3.0.0/24, internet: false, ipv6: { cidr: \"fd00:3::/64\", only: true } }
 machines:
-  a: { networks: { four: 10 }, docker: { image: nginx } }
-  b: { networks: { four: 11, dual: 11 }, docker: { image: nginx } }
-  c: { networks: { six: 12 }, docker: { image: nginx } }
+  a: { networks: { four: 10 }, app: { image: nginx } }
+  b: { networks: { four: 11, dual: 11 }, app: { image: nginx } }
+  c: { networks: { six: 12 }, app: { image: nginx } }
 ",
         );
         let of = |m: &str| families(&env, &env.machines[m]);

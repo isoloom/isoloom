@@ -4,7 +4,7 @@
 
 use serde_json::{Value, json};
 
-use crate::model::Spec;
+use crate::syntax::Spec;
 
 /// Where the schema is published.
 pub const SCHEMA_URL: &str = "https://www.isoloom.com/schema/v1.json";
@@ -12,8 +12,9 @@ pub const SCHEMA_URL: &str = "https://www.isoloom.com/schema/v1.json";
 /// The first line that tells YAML editors (the YAML language server) which schema to use.
 pub const MODELINE: &str = "# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json";
 
-/// The schema, generated from the model and completed with what `isoloom validate` checks
-/// that types alone don't say (name patterns, known OS names, address formats).
+/// The schema, generated from the spec's types ([`crate::syntax`]) and completed with what
+/// `isoloom validate` checks that types alone don't say (name patterns, address formats).
+#[must_use]
 pub fn schema() -> Value {
     let mut s = Value::from(schemars::schema_for!(Spec));
     // Optional fields come out as "this, or null". A spec never writes null, and editors report
@@ -28,14 +29,11 @@ pub fn schema() -> Value {
     s
 }
 
-/// Sets `key` to `v` on the node at `path`, when that node is an object.
+/// Sets `key` to `v` on the node at `path`, when there is one and it is an object.
 fn set(s: &mut Value, path: &[&str], key: &str, v: Value) {
-    let mut node = s;
-    for p in path {
-        node = &mut node[*p];
-    }
-    if node.is_object() {
-        node[key] = v;
+    let node = path.iter().try_fold(s, |node, p| node.get_mut(*p));
+    if let Some(Value::Object(node)) = node {
+        node.insert(key.to_owned(), v);
     }
 }
 
@@ -46,7 +44,6 @@ fn names(s: &mut Value) {
     set(s, &["properties", "name"], "pattern", json!("^[a-z0-9]+(-[a-z0-9]+)*$"));
     set(s, &["properties", "networks"], "propertyNames", json!({ "pattern": kebab }));
     set(s, &["properties", "machines"], "propertyNames", json!({ "pattern": kebab }));
-    set(s, &["properties", "inputs", "items"], "pattern", json!("^[A-Za-z_][A-Za-z0-9_]*$"));
 }
 
 /// The networks' blocks: a network is a /24 to /29; a LAN split into VLANs may be larger (from
@@ -73,46 +70,14 @@ fn networks(s: &mut Value) {
     set(s, &["$defs", "Bridged", "properties", "vlan"], "maximum", json!(4094));
     set(
         s,
-        &["$defs", "NetworkDocker", "properties", "cidr"],
+        &["$defs", "DockerNetwork", "properties", "cidr"],
         "pattern",
         json!(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}/(2[4-9])$"),
     );
 }
 
-/// The machines: the OS spellings (`debian@12`, `debian`), the last octet on each network, absolute volume paths.
+/// The machines: absolute volume paths.
 fn machines(s: &mut Value) {
-    let os = json!(crate::os::spellings());
-    set(s, &["$defs", "VmImpl", "properties", "os"], "enum", os.clone());
-    set(s, &["$defs", "Machine", "properties", "os"], "enum", os);
-    // `vm: {}` is complete when `common:` or a group supplies the OS.
-    set(s, &["$defs", "VmImpl"], "required", json!([]));
-    set(
-        s,
-        &["$defs", "Machine", "properties", "networks"],
-        "additionalProperties",
-        // 0: an address from the LAN's DHCP server, on a `bridged: { dhcp: true }` network. A
-        // list: several addresses on the network, the first the primary one.
-        json!({ "anyOf": [
-            { "type": "integer", "minimum": 0, "maximum": 254, "description": "The last octet of the machine's address on the network." },
-            {
-                "type": "array",
-                "items": { "type": "integer", "minimum": 1, "maximum": 254 },
-                "minItems": 1,
-                "uniqueItems": true,
-                "description": "Several addresses on the network, by last octet: the first is the machine's primary address (its name resolves to it), the others are on the same interface."
-            }
-        ] }),
-    );
-    set(
-        s,
-        &["$defs", "Machine", "properties", "volumes"],
-        "additionalProperties",
-        // A path, or a path and the folder of a shared volume (`Mount`), both absolute.
-        json!({ "anyOf": [
-            { "type": "string", "pattern": "^/", "description": "The whole volume at this absolute path." },
-            { "$ref": "#/$defs/MountPart" },
-        ] }),
-    );
     set(s, &["$defs", "MountPart", "properties", "path"], "pattern", json!("^/"));
 }
 

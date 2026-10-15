@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ vagrant
@@ -13,7 +14,7 @@ source: crates/isoloom/tests/example_snapshots.rs
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 2,
+  "resolved_version": 3,
   "name": "several-addresses",
   "instance": null,
   "inputs": [],
@@ -34,6 +35,7 @@ source: crates/isoloom/tests/example_snapshots.rs
       "access": false,
       "supplied": false,
       "shapes": [
+        "docker",
         "vm"
       ],
       "role": "target",
@@ -46,14 +48,12 @@ source: crates/isoloom/tests/example_snapshots.rs
       "docker_addresses": {
         "office": "10.86.0.10"
       },
-      "ports": [
-        {
+      "ports": {
+        "web": {
           "port": 80,
-          "name": null,
-          "http": true,
-          "publish": null
+          "protocol": "http"
         }
-      ],
+      },
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -79,6 +79,7 @@ source: crates/isoloom/tests/example_snapshots.rs
       "access": false,
       "supplied": false,
       "shapes": [
+        "docker",
         "vm"
       ],
       "role": "target",
@@ -91,7 +92,7 @@ source: crates/isoloom/tests/example_snapshots.rs
       "docker_addresses": {
         "office": "10.86.0.40"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -131,6 +132,7 @@ source: crates/isoloom/tests/example_snapshots.rs
       "access": false,
       "supplied": false,
       "shapes": [
+        "docker",
         "vm"
       ],
       "role": "target",
@@ -143,7 +145,7 @@ source: crates/isoloom/tests/example_snapshots.rs
       "docker_addresses": {
         "office": "10.86.0.20"
       },
-      "ports": [],
+      "ports": {},
       "depends_on": [],
       "inputs": [],
       "volumes": {},
@@ -179,6 +181,11 @@ source: crates/isoloom/tests/example_snapshots.rs
   "published": [],
   "targets": {
     "possible": [
+      "docker",
+      "hosted",
+      "docker-vm",
+      "cloud-docker",
+      "kubernetes",
       "vagrant",
       "proxmox",
       "esxi",
@@ -190,15 +197,16 @@ source: crates/isoloom/tests/example_snapshots.rs
       "esxi",
       "cloud-vm"
     ],
-    "refused": {},
+    "refused": {
+      "docker": "machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)",
+      "hosted": "machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)",
+      "docker-vm": "machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)",
+      "cloud-docker": "machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)",
+      "kubernetes": "machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)"
+    },
     "not_possible": {
-      "docker": "needs `docker:` on web, decoy, client",
-      "hosted": "needs `docker:` on web, decoy, client",
-      "docker-vm": "needs `docker:` on web, decoy, client",
-      "cloud-docker": "needs `docker:` on web, decoy, client",
-      "kubernetes": "needs `docker:` on web, decoy, client",
       "hybrid": "only when some machines are containers and others are VMs",
-      "external": "needs `external:` on web, decoy, client",
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {

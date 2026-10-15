@@ -9,11 +9,18 @@ use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::files::GeneratedFile;
 use isoloom_spec::model::Target;
+use isoloom_targets::Lab;
 use isoloom_targets::composite::{DockerVmBackend, HybridBackend};
 
 fn render(backend: &dyn Backend, example: &str) -> Vec<GeneratedFile> {
     let plan = testing::example(example, backend.target()).expect("the example plans");
     backend.render(&plan).expect("the example renders")
+}
+
+/// `yaml`, planned for `target` (whether or not validation would accept it).
+fn build(yaml: &str, target: Target) -> Environment {
+    let lab = Lab::parse(yaml).expect("parses");
+    Environment::build(&lab.for_target(target), target, None)
 }
 
 fn file(files: &[GeneratedFile], path: &str) -> String {
@@ -71,13 +78,13 @@ fn rendering_twice_gives_the_same_files() {
     assert_eq!(render(&HybridBackend, "mixed-office"), render(&HybridBackend, "mixed-office"));
 }
 
-/// A container `web` and a VM `db` on one network, with `extra` appended.
+/// A container `web` and a VM `db` (a TPM rules out its container form) on one network, with
+/// `extra` appended.
 fn mixed(extra: &str) -> Environment {
     let text = format!(
-        "version: 1\nname: m\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    networks: {{ lab: 10 }}\n    ports: [{{ port: 80 }}]\n    docker: {{ image: nginx }}\n  db:\n    networks: {{ lab: 20 }}\n    ports: [{{ port: 5432 }}]\n    vm: {{ os: debian@12 }}\n{extra}"
+        "version: 1\nname: m\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    networks: {{ lab: 10 }}\n    ports: {{ web: 80 }}\n    app: {{ image: nginx }}\n  db:\n    os: debian@12\n    networks: {{ lab: 20 }}\n    ports: {{ db: 5432 }}\n    hardware: {{ tpm: required }}\n{extra}"
     );
-    let spec = isoloom_spec::parse(&text).expect("parses");
-    Environment::build(&spec, Target::Hybrid, None)
+    build(&text, Target::Hybrid)
 }
 
 #[test]
@@ -107,20 +114,19 @@ fn hybrid_refuses_a_volume_shared_by_containers_and_vms() {
 
 #[test]
 fn hybrid_refuses_gateways_and_docker_vm_takes_them() {
-    let gateway = "version: 1\nname: g\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { wan: 2, lan: 1 }\n    docker: { image: alpine }\n    vm: { os: debian@12 }\n  pc:\n    networks: { lan: 10 }\n    vm: { os: debian@12 }\n";
-    let spec = isoloom_spec::parse(gateway).expect("parses");
-    let why = HybridBackend.refusal(&Environment::build(&spec, Target::Hybrid, None));
+    // `fw` has both forms (Debian's image, a Debian VM); a TPM makes `pc` a VM.
+    let gateway = "version: 1\nname: g\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    os: debian@12\n    networks: { wan: 2, lan: 1 }\n  pc:\n    os: debian@12\n    networks: { lan: 10 }\n    hardware: { tpm: required }\n";
+    let why = HybridBackend.refusal(&build(gateway, Target::Hybrid));
     assert_eq!(why.as_deref(), Some("networks with a `gateway` machine in hybrid environments come later"));
-    assert!(DockerVmBackend.refusal(&Environment::build(&spec, Target::DockerVm, None)).is_none());
+    assert!(DockerVmBackend.refusal(&build(gateway, Target::DockerVm)).is_none());
 }
 
 #[test]
 fn docker_vm_refuses_what_compose_cannot_run() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    docker: { image: alpine }\nprovision:\n  - ansible: site.yml\n",
-    )
-    .expect("parses");
-    let env = Environment::build(&spec, Target::DockerVm, None);
+    let env = build(
+        "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    app: { image: alpine }\nprovision:\n  - ansible: site.yml\n",
+        Target::DockerVm,
+    );
     assert_eq!(
         DockerVmBackend.render(&env).unwrap_err().to_string(),
         "docker-vm: environment-level provisioning (`provision:`) runs on VM targets for now"
@@ -143,17 +149,16 @@ fn hybrid_forwards_a_fixed_published_port() {
 fn only_containers_and_vms_make_an_environment_mixed() {
     // An external machine waiting for a container is neither a VM nor a container: the Docker
     // targets still render the environment.
-    let text = "version: 1\nname: x\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  cache:\n    networks: { lab: 20 }\n    ports: [{ port: 6379 }]\n    docker: { image: redis }\n  web:\n    networks: { lab: 10 }\n    depends_on: [cache]\n    external: { address: 10.9.0.10 }\n";
-    let spec = isoloom_spec::parse(text).expect("parses");
+    let text = "version: 1\nname: x\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  cache:\n    networks: { lab: 20 }\n    ports: { redis: 6379 }\n    app: { image: redis }\n  web:\n    networks: { lab: 10 }\n    depends_on: [cache]\noverrides:\n  external:\n    machines:\n      web: { ssh: { address: 10.9.0.10 } }\n";
     for target in [Target::DockerVm, Target::Hybrid] {
-        assert!(Environment::build(&spec, target, None).requirements.is_empty(), "{target:?}");
+        assert!(build(text, target).requirements.is_empty(), "{target:?}");
     }
 }
 
 #[test]
 fn hybrid_forwards_a_published_tool() {
     let mut spec = mixed("").spec().clone();
-    let tools = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    docker: { image: alpine }\ntools:\n  web-ui: { image: \"nginx:1\", port: 80, publish: 9090 }\n";
+    let tools = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    app: { image: alpine }\ntools:\n  web-ui: { image: \"nginx:1\", port: 80, publish: 9090 }\n";
     spec.tools = isoloom_spec::parse(tools).expect("parses").tools;
     let files = HybridBackend.render(&Environment::build(&spec, Target::Hybrid, None)).expect("renders");
     let compose = file(&files, "hybrid/compose.yml");

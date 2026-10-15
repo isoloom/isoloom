@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom-kubernetes/tests/snapshots.rs
+source: crates/backends/isoloom-kubernetes/tests/snapshots.rs
+assertion_line: 111
 expression: "chart(\"shared-files\")"
 ---
 === .isoloom/kubernetes/chart/Chart.yaml
@@ -19,8 +20,8 @@ appVersion: 0.1.0
 # images: each machine's image (images built from the project must be pushed where the
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
-  writer: alpine:3.20
-  reader: alpine:3.20
+  writer: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+  reader: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 
 === .isoloom/kubernetes/chart/values.schema.json
 {
@@ -213,12 +214,28 @@ spec:
         volumeMounts:
         - name: vol-shared
           mountPath: /data/shared
+      - name: init
+        image: '{{ index .Values.images "reader" }}'
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - sh /isoloom/scripts/steps__look.sh && exec sleep infinity
+        volumeMounts:
+        - name: vol-shared
+          mountPath: /data/shared
+        - name: scripts
+          mountPath: /isoloom/scripts
       nodeSelector:
         kubernetes.io/arch: amd64
       volumes:
       - name: vol-shared
         persistentVolumeClaim:
           claimName: shared
+      - name: scripts
+        configMap:
+          name: isoloom-scripts
+          defaultMode: 493
       - name: isoloom-probe
         emptyDir: {}
 ---
@@ -254,6 +271,7 @@ kind: ConfigMap
 metadata:
   name: isoloom-scripts
 binaryData:
+  steps__look.sh: '{{ required "files/project/steps__look.sh is missing: run isoloom generate" (.Files.Get "files/project/steps__look.sh") | b64enc }}'
   steps__write.sh: '{{ required "files/project/steps__write.sh is missing: run isoloom generate" (.Files.Get "files/project/steps__write.sh") | b64enc }}'
 
 === .isoloom/kubernetes/chart/templates/tests/checks.yaml

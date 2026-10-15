@@ -1,20 +1,30 @@
-//! Network appliances on Docker (`docker.appliance`): Cisco IOL wired as vrnetlab expects.
+//! Network appliances on Docker (`app.appliance`): Cisco IOL wired as vrnetlab expects.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
 use std::path::Path;
 
-use isoloom_spec::{Target, load, parse, validate};
-use isoloom_targets::{generate, refusal};
+use isoloom_spec::{Target, load, parse};
+use isoloom_targets::{Lab, generate, refusal};
 
-fn example() -> isoloom_spec::Spec {
-    load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/cisco-iol")).unwrap()
+fn example() -> Lab {
+    Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/cisco-iol")).unwrap())
+}
+
+/// A spec's problems, found parsing it or after, one `path: reason` a line.
+fn problems(yaml: &str) -> String {
+    let found = match parse(yaml) {
+        Ok(spec) => Lab::new(spec).problems(),
+        Err(isoloom_spec::LoadError::Invalid { problems, .. }) => problems,
+        Err(e) => panic!("{e}"),
+    };
+    found.iter().map(isoloom_spec::syntax::Problem::line).collect::<Vec<_>>().join("\n")
 }
 
 #[test]
 fn iol_gets_its_files_its_interfaces_in_order_and_its_addresses() {
     let spec = example();
-    assert_eq!(validate(&spec), vec![]);
+    assert_eq!(spec.problems(), vec![]);
     let files = generate(&spec, Target::Docker).unwrap();
     let file = |p: &str| files.iter().find(|f| f.path.ends_with(p)).unwrap_or_else(|| panic!("no {p}")).contents.clone();
     let cfg = file("appliances/r1/base.txt");
@@ -48,30 +58,25 @@ fn iol_gets_its_files_its_interfaces_in_order_and_its_addresses() {
 fn appliances_are_docker_only_and_checked() {
     let spec = example();
     assert!(refusal(&spec, Target::Kubernetes).unwrap().contains("network appliance"));
-    let problems = |yaml: &str| {
-        validate(&parse(yaml).unwrap())
-            .into_iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
     let base = "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n";
+    // Steps would be its VM form, which an appliance hasn't.
     let p = problems(&format!(
-        "{base}  r: {{ networks: {{ lan: 1 }}, access: true, docker: {{ image: x, appliance: cisco-iol, idle: true }}, vm: {{ os: debian@12 }} }}\n"
+        "{base}  r: {{ networks: {{ lan: 1 }}, os: debian@12, app: {{ image: x, appliance: cisco-iol, steps: [{{ run: a.sh }}] }} }}\n"
     ));
-    assert!(
-        p.contains("Docker targets only") && p.contains("access machine") && p.contains("no `idle`"),
-        "{p}"
-    );
+    assert!(p.contains("machines.r.app.steps: an appliance has no VM form"), "{p}");
+    let access = problems(&format!(
+        "{base}  r: {{ networks: {{ lan: 1 }}, access: true, app: {{ image: x, appliance: cisco-iol }} }}\n"
+    ));
+    assert!(access.contains("access machine"), "{access}");
     let p = problems(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.255.255.0/24 }\nmachines:\n  r: { networks: { lan: 1 }, docker: { image: x, appliance: cisco-iol } }\n",
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.255.255.0/24 }\nmachines:\n  r: { networks: { lan: 1 }, app: { image: x, appliance: cisco-iol } }\n",
     );
     assert!(p.contains("management network"), "{p}");
 }
 
 fn compose_of(example: &str) -> (String, Vec<isoloom_targets::GeneratedFile>) {
-    let spec = load(&Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../examples/{example}"))).unwrap();
-    assert_eq!(validate(&spec), vec![]);
+    let spec = Lab::new(load(&Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../examples/{example}"))).unwrap());
+    assert_eq!(spec.problems(), vec![]);
     let files = generate(&spec, Target::Docker).unwrap();
     (files.iter().find(|f| f.path.ends_with("compose.yml")).unwrap().contents.clone(), files)
 }
@@ -127,17 +132,10 @@ fn dynamips_builds_its_emulator_and_boots_the_firmware() {
             .iter()
             .any(|f| f.path.ends_with("appliances/r1/base.cfg") && f.contents.contains("interface FastEthernet1/0\n description wan"))
     );
-    let problems = |yaml: &str| {
-        validate(&parse(yaml).unwrap())
-            .into_iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
     let p = problems(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  r: { networks: { lan: 1 }, docker: { appliance: cisco-dynamips, image: x } }\n",
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  r: { networks: { lan: 1 }, app: { appliance: cisco-dynamips, image: x } }\n",
     );
-    assert!(p.contains("not `image` or `build`") && p.contains("firmware"), "{p}");
+    assert!(p.contains("boots its `firmware`; Isoloom builds its image, so no `image`"), "{p}");
 }
 
 #[test]
@@ -201,26 +199,22 @@ fn switch_service(c: &str) {
 
 #[test]
 fn a_lans_switch_is_checked() {
-    let problems = |yaml: &str| match parse(yaml) {
-        Ok(spec) => validate(&spec).into_iter().map(|p| p.to_string()).collect::<Vec<_>>().join("\n"),
-        Err(e) => e.to_string(),
-    };
     let spec = |lan: &str, sw: &str| {
         format!(
-            "version: 1\nname: t\nnetworks:\n  office: {{ cidr: 10.9.0.0/16, {lan} }}\n  other: {{ cidr: 10.8.0.0/16, vlans: {{ 10: {{ cidr: 10.8.10.0/24 }}, 20: {{ cidr: 10.8.20.0/24 }} }} }}\nmachines:\n  sw: {sw}\n  a: {{ networks: {{ office.vlan10: 10, office.vlan20: 10 }}, docker: {{ image: x }} }}\n"
+            "version: 1\nname: t\nnetworks:\n  office: {{ cidr: 10.9.0.0/16, {lan} }}\n  other: {{ cidr: 10.8.0.0/16, vlans: {{ 10: {{ cidr: 10.8.10.0/24 }}, 20: {{ cidr: 10.8.20.0/24 }} }} }}\nmachines:\n  sw: {sw}\n  a: {{ networks: {{ office.vlan10: 10, office.vlan20: 10 }}, app: {{ image: x }} }}\n"
         )
     };
     let vlans = "vlans: { 10: { cidr: 10.9.10.0/24 }, 20: { cidr: 10.9.20.0/24 } }";
-    let good = "{ docker: { image: x, appliance: cisco-iol-l2 } }";
+    let good = "{ app: { image: x, appliance: cisco-iol-l2 } }";
     assert_eq!(problems(&spec(&format!("switch: sw, {vlans}"), good)), "");
     assert_eq!(
-        problems(&spec(&format!("switch: sw, {vlans}"), "{ docker: { image: x, appliance: cisco-vios-l2 } }")),
+        problems(&spec(&format!("switch: sw, {vlans}"), "{ app: { image: x, appliance: cisco-vios-l2 } }")),
         ""
     );
     // Not a switch appliance.
-    let p = problems(&spec(&format!("switch: sw, {vlans}"), "{ docker: { image: x, appliance: cisco-iol } }"));
+    let p = problems(&spec(&format!("switch: sw, {vlans}"), "{ app: { image: x, appliance: cisco-iol } }"));
     assert!(p.contains("networks.office.switch: `sw` isn't a switch"), "{p}");
-    let p = problems(&spec(&format!("switch: sw, {vlans}"), "{ docker: { image: x } }"));
+    let p = problems(&spec(&format!("switch: sw, {vlans}"), "{ app: { image: x } }"));
     assert!(p.contains("isn't a switch"), "{p}");
     // No such machine.
     let p = problems(&spec(&format!("switch: nope, {vlans}"), good));
@@ -228,7 +222,7 @@ fn a_lans_switch_is_checked() {
     // Its ports are derived.
     let p = problems(&spec(
         &format!("switch: sw, {vlans}"),
-        "{ networks: { other.vlan10: 5 }, docker: { image: x, appliance: cisco-iol-l2 } }",
+        "{ networks: { other.vlan10: 5 }, app: { image: x, appliance: cisco-iol-l2 } }",
     ));
     assert!(
         p.contains("machines.sw.networks: `sw` switches LAN `office`") && p.contains("leave `networks` out"),
@@ -236,7 +230,7 @@ fn a_lans_switch_is_checked() {
     );
     let p = problems(&spec(
         &format!("switch: sw, {vlans}"),
-        "{ ports: [{ port: 22 }], docker: { image: x, appliance: cisco-iol-l2 } }",
+        "{ ports: { ssh: 22 }, app: { image: x, appliance: cisco-iol-l2 } }",
     ));
     assert!(p.contains("no `ports` or `aliases`"), "{p}");
     // A LAN without VLANs has no switch; a machine that isn't a switch still needs a network.
@@ -252,16 +246,16 @@ fn a_lans_switch_is_checked() {
         .replace("10.9.10.0/24", "10.9.0.64/26")
         .replace("10.9.20.0/24", "10.9.0.128/26")
         .replace("office.vlan10: 10, office.vlan20: 10", "office.vlan10: 70, office.vlan20: 130")
-        + "  b: { networks: { office: 10 }, docker: { image: x } }\n";
+        + "  b: { networks: { office: 10 }, app: { image: x } }\n";
     let p = problems(&direct);
     assert!(p.contains("networks.office.switch: machines join `office` directly"), "{p}");
     // A switch is one machine.
     let p = problems(&spec(
         &format!("switch: sw, {vlans}"),
-        "{ count: 2, docker: { image: x, appliance: cisco-iol-l2 } }",
+        "{ count: 2, app: { image: x, appliance: cisco-iol-l2 } }",
     ));
     assert!(p.contains("networks.office.switch: `sw` has a count"), "{p}");
     // Docker targets only, like every appliance.
-    let s = parse(&spec(&format!("switch: sw, {vlans}"), good)).unwrap();
+    let s = Lab::new(parse(&spec(&format!("switch: sw, {vlans}"), good)).unwrap());
     assert!(refusal(&s, Target::Kubernetes).unwrap().contains("network appliance"));
 }

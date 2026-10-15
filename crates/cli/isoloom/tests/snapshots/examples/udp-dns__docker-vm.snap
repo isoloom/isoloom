@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker-vm
@@ -8,6 +9,7 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/compose.yml
 ✓ .isoloom/docker/checks/client.sh
 ✓ .isoloom/docker/checks/dns.sh
+✓ .isoloom/docker/build/client/Dockerfile
 ✓ .isoloom/docker-vm/Vagrantfile
 ✓ .isoloom/docker-vm/proxmox/main.tf
 ✓ .isoloom/resolved.json
@@ -677,6 +679,8 @@ resource "local_file" "isoloom_project" {
   filename = "${path.module}/.isoloom-project-ignored.txt"
   content  = join("", [for f in local.project_ignored : "${replace("${basename(local.root)}/${f}", "/[\\\\*?\\[]/", "\\$0")}\n"])
 }
+
+## .isoloom/docker/build/client/Dockerfile: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/client.sh: identical in the `docker` snapshot
 

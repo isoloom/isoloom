@@ -16,7 +16,7 @@ dns: { private: true, domain: corp.internal }
 networks:
   office: { cidr: 10.84.0.0/24 }
 machines:
-  web: { networks: { office: 10 }, aliases: [www], ports: [{ port: 80 }], vm: { os: debian@12, provision: [web.sh] } }
+  web: { networks: { office: 10 }, aliases: [www], ports: { web: 80 }, os: debian@12, app: { steps: [{ run: web.sh }] } }
 ";
 
 /// `cloud`'s module for `yaml`.

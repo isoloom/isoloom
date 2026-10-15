@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ proxmox
@@ -507,4 +508,4 @@ locals {
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
-## .isoloom/resolved.json: identical in the `vagrant` snapshot
+## .isoloom/resolved.json: identical in the `docker` snapshot

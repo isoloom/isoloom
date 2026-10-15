@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ hosted (needs `docker:` on web, cache)
+✗ hosted (machines.cache.app.steps[1]: a reboot needs a machine with its own kernel and boot: a container has neither)
 
 # isoloom generate --target hosted (exit 1)
-· hosted: not possible for this spec (see `isoloom targets`)
+· hosted: machines.cache.app.steps[1]: a reboot needs a machine with its own kernel and boot: a container has neither

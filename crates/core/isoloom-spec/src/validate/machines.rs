@@ -78,10 +78,7 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
         resources(&s, p);
         aliases(&s, p);
         if m.docker.is_none() && m.vm.is_none() && !m.access {
-            p.add(
-                &s.at,
-                "give the machine at least one implementation: `docker:` and/or `vm:` (or an `os:`, a VM of that OS)",
-            );
+            p.add(&s.at, "give the machine a form: its `os`, plus an `app:` (or nothing more, the OS alone)");
         }
         if let Some(d) = &m.docker {
             docker(&s.at, d, p);

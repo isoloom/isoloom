@@ -15,10 +15,10 @@ use serde::{Deserialize, Deserializer};
 use super::machine::MachineInput;
 
 /// The machine fields `common:` and groups can't share: each is one machine's own.
-pub const OWN_FIELDS: &[&str] = &["networks", "ports", "access", "count", "aliases"];
+pub(crate) const OWN_FIELDS: &[&str] = &["networks", "ports", "access", "count", "aliases"];
 
 /// The machine fields `common:` and groups share.
-pub const SHARED_FIELDS: &[&str] = &[
+pub(crate) const SHARED_FIELDS: &[&str] = &[
     "os",
     "service",
     "with",
@@ -136,7 +136,9 @@ impl JsonSchema for Group {
         let members = g.subschema_for::<Vec<String>>();
         if let Some(props) = s.get_mut("properties").and_then(serde_json::Value::as_object_mut) {
             let mut m = members.to_value();
-            m["description"] = "Machine names, globs (`ws*`), or other groups.".into();
+            if let Some(o) = m.as_object_mut() {
+                o.insert("description".into(), "Machine names, globs (`ws*`), or other groups.".into());
+            }
             props.insert("members".into(), m);
         }
         s.insert("required".into(), serde_json::json!(["members"]));

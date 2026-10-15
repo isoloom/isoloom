@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ kubernetes
@@ -471,6 +472,57 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: staff
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      isoloom.com/machine: staff
+  template:
+    metadata:
+      labels:
+        isoloom.com/machine: staff
+        net.isoloom.com/office-vlan10: member
+    spec:
+      hostname: staff
+      containers:
+      - name: staff
+        image: '{{ index .Values.images "staff" }}'
+        imagePullPolicy: IfNotPresent
+        command:
+        - sleep
+        - infinity
+      nodeSelector:
+        kubernetes.io/arch: amd64
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: offline-staff
+spec:
+  podSelector:
+    matchLabels:
+      isoloom.com/machine: staff
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: guest
 spec:
   replicas: 1
@@ -780,6 +832,10 @@ spec:
           "type": "string",
           "minLength": 1
         },
+        "staff": {
+          "type": "string",
+          "minLength": 1
+        },
         "guest": {
           "type": "string",
           "minLength": 1
@@ -791,6 +847,7 @@ spec:
       },
       "required": [
         "intranet",
+        "staff",
         "guest",
         "admin"
       ],
@@ -810,8 +867,9 @@ spec:
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
   intranet: nginx:1.27-alpine
-  guest: alpine:3.20
-  admin: alpine:3.20
+  staff: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+  guest: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+  admin: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 
 ## .isoloom/kubernetes/checks/admin.sh
 #!/bin/sh
@@ -1392,6 +1450,57 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: staff
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      isoloom.com/machine: staff
+  template:
+    metadata:
+      labels:
+        isoloom.com/machine: staff
+        net.isoloom.com/office-vlan10: member
+    spec:
+      hostname: staff
+      containers:
+      - name: staff
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+        imagePullPolicy: IfNotPresent
+        command:
+        - sleep
+        - infinity
+      nodeSelector:
+        kubernetes.io/arch: amd64
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: offline-staff
+spec:
+  podSelector:
+    matchLabels:
+      isoloom.com/machine: staff
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: guest
 spec:
   replicas: 1
@@ -1409,7 +1518,7 @@ spec:
       hostname: guest
       containers:
       - name: guest
-        image: alpine:3.20
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
         imagePullPolicy: IfNotPresent
         command:
         - sleep
@@ -1438,7 +1547,7 @@ spec:
       hostname: admin
       containers:
       - name: admin
-        image: alpine:3.20
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
         imagePullPolicy: IfNotPresent
         command:
         - sleep

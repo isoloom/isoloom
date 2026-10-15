@@ -5,14 +5,13 @@ pub mod testing;
 
 use std::path::Path;
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Lab};
 use isoloom_render::backend::Backend;
-use isoloom_spec::Spec;
-use isoloom_spec::model::{Target, Virtiofs, VirtiofsCache};
+use isoloom_spec::model::{Spec, Target, Virtiofs, VirtiofsCache};
 use isoloom_terraform::ProxmoxBackend;
 use testing::{Outcome, example, file};
 
-/// The module of `spec`, checked valid.
+/// The module of `spec`, a lowered spec, checked valid.
 fn render(spec: &Spec) -> Outcome<String> {
     let problems = isoloom_spec::validate(spec);
     if !problems.is_empty() {
@@ -21,14 +20,20 @@ fn render(spec: &Spec) -> Outcome<String> {
     Ok(file(&ProxmoxBackend.render(&Environment::build(spec, Target::Proxmox, None))?, "proxmox/main.tf")?.to_owned())
 }
 
+/// The problems an author sees in `yaml`, one line each.
+fn problems(yaml: &str) -> String {
+    let found: Vec<String> = isoloom_plan::problems_in(yaml).iter().map(isoloom_spec::syntax::Problem::line).collect();
+    found.join("\n")
+}
+
 /// Why Proxmox refuses `yaml`, if it does.
 fn refusal(yaml: &str) -> Outcome<Option<String>> {
     testing::refusal(&ProxmoxBackend, yaml)
 }
 
-/// The `shared-files` example with its volume a folder of the server.
+/// The `shared-files` example, lowered for Proxmox, with its volume a folder of the server.
 fn shared_files() -> Outcome<Spec> {
-    let mut spec = example("shared-files")?;
+    let mut spec = example("shared-files")?.for_target(Target::Proxmox);
     if let Some(volume) = spec.volumes.get_mut("shared") {
         volume.virtiofs = Some(Virtiofs::default());
     }
@@ -82,10 +87,10 @@ fn a_named_mapping_is_used_as_it_is() -> Outcome {
 fn a_folder_of_the_volume_is_bound_from_the_whole() -> Outcome {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/shared-files/isoloom.yml");
     let text = std::fs::read_to_string(dir)?;
-    let text = text
-        .replace("shared: { owner: writer }", "shared: { owner: writer, virtiofs: {} }")
-        .replace("volumes: { shared: /data/shared }", "volumes: { shared: { path: /data/shared, subpath: out } }");
-    let tf = render(&isoloom_spec::parse(&text)?)?;
+    let text = text.replace("volumes: { shared: /data/shared }", "volumes: { shared: { path: /data/shared, subpath: out } }")
+        + "\noverrides:\n  proxmox:\n    volumes: { shared: { virtiofs: {} } }\n";
+    let lab = Lab::parse(&text).map_err(|problems| format!("{problems:?}"))?;
+    let tf = render(&lab.for_target(Target::Proxmox))?;
     assert!(tf.contains("/var/lib/isoloom/volumes/shared/out"), "{tf}");
     assert!(tf.contains("none bind,nofail"), "{tf}");
     Ok(())
@@ -94,7 +99,7 @@ fn a_folder_of_the_volume_is_bound_from_the_whole() -> Outcome {
 #[test]
 fn a_container_cant_mount_a_folder_of_the_server() -> Outcome {
     let why = refusal(
-        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: { virtiofs: {} } }\nmachines:\n  web: { networks: { lan: 10 }, volumes: { shared: /srv }, docker: { image: 'nginx:1.27', lxc: true } }\n",
+        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: {} }\nmachines:\n  web: { networks: { lan: 10 }, volumes: { shared: /srv }, app: { image: 'nginx:1.27' } }\noverrides: { proxmox: { machines: { web: { lxc: true } }, volumes: { shared: { virtiofs: {} } } } }\n",
     )?.expect("refused");
     assert!(why.contains("only a VM mounts") && why.contains("bind mount"), "{why}");
     Ok(())
@@ -102,10 +107,11 @@ fn a_container_cant_mount_a_folder_of_the_server() -> Outcome {
 
 #[test]
 fn a_vm_takes_at_most_eight_folders() -> Outcome {
-    let volumes = (0..9).map(|i| format!("  v{i}: {{ virtiofs: {{}} }}\n")).collect::<Vec<_>>().concat();
+    let volumes = (0..9).map(|i| format!("  v{i}: {{}}\n")).collect::<Vec<_>>().concat();
+    let folders = (0..9).map(|i| format!("      v{i}: {{ virtiofs: {{}} }}\n")).collect::<Vec<_>>().concat();
     let mounts: Vec<String> = (0..9).map(|i| format!("v{i}: /v{i}")).collect();
     let yaml = format!(
-        "version: 1\nname: f\nnetworks: {{ lan: {{ cidr: 10.30.0.0/24 }} }}\nvolumes:\n{volumes}machines:\n  web: {{ networks: {{ lan: 10 }}, volumes: {{ {} }}, vm: {{ os: debian@12, provision: [s.sh] }} }}\n",
+        "version: 1\nname: f\nnetworks: {{ lan: {{ cidr: 10.30.0.0/24 }} }}\nvolumes:\n{volumes}machines:\n  web: {{ networks: {{ lan: 10 }}, volumes: {{ {} }}, os: debian@12, app: {{ steps: [{{ run: s.sh }}] }} }}\noverrides:\n  proxmox:\n    volumes:\n{folders}",
         mounts.join(", ")
     );
     let why = refusal(&yaml)?.expect("refused");
@@ -114,21 +120,17 @@ fn a_vm_takes_at_most_eight_folders() -> Outcome {
 }
 
 #[test]
-fn windows_is_refused_with_the_driver_it_lacks() -> Outcome {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: { virtiofs: {} } }\nmachines:\n  dc: { networks: { lan: 10 }, volumes: { shared: /srv }, vm: { os: windows-server@2022, provision: [s.ps1] } }\n",
-    )?;
-    let problems = format!("{:?}", isoloom_spec::validate(&spec));
+fn windows_is_refused_with_the_driver_it_lacks() {
+    let problems = problems(
+        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: {} }\nmachines:\n  dc: { networks: { lan: 10 }, volumes: { shared: /srv }, os: windows-server@2022, app: { steps: [{ run: s.ps1 }] } }\noverrides: { proxmox: { volumes: { shared: { virtiofs: {} } } } }\n",
+    );
     assert!(problems.contains("virtio-fs and WinFsp"), "{problems}");
-    Ok(())
 }
 
 #[test]
-fn a_mapping_id_is_one_proxmox_takes() -> Outcome {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: { virtiofs: { mapping: '9 lives' } } }\nmachines:\n  web: { networks: { lan: 10 }, volumes: { shared: /srv }, vm: { os: debian@12, provision: [s.sh] } }\n",
-    )?;
-    let problems = format!("{:?}", isoloom_spec::validate(&spec));
-    assert!(problems.contains("volumes.shared.virtiofs.mapping"), "{problems}");
-    Ok(())
+fn a_mapping_id_is_one_proxmox_takes() {
+    let problems = problems(
+        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: {} }\nmachines:\n  web: { networks: { lan: 10 }, volumes: { shared: /srv }, os: debian@12, app: { steps: [{ run: s.sh }] } }\noverrides: { proxmox: { volumes: { shared: { virtiofs: { mapping: '9 lives' } } } } }\n",
+    );
+    assert!(problems.contains("overrides.proxmox.volumes.shared.virtiofs.mapping"), "{problems}");
 }

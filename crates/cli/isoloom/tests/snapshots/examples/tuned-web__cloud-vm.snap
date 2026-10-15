@@ -1,10 +1,11 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
-    ✗ digitalocean (machine `web` asks for a virtual TPM (`vm.tpm: true`): DigitalOcean gives none)
-    ✗ linode (machine `web` asks for a virtual TPM (`vm.tpm: true`): Linode gives none)
+    ✗ digitalocean (machine `web` asks for a virtual TPM (`hardware.tpm: required`): DigitalOcean gives none)
+    ✗ linode (machine `web` asks for a virtual TPM (`hardware.tpm: required`): Linode gives none)
 
 # isoloom generate --target cloud-vm (exit 0)
 ✓ .isoloom/cloud-vm/aws/main.tf
@@ -175,7 +176,7 @@ resource "aws_instance" "web" {
   lifecycle {
     precondition {
       condition     = data.aws_ami.debian_12.tpm_support == "v2.0"
-      error_message = "The machine asks for a TPM (vm.tpm), and this AMI has no NitroTPM support."
+      error_message = "The machine asks for a TPM (hardware.tpm), and this AMI has no NitroTPM support."
     }
   }
   subnet_id                   = aws_subnet.app.id
@@ -1379,4 +1380,4 @@ resource "local_file" "isoloom_project" {
   content  = join("", [for f in local.project_ignored : "${replace("${basename(local.root)}/${f}", "/[\\\\*?\\[]/", "\\$0")}\n"])
 }
 
-## .isoloom/resolved.json: identical in the `docker` snapshot
+## .isoloom/resolved.json: identical in the `vagrant` snapshot

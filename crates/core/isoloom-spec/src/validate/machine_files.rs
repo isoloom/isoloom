@@ -12,7 +12,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
         if !m.files.is_empty() && m.docker.as_ref().is_some_and(|d| d.appliance.is_some()) {
             p.add(
                 format!("machines.{name}.files"),
-                "a network appliance takes its configuration from `docker.config`, not `files`",
+                "a network appliance takes its configuration from `app.config`, not `files`",
             );
             continue;
         }

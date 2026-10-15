@@ -83,7 +83,7 @@ fn targets_lists_the_refused_clouds_under_cloud_vm() {
 fn invalid_spec_fails_validate_with_its_problems() {
     let dir = project(
         "invalid-spec",
-        "version: 1\nname: broken\nnetworks:\n  lan: { cidr: 10.0.0.0/24 }\nmachines:\n  a:\n    networks: { wan: 5 }\n    docker: { image: alpine }\n",
+        "version: 1\nname: broken\nnetworks:\n  lan: { cidr: 10.0.0.0/24 }\nmachines:\n  a:\n    networks: { wan: 5 }\n    app: { image: alpine }\n",
     );
     let o = isoloom(&dir, &["validate", dir.to_str().unwrap(), "--json"]);
     assert_eq!(o.status.code(), Some(1), "{}{}", stdout(&o), stderr(&o));
@@ -102,7 +102,7 @@ fn generate_rejects_an_unknown_target() {
 
 /// A spec AWS refuses on `cloud-vm` (a /29 network: AWS subnets are /28 or larger) while other
 /// clouds run it.
-const SMALL_SUBNET: &str = "version: 1\nname: small\nnetworks:\n  lab: { cidr: 10.9.0.0/29 }\nmachines:\n  w:\n    networks: { lab: 2 }\n    vm: { os: debian@12, provision: [setup.sh] }\n";
+const SMALL_SUBNET: &str = "version: 1\nname: small\nnetworks:\n  lab: { cidr: 10.9.0.0/29 }\nmachines:\n  w:\n    os: debian@12\n    networks: { lab: 2 }\n    app: { steps: [{ run: setup.sh }] }\n";
 
 /// A project holding [`SMALL_SUBNET`] and its set-up script.
 fn small_subnet(name: &str) -> PathBuf {
@@ -131,10 +131,10 @@ networks:
   app: { cidr: 10.60.0.0/24 }
 machines:
   web:
+    os: debian@12
     networks: { app: 10 }
-    ports: [{ port: 80 }]
-    docker: { image: nginx }
-    vm: { os: debian@12, provision: [setup.sh] }
+    ports: { web: 80 }
+    app: { image: nginx, steps: [{ run: setup.sh }] }
 ";
 
 /// A project with PROFILED and the given profiles.
@@ -159,7 +159,7 @@ fn profiles_lists_and_checks_each_profile() {
                 "description: a bigger web server\ntarget: vagrant\nspec:\n  machines: { web: { resources: { cpus: 4 } } }\n",
             ),
             ("typo", "spec:\n  machines: { wbe: { resources: { cpus: 4 } } }\n"),
-            ("nowhere", "target: kubernetes\nspec:\n  machines: { web: { docker: null } }\n"),
+            ("nowhere", "target: kubernetes\nspec:\n  machines: { web: { hardware: { tpm: required } } }\n"),
         ],
     );
     let o = isoloom(&home, &["profiles", dir.to_str().unwrap()]);

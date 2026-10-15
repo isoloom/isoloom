@@ -128,7 +128,7 @@ pub(crate) fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
                 r.assign("o.vm.box_version", Value::str(version.as_deref().unwrap_or(">= 0")));
             }
             HyperVBox::Missing => {
-                r.comment("No Hyper-V build of this box is known: give one with `vm.image.hyperv`.");
+                r.comment("No Hyper-V build of this box is known: give one with `overrides.vagrant.machines.<machine>.boxes.hyperv`.");
             }
         }
         r.assign("v.vmname", Value::str(vm_name));
@@ -255,7 +255,7 @@ pub(crate) fn refusal(env: &Environment) -> Option<String> {
         let b = images::vagrant(vm)?;
         (b.hyperv == HyperVBox::Missing).then(|| {
             format!(
-                "machine `{name}`: `{}` has no known Hyper-V build of its box; give one with `vm.image.hyperv`",
+                "machine `{name}`: `{}` has no known Hyper-V build of its box; give one with `overrides.vagrant.machines.{name}.boxes.hyperv`",
                 vm.os
             )
         })

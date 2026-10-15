@@ -3,21 +3,20 @@
 
 use std::path::Path;
 
-use isoloom_plan::Environment;
-use isoloom_spec::Spec;
-use isoloom_spec::model::Target;
+use isoloom_plan::{Environment, Lab};
+use isoloom_spec::model::{Spec, Target};
 
-/// The environment of the spec `yaml`, planned for the `docker` target.
+/// The environment of the spec `yaml` (the authored format), planned for the `docker` target.
 pub(crate) fn environment(yaml: &str) -> Environment {
-    let spec = isoloom_spec::parse(yaml).expect("the test's spec parses");
-    Environment::build(&spec, Target::Docker, None)
+    let lab = Lab::parse(yaml).expect("the test's spec parses");
+    Environment::build(&lab.for_target(Target::Docker), Target::Docker, None)
 }
 
 /// One of the project's examples.
 pub(crate) struct Example {
     /// Its folder's name.
     pub(crate) name: String,
-    /// Its spec.
+    /// Its spec, lowered for the `docker` target.
     pub(crate) spec: Spec,
 }
 
@@ -30,7 +29,7 @@ pub(crate) fn examples() -> Vec<Example> {
         .filter(|p| p.join("isoloom.yml").is_file())
         .map(|p| Example {
             name: p.file_name().expect("a folder name").to_string_lossy().into_owned(),
-            spec: isoloom_spec::load(&p).expect("the example loads"),
+            spec: Lab::new(isoloom_spec::load(&p).expect("the example loads")).for_target(Target::Docker),
         })
         .collect();
     out.sort_by(|a, b| a.name.cmp(&b.name));

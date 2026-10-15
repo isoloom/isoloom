@@ -81,7 +81,7 @@ impl Placement {
             tool: "terraform",
             source,
             review: "Review it with the notes the import printed.",
-            next: "add `vm.provision` (or `provision:`) to configure the machines, and `checks` that prove the behavior.",
+            next: "add `app: { steps: [...] }` (or `provision:`) to configure the machines, and `checks` that prove the behavior.",
             name,
         });
         for (key, n) in &names {
@@ -99,7 +99,7 @@ impl Placement {
                 y.machine_networks(joins.iter().map(|(k, o)| (&names[k], *o)));
             }
             y.resources(m.cpus, m.memory_mb);
-            y.vm_os(m.os);
+            y.os(m.os);
         }
         y.finish()
     }

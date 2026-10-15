@@ -1,0 +1,95 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: existing-hosts
+networks:
+  lab:
+    cidr: 192.168.1.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  web:
+    networks:
+      lab: 20
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: web
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: ~
+      init: []
+      idle: true
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+    external:
+      address: 192.168.1.20
+      user: florian
+      key: ~/.ssh/id_ed25519
+  cache:
+    networks:
+      lab: 21
+    os: debian@12
+    arch: amd64
+    privileged: true
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 6379
+        name: redis
+        http: false
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: debian-12
+      provision:
+        - provision/cache-boot.sh
+        - reboot
+        - provision/cache.sh
+      image: ~
+    external:
+      address: 192.168.1.21
+      user: florian
+      key: ~/.ssh/id_ed25519
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the cache came back with transparent hugepages off
+    from: cache
+    http: ~
+    tcp: ~
+    exec: cat /sys/kernel/mm/transparent_hugepage/enabled
+    script: ~
+    expect: "[never]"
+    wait: ~
+targets: ~

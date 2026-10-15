@@ -75,7 +75,7 @@ fn each_target_gets_its_own_overrides() {
     assert!(docker.spec.machines["status"].vm.is_some() && !docker.spec.machines["status"].docker.as_ref().unwrap().lxc);
     assert_eq!(docker.refusals, []);
     // The portal's and the scanner's `copy` and `packages` steps wait for VM configuration
-    // steps (Phase 3); the status board's VM recipe is a script.
+    // steps (Phase 4); the status board's VM recipe is a script.
     assert!(
         proxmox
             .refusals
@@ -87,7 +87,7 @@ fn each_target_gets_its_own_overrides() {
 #[test]
 fn a_windows_domain_lowers_onto_vms() {
     let l = on("forest-mini", Target::Vagrant);
-    // The station's `packages` step waits for VM configuration steps (Phase 3).
+    // The station's `packages` step waits for VM configuration steps (Phase 4).
     let refused: Vec<&str> = l.refusals.iter().map(|r| r.path.as_str()).collect();
     assert_eq!(refused, ["machines.station.app.steps[0]"]);
     let dc = &l.spec.machines["dc01"];

@@ -8,9 +8,15 @@ use isoloom_spec::model::Target;
 use super::EsxiBackend;
 
 fn env(spec: &str) -> Environment {
-    let spec = isoloom_spec::parse(spec).unwrap();
-    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-    Environment::build(&spec, Target::Esxi, None)
+    let lab = isoloom_plan::Lab::new(isoloom_spec::parse(spec).unwrap());
+    assert_eq!(lab.problems(), [], "the spec is valid");
+    Environment::build(&lab.for_target(Target::Esxi), Target::Esxi, None)
+}
+
+/// The plan of a spec validation refuses, to see the backend refuse it too.
+fn unchecked(spec: &str) -> Environment {
+    let lab = isoloom_plan::Lab::new(isoloom_spec::parse(spec).unwrap());
+    Environment::build(&lab.for_target(Target::Esxi), Target::Esxi, None)
 }
 
 const PAIR: &str = "
@@ -22,11 +28,13 @@ networks:
 machines:
   web:
     networks: { front: 10, back: 10 }
-    ports: [{ port: 80, publish: 8080 }]
-    vm: { os: ubuntu@24.04, provision: [web.sh] }
+    ports: { web: { port: 80, publish: 8080 } }
+    os: ubuntu@24.04
+    app: { steps: [{ run: web.sh }] }
   db:
     networks: { back: 20 }
-    vm: { os: debian@12, provision: [db.sh] }
+    os: debian@12
+    app: { steps: [{ run: db.sh }] }
 ";
 
 fn module(spec: &str) -> String {
@@ -60,14 +68,14 @@ fn a_vm_per_machine_set_up_through_the_router() {
 
 #[test]
 fn windows_and_ipv6_are_hosted_within_limits() {
-    let windows = PAIR.replace("os: debian@12, provision: [db.sh]", "os: windows-server@2022, provision: [db.ps1]");
+    let windows = PAIR.replace("os: debian@12", "os: windows-server@2022").replace("db.sh", "db.ps1");
     assert_eq!(EsxiBackend.refusal(&env(&windows)), None);
     let tf = module(&windows);
     assert!(tf.contains("guestos        = \"windows2019srvnext-64\""), "{tf}");
     assert!(tf.contains("resource \"random_password\" \"windows\""));
     assert!(!tf.contains("resource \"terraform_data\" \"db\""), "cloudbase-init sets it up");
     let shell = PAIR.replace("os: debian@12", "os: windows-server@2022");
-    let why = EsxiBackend.refusal(&env(&shell)).unwrap();
+    let why = EsxiBackend.refusal(&unchecked(&shell)).unwrap();
     assert!(why.contains("PowerShell scripts"), "{why}");
     let v6 = PAIR.replace("back: { cidr: 10.20.2.0/24 }", "back: { cidr: 10.20.2.0/24, ipv6: { cidr: \"fd00:20::/64\" } }");
     assert_eq!(EsxiBackend.refusal(&env(&v6)), None);

@@ -8,7 +8,7 @@
   "lab": {
     "name": "flag-portal",
     "instance": null,
-    "message": "The portal answers at http://localhost:${published.web.80}/.\n"
+    "message": "The portal answers at http://localhost:${published.web.portal}/.\n"
   },
   "target": "docker",
   "driver": "compose",
@@ -119,6 +119,7 @@
           "var": "CTF_FLAG_MAIN",
           "steps": [
             "up",
+            "start",
             "job-web-init-1"
           ]
         }
@@ -179,7 +180,7 @@
       "volumes": [
         {
           "name": "ctf",
-          "path": "/ctf",
+          "path": "/srv/ctf",
           "native": "${run.name}_web-ctf"
         }
       ],
@@ -443,8 +444,7 @@
       "from": {
         "kind": "published_port",
         "machine": "web",
-        "port": 80,
-        "protocol": "tcp"
+        "port": "portal"
       }
     }
   ],

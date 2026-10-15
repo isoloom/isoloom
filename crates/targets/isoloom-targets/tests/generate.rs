@@ -6,10 +6,23 @@
 use std::path::Path;
 
 use isoloom_spec::{Target, load, parse};
-use isoloom_targets::{GenerateError, generate, generate_all};
+use isoloom_targets::{GenerateError, Lab, generate, generate_all, generate_instance};
 
-fn example(name: &str) -> isoloom_spec::Spec {
+fn source(name: &str) -> isoloom_spec::Spec {
     load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).expect("example parses")
+}
+
+fn example(name: &str) -> Lab {
+    Lab::new(source(name))
+}
+
+fn lab(yaml: &str) -> Lab {
+    Lab::new(parse(yaml).expect("parses"))
+}
+
+/// The lab's problems, each as `path: reason`.
+fn problems(lab: &Lab) -> Vec<String> {
+    lab.problems().iter().map(isoloom_spec::syntax::Problem::line).collect()
 }
 
 #[test]
@@ -42,13 +55,13 @@ fn refusal_reports_what_a_generator_would_refuse() {
     assert_eq!(isoloom_targets::refusal(&plain, Target::Docker), None);
 }
 
-const BAD_CIDR: &str = "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/33 }\nmachines:\n  web: { networks: { app: 10 }, docker: { image: nginx } }\n";
+const BAD_CIDR: &str = "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/33 }\nmachines:\n  web: { networks: { app: 10 }, app: { image: nginx } }\n";
 const UNDECLARED_NETWORK: &str =
-    "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n";
+    "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n";
 
 /// `refusal` on a spec nobody validated: every target refused with the spec's problem, no panic.
 fn assert_refused_everywhere(yaml: &str, problem: &str) {
-    let spec = parse(yaml).expect("parses");
+    let spec = lab(yaml);
     for t in Target::ALL {
         let why = isoloom_targets::refusal(&spec, t).unwrap_or_else(|| panic!("{t:?} not refused"));
         assert!(why.contains(problem), "{t:?}: {why}");
@@ -67,8 +80,7 @@ fn refusal_of_an_undeclared_network_does_not_panic() {
 
 #[test]
 fn checks_plan_of_an_undeclared_network_does_not_panic() {
-    let spec = parse(UNDECLARED_NETWORK).expect("parses");
-    let _ = isoloom_plan::checks::plan(&spec);
+    let _ = isoloom_plan::checks::plan(&lab(UNDECLARED_NETWORK).spec());
 }
 
 #[test]
@@ -93,10 +105,8 @@ fn hybrid_runs_containers_beside_the_vms() {
 
 #[test]
 fn hybrid_is_offered_only_for_mixed_environments() {
-    let spec = example("hello-stack");
-    assert!(!isoloom_spec::targets::derive(&spec).contains(&Target::Hybrid));
-    let spec = example("mixed-office");
-    assert!(isoloom_spec::targets::derive(&spec).contains(&Target::Hybrid));
+    assert!(!example("hello-stack").possible().contains(&Target::Hybrid));
+    assert!(example("mixed-office").possible().contains(&Target::Hybrid));
 }
 
 #[test]
@@ -130,8 +140,15 @@ fn inputs_reach_only_the_machines_that_list_them() {
     let spec = example("supplier-portal-api");
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     let web = compose.split("\n  web:").nth(1).unwrap().split("\n  isoloom-check:").next().unwrap();
-    assert!(compose.contains("LAUNCH_TOKEN: ${LAUNCH_TOKEN:-}"));
-    assert!(!web.contains("LAUNCH_TOKEN"), "web must not receive the database's inputs");
+    assert!(compose.contains("API_URL: ${API_URL:-}"), "{compose}");
+    assert!(
+        !web.contains("API_URL") && !web.contains("launch-token"),
+        "web must not receive the database's inputs"
+    );
+    // A sensitive input is a file, read from the runner's environment: never an environment
+    // variable of the machine.
+    assert!(compose.contains("  input-launch-token:\n    environment: LAUNCH_TOKEN"), "{compose}");
+    assert!(!compose.contains("LAUNCH_TOKEN: ${LAUNCH_TOKEN"), "{compose}");
 }
 
 #[test]
@@ -151,8 +168,7 @@ fn libvirt_domains_are_named_after_the_environment() {
     let spec = example("hello-stack");
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     assert!(vf.contains("v.default_prefix = \"hello-stack_\""), "{vf}");
-    let two = isoloom_spec::instance::apply(&spec, 2).unwrap();
-    let vf = &generate(&two, Target::Vagrant).unwrap()[0].contents;
+    let vf = contents(&generate_instance(&spec, Target::Vagrant, 2).unwrap(), ".isoloom-2/vagrant/Vagrantfile");
     assert!(vf.contains("v.default_prefix = \"hello-stack-2_\""));
     let dvm = contents(&generate(&spec, Target::DockerVm).unwrap(), ".isoloom/docker-vm/Vagrantfile");
     assert!(dvm.contains("v.default_prefix = \"hello-stack_\""));
@@ -186,9 +202,16 @@ fn reach_rules_add_a_router_with_matching_rules() {
     // Offline machines lose their default route; no Docker-internal network with a router.
     assert!(compose.contains("ip route del default"));
     assert!(!compose.contains("internal: true"));
-    // Names across networks, and checks from the access side.
+    // Names across networks, and checks from the access machine (a Debian container here).
     assert!(compose.contains("cache:10.61.20.20"));
-    assert!(compose.contains("network_mode: service:isoloom-access"));
+    let check = compose
+        .split("\n  isoloom-check:\n")
+        .nth(1)
+        .unwrap()
+        .split("\n  isoloom-check-")
+        .next()
+        .unwrap();
+    assert!(check.contains("network_mode: service:user") && !compose.contains("isoloom-access"), "{compose}");
 }
 
 #[test]
@@ -208,7 +231,14 @@ fn vagrant_router_waits_and_offline_blocks() {
 #[test]
 fn unsupported_features_are_refused_with_the_reason() {
     let ad = example("corp-ad-basics");
-    assert_eq!(generate(&ad, Target::Docker), Err(GenerateError::NotPossible(Target::Docker)));
+    // Windows has no container form: the Docker target refuses it at the field that rules it out.
+    assert_eq!(
+        generate(&ad, Target::Docker),
+        Err(GenerateError::Unsupported {
+            target: Target::Docker,
+            what: "machines.dc01.os: Windows has no container form in 1.0".into()
+        })
+    );
     assert!(
         matches!(generate(&ad, Target::Vagrant), Err(GenerateError::Unsupported { .. })),
         "Windows has no local image yet"
@@ -224,10 +254,9 @@ fn unsupported_features_are_refused_with_the_reason() {
 fn an_arm64_access_machine_that_is_actually_built_is_still_refused_on_the_cloud() {
     // An access machine with no implementation isn't instantiated, so its arch is moot. One that
     // declares a VM is built, so arm64 must still be caught (the cloud images are x86-64 only).
-    let spec = parse(
-        "version: 1\nname: arm-access\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  kali:\n    networks: { lab: 10 }\n    access: true\n    arch: arm64\n    vm: { os: debian@12, provision: [p.sh] }\n",
-    )
-    .expect("parses");
+    let spec = lab(
+        "version: 1\nname: arm-access\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  kali:\n    os: debian@12\n    networks: { lab: 10 }\n    access: true\n    hardware: { arch: arm64 }\n    app: { steps: [{ run: p.sh }] }\n",
+    );
     assert!(
         matches!(generate(&spec, Target::CloudVm), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("arm64")),
         "an arm64 access machine with a VM must not slip past the cloud refusal"
@@ -273,11 +302,10 @@ fn vagrant_moves_machines_behind_their_gateway_after_provisioning() {
 
 #[test]
 fn networks_outside_10_move_into_10_on_docker_keeping_last_octets() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  corp: { cidr: 192.168.20.0/24 }\n  dmz: { cidr: 172.18.5.0/24 }\n  taken: { cidr: 10.192.20.0/24 }\nmachines:\n  a: { networks: { corp: 10, dmz: 7, taken: 9 }, docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n",
-    )
-    .unwrap();
-    assert_eq!(isoloom_spec::validate(&spec), vec![]);
+    let spec = lab(
+        "version: 1\nname: t\nnetworks:\n  corp: { cidr: 192.168.20.0/24 }\n  dmz: { cidr: 172.18.5.0/24 }\n  taken: { cidr: 10.192.20.0/24 }\nmachines:\n  a: { os: debian@12, networks: { corp: 10, dmz: 7, taken: 9 }, app: { image: x, steps: [{ run: p.sh }] } }\n",
+    );
+    assert_eq!(spec.problems(), vec![]);
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     // 172.N.X -> 10.N.X; 192.168.X -> 10.192.X, taken here, so the next free block.
     assert!(compose.contains("subnet: 10.18.5.0/24"), "{compose}");
@@ -292,24 +320,23 @@ fn networks_outside_10_move_into_10_on_docker_keeping_last_octets() {
 
 #[test]
 fn a_network_can_name_its_docker_block() {
-    let base = "version: 1\nname: t\nnetworks:\n  corp: { cidr: 192.168.20.0/24, docker: { cidr: DOCKER } }\nmachines:\n  a: { networks: { corp: 10 }, docker: { image: x } }\n";
-    let spec = isoloom_spec::parse(&base.replace("DOCKER", "10.77.0.0/24")).unwrap();
-    assert_eq!(isoloom_spec::validate(&spec), vec![]);
+    let base = "version: 1\nname: t\nnetworks:\n  corp: { cidr: 192.168.20.0/24 }\nmachines:\n  a: { networks: { corp: 10 }, app: { image: x } }\noverrides: { docker: { networks: { corp: { cidr: DOCKER } } } }\n";
+    let spec = lab(&base.replace("DOCKER", "10.77.0.0/24"));
+    assert_eq!(spec.problems(), vec![]);
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(compose.contains("ipv4_address: 10.77.0.10"));
     for bad in ["10.77.0.0/25", "172.20.0.0/24"] {
-        let p = isoloom_spec::validate(&isoloom_spec::parse(&base.replace("DOCKER", bad)).unwrap());
-        assert!(p.iter().any(|x| x.at == "networks.corp.docker.cidr"), "{bad}: {p:?}");
+        let p = lab(&base.replace("DOCKER", bad)).problems();
+        assert!(p.iter().any(|x| x.path.as_str() == "overrides.docker.networks.corp.cidr"), "{bad}: {p:?}");
     }
 }
 
 #[test]
 fn windows_machines_use_winrm_and_powershell() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm:\n      os: windows-server@2019\n      provision: [provision/dc.ps1]\n  web:\n    networks: { lab: 20 }\n    depends_on: [dc01]\n    vm:\n      os: windows-server@2019\n      image: { vagrant: example/win2019, vagrant_version: '1.0' }\n      provision: [provision/web.ps1]\n",
-    )
-    .unwrap();
-    assert_eq!(isoloom_spec::validate(&spec), vec![]);
+    let spec = lab(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    ports: { ldap: 389 }\n    app:\n      steps: [{ run: provision/dc.ps1 }]\n  web:\n    os: windows-server@2019\n    networks: { lab: 20 }\n    depends_on: [dc01]\n    app:\n      steps: [{ run: provision/web.ps1 }]\noverrides:\n  vagrant:\n    machines:\n      web: { box: example/win2019, box_version: '1.0' }\n",
+    );
+    assert_eq!(spec.problems(), vec![]);
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     let dc = &vf[vf.find("config.vm.define \"dc01\"").unwrap()..vf.find("config.vm.define \"web\"").unwrap()];
     assert!(dc.contains("m.vm.box = \"StefanScherer/windows_2019\""));
@@ -330,9 +357,12 @@ fn windows_machines_use_winrm_and_powershell() {
 
 #[test]
 fn windows_refuses_what_it_cant_do_yet() {
-    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  NAME:\n    networks: { lab: 10 }\n    vm: { os: windows-server@2019, provision: [STEP] }\n";
-    for (name, step, why) in [("dc01", "setup.yml", "PowerShell scripts"), ("averyveryverylongname", "a.ps1", "15 characters")] {
-        let spec = isoloom_spec::parse(&base.replace("NAME", name).replace("STEP", step)).unwrap();
+    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  NAME:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    app: { steps: [STEP] }\n";
+    for (name, step, why) in [
+        ("dc01", "{ playbook: setup.yml }", "PowerShell scripts"),
+        ("averyveryverylongname", "{ run: a.ps1 }", "15 characters"),
+    ] {
+        let spec = lab(&base.replace("NAME", name).replace("STEP", step));
         let err = generate(&spec, Target::Vagrant).unwrap_err().to_string();
         assert!(err.contains(why), "{name}: {err}");
     }
@@ -349,9 +379,11 @@ fn contents(files: &[isoloom_targets::GeneratedFile], path: &str) -> String {
 
 #[test]
 fn the_runner_supplies_the_access_machine_through_its_image_table() {
-    let spec = example("segmented");
+    // segmented's access machine without an `os` of its own: the runner supplies it.
+    let mut supplied = source("segmented");
+    supplied.machines["user"].os = None;
     let table = isoloom_spec::images::Table::parse("access:\n  docker: kalilinux/kali-rolling\n  vm: kali\n").unwrap();
-    let applied = table.apply(&spec);
+    let applied = Lab::new(supplied).with_images(table.clone());
     let compose = contents(&generate(&applied, Target::Docker).unwrap(), ".isoloom/docker/compose.yml");
     // The access machine is a real container now (kept running idle), not the check stand-in.
     assert!(
@@ -359,35 +391,43 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() {
         "{compose}"
     );
     assert!(!compose.contains("isoloom-access"));
-    // Its VM part comes from the spec, which wins over the table.
+    // Its VM too.
     let vagrant = contents(&generate(&applied, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
-    assert!(vagrant.contains("config.vm.define \"user\" do |m|\n    m.vm.box = \"bento/debian-12\""));
+    assert!(
+        vagrant.contains("config.vm.define \"user\" do |m|\n    m.vm.box = \"kalilinux/rolling\""),
+        "{vagrant}"
+    );
+    // An access machine with its own `os` is the spec's, which wins over the table.
+    let spec = example("segmented");
+    let with_table = example("segmented").with_images(table);
+    for t in [Target::Docker, Target::Vagrant] {
+        assert_eq!(generate(&with_table, t), generate(&spec, t), "{t:?}");
+    }
     // Without the table, nothing changes.
-    assert_eq!(isoloom_spec::images::Table::default().apply(&spec), spec);
+    assert_eq!(isoloom_spec::images::Table::default().apply(&spec.spec()), spec.spec());
 }
 
 #[test]
 fn the_image_table_sits_between_built_in_images_and_the_spec() {
-    let spec = example("hello-stack");
     let table = isoloom_spec::images::Table::parse("os:\n  debian@12: { vagrant: my-org/debian-12, vagrant_version: \"1.2.0\" }\n").unwrap();
-    let vagrant = contents(&generate(&table.apply(&spec), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    let vagrant = contents(
+        &generate(&example("hello-stack").with_images(table), Target::Vagrant).unwrap(),
+        ".isoloom/vagrant/Vagrantfile",
+    );
     assert!(
         vagrant.contains("m.vm.box = \"my-org/debian-12\"\n    m.vm.box_version = \"1.2.0\""),
         "{vagrant}"
     );
-    // A spec's own vm.image still wins.
-    let windows = example("windows-hello");
+    // A spec's own box (`overrides.vagrant`) still wins.
     let table = isoloom_spec::images::Table::parse("os:\n  windows-server@2019: { vagrant: other/box }\n").unwrap();
-    let mut pinned = windows.clone();
-    for m in pinned.machines.values_mut() {
-        if let Some(vm) = &mut m.vm {
-            vm.image = Some(isoloom_spec::model::VmImage {
-                vagrant: Some("spec/box".into()),
-                ..Default::default()
-            });
-        }
+    let mut pinned = source("windows-hello");
+    for m in pinned.overrides.vagrant.as_mut().unwrap().machines.values_mut() {
+        m.box_name = Some("spec/box".into());
     }
-    let vagrant = contents(&generate(&table.apply(&pinned), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    let vagrant = contents(
+        &generate(&Lab::new(pinned).with_images(table), Target::Vagrant).unwrap(),
+        ".isoloom/vagrant/Vagrantfile",
+    );
     assert!(vagrant.contains("\"spec/box\"") && !vagrant.contains("other/box"));
     assert!(isoloom_spec::images::Table::parse("bogus: 1\n").is_err());
     // The OS is written as a spec writes it.
@@ -413,10 +453,9 @@ fn proxmox_forwards_published_ports_from_the_router() {
 fn proxmox_cloud_init_uses_the_machines_declared_resolver() {
     // A machine that points at the lab's own resolver (e.g. an AD member at the domain
     // controller) must get that in cloud-init, not a forced public resolver.
-    let spec = parse(
-        "version: 1\nname: dns-lab\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  member:\n    networks: { lab: 10 }\n    dns: { servers: [10.60.0.2], domain: arm.lab }\n    vm: { os: debian@12, provision: [p.sh] }\n  plain:\n    networks: { lab: 11 }\n    vm: { os: debian@12, provision: [p.sh] }\n",
-    )
-    .expect("parses");
+    let spec = lab(
+        "version: 1\nname: dns-lab\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  member:\n    os: debian@12\n    networks: { lab: 10 }\n    dns: { servers: [10.60.0.2], domain: arm.lab }\n    app: { steps: [{ run: p.sh }] }\n  plain:\n    os: debian@12\n    networks: { lab: 11 }\n    app: { steps: [{ run: p.sh }] }\n",
+    );
     let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
     assert!(tf.contains("servers = [\"10.60.0.2\"]"), "{tf}");
     assert!(tf.contains("domain  = \"arm.lab\""), "{tf}");
@@ -456,10 +495,9 @@ fn kubernetes_turns_networks_and_reach_into_network_policies() {
 fn kubernetes_seeds_a_volume_from_the_image_before_the_init_jobs() {
     // `volumes: { ctf: /chroot }` over an image path: on Docker the named volume starts with the
     // image's files; the claim does too, from an init container of the machine's image.
-    let spec = parse(
-        "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  chal:\n    networks: { app: 10 }\n    volumes: { ctf: /chroot }\n    docker: { image: \"gcr.io/distroless/static\", init: [flag.sh] }\n",
-    )
-    .expect("parses");
+    let spec = lab(
+        "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  chal:\n    networks: { app: 10 }\n    volumes: { ctf: /chroot }\n    app: { image: \"gcr.io/distroless/static\" }\n    setup: [flag.sh]\n",
+    );
     let env = contents(&generate(&spec, Target::Kubernetes).unwrap(), ".isoloom/kubernetes/environment.yaml");
     let seed = env.find("- name: seed-ctf").expect("a seed init container");
     let init = env.find("initContainers:").expect("init containers");
@@ -503,16 +541,14 @@ fn kubernetes_publishes_and_keeps_offline_machines_inside() {
 
 #[test]
 fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() {
-    let mut spec = example("pivot-dmz");
+    let mut spec = source("pivot-dmz");
     // Kali has no AWS image yet: the user lands on Debian here.
     for m in spec.machines.values_mut() {
-        if let Some(vm) = &mut m.vm
-            && vm.os == "kali"
-        {
-            vm.os = "debian-12".into();
+        if m.os.is_some_and(|os| os.name() == "kali") {
+            m.os = Some("debian@12".parse().unwrap());
         }
     }
-    let tf = contents(&generate(&spec, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
+    let tf = contents(&generate(&Lab::new(spec), Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
     assert!(tf.contains("resource \"aws_network_interface\" \"gateway_dmz\""), "{tf}");
     assert!(tf.contains("resource \"aws_network_interface\" \"gateway_internal\""));
     assert!(tf.contains("source_dest_check = false"));
@@ -540,7 +576,7 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() {
 #[test]
 fn playbook_vars_keep_their_types() {
     let spec = example("ansible-pair");
-    let vars = &spec.provision[0].vars;
+    let vars = &spec.source().provision[0].vars;
     assert_eq!(vars["tools"], serde_json::json!(["curl", "jq"]));
     assert_eq!(vars["cache_port"], serde_json::json!(6379));
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
@@ -571,10 +607,9 @@ fn cloud_vm_runs_windows_over_winrm_with_its_name() {
 fn linux_machines_leave_windows_out_of_etc_hosts() {
     // A Linux member joining an AD domain must not have the Windows DC in /etc/hosts by its
     // short name: that shadows AD DNS and breaks the Kerberos SPN lookup on realm join.
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm: { os: windows-server@2019, provision: [p.ps1] }\n  lx01:\n    networks: { lab: 12 }\n    ports: [{ port: 22 }]\n    depends_on: [dc01]\n    vm: { os: ubuntu@24.04, provision: [p.sh] }\n",
-    )
-    .unwrap();
+    let spec = lab(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    ports: { ldap: 389 }\n    app: { steps: [{ run: p.ps1 }] }\n  lx01:\n    os: ubuntu@24.04\n    networks: { lab: 12 }\n    ports: { ssh: 22 }\n    depends_on: [dc01]\n    app: { steps: [{ run: p.sh }] }\n",
+    );
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     let start = vf.find("config.vm.define \"lx01\"").unwrap();
     let end = vf[start + 20..].find("config.vm.define").map_or(vf.len(), |i| start + 20 + i);
@@ -591,13 +626,16 @@ fn linux_machines_leave_windows_out_of_etc_hosts() {
 
 #[test]
 fn an_idle_container_is_kept_running() {
-    let spec = parse(
-        "version: 1\nname: idle\nnetworks:\n  lan: { cidr: 10.10.1.0/24 }\nmachines:\n  box:\n    networks: { lan: 10 }\n    docker: { image: \"alpine:3.20\", idle: true }\n  web:\n    networks: { lan: 11 }\n    ports: [{ port: 80 }]\n    docker: { image: \"nginx:1.27-alpine\" }\n",
-    )
-    .expect("spec parses");
+    // The OS alone: its official image, pinned, kept running idle.
+    let spec = lab(
+        "version: 1\nname: idle\nnetworks:\n  lan: { cidr: 10.10.1.0/24 }\nmachines:\n  box:\n    os: alpine\n    networks: { lan: 10 }\n  web:\n    networks: { lan: 11 }\n    ports: { web: 80 }\n    app: { image: \"nginx:1.27-alpine\" }\n",
+    );
+    let image = isoloom_spec::os::container_image(spec.source().machines["box"].os.unwrap().name()).unwrap();
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(
-        compose.contains("  box:\n    image: alpine:3.20\n    platform: linux/amd64\n    entrypoint:\n    - sleep\n    - infinity\n"),
+        compose.contains(&format!(
+            "  box:\n    image: {image}\n    platform: linux/amd64\n    entrypoint:\n    - sleep\n    - infinity\n"
+        )),
         "{compose}"
     );
     // A machine that runs its own service keeps its image's command.
@@ -615,7 +653,8 @@ fn an_idle_container_is_kept_running() {
 #[test]
 fn the_controller_is_small_by_default_and_sized_by_the_spec() {
     // ansible-pair asks for 768 MB.
-    let spec = example("ansible-pair");
+    let mut src = source("ansible-pair");
+    let spec = Lab::new(src.clone());
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
     assert!(
@@ -626,8 +665,8 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() {
     assert!(ctl.contains("v.memory = 768"));
     assert!(ctl.contains("command -v apk"));
     // Without `controller:`: 1 CPU, 512 MB, on every target with a controller.
-    let mut spec = spec;
-    spec.controller = None;
+    src.controller = None;
+    let spec = Lab::new(src.clone());
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
     assert!(ctl.contains("v.cpus = 1\n      v.memory = 512"), "{ctl}");
@@ -640,11 +679,13 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() {
     let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
     assert!(tf.contains("dedicated = 512"));
     // A box of one's own, pinned.
-    spec.controller = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks: {}\nmachines: {}\ncontroller: { image: { vagrant: bento/debian-12, vagrant_version: \"202407.22.0\" }, resources: { cpus: 2 } }\n",
+    let other = parse(
+        "version: 1\nname: t\nnetworks: {}\nmachines: {}\ncontroller: { resources: { cpus: 2 } }\noverrides: { vagrant: { controller: { box: bento/debian-12, box_version: \"202407.22.0\" } } }\n",
     )
-    .unwrap()
-    .controller;
+    .unwrap();
+    src.controller = other.controller;
+    src.overrides = other.overrides;
+    let spec = Lab::new(src);
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(vagrantfile.contains("m.vm.box = \"bento/debian-12\"\n    m.vm.box_version = \"202407.22.0\""));
     assert!(vagrantfile.contains("v.cpus = 2"));
@@ -652,15 +693,15 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() {
 
 #[test]
 fn the_controller_halts_after_provisioning_unless_kept_running() {
-    let mut spec = example("ansible-pair");
-    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    let mut src = source("ansible-pair");
+    let vagrantfile = contents(&generate(&Lab::new(src.clone()), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     let ctl = &vagrantfile[vagrantfile.find("config.vm.define \"isoloom-controller\"").unwrap()..];
     // After the playbooks, before the on-demand checks; marked so a check run waits it out.
     let (ansible, halt) = (ctl.find("name: \"ansible\"").unwrap(), ctl.find("name: \"halt\"").unwrap());
     assert!(ansible < halt, "{ctl}");
     assert!(ctl.contains("touch /run/isoloom-halting; (sleep 5; poweroff)"));
-    spec.controller.get_or_insert_default().keep_running = true;
-    let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
+    src.controller.get_or_insert_default().keep_running = true;
+    let vagrantfile = contents(&generate(&Lab::new(src), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(!vagrantfile.contains("name: \"halt\""));
 }
 
@@ -676,11 +717,11 @@ fn the_resolved_snapshot_tells_infra_from_targets() {
 #[test]
 fn the_provision_script_can_be_limited_to_machines() {
     let spec = example("ansible-pair");
-    let all = isoloom_targets::provision_script(&spec, &[]);
+    let all = isoloom_targets::provision_script(&spec.spec(), &[]);
     // (The retry of unreachable hosts limits itself, from the retry file: only the runs count.)
     let runs = |s: &str| s.lines().filter(|l| l.starts_with("run_play ")).map(String::from).collect::<Vec<_>>();
     assert!(runs(&all).iter().all(|l| !l.contains("--limit")), "{all}");
-    let some = isoloom_targets::provision_script(&spec, &["web".into(), "cache".into()]);
+    let some = isoloom_targets::provision_script(&spec.spec(), &["web".into(), "cache".into()]);
     assert!(runs(&some).iter().all(|l| l.contains(" --limit 'web,cache' ")), "{some}");
 }
 
@@ -712,10 +753,9 @@ fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
     assert!(vagrantfile.contains("web ansible_host=10.63.0.10\n"), "{vagrantfile}");
     // Python literals, single-quoted: Ansible reads these back with their types (checked with
     // ansible-inventory 2.x).
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      a: { code: \"10\", quote: \"it's\", n: 3, on: true, none: null, l: [x, 1], m: { k: v } }\n",
-    )
-    .unwrap();
+    let spec = lab(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: p.sh }] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      a: { code: \"10\", quote: \"it's\", n: 3, on: true, none: null, l: [x, 1], m: { k: v } }\n",
+    );
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(
         vagrantfile.contains(r#"a ansible_host=10.9.0.10 code='"10"' quote='"it'"'"'s"' n='3' on='True' none='None' l='["x", 1]' m='{"k": "v"}'"#),
@@ -725,11 +765,10 @@ fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
 
 #[test]
 fn host_vars_name_machines_and_variables() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      ghost: { x: 1 }\n      a: { \"bad name\": 1, 2go: 1, ok_1: 1 }\n",
-    )
-    .unwrap();
-    let problems: Vec<String> = isoloom_spec::validate(&spec).iter().map(std::string::ToString::to_string).collect();
+    let spec = lab(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: p.sh }] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      ghost: { x: 1 }\n      a: { \"bad name\": 1, 2go: 1, ok_1: 1 }\n",
+    );
+    let problems = problems(&spec);
     assert_eq!(problems.len(), 3, "{problems:?}");
     assert!(
         problems
@@ -744,26 +783,25 @@ fn host_vars_name_machines_and_variables() {
 /// so the start plan waits for the rest and runs it after (#42).
 #[test]
 fn leaf_init_jobs_run_after_the_wait() {
-    let spec = isoloom_spec::parse(
-        r#"
+    let spec = lab(r#"
 version: 1
 name: leaf
 networks: { lan: { cidr: 10.70.0.0/24 } }
 machines:
   db:
     networks: { lan: 20 }
-    ports: [{ port: 5432 }]
-    docker: { image: "postgres:17", init: [seed.sh] }
+    ports: { db: 5432 }
+    app: { image: "postgres:17" }
+    setup: [seed.sh]
   web:
     networks: { lan: 10 }
-    ports: [{ port: 80 }]
+    ports: { web: 80 }
     depends_on: [db]
-    docker: { image: "nginx:1.27-alpine", init: [setup.sh, warm.sh] }
-"#,
-    )
-    .unwrap();
+    app: { image: "nginx:1.27-alpine" }
+    setup: [setup.sh, warm.sh]
+"#);
     // db's job is waited for by web; web's two jobs by nothing.
-    assert_eq!(isoloom_targets::leaf_jobs(&spec), ["web-init-1", "web-init-2"]);
+    assert_eq!(isoloom_targets::leaf_jobs(&spec.for_target(Target::Docker)), ["web-init-1", "web-init-2"]);
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     let plan = isoloom_targets::start_plan(compose).unwrap();
     assert_eq!(plan.jobs, ["web-init-1", "web-init-2"]);
@@ -799,14 +837,15 @@ fn checks_on_the_docker_vm_never_rerun_init_jobs() {
 #[test]
 fn a_dormant_service_is_declared_but_never_waited_for() {
     // 4444 is the shell an exploit opens: `shell` has nothing else, `web` serves 80 too.
-    let spec = parse(
+    let source = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
-         shell: { networks: { lab: 5 }, ports: [{ port: 4444, dormant: true, publish: 4444 }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n  \
-         web: { networks: { lab: 10 }, ports: [{ port: 80 }, { port: 4444, dormant: true }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n  \
-         app: { networks: { lab: 20 }, depends_on: [web], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n",
+         shell: { os: debian@12, networks: { lab: 5 }, ports: { shell: { port: 4444, dormant: true, publish: 4444 } }, app: { image: x, steps: [{ run: p.sh }] } }\n  \
+         web: { os: debian@12, networks: { lab: 10 }, ports: { web: 80, shell: { port: 4444, dormant: true } }, app: { image: x, steps: [{ run: p.sh }] } }\n  \
+         app: { os: debian@12, networks: { lab: 20 }, depends_on: [web], app: { image: x, steps: [{ run: p.sh }] } }\n",
     )
     .unwrap();
-    assert_eq!(isoloom_spec::validate(&spec), vec![]);
+    let spec = Lab::new(source.clone());
+    assert_eq!(spec.problems(), vec![]);
 
     // Docker: the healthcheck probes 80 only; a machine with only dormant services has none,
     // so whatever waits for it waits for it to start.
@@ -836,7 +875,7 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
     assert!(vf.contains("</dev/tcp/web/80") && !vf.contains("/dev/tcp/web/4444"), "{vf}");
 
     // No derived check expects it to answer.
-    let plan = isoloom_plan::checks::plan(&spec);
+    let plan = isoloom_plan::checks::plan(&spec.spec());
     assert!(plan.iter().any(|c| c.name == "web:80 from app"));
     assert!(
         !plan.iter().any(|c| c.name.contains(":4444")),
@@ -845,25 +884,29 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
     );
 
     // Depending on a machine whose services are all dormant waits for nothing: refused.
-    let mut bad = spec.clone();
+    let mut bad = source;
     bad.machines.get_mut("app").unwrap().depends_on = vec!["shell".into()];
-    let problems: Vec<String> = isoloom_spec::validate(&bad).iter().map(std::string::ToString::to_string).collect();
     assert_eq!(
-        problems,
+        problems(&Lab::new(bad)),
         ["machines.app.depends_on[0]: `shell`'s ports are all dormant (they answer later), so there's nothing to wait for"]
     );
 }
 
-/// dns serves 53 over UDP (published) and TCP; syslog serves UDP only; app waits for dns.
-fn udp_spec() -> isoloom_spec::Spec {
-    let spec = parse(
+/// dns serves 53 over UDP (published, `dns`) and TCP (`zone`); syslog serves UDP only; app
+/// waits for dns.
+fn udp_source() -> isoloom_spec::Spec {
+    parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  far: { cidr: 10.9.1.0/24 }\nreach: [{ from: far, to: lab, ports: [53] }]\nmachines:\n  \
-         dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53 }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n  \
-         syslog: { networks: { lab: 6 }, ports: [{ port: 514, protocol: udp, publish: 1514 }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n  \
-         app: { networks: { far: 20 }, depends_on: [dns], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n",
+         dns: { os: debian@12, networks: { lab: 5 }, ports: { dns: { port: 53, protocol: udp, publish: 10053 }, zone: 53 }, app: { image: x, steps: [{ run: p.sh }] } }\n  \
+         syslog: { os: debian@12, networks: { lab: 6 }, ports: { syslog: { port: 514, protocol: udp, publish: 1514 } }, app: { image: x, steps: [{ run: p.sh }] } }\n  \
+         app: { os: debian@12, networks: { far: 20 }, depends_on: [dns], app: { image: x, steps: [{ run: p.sh }] } }\n",
     )
-    .unwrap();
-    assert_eq!(isoloom_spec::validate(&spec), vec![]);
+    .unwrap()
+}
+
+fn udp_spec() -> Lab {
+    let spec = Lab::new(udp_source());
+    assert_eq!(spec.problems(), vec![]);
     spec
 }
 
@@ -876,8 +919,8 @@ fn a_udp_service_is_published_as_udp_on_docker() {
     let svc = |n: &str| compose["services"][n].clone();
     let ports = serde_yaml_ng::to_string(&svc("dns")["ports"]).unwrap();
     assert!(ports.contains("+10053}:53/udp"), "{ports}");
-    assert_eq!(svc("dns")["labels"]["isoloom.port.53-udp"].as_str(), Some("udp:53"));
-    assert_eq!(svc("dns")["labels"]["isoloom.port.53"].as_str(), Some("tcp:53"));
+    assert_eq!(svc("dns")["labels"]["isoloom.port.dns"].as_str(), Some("udp:53"));
+    assert_eq!(svc("dns")["labels"]["isoloom.port.zone"].as_str(), Some("tcp:53"));
     let probe = serde_yaml_ng::to_string(&svc("dns")["healthcheck"]).unwrap();
     assert!(probe.contains("127.0.0.1 53"), "{probe}");
     assert!(svc("syslog").get("healthcheck").is_none());
@@ -885,19 +928,23 @@ fn a_udp_service_is_published_as_udp_on_docker() {
 }
 
 #[test]
-fn a_udp_and_a_tcp_service_sharing_a_name_stay_apart() {
-    // `dns` and `dns-udp`, on Docker and on the clouds.
-    let named = parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
-         dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, name: dns, publish: 10053 }, { port: 53, name: dns, publish: 1053 }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n",
-    )
-    .unwrap();
-    assert_eq!(isoloom_spec::validate(&named), vec![]);
+fn a_udp_and_a_tcp_port_on_one_number_stay_apart_by_name() {
+    // A name is one port's (a TCP and a UDP port share a number, never a name): `dns-udp` and
+    // `dns`, on Docker and on the clouds.
+    let named = lab("version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
+         dns: { os: debian@12, networks: { lab: 5 }, ports: { dns-udp: { port: 53, protocol: udp, publish: 10053 }, dns: { port: 53, publish: 1053 } }, app: { image: x, steps: [{ run: p.sh }] } }\n");
+    assert_eq!(named.problems(), vec![]);
     let c: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents(&generate(&named, Target::Docker).unwrap(), ".isoloom/docker/compose.yml")).unwrap();
     assert_eq!(c["services"]["dns"]["labels"]["isoloom.port.dns-udp"].as_str(), Some("udp:53"));
     assert_eq!(c["services"]["dns"]["labels"]["isoloom.port.dns"].as_str(), Some("tcp:53"));
     let aws = contents(&generate(&named, Target::CloudVm).unwrap(), ".isoloom/cloud-vm/aws/main.tf");
     assert!(aws.contains("\"dns/dns-udp\"") && aws.contains("\"dns/dns\""), "{aws}");
+    // The same name twice is no map: the YAML says so.
+    let twice = parse(
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
+         dns: { networks: { lab: 5 }, ports: { dns: { port: 53, protocol: udp }, dns: 53 }, app: { image: x } }\n",
+    );
+    assert!(twice.unwrap_err().to_string().contains("dns"));
 }
 
 #[test]
@@ -936,51 +983,45 @@ fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() {
 fn a_udp_service_is_never_waited_for_nor_checked() {
     let spec = udp_spec();
     // No derived check probes UDP (nothing tells an answer from a drop); TCP 53 is checked.
-    let plan = isoloom_plan::checks::plan(&spec);
+    let plan = isoloom_plan::checks::plan(&spec.spec());
     let names: Vec<&String> = plan.iter().map(|c| &c.name).collect();
     assert!(names.iter().any(|n| *n == "dns:53 from app"), "{names:?}");
     assert!(!names.iter().any(|n| n.contains(":514")), "{names:?}");
 
-    // The snapshot says so.
+    // The snapshot says so: each port with its protocol.
     let snap = isoloom_targets::resolved::resolve(&spec);
-    assert_eq!(snap["machines"]["dns"]["ports"][0]["protocol"], "udp");
-    assert!(snap["machines"]["dns"]["ports"][1].get("protocol").is_none());
+    assert_eq!(snap["machines"]["dns"]["ports"]["dns"]["protocol"], "udp");
+    assert_eq!(snap["machines"]["dns"]["ports"]["zone"]["protocol"], "tcp");
 
     // Depending on a machine with only UDP services waits for nothing: refused.
-    let mut bad = spec.clone();
+    let mut bad = udp_source();
     bad.machines.get_mut("app").unwrap().depends_on = vec!["syslog".into()];
-    let problems: Vec<String> = isoloom_spec::validate(&bad).iter().map(std::string::ToString::to_string).collect();
     assert_eq!(
-        problems,
+        problems(&Lab::new(bad)),
         ["machines.app.depends_on[0]: `syslog`'s ports are all UDP (no handshake to wait for), so there's nothing to wait for"]
     );
 }
 
 #[test]
 fn a_udp_service_is_validated() {
-    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { networks: { lab: 5 }, docker: { image: x }, ports: ";
-    let problems = |svcs: &str| -> Vec<String> {
-        isoloom_spec::validate(&parse(&format!("{base}{svcs} }}\n")).unwrap())
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect()
-    };
+    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { networks: { lab: 5 }, app: { image: x }, ports: ";
+    let problems = |svcs: &str| -> Vec<String> { problems(&lab(&format!("{base}{svcs} }}\n"))) };
     // One port over both protocols is two services; the same one twice isn't.
-    assert_eq!(problems("[{ port: 53, protocol: udp }, { port: 53, protocol: tcp }]"), Vec::<String>::new());
     assert_eq!(
-        problems("[{ port: 53, protocol: udp }, { port: 53, protocol: udp }]"),
-        ["machines.a.ports[1].port: port 53 (UDP) is listed twice"]
-    );
-    // A host port may be published once per protocol.
-    assert_eq!(
-        problems("[{ port: 53, protocol: udp, publish: 53 }, { port: 53, publish: 53 }]"),
+        problems("{ dns: { port: 53, protocol: udp }, zone: { port: 53, protocol: tcp } }"),
         Vec::<String>::new()
     );
     assert_eq!(
-        problems("[{ port: 69, protocol: udp, http: true }]"),
-        ["machines.a.ports[0]: `http` and `tls` run over TCP: a UDP port has neither"]
+        problems("{ dns: { port: 53, protocol: udp }, again: { port: 53, protocol: udp } }"),
+        ["machines.a.ports.again.port: port 53 (UDP) is listed twice"]
     );
-    let err = parse(&format!("{base}[{{ port: 53, protocol: sctp }}] }}\n")).unwrap_err().to_string();
+    // A host port may be published once per protocol.
+    assert_eq!(
+        problems("{ dns: { port: 53, protocol: udp, publish: 53 }, zone: { port: 53, publish: 53 } }"),
+        Vec::<String>::new()
+    );
+    // HTTP over UDP can't be written: one `protocol` says either.
+    let err = parse(&format!("{base}{{ dns: {{ port: 53, protocol: sctp }} }} }}\n")).unwrap_err().to_string();
     assert!(err.contains("sctp"), "{err}");
 }
 
@@ -994,10 +1035,9 @@ fn provider_block<'a>(vf: &'a str, vm: &str, provider: &str) -> &'a str {
 #[test]
 fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
     // GOAD-Mini's shape: one Windows DC and the controller running the lab's playbooks.
-    let spec = parse(
-        "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm: { os: windows-server@2019, provision: [p.ps1] }\nprovision:\n  - ansible: ansible/main.yml\n",
-    )
-    .unwrap();
+    let spec = lab(
+        "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    ports: { ldap: 389 }\n    app: { steps: [{ run: p.ps1 }] }\nprovision:\n  - ansible: ansible/main.yml\n",
+    );
     assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     assert!(vf.contains("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"]"));
@@ -1072,7 +1112,7 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
         "{web}"
     );
     assert!(web.contains("IsoloomHyperV.prune([\"isoloom-segmented-front\"])"), "{web}");
-    hyperv_router_and_macs(&v, spec.networks.len());
+    hyperv_router_and_macs(&v, spec.source().networks.len());
 }
 
 /// On Hyper-V the router is on every network (`networks` of them), with an adapter on each;
@@ -1090,7 +1130,8 @@ fn hyperv_router_and_macs(v: &str, networks: usize) {
 
 #[test]
 fn vagrant_on_hyperv_takes_windows_and_privileged_machines() {
-    // Windows: the box's Hyper-V build from `vm.image.hyperv`, a static address through WMI.
+    // Windows: the box's Hyper-V build from `overrides.vagrant` (`boxes.hyperv`), a static
+    // address through WMI.
     let win = example("windows-hello");
     let v = contents(&generate(&win, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(
@@ -1109,23 +1150,30 @@ fn vagrant_on_hyperv_takes_windows_and_privileged_machines() {
     let hosts = example("existing-hosts");
     let v = contents(&generate(&hosts, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(!define_block(&v, "cache").contains("enable_virtualization_extensions"));
-    let nested = parse("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  hv: { networks: { lab: 10 }, nested_virtualization: true, vm: { os: debian@12, provision: [a.sh] } }\n").unwrap();
+    let nested = lab(
+        "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  hv: { os: debian@12, networks: { lab: 10 }, hardware: { nested_virtualization: true }, app: { steps: [{ run: a.sh }] } }\n",
+    );
     let v = contents(&generate(&nested, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(define_block(&v, "hv").contains("v.enable_virtualization_extensions = true"), "{v}");
 }
 
 #[test]
 fn an_os_without_a_hyperv_box_is_refused_on_hyperv_until_the_spec_gives_one() {
-    let yaml = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    networks: { lab: 10 }\n    vm: { os: debian@13, provision: [setup.sh] }\n";
-    let spec = parse(yaml).unwrap();
+    let yaml = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    os: debian@13\n    networks: { lab: 10 }\n    app: { steps: [{ run: setup.sh }] }\n";
+    let spec = lab(yaml);
     // Still generated for every other provider; the Hyper-V block says what is missing.
     let v = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
-    assert!(v.contains("# No Hyper-V build of this box is known: give one with `vm.image.hyperv`."), "{v}");
+    assert!(
+        v.contains("# No Hyper-V build of this box is known: give one with `overrides.vagrant.machines.<machine>.boxes.hyperv`."),
+        "{v}"
+    );
     assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
     let why = isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("hyperv")).expect("refused on Hyper-V");
-    assert!(why.contains("machine `box`") && why.contains("vm.image.hyperv"), "{why}");
+    assert!(why.contains("machine `box`") && why.contains("boxes.hyperv"), "{why}");
     // The spec's own box: its latest version with a Hyper-V build.
-    let own = parse(&yaml.replace("os: debian@13", "os: debian@13, image: { hyperv: my/debian13 }")).unwrap();
+    let own = lab(&format!(
+        "{yaml}overrides: {{ vagrant: {{ machines: {{ box: {{ boxes: {{ hyperv: my/debian13 }} }} }} }} }}\n"
+    ));
     assert_eq!(isoloom_targets::refusal_on(&own, Target::Vagrant, Some("hyperv")), None);
     let v = contents(&generate(&own, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(v.contains("o.vm.box = \"my/debian13\"\n      o.vm.box_version = \">= 0\""), "{v}");

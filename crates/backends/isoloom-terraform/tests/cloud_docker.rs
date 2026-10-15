@@ -12,7 +12,7 @@ use testing::{Outcome, example, file};
 
 /// Example `name`'s plan for `target`.
 fn env(name: &str, target: Target) -> Outcome<Environment> {
-    Ok(Environment::build(&example(name)?, target, None))
+    Ok(testing::planned(&example(name)?, target))
 }
 
 /// hello-stack's module on `cloud`.

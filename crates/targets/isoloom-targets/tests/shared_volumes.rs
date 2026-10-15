@@ -5,14 +5,19 @@
 
 use std::path::Path;
 
-use isoloom_spec::{Spec, Target, load, parse, validate};
-use isoloom_targets::{generate, refusal};
+use isoloom_spec::syntax::Tpm;
+use isoloom_spec::{Spec, Target, load, parse};
+use isoloom_targets::{Lab, generate, refusal};
 
-fn shared() -> Spec {
+fn shared_source() -> Spec {
     load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/shared-files")).unwrap()
 }
 
-fn all(spec: &Spec, t: Target) -> String {
+fn shared() -> Lab {
+    Lab::new(shared_source())
+}
+
+fn all(spec: &Lab, t: Target) -> String {
     generate(spec, t).unwrap().into_iter().map(|f| f.contents).collect()
 }
 
@@ -71,17 +76,17 @@ networks: { a: { cidr: 10.84.0.0/24 }, b: { cidr: 10.85.0.0/24 } }
 volumes: { lonely: {}, data: { owner: ghost }, apart: {} }
 machines:
   one:
+    os: alpine
     networks: { a: 10 }
     volumes: { data: /d, apart: /x }
-    docker: { image: alpine, idle: true }
   two:
+    os: alpine
     networks: { b: 10 }
     volumes: { apart: /y }
-    docker: { image: alpine, idle: true }
 ",
     )
     .unwrap();
-    let problems: Vec<String> = validate(&spec).into_iter().map(|p| p.to_string()).collect();
+    let problems: Vec<String> = Lab::new(spec).problems().iter().map(isoloom_spec::syntax::Problem::line).collect();
     let has = |at: &str, what: &str| problems.iter().any(|p| p.starts_with(at) && p.contains(what));
     assert!(has("volumes.lonely", "no machine mounts it"), "{problems:#?}");
     assert!(has("volumes.data.owner", "`ghost` doesn't mount it"), "{problems:#?}");
@@ -90,7 +95,8 @@ machines:
 
 #[test]
 fn hybrid_refuses_a_volume_shared_by_a_container_and_a_vm() {
-    let mut spec = shared();
-    spec.machines["reader"].docker = None;
-    assert!(refusal(&spec, Target::Hybrid).unwrap().contains("shared by containers and VMs"));
+    // A TPM rules out the reader's container form: it is a VM, the writer a container.
+    let mut spec = shared_source();
+    spec.machines["reader"].hardware.tpm = Tpm::Required;
+    assert!(refusal(&Lab::new(spec), Target::Hybrid).unwrap().contains("shared by containers and VMs"));
 }

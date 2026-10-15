@@ -346,7 +346,7 @@ impl<'a> Import<'a> {
                 .add(at, NoteKind::Changed, format!("`{path}`: steps are .sh (Linux) or .ps1 (Windows) files")),
             (None, Some(_)) => self
                 .notes
-                .add(at, NoteKind::InImage, "an inline script: put it in a file and list it in `vm.provision`"),
+                .add(at, NoteKind::InImage, "an inline script: put it in a file and list it in `app.steps`"),
             _ => {}
         }
         // `reboot: true`: Vagrant restarts the guest after the script (if any).
@@ -358,7 +358,7 @@ impl<'a> Import<'a> {
                     "`reboot: true` on Windows: restart it from the environment's playbooks (`ansible.windows.win_reboot`)",
                 );
             } else {
-                m.provision.push(crate::model::REBOOT_STEP.into());
+                m.provision.push(isoloom_spec::model::REBOOT_STEP.into());
             }
         }
     }
@@ -374,7 +374,7 @@ impl<'a> Import<'a> {
             tool: "vagrant",
             source,
             review: "Review it with the notes the import printed.",
-            next: "add `docker:` to machines that can be containers, and `checks` that prove the behavior.",
+            next: "add `app.image` or `app.build` to machines that should be a container rather than their steps' build, and `checks` that prove the behavior.",
             name,
         });
         for (key, n) in &names {
@@ -390,17 +390,13 @@ impl<'a> Import<'a> {
                 publish: Some(host),
             }));
             y.resources(m.cpus, m.memory_mb);
-            y.vm_os(&m.os);
-            if let Some((b, v)) = &m.image {
-                y.line(format!("      image:\n        vagrant: \"{b}\""));
-                if let Some(v) = v {
-                    y.line(format!("        vagrant_version: \"{v}\""));
-                }
-            }
+            y.os(&m.os);
             if !m.provision.is_empty() {
-                y.line(format!("      provision: [{}]", m.provision.join(", ")));
+                let steps: Vec<String> = m.provision.iter().map(|s| step(s)).collect();
+                y.line(format!("    app:\n      steps: [{}]", steps.join(", ")));
             }
         }
+        boxes(&mut y, machines);
         if !self.env_playbooks.is_empty() {
             y.line("\nprovision:");
             for p in &self.env_playbooks {
@@ -408,5 +404,35 @@ impl<'a> Import<'a> {
             }
         }
         y.finish()
+    }
+}
+/// A provisioning step as an `app.steps` item: a playbook, a script, or a reboot.
+fn step(s: &str) -> String {
+    let path = std::path::Path::new(s);
+    let playbook = path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("yml") || e.eq_ignore_ascii_case("yaml"));
+    if s == isoloom_spec::model::REBOOT_STEP {
+        s.to_owned()
+    } else if playbook {
+        format!("{{ playbook: {s} }}")
+    } else {
+        format!("{{ run: {s} }}")
+    }
+}
+
+/// The boxes the Vagrantfile pins, as `overrides.vagrant`, when any machine has one.
+fn boxes(y: &mut DraftYaml, machines: &[Machine]) {
+    let pinned: Vec<(&str, &str, Option<&str>)> = machines
+        .iter()
+        .filter_map(|m| m.image.as_ref().map(|(b, v)| (m.name.as_str(), b.as_str(), v.as_deref())))
+        .collect();
+    if pinned.is_empty() {
+        return;
+    }
+    y.line("\noverrides:\n  vagrant:\n    machines:");
+    for (name, b, v) in pinned {
+        let version = v.map(|v| format!(", box_version: \"{v}\"")).unwrap_or_default();
+        y.line(format!("      {name}: {{ box: \"{b}\"{version} }}"));
     }
 }

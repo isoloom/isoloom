@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom-kubernetes/tests/snapshots.rs
+source: crates/backends/isoloom-kubernetes/tests/snapshots.rs
+assertion_line: 96
 expression: "manifests(\"segmented\")"
 ---
 === .isoloom/kubernetes/kustomization.yaml
@@ -225,6 +226,34 @@ spec:
   - name: p4444
     port: 4444
     targetPort: 4444
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      isoloom.com/machine: user
+  template:
+    metadata:
+      labels:
+        isoloom.com/machine: user
+        net.isoloom.com/access: member
+    spec:
+      hostname: user
+      containers:
+      - name: user
+        image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+        imagePullPolicy: IfNotPresent
+        command:
+        - sleep
+        - infinity
+      nodeSelector:
+        kubernetes.io/arch: amd64
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

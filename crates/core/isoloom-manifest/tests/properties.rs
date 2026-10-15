@@ -65,14 +65,9 @@ fn placeholder() -> impl Strategy<Value = Placeholder> {
         Just(Placeholder::Value),
         "[A-Z_][A-Z0-9_]{0,8}".prop_map(|n| Placeholder::Param(isoloom_manifest::EnvName::parse(&n).unwrap())),
         "[a-z][a-z0-9_]{0,8}".prop_map(|n| Placeholder::Output(isoloom_manifest::SnakeName::parse(&n).unwrap())),
-        ("[a-z][a-z0-9.-]{0,6}", 1..=u16::MAX, any::<bool>()).prop_map(|(m, port, udp)| Placeholder::Published {
+        ("[a-z][a-z0-9.-]{0,6}", "[a-z][a-z0-9-]{0,30}").prop_map(|(m, port)| Placeholder::Published {
             machine: isoloom_manifest::Name::parse(&m).unwrap(),
-            port: std::num::NonZeroU16::new(port).unwrap(),
-            protocol: if udp {
-                isoloom_manifest::Protocol::Udp
-            } else {
-                isoloom_manifest::Protocol::Tcp
-            },
+            port: isoloom_manifest::Name::parse(&port).unwrap(),
         }),
     ]
 }

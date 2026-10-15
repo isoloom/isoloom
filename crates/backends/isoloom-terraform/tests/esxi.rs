@@ -12,7 +12,7 @@ use testing::{Outcome, example, file};
 
 /// Example `name`'s plan on ESXi.
 fn env(name: &str) -> Outcome<Environment> {
-    Ok(Environment::build(&example(name)?, Target::Esxi, None))
+    Ok(testing::planned(&example(name)?, Target::Esxi))
 }
 
 /// The module of `env`.
@@ -80,7 +80,7 @@ fn esxi_shared_files() -> Outcome {
 /// setting and shares the volume over NFS from its owner, as every other target does.
 #[test]
 fn virtiofs_is_ignored() -> Outcome {
-    let mut spec = example("shared-files")?;
+    let mut spec = example("shared-files")?.for_target(Target::Esxi);
     let plain = Environment::build(&spec, Target::Esxi, None);
     spec.volumes.get_mut("shared").unwrap().virtiofs = Some(isoloom_spec::model::Virtiofs::default());
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
@@ -107,16 +107,23 @@ networks:
   lan: { cidr: 10.30.0.0/24, mtu: 9000 }
   office: { cidr: 192.168.10.0/24, bridged: { interface: vmnic1, vlan: 20 } }
   home: { cidr: 192.168.1.0/24, bridged: { dhcp: true, default_route: true } }
-  corp: { cidr: 10.50.0.0/24, external: corp-net }
+  corp: { cidr: 10.50.0.0/24 }
 machines:
   web:
     networks: { lan: 10, office: 10, home: 0, corp: 5 }
-    secrets: [db-password]
+    files: [{ path: /run/secrets/db-password, secret: db-password }]
     disks: { data: { size_gb: 20, mount: /data }, scratch: { size_gb: 5, fs: raw } }
-    vm: { os: debian@12, provision: [s.sh], boot: { firmware: uefi } }
+    os: debian@12
+    app: { steps: [{ run: s.sh }] }
+    hardware: { boot: { firmware: uefi } }
   db:
     networks: { lan: 20 }
-    vm: { os: ubuntu@24.04, provision: [db.sh], boot: { firmware: bios } }
+    os: ubuntu@24.04
+    app: { steps: [{ run: db.sh }] }
+    hardware: { boot: { firmware: bios } }
+overrides:
+  esxi:
+    networks: { corp: { external: corp-net } }
 ";
 
 /// The plan of `text`, a valid spec, on ESXi.
@@ -138,11 +145,11 @@ fn a_boot_esxi_has_no_setting_for_is_refused() -> Outcome {
         ("{ kernel: /boot/vmlinuz }", "kernel"),
         ("{ firmware: uefi, firmware_format: raw }", "firmware_format"),
     ] {
-        let text = LAB.replace("provision: [db.sh], boot: { firmware: bios }", &format!("provision: [db.sh], boot: {boot}"));
+        let text = LAB.replace("hardware: { boot: { firmware: bios } }", &format!("hardware: {{ boot: {boot} }}"));
         let why = EsxiBackend.refusal(&lab(&text)?).expect("refused");
-        assert!(why.contains(&format!("`vm.boot.{field}`")), "{why}");
+        assert!(why.contains(&format!("`hardware.boot.{field}`")), "{why}");
     }
-    let order = LAB.replace("provision: [db.sh], boot: { firmware: bios }", "provision: [db.sh], boot: { order: [hd] }");
+    let order = LAB.replace("hardware: { boot: { firmware: bios } }", "hardware: { boot: { order: [hd] } }");
     assert_eq!(EsxiBackend.refusal(&lab(&order)?), None);
     Ok(())
 }

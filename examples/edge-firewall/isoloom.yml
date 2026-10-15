@@ -16,38 +16,35 @@ reach:
 
 machines:
   fw:
+    os: debian@12
     networks: { outside: 5, dmz: 1, lan: 1 }
-    ports: [{ port: 8080, name: status, http: true }]
-    docker:
-      build: build/fw
-    vm:
-      os: debian@12
-      provision: [provision/fw.sh]
+    ports: { status: { port: 8080, protocol: http } }
+    app:
+      build: build/fw                        # the container form: its own Dockerfile
+      steps: [{ run: provision/fw.sh }]      # the VM form: its script
 
   web:
+    os: debian@12
     networks: { dmz: 10 }
     aliases: [www.edge.test]
-    ports: [{ port: 80, http: true }]
-    docker:
+    ports: { web: { port: 80, protocol: http } }
+    app:
       build: build/web
-    vm:
-      os: debian@12
-      provision: [provision/web.sh]
+      steps: [{ run: provision/web.sh }]
 
+  # A published image on containers, a Debian VM its step sets up (`service: redis` in Phase 4).
   cache:
+    os: debian@12
     networks: { lan: 20 }
-    ports: [{ port: 6379, name: redis }]
-    docker:
+    ports: { redis: 6379 }
+    app:
       image: "redis:7-alpine"
-    vm:
-      os: debian@12
-      provision: [provision/cache.sh]
+      steps: [{ run: provision/cache.sh }]
 
   user:
+    os: debian@12
     access: true
     networks: { outside: 10 }
-    vm:
-      os: debian@12
 
 checks:
   - name: the web page answers through the firewall

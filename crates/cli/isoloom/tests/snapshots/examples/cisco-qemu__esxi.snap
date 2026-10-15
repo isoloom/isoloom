@@ -1,8 +1,9 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
-✗ esxi (needs `vm:` on vios, csr, host-a, host-b)
+✗ esxi (machines.vios.app.appliance: an appliance's packaging exists only as a container)
 
 # isoloom generate --target esxi (exit 1)
-· esxi: not possible for this spec (see `isoloom targets`)
+· esxi: machines.vios.app.appliance: an appliance's packaging exists only as a container

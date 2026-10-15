@@ -263,9 +263,9 @@ pub struct Publish {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Port {
-    /// Its name in the spec (`portal`), when it has one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<Name>,
+    /// Its name in the spec (`portal`): unique on its machine, how placeholders and outputs
+    /// name it (`${published.web.portal}`).
+    pub name: Name,
     /// The machine's port.
     pub port: NonZeroU16,
     /// TCP or UDP.

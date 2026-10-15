@@ -5,13 +5,13 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
 use isoloom_spec::{Target, parse};
-use isoloom_targets::generate;
+use isoloom_targets::{Lab, generate};
 
 const DO: &str = ".isoloom/cloud-vm/digitalocean/main.tf";
 
 fn cloud_vm(yaml: &str) -> Vec<isoloom_targets::GeneratedFile> {
-    let spec = parse(yaml).expect("spec parses");
-    generate(&spec, Target::CloudVm).expect("cloud-vm generates")
+    let lab = Lab::new(parse(yaml).expect("spec parses"));
+    generate(&lab, Target::CloudVm).expect("cloud-vm generates")
 }
 
 #[test]
@@ -25,8 +25,9 @@ networks:
 machines:
   web:
     networks: { lab: 10 }
-    ports: [{ port: 80, http: true, publish: 8080 }]
-    vm: { os: debian@12, provision: [p.sh] }
+    os: debian@12
+    ports: { web: { port: 80, protocol: http, publish: 8080 } }
+    app: { steps: [{ run: p.sh }] }
 ",
     );
     let tf = &files.iter().find(|f| f.path == DO).expect("a digitalocean file (refusal is None)").contents;
@@ -38,7 +39,7 @@ machines:
     // The published port opens for allowed_cidr and is listed in the published output.
     assert!(tf.contains("port_range       = \"8080\""), "the published port");
     assert!(
-        tf.contains("\"web/80\" = \"${digitalocean_droplet.web.ipv4_address}:8080\""),
+        tf.contains("\"web/web\" = \"${digitalocean_droplet.web.ipv4_address}:8080\""),
         "the published map"
     );
 }
@@ -56,11 +57,11 @@ networks:
 machines:
   web:
     networks: { a: 10 }
-    ports: [{ port: 80, http: true }]
-    vm: { os: debian@12 }
+    os: debian@12
+    ports: { web: { port: 80, protocol: http } }
   box:
+    os: debian@12
     networks: { b: 10 }
-    vm: { os: debian@12 }
 ",
     );
     assert!(files.iter().any(|f| f.path == ".isoloom/cloud-vm/aws/main.tf"), "AWS still generates");

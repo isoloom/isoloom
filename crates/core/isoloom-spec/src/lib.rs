@@ -37,33 +37,34 @@ pub mod windows;
 
 use std::path::{Path, PathBuf};
 
-pub use error::{LoadError, Stage};
-pub use model::{
-    Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Port, Reach, Resources, Shape, Spec, Target, Tc, Vlan,
-};
+pub use error::{LoadError, Result, Stage};
+pub use model::{Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Port, Reach, Resources, Shape, Target, Tc, Vlan};
+pub use syntax::Spec;
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};
 
 /// The spec file names, at the root of a project: `isoloom.yml` (canonical) or `isoloom.yaml`.
-pub const SPEC_FILES: &[&str] = &["isoloom.yml", "isoloom.yaml"];
+pub const SPEC_FILES: &[&str] = &[SPEC_FILE, "isoloom.yaml"];
 
-/// Parses a spec from YAML text. Unknown fields are errors (typos shouldn't pass silently).
-/// VLANs written under their LAN come back as networks of their own ([`vlans::flatten`]): the
-/// rest of Isoloom only deals in networks.
-pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
-    let mut doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml)?;
-    // A machine's `os` reaches its `vm:` before clones copy the machine and before a shared
-    // `vm:` could fill its OS.
-    os::fill_vm(&mut doc);
-    // `count:` clones, then `common:` and `groups:` fold into the machines, so every reader sees
-    // finished ones.
-    let clones = clones::expand(&mut doc).map_err(LoadError::at(Stage::Clones))?;
-    groups::expand(&mut doc).map_err(LoadError::at(Stage::Groups))?;
-    addresses::split(&mut doc).map_err(LoadError::at(Stage::Addresses))?;
-    let mut spec: Spec = serde_yaml_ng::from_value(doc)?;
-    spec.clones = clones;
-    os::canonical(&mut spec).map_err(LoadError::at(Stage::Os))?;
-    vlans::flatten(spec).map_err(LoadError::at(Stage::Vlans))
+/// The spec file's usual name, the one a spec read from text is reported under.
+pub const SPEC_FILE: &str = "isoloom.yml";
+
+/// Reads a spec from YAML text, written in the format authors write ([`syntax`]).
+///
+/// # Errors
+///
+/// [`LoadError::Invalid`] with every problem found, coded and placed (`file` names the spec file
+/// in their first line).
+pub fn parse(yaml: &str) -> Result<syntax::Spec, LoadError> {
+    parse_file(yaml, SPEC_FILE)
+}
+
+/// [`parse`], the problems naming the spec file `file`.
+fn parse_file(yaml: &str, file: &str) -> Result<syntax::Spec, LoadError> {
+    syntax::parse(yaml).map_err(|problems| LoadError::Invalid {
+        file: file.to_owned(),
+        problems,
+    })
 }
 
 /// The spec file in `dir`: `isoloom.yml` or `isoloom.yaml`, never both.
@@ -77,20 +78,33 @@ pub fn find(dir: &Path) -> Result<PathBuf, LoadError> {
 }
 
 /// Reads the spec in `dir` (see [`find`]).
+///
+/// # Errors
+///
+/// [`LoadError`]: no spec file (or two), one that can't be read, or its problems.
 pub fn load(dir: &Path) -> Result<Spec, LoadError> {
     load_with(dir, &[])
 }
 
 /// Reads the spec in `dir` with `-s key=value` overrides applied first (see
 /// [`defaults::override_spec`]); keys prefixed `defaults.` are left to the defaults.
+///
+/// # Errors
+///
+/// [`LoadError`], as [`load`], or an override that doesn't apply.
 pub fn load_with(dir: &Path, sets: &[String]) -> Result<Spec, LoadError> {
     load_profiled(dir, None, sets)
 }
 
 /// Reads the spec in `dir` with a profile's `spec` merged in (checked against the spec first:
 /// see [`profile::Profile::check`]), then `-s key=value` overrides.
+///
+/// # Errors
+///
+/// [`LoadError`], as [`load_with`], or a profile that names what the spec doesn't have.
 pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[String]) -> Result<Spec, LoadError> {
     let path = find(dir)?;
+    let file = path.file_name().map_or_else(|| SPEC_FILE.to_owned(), |f| f.to_string_lossy().into_owned());
     let text = std::fs::read_to_string(&path).map_err(|source| LoadError::Read { path, source })?;
     let text = match profile {
         Some(p) => {
@@ -104,7 +118,7 @@ pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[Str
         None => defaults::override_spec(&text, sets),
     }
     .map_err(LoadError::at(Stage::Overrides))?;
-    parse(&text)
+    parse_file(&text, &file)
 }
 
 /// A machine's CPUs when its `resources` don't say (defaults sized for a VM, which needs more
@@ -130,7 +144,8 @@ pub struct Totals {
 
 /// What the whole spec needs when every machine is a VM, each machine's `resources` or the
 /// defaults: what `isoloom resources` reports before a run.
-pub fn totals(spec: &Spec) -> Totals {
+#[must_use]
+pub fn totals(spec: &model::Spec) -> Totals {
     spec.machines.values().fold(Totals::default(), |t, m| {
         let r = m.resources.unwrap_or(Resources {
             cpus: None,
