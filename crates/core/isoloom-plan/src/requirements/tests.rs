@@ -195,3 +195,49 @@ fn several_addresses_need_the_feature_of_the_machines_shape() {
     assert_eq!(more(MachineShape::Container).feature(), Feature::ContainerMoreAddresses);
     assert_eq!(more(MachineShape::External).feature(), Feature::ContainerMoreAddresses);
 }
+
+#[test]
+fn mixing_containers_and_vms_asks_for_a_volume_both_mount_and_a_vm_after_a_container() {
+    let env = crate::testing::environment(
+        "version: 1\nname: t\nvolumes: { data: { owner: db } }\nmachines:\n  db: { app: { image: postgres }, volumes: { data: /d } }\n  vm: { os: debian@12, app: { steps: [{ run: a.sh }, reboot] }, volumes: { data: /d }, depends_on: [db] }\n  other: { app: { image: nginx }, depends_on: [db] }\n",
+        isoloom_spec::model::Target::Hybrid,
+    );
+    let mixed: Vec<&Requirement> = env
+        .requirements
+        .iter()
+        .filter(|r| matches!(r, Requirement::VolumeAcrossShapes { .. } | Requirement::VmDependsOnContainer { .. }))
+        .collect();
+    assert_eq!(
+        mixed,
+        [
+            &Requirement::VolumeAcrossShapes { volume: "data".into() },
+            &Requirement::VmDependsOnContainer {
+                vm: "vm".into(),
+                container: "db".into()
+            }
+        ]
+    );
+    let docker = crate::testing::environment(
+        "version: 1\nname: t\nvolumes: { data: { owner: a } }\nmachines:\n  a: { app: { image: x }, volumes: { data: /d } }\n  b: { app: { image: x }, volumes: { data: /d }, depends_on: [a] }\n",
+        isoloom_spec::model::Target::Docker,
+    );
+    assert!(
+        !docker
+            .requirements
+            .iter()
+            .any(|r| matches!(r, Requirement::VolumeAcrossShapes { .. } | Requirement::VmDependsOnContainer { .. }))
+    );
+}
+
+#[test]
+fn a_vm_that_requires_a_tpm_asks_for_one_and_windows_11_merely_expects_it() {
+    let tpm = |machines: &str| {
+        let env = crate::testing::environment(&format!("version: 1\nname: t\nmachines:\n{machines}"), isoloom_spec::model::Target::Vagrant);
+        env.requirements.into_iter().find(|r| matches!(r, Requirement::Tpm { .. }))
+    };
+    assert_eq!(
+        tpm("  a: { os: debian@12 }\n  b: { os: debian@12, hardware: { tpm: required } }\n"),
+        Some(Requirement::Tpm { machine: "b".into() })
+    );
+    assert_eq!(tpm("  w: { os: windows@11 }\n"), None);
+}
