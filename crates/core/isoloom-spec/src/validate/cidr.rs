@@ -1,11 +1,14 @@
 //! IPv4 blocks: parsing `a.b.c.d/len`, the addresses Isoloom reserves in a block, and where
 //! each network lands on the Docker target.
 
+use std::fmt;
 use std::net::Ipv4Addr;
+use std::str::FromStr;
 
+use crate::Error;
 use crate::model::Spec;
 
-/// An IPv4 block, parsed from `a.b.c.d/len`.
+/// An IPv4 block, parsed from `a.b.c.d/len` and written back the same way (`Display`, `FromStr`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cidr {
     /// The network address, as a number.
@@ -158,6 +161,20 @@ fn moved_block(block: Cidr, taken: &[Cidr]) -> Cidr {
         .unwrap_or(Cidr { base: first, len: block.len })
 }
 
+impl fmt::Display for Cidr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", Ipv4Addr::from(self.base), self.len)
+    }
+}
+
+impl FromStr for Cidr {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Cidr, Error> {
+        Cidr::parse(s).ok_or_else(|| Error::Cidr(s.to_owned()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,6 +185,19 @@ mod tests {
 
     fn ip(text: &str) -> Ipv4Addr {
         text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_block_reads_and_writes_as_its_text() {
+        let lan: Cidr = "10.20.0.0/24".parse().unwrap();
+        assert_eq!(lan, Cidr { base: 0x0a14_0000, len: 24 });
+        assert_eq!(lan.to_string(), "10.20.0.0/24");
+        assert_eq!(Cidr { base: 0, len: 0 }.to_string(), "0.0.0.0/0");
+        let host = "10.20.0.5/24".parse::<Cidr>().unwrap_err();
+        assert_eq!(
+            host.to_string(),
+            "`10.20.0.5/24` isn't an IPv4 block: write the network's own address, `/` and the prefix length (`10.20.0.0/24`)"
+        );
     }
 
     #[test]

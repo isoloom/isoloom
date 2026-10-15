@@ -393,7 +393,7 @@ pub fn lay_out(spec: &Spec, target: Target) -> Spec {
     if on_docker(target) {
         for (name, c) in docker_cidrs(spec) {
             if let Some(n) = s.networks.get_mut(&name) {
-                n.cidr = format!("{}/{}", Ipv4Addr::from(c.base), c.len);
+                n.cidr = c.to_string();
             }
         }
     }

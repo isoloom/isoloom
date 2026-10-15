@@ -12,7 +12,6 @@
 //!   pip's and npm's configuration and the time servers.
 
 use std::collections::HashSet;
-use std::net::Ipv4Addr;
 
 pub use isoloom_plan::images::rewrite_image;
 use isoloom_spec::model::{Constraints, Mirrors, Spec};
@@ -42,7 +41,7 @@ pub fn no_proxy(spec: &Spec) -> Vec<String> {
     let local = ["localhost", "127.0.0.1", "::1"].map(str::to_owned);
     let names = spec.machines.iter().flat_map(|(name, m)| std::iter::once(name).chain(&m.aliases).cloned());
     let blocks = spec.networks.values().map(|n| n.cidr.clone());
-    let docker = docker_cidrs(spec).into_iter().map(|(_, c)| format!("{}/{}", Ipv4Addr::from(c.base), c.len));
+    let docker = docker_cidrs(spec).into_iter().map(|(_, c)| c.to_string());
     let own = spec.constraints.iter().flat_map(|c| &c.proxy).flat_map(|p| p.no_proxy.iter().cloned());
     let mut seen = HashSet::new();
     local

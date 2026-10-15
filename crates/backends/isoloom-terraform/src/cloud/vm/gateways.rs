@@ -134,7 +134,10 @@ pub(crate) fn covering(env: &Environment, shortest: u8) -> Option<Cidr> {
     let first = nets.first()?;
     (shortest..=first.len)
         .rev()
-        .filter_map(|len| Cidr::parse(&format!("{}/{len}", Ipv4Addr::from(first.base & mask(len)))))
+        .map(|len| Cidr {
+            base: first.base & mask(len),
+            len,
+        })
         .find(|c| nets.iter().all(|n| c.contains(*n)))
 }
 

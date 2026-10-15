@@ -9,7 +9,7 @@ use serde_yaml_ng::Value;
 
 use super::DEFAULT_NETWORK;
 use super::text::str_of;
-use crate::draft::{LEFT_OUT, NoteKind, Notes, block_text};
+use crate::draft::{LEFT_OUT, NoteKind, Notes};
 use crate::naming::{label, unique};
 use crate::{Error, Result};
 use isoloom_spec::validate::{Cidr, PRIVATE};
@@ -139,8 +139,8 @@ impl Blocks {
         })?;
         self.next += 1;
         let why = match &subnet {
-            Some(s) => format!("{s} isn't a private /24 to /29; re-addressed to {}", block_text(cidr)),
-            None => format!("no subnet given; addressed as {}", block_text(cidr)),
+            Some(s) => format!("{s} isn't a private /24 to /29; re-addressed to {cidr}"),
+            None => format!("no subnet given; addressed as {cidr}"),
         };
         notes.add(format!("{at}.ipam"), NoteKind::Changed, why);
         Ok(cidr)

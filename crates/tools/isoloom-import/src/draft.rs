@@ -4,8 +4,6 @@
 pub(crate) mod quoting;
 pub(crate) mod writer;
 
-pub(crate) use writer::block_text;
-
 use std::fmt;
 
 /// A drafted `isoloom.yml` and the notes on it.

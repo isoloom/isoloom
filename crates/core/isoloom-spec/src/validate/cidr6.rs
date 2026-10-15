@@ -1,12 +1,17 @@
 //! IPv6 blocks: parsing `prefix::/64`, the address a machine's octet gives it, and the
 //! addresses Isoloom keeps for itself (the gateway, its router).
 
+use std::fmt;
 use std::net::Ipv6Addr;
+use std::str::FromStr;
+
+use crate::Error;
 
 /// The prefix length of every IPv6 block: a LAN's, the one SLAAC and the clouds' subnets use.
 pub const PREFIX: u8 = 64;
 
-/// An IPv6 /64 block, parsed from `prefix::/64`.
+/// An IPv6 /64 block, parsed from `prefix::/64` and written back the same way (`Display`,
+/// `FromStr`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cidr6 {
     /// The network address, as a number.
@@ -48,11 +53,19 @@ impl Cidr6 {
     pub fn gateway(self) -> Ipv6Addr {
         Ipv6Addr::from(self.base | 1)
     }
+}
 
-    /// The block written back, `prefix::/64`.
-    #[must_use]
-    pub fn text(self) -> String {
-        format!("{}/{PREFIX}", Ipv6Addr::from(self.base))
+impl fmt::Display for Cidr6 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{PREFIX}", Ipv6Addr::from(self.base))
+    }
+}
+
+impl FromStr for Cidr6 {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Cidr6, Error> {
+        Cidr6::parse(s).ok_or_else(|| Error::Cidr6(s.to_owned()))
     }
 }
 
@@ -73,7 +86,17 @@ mod tests {
         assert_eq!(c.host(10).to_string(), "fd00:20::10");
         assert_eq!(c.host(254).to_string(), "fd00:20::254");
         assert_eq!(c.gateway().to_string(), "fd00:20::1");
-        assert_eq!(c.text(), "fd00:20::/64");
+        assert_eq!(c.to_string(), "fd00:20::/64");
+    }
+
+    #[test]
+    fn a_block_reads_from_its_text_or_says_why_not() {
+        assert_eq!("fd00:20::/64".parse::<Cidr6>().map(|c| c.to_string()).ok().as_deref(), Some("fd00:20::/64"));
+        let short = "fd00:20::/48".parse::<Cidr6>().unwrap_err();
+        assert_eq!(
+            short.to_string(),
+            "`fd00:20::/48` isn't an IPv6 block: write a unique local or global network address and `/64` (`fd00:20::/64`)"
+        );
     }
 
     #[test]
@@ -118,7 +141,7 @@ mod tests {
             let ip = Ipv6Addr::new(0xfd00 | (a & 0xff), b, c, d, 0, 0, 0, 0);
             let text = format!("{ip}/64");
             let parsed = Cidr6::parse(&text).unwrap();
-            prop_assert_eq!(parsed.text(), text);
+            prop_assert_eq!(parsed.to_string(), text);
         }
 
         /// Any address with host bits set is refused: only the network address names a block.

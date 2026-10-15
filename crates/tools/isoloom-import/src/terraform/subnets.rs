@@ -1,8 +1,6 @@
 //! The subnets that become the draft's networks: a private block each, by the address other
 //! resources refer to it by.
 
-use std::net::Ipv4Addr;
-
 use indexmap::IndexMap;
 use isoloom_spec::validate::{Cidr, PRIVATE};
 
@@ -49,7 +47,7 @@ pub(super) fn networks(all: &[Instance], notes: &mut Notes) -> IndexMap<String, 
                 let kept = if c.len < 24 { Cidr { base: c.base, len: 24 } } else { c };
                 nets.insert(i.address(), (kept, label(&i.name_or(None))));
                 if c.len < 24 {
-                    let text = format!("{} is bigger than a /24: kept as {}/24", block.unwrap_or_default(), Ipv4Addr::from(kept.base));
+                    let text = format!("{} is bigger than a /24: kept as {kept}", block.unwrap_or_default());
                     notes.add(at, NoteKind::Changed, text);
                 }
             }

@@ -47,7 +47,7 @@ pub fn network(spec: &Spec, network: &str) -> Option<Ipv6Plan> {
     let v6 = spec.networks.get(network)?.ipv6.as_ref()?;
     let c = Cidr6::parse(&v6.cidr)?;
     Some(Ipv6Plan {
-        cidr: c.text(),
+        cidr: c.to_string(),
         gateway: c.gateway(),
         addresses: v6.addresses,
         only: v6.only,
@@ -108,7 +108,7 @@ pub fn routes(spec: &Spec, m: &Machine) -> Vec<Route6> {
         .filter(|n| !m.networks.contains_key(*n))
         .filter_map(|n| {
             Some(Route6 {
-                cidr: block(spec, n)?.text(),
+                cidr: block(spec, n)?.to_string(),
                 via: *via,
             })
         })

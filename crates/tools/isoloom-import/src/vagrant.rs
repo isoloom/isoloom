@@ -14,7 +14,7 @@ use serde_json::Value;
 
 pub use recording::Recording;
 
-use crate::draft::{Draft, NoteKind, Notes, block_text};
+use crate::draft::{Draft, NoteKind, Notes};
 use crate::naming::{label, unique};
 use crate::{Error, Result};
 use recording::{Call, number, text};
@@ -218,7 +218,7 @@ impl<'a> Import<'a> {
             return;
         };
         let cidr = block(ip, text(c.opt("netmask")).as_deref());
-        let key = block_text(cidr);
+        let key = cidr.to_string();
         self.nets
             .entry(key.clone())
             .or_insert_with(|| (cidr, text(c.opt("virtualbox__intnet")).map(|n| label(&n)).unwrap_or_default()));
@@ -332,10 +332,10 @@ mod tests {
     #[test]
     fn a_private_network_block_follows_its_netmask_within_the_spec_sizes() {
         let ip = Ipv4Addr::new(192, 168, 33, 77);
-        assert_eq!(block_text(block(ip, None)), "192.168.33.0/24");
-        assert_eq!(block_text(block(ip, Some("255.255.255.240"))), "192.168.33.64/28");
-        assert_eq!(block_text(block(ip, Some("16"))), "192.168.33.0/24");
-        assert_eq!(block_text(block(ip, Some("30"))), "192.168.33.72/29");
+        assert_eq!(block(ip, None).to_string(), "192.168.33.0/24");
+        assert_eq!(block(ip, Some("255.255.255.240")).to_string(), "192.168.33.64/28");
+        assert_eq!(block(ip, Some("16")).to_string(), "192.168.33.0/24");
+        assert_eq!(block(ip, Some("30")).to_string(), "192.168.33.72/29");
     }
 
     #[test]

@@ -3,8 +3,6 @@
 //! `reach` rules out of it, the internet); per machine, its own networks and the `reach` rules
 //! opening them.
 
-use std::net::Ipv4Addr;
-
 use isoloom_plan::{Environment, NetworkPlan};
 use isoloom_spec::model::{Machine, Reach};
 use isoloom_spec::validate::{Cidr, PRIVATE};
@@ -75,7 +73,7 @@ pub(crate) fn out_of<'a>(env: &'a Environment, net: &str) -> Vec<Rule<'a>> {
 pub(crate) fn public_blocks() -> Vec<String> {
     let mut out = Vec::new();
     split(Cidr { base: 0, len: 0 }, &mut out);
-    out.into_iter().map(|c| format!("{}/{}", Ipv4Addr::from(c.base), c.len)).collect()
+    out.into_iter().map(|c| c.to_string()).collect()
 }
 
 fn split(block: Cidr, out: &mut Vec<Cidr>) {

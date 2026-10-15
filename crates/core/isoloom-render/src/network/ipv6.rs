@@ -72,7 +72,7 @@ pub fn forward_rules(spec: &Spec, from: &str, to: &str, ports: &[u16]) -> Vec<St
     let (Some(from), Some(to)) = (block(spec, from), block(spec, to)) else {
         return Vec::new();
     };
-    let (from, to) = (from.text(), to.text());
+    let (from, to) = (from.to_string(), to.to_string());
     if ports.is_empty() {
         return vec![format!("ip6 saddr {from} ip6 daddr {to} accept")];
     }

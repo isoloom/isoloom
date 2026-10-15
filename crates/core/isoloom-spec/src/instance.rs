@@ -48,9 +48,7 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec> {
             len: block.len,
         };
         if let Some(net) = copy.networks.get_mut(&name) {
-            net.docker = Some(NetworkDocker {
-                cidr: format!("{}/{}", std::net::Ipv4Addr::from(shifted.base), shifted.len),
-            });
+            net.docker = Some(NetworkDocker { cidr: shifted.to_string() });
         }
     }
     shift_ipv6(&mut copy, n)?;
@@ -80,14 +78,14 @@ fn shift_ipv6(copy: &mut Spec, n: u8) -> Result<()> {
         let moved = Cidr6 {
             base: block.base.wrapping_add(u128::from(n) << 80),
         };
-        if Cidr6::parse(&moved.text()).is_none() {
+        if Cidr6::parse(&moved.to_string()).is_none() {
             return Err(Error::InstanceIpv6 {
                 network: name.clone(),
                 cidr: v6.cidr.clone(),
                 instance: n,
             });
         }
-        v6.cidr = moved.text();
+        v6.cidr = moved.to_string();
     }
     Ok(())
 }

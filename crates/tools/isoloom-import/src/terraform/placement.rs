@@ -6,7 +6,6 @@ use indexmap::IndexMap;
 use isoloom_spec::validate::Cidr;
 
 use super::vms::Machine;
-use crate::draft::block_text;
 use crate::draft::writer::{Header, Writer};
 use crate::naming::{network_names, unique};
 
@@ -35,7 +34,7 @@ impl Placement {
                     .find(|(c, _)| c.contains(host(*ip)))
                     .cloned()
                     .unwrap_or_else(|| (own_block(*ip), String::new()));
-                let key = block_text(cidr);
+                let key = cidr.to_string();
                 used.entry(key.clone()).or_insert((cidr, named));
                 joins.push((key, ip.octets()[3]));
             }
@@ -54,7 +53,7 @@ impl Placement {
         let key = if let Some(k) = self.used.keys().next() {
             k.clone()
         } else {
-            let key = block_text(FALLBACK_NETWORK);
+            let key = FALLBACK_NETWORK.to_string();
             self.used.insert(key.clone(), (FALLBACK_NETWORK, "lab".into()));
             key
         };

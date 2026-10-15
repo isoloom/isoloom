@@ -3,14 +3,8 @@
 //! itself, through [`Writer::line`] and the quoting of [`super::quoting`].
 
 use std::fmt::Display;
-use std::net::Ipv4Addr;
 
 use isoloom_spec::validate::Cidr;
-
-/// A network block as a draft writes it, e.g. `10.0.1.0/24`.
-pub(crate) fn block_text(c: Cidr) -> String {
-    format!("{}/{}", Ipv4Addr::from(c.base), c.len)
-}
 
 /// A draft being written, top to bottom.
 #[derive(Debug)]
@@ -123,7 +117,7 @@ impl Writer {
     pub(crate) fn network(&mut self, name: &str, width: usize, block: Cidr, internet: bool) {
         let pad = " ".repeat(width.saturating_sub(name.len()));
         let internet = if internet { "" } else { ", internet: false" };
-        self.line(format!("  {name}:{pad} {{ cidr: {}{internet} }}", block_text(block)));
+        self.line(format!("  {name}:{pad} {{ cidr: {block}{internet} }}"));
     }
 
     /// The `machines:` key, after a blank line.

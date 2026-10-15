@@ -24,7 +24,7 @@ pub(super) fn vpc_block(env: &Environment) -> Option<String> {
     if routed(env).is_empty() {
         return None;
     }
-    covering(env, LARGEST).map(|c| format!("{}/{}", std::net::Ipv4Addr::from(c.base), c.len))
+    covering(env, LARGEST).map(|c| c.to_string())
 }
 
 /// Why AWS can't route these networks through their gateways, if it can't.

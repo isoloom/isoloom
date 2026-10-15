@@ -1,17 +1,10 @@
 //! The snapshot's networks, and the addresses Isoloom gives its own infrastructure on them: the
 //! router, the controller and the tools.
 
-use std::net::Ipv4Addr;
-
 use isoloom_render::router;
 use isoloom_spec::model::Spec;
 use isoloom_spec::validate::{Cidr, docker_cidrs};
 use serde_json::{Map, Value, json};
-
-/// A block as the snapshot writes it, e.g. `10.0.1.0/24`.
-fn block_text(c: Cidr) -> String {
-    format!("{}/{}", Ipv4Addr::from(c.base), c.len)
-}
 
 /// One address per network of the spec, `at` its block. A network whose block doesn't parse
 /// (a spec that isn't valid) has no address.
@@ -25,7 +18,7 @@ fn per_network(spec: &Spec, at: impl Fn(Cidr) -> String) -> Map<String, Value> {
 /// Each network with its blocks and the addresses Isoloom gives its infrastructure (`routed`:
 /// the spec needs the router).
 pub(super) fn networks(spec: &Spec, routed: bool) -> Map<String, Value> {
-    let docker_blocks: Map<String, Value> = docker_cidrs(spec).into_iter().map(|(n, c)| (n, json!(block_text(c)))).collect();
+    let docker_blocks: Map<String, Value> = docker_cidrs(spec).into_iter().map(|(n, c)| (n, json!(c.to_string()))).collect();
     let mut networks = Map::new();
     for (name, n) in &spec.networks {
         let Some(c) = Cidr::parse(&n.cidr) else { continue };
