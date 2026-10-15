@@ -2,9 +2,9 @@
 //! a Terraform module per cloud under `.isoloom/cloud-docker/<cloud>/`: AWS, Azure, Google
 //! Cloud, DigitalOcean, Linode and Oracle Cloud. Rendered from the plan with the HCL builder.
 //!
-//! - The Compose file is the `docker` target's, rendered by the Compose backend
-//!   (`.isoloom/docker/compose.yml` and the files it mounts): the VM runs exactly what
-//!   `isoloom run docker` runs.
+//! - The Compose file is the `docker` target's (`.isoloom/docker/compose.yml` and the files it
+//!   mounts), which `isoloom-targets` renders with the Compose backend before these modules: the
+//!   VM runs exactly what the `docker` target runs.
 //! - Each cloud ([`Cloud`]) brings its resources: its own network, a firewall letting
 //!   `allowed_cidr` in for SSH and the published ports, and one Debian (Ubuntu on Oracle) VM
 //!   sized for every container at once ([`host::Sizing`]).
@@ -26,8 +26,8 @@ mod linode;
 mod oci;
 pub mod proxmox;
 
-use isoloom_plan::{Capabilities, Environment};
-use isoloom_render::backend::{self, Backend, Files, RenderError};
+use isoloom_plan::Environment;
+use isoloom_render::backend::{Files, RenderError};
 use isoloom_render::{GenerateError, GeneratedFile};
 use isoloom_spec::model::Target;
 
@@ -81,44 +81,25 @@ impl Cloud {
     }
 }
 
-/// The `cloud-docker` backend.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct CloudDockerBackend;
-
-impl Backend for CloudDockerBackend {
-    fn target(&self) -> Target {
-        Target::CloudDocker
+/// cloud-docker's own refusal ([`refusal`]) as the error a render returns.
+pub fn check(env: &Environment) -> Result<(), RenderError> {
+    match refusal(env) {
+        Some(what) => Err(unsupported(what)),
+        None => Ok(()),
     }
+}
 
-    /// Compose's but existing networks: the VM runs the Compose file, so it can render what
-    /// Compose can, with the secrets `isoloom run` delivers to the VM; the Docker host is a
-    /// fresh VM with no existing network to join.
-    fn capabilities(&self) -> Capabilities {
-        isoloom_compose::render::capabilities_on_a_vm()
-    }
-
-    /// The `docker` target's Compose file (and the files it mounts), then a module per cloud.
-    fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        backend::check(Target::CloudDocker, env, &self.capabilities())?;
-        if let Some(what) = refusal(env) {
-            return Err(unsupported(what));
-        }
-        let on_docker = Environment::build(env.spec(), Target::Docker, env.instance);
-        let mut files = isoloom_compose::render(Target::Docker, &on_docker)?;
-        for cloud in Cloud::ALL {
-            let module = cloud
+/// A Terraform module per cloud, in [`Cloud::ALL`]'s order: the Terraform side of the
+/// `cloud-docker` target, after its Compose file.
+pub fn modules(env: &Environment) -> Result<Files, RenderError> {
+    Cloud::ALL
+        .into_iter()
+        .map(|cloud| {
+            cloud
                 .render(env)
-                .map_err(|e| unsupported(format!("the {} module couldn't be written: {e}", cloud.id())))?;
-            files.push(module);
-        }
-        Ok(files)
-    }
-
-    fn refusal(&self, env: &Environment) -> Option<String> {
-        isoloom_plan::refusal(&env.requirements, &self.capabilities())
-            .map(|r| r.to_string())
-            .or_else(|| refusal(env))
-    }
+                .map_err(|e| unsupported(format!("the {} module couldn't be written: {e}", cloud.id())))
+        })
+        .collect()
 }
 
 /// What the clouds can't host yet: arm64 (their images and VM sizes are x86-64).

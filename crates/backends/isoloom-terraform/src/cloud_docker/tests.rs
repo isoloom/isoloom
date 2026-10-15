@@ -1,11 +1,10 @@
 //! The Docker host on small plans: its size, its ports on every cloud, its set-up in order.
 
 use isoloom_plan::Environment;
-use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 
 use super::host::{Sizing, published};
-use super::{Cloud, CloudDockerBackend};
+use super::{Cloud, check, modules, refusal};
 
 const SPEC: &str = "
 version: 1
@@ -85,16 +84,15 @@ fn arm64_is_refused_from_the_plan() {
     let e = env(
         "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    docker: { image: nginx }\n",
     );
-    let why = CloudDockerBackend.refusal(&e).unwrap();
+    let why = refusal(&e).unwrap();
     assert_eq!(why, "machine `w`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)");
-    assert!(CloudDockerBackend.render(&e).unwrap_err().to_string().ends_with(&why));
+    assert!(check(&e).unwrap_err().to_string().ends_with(&why));
 }
 
 #[test]
-fn the_compose_file_comes_with_the_modules() {
-    let files = CloudDockerBackend.render(&env(SPEC)).unwrap();
+fn a_module_per_cloud() {
+    let files = modules(&env(SPEC)).unwrap();
     let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
-    assert!(paths.contains(&".isoloom/docker/compose.yml"), "{paths:?}");
     for cloud in Cloud::ALL {
         assert!(paths.contains(&format!(".isoloom/cloud-docker/{}/main.tf", cloud.id()).as_str()), "{paths:?}");
     }

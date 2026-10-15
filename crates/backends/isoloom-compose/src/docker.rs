@@ -29,13 +29,11 @@
 //!
 //! Nothing is published on the host: the environment is reached from its own networks.
 
-use std::fmt::Write as _;
-
 use isoloom_plan::checks::Position;
 use serde_yaml_ng::{Mapping, Value};
 
 use crate::file::ComposeFile;
-use crate::model::{Arch, Machine, Spec};
+use crate::model::{Arch, Machine};
 
 pub(crate) const DIR: &str = "docker";
 /// From `.isoloom/docker/` back to the project folder.
@@ -45,36 +43,9 @@ pub const MANAGED_LABEL: &str = "isoloom.managed";
 /// The environment a Docker resource belongs to.
 pub const ENVIRONMENT_LABEL: &str = "isoloom.environment";
 
-/// The check runner: a small image with `sh`, `curl` and busybox `nc`.
-pub const CHECK_IMAGE: &str = "curlimages/curl:8.11.1";
-
-/// A static busybox Isoloom brings into every machine with services, so its probe needs
-/// nothing from the machine's image (distroless and `scratch` images have no shell).
-pub const PROBE_IMAGE: &str = "busybox:1.37.0-musl";
-/// Where a machine sees that busybox (read-only).
-pub const PROBE_DIR: &str = "/.isoloom-probe";
-
 /// The one-shot service (Compose) that copies the probe for machines of this architecture.
 pub fn probe_service(arch: Arch) -> String {
     format!("isoloom-probe-{}", arch.id())
-}
-
-/// A TCP probe for each service port but the dormant ones, run by Isoloom's own busybox (see
-/// [`PROBE_IMAGE`]).
-pub fn probe(m: &Machine) -> String {
-    m.ready_ports()
-        .iter()
-        .map(|port| format!("{PROBE_DIR}/busybox nc -z -w 2 127.0.0.1 {port}"))
-        .collect::<Vec<_>>()
-        .join(" && ")
-}
-
-/// Everything a machine's readiness checks, as one line for Isoloom's busybox `sh`: its ports
-/// ([`probe`]), then its own healthcheck (`health`; a page through busybox `wget`), grouped so
-/// its own `||` stays its own. Empty when there is neither.
-pub fn ready_test(m: &Machine, health: Option<&isoloom_plan::Health>) -> String {
-    let own = health.map(|h| format!("( {} )", h.shell_test(&format!("{PROBE_DIR}/busybox wget"))));
-    [probe(m)].into_iter().filter(|t| !t.is_empty()).chain(own).collect::<Vec<_>>().join(" && ")
 }
 
 /// What a machine that waits for `m` waits for: healthy (its probe passes) when it has a port
@@ -91,17 +62,6 @@ pub fn relative_to(from: &str, path: &str) -> String {
     let mut out: Vec<String> = std::iter::repeat_n("..".to_string(), f.len() - common).collect();
     out.extend(p[common..].iter().cloned());
     out.join("/")
-}
-
-/// The one-shot `init:` jobs no running service waits for: those of machines nothing depends
-/// on. Compose's `up --wait` fails when such a job exits, even with 0, so starters bring the
-/// rest up with `--wait` first, then run these attached, in order (see [`start_commands`]).
-pub fn leaf_jobs(spec: &Spec) -> Vec<String> {
-    spec.machines
-        .iter()
-        .filter(|(name, m)| m.docker.is_some() && !spec.machines.values().any(|o| o.docker.is_some() && o.depends_on.iter().any(|d| d == *name)))
-        .flat_map(|(name, m)| init_names(name, m))
-        .collect()
 }
 
 /// How to start a Compose file: `wait` for everything but `jobs` (`up -d --wait`), then run
@@ -193,31 +153,6 @@ fn plan_of(started: &[Started]) -> StartPlan {
     StartPlan { wait, jobs }
 }
 
-/// The shell command that starts a Compose project with `compose` (e.g. `docker compose -f x`):
-/// plain `up -d --build --wait` when no job is left over, else the two steps of [`StartPlan`].
-/// `jobs` are the leaf jobs ([`leaf_jobs`]); the services to wait for are listed at run time.
-pub fn start_commands(compose: &str, jobs: &[String], wait_timeout: Option<u32>) -> String {
-    let timeout = wait_timeout.map(|t| format!(" --wait-timeout {t}")).unwrap_or_default();
-    if jobs.is_empty() {
-        return format!("{compose} up -d --build --wait{timeout}");
-    }
-    let exclude = jobs.iter().fold(String::new(), |mut out, j| {
-        let _ = write!(out, " -e {j}");
-        out
-    });
-    let mut cmd = format!("{compose} up -d --build --wait{timeout} $({compose} config --services | grep -vx{exclude})");
-    for j in jobs {
-        let _ = write!(cmd, " && {compose} up --no-deps --exit-code-from {j} {j}");
-    }
-    cmd
-}
-
-/// The runner of a machine's `exec` checks, in `.isoloom/docker/checks/`: piped into the
-/// machine (`docker compose exec -T <machine> sh -s < exec-<machine>.sh`).
-pub fn exec_runner(machine: &str) -> String {
-    format!("exec-{machine}.sh")
-}
-
 /// The check runner service of a position: `isoloom-check` where a user stands (`default`),
 /// `isoloom-check-<position>` for the others.
 pub fn check_runner_service(pos: &Position, default: &Position) -> String {
@@ -233,12 +168,6 @@ pub fn tool_service(tool: &str) -> String {
     format!("isoloom-tool-{tool}")
 }
 
-/// Init job service names for a machine.
-pub(crate) fn init_names(name: &str, m: &Machine) -> Vec<String> {
-    let n = m.docker.as_ref().map_or(0, |d| d.init.len());
-    (1..=n).map(|i| format!("{name}-init-{i}")).collect()
-}
-
 /// The last component of a `/`-separated path (a script's name in the container).
 pub fn file_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
@@ -249,14 +178,13 @@ pub const TOOLBOX_IMAGE: &str = "nicolaka/netshoot";
 
 /// Stands in for an access machine the runner supplies, so checks run from its side.
 pub(crate) const STAND_IN: &str = "isoloom-access";
-/// A small image with busybox `ip`, for the router, route sidecars and the stand-in.
-pub const UTILITY_IMAGE: &str = "alpine:3.20";
-
 /// The sidecar image of a machine on a network with `tc`: one with `tc` (the utility image has
 /// none, and an offline machine couldn't install it).
 pub(crate) const TC_IMAGE: &str = "nicolaka/netshoot:v0.13";
 
 pub use isoloom_plan::routing::offline;
+pub(crate) use isoloom_render::container::init_names;
+pub use isoloom_render::container::{CHECK_IMAGE, PROBE_DIR, PROBE_IMAGE, UTILITY_IMAGE, exec_runner, leaf_jobs, probe, ready_test, start_commands};
 
 #[cfg(test)]
 mod tests {

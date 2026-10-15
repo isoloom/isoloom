@@ -82,6 +82,16 @@ pub trait Backend: Sync {
     }
 }
 
+/// A refusal of a part a target is made of (another target's renderer), reported as `target`'s:
+/// the hybrid target's Vagrant VMs and Compose containers, say.
+pub fn as_target(e: impl Into<RenderError>, target: Target) -> RenderError {
+    match e.into() {
+        RenderError::Refused { refusal, .. } => RenderError::Refused { target, refusal },
+        RenderError::Generate(GenerateError::Unsupported { what, .. }) => RenderError::Generate(GenerateError::Unsupported { target, what }),
+        other @ RenderError::Generate(_) => other,
+    }
+}
+
 /// `env` checked against `caps`: the refusal as a [`RenderError`], for a backend's `render`.
 pub fn check(target: Target, env: &Environment, caps: &Capabilities) -> Result<(), RenderError> {
     match refusal(&env.requirements, caps) {

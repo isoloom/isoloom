@@ -159,7 +159,7 @@ fn commands(env: &Environment, auto_stop_here: bool) -> Vec<Expression> {
     } else {
         format!("set -a; . {}; set +a; ", steps::INPUTS_FILE)
     };
-    let files = isoloom_compose::render::files::host_environment(env);
+    let files = isoloom_render::container::host_environment(env);
     let up = format!("cd {} && {inputs}{files}{}", steps::PROJECT_DIR, start(env));
     // The containers' secrets are root's on the host: read, then Compose started, as root.
     let secrets = isoloom_render::secrets::of_containers(env);
@@ -173,10 +173,10 @@ fn commands(env: &Environment, auto_stop_here: bool) -> Vec<Expression> {
 }
 
 /// Starts the Compose file: everything up and healthy, then the one-shot jobs nothing waits for
-/// (see `isoloom_compose::docker::start_commands`).
+/// (see `isoloom_render::container::start_commands`).
 fn start(env: &Environment) -> String {
-    let jobs = isoloom_compose::docker::leaf_jobs(env.spec());
-    isoloom_compose::docker::start_commands(COMPOSE, &jobs, Some(WAIT_TIMEOUT))
+    let jobs = isoloom_render::container::leaf_jobs(env.spec());
+    isoloom_render::container::start_commands(COMPOSE, &jobs, Some(WAIT_TIMEOUT))
 }
 
 /// The host's set-up, then its outputs: the end of every module.

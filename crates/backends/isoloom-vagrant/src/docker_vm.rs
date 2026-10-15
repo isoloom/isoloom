@@ -14,18 +14,17 @@
 //! - ESXi: the vagrant-vmware-esxi provider reads the host from ESXI_HOSTNAME, ESXI_USERNAME
 //!   and ESXI_PASSWORD (and the datastore from ESXI_DATASTORE).
 //!
-//! It refuses what the Compose file can't run: its capabilities are Compose's.
+//! This is the Vagrant side of the target; `isoloom-targets` puts it together with the
+//! `docker` target's Compose file (first) and the Proxmox module, and refuses what the Compose
+//! file can't run: its capabilities are Compose's.
 
 use std::fmt::Write as _;
 
 use isoloom_plan::checks::{Position, Probe};
-use isoloom_plan::{Capabilities, Environment, MachineShape};
-use isoloom_render::backend::{self, Backend, Files, RenderError};
+use isoloom_plan::{Environment, MachineShape};
+use isoloom_render::container as docker;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
-use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_docker;
 
-use crate::docker;
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 
@@ -35,34 +34,6 @@ const COMPOSE: &str = ".isoloom/docker/compose.yml";
 /// The derived-checks switch, read from the host's environment when Vagrant runs.
 const DERIVED: &str = "ENV.fetch(\"ISOLOOM_DERIVED\", \"1\")";
 
-/// The `docker-vm` backend.
-#[derive(Debug, Clone, Copy)]
-pub struct DockerVmBackend;
-
-impl Backend for DockerVmBackend {
-    fn target(&self) -> Target {
-        Target::DockerVm
-    }
-
-    /// Compose's but existing networks: the VM runs the Compose file, so it can render what
-    /// Compose can, with the secrets `isoloom run` delivers to the VM; the Docker host is a
-    /// fresh VM with no existing network to join.
-    fn capabilities(&self) -> Capabilities {
-        isoloom_compose::render::capabilities_on_a_vm()
-    }
-
-    /// The `docker` target's Compose file (and the files it mounts), the Vagrantfile, and the
-    /// Proxmox module.
-    fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        backend::check(Target::DockerVm, env, &self.capabilities())?;
-        let on_docker = Environment::build(env.spec(), Target::Docker, env.instance);
-        let mut files = isoloom_compose::render(Target::Docker, &on_docker)?;
-        files.push(vagrantfile(env));
-        files.push(proxmox(env)?);
-        Ok(files)
-    }
-}
-
 /// The CPUs and memory (MB) of the VM: every container's at once, plus Docker's own 1 GB; at
 /// least 2 CPUs (at most 16) and 2 GB.
 fn host_size(env: &Environment) -> (u32, u32) {
@@ -71,7 +42,8 @@ fn host_size(env: &Environment) -> (u32, u32) {
     (cpus.clamp(2, 16), mem.max(2048))
 }
 
-fn vagrantfile(env: &Environment) -> GeneratedFile {
+/// `.isoloom/docker-vm/Vagrantfile`: the VM, Docker, then the Compose file up and its checks.
+pub fn vagrantfile(env: &Environment) -> GeneratedFile {
     let mut r = Ruby::new();
     r.text(&header("#"));
     r.comment(&format!(
@@ -178,7 +150,7 @@ fn environment(r: &mut Ruby, env: &Environment) {
     let compose = format!("ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f {COMPOSE}");
     let start = docker::start_commands(&compose, &docker::leaf_jobs(env.spec()), Some(900));
     let secrets = isoloom_render::secrets::host_environment(&isoloom_render::secrets::of_containers(env));
-    let files = isoloom_compose::render::files::host_environment(env);
+    let files = docker::host_environment(env);
     let script = format!("{secrets}cd /opt/isoloom && {files}{start} && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready");
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
     r.call(shell("config", "environment").kw("inline", Value::str(&script)).kw_opt("env", inputs));
@@ -224,15 +196,5 @@ fn exec_runs(env: &Environment) -> String {
             docker::exec_runner(m)
         );
         s
-    })
-}
-
-/// The Proxmox module: the cloud-docker target's Docker host, on a Proxmox server.
-fn proxmox(env: &Environment) -> Result<GeneratedFile, RenderError> {
-    cloud_docker::proxmox::render(env).map_err(|e| {
-        RenderError::Generate(isoloom_render::GenerateError::Unsupported {
-            target: Target::DockerVm,
-            what: format!("the Proxmox module couldn't be written: {e}"),
-        })
     })
 }

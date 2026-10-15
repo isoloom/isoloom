@@ -8,7 +8,7 @@
 //! project at apply time, copied into the chart).
 
 use indexmap::IndexMap;
-use isoloom_compose::docker::PROBE_IMAGE;
+use isoloom_render::container::PROBE_IMAGE;
 use isoloom_spec::shell;
 
 use crate::kustomize::key;

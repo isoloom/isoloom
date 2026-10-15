@@ -7,13 +7,13 @@ use isoloom_compose::ComposeBackend;
 use isoloom_kubernetes::KubernetesBackend;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_docker::CloudDockerBackend;
 use isoloom_terraform::cloud_services::CloudServicesBackend;
 use isoloom_terraform::cloud_vm::CloudVmBackend;
 use isoloom_terraform::esxi::EsxiBackend;
 use isoloom_terraform::proxmox::ProxmoxBackend;
 use isoloom_vagrant::vagrant::VagrantBackend;
-use isoloom_vagrant::{DockerVmBackend, HybridBackend};
+
+pub use crate::composite::{CloudDockerBackend, DockerVmBackend, HybridBackend};
 
 static DOCKER: ComposeBackend = ComposeBackend(Target::Docker);
 static HOSTED: ComposeBackend = ComposeBackend(Target::Hosted);

@@ -3,6 +3,7 @@
 //! compare with what's committed. Output lives under `.isoloom/<target>/` in the project.
 
 pub mod backends;
+pub mod composite;
 pub mod report;
 pub mod resolved;
 

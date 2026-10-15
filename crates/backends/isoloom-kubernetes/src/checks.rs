@@ -3,11 +3,11 @@
 //! Jobs, carried by a ConfigMap of their own; `exec` checks run inside the machine from a
 //! runner of their own (`kubectl exec -i deploy/<machine> -- sh -s`), which the Jobs don't run.
 
-use isoloom_compose::docker::{CHECK_IMAGE, exec_runner};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::RenderError;
+use isoloom_render::container::{CHECK_IMAGE, exec_runner};
 
 use crate::kustomize::{CHECK_SCRIPTS, Kustomization, key};
 use crate::network::{self, CHECK_LABEL};

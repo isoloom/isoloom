@@ -486,7 +486,6 @@ version = "0.10.1"
 dependencies = [
  "indexmap",
  "insta",
- "isoloom-compose",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -554,6 +553,7 @@ name = "isoloom-targets"
 version = "0.10.1"
 dependencies = [
  "indexmap",
+ "insta",
  "isoloom-ansible",
  "isoloom-compose",
  "isoloom-import",
@@ -576,7 +576,6 @@ version = "0.10.1"
 dependencies = [
  "indexmap",
  "insta",
- "isoloom-compose",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -589,11 +588,9 @@ version = "0.10.1"
 dependencies = [
  "indexmap",
  "insta",
- "isoloom-compose",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
- "isoloom-terraform",
 ]
 
 [[package]]

@@ -22,7 +22,7 @@ use crate::storage;
 
 // Isoloom's static busybox (the probe needs nothing from the machine's image) and its utility
 // image, as on Compose.
-use isoloom_compose::docker::{PROBE_DIR, PROBE_IMAGE, UTILITY_IMAGE};
+use isoloom_render::container::{PROBE_DIR, PROBE_IMAGE, UTILITY_IMAGE};
 
 /// The emptyDir holding Isoloom's probe, and the init container filling it.
 pub const PROBE_VOLUME: &str = "isoloom-probe";

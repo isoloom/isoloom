@@ -10,9 +10,9 @@ use isoloom_render::{GenerateError, router};
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
-use super::containers::{Containers, docker_net};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
+use isoloom_render::container::{HybridContainers as Containers, docker_net, host_environment};
 
 const HOST: &str = "isoloom-docker";
 
@@ -75,7 +75,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     );
     r.heredoc(shell("m", "networks"), "inline", "SH", &networks_script(nics));
     let secrets = isoloom_render::secrets::host_environment(&isoloom_render::secrets::of_containers(env));
-    let files = isoloom_compose::render::files::host_environment(env);
+    let files = host_environment(env);
     let up = format!("{secrets}cd /opt/isoloom && {files}docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900");
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
     r.call(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", inputs));

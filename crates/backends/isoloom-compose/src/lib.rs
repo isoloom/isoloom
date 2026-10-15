@@ -5,6 +5,7 @@
 pub mod appliances;
 pub mod docker;
 pub mod file;
+pub mod hybrid;
 mod ipv6;
 pub mod manifest;
 mod outside;

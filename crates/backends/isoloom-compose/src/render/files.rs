@@ -7,12 +7,10 @@
 //! reads the file from the project into the variable first ([`project_variables`]): the
 //! generated file never holds the project's contents, and an edit takes effect at the next run.
 
-use std::fmt::Write as _;
-
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_spec::model::MachineFile;
-use isoloom_spec::shell::quote;
+use isoloom_render::container::copied_from_project;
+pub use isoloom_render::container::{host_environment, project_variables, variable};
 
 use crate::docker::ROOT;
 use crate::file::{Config, ConfigMount};
@@ -20,47 +18,6 @@ use crate::file::{Config, ConfigMount};
 /// The name of machine `machine`'s `n`th file's config.
 fn name(machine: &str, n: usize) -> String {
     format!("{machine}-file-{n}")
-}
-
-/// The variable of Compose's own environment holding machine `machine`'s `n`th file, when it
-/// is a project file with an owner or a mode (`ISOLOOM_FILE_WEB_1`). Machine names are
-/// kebab-case, so two files never share one.
-pub fn variable(machine: &str, n: usize) -> String {
-    format!("ISOLOOM_FILE_{}_{n}", machine.to_ascii_uppercase().replace('-', "_"))
-}
-
-/// Whether file `f` is copied in from Compose's environment: a project file the spec gives an
-/// owner or a mode.
-fn copied_from_project(f: &MachineFile) -> bool {
-    f.source.is_some() && f.sets_owner_or_mode()
-}
-
-/// The project files Compose reads from its own environment, as (variable, path in the
-/// project): what whoever starts Compose sets first (`isoloom run`, or a Docker host's start
-/// script).
-pub fn project_variables(env: &Environment) -> Vec<(String, String)> {
-    env.machines
-        .iter()
-        .filter(|(_, mp)| mp.shape == MachineShape::Container)
-        .flat_map(|(machine, mp)| {
-            mp.files
-                .iter()
-                .enumerate()
-                .filter(|(_, f)| copied_from_project(f))
-                .filter_map(move |(n, f)| Some((variable(machine, n), f.source.clone()?)))
-        })
-        .collect()
-}
-
-/// On a Docker host, in the project's folder before `docker compose up`: each project file with
-/// an owner or a mode read into its variable, its last line breaks kept, as commands joined by
-/// `&&` (ending with one). Nothing when there are none.
-pub fn host_environment(env: &Environment) -> String {
-    let mut out = String::new();
-    for (var, path) in project_variables(env) {
-        let _ = write!(out, "{var}=\"$(cat {}; printf x)\" && {var}=\"${{{var}%x}}\" && export {var} && ", quote(&path));
-    }
-    out
 }
 
 /// The usage line saying where the project files with an owner or a mode come from, when the

@@ -10,9 +10,9 @@
 
 use std::fmt::Write as _;
 
-use isoloom_compose::docker::PROBE_IMAGE;
 use isoloom_plan::Environment;
 use isoloom_plan::secrets::{DEFAULT_MODE, SecretFile};
+use isoloom_render::container::PROBE_IMAGE;
 
 use crate::machine::Machine;
 use crate::objects::{Container, EmptyDir, Image, KeyToPath, Volume, VolumeMount, VolumeSource};

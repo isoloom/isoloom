@@ -5,6 +5,7 @@
 pub mod backend;
 pub mod boot;
 pub mod constraints;
+pub mod container;
 pub mod disks;
 pub mod hcl_builder;
 pub mod ignore;

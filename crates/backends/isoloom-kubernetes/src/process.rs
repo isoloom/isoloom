@@ -6,9 +6,9 @@
 //! probe; the port probe then comes first, as the startup probe (the readiness probe only starts
 //! once the startup probe has passed), so the machine is still ready only when both pass.
 
-use isoloom_compose::docker::PROBE_DIR;
 use isoloom_plan::process::{DEFAULT_INTERVAL, DEFAULT_RETRIES};
 use isoloom_plan::{Health, HealthTest};
+use isoloom_render::container::PROBE_DIR;
 
 use crate::kustomize::key;
 use crate::machine::Machine;
@@ -42,7 +42,7 @@ pub(crate) fn runs_scripts(m: &Machine) -> bool {
 /// Everything the machine's readiness checks, as one shell line for Isoloom's busybox: its
 /// ports, then its own healthcheck. Empty when it has neither.
 pub(crate) fn ready_test(m: &Machine) -> String {
-    isoloom_compose::docker::ready_test(m.spec, m.plan.process.health.as_ref())
+    isoloom_render::container::ready_test(m.spec, m.plan.process.health.as_ref())
 }
 
 /// A command run by Isoloom's busybox shell.
@@ -54,7 +54,7 @@ fn busybox(line: String) -> Exec {
 
 /// The startup and readiness probes, when the machine has something to probe.
 pub(crate) fn probes(m: &Machine, c: &mut Container) {
-    let ports = isoloom_compose::docker::probe(m.spec);
+    let ports = isoloom_render::container::probe(m.spec);
     let Some(h) = m.plan.process.health.as_ref() else {
         if !ports.is_empty() {
             c.readiness_probe = Some(Probe {

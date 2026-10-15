@@ -11,7 +11,7 @@ use std::path::Path;
 use isoloom_plan::Environment;
 use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
-use isoloom_terraform::cloud_docker::CloudDockerBackend;
+use isoloom_terraform::cloud_docker::modules;
 use isoloom_terraform::cloud_services::CloudServicesBackend;
 
 fn env(example: &str, target: Target) -> Environment {
@@ -26,7 +26,7 @@ fn file(files: &Files, suffix: &str) -> String {
 }
 
 fn cloud(cloud: &str) -> String {
-    let files = CloudDockerBackend.render(&env("hello-stack", Target::CloudDocker)).expect("renders");
+    let files = modules(&env("hello-stack", Target::CloudDocker)).expect("renders");
     file(&files, &format!("cloud-docker/{cloud}/main.tf"))
 }
 
@@ -80,16 +80,8 @@ fn cloud_services_cloud_bucket() {
 fn rendering_twice_gives_the_same_files() {
     for example in ["hello-stack", "udp-dns", "segmented", "workbench"] {
         let e = env(example, Target::CloudDocker);
-        assert_eq!(CloudDockerBackend.render(&e), CloudDockerBackend.render(&e), "{example}");
+        assert_eq!(modules(&e), modules(&e), "{example}");
     }
     let e = env("cloud-bucket", Target::CloudServices);
     assert_eq!(CloudServicesBackend.render(&e), CloudServicesBackend.render(&e));
-}
-
-#[test]
-fn a_machine_needing_a_controller_is_refused_by_capabilities() {
-    let e = env("ansible-pair", Target::CloudDocker);
-    let why = CloudDockerBackend.refusal(&e).expect("refused");
-    assert!(why.contains("provision"), "{why}");
-    assert!(CloudDockerBackend.render(&e).is_err());
 }

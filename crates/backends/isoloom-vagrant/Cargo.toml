@@ -12,8 +12,6 @@ publish.workspace = true
 isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 isoloom-render.workspace = true
-isoloom-compose.workspace = true
-isoloom-terraform.workspace = true
 indexmap.workspace = true
 
 [dev-dependencies]

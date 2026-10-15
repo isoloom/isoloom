@@ -9,7 +9,7 @@ use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::files::GeneratedFile;
 use isoloom_spec::model::Target;
-use isoloom_vagrant::{DockerVmBackend, HybridBackend};
+use isoloom_targets::composite::{DockerVmBackend, HybridBackend};
 
 fn plan(example: &str, target: Target) -> Environment {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);
