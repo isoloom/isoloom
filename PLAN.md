@@ -603,7 +603,7 @@ Kubernetes, Helm, Kustomize, hybrid, hosted, external and Terraform ESXi, onto t
 ### Phase 8: After 1.0 (1.x)
 
 - **Isothrum:** `isothrum-desktop` (moved out of `apps/desktop`, dynamic specs) and `isothrum-ui`, shared with the website and the launcher.
-- **Isoloom ecosystem:** import as the front door, the VS Code extension, packages, registry modules and the website rewrite.
+- **Isoloom ecosystem:** import as the front door (today only Compose, Vagrant and Terraform import; **Helm and Kubernetes importers don't exist yet** and are built in 1.x), the VS Code extension, packages, registry modules and the website rewrite.
 - **More CM and IaC tools:** Puppet, Chef, Salt, DSC, Pulumi, Podman.
 - **Windows on container targets** (dockur), from `v1/windows-in-docker`.
 - **Runtime features in Isothrum:** drift detection, upgrades, snapshots and the hub.
