@@ -3,12 +3,12 @@
 //! `reboot` step ends a provisioner; Terraform restarts the machine and the next one checks
 //! that it did before going on.
 
-use isoloom_plan::{Environment, MachineShape, Step};
+use isoloom_plan::{Environment, MachinePlan, MachineShape, Step};
 use isoloom_render::hcl_builder::{Expression, Template, reference};
 use isoloom_render::steps;
 
 use super::provisioner::{Connection, Provisioner, Upload};
-use super::{Shell, at_every_boot, controller};
+use super::{Remote, Shell, at_every_boot, controller};
 use crate::module::{ident, inputs};
 
 /// Waits for cloud-init to finish its first boot (it may still be installing packages).
@@ -39,17 +39,11 @@ impl Default for Hooks {
     }
 }
 
-/// A Linux machine, as Terraform reaches it.
+/// A Linux machine, as Terraform reaches it over SSH.
 #[derive(Debug, Clone)]
 pub(crate) struct Machine<'a> {
-    /// The plan.
-    pub(crate) env: &'a Environment,
     /// The machine.
-    pub(crate) name: &'a str,
-    /// What replaces its set-up when it changes (the instance's id).
-    pub(crate) replace_on: Expression,
-    /// Its address, from where Terraform runs.
-    pub(crate) host: Expression,
+    pub(crate) remote: Remote<'a>,
     /// The SSH user (it has `sudo`).
     pub(crate) user: String,
     /// The target's additions.
@@ -58,9 +52,9 @@ pub(crate) struct Machine<'a> {
 
 /// The machine's set-up: `terraform_data.<machine>`.
 pub(crate) fn provisioner(m: Machine) -> Provisioner {
-    let mp = &m.env.machines[m.name];
+    let Remote { env, name, plan: mp, .. } = m.remote;
     let mut uploads = vec![Upload::Project {
-        id: ident(m.name),
+        id: ident(name),
         destination: steps::PROJECT_ARCHIVE,
     }];
     if !mp.inputs.is_empty() {
@@ -70,20 +64,22 @@ pub(crate) fn provisioner(m: Machine) -> Provisioner {
         });
     }
     Provisioner {
-        name: ident(m.name),
-        replace_on: m.replace_on.clone(),
+        name: ident(name),
+        replace_on: m.remote.replace_on.clone(),
         uploads,
         parts: parts(&m),
-        depends_on: depends_on(m.env, m.name),
-        connection: Connection::Ssh { host: m.host, user: m.user },
-        announce: (!mp.secrets.is_empty()).then(|| m.name.to_owned()),
+        depends_on: depends_on(env, mp),
+        connection: Connection::Ssh {
+            host: m.remote.host,
+            user: m.user,
+        },
+        announce: (!mp.secrets.is_empty()).then(|| name.to_owned()),
     }
 }
 
-/// The set-up provisioners of the VMs `machine` depends on.
-pub(crate) fn depends_on(env: &Environment, machine: &str) -> Vec<Expression> {
-    env.machines[machine]
-        .depends_on
+/// The set-up provisioners of the VMs machine `mp` depends on.
+pub(crate) fn depends_on(env: &Environment, mp: &MachinePlan) -> Vec<Expression> {
+    mp.depends_on
         .iter()
         .filter(|d| env.machines.get(*d).is_some_and(|dp| dp.shape == MachineShape::Vm))
         .map(|d| reference(&format!("terraform_data.{}", ident(d))))
@@ -92,7 +88,7 @@ pub(crate) fn depends_on(env: &Environment, machine: &str) -> Vec<Expression> {
 
 /// The commands, one list per part between `reboot` steps.
 fn parts(m: &Machine) -> Vec<Vec<Expression>> {
-    let (env, hooks) = (m.env, &m.hooks);
+    let (Remote { env, name, plan, .. }, hooks) = (&m.remote, &m.hooks);
     let mut first: Vec<Template> = vec!["set -e".into(), CLOUD_INIT_WAIT.into()];
     if controller::needed(env) {
         first.push(controller::authorize());
@@ -101,7 +97,7 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
     let (mut done, mut part) = (Vec::new(), first);
     let mut again: Vec<Template> = Vec::new();
     let mut closing = false;
-    for step in env.machines[m.name].lifecycle.iter().filter(|s| !(hooks.skip)(s)) {
+    for step in plan.lifecycle.iter().filter(|s| !(hooks.skip)(s)) {
         if !closing && matches!(step, Step::Egress | Step::Tc | Step::Ready) {
             part.extend(hooks.before_egress.iter().cloned());
             closing = true;
@@ -112,7 +108,7 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
             next.extend(hooks.after_reboot.iter().chain(&hooks.at_boot).cloned());
             next.extend(again.iter().cloned());
             done.push(std::mem::replace(&mut part, next));
-        } else if let Some(c) = Shell::Sudo.step(env, m.name, step) {
+        } else if let Some(c) = Shell::Sudo.step(env, name, step) {
             if at_every_boot(step) {
                 again.push(c.clone().into());
             }

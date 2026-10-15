@@ -3,7 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
-use std::path::Path;
+pub mod testing;
 
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
@@ -11,15 +11,9 @@ use isoloom_spec::files::GeneratedFile;
 use isoloom_spec::model::Target;
 use isoloom_targets::composite::{DockerVmBackend, HybridBackend};
 
-fn plan(example: &str, target: Target) -> Environment {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);
-    let spec = isoloom_spec::load(&dir).expect("the example loads");
-    assert!(isoloom_spec::validate(&spec).is_empty(), "the example is valid");
-    Environment::build(&spec, target, None)
-}
-
 fn render(backend: &dyn Backend, example: &str) -> Vec<GeneratedFile> {
-    backend.render(&plan(example, backend.target())).expect("the example renders")
+    let plan = testing::example(example, backend.target()).expect("the example plans");
+    backend.render(&plan).expect("the example renders")
 }
 
 fn file(files: &[GeneratedFile], path: &str) -> String {

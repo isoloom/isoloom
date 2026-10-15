@@ -6,7 +6,7 @@
 //! cloud-init's own: each found by its serial (the disk's name, as the target attaches it),
 //! partitioned, formatted with its name as the label and mounted from `/etc/fstab`.
 
-use isoloom_plan::{DataDisk, Environment, Step};
+use isoloom_plan::{DataDisk, Environment, MachinePlan, Step};
 use isoloom_render::hcl_builder::{Expression, boolean, call, list, object, string};
 use isoloom_render::steps;
 
@@ -154,8 +154,7 @@ pub(crate) fn prelude(env: &Environment) -> Option<String> {
 
 /// Adds `machine`'s steps to `config`: the prelude, the inputs file, the steps (the project is
 /// the target's: its files are written in place), and what a `reboot` step needs.
-pub(crate) fn machine(env: &Environment, machine: &str, config: &mut CloudConfig) {
-    let mp = &env.machines[machine];
+pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), config: &mut CloudConfig) {
     config.bootcmd.extend(prelude(env));
     if !mp.inputs.is_empty() {
         // Written outside /tmp (emptied at boot, maybe after cloud-init writes its files), then

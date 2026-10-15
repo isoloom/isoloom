@@ -35,7 +35,7 @@ mod outside;
 mod router;
 mod windows;
 
-use isoloom_plan::{Capabilities, Environment, Feature};
+use isoloom_plan::{Capabilities, Environment};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::{Backend, Files, RenderError};
 use isoloom_spec::images::is_windows;
@@ -44,7 +44,7 @@ use isoloom_spec::model::Target;
 use crate::limits::Limits;
 use crate::machine::{controller, vms};
 use crate::module::{ProjectCopy, Usage};
-use crate::{Result, checks, target};
+use crate::{Result, target};
 
 /// The OS of the router and the controller: Ubuntu's OVA has cloud-init and open-vm-tools,
 /// which reports the router's uplink address.
@@ -128,57 +128,15 @@ impl Backend for EsxiBackend {
         Target::Esxi
     }
 
-    /// What the router, the controller, the machines' own steps and the provider give: the
-    /// rest (own images, TPM, GPUs, nesting, rate limits, which the provider has no setting
-    /// for) is refused.
+    /// What a server target gives (`crate::server::features`): the router, the controller, the
+    /// machines' own steps and the provider. The rest (own images, TPM, GPUs, nesting, rate
+    /// limits, which the provider has no setting for) is refused.
     fn capabilities(&self) -> Capabilities {
-        Capabilities::of([
-            Feature::EnvironmentProvisioning,
-            Feature::PlaybookChecks,
-            Feature::ExecWithoutContainer,
-            // Gateway networks are refused by the target's own limit (`LIMITS.gateways`), with
-            // its own reason: the plan's requirement names hybrid.
-            Feature::Gateways,
-            Feature::MachineAliases,
-            Feature::Ulimits,
-            Feature::TrafficControl,
-            Feature::MachineProcess,
-            // No DNS on a standalone host: each VM's hosts file carries the names under the
-            // zone's domain, its search domain.
-            Feature::PrivateDns,
-            // The router's address on each IPv6 network, the machines' from their steps.
-            Feature::Ipv6,
-            // An existing port group (`external`), or the host's LAN (`bridged`).
-            Feature::ExternalNetworks,
-            Feature::BridgedNetworks,
-            // Delivered by `isoloom run` over SSH through the router (WinRM on Windows).
-            Feature::Secrets,
-            Feature::SecretOwners,
-            // A machine's firmware (`boot_firmware`); its own `refusal` says what ESXi can't boot.
-            Feature::OwnBoot,
-            // The vSwitch's MTU, and each guest interface's on it.
-            Feature::NetworkMtu,
-            // An `esxi_virtual_disk` each, attached by SCSI slot.
-            Feature::DataDisks,
-            Feature::RawDisks,
-            Feature::TmpfsModes,
-            // Each VM's set-up adds them on the interface of its primary address.
-            Feature::VmMoreAddresses,
-        ])
+        Capabilities::of(super::features())
     }
 
     fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {
-        target::render(
-            Target::Esxi,
-            &self.capabilities(),
-            env,
-            || refusal(env),
-            || {
-                let mut files = vec![module(env)?];
-                files.extend(checks::runners(env, Target::Esxi.id()));
-                Ok(files)
-            },
-        )
+        super::render(Target::Esxi, &self.capabilities(), env, refusal, module)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {

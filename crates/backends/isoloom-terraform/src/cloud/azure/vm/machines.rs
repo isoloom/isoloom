@@ -13,15 +13,14 @@ use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
 use super::{USER, image, machine_size, public_ip as address_of, size};
 use crate::cloud::auto_stop;
 use crate::cloud::instance::name_with;
-use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image};
-use crate::machine::{controller, linux, windows};
+use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image, reach};
+use crate::machine::{Remote, controller, linux, windows};
 use crate::module::ident;
 
 /// A Linux machine: its security group, public IP, interfaces and VM, its set-up over SSH.
-pub(super) fn linux(env: &Environment, name: &str, m: &mut Module) {
-    let mp = &env.machines[name];
+pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
     let id = ident(name);
-    m.commented(&format!("Machine `{name}`: what may reach it."), group(env, name, false));
+    m.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
     m.block(public_ip(&id, name));
     m.blocks(nics(&id, name, mp));
     let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
@@ -42,10 +41,13 @@ pub(super) fn linux(env: &Environment, name: &str, m: &mut Module) {
     let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
     at_boot.extend(gateways::at_boot(mp));
     let machine = linux::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("azurerm_linux_virtual_machine.{id}.id")),
-        host: address_of(&id),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("azurerm_linux_virtual_machine.{id}.id")),
+            host: address_of(&id),
+        },
         user: USER.to_owned(),
         hooks: hooks::of(mp, at_boot),
     };
@@ -152,14 +154,13 @@ fn source_image(os: &str, tpm: bool) -> Block {
 /// Who may reach a machine: its own networks, its set-up from `allowed_cidr` (SSH, or WinRM on
 /// Windows), the networks `reach` opens to it (on their ports, TCP and UDP), and its published
 /// ports from `allowed_cidr`.
-fn group(env: &Environment, name: &str, windows: bool) -> Block {
-    let spec = env.spec();
-    let m = &spec.machines[name];
+fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Block {
     let allowed = || reference("var.allowed_cidr");
     let mut g = Nsg::new(&ident(name), name);
-    for n in m.networks.keys() {
-        g = g.allow(&format!("net-{n}"), "*", "*", string(env.networks[n].cidr.as_str()));
-        if let Some(v6) = &env.networks[n].ipv6 {
+    let Some(m) = env.spec().machines.get(name) else { return g.build() };
+    for (n, p) in reach::own(env, m) {
+        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.as_str()));
+        if let Some(v6) = &p.ipv6 {
             g = g.allow(&format!("net-{n}-ipv6"), "*", "*", string(v6.cidr.as_str()));
         }
     }
@@ -168,22 +169,17 @@ fn group(env: &Environment, name: &str, windows: bool) -> Block {
     } else {
         g.allow("ssh", "Tcp", "22", allowed())
     };
-    let opened = spec
-        .reach
-        .iter()
-        .filter(|x| m.networks.contains_key(&x.to) && !m.networks.contains_key(&x.from));
-    for (i, reach) in opened.enumerate() {
+    for (i, (reach, from)) in reach::opening(env, m).enumerate() {
         // Each block of the network the rule opens from: its IPv4 one, and its IPv6 one when
         // both ends are IPv6.
-        let from = &env.networks[&reach.from];
-        let both6 = from.ipv6.is_some() && env.networks[&reach.to].ipv6.is_some();
+        let both6 = from.ipv6.is_some() && env.networks.get(&reach.to).is_some_and(|to| to.ipv6.is_some());
         let v6 = from.ipv6.as_ref().filter(|_| both6).map(|v| (v.cidr.as_str(), "-ipv6"));
         for (block, suffix) in std::iter::once((from.cidr.as_str(), "")).chain(v6) {
             let rule = format!("reach-{i}-{}{suffix}", reach.from);
             g = reach_rules(g, &rule, &reach.ports, block);
         }
     }
-    for p in &env.machines[name].ports {
+    for p in &mp.ports {
         let (rule, protocol) = if p.protocol.is_tcp() {
             (format!("published-{}", p.publish), "Tcp")
         } else {
@@ -196,19 +192,21 @@ fn group(env: &Environment, name: &str, windows: bool) -> Block {
 
 /// A Windows machine: its security group, public IP, interface and VM (its name, the
 /// administrator and a WinRM listener set at creation), its set-up over WinRM.
-pub(super) fn windows(env: &Environment, name: &str, m: &mut Module) {
-    let mp = &env.machines[name];
+pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
     let id = ident(name);
-    m.commented(&format!("Machine `{name}` (Windows): what may reach it."), group(env, name, true));
+    m.commented(&format!("Machine `{name}` (Windows): what may reach it."), group(env, (name, mp), true));
     m.block(public_ip(&id, name));
     m.blocks(nics(&id, name, mp));
-    m.block(windows_vm(env, name, mp));
+    m.block(windows_vm(name, mp));
     m.blocks(disks::azure(name, "azurerm_windows_virtual_machine", &mp.disks));
     m.blocks(windows::blocks(windows::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("azurerm_windows_virtual_machine.{id}.id")),
-        host: address_of(&id),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("azurerm_windows_virtual_machine.{id}.id")),
+            host: address_of(&id),
+        },
         password: reference(windows::PASSWORD),
         skip: hooks::network_does,
         platform: windows::Platform {
@@ -219,12 +217,12 @@ pub(super) fn windows(env: &Environment, name: &str, m: &mut Module) {
     }));
 }
 
-fn windows_vm(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
+fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
     let id = ident(name);
     // Windows wants 2 GB and more, and Azure's images a 127 GB disk.
     let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB).max(2048);
     let disk = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(127);
-    let ids = env.machines[name]
+    let ids = mp
         .addresses
         .keys()
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));

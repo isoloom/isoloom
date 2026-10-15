@@ -1,0 +1,74 @@
+//! What the integration tests share: specs from the repository's examples or written in a
+//! test, checked valid, and the file a backend wrote at a path.
+
+use std::error::Error;
+use std::path::Path;
+
+use isoloom_plan::Environment;
+use isoloom_render::GeneratedFile;
+use isoloom_render::backend::Backend;
+use isoloom_spec::Spec;
+use isoloom_spec::model::Target;
+
+/// A test's outcome: a failure is the report.
+pub type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+
+/// The repository's example `name` (its folder under `examples/`), checked valid.
+///
+/// # Errors
+///
+/// When it doesn't load, or isn't valid.
+pub fn example(name: &str) -> Outcome<Spec> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
+    valid(isoloom_spec::load(&dir)?)
+}
+
+/// The spec `yaml`, checked valid.
+///
+/// # Errors
+///
+/// When it doesn't parse, or isn't valid.
+pub fn spec(yaml: &str) -> Outcome<Spec> {
+    valid(isoloom_spec::parse(yaml)?)
+}
+
+/// The plan of `yaml`, a valid spec, for `target`.
+///
+/// # Errors
+///
+/// When the spec doesn't parse, or isn't valid.
+pub fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
+    Ok(Environment::build(&spec(yaml)?, target, None))
+}
+
+/// Why `backend` refuses `yaml` (a spec, valid or not), if it does.
+///
+/// # Errors
+///
+/// When the spec doesn't parse.
+pub fn refusal(backend: &dyn Backend, yaml: &str) -> Outcome<Option<String>> {
+    Ok(backend.refusal(&Environment::build(&isoloom_spec::parse(yaml)?, backend.target(), None)))
+}
+
+/// `spec`, when validation finds nothing wrong with it.
+fn valid(spec: Spec) -> Outcome<Spec> {
+    let problems = isoloom_spec::validate(&spec);
+    if problems.is_empty() {
+        Ok(spec)
+    } else {
+        Err(format!("the spec isn't valid: {problems:?}").into())
+    }
+}
+
+/// The contents of the file among `files` whose path ends with `suffix`.
+///
+/// # Errors
+///
+/// When there is none.
+pub fn file<'a>(files: &'a [GeneratedFile], suffix: &str) -> Outcome<&'a str> {
+    files
+        .iter()
+        .find(|f| f.path.ends_with(suffix))
+        .map(|f| f.contents.as_str())
+        .ok_or_else(|| format!("no file ending with {suffix}").into())
+}

@@ -4,7 +4,7 @@
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, NetworkPlan};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, null, number, object, reference, string};
 use isoloom_render::inventory::WinrmAuth;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
@@ -13,8 +13,8 @@ use super::network::vpc;
 use super::{NESTING, RULES, for_nics, image, machine_type, public_ip, user};
 use crate::cloud::auto_stop;
 use crate::cloud::instance::{name_with, tags};
-use crate::cloud::vm::{disks, gateways, hooks, interfaces, nested, own_image};
-use crate::machine::{controller, linux};
+use crate::cloud::vm::{disks, gateways, hooks, interfaces, nested, own_image, reach};
+use crate::machine::{Remote, controller, linux};
 use crate::module::{ident, resource};
 
 /// A machine's machine type: its GPUs', else a nesting one, else by its memory, with room for an
@@ -40,13 +40,12 @@ fn at_boot(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>, gateway: O
 }
 
 /// A Linux machine: what may reach it, its instance, its set-up over SSH.
-pub(super) fn linux(env: &Environment, name: &str, m: &mut Module) {
-    let mp = &env.machines[name];
+pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
     let id = ident(name);
     if mp.addresses.is_empty() {
         return;
     }
-    let rules = firewalls(env, name);
+    let rules = firewalls(env, (name, mp));
     if let Some((first, rest)) = rules.split_first() {
         m.commented(&format!("Machine `{name}`: what may reach it."), first.clone());
         m.blocks(rest.iter().cloned());
@@ -71,10 +70,13 @@ pub(super) fn linux(env: &Environment, name: &str, m: &mut Module) {
     m.block(vm);
     let hooks = hooks::of(mp, at_boot(env, &mp.addresses, Some(mp)));
     let machine = linux::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("google_compute_instance.{id}.id")),
-        host: public_ip(&id),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("google_compute_instance.{id}.id")),
+            host: public_ip(&id),
+        },
         user: user(os).to_owned(),
         hooks,
     };
@@ -86,32 +88,25 @@ pub(super) fn linux(env: &Environment, name: &str, m: &mut Module) {
 /// `allowed_cidr` and its published ports in its first network's (where its public address is),
 /// the networks `reach` opens to it (on their ports, TCP and UDP) in the VPC of the network
 /// opened.
-fn firewalls(env: &Environment, name: &str) -> Vec<Block> {
-    let spec = env.spec();
-    let m = &spec.machines[name];
+fn firewalls(env: &Environment, (name, mp): (&str, &MachinePlan)) -> Vec<Block> {
     let id = ident(name);
     let allowed = || list([reference("var.allowed_cidr")]);
-    let cidrs = |n: &str| list([string(env.networks[n].cidr.as_str())]);
+    let cidrs = |p: &NetworkPlan| list([string(p.cidr.as_str())]);
+    let Some(m) = env.spec().machines.get(name) else { return Vec::new() };
     let Some(first) = m.networks.keys().next() else { return Vec::new() };
-    let mut out: Vec<Block> = m
-        .networks
-        .keys()
-        .map(|n| firewall((&id, name), (&format!("net-{n}"), n), cidrs(n), vec![allow("all", &[])]))
+    let mut out: Vec<Block> = reach::own(env, m)
+        .map(|(n, p)| firewall((&id, name), (&format!("net-{n}"), n), cidrs(p), vec![allow("all", &[])]))
         .collect();
     out.push(firewall((&id, name), ("ssh", first), allowed(), vec![allow("tcp", &[22])]));
-    for r in spec
-        .reach
-        .iter()
-        .filter(|r| m.networks.contains_key(&r.to) && !m.networks.contains_key(&r.from))
-    {
+    for (r, from) in reach::opening(env, m) {
         let allows = if r.ports.is_empty() {
             vec![allow("all", &[])]
         } else {
             vec![allow("tcp", &r.ports), allow("udp", &r.ports)]
         };
-        out.push(firewall((&id, name), (&format!("reach-{}", r.from), &r.to), cidrs(&r.from), allows));
+        out.push(firewall((&id, name), (&format!("reach-{}", r.from), &r.to), cidrs(from), allows));
     }
-    let ports = &env.machines[name].ports;
+    let ports = &mp.ports;
     let published = |tcp: bool| -> Vec<u16> { ports.iter().filter(|x| x.protocol.is_tcp() == tcp).map(|x| x.publish).collect() };
     let allows: Vec<Block> = [("tcp", published(true)), ("udp", published(false))]
         .into_iter()

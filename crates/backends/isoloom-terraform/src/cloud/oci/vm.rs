@@ -35,7 +35,7 @@ use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHEC
 use crate::cloud::vm::{disks, gateways, hooks, interfaces, nested, own_image, private_dns};
 use crate::cloud::{Cloud, auto_stop, operator};
 use crate::limits::Limits;
-use crate::machine::{linux, vms};
+use crate::machine::{Remote, linux, vms};
 use crate::module::variable::Variable;
 use crate::module::{self, ProjectCopy, Usage, ident, providers, resource};
 
@@ -183,16 +183,19 @@ fn machine(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
         instance(env, (name, mp), (net, &address.to_string()), group),
     );
     vnics(env, (name, mp), m);
-    addresses::blocks(env, name, m);
+    addresses::blocks((name, mp), m);
     let mac = |n: &str| call("lower", [reference(&format!("data.oci_core_vnic.{id}_{}.mac_address", ident(n)))]);
     let mut at_boot = interfaces::up(env, &mp.addresses, &mac);
     at_boot.extend(ipv6::at_boot(env, name, mp));
     at_boot.extend(gateways::at_boot(mp));
     let machine = linux::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("oci_core_instance.{id}.id")),
-        host: public_ip(name),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("oci_core_instance.{id}.id")),
+            host: public_ip(name),
+        },
         user: USER.to_owned(),
         hooks: hooks::of(mp, at_boot),
     };

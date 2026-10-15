@@ -6,7 +6,7 @@
 use std::borrow::Cow;
 use std::net::Ipv4Addr;
 
-use isoloom_plan::{Environment, MachinePlan, Step};
+use isoloom_plan::{Environment, MachinePlan, NetworkPlan, Step};
 use isoloom_render::hcl_builder::Template;
 use isoloom_spec::validate::Cidr;
 
@@ -15,20 +15,44 @@ pub(crate) fn routed(env: &Environment) -> Vec<(&str, &str)> {
     env.networks.iter().filter_map(|(n, p)| p.gateway.as_deref().map(|g| (n.as_str(), g))).collect()
 }
 
-/// The networks `net` reaches through a machine, each with that machine: every other one
-/// through its own gateway when a machine routes it, else each routed network through its
-/// gateway.
-pub(crate) fn through<'a>(env: &'a Environment, net: &str) -> Vec<(&'a str, &'a str)> {
+/// A network one reaches through a machine.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Hop<'a> {
+    /// The network reached.
+    pub(crate) network: &'a str,
+    /// Its plan.
+    pub(crate) plan: &'a NetworkPlan,
+    /// The machine it goes through.
+    pub(crate) gateway: &'a str,
+    /// That machine's plan.
+    pub(crate) machine: &'a MachinePlan,
+}
+
+/// The networks `net` reaches through a machine, in spec order: every other one through its
+/// own gateway when a machine routes it, else each routed network through its gateway.
+pub(crate) fn through<'a>(env: &'a Environment, net: &str) -> Vec<Hop<'a>> {
     let gateways = routed(env);
     let own = gateways.iter().find(|(n, _)| *n == net).map(|(_, g)| *g);
     env.networks
-        .keys()
-        .filter(|n| n.as_str() != net)
-        .filter_map(|other| {
+        .iter()
+        .filter(|(n, _)| n.as_str() != net)
+        .filter_map(|(other, plan)| {
             let gateway = own.or_else(|| gateways.iter().find(|(n, _)| *n == other.as_str()).map(|(_, g)| *g))?;
-            Some((other.as_str(), gateway))
+            let (gateway, machine) = env.machines.get_key_value(gateway)?;
+            Some(Hop {
+                network: other,
+                plan,
+                gateway,
+                machine,
+            })
         })
         .collect()
+}
+
+/// Machine `mp`'s interface toward network `net`: its own there when it has one, else its
+/// first. The network that interface is on, and its address there.
+pub(crate) fn toward<'a>(mp: &'a MachinePlan, net: &str) -> Option<(&'a str, Ipv4Addr)> {
+    mp.addresses.get_key_value(net).or_else(|| mp.addresses.first()).map(|(n, a)| (n.as_str(), *a))
 }
 
 /// Whether the octet is the machine's gateway address on `network` (validation gives the
@@ -41,7 +65,10 @@ pub(crate) fn is_gateway_address(env: &Environment, machine: &str, network: &str
 fn moves(env: &Environment, to: &dyn Fn(&Environment, &str, Cidr) -> Option<Ipv4Addr>) -> Vec<(Ipv4Addr, Ipv4Addr)> {
     routed(env)
         .into_iter()
-        .filter_map(|(n, _)| Cidr::parse(&env.networks[n].cidr).and_then(|c| Some((c.gateway(), to(env, n, c)?))))
+        .filter_map(|(n, _)| {
+            let c = Cidr::parse(&env.networks.get(n)?.cidr)?;
+            Some((c.gateway(), to(env, n, c)?))
+        })
         .collect()
 }
 
@@ -58,23 +85,23 @@ pub(crate) fn relocated_with<'a>(env: &'a Environment, to: &dyn Fn(&Environment,
     if moves.is_empty() {
         return Cow::Borrowed(env);
     }
-    let moved = |a: Ipv4Addr| moves.iter().find(|(from, _)| *from == a).map_or(a, |(_, to)| *to);
+    let new_address = |a: Ipv4Addr| moves.iter().find(|(old, _)| *old == a).map_or(a, |(_, new)| *new);
     let mut env = env.clone();
     for mp in env.machines.values_mut() {
         for a in mp.addresses.values_mut() {
-            *a = moved(*a);
+            *a = new_address(*a);
         }
         for step in &mut mp.lifecycle {
             if let Step::Hosts { entries } = step {
                 for (a, _) in entries.iter_mut() {
-                    *a = moved(*a);
+                    *a = new_address(*a);
                 }
             }
         }
     }
     if let Some(zone) = &mut env.private_dns {
         for r in &mut zone.records {
-            r.address = moved(r.address);
+            r.address = new_address(r.address);
         }
     }
     Cow::Owned(env)

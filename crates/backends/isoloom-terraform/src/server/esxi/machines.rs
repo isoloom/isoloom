@@ -15,7 +15,7 @@ use super::guest::{Guest, Nic};
 use crate::machine::cloud_init::CloudConfig;
 use crate::machine::controller::{self, Ssh};
 use crate::machine::linux::{self, Hooks};
-use crate::machine::{cloudbase_init, vms};
+use crate::machine::{Remote, cloudbase_init, vms};
 use crate::module::ident;
 use crate::server::router::is_default_gateway;
 
@@ -87,7 +87,7 @@ pub(super) fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u6
                 .or_else(|| env.private_dns.as_ref().map(|z| z.domain.clone())),
         ),
         user_data: if windows {
-            cloudbase_init::user_data(env, name)
+            cloudbase_init::user_data(env, (name, mp))
         } else {
             CloudConfig::new(name, reference("local.users")).document()
         },
@@ -104,10 +104,13 @@ pub(super) fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u6
         return;
     };
     let setup = linux::provisioner(linux::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("esxi_guest.{id}.id")),
-        host: string(address.to_string()),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("esxi_guest.{id}.id")),
+            host: string(address.to_string()),
+        },
         user: "isoloom".to_owned(),
         hooks: Hooks::default(),
     });

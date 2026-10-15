@@ -15,7 +15,12 @@ pub(crate) fn runners(env: &Environment, dir: &str) -> Vec<GeneratedFile> {
     let host = |h: &Host, _: &Position| -> String {
         match h {
             Host::Literal(l) => l.clone(),
-            Host::Machine { name, network } => env.machines[name].addresses[network].to_string(),
+            Host::Machine { name, network } => env
+                .machines
+                .get(name)
+                .and_then(|mp| mp.addresses.get(network))
+                .map(ToString::to_string)
+                .unwrap_or_default(),
         }
     };
     let run_script = |path: &str| format!("cd /opt/isoloom && sh {path}");

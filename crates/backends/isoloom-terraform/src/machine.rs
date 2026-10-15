@@ -29,9 +29,44 @@ pub(crate) mod windows;
 #[cfg(test)]
 mod tests;
 
-use isoloom_plan::{Environment, MachinePlan, MachineShape, Step};
+use isoloom_plan::{Environment, Feature, MachinePlan, MachineShape, Step};
+use isoloom_render::hcl_builder::Expression;
 use isoloom_render::steps;
 use isoloom_spec::shell::quote;
+
+/// What every VM target renders through this core; a target refuses one on its own, with its
+/// own reason, where its platform can't give it.
+///
+/// - Environment-level provisioning: the [`controller`] runs the playbooks; playbook checks run
+///   there too, `exec` checks on the machine.
+/// - The set-up steps: machine aliases, ulimits, a machine's own process, tmpfs modes, its
+///   further addresses (on the interface of its primary address), IPv6, link impairment (`tc`)
+///   and the networks a machine routes (`gateway:`, refused by a target's limits where its
+///   network can't).
+/// - Secrets, owners included, delivered by `isoloom run` over the machine's own connection (SSH,
+///   or WinRM on Windows).
+/// - The private zone's names: the platform's DNS where it has one, else each VM's hosts file
+///   under the zone's domain, its search domain.
+/// - A network's MTU, where the platform sets one, and data disks (raw ones left unformatted).
+pub(crate) const FEATURES: [Feature; 17] = [
+    Feature::EnvironmentProvisioning,
+    Feature::PlaybookChecks,
+    Feature::ExecWithoutContainer,
+    Feature::MachineAliases,
+    Feature::Ulimits,
+    Feature::MachineProcess,
+    Feature::TmpfsModes,
+    Feature::VmMoreAddresses,
+    Feature::Ipv6,
+    Feature::TrafficControl,
+    Feature::Gateways,
+    Feature::Secrets,
+    Feature::SecretOwners,
+    Feature::PrivateDns,
+    Feature::NetworkMtu,
+    Feature::DataDisks,
+    Feature::RawDisks,
+];
 
 /// The VMs of the environment, in start order.
 pub(crate) fn vms(env: &Environment) -> impl Iterator<Item = (&str, &MachinePlan)> {
@@ -46,6 +81,21 @@ pub(crate) fn vms(env: &Environment) -> impl Iterator<Item = (&str, &MachinePlan
 /// transport runs it again after each `reboot` step.
 pub(crate) fn at_every_boot(step: &Step) -> bool {
     matches!(step, Step::Trunks | Step::MoreAddresses { .. } | Step::Routes { .. } | Step::Ipv6 { .. })
+}
+
+/// A machine as Terraform reaches it to set it up, whatever the transport.
+#[derive(Debug, Clone)]
+pub(crate) struct Remote<'a> {
+    /// The plan.
+    pub(crate) env: &'a Environment,
+    /// The machine's name.
+    pub(crate) name: &'a str,
+    /// Its plan.
+    pub(crate) plan: &'a MachinePlan,
+    /// What replaces its set-up when it changes (the instance's id).
+    pub(crate) replace_on: Expression,
+    /// Its address, from where Terraform runs.
+    pub(crate) host: Expression,
 }
 
 /// How a root script runs on a machine.

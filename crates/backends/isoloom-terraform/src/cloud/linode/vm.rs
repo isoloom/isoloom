@@ -22,7 +22,7 @@ use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHEC
 use crate::cloud::vm::{disks, hooks, own_image};
 use crate::cloud::{Cloud, auto_stop, operator};
 use crate::limits::Limits;
-use crate::machine::{linux, vms};
+use crate::machine::{Remote, linux, vms};
 use crate::module::{self, ProjectCopy, Usage, ident, providers, resource};
 
 /// What Linode takes.
@@ -166,10 +166,13 @@ fn machine(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
     );
     let at_boot = std::iter::once(Template::text(SUDO)).chain(network::routes(env, net)).collect();
     let machine = linux::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("linode_instance.{id}.id")),
-        host: public_ip(name),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("linode_instance.{id}.id")),
+            host: public_ip(name),
+        },
         user: USER.to_owned(),
         hooks: hooks::of(mp, at_boot),
     };

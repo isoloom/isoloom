@@ -48,7 +48,7 @@ use isoloom_spec::model::Target;
 use crate::limits::Limits;
 use crate::machine::{cloudbase_init, controller as core_controller, vms};
 use crate::module::{ProjectCopy, Usage};
-use crate::{Result, checks, target};
+use crate::{Result, target};
 
 /// What Proxmox can't host yet.
 const LIMITS: Limits = Limits {
@@ -108,64 +108,26 @@ impl Backend for ProxmoxBackend {
         Target::Proxmox
     }
 
-    /// Environment-level provisioning (a controller VM) and the checks, from the VMs.
+    /// What a server target gives (`crate::server::features`), and a virtual TPM, GPUs passed
+    /// through, nesting, rate limits and VMs waiting for LXC containers.
     fn capabilities(&self) -> Capabilities {
-        Capabilities::of([
-            Feature::EnvironmentProvisioning,
-            Feature::PlaybookChecks,
-            Feature::ExecWithoutContainer,
-            // Gateway networks are refused by the target's own limit (`LIMITS.gateways`), with
-            // its own reason: the plan's requirement names hybrid.
-            Feature::Gateways,
-            Feature::MachineAliases,
-            Feature::Ulimits,
-            Feature::TrafficControl,
-            Feature::Ipv6,
-            // An existing bridge (`external`), or the uplink or another bridge (`bridged`).
-            Feature::ExternalNetworks,
-            Feature::BridgedNetworks,
+        Capabilities::of(super::features().chain([
             Feature::Tpm,
-            // Delivered by `isoloom run` over the machine's SSH, owners included.
-            Feature::Secrets,
-            Feature::SecretOwners,
-            Feature::MachineProcess,
-            // A machine's firmware and boot order; its own `refusal` says what Proxmox can't boot.
-            Feature::OwnBoot,
             // Passed through by PCI id or resource mapping (`gpus.ids`, refused without).
             Feature::VmGpus,
             // The VMs take the server's CPU (`cpu.type = host`).
             Feature::NestedVirtualization,
-            // On every device: the network's MTU, the machine's rate limit.
-            Feature::NetworkMtu,
+            // On every device, as its network's MTU is.
             Feature::RateLimit,
             // A VM may wait for an LXC container (`docker.lxc`) as for a VM.
             Feature::VmAfterContainer,
-            // The SDN zone's DNS needs a PowerDNS server outside the environment: each VM's
-            // hosts file carries the names, and the zone's domain is its search domain.
-            Feature::PrivateDns,
-            // Each VM's set-up adds them on the interface of its primary address (an LXC
-            // container has one address per network, refused).
-            Feature::VmMoreAddresses,
-            Feature::DataDisks,
-            Feature::RawDisks,
-            Feature::TmpfsModes,
-        ])
+        ]))
     }
 
     fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {
         let checked = lxc::checked(env);
-        let env = &*virtiofs::mounted(&checked);
-        target::render(
-            Target::Proxmox,
-            &self.capabilities(),
-            env,
-            || refusal(env),
-            || {
-                let mut files = vec![module(env)?];
-                files.extend(checks::runners(env, Target::Proxmox.id()));
-                Ok(files)
-            },
-        )
+        let mounted = virtiofs::mounted(&checked);
+        super::render(Target::Proxmox, &self.capabilities(), &mounted, refusal, module)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {

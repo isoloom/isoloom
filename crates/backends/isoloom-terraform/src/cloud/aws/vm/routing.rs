@@ -12,7 +12,7 @@ use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, Expression, Module, reference, string};
 
 use crate::cloud::aws::route_out;
-use crate::cloud::vm::gateways::{covering, routed};
+use crate::cloud::vm::gateways::{Hop, covering, routed, through, toward};
 use crate::module::{ident, resource};
 
 /// Every network in one VPC block: a /16 at most (AWS's largest).
@@ -34,19 +34,14 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
     })
 }
 
-/// Machine `gateway`'s interface toward `net`: its interface on it when it has one there, else
-/// its first.
-fn interface(env: &Environment, gateway: &str, net: &str) -> Expression {
-    let id = ident(gateway);
-    let addresses = &env.machines[gateway].addresses;
-    if addresses.len() == 1 {
+/// The gateway's interface toward `net` (`gateways::toward`): the instance's own when it has
+/// one interface, else the network interface it has there.
+fn interface(hop: &Hop, net: &str) -> Expression {
+    let id = ident(hop.gateway);
+    if hop.machine.addresses.len() == 1 {
         return reference(&format!("aws_instance.{id}.primary_network_interface_id"));
     }
-    let on = if addresses.contains_key(net) {
-        net
-    } else {
-        addresses.keys().next().map_or(net, String::as_str)
-    };
+    let on = toward(hop.machine, net).map_or(net, |(on, _)| on);
     reference(&format!("aws_network_interface.{id}_{}.id", ident(on)))
 }
 
@@ -61,18 +56,13 @@ fn route(cidr: &str, target: (&str, Expression)) -> Block {
 /// gateway routes it to (all of them, on a routed network) through that gateway, and each
 /// routed network through its own.
 fn table(env: &Environment, net: &str) -> Block {
-    let gateways = routed(env);
-    let mut b = resource("aws_route_table", &ident(net))
+    let b = resource("aws_route_table", &ident(net))
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
         .add_block(route_out());
-    let own = gateways.iter().find(|(n, _)| *n == net).map(|(_, g)| *g);
-    for (other, p) in env.networks.iter().filter(|(n, _)| n.as_str() != net) {
-        let through = own.or_else(|| gateways.iter().find(|(n, _)| *n == other.as_str()).map(|(_, g)| *g));
-        if let Some(gateway) = through {
-            b = b.add_block(route(&p.cidr, ("network_interface_id", interface(env, gateway, net))));
-        }
-    }
-    b.build()
+    through(env, net)
+        .iter()
+        .fold(b, |b, hop| b.add_block(route(&hop.plan.cidr, ("network_interface_id", interface(hop, net)))))
+        .build()
 }
 
 /// A route table per network when a machine routes one, else none (`None`: every subnet shares

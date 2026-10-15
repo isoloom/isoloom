@@ -7,7 +7,7 @@
 //! ready marker over WinRM before running the playbooks (`controller::windows_waits`).
 
 use isoloom_plan::lifecycle::has_extension;
-use isoloom_plan::{Environment, Step};
+use isoloom_plan::{Environment, MachinePlan, Step};
 use isoloom_render::hcl_builder::{Expression, Template, call, for_list, reference, string};
 use isoloom_render::steps;
 
@@ -23,11 +23,11 @@ pub(crate) fn refusal(env: &Environment, platform: &str) -> Option<String> {
     vms(env).filter(|(_, mp)| mp.is_windows()).find_map(|(name, mp)| {
         let why = if name.len() > 15 {
             "Windows computer names are at most 15 characters"
-        } else if spec.machines[name].vm.as_ref()?.provision.iter().any(|s| !has_extension(s, "ps1")) {
+        } else if spec.machines.get(name)?.vm.as_ref()?.provision.iter().any(|s| !has_extension(s, "ps1")) {
             "Windows provisioning steps are PowerShell scripts (.ps1); Ansible runs from the controller (`provision:`)"
         } else if mp.default_gateway.is_some() || mp.is_gateway {
             "a gateway machine's routes on Windows come later"
-        } else if mp.addresses.keys().any(|n| !env.networks[n].internet) {
+        } else if mp.addresses.keys().any(|n| env.networks.get(n).is_some_and(|p| !p.internet)) {
             "`internet: false` on Windows comes later"
         } else if !mp.volumes.is_empty() {
             "volumes on Windows come later"
@@ -41,8 +41,7 @@ pub(crate) fn refusal(env: &Environment, platform: &str) -> Option<String> {
 }
 
 /// The cloudbase-init script of Windows machine `name`.
-pub(crate) fn user_data(env: &Environment, name: &str) -> Expression {
-    let mp = &env.machines[name];
+pub(crate) fn user_data(env: &Environment, (name, mp): (&str, &MachinePlan)) -> Expression {
     let host = name.to_uppercase();
     let mut t = Template::text(format!(
         "#ps1_sysnative\n# Isoloom: machine `{name}`, set up by cloudbase-init at its first boot.\n$ErrorActionPreference = 'Stop'\nif (Test-Path '{DONE}') {{ exit 0 }}\nNew-Item -ItemType Directory -Force C:\\ProgramData\\isoloom | Out-Null\n# The administrator the controller's playbooks run as, over WinRM.\n$password = ConvertTo-SecureString '"
@@ -54,7 +53,8 @@ pub(crate) fn user_data(env: &Environment, name: &str) -> Expression {
     if mp.lifecycle.iter().any(|s| matches!(s, Step::Run { .. })) {
         t.append(project_files());
     }
-    let mut ps: Vec<String> = env.spec().machines[name].ports.iter().flat_map(windows::firewall).collect();
+    let ports = env.spec().machines.get(name).map(|m| m.ports.as_slice()).unwrap_or_default();
+    let mut ps: Vec<String> = ports.iter().flat_map(windows::firewall).collect();
     ps.extend(
         mp.lifecycle
             .iter()

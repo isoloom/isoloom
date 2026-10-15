@@ -13,9 +13,9 @@ use crate::module::ident;
 /// The VNet a network's frames travel on: its own, or its LAN's when it is a VLAN (then with
 /// its tag).
 fn segment(env: &Environment, net: &str) -> (String, Option<u16>) {
-    match &env.networks[net].vlan {
+    match env.networks.get(net).and_then(|p| p.vlan.as_ref()) {
         Some((lan, id)) => (lan.clone(), Some(*id)),
-        None => (net.to_string(), None),
+        None => (net.to_owned(), None),
     }
 }
 
@@ -24,11 +24,11 @@ fn carries_vlans(env: &Environment, name: &str) -> bool {
     env.networks.values().any(|n| n.vlan.as_ref().is_some_and(|(l, _)| l == name))
 }
 
-/// The VNets: one per network that is no VLAN, then one per LAN that is only the frame around
-/// its VLANs. Their references, for the applier to wait on.
+/// A VNet per network that is no VLAN, then one per LAN that is only the frame around its
+/// VLANs. Their references, for the applier to wait on.
 pub(super) fn vnets(env: &Environment, m: &mut Module) -> Vec<Expression> {
     let mut out = Vec::new();
-    let mut add = |m: &mut Module, name: &str, id: String, what: String| {
+    let mut add = |module: &mut Module, name: &str, id: String, what: String| {
         let mut b = Block::builder("resource")
             .add_label("proxmox_sdn_vnet")
             .add_label(ident(name))
@@ -37,7 +37,7 @@ pub(super) fn vnets(env: &Environment, m: &mut Module) -> Vec<Expression> {
         if carries_vlans(env, name) {
             b = b.add_attribute(("vlan_aware", boolean(true)));
         }
-        m.commented(&what, b.build());
+        module.commented(&what, b.build());
         out.push(reference(&format!("proxmox_sdn_vnet.{}", ident(name))));
     };
     for (i, (net, plan)) in env.networks.iter().enumerate().filter(|(_, (_, p))| p.vlan.is_none()) {
@@ -64,7 +64,7 @@ pub(super) fn on(env: &Environment, net: &str, b: BlockBuilder, guest: Option<&M
     if let Some(tag) = tag {
         b = b.add_attribute(("vlan_id", number(tag.into())));
     }
-    if let Some(mtu) = env.networks[net].mtu {
+    if let Some(mtu) = env.networks.get(net).and_then(|p| p.mtu) {
         b = b.add_attribute(("mtu", number(mtu.into())));
     }
     match guest {

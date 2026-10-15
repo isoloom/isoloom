@@ -1,12 +1,13 @@
 //! The cloud-services scripts with every `cloud:` key that shapes them (`before`, `env`,
 //! `apply_retries`, inputs at any depth), as snapshots.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+pub mod testing;
 
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::CloudServicesBackend;
+use testing::{Outcome, spec};
 
 const SPEC: &str = r#"version: 1
 name: goat
@@ -22,34 +23,32 @@ cloud:
   requires: [jq, "python3 -c 'import boto3'"]
 "#;
 
-fn file(name: &str) -> String {
-    let spec = isoloom_spec::parse(SPEC).unwrap();
-    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-    CloudServicesBackend
-        .render(&Environment::build(&spec, Target::CloudServices, None))
-        .unwrap()
-        .into_iter()
-        .find(|f| f.path == format!(".isoloom/cloud-services/{name}"))
-        .unwrap()
-        .contents
+/// The script or variables file `name` written for `SPEC`.
+fn file(name: &str) -> Outcome<String> {
+    let files = CloudServicesBackend.render(&Environment::build(&spec(SPEC)?, Target::CloudServices, None))?;
+    Ok(testing::file(&files, &format!(".isoloom/cloud-services/{name}"))?.to_owned())
 }
 
 #[test]
-fn up_copies_the_module_runs_the_steps_and_retries() {
-    insta::assert_snapshot!(file("up.sh"));
+fn up_copies_the_module_runs_the_steps_and_retries() -> Outcome {
+    insta::assert_snapshot!(file("up.sh")?);
+    Ok(())
 }
 
 #[test]
-fn down_destroys_with_the_copy_as_applied() {
-    insta::assert_snapshot!(file("down.sh"));
+fn down_destroys_with_the_copy_as_applied() -> Outcome {
+    insta::assert_snapshot!(file("down.sh")?);
+    Ok(())
 }
 
 #[test]
-fn outputs_read_the_state() {
-    insta::assert_snapshot!(file("outputs.sh"));
+fn outputs_read_the_state() -> Outcome {
+    insta::assert_snapshot!(file("outputs.sh")?);
+    Ok(())
 }
 
 #[test]
-fn inputs_stay_out_of_the_fixed_variables() {
-    insta::assert_snapshot!(file("terraform.tfvars.json"));
+fn inputs_stay_out_of_the_fixed_variables() -> Outcome {
+    insta::assert_snapshot!(file("terraform.tfvars.json")?);
+    Ok(())
 }

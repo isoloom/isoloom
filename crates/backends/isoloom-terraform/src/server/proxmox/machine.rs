@@ -21,19 +21,19 @@ pub(super) fn blocks(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Mo
     let boot = if mp.is_windows() {
         m.commented(
             &format!("Machine `{name}`: its set-up, run by cloudbase-init."),
-            snippet_file(&ident(name), &format!("{name}.ps1"), cloudbase_init::user_data(env, name)),
+            snippet_file(&ident(name), &format!("{name}.ps1"), cloudbase_init::user_data(env, (name, mp))),
         );
         windows::boot(mp)
     } else {
         let mut config = CloudConfig::new(name, reference("local.users"));
-        let domain = env.spec().machines.get(name).and_then(|m| m.dns.as_ref()?.domain.as_deref());
+        let domain = env.spec().machines.get(name).and_then(|machine| machine.dns.as_ref()?.domain.as_deref());
         config.fqdn = domain.map(|d| format!("{name}.{d}"));
         config.packages = ["nftables", "curl", "netcat-openbsd"].map(String::from).to_vec();
-        if needs_project(env, name) {
+        if needs_project(env, (name, mp)) {
             config.file_lists.push(reference("local.project_files"));
         }
         config.files.extend(super::virtiofs::tag_files(env, name));
-        cloud_init::machine(env, name, &mut config);
+        cloud_init::machine(env, (name, mp), &mut config);
         m.commented(&format!("Machine `{name}`."), snippet(&ident(name), name, config.document()));
         super::image::boot(name, mp).unwrap_or_else(|| Boot::Image(super::arch::image_res(mp)))
     };
@@ -97,11 +97,11 @@ pub(super) fn depends_on(env: &Environment, mp: &MachinePlan) -> Vec<Expression>
 }
 
 /// Whether the machine gets the project: its steps read it, or a check runner runs a script there.
-fn needs_project(env: &Environment, name: &str) -> bool {
-    let runs = isoloom_plan::machine_files::reads_project(&env.machines[name].lifecycle);
+fn needs_project(env: &Environment, (name, mp): (&str, &MachinePlan)) -> bool {
+    let runs = isoloom_plan::machine_files::reads_project(&mp.lifecycle);
     let scripts = by_position(env.spec(), &env.checks)
         .into_iter()
-        .any(|(p, g)| p == Position::Machine(name.to_string()) && g.iter().any(|c| matches!(c.probe, Probe::Script { .. })));
+        .any(|(p, g)| p == Position::Machine(name.to_owned()) && g.iter().any(|c| matches!(c.probe, Probe::Script { .. })));
     runs || scripts
 }
 
@@ -109,7 +109,7 @@ fn needs_project(env: &Environment, name: &str) -> bool {
 /// else a public one so it can still install software. Its search domain is its own, else the
 /// private zone's (`dns.private`), whose names its hosts file carries.
 fn dns(env: &Environment, name: &str) -> Block {
-    let d = env.spec().machines[name].dns.as_ref();
+    let d = env.spec().machines.get(name).and_then(|m| m.dns.as_ref());
     let servers: Vec<Expression> = match d.filter(|d| !d.servers.is_empty()) {
         Some(d) => d.servers.iter().map(|s| string(s.as_str())).collect(),
         None => vec![string("1.1.1.1")],

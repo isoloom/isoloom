@@ -9,10 +9,46 @@ pub(crate) mod esxi;
 pub(crate) mod proxmox;
 pub(crate) mod router;
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Capabilities, Environment, Feature};
+use isoloom_render::GeneratedFile;
+use isoloom_render::backend::{Files, RenderError};
 use isoloom_render::hcl_builder::{Expression, Module, Template, object, reference, string};
+use isoloom_spec::model::Target;
 
-use crate::machine::{controller, windows};
+use crate::machine::{self, controller, windows};
+use crate::{Result, checks};
+
+/// What a server target renders: the VM core's features (`machine::FEATURES`), and networks
+/// outside the environment (an existing bridge or port group, `external`, or the server's LAN,
+/// `bridged`) and a machine's own firmware (`vm.boot`, each target refusing what its hypervisor
+/// has no setting for).
+pub(crate) fn features() -> impl Iterator<Item = Feature> {
+    machine::FEATURES
+        .into_iter()
+        .chain([Feature::ExternalNetworks, Feature::BridgedNetworks, Feature::OwnBoot])
+}
+
+/// A server target's files, once the plan's requirements (`capabilities`) and its own `refusal`
+/// let it: its `module`, then the check runners.
+pub(crate) fn render(
+    target: Target,
+    capabilities: &Capabilities,
+    env: &Environment,
+    refusal: fn(&Environment) -> Option<String>,
+    module: fn(&Environment) -> Result<GeneratedFile>,
+) -> std::result::Result<Files, RenderError> {
+    crate::target::render(
+        target,
+        capabilities,
+        env,
+        || refusal(env),
+        || {
+            let mut files = vec![module(env)?];
+            files.extend(checks::runners(env, target.id()));
+            Ok(files)
+        },
+    )
+}
 
 /// `iso<slot><suffix>`: a name unique per environment on the server (`var.slot`).
 pub(crate) fn slotted(suffix: &str) -> Expression {

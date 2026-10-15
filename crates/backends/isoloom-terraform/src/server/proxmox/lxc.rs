@@ -14,7 +14,7 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, list, number, object, reference, string};
 use isoloom_render::router;
-use isoloom_spec::model::Arch;
+use isoloom_spec::model::{Arch, Machine};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
@@ -24,9 +24,29 @@ use crate::module::ident;
 use crate::module::variable::Variable;
 use crate::server::slotted;
 
+/// A machine that runs as an LXC container.
+#[derive(Debug, Clone, Copy)]
+struct Container<'a> {
+    /// Its name.
+    name: &'a str,
+    /// Its plan.
+    plan: &'a MachinePlan,
+    /// What the spec says of it.
+    machine: &'a Machine,
+}
+
 /// The machines that run as LXC containers.
-pub(super) fn containers(env: &Environment) -> impl Iterator<Item = (&String, &MachinePlan)> {
-    env.machines.iter().filter(|(_, mp)| mp.shape == MachineShape::Container)
+fn containers(env: &Environment) -> impl Iterator<Item = Container<'_>> {
+    env.machines
+        .iter()
+        .filter(|(_, mp)| mp.shape == MachineShape::Container)
+        .filter_map(|(name, plan)| {
+            Some(Container {
+                name,
+                plan,
+                machine: env.spec().machines.get(name)?,
+            })
+        })
 }
 
 /// Whether the environment has any.
@@ -35,10 +55,10 @@ pub(super) fn needed(env: &Environment) -> bool {
 }
 
 /// What a container can't have, if the machine asks for it.
-fn lacking(env: &Environment, name: &str, mp: &MachinePlan) -> Option<&'static str> {
-    let m = &env.spec().machines[name];
-    let at = Position::Machine(name.to_string());
-    let checked = env.checks.iter().any(|c| c.position == at && !c.derived);
+fn lacking(env: &Environment, c: Container) -> Option<&'static str> {
+    let Container { name, plan: mp, machine: m } = c;
+    let at = Position::Machine(name.to_owned());
+    let checked = env.checks.iter().any(|check| check.position == at && !check.derived);
     let init = m.docker.as_ref().is_some_and(|d| !d.init.is_empty());
     [
         (mp.arch != Arch::Amd64, "an arm64 image (a container runs the server's own architecture)"),
@@ -76,8 +96,13 @@ pub(super) fn checked(env: &Environment) -> Cow<'_, Environment> {
 
 /// Why a container can't run, if one can't.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
-    containers(env).find_map(|(name, mp)| {
-        lacking(env, name, mp).map(|what| format!("machine `{name}` runs as an LXC container (`docker.lxc`), which can't have {what}: give it a `vm:`"))
+    containers(env).find_map(|c| {
+        lacking(env, c).map(|what| {
+            format!(
+                "machine `{}` runs as an LXC container (`docker.lxc`), which can't have {what}: give it a `vm:`",
+                c.name
+            )
+        })
     })
 }
 
@@ -96,8 +121,9 @@ pub(super) fn variables(env: &Environment) -> Vec<Block> {
 
 /// Each container: its image, pulled as a template, then the container and its firewall.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    for (name, mp) in containers(env) {
-        let reference_of = env.spec().machines[name].docker.as_ref().and_then(|d| d.image.clone()).unwrap_or_default();
+    for c in containers(env) {
+        let name = c.name;
+        let reference_of = c.machine.docker.as_ref().and_then(|d| d.image.clone()).unwrap_or_default();
         let image = Block::builder("resource")
             .add_label("proxmox_oci_image")
             .add_label(ident(name))
@@ -108,7 +134,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .add_attribute(("overwrite_unmanaged", boolean(true)))
             .build();
         m.commented(&format!("Machine `{name}`: an LXC container (`docker.lxc`), from its image."), image);
-        m.block(container(env, name, mp));
+        m.block(container(env, c));
         firewall::guest(env, name, Guest::Container, m);
     }
 }
@@ -119,16 +145,15 @@ fn oci_reference(image: &str) -> String {
     let first = image.split('/').next().unwrap_or_default();
     let has_registry = image.contains('/') && (first.contains('.') || first.contains(':') || first == "localhost");
     match (has_registry, image.contains('/')) {
-        (true, _) => image.to_string(),
+        (true, _) => image.to_owned(),
         (false, true) => format!("docker.io/{image}"),
         (false, false) => format!("docker.io/library/{image}"),
     }
 }
 
 /// The container: its size, its devices and addresses, its entrypoint and environment.
-fn container(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
-    let spec = env.spec();
-    let m = &spec.machines[name];
+fn container(env: &Environment, c: Container) -> Block {
+    let Container { name, plan: mp, machine: m } = c;
     let mut b = Block::builder("resource")
         .add_label("proxmox_virtual_environment_container")
         .add_label(ident(name))
@@ -161,7 +186,7 @@ fn container(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
         let vars = mp.settings.environment.iter().map(|(k, v)| (k.as_str(), string(v.as_str())));
         b = b.add_attribute(("environment_variables", object(vars)));
     }
-    b.add_block(initialization(env, name, mp))
+    b.add_block(initialization(env, c))
         .add_block(
             Block::builder("operating_system")
                 .add_attribute(("template_file_id", reference(&format!("proxmox_oci_image.{}.id", ident(name)))))
@@ -173,9 +198,9 @@ fn container(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
 
 /// Its name, its resolver (the router, for the environment's names), an address per device
 /// with the router as the gateway, and an idle image kept running.
-fn initialization(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
+fn initialization(env: &Environment, c: Container) -> Block {
+    let Container { name, plan: mp, machine: m } = c;
     let spec = env.spec();
-    let m = &spec.machines[name];
     let first = mp.addresses.keys().next().map(|n| router::address(spec, n).to_string()).unwrap_or_default();
     let mut dns = Block::builder("dns").add_attribute(("servers", list([string(first.as_str())])));
     if let Some(domain) = m.dns.as_ref().and_then(|d| d.domain.as_deref()) {
@@ -185,7 +210,7 @@ fn initialization(env: &Environment, name: &str, mp: &MachinePlan) -> Block {
         .add_attribute(("hostname", string(name)))
         .add_block(dns.build());
     for (i, (net, addr)) in mp.addresses.iter().enumerate() {
-        let len = Cidr::parse(&env.networks[net].cidr).map_or(32, |c| c.len);
+        let len = env.networks.get(net).and_then(|p| Cidr::parse(&p.cidr)).map_or(32, |cidr| cidr.len);
         let mut ipv4 = Block::builder("ipv4").add_attribute(("address", string(format!("{addr}/{len}"))));
         if i == 0 {
             ipv4 = ipv4.add_attribute(("gateway", string(first.as_str())));

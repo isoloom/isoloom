@@ -1,11 +1,28 @@
-//! The firewall rules a cloud writes per network, read from the plan: who may reach a network
-//! (its own machines, the `reach` rules into it), where its machines may go (their network, the
-//! `reach` rules out of it, the internet).
+//! The firewall rules a cloud writes, read from the plan: per network, who may reach it (its
+//! own machines, the `reach` rules into it) and where its machines may go (their network, the
+//! `reach` rules out of it, the internet); per machine, its own networks and the `reach` rules
+//! opening them.
 
 use std::net::Ipv4Addr;
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, NetworkPlan};
+use isoloom_spec::model::{Machine, Reach};
 use isoloom_spec::validate::{Cidr, PRIVATE};
+
+/// Machine `m`'s own networks, each with its plan.
+pub(crate) fn own<'a>(env: &'a Environment, m: &'a Machine) -> impl Iterator<Item = (&'a String, &'a NetworkPlan)> {
+    m.networks.keys().filter_map(|n| env.networks.get_key_value(n))
+}
+
+/// The `reach` rules opening one of machine `m`'s networks to a network it isn't on, each with
+/// the plan of the network they open from.
+pub(crate) fn opening<'a>(env: &'a Environment, m: &'a Machine) -> impl Iterator<Item = (&'a Reach, &'a NetworkPlan)> {
+    env.spec()
+        .reach
+        .iter()
+        .filter(|r| m.networks.contains_key(&r.to) && !m.networks.contains_key(&r.from))
+        .filter_map(|r| Some((r, env.networks.get(&r.from)?)))
+}
 
 /// A rule between two networks: the other network's block, and its ports (empty: every port).
 #[derive(Debug, Clone, PartialEq, Eq)]

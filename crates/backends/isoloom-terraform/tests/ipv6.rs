@@ -1,12 +1,12 @@
 //! IPv6 networks on the Terraform targets: Azure and Oracle Cloud write the spec's block, the
 //! other clouds refuse with their own reason, and Proxmox's router carries the IPv6 side.
 
-#![allow(clippy::unwrap_used)]
+pub mod testing;
 
-use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::{Cloud, CloudVmModule};
+use isoloom_terraform::{Cloud, CloudVmModule, ProxmoxBackend};
+use testing::{Outcome, file, plan};
 
 const SPEC: &str = "version: 1
 name: v6
@@ -19,16 +19,12 @@ machines:
   user: { networks: { front: 10 }, vm: { os: debian@12 } }
 ";
 
-fn env(target: Target) -> Environment {
-    Environment::build(&isoloom_spec::parse(SPEC).unwrap(), target, None)
-}
-
 #[test]
-fn azure_writes_the_block_the_interfaces_and_the_rules() {
-    let azure = cloud("azure");
-    let e = env(Target::CloudVm);
+fn azure_writes_the_block_the_interfaces_and_the_rules() -> Outcome {
+    let azure = CloudVmModule::new(Cloud::Azure);
+    let e = plan(SPEC, Target::CloudVm)?;
     assert_eq!(azure.refusal(&e), None);
-    let tf = &azure.render(&e).unwrap()[0].contents;
+    let tf = &azure.render(&e)?.contents;
     assert!(tf.contains("\"10.67.20.0/24\", \"fd00:67:20::/64\""), "{tf}");
     assert!(tf.contains("private_ip_address_version    = \"IPv6\""), "{tf}");
     assert!(tf.contains("private_ip_address            = \"fd00:67:20::10\""), "{tf}");
@@ -36,41 +32,36 @@ fn azure_writes_the_block_the_interfaces_and_the_rules() {
     // The virtual network routes between subnets: no route through a router that isn't there.
     assert!(!tf.contains("ip -6 route"), "{tf}");
     assert!(tf.contains("ip -6 addr replace fd00:67:20::10/64"), "{tf}");
+    Ok(())
 }
 
 #[test]
-fn the_other_clouds_refuse_with_their_reason() {
-    let e = env(Target::CloudVm);
-    for (name, why) in [("aws", "Amazon-provided"), ("gcp", "fd20::/20")] {
-        let cloud = cloud(name);
+fn the_other_clouds_refuse_with_their_reason() -> Outcome {
+    let e = plan(SPEC, Target::CloudVm)?;
+    for (name, why) in [(Cloud::Aws, "Amazon-provided"), (Cloud::Gcp, "fd20::/20")] {
+        let cloud = CloudVmModule::new(name);
         let refusal = cloud.refusal(&e).unwrap();
         assert!(refusal.starts_with("network `front` is IPv6: ") && refusal.contains(why), "{name}: {refusal}");
     }
+    Ok(())
 }
 
 #[test]
-fn the_proxmox_router_takes_its_ipv6_address_and_forwards() {
-    let files = isoloom_terraform::ProxmoxBackend.render(&env(Target::Proxmox)).unwrap();
-    let tf = &files.iter().find(|f| f.path.ends_with("proxmox/main.tf")).unwrap().contents;
+fn the_proxmox_router_takes_its_ipv6_address_and_forwards() -> Outcome {
+    let files = ProxmoxBackend.render(&plan(SPEC, Target::Proxmox)?)?;
+    let tf = file(&files, "proxmox/main.tf")?;
     assert!(tf.contains("Address=fd00:67:20::254/64"), "{tf}");
     assert!(tf.contains("net.ipv6.conf.all.forwarding=1"), "{tf}");
     assert!(tf.contains("ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64"), "{tf}");
-}
-
-fn cloud(name: &str) -> CloudVmModule {
-    Cloud::ALL.into_iter().find(|c| c.id() == name).map(CloudVmModule::from).unwrap()
-}
-
-fn env_of(spec: &str) -> Environment {
-    Environment::build(&isoloom_spec::parse(spec).unwrap(), Target::CloudVm, None)
+    Ok(())
 }
 
 #[test]
-fn oracle_cloud_writes_the_block_the_vnics_and_the_rules() {
-    let e = env(Target::CloudVm);
-    let oci = cloud("oci");
+fn oracle_cloud_writes_the_block_the_vnics_and_the_rules() -> Outcome {
+    let e = plan(SPEC, Target::CloudVm)?;
+    let oci = CloudVmModule::new(Cloud::Oci);
     assert_eq!(oci.refusal(&e), None);
-    let tf = &oci.render(&e).unwrap()[0].contents;
+    let tf = &oci.render(&e)?.contents;
     // The spec's blocks alone: the VCN's private prefixes, no Oracle-allocated public one.
     assert!(tf.contains("is_ipv6enabled                   = true"), "{tf}");
     assert!(tf.contains("is_oracle_gua_allocation_enabled = false"), "{tf}");
@@ -93,17 +84,18 @@ fn oracle_cloud_writes_the_block_the_vnics_and_the_rules() {
     );
     assert!(tf.contains("source      = \"::/0\"\n    protocol    = \"58\""), "{tf}");
     assert!(!tf.contains("ip -6 route"), "{tf}");
+    Ok(())
 }
 
 #[test]
-fn oracle_cloud_reads_back_the_addresses_it_picks() {
+fn oracle_cloud_reads_back_the_addresses_it_picks() -> Outcome {
     let spec = SPEC
         .replace("ipv6: { cidr: \"fd00:67:20::/64\" }", "ipv6: { cidr: \"fd00:67:20::/64\", addresses: auto }")
         .replace("user: { networks: { front: 10 }", "user: { networks: { front: 10, back: 20 }");
-    let e = env_of(&spec);
-    let oci = cloud("oci");
+    let e = plan(&spec, Target::CloudVm)?;
+    let oci = CloudVmModule::new(Cloud::Oci);
     assert_eq!(oci.refusal(&e), None);
-    let tf = &oci.render(&e).unwrap()[0].contents;
+    let tf = &oci.render(&e)?.contents;
     // No address named on `back`: Oracle Cloud picks it, and the set-up reads it back.
     assert!(!tf.contains("fd00:67:20::10"), "{tf}");
     assert!(
@@ -113,16 +105,20 @@ fn oracle_cloud_reads_back_the_addresses_it_picks() {
     assert!(tf.contains("data.oci_core_vnic.user_back.ipv6addresses[0]"), "{tf}");
     assert!(tf.contains("inet 10.67.20.20/"), "{tf}");
     // Azure gives each interface its derived address, so it refuses.
-    let azure = cloud("azure").refusal(&e).unwrap();
+    let azure = CloudVmModule::new(Cloud::Azure).refusal(&e).unwrap();
     assert!(azure.contains("`ipv6.addresses: auto`"), "{azure}");
+    Ok(())
 }
 
 #[test]
-fn oracle_cloud_refuses_what_its_prefixes_cannot_hold() {
+fn oracle_cloud_refuses_what_its_prefixes_cannot_hold() -> Outcome {
     let reserved = SPEC.replace("user: { networks: { front: 10 }", "user: { networks: { front: 3 }");
-    let why = cloud("oci").refusal(&env_of(&reserved)).unwrap();
+    let why = CloudVmModule::new(Cloud::Oci).refusal(&plan(&reserved, Target::CloudVm)?).unwrap();
     assert!(why.contains("first four IPv6 addresses") && why.contains("fd00:67:10::3"), "{why}");
     let only = SPEC.replace("ipv6: { cidr: \"fd00:67:10::/64\" }", "ipv6: { cidr: \"fd00:67:10::/64\", only: true }");
-    let why = cloud("oci").refusal(&env_of(&only)).unwrap();
-    assert!(why.contains("IPv6-only"), "{why}");
+    // Not a valid spec (an IPv6-only network has no way out): the cloud refuses it all the same.
+    let unchecked = isoloom_plan::Environment::build(&isoloom_spec::parse(&only)?, Target::CloudVm, None);
+    let ipv6_only = CloudVmModule::new(Cloud::Oci).refusal(&unchecked).unwrap();
+    assert!(ipv6_only.contains("IPv6-only"), "{ipv6_only}");
+    Ok(())
 }

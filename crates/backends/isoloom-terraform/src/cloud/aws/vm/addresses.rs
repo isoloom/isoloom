@@ -63,7 +63,7 @@ pub(super) fn on_interface(nic: BlockBuilder, mp: Option<&MachinePlan>, network:
     if s.single.is_empty() && s.prefixes.is_empty() {
         return nic.add_attribute(("private_ips", list([string(primary)])));
     }
-    let addresses = std::iter::once(primary.to_string()).chain(s.single.iter().map(ToString::to_string));
+    let addresses = std::iter::once(primary.to_owned()).chain(s.single.iter().map(ToString::to_string));
     let nic = nic
         .add_attribute(("private_ip_list_enabled", boolean(true)))
         .add_attribute(("private_ip_list", list(addresses.map(string))));
@@ -99,8 +99,7 @@ const PER_INTERFACE: &[(&str, usize)] = &[
 pub(super) fn sized(size: &'static str, mp: &MachinePlan) -> &'static str {
     let need = slots(mp, !mp.is_windows());
     let from = PER_INTERFACE.iter().position(|(t, _)| *t == size).unwrap_or(0);
-    let fits = |(_, ips): &&(&str, usize)| *ips >= need;
-    PER_INTERFACE[from..].iter().find(fits).map_or(size, |(t, _)| t)
+    PER_INTERFACE.iter().skip(from).find(|(_, ips)| *ips >= need).map_or(size, |(t, _)| t)
 }
 
 /// Why AWS can't give machine `name` its addresses: more on one interface than its largest

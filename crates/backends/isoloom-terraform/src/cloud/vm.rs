@@ -2,9 +2,9 @@
 //! `.isoloom/cloud-vm/<cloud>/`, and the check runners every cloud shares under
 //! `.isoloom/cloud-vm/checks/`.
 //!
-//! Each cloud's module is a backend of its own ([`CloudVmModule`]): its refusal read from the
-//! plan, then its module, rendered from the plan through the VM core (`crate::machine`). No
-//! cloud stands for the others: a cloud whose refusal fires drops only its module, so a
+//! Each cloud's module is its own ([`CloudVmModule`]): its refusal read from the plan, then its
+//! module, rendered from the plan through the VM core (`crate::machine`). No cloud stands for
+//! the others: a cloud whose refusal fires drops only its module, so a
 //! feature one cloud can't do never hides another cloud's working module. The target is
 //! refused only when every cloud refuses it ([`CloudVmBackend`]).
 //!
@@ -28,7 +28,7 @@ pub(crate) mod reach;
 pub(crate) mod rules;
 pub(crate) mod windows;
 
-use isoloom_plan::{Capabilities, Environment, Feature};
+use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::{Backend, Files, RenderError};
 use isoloom_render::hcl_builder::Module;
@@ -56,9 +56,9 @@ pub(crate) fn providers(env: &Environment, base: &[Provider], windows: &[Provide
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Machines {
     /// A Linux VM's resources and set-up.
-    pub(crate) linux: fn(&Environment, &str, &mut Module),
+    pub(crate) linux: fn(&Environment, (&str, &MachinePlan), &mut Module),
     /// A Windows VM's resources and set-up.
-    pub(crate) windows: fn(&Environment, &str, &mut Module),
+    pub(crate) windows: fn(&Environment, (&str, &MachinePlan), &mut Module),
     /// The controller's resources and set-up.
     pub(crate) controller: fn(&Environment, &mut Module),
 }
@@ -68,7 +68,7 @@ impl Machines {
     pub(crate) fn write(&self, env: &Environment, m: &mut Module) {
         for (name, mp) in vms(env) {
             let machine = if mp.is_windows() { self.windows } else { self.linux };
-            machine(env, name, m);
+            machine(env, (name, mp), m);
         }
         if controller::needed(env) {
             (self.controller)(env, m);
@@ -83,52 +83,26 @@ pub(crate) fn credentials(env: &Environment, m: &mut Module) {
     controller::write_key(env, m);
 }
 
-/// What the clouds of the target can render: environment-level provisioning (a controller),
-/// playbook checks (refused by each cloud's own limit until the cloud runs them), `exec` checks
-/// (run on the machine), machine aliases and ulimits (the set-up steps), and gateway networks
-/// and link impairment (refused by each cloud's own limits, with their own reasons: the plan's
-/// requirements name other targets), data disks (a volume each, attached; raw ones left
-/// unformatted) and tmpfs modes (a VM sets its tmpfs up in its provisioning).
+/// What the clouds of the target can render: the VM core's features (`machine::FEATURES`),
+/// each cloud refusing on its own, with its reason, what it can't give (a router in the path
+/// for `tc`, a network's MTU, a further address on DigitalOcean); and these.
 fn capabilities() -> Capabilities {
-    Capabilities::of([
-        Feature::EnvironmentProvisioning,
-        Feature::PlaybookChecks,
-        Feature::ExecWithoutContainer,
-        Feature::Gateways,
-        Feature::MachineAliases,
-        Feature::Ulimits,
-        Feature::TrafficControl,
-        Feature::Ipv6,
+    Capabilities::of(machine::FEATURES.into_iter().chain([
         // Addresses the cloud hands out: Oracle Cloud picks one in the subnet's prefix; Azure
         // refuses it on its own, and the other clouds refuse IPv6 altogether.
         Feature::Ipv6Auto,
         // Given on AWS (NitroTPM), Azure, Google Cloud and Oracle Cloud; DigitalOcean and Linode
         // refuse it on their own.
         Feature::Tpm,
-        // Delivered by `isoloom run` over the machine's SSH, owners included.
-        Feature::Secrets,
-        Feature::SecretOwners,
-        Feature::MachineProcess,
         // A GPU instance type (each cloud's own table; refused where it has none).
         Feature::VmGpus,
         // A size that nests and the cloud's switch (refused by the clouds that have none).
         Feature::NestedVirtualization,
-        // The cloud's private zone (AWS, Azure, Google Cloud, Oracle Cloud), and every VM's
-        // hosts file (on DigitalOcean and Linode, which have no private DNS, the hosts file only).
-        Feature::PrivateDns,
-        // The cloud learns them (a secondary address, an alias range) and the VM's set-up adds
-        // them; DigitalOcean, which gives a Droplet one VPC address, refuses.
-        Feature::VmMoreAddresses,
-        // A network's MTU: Google Cloud sets it on its VPC; the other clouds refuse it on their
-        // own (they have no setting for it).
-        Feature::NetworkMtu,
-        Feature::DataDisks,
-        Feature::RawDisks,
-        Feature::TmpfsModes,
-    ])
+    ]))
 }
 
-/// The `cloud-vm` module on one cloud: its refusal, then its module.
+/// The `cloud-vm` module on one cloud: its refusal, then its module (what [`CloudVmBackend`]
+/// writes for each cloud that takes the environment).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CloudVmModule(Cloud);
 
@@ -163,7 +137,24 @@ impl CloudVmModule {
         }
     }
 
-    /// Its module, `.isoloom/cloud-vm/<cloud>/main.tf`, for an environment it takes.
+    /// Why its cloud can't run `env`: the plan's requirements the target lacks, else the
+    /// cloud's own rules.
+    #[must_use]
+    pub fn refusal(self, env: &Environment) -> Option<String> {
+        target::refusal(env, &capabilities(), || self.own_refusal(env))
+    }
+
+    /// Its module, `.isoloom/cloud-vm/<cloud>/main.tf`.
+    ///
+    /// # Errors
+    ///
+    /// The [`refusal`](Self::refusal) as an unsupported environment for `cloud-vm`, or the
+    /// module that couldn't be written.
+    pub fn render(self, env: &Environment) -> std::result::Result<GeneratedFile, RenderError> {
+        target::render(Target::CloudVm, &capabilities(), env, || self.own_refusal(env), || self.module(env))
+    }
+
+    /// Its module, for an environment it takes.
     fn module(self, env: &Environment) -> Result<GeneratedFile> {
         match self.0 {
             Cloud::Aws => aws::vm::module(env),
@@ -173,24 +164,6 @@ impl CloudVmModule {
             Cloud::Linode => linode::vm::module(env),
             Cloud::Oci => oci::vm::module(env),
         }
-    }
-}
-
-impl Backend for CloudVmModule {
-    fn target(&self) -> Target {
-        Target::CloudVm
-    }
-
-    fn capabilities(&self) -> Capabilities {
-        capabilities()
-    }
-
-    fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {
-        target::render(Target::CloudVm, &capabilities(), env, || self.own_refusal(env), || Ok(vec![self.module(env)?]))
-    }
-
-    fn refusal(&self, env: &Environment) -> Option<String> {
-        target::refusal(env, &capabilities(), || self.own_refusal(env))
     }
 }
 

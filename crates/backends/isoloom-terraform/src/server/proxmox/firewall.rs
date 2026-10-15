@@ -60,7 +60,9 @@ fn accept(comment: &str, fields: Vec<(&str, Expression)>) -> Block {
 
 /// The rules into machine `name`: its networks, the `reach` rules into them, its published ports.
 fn rules(env: &Environment, name: &str) -> Vec<Block> {
-    let mp = &env.machines[name];
+    let (Some(mp), Some(m)) = (env.machines.get(name), env.spec().machines.get(name)) else {
+        return Vec::new();
+    };
     let mut out: Vec<Block> = mp.addresses.keys().map(|n| accept(&format!("network {n}"), vec![("source", set(n))])).collect();
     let spec = env.spec();
     let into = spec
@@ -84,7 +86,7 @@ fn rules(env: &Environment, name: &str) -> Vec<Block> {
         f.push(("macro", string("Ping")));
         out.push(accept(&comment, f));
     }
-    for p in &spec.machines[name].ports {
+    for p in &m.ports {
         if p.publish.is_some() {
             let f = vec![("proto", string(p.protocol.id())), ("dport", string(p.port.to_string()))];
             out.push(accept("published", f));

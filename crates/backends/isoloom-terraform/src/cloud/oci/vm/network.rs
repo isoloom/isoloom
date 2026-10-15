@@ -17,12 +17,12 @@
 //!   prefixes itself; no IPv6 route leaves it, since Oracle Cloud routes no private prefix to
 //!   the internet (machines go out over IPv4).
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, NetworkPlan};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, index, list, number, reference, string};
 
 use crate::cloud::instance::name_with;
 use crate::cloud::oci::{in_compartment, route_out};
-use crate::cloud::vm::gateways::routed;
+use crate::cloud::vm::gateways::{Hop, routed, through, toward};
 use crate::cloud::vm::reach::{self, Rule};
 use crate::module::{ident, resource};
 
@@ -65,7 +65,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     for (net, p) in &env.networks {
         m.commented(
             &format!("Network `{net}`: what may reach its machines, and where they may go."),
-            security_list(env, net, &p.cidr),
+            security_list(env, (net, p)),
         );
         let mut subnet = in_compartment(resource("oci_core_subnet", &ident(net)))
             .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
@@ -156,7 +156,8 @@ fn reach_rules(kind: &str, rules: &[Rule<'_>], what: &str) -> Vec<Block> {
 }
 
 /// A network's security list: the IPv4 rules, then their IPv6 mirror on a dual-stack network.
-fn security_list(env: &Environment, net: &str, cidr: &str) -> Block {
+fn security_list(env: &Environment, (net, p): (&str, &NetworkPlan)) -> Block {
+    let cidr = p.cidr.as_str();
     let (inbound, outbound) = ("ingress_security_rules", "egress_security_rules");
     let allowed = || reference("var.allowed_cidr");
     let mut b = in_vcn(resource("oci_core_security_list", &ident(net)), display(net))
@@ -170,7 +171,7 @@ fn security_list(env: &Environment, net: &str, cidr: &str) -> Block {
         b = b.add_block(rule(outbound, "the internet", string(block), "all", None));
     }
     b = b.add_block(fragmentation(outbound, false));
-    if let Some(v6) = env.networks[net].ipv6.as_ref().map(|v| v.cidr.as_str()) {
+    if let Some(v6) = p.ipv6.as_ref().map(|v| v.cidr.as_str()) {
         b = b
             .add_block(rule(inbound, "its own network (IPv6)", string(v6), "all", None))
             .add_blocks(reach_rules(inbound, &ipv6(env, reach::into(env, net)), "from"))
@@ -187,52 +188,42 @@ fn ipv6<'a>(env: &'a Environment, rules: Vec<Rule<'a>>) -> Vec<Rule<'a>> {
     rules
         .into_iter()
         .filter_map(|r| {
-            let v6 = env.networks[r.network].ipv6.as_ref()?;
+            let v6 = env.networks.get(r.network)?.ipv6.as_ref()?;
             Some(Rule { cidr: &v6.cidr, ..r })
         })
         .collect()
 }
 
-/// The private IP of machine `gateway`'s VNIC toward `net` (on it, else its first), looked up
-/// once the VNIC exists.
-fn gateway_ip(env: &Environment, gateway: &str, net: &str) -> (String, Block) {
-    let addresses = &env.machines[gateway].addresses;
-    let on = if addresses.contains_key(net) {
-        net
-    } else {
-        addresses.keys().next().map_or(net, String::as_str)
-    };
-    let id = format!("{}_{}", ident(gateway), ident(on));
-    let mut after = vec![reference(&format!("oci_core_instance.{}", ident(gateway)))];
-    if addresses.keys().next().is_some_and(|first| first != on) {
+/// The private IP of the gateway's VNIC toward `net` (`gateways::toward`), looked up once the
+/// VNIC exists.
+fn gateway_ip(hop: &Hop, net: &str) -> Option<(String, Block)> {
+    let (on, address) = toward(hop.machine, net)?;
+    let id = format!("{}_{}", ident(hop.gateway), ident(on));
+    let mut after = vec![reference(&format!("oci_core_instance.{}", ident(hop.gateway)))];
+    if hop.machine.addresses.keys().next().is_some_and(|first| first != on) {
         after.push(reference(&format!("oci_core_vnic_attachment.{id}")));
     }
     let data = Block::builder("data")
         .add_label("oci_core_private_ips")
         .add_label(&id)
-        .add_attribute(("ip_address", string(addresses[on].to_string())))
+        .add_attribute(("ip_address", string(address.to_string())))
         .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", ident(on)))))
         .add_attribute(("depends_on", list(after)))
         .build();
-    (id, data)
+    Some((id, data))
 }
 
 /// With a machine routing a network: each network's own route table, attached to its subnet
 /// once the gateways exist, and the gateways' private IPs it names.
 pub(super) fn gateway_routes(env: &Environment, m: &mut Module) {
-    let gateways = routed(env);
-    if gateways.is_empty() {
+    if routed(env).is_empty() {
         return;
     }
     let mut lookups: Vec<String> = Vec::new();
     for net in env.networks.keys() {
-        let own = gateways.iter().find(|(n, _)| *n == net.as_str()).map(|(_, g)| *g);
         let mut table = in_vcn(resource("oci_core_route_table", &ident(net)), display(net)).add_block(route_out());
-        for (other, p) in env.networks.iter().filter(|(n, _)| *n != net) {
-            let Some(gateway) = own.or_else(|| gateways.iter().find(|(n, _)| *n == other.as_str()).map(|(_, g)| *g)) else {
-                continue;
-            };
-            let (id, data) = gateway_ip(env, gateway, net);
+        for hop in through(env, net) {
+            let Some((id, data)) = gateway_ip(&hop, net) else { continue };
             if !lookups.contains(&id) {
                 m.block(data);
                 lookups.push(id.clone());
@@ -240,7 +231,7 @@ pub(super) fn gateway_routes(env: &Environment, m: &mut Module) {
             let ip = attr(index(reference(&format!("data.oci_core_private_ips.{id}.private_ips")), 0), "id");
             table = table.add_block(
                 Block::builder("route_rules")
-                    .add_attribute(("destination", string(p.cidr.as_str())))
+                    .add_attribute(("destination", string(hop.plan.cidr.as_str())))
                     .add_attribute(("network_entity_id", ip))
                     .build(),
             );

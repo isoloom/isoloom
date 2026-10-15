@@ -1,11 +1,12 @@
 //! The VPC, its subnets, and each machine's security group.
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, boolean, list, object, reference, string};
 
 use super::routing;
 use crate::cloud::aws::{egress, first_zone, ingress, key_pair, route_out};
 use crate::cloud::instance::name_with;
+use crate::cloud::vm::reach;
 use crate::module::{ident, resource};
 
 /// The networks: one VPC, a subnet per network with its exact range (the first network's block
@@ -89,19 +90,13 @@ fn subnet(net: &str, cidr: &str, added: bool, table: &str) -> [Block; 2] {
 /// Who may reach a machine: its own networks, the networks `reach` opens to it (on their ports,
 /// TCP and UDP), its set-up from `allowed_cidr` (SSH, or WinRM on Windows), and its published
 /// ports from `allowed_cidr`.
-pub(super) fn security_group(env: &Environment, name: &str, windows: bool) -> Block {
-    let spec = env.spec();
-    let m = &spec.machines[name];
+pub(super) fn security_group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Block {
     let mut b = resource("aws_security_group", &ident(name))
         .add_attribute(("name", name_with(&format!("-{name}"))))
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")));
-    for n in m.networks.keys() {
-        b = b.add_block(ingress(
-            &format!("its network ({n})"),
-            (0, 0),
-            "-1",
-            list([string(env.networks[n].cidr.as_str())]),
-        ));
+    let Some(m) = env.spec().machines.get(name) else { return b.build() };
+    for (n, p) in reach::own(env, m) {
+        b = b.add_block(ingress(&format!("its network ({n})"), (0, 0), "-1", list([string(p.cidr.as_str())])));
     }
     let allowed = || list([reference("var.allowed_cidr")]);
     b = b.add_block(if windows {
@@ -109,12 +104,8 @@ pub(super) fn security_group(env: &Environment, name: &str, windows: bool) -> Bl
     } else {
         ingress("SSH from allowed_cidr", (22, 22), "tcp", allowed())
     });
-    for reach in spec
-        .reach
-        .iter()
-        .filter(|x| m.networks.contains_key(&x.to) && !m.networks.contains_key(&x.from))
-    {
-        let from = list([string(env.networks[&reach.from].cidr.as_str())]);
+    for (reach, plan) in reach::opening(env, m) {
+        let from = list([string(plan.cidr.as_str())]);
         let what = format!("reach from {}", reach.from);
         if reach.ports.is_empty() {
             b = b.add_block(ingress(&what, (0, 0), "-1", from));
@@ -126,7 +117,7 @@ pub(super) fn security_group(env: &Environment, name: &str, windows: bool) -> Bl
             }
         }
     }
-    for p in &env.machines[name].ports {
+    for p in &mp.ports {
         b = b.add_block(ingress("published", (p.publish, p.publish), p.protocol.id(), allowed()));
     }
     b.add_block(egress()).build()

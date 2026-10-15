@@ -3,7 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
 
-use std::path::Path;
+pub mod testing;
 
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
@@ -11,10 +11,7 @@ use isoloom_spec::model::Target;
 use isoloom_targets::composite::CloudDockerBackend;
 
 fn env(example: &str) -> Environment {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);
-    let spec = isoloom_spec::load(&dir).expect("the example loads");
-    assert!(isoloom_spec::validate(&spec).is_empty(), "the example is valid");
-    Environment::build(&spec, Target::CloudDocker, None)
+    testing::example(example, Target::CloudDocker).expect("the example plans")
 }
 
 #[test]

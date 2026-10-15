@@ -1,27 +1,21 @@
 //! The Proxmox module's links, firewall, pool, arm64 VMs and LXC containers (not run on a real
 //! host): what the module writes for each.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+pub mod testing;
 
-use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::ProxmoxBackend;
+use testing::{Outcome, file, plan};
 
-fn render(yaml: &str) -> String {
-    let spec = isoloom_spec::parse(yaml).unwrap();
-    assert_eq!(isoloom_spec::validate(&spec), vec![]);
-    let e = Environment::build(&spec, Target::Proxmox, None);
-    match ProxmoxBackend.render(&e) {
-        Ok(files) => files[0].contents.clone(),
-        Err(e) => panic!("{e}"),
-    }
+/// The module of `yaml`, a valid spec.
+fn render(yaml: &str) -> Outcome<String> {
+    Ok(file(&ProxmoxBackend.render(&plan(yaml, Target::Proxmox)?)?, "proxmox/main.tf")?.to_owned())
 }
 
-fn refusal(yaml: &str) -> String {
-    let spec = isoloom_spec::parse(yaml).unwrap();
-    let e = Environment::build(&spec, Target::Proxmox, None);
-    ProxmoxBackend.refusal(&e).expect("refused")
+/// Why Proxmox refuses `yaml`, if it does.
+fn refusal(yaml: &str) -> Outcome<Option<String>> {
+    testing::refusal(&ProxmoxBackend, yaml)
 }
 
 const TWO: &str = "version: 1
@@ -45,27 +39,29 @@ machines:
 ";
 
 #[test]
-fn a_lan_is_one_vlan_aware_vnet_and_its_vlans_are_tags() {
-    let tf = render(TWO);
+fn a_lan_is_one_vlan_aware_vnet_and_its_vlans_are_tags() -> Outcome {
+    let tf = render(TWO)?;
     assert!(tf.contains("resource \"proxmox_sdn_vnet\" \"office\""), "{tf}");
     assert!(tf.contains("vlan_aware = true"), "{tf}");
     assert!(!tf.contains("resource \"proxmox_sdn_vnet\" \"office_vlan10\""), "{tf}");
     assert!(tf.contains("vlan_id  = 10") || tf.contains("vlan_id = 10"), "{tf}");
     assert!(tf.contains("vlan_id  = 20") || tf.contains("vlan_id = 20"), "{tf}");
+    Ok(())
 }
 
 #[test]
-fn mtu_and_rate_limit_go_on_the_devices() {
-    let tf = render(TWO);
+fn mtu_and_rate_limit_go_on_the_devices() -> Outcome {
+    let tf = render(TWO)?;
     // The zone carries the largest; each device its network's.
     assert!(tf.contains("mtu   = 9000") || tf.contains("mtu = 9000"), "{tf}");
     assert!(tf.contains("= 1400"), "{tf}");
     assert!(tf.contains("rate_limit = 1.25"), "{tf}");
+    Ok(())
 }
 
 #[test]
-fn the_firewall_enforces_reach_and_the_published_ports() {
-    let tf = render(TWO);
+fn the_firewall_enforces_reach_and_the_published_ports() -> Outcome {
+    let tf = render(TWO)?;
     assert!(tf.contains("resource \"proxmox_virtual_environment_firewall_ipset\" \"servers\""), "{tf}");
     assert!(tf.contains("resource \"proxmox_virtual_environment_firewall_options\" \"web\""), "{tf}");
     assert!(tf.contains("input_policy  = \"DROP\""), "{tf}");
@@ -74,21 +70,23 @@ fn the_firewall_enforces_reach_and_the_published_ports() {
     assert!(tf.contains("firewall"), "{tf}");
     assert!(tf.contains("resource \"proxmox_virtual_environment_pool\" \"env\""), "{tf}");
     assert!(tf.contains("= proxmox_virtual_environment_pool.env.pool_id"), "{tf}");
+    Ok(())
 }
 
 #[test]
-fn an_arm64_machine_is_an_emulated_aarch64_vm() {
+fn an_arm64_machine_is_an_emulated_aarch64_vm() -> Outcome {
     let tf = render(
         "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, arch: arm64, vm: { os: debian@12, provision: [s.sh] } }\n",
-    );
+    )?;
     assert!(tf.contains("debian-12-genericcloud-arm64.qcow2"), "{tf}");
     assert!(tf.contains("architecture = \"aarch64\""), "{tf}");
     assert!(tf.contains("bios"), "{tf}");
     assert!(tf.contains("\"serial0\""), "{tf}");
     let why = refusal(
         "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, arch: arm64, vm: { os: rocky@9, provision: [s.sh] } }\n",
-    );
+    )?.expect("refused");
     assert!(why.contains("no arm64 Proxmox image for `rocky-9`"), "{why}");
+    Ok(())
 }
 
 const LXC: &str = "version: 1
@@ -101,8 +99,8 @@ machines:
 ";
 
 #[test]
-fn an_lxc_machine_is_a_container_from_its_oci_image() {
-    let tf = render(LXC);
+fn an_lxc_machine_is_a_container_from_its_oci_image() -> Outcome {
+    let tf = render(LXC)?;
     assert!(tf.contains("resource \"proxmox_oci_image\" \"web\""), "{tf}");
     assert!(
         tf.contains("reference           = \"docker.io/library/nginx:1.27\"") || tf.contains("\"docker.io/library/nginx:1.27\""),
@@ -117,14 +115,16 @@ fn an_lxc_machine_is_a_container_from_its_oci_image() {
     // The router answers the environment's names for it.
     assert!(tf.contains("dnsmasq"), "{tf}");
     assert!(tf.contains("10.9.0.10 web"), "{tf}");
+    Ok(())
 }
 
 #[test]
-fn lxc_is_opt_in_and_refuses_what_a_container_cannot_carry() {
-    let spec = isoloom_spec::parse(&LXC.replace(", lxc: true", "")).unwrap();
+fn lxc_is_opt_in_and_refuses_what_a_container_cannot_carry() -> Outcome {
+    let spec = isoloom_spec::parse(&LXC.replace(", lxc: true", ""))?;
     assert!(!isoloom_spec::effective(&spec).contains(&Target::Proxmox));
-    let why = refusal(&LXC.replace("environment: { MODE: lab }", "volumes: { data: /data }"));
-    assert!(why.contains("`volumes`"), "{why}");
-    let why = refusal(&LXC.replace("environment: { MODE: lab }", "disks: { data: { size_gb: 2, mount: /data } }"));
-    assert!(why.contains("`disks`"), "{why}");
+    let volumes = refusal(&LXC.replace("environment: { MODE: lab }", "volumes: { data: /data }"))?.expect("refused");
+    assert!(volumes.contains("`volumes`"), "{volumes}");
+    let disks = refusal(&LXC.replace("environment: { MODE: lab }", "disks: { data: { size_gb: 2, mount: /data } }"))?.expect("refused");
+    assert!(disks.contains("`disks`"), "{disks}");
+    Ok(())
 }

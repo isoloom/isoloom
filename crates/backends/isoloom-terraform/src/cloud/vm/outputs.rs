@@ -36,8 +36,8 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
         );
     }
     let published: Vec<(String, Expression)> = vms(env)
-        .flat_map(|(n, _)| {
-            let sm = &env.spec().machines[n];
+        .filter_map(|(n, _)| Some((n, env.spec().machines.get(n)?)))
+        .flat_map(|(n, sm)| {
             sm.ports.iter().filter_map(move |sv| {
                 let h = sv.publish?;
                 let at = Template::new().with_expr((reach.public_ip)(n)).with_text(format!(":{h}"));
@@ -54,7 +54,11 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
 /// else the controller.
 fn stand_at(env: &Environment, reach: &Reach) -> Expression {
     let linux: Vec<&str> = vms(env).filter(|(_, mp)| !mp.is_windows()).map(|(n, _)| n).collect();
-    let access = linux.iter().rev().find(|n| env.spec().machines[**n].access).or(linux.first());
+    let access = linux
+        .iter()
+        .rev()
+        .find(|n| env.spec().machines.get(**n).is_some_and(|m| m.access))
+        .or(linux.first());
     match (access, &reach.controller) {
         (Some(n), _) => (reach.public_ip)(n),
         (None, Some((c, _))) if controller::needed(env) => c.clone(),

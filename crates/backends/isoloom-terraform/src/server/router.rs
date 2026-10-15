@@ -67,12 +67,12 @@ pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
         .spec()
         .machines
         .iter()
-        .filter(|(_, m)| !m.networks.is_empty())
-        .flat_map(|(name, m)| {
-            m.ports.iter().filter_map(move |sv| {
+        .filter(|(_, machine)| !machine.networks.is_empty())
+        .flat_map(|(name, machine)| {
+            machine.ports.iter().filter_map(move |sv| {
                 let h = sv.publish?;
                 let at = Template::new().with_expr(reference("local.router_address")).with_text(format!(":{h}"));
-                Some((format!("{name}/{}", m.port_label(sv)), at.into_expression()))
+                Some((format!("{name}/{}", machine.port_label(sv)), at.into_expression()))
             })
         })
         .collect();
@@ -83,7 +83,7 @@ pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
         .spec()
         .machines
         .iter()
-        .filter(|(_, m)| m.vm.is_some())
+        .filter(|(_, machine)| machine.vm.is_some())
         .filter_map(|(n, _)| first_address(env, n).map(|a| (n.clone(), string(a))))
         .collect();
     m.commented(

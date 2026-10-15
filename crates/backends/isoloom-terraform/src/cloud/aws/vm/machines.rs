@@ -14,7 +14,7 @@ use crate::cloud::auto_stop;
 use crate::cloud::aws::instance_type;
 use crate::cloud::instance::name_with;
 use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image};
-use crate::machine::{controller, linux, windows};
+use crate::machine::{Remote, controller, linux, windows};
 use crate::module::{ident, resource};
 
 /// An instance's user data on Linux: the auto-stop, scheduled at first boot.
@@ -26,8 +26,7 @@ fn linux_user_data() -> Expression {
 /// network, its Elastic IP on several (AWS doesn't auto-assign one then).
 pub(super) fn public_ip(env: &Environment, name: &str) -> Expression {
     let id = ident(name);
-    let mp = &env.machines[name];
-    if !mp.is_windows() && addresses::needs_interfaces(mp) {
+    if env.machines.get(name).is_some_and(|mp| !mp.is_windows() && addresses::needs_interfaces(mp)) {
         reference(&format!("aws_eip.{id}.public_ip"))
     } else {
         reference(&format!("aws_instance.{id}.public_ip"))
@@ -43,10 +42,9 @@ fn ami(mp: &MachinePlan) -> Expression {
 }
 
 /// A Linux machine: its security group, its instance, its set-up over SSH.
-pub(super) fn linux(env: &Environment, name: &str, m: &mut Module) {
-    let mp = &env.machines[name];
+pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
     let id = ident(name);
-    m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, name, false));
+    m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
     let mut instance = resource("aws_instance", &id)
         .add_attribute(("ami", ami(mp)))
@@ -58,17 +56,20 @@ pub(super) fn linux(env: &Environment, name: &str, m: &mut Module) {
     }
     let instance = nesting(instance, mp);
     if addresses::needs_interfaces(mp) {
-        m.blocks(several_networks(env, name, instance));
+        m.blocks(several_networks((name, mp), instance));
     } else {
-        m.block(one_network(env, name, instance));
+        m.block(one_network((name, mp), instance));
     }
     let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
     at_boot.extend(gateways::at_boot(mp));
     let machine = linux::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("aws_instance.{id}.id")),
-        host: public_ip(env, name),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("aws_instance.{id}.id")),
+            host: public_ip(env, name),
+        },
         user: image_user(mp.os.as_deref().unwrap_or_default()).to_owned(),
         hooks: hooks::of(mp, at_boot),
     };
@@ -90,8 +91,7 @@ fn nitro_tpm(ami: &str) -> Block {
 }
 
 /// The instance on its network, at its address.
-fn one_network(env: &Environment, name: &str, instance: BlockBuilder) -> Block {
-    let mp = &env.machines[name];
+fn one_network((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Block {
     let id = ident(name);
     let Some((net, addr)) = mp.addresses.first() else { return instance.build() };
     // A gateway forwards traffic that isn't its own.
@@ -116,8 +116,7 @@ fn one_network(env: &Environment, name: &str, instance: BlockBuilder) -> Block {
 /// An interface per network at its address (source/destination check off, so a reply can leave
 /// from the interface of the network it's for), the instance on the first, the others attached,
 /// and an Elastic IP on the first.
-fn several_networks(env: &Environment, name: &str, instance: BlockBuilder) -> Vec<Block> {
-    let mp = &env.machines[name];
+fn several_networks((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Vec<Block> {
     let id = ident(name);
     let group = reference(&format!("aws_security_group.{id}.id"));
     let mut out: Vec<Block> = mp
@@ -167,14 +166,14 @@ fn disk(gb: u32) -> Block {
 
 /// The interfaces after the first, attached to instance `id` in order.
 fn attachments(id: &str, interfaces: impl Iterator<Item = String>) -> Vec<Block> {
-    interfaces
-        .enumerate()
+    (0_u64..)
+        .zip(interfaces)
         .skip(1)
         .map(|(i, nic)| {
             resource("aws_network_interface_attachment", &nic)
                 .add_attribute(("instance_id", reference(&format!("aws_instance.{id}.id"))))
                 .add_attribute(("network_interface_id", reference(&format!("aws_network_interface.{nic}.id"))))
-                .add_attribute(("device_index", number(i as u64)))
+                .add_attribute(("device_index", number(i)))
                 .build()
         })
         .collect()
@@ -194,10 +193,12 @@ fn mac(nic: &str) -> Expression {
 
 /// A Windows machine: its security group, its instance (the administrator and WinRM at first
 /// boot), its set-up over WinRM.
-pub(super) fn windows(env: &Environment, name: &str, m: &mut Module) {
-    let mp = &env.machines[name];
+pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
     let id = ident(name);
-    m.commented(&format!("Machine `{name}` (Windows): what may reach it."), security_group(env, name, true));
+    m.commented(
+        &format!("Machine `{name}` (Windows): what may reach it."),
+        security_group(env, (name, mp), true),
+    );
     let Some((net, addr)) = mp.addresses.first() else { return };
     // Windows wants 2 GB and more.
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB).max(2048);
@@ -218,10 +219,13 @@ pub(super) fn windows(env: &Environment, name: &str, m: &mut Module) {
         instance,
     );
     m.blocks(windows::blocks(windows::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("aws_instance.{id}.id")),
-        host: reference(&format!("aws_instance.{id}.public_ip")),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("aws_instance.{id}.id")),
+            host: reference(&format!("aws_instance.{id}.public_ip")),
+        },
         password: reference(windows::PASSWORD),
         skip: hooks::network_does,
         platform: windows::Platform::default(),

@@ -9,8 +9,8 @@ use isoloom_render::steps;
 use isoloom_spec::model::Port;
 
 use super::provisioner::{Connection, Provisioner, Upload};
-use super::{linux, vms};
-use crate::module::{self, ident};
+use super::{Remote, linux, vms};
+use crate::module::{self, ident, resource};
 
 /// The Terraform expression of the Windows machines' password.
 pub(crate) const PASSWORD: &str = "random_password.windows.result";
@@ -31,17 +31,11 @@ const SETUP: &str = "C:/ProgramData/isoloom/setup.ps1";
 /// Where the project's archive goes (the `Project` step unpacks it from there).
 const ARCHIVE: &str = "C:/Windows/Temp/isoloom-project.tgz";
 
-/// A Windows machine, as Terraform reaches it.
+/// A Windows machine, as Terraform reaches it over WinRM.
 #[derive(Debug, Clone)]
 pub(crate) struct Machine<'a> {
-    /// The plan.
-    pub(crate) env: &'a Environment,
     /// The machine.
-    pub(crate) name: &'a str,
-    /// What replaces its set-up when it changes (the instance's id).
-    pub(crate) replace_on: Expression,
-    /// Its address, from where Terraform runs.
-    pub(crate) host: Expression,
+    pub(crate) remote: Remote<'a>,
     /// The password of `isoloom`.
     pub(crate) password: Expression,
     /// The steps the platform does itself, left out.
@@ -71,9 +65,10 @@ pub(crate) fn computer_name(name: &str) -> String {
 /// restarts (`time_sleep.<id>_restart`) unless the platform names it, then its set-up
 /// (`terraform_data.<id>`).
 pub(crate) fn blocks(w: Machine) -> Vec<Block> {
-    let id = ident(w.name);
+    let Remote { env, name, plan, .. } = w.remote;
+    let id = ident(name);
     let connection = Connection::WinRm {
-        host: w.host.clone(),
+        host: w.remote.host.clone(),
         password: w.password.clone(),
         ntlm: w.platform.ntlm,
     };
@@ -94,18 +89,18 @@ pub(crate) fn blocks(w: Machine) -> Vec<Block> {
         content: string(setup_script(&w)),
         destination: SETUP.to_owned(),
     });
-    depends_on.extend(linux::depends_on(w.env, w.name));
+    depends_on.extend(linux::depends_on(env, plan));
     let mut commands = w.platform.before.clone();
     commands.push(string(format!("powershell -NoProfile -ExecutionPolicy Bypass -File {SETUP}")));
     let setup = Provisioner {
         name: id,
-        replace_on: w.replace_on,
+        replace_on: w.remote.replace_on,
         connection,
         uploads,
         parts: vec![commands],
         depends_on,
         // `isoloom run` delivers its secrets over WinRM while the set-up waits for them.
-        announce: (!w.env.machines[w.name].secrets.is_empty()).then(|| w.name.to_owned()),
+        announce: (!plan.secrets.is_empty()).then(|| name.to_owned()),
     };
     out.push(setup.block());
     out
@@ -114,11 +109,11 @@ pub(crate) fn blocks(w: Machine) -> Vec<Block> {
 /// Its renaming (`terraform_data.<id>_name`) and the pause while it restarts
 /// (`time_sleep.<id>_restart`).
 fn rename(w: &Machine, connection: &Connection) -> [Block; 2] {
-    let id = ident(w.name);
-    let host = computer_name(w.name);
+    let id = ident(w.remote.name);
+    let host = computer_name(w.remote.name);
     let rename = Provisioner {
         name: format!("{id}_name"),
-        replace_on: w.replace_on.clone(),
+        replace_on: w.remote.replace_on.clone(),
         connection: connection.clone(),
         uploads: Vec::new(),
         parts: vec![vec![string(format!(
@@ -128,9 +123,7 @@ fn rename(w: &Machine, connection: &Connection) -> [Block; 2] {
         depends_on: Vec::new(),
         announce: None,
     };
-    let pause = Block::builder("resource")
-        .add_label("time_sleep")
-        .add_label(format!("{id}_restart"))
+    let pause = resource("time_sleep", &format!("{id}_restart"))
         .add_attribute(("create_duration", string("90s")))
         .add_attribute(("depends_on", list([reference(&format!("terraform_data.{id}_name"))])))
         .build();
@@ -139,28 +132,29 @@ fn rename(w: &Machine, connection: &Connection) -> [Block; 2] {
 
 /// Whether its steps read the project (it gets the project then).
 fn has_runs(w: &Machine) -> bool {
-    isoloom_plan::machine_files::reads_project(&w.env.machines[w.name].lifecycle)
+    isoloom_plan::machine_files::reads_project(&w.remote.plan.lifecycle)
 }
 
 /// The set-up script: its name checked, published ports forwarded, its services' ports opened,
 /// then its steps.
 fn setup_script(w: &Machine) -> String {
-    let m = &w.env.spec().machines[w.name];
+    let Remote { env, name, plan, .. } = w.remote;
+    let ports = env.spec().machines.get(name).map(|m| m.ports.as_slice()).unwrap_or_default();
     let mut ps = vec![
         "$ErrorActionPreference = 'Stop'".to_owned(),
         format!(
             "if ($env:COMPUTERNAME -ne '{}') {{ throw \"still named $env:COMPUTERNAME: the rename hasn't taken effect\" }}",
-            computer_name(w.name).to_uppercase()
+            computer_name(name).to_uppercase()
         ),
     ];
-    ps.extend(m.ports.iter().filter_map(port_proxy));
-    ps.extend(m.ports.iter().flat_map(firewall));
+    ps.extend(ports.iter().filter_map(port_proxy));
+    ps.extend(ports.iter().flat_map(firewall));
     let runs = has_runs(w);
-    for step in w.env.machines[w.name].lifecycle.iter().filter(|s| !(w.skip)(s)) {
+    for step in plan.lifecycle.iter().filter(|s| !(w.skip)(s)) {
         if *step == Step::Project && !runs {
             continue;
         }
-        ps.extend(steps::windows(w.env, w.name, step).map(|s| s.trim_end().to_owned()));
+        ps.extend(steps::windows(env, name, step).map(|s| s.trim_end().to_owned()));
     }
     ps.join("\n") + "\n"
 }

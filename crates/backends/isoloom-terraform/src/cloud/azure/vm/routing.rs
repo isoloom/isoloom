@@ -13,19 +13,8 @@ use isoloom_render::hcl_builder::{Module, reference, string};
 
 use super::network::placed;
 use crate::cloud::instance::name_with;
-use crate::cloud::vm::gateways::{routed, through};
+use crate::cloud::vm::gateways::{routed, through, toward};
 use crate::module::{ident, resource};
-
-/// Machine `gateway`'s address toward `net`: its address there when it has one, else its first
-/// (one virtual network: any of its interfaces is reachable from every subnet).
-fn next_hop(env: &Environment, gateway: &str, net: &str) -> String {
-    let addresses = &env.machines[gateway].addresses;
-    addresses
-        .get(net)
-        .or_else(|| addresses.values().next())
-        .map(ToString::to_string)
-        .unwrap_or_default()
-}
 
 /// With a machine routing a network: each network's route table, its routes through the
 /// gateways and its association with the network's subnet.
@@ -42,15 +31,18 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         } else {
             m.block(table);
         }
-        for (other, gateway) in through(env, net) {
+        for hop in through(env, net) {
+            // The gateway's address toward `net` (one virtual network: any of its interfaces is
+            // reachable from every subnet).
+            let next_hop = toward(hop.machine, net).map(|(_, a)| a.to_string()).unwrap_or_default();
             m.block(
-                resource("azurerm_route", &format!("{id}_{}", ident(other)))
-                    .add_attribute(("name", string(format!("to-{other}"))))
+                resource("azurerm_route", &format!("{id}_{}", ident(hop.network)))
+                    .add_attribute(("name", string(format!("to-{}", hop.network))))
                     .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))
                     .add_attribute(("route_table_name", reference(&format!("azurerm_route_table.{id}.name"))))
-                    .add_attribute(("address_prefix", string(env.networks[other].cidr.as_str())))
+                    .add_attribute(("address_prefix", string(hop.plan.cidr.as_str())))
                     .add_attribute(("next_hop_type", string("VirtualAppliance")))
-                    .add_attribute(("next_hop_in_ip_address", string(next_hop(env, gateway, net))))
+                    .add_attribute(("next_hop_in_ip_address", string(next_hop)))
                     .build(),
             );
         }

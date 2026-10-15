@@ -73,7 +73,7 @@ fn windows_and_ipv6_are_hosted_within_limits() {
     assert_eq!(EsxiBackend.refusal(&env(&v6)), None);
     assert!(module(&v6).contains("\"10.20.2.254/24\", \"fd00:20::254/64\""), "the router's IPv6 address");
     let kali = PAIR.replace("os: debian@12", "os: kali");
-    let why = EsxiBackend.refusal(&env(&kali)).unwrap();
-    assert!(why.contains("no ESXi image for `kali`"), "{why}");
+    let no_image = EsxiBackend.refusal(&env(&kali)).unwrap();
+    assert!(no_image.contains("no ESXi image for `kali`"), "{no_image}");
     assert_eq!(EsxiBackend.refusal(&env(PAIR)), None);
 }

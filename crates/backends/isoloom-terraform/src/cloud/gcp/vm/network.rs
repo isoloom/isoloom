@@ -73,7 +73,7 @@ fn peerings(env: &Environment, m: &mut Module) {
         .collect();
     let mut before: Option<String> = None;
     for (i, a) in open.iter().enumerate() {
-        for b in &open[i + 1..] {
+        for b in open.iter().skip(i + 1) {
             for (from, to) in [(*a, *b), (*b, *a)] {
                 let id = format!("{}_{}", ident(from), ident(to));
                 let mut peering = resource("google_compute_network_peering", &id)
@@ -96,9 +96,9 @@ fn peerings(env: &Environment, m: &mut Module) {
 fn routes(env: &Environment, m: &mut Module) {
     let mut first = true;
     for net in env.networks.keys() {
-        for (other, gateway) in through(env, net) {
-            let Some(at) = env.machines[gateway].addresses.get(net) else { continue };
-            let route = route(net, (other, env.networks[other].cidr.as_str()), gateway, &at.to_string());
+        for hop in through(env, net) {
+            let Some(at) = hop.machine.addresses.get(net) else { continue };
+            let route = route(net, (hop.network, hop.plan.cidr.as_str()), hop.gateway, &at.to_string());
             if std::mem::take(&mut first) {
                 m.commented("The networks a machine routes: each VPC sends them to the gateway's address in it.", route);
             } else {

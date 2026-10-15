@@ -19,7 +19,7 @@ use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHEC
 use crate::cloud::vm::{disks, hooks, own_image, published};
 use crate::cloud::{Cloud, auto_stop, operator};
 use crate::limits::Limits;
-use crate::machine::{linux, vms};
+use crate::machine::{Remote, linux, vms};
 use crate::module::{self, ProjectCopy, Usage, ident, providers, resource};
 
 /// What DigitalOcean takes.
@@ -161,10 +161,13 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
         firewall(mp, &id),
     );
     let machine = linux::Machine {
-        env,
-        name,
-        replace_on: reference(&format!("digitalocean_droplet.{id}.id")),
-        host: public_ip(name),
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("digitalocean_droplet.{id}.id")),
+            host: public_ip(name),
+        },
         user: USER.to_owned(),
         hooks: hooks::of(mp, Vec::new()),
     };

@@ -58,7 +58,12 @@ pub(super) fn mounted(env: &Environment) -> Cow<'_, Environment> {
             if spec.volumes.get(volume.as_str()).is_some_and(|v| v.virtiofs.is_some()) {
                 *role = SharedRole::HostFolder {
                     tag_file: format!("{TAG_DIR}/{volume}"),
-                    folder: spec.machines[name.as_str()].volumes[volume.as_str()].subpath().map(String::from),
+                    folder: spec
+                        .machines
+                        .get(name.as_str())
+                        .and_then(|m| m.volumes.get(volume.as_str()))
+                        .and_then(|v| v.subpath())
+                        .map(String::from),
                 };
             }
         }

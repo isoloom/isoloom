@@ -16,7 +16,7 @@ pub(crate) fn up(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>, mac:
         .iter()
         .skip(1)
         .map(|(n, a)| {
-            let len = Cidr::parse(&env.networks[n].cidr).map_or(32, |c| c.len);
+            let len = env.networks.get(n).and_then(|p| Cidr::parse(&p.cidr)).map_or(32, |c| c.len);
             Template::text("IF=$(ip -o link | grep -i \"").with_expr(mac(n)).with_text(format!(
                 "\" | awk -F': ' '{{print $2}}'); sudo ip link set \"$IF\" up && (ip -4 addr show \"$IF\" | grep -q {a}/ || sudo ip addr add {a}/{len} dev \"$IF\")"
             ))

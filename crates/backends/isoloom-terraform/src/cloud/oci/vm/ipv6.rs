@@ -16,13 +16,16 @@ use crate::module::ident;
 
 /// Whether `net` is dual-stack and leaves its machines' addresses to Oracle Cloud.
 fn auto(env: &Environment, net: &str) -> bool {
-    env.networks[net].ipv6.as_ref().is_some_and(|v| v.addresses == Ipv6Addresses::Auto)
+    env.networks
+        .get(net)
+        .and_then(|p| p.ipv6.as_ref())
+        .is_some_and(|v| v.addresses == Ipv6Addresses::Auto)
 }
 
 /// A VNIC's IPv6 side on `net` (`create_vnic_details`): an address from the subnet's prefix,
 /// the machine's derived one unless the network leaves it to Oracle Cloud.
 pub(super) fn vnic(env: &Environment, mp: &MachinePlan, net: &str, b: BlockBuilder) -> BlockBuilder {
-    let Some(v6) = &env.networks[net].ipv6 else {
+    let Some(v6) = env.networks.get(net).and_then(|p| p.ipv6.as_ref()) else {
         return b;
     };
     let b = b.add_attribute(("assign_ipv6ip", boolean(true)));

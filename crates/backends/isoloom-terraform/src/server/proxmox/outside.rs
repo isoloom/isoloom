@@ -29,7 +29,7 @@ pub(super) fn interfaces(env: &Environment, mp: &MachinePlan) -> Vec<(Block, Blo
             };
             let ip = match address {
                 OutsideAddress::Fixed(ip) => format!("{ip}/{}", Cidr::parse(&n.cidr).map_or(32, |c| c.len)),
-                OutsideAddress::Dhcp => "dhcp".to_string(),
+                OutsideAddress::Dhcp => "dhcp".to_owned(),
             };
             // The machine's rate limit holds on every link; reach rules don't reach outside.
             Some((super::links::limited(device, mp).build(), ip_config(&ip, None)))
