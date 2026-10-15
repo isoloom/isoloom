@@ -18,26 +18,24 @@
 mod addresses;
 mod ipv6;
 mod network;
+mod private_dns;
 mod published;
 
+use std::net::Ipv4Addr;
+
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::GeneratedFile;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, index, list, number, object, reference, string};
-use isoloom_spec::model::Target;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::{SHAPE, availability_domain, availability_domains, in_compartment, provider, ubuntu_images};
-use crate::Result;
-use crate::cloud::instance::{self, name_with};
-use crate::cloud::vm::gpus::GpuSizes;
-use crate::cloud::vm::outputs::{self, Reach};
+use crate::cloud::instance::name_with;
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
-use crate::cloud::vm::{disks, gateways, hooks, interfaces, nested, own_image, private_dns};
-use crate::cloud::{Cloud, auto_stop, operator};
+use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
+use crate::cloud::{Cloud, auto_stop};
 use crate::limits::Limits;
 use crate::machine::{Remote, linux, vms};
 use crate::module::variable::Variable;
-use crate::module::{self, ProjectCopy, Usage, ident, providers, resource};
+use crate::module::{Usage, ident, providers, resource};
 
 /// What Oracle Cloud takes: Ubuntu, and Debian on the newest Ubuntu LTS (it has no Debian image).
 /// Any other OS needs an image of its own (`vm.image.oci`) rather than running Ubuntu in its place.
@@ -65,6 +63,8 @@ const RULES: Rules = Rules {
     picks_ipv6: true,
     volumes: Volumes { smallest_gb: 50, most: 15 },
     tpm: true,
+    subnets: None,
+    kept: None,
     images: Images {
         label: "Oracle Cloud",
         has: |os| matches!(os, "debian-12" | "debian-13" | "ubuntu-22.04" | "ubuntu-24.04"),
@@ -78,7 +78,7 @@ const USER: &str = "ubuntu";
 
 /// Why Oracle Cloud can't run this environment, if it can't: its rules, then what its VCN can't
 /// hold.
-pub(crate) fn refusal(env: &Environment) -> Option<String> {
+fn refusal(env: &Environment) -> Option<String> {
     RULES.linux_refusal(env).or_else(|| network::refusal(env)).or_else(|| ipv6::refusal(env))
 }
 
@@ -102,51 +102,48 @@ fn sizing(memory_mb: u32) -> (u32, u32) {
     ((gb / 8).max(1), gb)
 }
 
-/// The module: the images, the VCN, its security list and subnet, each machine, the outputs.
-pub(crate) fn module(env: &Environment) -> Result<GeneratedFile> {
-    let env = &*gateways::relocated(env);
-    let folder = format!("{}/{}", Target::CloudVm.id(), Cloud::Oci.id());
-    let usage = Usage {
+/// Its `cloud-vm` driver: its module takes the compartment it goes in, and authenticates with
+/// the OCI CLI's configuration.
+pub(crate) const DRIVER: Driver = Driver {
+    usage: |folder| Usage {
         after: "# Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.\n",
-        ..Usage::with_key(
-            &folder,
-            "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ",
-        )
-    };
-    let mut m = module::start(&usage);
-    m.block(providers::terraform(&[providers::OCI, providers::LOCAL]));
-    m.block(
-        Variable::new("compartment_id", "string")
-            .describe("The compartment the environment goes in")
-            .block(),
-    );
-    m.block(
-        Variable::new("region", "string")
-            .default(string("eu-paris-1"))
-            .describe("The OCI region to launch in")
-            .block(),
-    );
-    m.blocks(operator::variables(env));
-    m.block(provider());
-    m.blocks(instance::id_and_locals(env, Vec::new()));
+        ..Usage::with_key(folder, "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ")
+    },
+    requires: (&[providers::OCI, providers::LOCAL], &[]),
+    variables: || {
+        vec![
+            Variable::new("compartment_id", "string")
+                .describe("The compartment the environment goes in")
+                .block(),
+            Variable::new("region", "string")
+                .default(string("eu-paris-1"))
+                .describe("The OCI region to launch in")
+                .block(),
+        ]
+    },
+    provider: |_, m| {
+        m.block(provider());
+        Vec::new()
+    },
+    refusal,
+    write,
+};
+
+/// The module after its providers: the images, the VCN, its security list and subnet, each machine, the outputs.
+fn write(env: &Environment, m: &mut Module) {
+    let env = &*gateways::relocated(env);
     m.commented(
         "The compartment's availability domains; the instances land in the first.",
         availability_domains(),
     );
-    images(env, &mut m);
-    network::blocks(env, &mut m);
-    private_dns::oci(env, &mut m);
-    for (name, mp) in vms(env) {
-        machine(env, name, mp, &mut m);
+    images(env, m);
+    network::blocks(env, m);
+    private_dns::write(env, m);
+    for (vm, at) in vm::at_first_address(env) {
+        machine(env, vm, at, m);
     }
-    network::gateway_routes(env, &mut m);
-    let reach = Reach {
-        public_ip: &public_ip,
-        user: &|_| USER.to_owned(),
-        controller: None,
-    };
-    outputs::write(env, &reach, &mut m);
-    module::file(Target::CloudVm, &folder, m, ProjectCopy::Archive)
+    network::gateway_routes(env, m);
+    outputs::write_as(env, USER, &public_ip, m);
 }
 
 /// An instance's public address.
@@ -172,11 +169,8 @@ fn images(env: &Environment, m: &mut Module) {
 
 /// Machine `name`'s instance at its fixed address, its VNICs and further addresses, and its
 /// set-up over SSH.
-fn machine(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
+fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) {
     let id = ident(name);
-    let Some((net, address)) = mp.addresses.first() else {
-        return;
-    };
     let group = published::group(name, mp, m);
     m.commented(
         &format!("Machine `{name}`, at its fixed address {address}."),

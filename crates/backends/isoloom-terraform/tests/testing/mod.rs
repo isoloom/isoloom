@@ -8,6 +8,7 @@ use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
+use isoloom_terraform::{Cloud, CloudVmModule, ProxmoxBackend};
 
 /// A test's outcome: a failure is the report.
 pub type Outcome<T = ()> = Result<T, Box<dyn Error>>;
@@ -44,6 +45,24 @@ pub fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
 #[must_use]
 pub fn planned(lab: &Lab, target: Target) -> Environment {
     Environment::build(&lab.for_target(target), target, None)
+}
+
+/// `cloud`'s `cloud-vm` module for `yaml`, a valid spec.
+///
+/// # Errors
+///
+/// When the spec isn't valid, or the cloud refuses it.
+pub fn cloud_vm(cloud: Cloud, yaml: &str) -> Outcome<String> {
+    Ok(CloudVmModule::new(cloud).render(&plan(yaml, Target::CloudVm)?)?.contents)
+}
+
+/// The Proxmox module for `yaml`, a valid spec.
+///
+/// # Errors
+///
+/// When the spec isn't valid, or Proxmox refuses it.
+pub fn proxmox(yaml: &str) -> Outcome<String> {
+    Ok(file(&ProxmoxBackend.render(&plan(yaml, Target::Proxmox)?)?, "proxmox/main.tf")?.to_owned())
 }
 
 /// Why `backend` refuses `yaml` (a spec, valid or not), if it does.

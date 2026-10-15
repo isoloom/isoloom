@@ -20,25 +20,22 @@ mod addresses;
 mod machines;
 mod network;
 mod outputs;
+mod private_dns;
 mod routing;
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::GeneratedFile;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, string};
 use isoloom_spec::images::is_windows;
-use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use super::{ami, ami_filter, instance_type, provider, region, zones};
-use crate::Result;
-use crate::cloud::vm::gpus::GpuSizes;
-use crate::cloud::vm::rules::{Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes, kept_address};
-use crate::cloud::vm::{self, disks, gateways, nested, own_image, windows};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::cloud::{Cloud, instance, operator};
 use crate::limits::Limits;
 use crate::machine::{controller, vms};
 use crate::module::providers;
-use crate::module::{self, ProjectCopy, Usage, ident};
+use crate::module::{Usage, ident};
 
 /// What AWS takes.
 const RULES: Rules = Rules {
@@ -66,6 +63,11 @@ const RULES: Rules = Rules {
         most: disks::AWS_MAX_DISKS,
     },
     tpm: true,
+    subnets: Some(Subnets {
+        called: "subnets",
+        longest: 28,
+    }),
+    kept: Some(FIRST_THREE),
     images: Images {
         label: "AWS",
         has: |os| image(os).is_some(),
@@ -128,7 +130,7 @@ fn image_user(os: &str) -> &'static str {
 
 /// Why AWS can't run this environment, if it can't: its limits, then its address rules and
 /// images (a machine's own AMI stands in for its OS's), then its other features.
-pub(crate) fn refusal(env: &Environment) -> Option<String> {
+fn refusal(env: &Environment) -> Option<String> {
     RULES
         .limits
         .refusal(env)
@@ -143,56 +145,52 @@ pub(crate) fn refusal(env: &Environment) -> Option<String> {
 
 fn networks_refusal(env: &Environment) -> Option<String> {
     let nets: Vec<Cidr> = env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).collect();
-    if nets.iter().any(|c| c.len > 28) {
-        return Some("AWS subnets are /28 or larger".to_owned());
-    }
     let family = |c: &Cidr| c.base >> 24;
-    if nets.iter().any(|c| family(c) != nets.first().map_or(0, family)) {
-        return Some("AWS can't mix private ranges (10/8, 172.16/12, 192.168/16) in one VPC".to_owned());
-    }
-    windows::udp_redirect(env.spec())
+    let mixed = || nets.iter().any(|c| family(c) != nets.first().map_or(0, family));
+    RULES
+        .subnets(env)
+        .or_else(|| mixed().then(|| "AWS can't mix private ranges (10/8, 172.16/12, 192.168/16) in one VPC".to_owned()))
+        .or_else(|| windows::udp_redirect(env.spec()))
 }
 
 fn machines_refusal(env: &Environment) -> Option<String> {
     env.spec().machines.iter().find_map(|(name, m)| {
         let vm = m.vm.as_ref()?;
         RULES
-            .images
-            .missing(name, &vm.os, own_image::of_machine(m, RULES.images.own))
+            .image(name, m)
             .or_else(|| windows::refusal(name, m))
             .or_else(|| {
                 (is_windows(&vm.os) && vm.tpm == Some(true))
                     .then(|| format!("machine `{name}`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later"))
             })
             .or_else(|| env.machines.get(name).and_then(|mp| addresses::refusal(name, mp)))
-            .or_else(|| {
-                kept_address(env, name, m, 0..=3).map(|net| format!("machine `{name}`: AWS keeps the first addresses of a subnet (.1 to .3) on `{net}`"))
-            })
+            .or_else(|| RULES.kept(env, name, m))
     })
 }
 
-/// The module.
-pub(crate) fn module(env: &Environment) -> Result<GeneratedFile> {
+/// Its `cloud-vm` driver.
+pub(crate) const DRIVER: Driver = Driver {
+    usage: |folder| Usage::with_key(folder, operator::ALLOWED),
+    requires: (&[providers::AWS, providers::LOCAL], &[providers::RANDOM, providers::TIME]),
+    variables: || vec![region()],
+    provider: |env, m| {
+        m.block(provider(instance::tags(env)));
+        Vec::new()
+    },
+    refusal,
+    write,
+};
+
+/// The module's blocks after the providers, from the plan.
+fn write(env: &Environment, m: &mut Module) {
     let env = &*gateways::relocated(env);
-    let folder = format!("{}/{}", Target::CloudVm.id(), Cloud::Aws.id());
-    let mut m = module::start(&Usage::with_key(&folder, operator::ALLOWED));
-    m.block(providers::terraform(&vm::providers(
-        env,
-        &[providers::AWS, providers::LOCAL],
-        &[providers::RANDOM, providers::TIME],
-    )));
-    m.block(region());
-    m.blocks(operator::variables(env));
-    m.block(provider(instance::tags(env)));
-    m.blocks(instance::id_and_locals(env, Vec::new()));
     m.block(zones());
-    network::blocks(env, &mut m);
-    vm::private_dns::aws(env, &mut m);
-    vm::credentials(env, &mut m);
+    network::blocks(env, m);
+    private_dns::write(env, m);
+    vm::credentials(env, m);
     m.blocks(amis(env));
-    MACHINES.write(env, &mut m);
-    outputs::blocks(env, &mut m);
-    module::file(Target::CloudVm, &folder, m, ProjectCopy::Archive)
+    MACHINES.write(env, m);
+    outputs::blocks(env, m);
 }
 
 /// An AMI lookup per OS (the controller's among them).

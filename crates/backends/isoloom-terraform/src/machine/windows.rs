@@ -15,10 +15,15 @@ use crate::module::{self, ident, resource};
 /// The Terraform expression of the Windows machines' password.
 pub(crate) const PASSWORD: &str = "random_password.windows.result";
 
+/// Whether the environment has a Windows VM: its module then generates their password.
+pub(crate) fn any(env: &Environment) -> bool {
+    vms(env).any(|(_, mp)| mp.is_windows())
+}
+
 /// The Windows machines' administrator password (user `isoloom`), for WinRM, when a VM runs
 /// Windows.
 pub(crate) fn write_password(env: &Environment, m: &mut Module) {
-    if vms(env).any(|(_, mp)| mp.is_windows()) {
+    if any(env) {
         m.commented(
             "The Windows machines' administrator password (user isoloom), for WinRM.",
             module::password("windows"),

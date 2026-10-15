@@ -7,23 +7,20 @@
 
 mod network;
 
+use std::net::Ipv4Addr;
+
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::GeneratedFile;
 use isoloom_render::hcl_builder::{Block, Expression, Module, Template, boolean, call, list, reference, string};
 use isoloom_spec::DEFAULT_MEMORY_MB;
-use isoloom_spec::model::Target;
 
 use super::region;
-use crate::Result;
-use crate::cloud::instance::{self, name_with, tag_list};
-use crate::cloud::vm::gpus::GpuSizes;
-use crate::cloud::vm::outputs::{self, Reach};
+use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
-use crate::cloud::vm::{disks, hooks, own_image};
+use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
 use crate::cloud::{Cloud, auto_stop, operator};
 use crate::limits::Limits;
-use crate::machine::{Remote, linux, vms};
-use crate::module::{self, ProjectCopy, Usage, ident, providers, resource};
+use crate::machine::{Remote, linux};
+use crate::module::{self, Usage, ident, providers, resource};
 
 /// What Linode takes.
 const RULES: Rules = Rules {
@@ -52,6 +49,8 @@ const RULES: Rules = Rules {
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 10, most: 6 },
     tpm: false,
+    subnets: None,
+    kept: None,
     images: Images {
         label: "Linode",
         has: |os| image(os).is_some(),
@@ -67,7 +66,7 @@ const USER: &str = "root";
 const SUDO: &str = "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)";
 
 /// Why Linode can't run this environment, if it can't.
-pub(crate) fn refusal(env: &Environment) -> Option<String> {
+fn refusal(env: &Environment) -> Option<String> {
     RULES.linux_refusal(env)
 }
 
@@ -93,30 +92,29 @@ fn plan(memory_mb: u32) -> &'static str {
     }
 }
 
-/// The module: the VPC and its subnets, the firewalls, each machine, the outputs.
-pub(crate) fn module(env: &Environment) -> Result<GeneratedFile> {
-    let folder = format!("{}/{}", Target::CloudVm.id(), Cloud::Linode.id());
-    let usage = Usage {
+/// Its `cloud-vm` driver: its module authenticates with a token in the environment.
+pub(crate) const DRIVER: Driver = Driver {
+    usage: |folder| Usage {
         before: "# Auth:   export LINODE_TOKEN=<token> (the provider reads it).\n",
-        ..Usage::with_key(&folder, operator::ALLOWED)
-    };
-    let mut m = module::start(&usage);
-    m.block(providers::terraform(&[providers::LINODE, providers::RANDOM, providers::LOCAL]));
-    m.block(region());
-    m.blocks(operator::variables(env));
-    m.block(Block::builder("provider").add_label("linode").build());
-    m.blocks(instance::id_and_locals(env, Vec::new()));
-    network::blocks(env, &mut m);
-    for (name, mp) in vms(env) {
-        machine(env, name, mp, &mut m);
+        ..Usage::with_key(folder, operator::ALLOWED)
+    },
+    requires: (&[providers::LINODE, providers::RANDOM, providers::LOCAL], &[]),
+    variables: || vec![region()],
+    provider: |_, m| {
+        m.block(Block::builder("provider").add_label("linode").build());
+        Vec::new()
+    },
+    refusal,
+    write,
+};
+
+/// The module after its providers: the VPC and its subnets, the firewalls, each machine, the outputs.
+fn write(env: &Environment, m: &mut Module) {
+    network::blocks(env, m);
+    for (vm, at) in vm::at_first_address(env) {
+        machine(env, vm, at, m);
     }
-    let reach = Reach {
-        public_ip: &public_ip,
-        user: &|_| USER.to_owned(),
-        controller: None,
-    };
-    outputs::write(env, &reach, &mut m);
-    module::file(Target::CloudVm, &folder, m, ProjectCopy::Archive)
+    outputs::write_as(env, USER, &public_ip, m);
 }
 
 /// A Linode's public address.
@@ -126,11 +124,8 @@ fn public_ip(name: &str) -> Expression {
 
 /// Machine `name`'s root password (for the console: SSH logs in with the key), its instance (a
 /// public interface, and a VPC interface pinned to its address), its set-up over SSH.
-fn machine(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
+fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) {
     let id = ident(name);
-    let Some((net, address)) = mp.addresses.first() else {
-        return;
-    };
     m.block(module::password(&id));
     let user_data = call("base64encode", [auto_stop::if_set(auto_stop::script(), string(""))]);
     let mut vpc = Block::builder("interface")

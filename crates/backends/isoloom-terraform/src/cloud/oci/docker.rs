@@ -3,36 +3,46 @@
 //! own).
 
 use isoloom_plan::Environment;
+use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, attr, boolean, index, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{SHAPE, availability_domain, availability_domains, in_compartment, provider, route_out, ubuntu_images};
-use crate::cloud::{instance, operator};
-use crate::docker_host::{self, Access, AutoStop, Sizing, published};
-use crate::module::providers::{self, terraform};
+use crate::cloud::docker::Driver;
+use crate::docker_host::{Access, AutoStop, published};
+use crate::module::providers;
 use crate::module::variable::Variable;
 
-/// The module's resources and the host's set-up, from the plan.
-pub(crate) fn write(env: &Environment, m: &mut Module) {
-    m.block(terraform(&[providers::OCI, providers::LOCAL]));
-    m.blocks([
-        Variable::new("compartment_id", "string").block(),
-        Variable::new("region", "string").default(string("eu-paris-1")).block(),
-    ]);
-    m.blocks(operator::variables(env));
-    m.block(provider());
-    m.blocks(instance::id_and_locals(env, Vec::new()));
+/// Its `cloud-docker` driver: no size variable, its shape's OCPUs and memory follow the sizing.
+pub(crate) const DRIVER: Driver = Driver {
+    requires: providers::OCI,
+    variables: || {
+        vec![
+            Variable::new("compartment_id", "string").block(),
+            Variable::new("region", "string").default(string("eu-paris-1")).block(),
+        ]
+    },
+    size: None,
+    provider: |_, m| {
+        m.block(provider());
+        Vec::new()
+    },
+    resources,
+};
+
+/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
+/// it.
+fn resources(env: &Environment, m: &mut Module) -> Access {
     m.block(availability_domains());
     m.block(ubuntu_images("ubuntu", "24.04"));
     m.blocks(network(env));
     m.block(vm(env));
-    let access = Access {
+    Access {
         host: reference("oci_core_instance.env.public_ip"),
         user: "ubuntu",
         replace_on: reference("oci_core_instance.env.id"),
         auto_stop: AutoStop::SetUp,
-    };
-    docker_host::environment(env, &access, m);
+    }
 }
 
 /// `resource "<kind>" "env"` in the compartment.
@@ -101,7 +111,7 @@ fn network(env: &Environment) -> Vec<Block> {
 }
 
 fn vm(env: &Environment) -> Block {
-    let (ocpus, memory) = Sizing::of(env).pick([(1, 4), (2, 8), (4, 16)]);
+    let (ocpus, memory) = HostSize::of(env).pick([(1, 4), (2, 8), (4, 16)]);
     resource("oci_core_instance")
         .add_attribute(("availability_domain", availability_domain()))
         .add_attribute(("display_name", reference("local.name")))

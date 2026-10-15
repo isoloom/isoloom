@@ -3,12 +3,11 @@
 //! machine boots its OS's template (`windows`), so its own image is refused.
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, boolean};
 
 use super::machine::Boot;
 use crate::machine::vms;
 use crate::module::ident;
-use crate::server::slotted;
 
 /// A machine's own Proxmox image.
 enum Own<'a> {
@@ -63,16 +62,9 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
 pub(super) fn downloads(env: &Environment, m: &mut Module) {
     for (name, mp) in vms(env) {
         let Some(Own::Url(url)) = own(mp) else { continue };
-        let block = Block::builder("resource")
-            .add_label("proxmox_download_file")
-            .add_label(own_res(name))
-            .add_attribute(("node_name", reference("var.node")))
-            .add_attribute(("datastore_id", reference("var.image_datastore")))
-            .add_attribute(("content_type", string("iso")))
-            .add_attribute(("url", string(url)))
-            .add_attribute(("file_name", slotted(&format!("-{name}.img"))))
-            .add_attribute(("overwrite_unmanaged", boolean(true)))
-            .build();
-        m.commented(&format!("Machine `{name}`'s own cloud image (`overrides.proxmox`)."), block);
+        m.commented(
+            &format!("Machine `{name}`'s own cloud image (`overrides.proxmox`)."),
+            super::base::download(&own_res(name), url, &format!("-{name}.img")),
+        );
     }
 }

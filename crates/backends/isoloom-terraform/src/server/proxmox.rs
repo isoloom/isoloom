@@ -40,15 +40,14 @@ mod virtiofs;
 mod windows;
 
 use isoloom_plan::{Capabilities, Environment, Feature};
-use isoloom_render::GeneratedFile;
 use isoloom_render::backend::{Backend, Files, RenderError};
-use isoloom_spec::images::is_windows;
+use isoloom_render::hcl_builder::Module;
 use isoloom_spec::model::Target;
 
+use super::Parts;
 use crate::limits::Limits;
 use crate::machine::{cloudbase_init, controller as core_controller, vms};
 use crate::module::{ProjectCopy, Usage};
-use crate::{Result, target};
 
 /// What Proxmox can't host yet.
 const LIMITS: Limits = Limits {
@@ -84,11 +83,9 @@ fn image_url(os: &str) -> Option<&'static str> {
 /// have here yet, then a boot of its own Proxmox has no setting for.
 fn refusal(env: &Environment) -> Option<String> {
     LIMITS.refusal(env).or_else(|| gpus::refusal(env)).or_else(|| {
-        vms(env)
-            .find_map(|(name, mp)| {
-                let os = mp.os.as_deref().unwrap_or_default();
-                (!is_windows(os) && image_url(os).is_none() && !image::has_own(mp))
-                    .then(|| format!("machine `{name}`: no Proxmox image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)"))
+        super::without_image(env, |os, mp| image_url(os).is_some() || image::has_own(mp))
+            .map(|(name, os)| {
+                format!("machine `{name}`: no Proxmox image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)")
             })
             .or_else(|| cloudbase_init::refusal(env, "Proxmox"))
             .or_else(|| image::refusal(env))
@@ -127,32 +124,38 @@ impl Backend for ProxmoxBackend {
     fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {
         let checked = lxc::checked(env);
         let mounted = virtiofs::mounted(&checked);
-        super::render(Target::Proxmox, &self.capabilities(), &mounted, refusal, module)
+        PARTS.render(&self.capabilities(), &mounted)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
-        target::refusal(env, &self.capabilities(), || refusal(env))
+        PARTS.refusal(&self.capabilities(), env)
     }
 }
 
 /// The module: its base (settings, networks, images), the router, the machines, the LXC
 /// containers, the controller, the outputs.
-fn module(env: &Environment) -> Result<GeneratedFile> {
-    let usage = Usage {
+const PARTS: Parts = Parts {
+    target: Target::Proxmox,
+    refusal,
+    usage: |folder| Usage {
         apply: " -var proxmox_endpoint=https://<server>:8006/ -var proxmox_api_token=<user@realm!name=secret>",
         key: None,
-        ..Usage::with_key(Target::Proxmox.id(), "")
-    };
-    let mut m = crate::module::start(&usage);
-    base::blocks(env, &mut m);
-    router::blocks(env, &mut m);
+        ..Usage::with_key(folder, "")
+    },
+    copy: ProjectCopy::Files,
+    base: base::blocks,
+    router: router::blocks,
+    guests,
+    outputs: router::outputs,
+};
+
+/// The VMs, the LXC containers, then the controller.
+fn guests(env: &Environment, m: &mut Module) {
     for (name, mp) in vms(env) {
-        machine::blocks(env, name, mp, &mut m);
+        machine::blocks(env, name, mp, m);
     }
-    lxc::blocks(env, &mut m);
+    lxc::blocks(env, m);
     if core_controller::needed(env) {
-        controller::blocks(env, &mut m);
+        controller::blocks(env, m);
     }
-    router::outputs(env, &mut m);
-    crate::module::file(Target::Proxmox, Target::Proxmox.id(), m, ProjectCopy::Files)
 }

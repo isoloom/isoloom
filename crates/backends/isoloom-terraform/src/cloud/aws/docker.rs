@@ -2,37 +2,47 @@
 //! instance whose user data schedules the auto-stop (it terminates on shutdown).
 
 use isoloom_plan::Environment;
+use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, null, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{ami, egress, first_zone, ingress, instance_type, key_pair, provider, region, route_out, zones};
-use crate::cloud::{auto_stop, instance, operator};
-use crate::docker_host::{self, Access, AutoStop, Sizing, published};
-use crate::module::providers::{self, terraform};
-use crate::module::variable::Variable;
+use crate::cloud::auto_stop;
+use crate::cloud::docker::{Driver, SizeVariable};
+use crate::docker_host::{Access, AutoStop, published};
+use crate::module::providers;
 
-/// The module's resources and the host's set-up, from the plan.
-pub(crate) fn write(env: &Environment, m: &mut Module) {
-    m.block(terraform(&[providers::AWS, providers::LOCAL]));
-    m.block(region());
+/// Its `cloud-docker` driver.
+pub(crate) const DRIVER: Driver = Driver {
+    requires: providers::AWS,
+    variables: || vec![region()],
     // Free Tier eligible sizes where they fit (the AWS Free plan refuses other types).
-    let size = Sizing::of(env);
-    m.block(Variable::new("instance_type", "string").default(string(instance_type(size.memory_mb))).block());
-    m.blocks(operator::variables(env));
-    m.block(provider(tags(env)));
-    m.blocks(instance::id_and_locals(env, Vec::new()));
+    size: Some(SizeVariable {
+        name: "instance_type",
+        default: |s| instance_type(s.memory_mb),
+    }),
+    provider: |env, m| {
+        m.block(provider(tags(env)));
+        Vec::new()
+    },
+    resources,
+};
+
+/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
+/// it.
+fn resources(env: &Environment, m: &mut Module) -> Access {
+    let size = HostSize::of(env);
     m.block(zones());
     m.block(ami("debian", "136693071363", "debian-12-amd64-*").build());
     m.blocks(network());
     m.block(security_group(env));
     m.block(vm(size));
-    let access = Access {
+    Access {
         host: reference("aws_instance.env.public_ip"),
         user: "admin",
         replace_on: reference("aws_instance.env.id"),
         auto_stop: AutoStop::UserData,
-    };
-    docker_host::environment(env, &access, m);
+    }
 }
 
 /// The tags on every resource: the environment's, who manages it, its expiry.
@@ -102,7 +112,7 @@ fn security_group(env: &Environment) -> Block {
 }
 
 /// The instance: the auto-stop in its user data, terminated when it shuts down.
-fn vm(size: Sizing) -> Block {
+fn vm(size: HostSize) -> Block {
     resource("aws_instance")
         .add_attribute(("ami", reference("data.aws_ami.debian.id")))
         .add_attribute(("instance_type", reference("var.instance_type")))

@@ -8,15 +8,12 @@ use isoloom_spec::model::Target;
 use super::EsxiBackend;
 
 fn env(spec: &str) -> Environment {
-    let lab = isoloom_plan::Lab::new(isoloom_spec::parse(spec).unwrap());
-    assert_eq!(lab.problems(), [], "the spec is valid");
-    Environment::build(&lab.for_target(Target::Esxi), Target::Esxi, None)
+    crate::testing::environment(spec, Target::Esxi)
 }
 
 /// The plan of a spec validation refuses, to see the backend refuse it too.
 fn unchecked(spec: &str) -> Environment {
-    let lab = isoloom_plan::Lab::new(isoloom_spec::parse(spec).unwrap());
-    Environment::build(&lab.for_target(Target::Esxi), Target::Esxi, None)
+    crate::testing::planned(spec, Target::Esxi)
 }
 
 const PAIR: &str = "

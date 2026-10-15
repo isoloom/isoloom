@@ -85,15 +85,14 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_plan::Environment;
+
     use isoloom_spec::model::Target;
 
     const SPEC: &str = "version: 1\nname: e\nnetworks:\n  out: { cidr: 10.70.0.0/24 }\n  dmz: { cidr: 10.70.10.0/24, gateway: fw }\n  far: { cidr: 10.80.0.0/24 }\nmachines:\n  fw: { networks: { out: 5, dmz: 1 }, os: debian@12 }\n  web: { networks: { dmz: 10 }, os: debian@12 }\n  x: { networks: { far: 10 }, os: debian@12 }\n";
 
     #[test]
     fn networks_beyond_one_slash_16_are_refused() {
-        let lab = isoloom_plan::Lab::new(isoloom_spec::parse(SPEC).unwrap());
-        let env = Environment::build(&lab.for_target(Target::CloudVm), Target::CloudVm, None);
+        let env = crate::testing::planned(SPEC, Target::CloudVm);
         assert!(super::refusal(&env).unwrap().contains("one /16"));
         assert_eq!(super::vpc_block(&env), None);
     }

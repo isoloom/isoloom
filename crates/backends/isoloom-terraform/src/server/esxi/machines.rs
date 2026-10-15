@@ -58,8 +58,18 @@ fn nics(env: &Environment, mp: &MachinePlan) -> Vec<Nic> {
     out
 }
 
+/// The machines, each set up through the router, then the controller.
+pub(super) fn guests(env: &Environment, m: &mut Module) {
+    for (i, (name, mp)) in (0..).zip(vms(env)) {
+        machine(env, (name, mp), i, m);
+    }
+    if controller::needed(env) {
+        controller(env, m);
+    }
+}
+
 /// Machine `name` (the `i`th VM): its data disks, its VM and its set-up.
-pub(super) fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut Module) {
+fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut Module) {
     let id = ident(name);
     let dns = env.spec().machines.get(name).and_then(|sm| sm.dns.as_ref());
     let servers = match dns.filter(|d| !d.servers.is_empty()) {
@@ -123,7 +133,7 @@ pub(super) fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u6
 /// The controller: on every network at the controller address, then its playbooks over SSH
 /// through the router once every machine is set up (a Linux one's set-up done, a Windows one
 /// answering WinRM with its ready marker).
-pub(super) fn controller(env: &Environment, m: &mut Module) {
+fn controller(env: &Environment, m: &mut Module) {
     let nics: Vec<Nic> = env
         .networks
         .iter()

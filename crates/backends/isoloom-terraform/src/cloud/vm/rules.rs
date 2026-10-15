@@ -6,6 +6,7 @@ use std::ops::RangeInclusive;
 
 use isoloom_plan::Environment;
 use isoloom_spec::model::{Ipv6Addresses, Machine};
+use isoloom_spec::validate::Cidr;
 use isoloom_spec::windows::Tpm;
 
 use super::gpus::{self, GpuSizes};
@@ -55,6 +56,31 @@ pub(crate) struct Volumes {
     pub(crate) most: usize,
 }
 
+/// The smallest subnets a cloud makes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Subnets {
+    /// What the cloud calls them (`subnetworks`).
+    pub(crate) called: &'static str,
+    /// The longest prefix it takes (29: a /29).
+    pub(crate) longest: u8,
+}
+
+/// The first addresses of a subnet a cloud keeps for itself, which no machine may take.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Kept {
+    /// The first and the last octet kept.
+    pub(crate) octets: (u8, u8),
+    /// Them, as the refusal says it (`a subnetwork's first address (.1, its gateway)`).
+    pub(crate) said: &'static str,
+}
+
+/// AWS's and Azure's: a subnet's first addresses, its router's and the DNS's (and its
+/// network address).
+pub(crate) const FIRST_THREE: Kept = Kept {
+    octets: (0, 3),
+    said: "the first addresses of a subnet (.1 to .3)",
+};
+
 /// A cloud's images for the OSes a machine runs.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Images {
@@ -99,6 +125,11 @@ pub(crate) struct Rules {
     pub(crate) tpm: bool,
     /// Its images.
     pub(crate) images: Images,
+    /// Its smallest subnets (`None`: any network the spec takes).
+    pub(crate) subnets: Option<Subnets>,
+    /// The addresses it keeps in a subnet (`None`: none the spec could give, or its own refusal
+    /// says which).
+    pub(crate) kept: Option<Kept>,
 }
 
 impl Rules {
@@ -112,6 +143,27 @@ impl Rules {
             .or_else(|| self.mtu(env))
             .or_else(|| self.ipv6_addresses(env))
             .or_else(|| self.volumes(env))
+    }
+
+    /// Why the cloud can't make a network's subnet, if it can't: smaller than it makes.
+    pub(crate) fn subnets(&self, env: &Environment) -> Option<String> {
+        let Subnets { called, longest } = self.subnets?;
+        let small = env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).any(|c| c.len > longest);
+        small.then(|| format!("{} {called} are /{longest} or larger", self.cloud))
+    }
+
+    /// Why VM `name` has no image on the cloud, if it hasn't: none for its OS, and none of its
+    /// own.
+    pub(crate) fn image(&self, name: &str, m: &Machine) -> Option<String> {
+        let vm = m.vm.as_ref()?;
+        self.images.missing(name, &vm.os, own_image::of_machine(m, self.images.own))
+    }
+
+    /// Why machine `name` can't have its address on one of its networks, if it can't: one the
+    /// cloud keeps.
+    pub(crate) fn kept(&self, env: &Environment, name: &str, m: &Machine) -> Option<String> {
+        let Kept { octets: (first, last), said } = self.kept?;
+        kept_address(env, name, m, first..=last).map(|net| format!("machine `{name}`: {} keeps {said} on `{net}`", self.cloud))
     }
 
     /// Why the cloud can't give the machines their GPUs, if it can't.
@@ -206,7 +258,7 @@ impl Rules {
 /// The network where machine `name` takes one of the `kept` addresses of its subnet, which the
 /// cloud keeps for itself. A gateway machine's gateway address doesn't count: it moves elsewhere
 /// (`gateways`).
-pub(crate) fn kept_address<'a>(env: &Environment, name: &str, m: &'a Machine, kept: RangeInclusive<u8>) -> Option<&'a str> {
+fn kept_address<'a>(env: &Environment, name: &str, m: &'a Machine, kept: RangeInclusive<u8>) -> Option<&'a str> {
     m.networks
         .iter()
         .find(|(n, o)| kept.contains(o) && !gateways::is_gateway_address(env, name, n))

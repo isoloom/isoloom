@@ -31,20 +31,19 @@ mod boot;
 mod disks;
 mod guest;
 mod machines;
+mod networks;
 mod outside;
 mod router;
 mod windows;
 
 use isoloom_plan::{Capabilities, Environment};
-use isoloom_render::GeneratedFile;
 use isoloom_render::backend::{Backend, Files, RenderError};
-use isoloom_spec::images::is_windows;
 use isoloom_spec::model::Target;
 
+use super::Parts;
 use crate::limits::Limits;
-use crate::machine::{controller, vms};
+use crate::machine::vms;
 use crate::module::{ProjectCopy, Usage};
-use crate::{Result, target};
 
 /// The OS of the router and the controller: Ubuntu's OVA has cloud-init and open-vm-tools,
 /// which reports the router's uplink address.
@@ -92,11 +91,8 @@ fn refusal(env: &Environment) -> Option<String> {
     LIMITS
         .refusal(env)
         .or_else(|| {
-            vms(env).find_map(|(name, mp)| {
-                let os = mp.os.as_deref().unwrap_or_default();
-                (!is_windows(os) && !LINUX.contains(&os)).then(|| {
-                    format!("machine `{name}`: no ESXi image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)")
-                })
+            super::without_image(env, |os, _| LINUX.contains(&os)).map(|(name, os)| {
+                format!("machine `{name}`: no ESXi image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)")
             })
         })
         .or_else(|| windows::refusal(env))
@@ -136,34 +132,30 @@ impl Backend for EsxiBackend {
     }
 
     fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {
-        super::render(Target::Esxi, &self.capabilities(), env, refusal, module)
+        PARTS.render(&self.capabilities(), env)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
-        target::refusal(env, &self.capabilities(), || refusal(env))
+        PARTS.refusal(&self.capabilities(), env)
     }
 }
 
 /// The module: its base (settings, networks), the router, the machines, the controller, the
 /// outputs.
-fn module(env: &Environment) -> Result<GeneratedFile> {
-    let usage = Usage {
+const PARTS: Parts = Parts {
+    target: Target::Esxi,
+    refusal,
+    usage: |folder| Usage {
         before: "# Needs:  ovftool on this machine, SSH enabled on the ESXi host\n",
         apply: " -var esxi_hostname=<host> -var esxi_password=<password>",
-        ..Usage::with_key(Target::Esxi.id(), "")
-    };
-    let mut m = crate::module::start(&usage);
-    base::blocks(env, &mut m);
-    router::blocks(env, &mut m);
-    for (i, (name, mp)) in (0..).zip(vms(env)) {
-        machines::machine(env, (name, mp), i, &mut m);
-    }
-    if controller::needed(env) {
-        machines::controller(env, &mut m);
-    }
-    router::outputs(env, &mut m);
-    crate::module::file(Target::Esxi, Target::Esxi.id(), m, ProjectCopy::Archive)
-}
+        ..Usage::with_key(folder, "")
+    },
+    copy: ProjectCopy::Archive,
+    base: base::blocks,
+    router: router::blocks,
+    guests: machines::guests,
+    outputs: router::outputs,
+};
 
 #[cfg(test)]
 mod tests;

@@ -20,6 +20,16 @@ pub(crate) struct Reach<'a> {
     pub(crate) controller: Option<(Expression, &'a str)>,
 }
 
+/// The outputs of a cloud with no controller, whose machines all log in as `user`.
+pub(crate) fn write_as(env: &Environment, user: &str, public_ip: &dyn Fn(&str) -> Expression, m: &mut Module) {
+    let reach = Reach {
+        public_ip,
+        user: &|_| user.to_owned(),
+        controller: None,
+    };
+    write(env, &reach, m);
+}
+
 /// The outputs every cloud module gives: `machines`, `ssh_users`, `ip`, `ready_file`, `checks`
 /// and `published`.
 pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {

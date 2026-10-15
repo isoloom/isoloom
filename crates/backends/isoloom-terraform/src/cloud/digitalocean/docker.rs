@@ -6,31 +6,37 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, list, reference, 
 use isoloom_spec::model::Protocol;
 
 use super::{Way, region, rule, ssh_key, vpc};
-use crate::cloud::instance::{self, tag_list};
-use crate::cloud::operator;
-use crate::docker_host::{self, Access, AutoStop, Sizing, published};
-use crate::module::providers::{self, terraform};
-use crate::module::variable::Variable;
+use crate::cloud::docker::{Driver, SizeVariable};
+use crate::cloud::instance::tag_list;
+use crate::docker_host::{Access, AutoStop, published};
+use crate::module::providers;
 
-/// The module's resources and the host's set-up, from the plan.
-pub(crate) fn write(env: &Environment, m: &mut Module) {
-    m.block(terraform(&[providers::DIGITALOCEAN, providers::LOCAL]));
-    let size = Sizing::of(env).pick(["s-2vcpu-4gb", "s-4vcpu-8gb", "s-8vcpu-16gb"]);
-    m.block(region());
-    m.block(Variable::new("size", "string").default(string(size)).block());
-    m.blocks(operator::variables(env));
-    m.blocks(instance::id_and_locals(env, Vec::new()));
+/// Its `cloud-docker` driver.
+pub(crate) const DRIVER: Driver = Driver {
+    requires: providers::DIGITALOCEAN,
+    variables: || vec![region()],
+    size: Some(SizeVariable {
+        name: "size",
+        default: |s| s.pick(["s-2vcpu-4gb", "s-4vcpu-8gb", "s-8vcpu-16gb"]),
+    }),
+    // No provider block: the provider reads its token from the environment.
+    provider: |_, _| Vec::new(),
+    resources,
+};
+
+/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
+/// it.
+fn resources(env: &Environment, m: &mut Module) -> Access {
     m.block(vpc("10.42.1.0/24"));
     m.block(ssh_key());
     m.block(droplet(env));
     m.block(firewall(env));
-    let access = Access {
+    Access {
         host: reference("digitalocean_droplet.env.ipv4_address"),
         user: "root",
         replace_on: reference("digitalocean_droplet.env.id"),
         auto_stop: AutoStop::SetUp,
-    };
-    docker_host::environment(env, &access, m);
+    }
 }
 
 /// `resource "<kind>" "env"`, named after the environment.

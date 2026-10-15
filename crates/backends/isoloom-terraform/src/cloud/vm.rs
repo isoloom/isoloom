@@ -11,8 +11,9 @@
 //! What the clouds share lives here, by concept: what a cloud takes ([`rules`]: the features it
 //! lacks, its GPU types, nesting, MTU, volumes and images), its machines' set-up hooks, their
 //! interfaces after the first, their data disks, their own images, the networks routed through
-//! a machine, the private DNS zone, the `reach` rules, the Windows limits, the outputs, and the
-//! parts of a module around a cloud's own resources (its providers, its credentials).
+//! a machine, the private DNS zone's records, the `reach` rules, the Windows limits, the outputs,
+//! and a module's frame around a cloud's own part (its [`Driver`]: its first lines, its
+//! providers, its credentials).
 
 pub(crate) mod disks;
 pub(crate) mod gateways;
@@ -28,28 +29,57 @@ pub(crate) mod reach;
 pub(crate) mod rules;
 pub(crate) mod windows;
 
+use std::net::Ipv4Addr;
+
 use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::{Backend, Files, RenderError};
-use isoloom_render::hcl_builder::Module;
+use isoloom_render::hcl_builder::{Block, Module};
 use isoloom_spec::model::Target;
 
-use super::{Cloud, aws, azure, digitalocean, gcp, linode, oci};
+use super::{Cloud, ProviderConfig, aws, azure, digitalocean, gcp, linode, oci};
 use crate::machine::{self, controller, vms};
-use crate::module::providers::{Provider, TLS};
+use crate::module::providers::{self, Provider, TLS};
+use crate::module::{self, ProjectCopy, Usage};
 use crate::{Result, checks, target};
+
+/// A cloud's own part of its `cloud-vm` module. The module's frame is the same on every cloud:
+/// its folder, its first lines, the `terraform` block, the module's head (`cloud::head`), the
+/// file.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Driver {
+    /// How to start its module (the settings `apply` takes, how it authenticates), from its
+    /// folder.
+    pub(crate) usage: for<'a> fn(&'a str) -> Usage<'a>,
+    /// The providers it requires, then those its Windows machines add.
+    pub(crate) requires: (&'static [Provider], &'static [Provider]),
+    /// Its variables before the operator's: where it runs, which account.
+    pub(crate) variables: fn() -> Vec<Block>,
+    /// Its provider's configuration.
+    pub(crate) provider: ProviderConfig,
+    /// Why it can't run the environment, if it can't.
+    pub(crate) refusal: fn(&Environment) -> Option<String>,
+    /// Its blocks after the module's head.
+    pub(crate) write: fn(&Environment, &mut Module),
+}
 
 /// The providers a cloud's module requires: `base` (the cloud's own, the archive's file list),
 /// TLS for the controller's key, and `windows` for the Windows machines.
-pub(crate) fn providers(env: &Environment, base: &[Provider], windows: &[Provider]) -> Vec<Provider> {
+fn required(env: &Environment, base: &[Provider], windows: &[Provider]) -> Vec<Provider> {
     let mut p = base.to_vec();
     if controller::needed(env) {
         p.push(TLS);
     }
-    if vms(env).any(|(_, mp)| mp.is_windows()) {
+    if machine::windows::any(env) {
         p.extend_from_slice(windows);
     }
     p
+}
+
+/// Each VM with its first network and its address there, the one its instance's interface is on
+/// (a VM on no network has none).
+pub(crate) fn at_first_address(env: &Environment) -> impl Iterator<Item = ((&str, &MachinePlan), (&str, Ipv4Addr))> {
+    vms(env).filter_map(|(name, mp)| mp.addresses.first().map(|(net, a)| ((name, mp), (net.as_str(), *a))))
 }
 
 /// How a cloud's module writes its machines: a Linux VM, a Windows VM, the controller.
@@ -125,16 +155,21 @@ impl CloudVmModule {
         self.0
     }
 
+    /// Its cloud's own part.
+    const fn driver(self) -> Driver {
+        match self.0 {
+            Cloud::Aws => aws::vm::DRIVER,
+            Cloud::Azure => azure::vm::DRIVER,
+            Cloud::Gcp => gcp::vm::DRIVER,
+            Cloud::DigitalOcean => digitalocean::vm::DRIVER,
+            Cloud::Linode => linode::vm::DRIVER,
+            Cloud::Oci => oci::vm::DRIVER,
+        }
+    }
+
     /// Why its cloud can't run `env` beyond the plan's requirements: the cloud's own rules.
     fn own_refusal(self, env: &Environment) -> Option<String> {
-        match self.0 {
-            Cloud::Aws => aws::vm::refusal(env),
-            Cloud::Azure => azure::vm::refusal(env),
-            Cloud::Gcp => gcp::vm::refusal(env),
-            Cloud::DigitalOcean => digitalocean::vm::refusal(env),
-            Cloud::Linode => linode::vm::refusal(env),
-            Cloud::Oci => oci::vm::refusal(env),
-        }
+        (self.driver().refusal)(env)
     }
 
     /// Why its cloud can't run `env`: the plan's requirements the target lacks, else the
@@ -154,16 +189,17 @@ impl CloudVmModule {
         target::render(Target::CloudVm, &capabilities(), env, || self.own_refusal(env), || self.module(env))
     }
 
-    /// Its module, for an environment it takes.
+    /// Its module, for an environment it takes: how to start it, the providers, then the
+    /// cloud's own blocks.
     fn module(self, env: &Environment) -> Result<GeneratedFile> {
-        match self.0 {
-            Cloud::Aws => aws::vm::module(env),
-            Cloud::Azure => azure::vm::module(env),
-            Cloud::Gcp => gcp::vm::module(env),
-            Cloud::DigitalOcean => digitalocean::vm::module(env),
-            Cloud::Linode => linode::vm::module(env),
-            Cloud::Oci => oci::vm::module(env),
-        }
+        let driver = self.driver();
+        let folder = format!("{}/{}", Target::CloudVm.id(), self.0.id());
+        let mut m = module::start(&(driver.usage)(&folder));
+        let (base, windows) = driver.requires;
+        m.block(providers::terraform(&required(env, base, windows)));
+        super::head(env, &mut m, (driver.variables)(), driver.provider);
+        (driver.write)(env, &mut m);
+        module::file(Target::CloudVm, &folder, m, ProjectCopy::Archive)
     }
 }
 

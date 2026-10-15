@@ -122,13 +122,10 @@ mod tests {
     use super::*;
 
     fn plan(octets: &str) -> MachinePlan {
-        let lab = isoloom_plan::Lab::new(
-            isoloom_spec::parse(&format!(
-                "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: {octets} }}, os: debian@12, app: {{ steps: [{{ run: s.sh }}] }} }}\n"
-            ))
-            .unwrap(),
+        let yaml = format!(
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: {octets} }}, os: debian@12, app: {{ steps: [{{ run: s.sh }}] }} }}\n"
         );
-        isoloom_plan::Environment::build(&lab.for_target(Target::CloudVm), Target::CloudVm, None).machines["web"].clone()
+        crate::testing::planned(&yaml, Target::CloudVm).machines["web"].clone()
     }
 
     #[test]

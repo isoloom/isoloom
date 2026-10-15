@@ -40,8 +40,6 @@ pub(crate) fn host_variables(env: &Environment) -> Vec<Block> {
             .describe("When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy")
             .block(),
     ];
-    if !env.spec().inputs.is_empty() {
-        v.push(inputs::variable());
-    }
+    v.extend(inputs::variable(env));
     v
 }

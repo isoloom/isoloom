@@ -19,26 +19,27 @@
 
 mod machines;
 mod network;
+mod private_dns;
 
 use std::net::Ipv4Addr;
 
 use isoloom_plan::{Environment, NetworkPlan};
-use isoloom_render::GeneratedFile;
-use isoloom_render::hcl_builder::{Template, reference};
+use isoloom_render::hcl_builder::{Module, Template, reference};
 use isoloom_spec::images::is_windows;
-use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
-use super::{own_project, project, provider, public_ip, variables};
-use crate::Result;
-use crate::cloud::vm::gpus::GpuSizes;
-use crate::cloud::vm::outputs::{self, Reach};
-use crate::cloud::vm::rules::{Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes, kept_address};
-use crate::cloud::vm::{self, gateways, own_image};
-use crate::cloud::{Cloud, instance, operator};
+use super::{own_project, provider_and_project, public_ip, variables};
+use crate::cloud::Cloud;
+use crate::cloud::vm::rules::{Images, Kept, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::{
+    self, Driver, gateways,
+    gpus::GpuSizes,
+    outputs::{self, Reach},
+    own_image,
+};
 use crate::limits::Limits;
 use crate::machine::controller;
-use crate::module::{self, ProjectCopy, Usage, ident, providers};
+use crate::module::{Usage, ident, providers};
 
 /// What Google Cloud takes.
 const RULES: Rules = Rules {
@@ -64,6 +65,14 @@ const RULES: Rules = Rules {
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 10, most: 15 },
     tpm: true,
+    subnets: Some(Subnets {
+        called: "subnetworks",
+        longest: 29,
+    }),
+    kept: Some(Kept {
+        octets: (1, 1),
+        said: "a subnetwork's first address (.1, its gateway)",
+    }),
     images: Images {
         label: "GCP",
         has: |os| image(os).is_some(),
@@ -111,13 +120,10 @@ fn machine_type(memory_mb: u32) -> &'static str {
 
 /// Why Google Cloud can't run this environment, if it can't: its features, its address rules,
 /// then single-interface Linux machines with images, and the controller on one network.
-pub(crate) fn refusal(env: &Environment) -> Option<String> {
+fn refusal(env: &Environment) -> Option<String> {
     let spec = env.spec();
-    if let Some(why) = RULES.features(env) {
+    if let Some(why) = RULES.features(env).or_else(|| RULES.subnets(env)) {
         return Some(why);
-    }
-    if env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).any(|c| c.len > 29) {
-        return Some("Google Cloud subnetworks are /29 or larger".to_owned());
     }
     let machine = spec.machines.iter().find_map(|(name, m)| {
         let vm = m.vm.as_ref()?;
@@ -125,11 +131,8 @@ pub(crate) fn refusal(env: &Environment) -> Option<String> {
             return Some(format!("machine `{name}`: Windows on GCP comes later"));
         }
         interfaces_refusal(env, name)
-            .or_else(|| RULES.images.missing(name, &vm.os, own_image::of_machine(m, RULES.images.own)))
-            .or_else(|| {
-                kept_address(env, name, m, 1..=1)
-                    .map(|net| format!("machine `{name}`: Google Cloud keeps a subnetwork's first address (.1, its gateway) on `{net}`"))
-            })
+            .or_else(|| RULES.image(name, m))
+            .or_else(|| RULES.kept(env, name, m))
     });
     if machine.is_some() {
         return machine;
@@ -197,28 +200,31 @@ fn mtu(n: &NetworkPlan) -> u16 {
     n.mtu.unwrap_or(1500)
 }
 
-/// The module.
-pub(crate) fn module(env: &Environment) -> Result<GeneratedFile> {
+/// Its `cloud-vm` driver: its module takes the billing account its project goes on.
+pub(crate) const DRIVER: Driver = Driver {
+    usage: |folder| Usage::with_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
+    requires: (&[providers::GOOGLE, providers::LOCAL], &[]),
+    variables: || variables().into(),
+    provider: |env, m| {
+        let mut locals = provider_and_project(env, m);
+        locals.push(("zone", Template::new().with_expr(reference("var.region")).with_text("-a").into_expression()));
+        locals
+    },
+    refusal,
+    write,
+};
+
+/// The module's blocks after the providers, from the plan.
+fn write(env: &Environment, m: &mut Module) {
     let env = &*gateways::relocated_with(env, &|e, n, _| relocate(e, n));
-    let folder = format!("{}/{}", Target::CloudVm.id(), Cloud::Gcp.id());
-    let usage = Usage::with_key(&folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 ");
-    let mut m = module::start(&usage);
-    m.block(providers::terraform(&vm::providers(env, &[providers::GOOGLE, providers::LOCAL], &[])));
-    m.blocks(variables());
-    m.blocks(operator::variables(env));
-    m.block(provider());
-    let project = project(env, &mut m);
-    let zone = Template::new().with_expr(reference("var.region")).with_text("-a").into_expression();
-    m.blocks(instance::id_and_locals(env, vec![("project", project), ("zone", zone)]));
-    network::blocks(env, &mut m);
-    vm::private_dns::gcp(env, own_project(), &mut m);
-    vm::credentials(env, &mut m);
-    MACHINES.write(env, &mut m);
+    network::blocks(env, m);
+    private_dns::write(env, own_project(), m);
+    vm::credentials(env, m);
+    MACHINES.write(env, m);
     let reach = Reach {
         public_ip: &|n| public_ip(&ident(n)),
         user: &|mp| user(mp.os.as_deref().unwrap_or_default()).to_owned(),
         controller: Some((public_ip("isoloom_controller"), user(controller::OS))),
     };
-    outputs::write(env, &reach, &mut m);
-    module::file(Target::CloudVm, &folder, m, ProjectCopy::Archive)
+    outputs::write(env, &reach, m);
 }

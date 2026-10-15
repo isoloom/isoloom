@@ -4,6 +4,7 @@
 
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position};
+use isoloom_render::checks::address_of;
 use isoloom_render::hcl_builder::{Block, Expression, list, object, string};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 
@@ -12,17 +13,7 @@ use crate::module::output;
 /// The runner scripts, under `.isoloom/<dir>/checks/`. A script check runs from the project copy
 /// at `/opt/isoloom`.
 pub(crate) fn runners(env: &Environment, dir: &str) -> Vec<GeneratedFile> {
-    let host = |h: &Host, _: &Position| -> String {
-        match h {
-            Host::Literal(l) => l.clone(),
-            Host::Machine { name, network } => env
-                .machines
-                .get(name)
-                .and_then(|mp| mp.addresses.get(network))
-                .map(ToString::to_string)
-                .unwrap_or_default(),
-        }
-    };
+    let host = |h: &Host, _: &Position| address_of(env, h);
     let run_script = |path: &str| format!("cd /opt/isoloom && sh {path}");
     let render = checks::Render {
         host: &host,

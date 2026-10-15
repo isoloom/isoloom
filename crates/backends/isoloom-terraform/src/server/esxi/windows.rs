@@ -9,7 +9,7 @@
 
 use isoloom_plan::Environment;
 
-use crate::machine::{cloudbase_init, vms};
+use crate::machine::cloudbase_init;
 
 /// The guest OS type ESXi gives a VM of Windows `os` (VMware's names: Windows Server 2022 is
 /// the one after 2019, 2025 the one after 2022).
@@ -29,11 +29,6 @@ pub(super) fn guestos(os: &str) -> &'static str {
 /// What ESXi can't give a Windows machine yet: cloudbase-init's limits, as on Proxmox.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
     cloudbase_init::refusal(env, "ESXi")
-}
-
-/// Whether the environment has a Windows machine (the module then has its password).
-pub(super) fn any(env: &Environment) -> bool {
-    vms(env).any(|(_, mp)| mp.is_windows())
 }
 
 #[cfg(test)]

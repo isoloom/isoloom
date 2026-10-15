@@ -76,12 +76,24 @@ pub(crate) fn file(target: Target, folder: &str, mut m: Module, copy: ProjectCop
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
 
     #[test]
     fn an_identifier_has_no_dash_or_dot() {
         assert_eq!(ident("web-1"), "web_1");
         assert_eq!(ident("ubuntu-24.04"), "ubuntu_24_04");
+    }
+
+    proptest! {
+        #[test]
+        fn a_name_made_an_identifier_keeps_its_length_and_stays_one(name in "[a-z0-9._-]{1,24}") {
+            let id = ident(&name);
+            prop_assert!(!id.contains(['-', '.']), "{id}");
+            prop_assert_eq!(id.len(), name.len());
+            prop_assert_eq!(ident(&id), id);
+        }
     }
 
     #[test]

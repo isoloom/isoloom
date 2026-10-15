@@ -3,15 +3,15 @@
 //! containers' Compose file.
 
 use isoloom_plan::Environment;
-use isoloom_render::container::{HybridContainers as Containers, docker_net, host_environment};
+use isoloom_render::container::{HostSize, HybridContainers as Containers, docker_net, host_environment};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use crate::error::{Error, Result};
 use crate::ruby::{Call, Ruby, Value};
+use crate::stable_hash;
 use crate::vagrantfile::{self, shell};
-use crate::{docker_host, stable_hash};
 
 const HOST: &str = "isoloom-docker";
 
@@ -85,7 +85,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
 /// Sized for every container at once plus Docker's own 1 GB (2 to 16 CPUs), every lab
 /// interface promiscuous so each container answers at its own MAC address.
 fn virtualbox(r: &mut Ruby, env: &Environment, nics: usize) {
-    let size = docker_host::Size::of(env);
+    let size = HostSize::of(env);
     r.block(Call::new("m.vm.provider").arg(Value::str("virtualbox")), "v", |r| {
         r.assign("v.name", Value::str(&format!("{} · containers", env.name)));
         r.assign("v.cpus", size.cpus);

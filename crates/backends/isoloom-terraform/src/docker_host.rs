@@ -1,6 +1,6 @@
 //! The Docker host: one VM running the environment's containers with the `docker` target's
 //! Compose file, on a cloud (`cloud-docker`) or a Proxmox server (`docker-vm`). Every module of
-//! it shares its size, the ports it opens, its set-up over SSH and its outputs; a platform only
+//! it shares its size (`isoloom_render::container::HostSize`), the ports it opens, its set-up over SSH and its outputs; a platform only
 //! brings its network, firewall and VM.
 
 use isoloom_plan::{Environment, MachineShape, Step};
@@ -21,44 +21,6 @@ const READY_FILE: &str = "/var/lib/isoloom/ready";
 const COMPOSE: &str = "sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml";
 /// Seconds `docker compose up --wait` waits for every container to be healthy.
 const WAIT_TIMEOUT: u32 = 900;
-
-/// What the host needs: every container's at once.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Sizing {
-    /// CPUs: one per container unless it says, at least 2, at most 16.
-    pub(crate) cpus: u32,
-    /// Memory in MB: 512 per container unless it says, plus 1 GB for Docker itself.
-    pub(crate) memory_mb: u32,
-    /// Disk in GB: 5 per container unless it says, at least 20.
-    pub(crate) disk_gb: u32,
-}
-
-impl Sizing {
-    /// The host's size for the environment's containers.
-    pub(crate) fn of(env: &Environment) -> Sizing {
-        let containers = env.machines.values().filter(|m| m.shape == MachineShape::Container);
-        let (mut cpus, mut memory_mb, mut disk_gb) = (0u32, 1024u32, 0u32);
-        for m in containers {
-            cpus += m.size.cpus.unwrap_or(1);
-            memory_mb += m.size.memory_mb.unwrap_or(512);
-            disk_gb += m.size.disk_gb.unwrap_or(5);
-        }
-        Sizing {
-            cpus: cpus.clamp(2, 16),
-            memory_mb,
-            disk_gb: disk_gb.max(20),
-        }
-    }
-
-    /// One of a cloud's three VM sizes: up to 4 GB of memory, up to 8 GB, more.
-    pub(crate) fn pick<T: Copy>(&self, [small, medium, large]: [T; 3]) -> T {
-        match self.memory_mb {
-            0..=4096 => small,
-            4097..=8192 => medium,
-            _ => large,
-        }
-    }
-}
 
 /// The ports the containers publish over `protocol`, sorted, each once.
 pub(crate) fn published(env: &Environment, protocol: Protocol) -> Vec<u16> {
@@ -202,20 +164,6 @@ mod tests {
 
     use super::*;
     use crate::cloud::docker::tests::{SPEC, env};
-
-    #[test]
-    fn the_host_is_sized_for_every_container_at_once() {
-        let s = Sizing::of(&env(SPEC));
-        assert_eq!(
-            s,
-            Sizing {
-                cpus: 3,
-                memory_mb: 4096 + 512 + 1024,
-                disk_gb: 35
-            }
-        );
-        assert_eq!(s.pick(["small", "medium", "large"]), "medium");
-    }
 
     #[test]
     fn published_ports_are_sorted_once_per_protocol() {

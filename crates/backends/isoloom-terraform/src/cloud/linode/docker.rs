@@ -6,20 +6,27 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, call, list, refer
 use isoloom_spec::model::Protocol;
 
 use super::{Action, Way, region, rule};
-use crate::cloud::instance::{self, tag_list};
-use crate::cloud::operator;
-use crate::docker_host::{self, Access, AutoStop, Sizing, published, tcp_ports};
-use crate::module::providers::{self, terraform};
-use crate::module::variable::Variable;
+use crate::cloud::docker::{Driver, SizeVariable};
+use crate::cloud::instance::tag_list;
+use crate::docker_host::{Access, AutoStop, published, tcp_ports};
+use crate::module::providers;
 
-/// The module's resources and the host's set-up, from the plan.
-pub(crate) fn write(env: &Environment, m: &mut Module) {
-    m.block(terraform(&[providers::LINODE, providers::LOCAL]));
-    let size = Sizing::of(env).pick(["g6-standard-2", "g6-standard-4", "g6-standard-6"]);
-    m.block(region());
-    m.block(Variable::new("type", "string").default(string(size)).block());
-    m.blocks(operator::variables(env));
-    m.blocks(instance::id_and_locals(env, Vec::new()));
+/// Its `cloud-docker` driver.
+pub(crate) const DRIVER: Driver = Driver {
+    requires: providers::LINODE,
+    variables: || vec![region()],
+    size: Some(SizeVariable {
+        name: "type",
+        default: |s| s.pick(["g6-standard-2", "g6-standard-4", "g6-standard-6"]),
+    }),
+    // No provider block: the provider reads its token from the environment.
+    provider: |_, _| Vec::new(),
+    resources,
+};
+
+/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
+/// it.
+fn resources(env: &Environment, m: &mut Module) -> Access {
     m.block(
         resource("linode_instance")
             .add_attribute(("region", reference("var.region")))
@@ -30,13 +37,12 @@ pub(crate) fn write(env: &Environment, m: &mut Module) {
             .build(),
     );
     m.block(firewall(env));
-    let access = Access {
+    Access {
         host: call("one", [reference("linode_instance.env.ipv4")]),
         user: "root",
         replace_on: reference("linode_instance.env.id"),
         auto_stop: AutoStop::SetUp,
-    };
-    docker_host::environment(env, &access, m);
+    }
 }
 
 /// `resource "<kind>" "env"`, labelled after the environment.

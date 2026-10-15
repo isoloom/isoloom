@@ -3,10 +3,9 @@
 
 pub mod testing;
 
-use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::{Cloud, CloudVmModule, ProxmoxBackend};
-use testing::{Outcome, file, plan};
+use isoloom_terraform::{Cloud, CloudVmModule};
+use testing::{Outcome, plan, proxmox};
 
 const SPEC: &str = "version: 1
 name: v6
@@ -48,8 +47,7 @@ fn the_other_clouds_refuse_with_their_reason() -> Outcome {
 
 #[test]
 fn the_proxmox_router_takes_its_ipv6_address_and_forwards() -> Outcome {
-    let files = ProxmoxBackend.render(&plan(SPEC, Target::Proxmox)?)?;
-    let tf = file(&files, "proxmox/main.tf")?;
+    let tf = proxmox(SPEC)?;
     assert!(tf.contains("Address=fd00:67:20::254/64"), "{tf}");
     assert!(tf.contains("net.ipv6.conf.all.forwarding=1"), "{tf}");
     assert!(tf.contains("ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64"), "{tf}");

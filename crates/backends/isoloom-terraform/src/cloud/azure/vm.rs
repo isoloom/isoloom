@@ -19,23 +19,23 @@
 
 mod machines;
 mod network;
+mod private_dns;
 mod routing;
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::GeneratedFile;
-use isoloom_render::hcl_builder::{Expression, reference};
-use isoloom_spec::model::Target;
-use isoloom_spec::validate::Cidr;
+use isoloom_render::hcl_builder::{Expression, Module, reference};
 
-use super::{base, variables};
-use crate::Result;
-use crate::cloud::vm::gpus::GpuSizes;
-use crate::cloud::vm::outputs::{self, Reach};
-use crate::cloud::vm::rules::{Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes, kept_address};
-use crate::cloud::vm::{self, gateways, own_image, windows};
+use super::{provider, variables};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::{
+    self, Driver, gateways,
+    gpus::GpuSizes,
+    outputs::{self, Reach},
+    own_image, windows,
+};
 use crate::cloud::{Cloud, operator};
 use crate::limits::Limits;
-use crate::module::{self, ProjectCopy, Usage, ident, providers};
+use crate::module::{Usage, ident, providers};
 
 /// Azure creates the administrator with the VM: a name it never reserves, on every machine.
 const USER: &str = "isoloom";
@@ -62,6 +62,11 @@ const RULES: Rules = Rules {
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 1, most: 2 },
     tpm: true,
+    subnets: Some(Subnets {
+        called: "subnets",
+        longest: 29,
+    }),
+    kept: Some(FIRST_THREE),
     images: Images {
         label: "Azure",
         has: |os| image(os).is_some(),
@@ -110,52 +115,45 @@ fn size(memory_mb: u32) -> &'static str {
 
 /// Why Azure can't run this environment, if it can't: its features, its address rules, its
 /// images, then what no cloud does yet for a Windows machine.
-pub(crate) fn refusal(env: &Environment) -> Option<String> {
+fn refusal(env: &Environment) -> Option<String> {
     let spec = env.spec();
-    if let Some(why) = RULES.features(env) {
-        return Some(why);
-    }
-    if env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).any(|c| c.len > 29) {
-        return Some("Azure subnets are /29 or larger".to_owned());
-    }
-    let machine = spec.machines.iter().find_map(|(name, m)| {
-        let vm = m.vm.as_ref()?;
-        RULES
-            .images
-            .missing(name, &vm.os, own_image::of_machine(m, RULES.images.own))
-            .or_else(|| windows::refusal(name, m))
-            .or_else(|| {
-                kept_address(env, name, m, 0..=3).map(|net| format!("machine `{name}`: Azure keeps the first addresses of a subnet (.1 to .3) on `{net}`"))
-            })
-    });
-    machine.or_else(|| windows::udp_redirect(spec))
+    let machine = || {
+        spec.machines.iter().find_map(|(name, m)| {
+            m.vm.as_ref()?;
+            RULES.image(name, m).or_else(|| windows::refusal(name, m)).or_else(|| RULES.kept(env, name, m))
+        })
+    };
+    RULES
+        .features(env)
+        .or_else(|| RULES.subnets(env))
+        .or_else(machine)
+        .or_else(|| windows::udp_redirect(spec))
 }
 
-/// The module.
-pub(crate) fn module(env: &Environment) -> Result<GeneratedFile> {
+/// Its `cloud-vm` driver.
+pub(crate) const DRIVER: Driver = Driver {
+    usage: |folder| Usage::with_key(folder, operator::ALLOWED),
+    requires: (&[providers::AZURERM, providers::LOCAL], &[providers::RANDOM]),
+    variables: || variables().into(),
+    provider,
+    refusal,
+    write,
+};
+
+/// The module's blocks after the providers, from the plan.
+fn write(env: &Environment, m: &mut Module) {
     let env = &*gateways::relocated(env);
-    let folder = format!("{}/{}", Target::CloudVm.id(), Cloud::Azure.id());
-    let mut m = module::start(&Usage::with_key(&folder, operator::ALLOWED));
-    m.block(providers::terraform(&vm::providers(
-        env,
-        &[providers::AZURERM, providers::LOCAL],
-        &[providers::RANDOM],
-    )));
-    m.blocks(variables());
-    m.blocks(operator::variables(env));
-    m.blocks(base(env));
-    network::blocks(env, &mut m);
-    routing::blocks(env, &mut m);
-    vm::private_dns::azure(env, &mut m);
-    vm::credentials(env, &mut m);
-    MACHINES.write(env, &mut m);
+    network::blocks(env, m);
+    routing::blocks(env, m);
+    private_dns::write(env, m);
+    vm::credentials(env, m);
+    MACHINES.write(env, m);
     let reach = Reach {
         public_ip: &|n| public_ip(&ident(n)),
         user: &|_| USER.to_owned(),
         controller: Some((public_ip("isoloom_controller"), USER)),
     };
-    outputs::write(env, &reach, &mut m);
-    module::file(Target::CloudVm, &folder, m, ProjectCopy::Archive)
+    outputs::write(env, &reach, m);
 }
 
 /// The address Terraform reaches a machine at (`id`: its resource name).

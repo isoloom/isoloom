@@ -57,8 +57,10 @@ pub(super) fn hostpci(gpus: Option<&Gpus>) -> Vec<Block> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use proptest::prelude::*;
     use serde_json::json;
+
+    use super::*;
 
     fn gpus(v: serde_json::Value) -> Gpus {
         serde_json::from_value(v).unwrap()
@@ -91,5 +93,20 @@ mod tests {
             text.contains("hostpci {\n  device  = \"hostpci1\"\n  mapping = \"rtx\"\n  pcie    = true\n}"),
             "{text}"
         );
+    }
+
+    proptest! {
+        #[test]
+        fn every_pci_address_written_out_is_one(domain: u16, bus: u8, device in 0u8..32, function in 0u8..8) {
+            let slot = format!("{bus:02x}:{device:02x}");
+            for id in [format!("{domain:04x}:{slot}.{function}"), format!("{slot}.{function}"), slot.clone()] {
+                prop_assert!(pci_address(&id), "{id}");
+            }
+        }
+
+        #[test]
+        fn a_mapping_name_is_no_pci_address(name in "[g-z][a-z0-9_-]{0,12}") {
+            prop_assert!(!pci_address(&name));
+        }
     }
 }

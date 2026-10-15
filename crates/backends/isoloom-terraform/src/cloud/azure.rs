@@ -1,12 +1,12 @@
 //! Azure: what its `cloud-vm` module ([`vm`]) and its `cloud-docker` module ([`docker`])
-//! share: the subscription and the region, the provider, and the environment's instance with
-//! the tags every resource carries.
+//! share: the subscription and the region, and the provider with the tags every resource
+//! carries.
 
 pub(crate) mod docker;
 pub(crate) mod vm;
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, null, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, null, reference, string};
 
 use crate::cloud::instance;
 use crate::module::variable::Variable;
@@ -23,16 +23,14 @@ pub(crate) fn variables() -> [Block; 2] {
     ]
 }
 
-/// The provider, the environment's random id, the names and the tags every resource carries
-/// (`local.tags`).
-pub(crate) fn base(env: &Environment) -> Vec<Block> {
-    let mut blocks = vec![
+/// The provider, and the tags every resource carries (`local.tags`).
+pub(crate) fn provider(env: &Environment, m: &mut Module) -> Vec<(&'static str, Expression)> {
+    m.block(
         Block::builder("provider")
             .add_label("azurerm")
             .add_block(Block::builder("features").build())
             .add_attribute(("subscription_id", reference("var.subscription_id")))
             .build(),
-    ];
-    blocks.extend(instance::id_and_locals(env, vec![("tags", instance::tags(env))]));
-    blocks
+    );
+    vec![("tags", instance::tags(env))]
 }

@@ -12,6 +12,49 @@ use isoloom_spec::shell::quote;
 
 use crate::GeneratedFile;
 
+/// The size of the VM the containers run on (a cloud VM, a local VM): every container's at
+/// once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct HostSize {
+    /// CPUs: one per container unless it says, at least 2, at most 16.
+    pub cpus: u32,
+    /// Memory in MB: 512 per container unless it says, plus 1 GB for Docker itself.
+    pub memory_mb: u32,
+    /// Disk in GB: 5 per container unless it says, at least 20.
+    pub disk_gb: u32,
+}
+
+impl HostSize {
+    /// The host's size for the environment's containers.
+    #[must_use]
+    pub fn of(env: &Environment) -> HostSize {
+        let containers = env.machines.values().filter(|m| m.shape == MachineShape::Container);
+        let (cpus, memory_mb, disk_gb) = containers.fold((0u32, 1024u32, 0u32), |(c, m, d), x| {
+            (
+                c.saturating_add(x.size.cpus.unwrap_or(1)),
+                m.saturating_add(x.size.memory_mb.unwrap_or(512)),
+                d.saturating_add(x.size.disk_gb.unwrap_or(5)),
+            )
+        });
+        HostSize {
+            cpus: cpus.clamp(2, 16),
+            memory_mb,
+            disk_gb: disk_gb.max(20),
+        }
+    }
+
+    /// One of three sizes of VM by its memory: up to 4 GB, up to 8 GB, more.
+    #[must_use]
+    pub fn pick<T: Copy>(&self, [small, medium, large]: [T; 3]) -> T {
+        match self.memory_mb {
+            0..=4096 => small,
+            4097..=8192 => medium,
+            _ => large,
+        }
+    }
+}
+
 /// The check runner: a small image with `sh`, `curl` and busybox `nc`.
 pub const CHECK_IMAGE: &str = "curlimages/curl:8.11.1";
 
@@ -143,4 +186,42 @@ pub struct HybridContainers {
 /// environment.
 pub fn docker_net(env: &Environment, net: &str) -> String {
     format!("isoloom-{}-{net}", env.name)
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_plan::Environment;
+    use isoloom_spec::model::Target;
+
+    use super::HostSize;
+
+    /// The containers' host for `yaml`, on `docker-vm`.
+    fn host_size(yaml: &str) -> HostSize {
+        let lab = isoloom_plan::Lab::parse(yaml).expect("parses");
+        HostSize::of(&Environment::build(&lab.for_target(Target::DockerVm), Target::DockerVm, None))
+    }
+
+    #[test]
+    fn every_container_counts_and_docker_takes_a_gigabyte() {
+        let size = host_size(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, app: { image: nginx } }\n  b: { networks: { lan: 11 }, resources: { cpus: 3, memory_mb: 4096, disk_gb: 30 }, app: { image: nginx } }\n",
+        );
+        assert_eq!(
+            size,
+            HostSize {
+                cpus: 4,
+                memory_mb: 512 + 4096 + 1024,
+                disk_gb: 35
+            }
+        );
+        assert_eq!(size.pick(["small", "medium", "large"]), "medium");
+    }
+
+    #[test]
+    fn a_few_small_containers_take_the_smallest_host() {
+        let size =
+            host_size("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, app: { image: nginx } }\n");
+        assert_eq!((size.cpus, size.memory_mb, size.disk_gb), (2, 1536, 20));
+        assert_eq!(size.pick(["small", "medium", "large"]), "small");
+    }
 }

@@ -1,7 +1,8 @@
-//! The clouds: the [`Cloud`]s the modules run on, what every cloud module shares (the
-//! operator's variables, the environment's instance, the auto-stop), the targets on them
-//! (`cloud-vm`, `cloud-docker`, `cloud-services`), and each cloud's own folder, its pieces for
-//! both `cloud-vm` and `cloud-docker`.
+//! The clouds: the [`Cloud`]s the modules run on, what every cloud module shares (its head: the
+//! operator's variables, the provider, the environment's instance; the auto-stop), the targets
+//! on them (`cloud-vm`, `cloud-docker`, `cloud-services`), and each cloud's own folder: its
+//! pieces for both targets, and its driver of each (`<cloud>::vm::DRIVER`,
+//! `<cloud>::docker::DRIVER`), which holds only what the cloud does its own way.
 
 pub(crate) mod auto_stop;
 pub(crate) mod aws;
@@ -17,6 +18,9 @@ pub(crate) mod services;
 pub(crate) mod vm;
 
 use std::fmt;
+
+use isoloom_plan::Environment;
+use isoloom_render::hcl_builder::{Block, Expression, Module};
 
 /// A cloud the `cloud-vm` and `cloud-docker` modules run on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -66,6 +70,19 @@ impl Cloud {
             Cloud::Oci => "Oracle Cloud",
         }
     }
+}
+
+/// A cloud's provider in its modules: writes the provider's configuration, and gives the locals
+/// it adds to the environment's (`instance::id_and_locals`).
+pub(crate) type ProviderConfig = fn(&Environment, &mut Module) -> Vec<(&'static str, Expression)>;
+
+/// A cloud module's start after its `terraform` block, the same on every cloud and target: the
+/// cloud's `variables`, the operator's, then its provider and the environment's id and locals.
+pub(crate) fn head(env: &Environment, m: &mut Module, variables: Vec<Block>, provider: ProviderConfig) {
+    m.blocks(variables);
+    m.blocks(operator::variables(env));
+    let locals = provider(env, m);
+    m.blocks(instance::id_and_locals(env, locals));
 }
 
 impl fmt::Display for Cloud {

@@ -39,6 +39,12 @@ pub(crate) fn provider() -> Block {
         .build()
 }
 
+/// The provider, and the project local: the project given, else one of its own ([`project`]).
+pub(crate) fn provider_and_project(env: &Environment, m: &mut Module) -> Vec<(&'static str, Expression)> {
+    m.block(provider());
+    vec![("project", project(env, m))]
+}
+
 /// `var.project == "" ? 1 : 0`: a project of its own when none is given.
 pub(crate) fn own_project() -> Expression {
     conditional(binary(reference("var.project"), BinaryOperator::Eq, string("")), number(1), number(0))

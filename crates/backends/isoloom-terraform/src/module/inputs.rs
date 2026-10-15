@@ -1,18 +1,19 @@
 //! The spec's launch-time inputs (`inputs:`): the `inputs` variable a module takes them in, and
 //! the inputs file a machine reads them from.
 
+use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, Expression, Template, call, list, object, reference, string};
 
 use super::variable::Variable;
 
-/// The `inputs` variable: the values the spec's `inputs:` are given at launch.
-pub(crate) fn variable() -> Block {
-    Variable::new("inputs", "string")
+/// The `inputs` variable, when the spec has `inputs:`: the values they are given at launch.
+pub(crate) fn variable(env: &Environment) -> Option<Block> {
+    let variable = Variable::new("inputs", "string")
         .typed(call("map", [reference("string")]))
         .default(object::<&str>([]))
         .sensitive()
-        .describe("Values given at launch")
-        .block()
+        .describe("Values given at launch");
+    (!env.spec().inputs.is_empty()).then(|| variable.block())
 }
 
 /// A machine's inputs file (`KEY='value'` lines, read with `sh`'s `.`), from `var.inputs`.

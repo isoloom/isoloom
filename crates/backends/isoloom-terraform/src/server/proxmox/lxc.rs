@@ -253,6 +253,8 @@ pub(super) fn router_dns(env: &Environment) -> Option<(Vec<Expression>, &'static
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::oci_reference;
 
     #[test]
@@ -261,5 +263,14 @@ mod tests {
         assert_eq!(oci_reference("bitnami/redis"), "docker.io/bitnami/redis");
         assert_eq!(oci_reference("ghcr.io/o/app:1"), "ghcr.io/o/app:1");
         assert_eq!(oci_reference("localhost:5000/app"), "localhost:5000/app");
+    }
+
+    proptest! {
+        #[test]
+        fn a_reference_in_full_stays_as_it_is(image in "[a-z0-9]{1,8}(/[a-z0-9]{1,8}){0,2}(:[a-z0-9.]{1,6})?") {
+            let full = oci_reference(&image);
+            prop_assert!(full.ends_with(&image), "{full}");
+            prop_assert_eq!(oci_reference(&full), full);
+        }
     }
 }

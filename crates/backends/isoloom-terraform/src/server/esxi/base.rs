@@ -1,16 +1,15 @@
 //! The module's base, before the router and the machines: its providers, variables, the
 //! connection to the host, the locals every VM shares, the generated credentials, and the
-//! networks (a vSwitch and a port group each).
+//! networks (`networks`, `outside`).
 
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, for_list, list, number, object, reference, string};
 
 use super::{SERVICE_OS, default_image};
-use crate::machine::vms;
-use crate::module::providers::{self, terraform};
+use crate::machine::{vms, windows};
+use crate::module::providers;
 use crate::module::variable::Variable;
-use crate::module::{ident, inputs, resource};
-use crate::server::{credentials, slotted, user};
+use crate::server::{self, credentials, user};
 
 /// The highest slot: it is the fourth byte of the VMs' MACs, which VMware keeps under 0x40 for
 /// addresses set by hand.
@@ -18,34 +17,10 @@ const MAX_SLOT: u64 = 63;
 
 /// Everything before the router.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let mut required = vec![providers::ESXI, providers::TLS, providers::LOCAL];
-    if super::windows::any(env) {
-        required.push(providers::RANDOM);
-    }
-    m.block(terraform(&required));
-    m.blocks(variables(env));
-    if !env.spec().inputs.is_empty() {
-        m.block(inputs::variable());
-    }
-    m.block(provider());
+    server::head(env, m, &[providers::ESXI, providers::TLS, providers::LOCAL], variables(env), provider());
     m.commented("The project's root, and the `isoloom` user on every VM.", locals());
     credentials(env, m);
-    for (net, plan) in &env.networks {
-        let name = || slotted(&format!("-{net}"));
-        let mut vswitch = resource("esxi_vswitch", &ident(net)).add_attribute(("name", name()));
-        if let Some(mtu) = plan.mtu {
-            vswitch = vswitch.add_attribute(("mtu", number(mtu.into())));
-        }
-        m.commented(&format!("Network `{net}`: {}, on its own vSwitch with no uplink.", plan.cidr), vswitch.build());
-        // VLAN 4095 passes the machines' own VLAN tags (trunks), and untagged frames as well.
-        m.block(
-            resource("esxi_portgroup", &ident(net))
-                .add_attribute(("name", name()))
-                .add_attribute(("vswitch", reference(&format!("esxi_vswitch.{}.name", ident(net)))))
-                .add_attribute(("vlan", number(4095)))
-                .build(),
-        );
-    }
+    super::networks::blocks(env, m);
     super::outside::blocks(env, m);
 }
 
@@ -116,7 +91,7 @@ fn images(env: &Environment) -> Block {
     let has = call("contains", [call("keys", [reference("var.images")]), reference("os")]);
     let condition = call("alltrue", [for_list("os", needed, has, None)]);
     let mut description = "An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default; for another OS, an OVA with cloud-init and open-vm-tools".to_owned();
-    if super::windows::any(env) {
+    if windows::any(env) {
         description.push_str("; for Windows, an OVA with VMware Tools and cloudbase-init (its VMware guestinfo service), sysprepped");
     }
     Variable::new("images", "string")

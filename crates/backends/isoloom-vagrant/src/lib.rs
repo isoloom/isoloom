@@ -36,7 +36,6 @@
 //! ```
 
 mod backend;
-mod docker_host;
 pub mod docker_vm;
 mod error;
 pub mod hybrid;

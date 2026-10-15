@@ -3,15 +3,9 @@
 
 pub mod testing;
 
-use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::ProxmoxBackend;
-use testing::{Outcome, file, plan};
-
-/// The module of `yaml`, a valid spec.
-fn render(yaml: &str) -> Outcome<String> {
-    Ok(file(&ProxmoxBackend.render(&plan(yaml, Target::Proxmox)?)?, "proxmox/main.tf")?.to_owned())
-}
+use testing::{Outcome, proxmox};
 
 /// Why Proxmox refuses `yaml`, if it does.
 fn refusal(yaml: &str) -> Outcome<Option<String>> {
@@ -41,7 +35,7 @@ machines:
 
 #[test]
 fn a_lan_is_one_vlan_aware_vnet_and_its_vlans_are_tags() -> Outcome {
-    let tf = render(TWO)?;
+    let tf = proxmox(TWO)?;
     assert!(tf.contains("resource \"proxmox_sdn_vnet\" \"office\""), "{tf}");
     assert!(tf.contains("vlan_aware = true"), "{tf}");
     assert!(!tf.contains("resource \"proxmox_sdn_vnet\" \"office_vlan10\""), "{tf}");
@@ -52,7 +46,7 @@ fn a_lan_is_one_vlan_aware_vnet_and_its_vlans_are_tags() -> Outcome {
 
 #[test]
 fn mtu_and_rate_limit_go_on_the_devices() -> Outcome {
-    let tf = render(TWO)?;
+    let tf = proxmox(TWO)?;
     // The zone carries the largest; each device its network's.
     assert!(tf.contains("mtu   = 9000") || tf.contains("mtu = 9000"), "{tf}");
     assert!(tf.contains("= 1400"), "{tf}");
@@ -62,7 +56,7 @@ fn mtu_and_rate_limit_go_on_the_devices() -> Outcome {
 
 #[test]
 fn the_firewall_enforces_reach_and_the_published_ports() -> Outcome {
-    let tf = render(TWO)?;
+    let tf = proxmox(TWO)?;
     assert!(tf.contains("resource \"proxmox_virtual_environment_firewall_ipset\" \"servers\""), "{tf}");
     assert!(tf.contains("resource \"proxmox_virtual_environment_firewall_options\" \"web\""), "{tf}");
     assert!(tf.contains("input_policy  = \"DROP\""), "{tf}");
@@ -76,7 +70,7 @@ fn the_firewall_enforces_reach_and_the_published_ports() -> Outcome {
 
 #[test]
 fn an_arm64_machine_is_an_emulated_aarch64_vm() -> Outcome {
-    let tf = render(
+    let tf = proxmox(
         "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, hardware: { arch: arm64 }, os: debian@12, app: { steps: [{ run: s.sh }] } }\n",
     )?;
     assert!(tf.contains("debian-12-genericcloud-arm64.qcow2"), "{tf}");
@@ -102,7 +96,7 @@ overrides: { proxmox: { machines: { web: { lxc: true } } } }
 
 #[test]
 fn an_lxc_machine_is_a_container_from_its_oci_image() -> Outcome {
-    let tf = render(LXC)?;
+    let tf = proxmox(LXC)?;
     assert!(tf.contains("resource \"proxmox_oci_image\" \"web\""), "{tf}");
     assert!(
         tf.contains("reference           = \"docker.io/library/nginx:1.27\"") || tf.contains("\"docker.io/library/nginx:1.27\""),

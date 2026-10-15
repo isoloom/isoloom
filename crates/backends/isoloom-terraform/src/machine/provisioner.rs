@@ -136,25 +136,29 @@ fn announce(name: &str, c: &Connection) -> Block {
     provisioner("local-exec").add_attribute(("command", command.into_expression())).build()
 }
 
+/// An SSH connection as `user` to `host`, through `bastion` when there is one (as the same
+/// user, with the same key).
+fn ssh(host: &Expression, user: &str, bastion: Option<&Expression>) -> BlockBuilder {
+    let key = || call("file", [call("pathexpand", [reference("var.ssh_private_key_file")])]);
+    let mut b = Block::builder("connection")
+        .add_attribute(("type", string("ssh")))
+        .add_attribute(("host", host.clone()))
+        .add_attribute(("user", string(user)))
+        .add_attribute(("private_key", key()));
+    if let Some(bastion) = bastion {
+        b = b
+            .add_attribute(("bastion_host", bastion.clone()))
+            .add_attribute(("bastion_user", string(user)))
+            .add_attribute(("bastion_private_key", key()));
+    }
+    b.add_attribute(("timeout", string("10m")))
+}
+
 fn connection(c: &Connection) -> Block {
     let b = Block::builder("connection");
-    let key = || call("file", [call("pathexpand", [reference("var.ssh_private_key_file")])]);
     match c {
-        Connection::Ssh { host, user } => b
-            .add_attribute(("type", string("ssh")))
-            .add_attribute(("host", host.clone()))
-            .add_attribute(("user", string(user.as_str())))
-            .add_attribute(("private_key", key()))
-            .add_attribute(("timeout", string("10m"))),
-        Connection::SshVia { host, user, bastion } => b
-            .add_attribute(("type", string("ssh")))
-            .add_attribute(("host", host.clone()))
-            .add_attribute(("user", string(user.as_str())))
-            .add_attribute(("private_key", key()))
-            .add_attribute(("bastion_host", bastion.clone()))
-            .add_attribute(("bastion_user", string(user.as_str())))
-            .add_attribute(("bastion_private_key", key()))
-            .add_attribute(("timeout", string("10m"))),
+        Connection::Ssh { host, user } => ssh(host, user, None),
+        Connection::SshVia { host, user, bastion } => ssh(host, user, Some(bastion)),
         Connection::WinRm { host, password, ntlm } => {
             let b = b
                 .add_attribute(("type", string("winrm")))

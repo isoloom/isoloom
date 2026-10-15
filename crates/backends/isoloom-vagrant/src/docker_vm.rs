@@ -23,7 +23,6 @@ use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container as docker;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 
-use crate::docker_host;
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 
@@ -35,7 +34,7 @@ const DERIVED: &str = "ENV.fetch(\"ISOLOOM_DERIVED\", \"1\")";
 
 /// The CPUs and memory (MB) of the VM: the containers' host's, at least 2 GB.
 fn host_size(env: &Environment) -> (u32, u32) {
-    let size = docker_host::Size::of(env);
+    let size = docker::HostSize::of(env);
     (size.cpus, size.memory_mb.max(2048))
 }
 

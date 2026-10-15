@@ -9,29 +9,24 @@ use isoloom_render::hcl_builder::{
 
 use super::image_url;
 use crate::machine::{controller, vms};
-use crate::module::providers::{self, terraform};
+use crate::module::providers;
 use crate::module::variable::Variable;
-use crate::module::{ident, inputs, resource};
-use crate::server::{credentials, slotted, user};
+use crate::module::{ident, resource};
+use crate::server::{self, credentials, slotted, user};
 
 /// The environment's pool, as a VM or a container names it.
 pub(super) const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";
 
 /// Everything before the router.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let mut required = vec![providers::PROXMOX, providers::TLS];
-    if vms(env).any(|(_, mp)| mp.is_windows()) {
-        required.push(providers::RANDOM);
-    }
-    m.block(terraform(&required));
-    m.blocks(variables());
-    m.blocks(super::windows::variables(env));
-    m.blocks(super::lxc::variables(env));
-    m.blocks(super::virtiofs::variables(env));
-    if !env.spec().inputs.is_empty() {
-        m.block(inputs::variable());
-    }
-    m.block(provider());
+    let variables = [
+        variables(),
+        super::windows::variables(env),
+        super::lxc::variables(env),
+        super::virtiofs::variables(env),
+    ]
+    .concat();
+    server::head(env, m, &[providers::PROXMOX, providers::TLS], variables, provider());
     m.commented(
         "The project, written to /opt/isoloom in each machine that has steps; the `isoloom` user on every VM.",
         locals(env),

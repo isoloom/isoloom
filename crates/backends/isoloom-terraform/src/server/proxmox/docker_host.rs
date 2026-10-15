@@ -6,6 +6,7 @@
 
 use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
+use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{
     BinaryOperator, Block, BlockBuilder, Expression, Structure, Template, binary, boolean, call, conditional, for_list, index, list, null, number, reference,
     string,
@@ -16,7 +17,7 @@ use super::base::{connection, download, is_set, is_unset, provider};
 use super::machine::snippet;
 use crate::Result;
 use crate::cloud::operator;
-use crate::docker_host::{self, Access, AutoStop, Sizing};
+use crate::docker_host::{self, Access, AutoStop};
 use crate::machine::cloud_init::{self, CloudConfig};
 use crate::module::providers::{self, terraform};
 use crate::module::variable::Variable;
@@ -119,7 +120,7 @@ fn settings(name: &str, attributes: Vec<(&str, Expression)>) -> Block {
 }
 
 fn vm(env: &Environment) -> Block {
-    let size = Sizing::of(env);
+    let size = HostSize::of(env);
     let ip_config = Block::builder("ip_config")
         .add_block(settings("ipv4", vec![("address", string("dhcp"))]))
         .build();
