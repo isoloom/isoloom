@@ -44,3 +44,35 @@ pub fn totals(spec: &model::Spec) -> Totals {
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn totals_add_each_machines_size_or_the_defaults() {
+        let spec = crate::testing::model(&crate::testing::lab(
+            "machines:\n  a: { networks: { lan: 10 }, docker: { image: x }, resources: { cpus: 4, memory_mb: 512, disk_gb: 5 } }\n  b: { networks: { lan: 11 }, docker: { image: x }, resources: { cpus: 2 } }\n  c: { networks: { lan: 12 }, docker: { image: x } }\n",
+        ))
+        .unwrap();
+        assert_eq!(
+            totals(&spec),
+            Totals {
+                machines: 3,
+                cpus: 4 + 2 + DEFAULT_CPUS,
+                memory_mb: 512 + 2 * DEFAULT_MEMORY_MB,
+                disk_gb: 5 + 2 * DEFAULT_DISK_GB,
+            }
+        );
+    }
+
+    #[test]
+    fn totals_saturate_instead_of_overflowing() {
+        let huge = u32::MAX;
+        let spec = crate::testing::model(&crate::testing::lab(&format!(
+            "machines:\n  a: {{ networks: {{ lan: 10 }}, docker: {{ image: x }}, resources: {{ cpus: {huge} }} }}\n  b: {{ networks: {{ lan: 11 }}, docker: {{ image: x }}, resources: {{ cpus: 3 }} }}\n"
+        )))
+        .unwrap();
+        assert_eq!(totals(&spec).cpus, u32::MAX);
+    }
+}

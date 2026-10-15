@@ -120,3 +120,22 @@ fn drop_null(v: &mut Value) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn null_is_dropped_from_every_alternative_inside_a_list() {
+        let mut v = json!({ "anyOf": [{ "type": ["string", "null"] }, { "type": "integer" }, { "type": "boolean" }], "default": null });
+        drop_null(&mut v);
+        assert_eq!(v, json!({ "anyOf": [{ "type": "string" }, { "type": "integer" }, { "type": "boolean" }] }));
+    }
+
+    #[test]
+    fn an_optional_field_keeps_only_its_real_type() {
+        let mut v = json!({ "description": "d", "anyOf": [{ "$ref": "#/$defs/X" }, { "type": "null" }] });
+        drop_null(&mut v);
+        assert_eq!(v, json!({ "description": "d", "$ref": "#/$defs/X" }));
+    }
+}

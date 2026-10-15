@@ -211,3 +211,81 @@ fn one_machine_fields(top: &Mapping, clones: &Clones) -> Result<(), Problem> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expanded(yaml: &str) -> (Value, Result<Clones, Problem>) {
+        let mut doc: Value = serde_yaml_ng::from_str(yaml).unwrap();
+        let clones = expand(&mut doc);
+        (doc, clones)
+    }
+
+    #[test]
+    fn a_counted_machine_becomes_its_clones_one_address_further_each() {
+        let (doc, clones) = expanded("machines:\n  ws: { count: 3, networks: { lan: 50, mgmt: [20, 30] } }\n  db: { networks: { lan: 10 } }\n");
+        assert_eq!(clones.unwrap()["ws"], ["ws-01", "ws-02", "ws-03"]);
+        let names: Vec<&str> = doc["machines"].as_mapping().unwrap().keys().filter_map(Value::as_str).collect();
+        assert_eq!(names, ["ws-01", "ws-02", "ws-03", "db"]);
+        assert_eq!(doc["machines"]["ws-03"]["networks"]["lan"].as_u64(), Some(52));
+        assert_eq!(doc["machines"]["ws-02"]["networks"]["mgmt"][1].as_u64(), Some(31));
+        assert!(doc["machines"]["ws-01"].get("count").is_none());
+    }
+
+    #[test]
+    fn a_check_from_the_base_runs_from_each_clone() {
+        let (doc, _) = expanded(
+            "machines:\n  ws: { count: 2 }\n  db: {}\nchecks:\n  - { name: reaches the db, from: ws, tcp: 'db:5432' }\n  - { from: db, tcp: 'ws-01:22' }\n  - probe.sh\n",
+        );
+        let checks = doc["checks"].as_sequence().unwrap();
+        assert_eq!(checks.len(), 4);
+        assert_eq!(
+            (checks[0]["from"].as_str(), checks[0]["name"].as_str()),
+            (Some("ws-01"), Some("reaches the db (ws-01)"))
+        );
+        assert_eq!(
+            (checks[1]["from"].as_str(), checks[1]["name"].as_str()),
+            (Some("ws-02"), Some("reaches the db (ws-02)"))
+        );
+        assert_eq!(checks[2]["from"].as_str(), Some("db"));
+        assert_eq!(checks[3].as_str(), Some("probe.sh"));
+    }
+
+    #[test]
+    fn where_the_base_is_named_every_clone_is_meant() {
+        let (doc, _) = expanded(
+            "machines:\n  ws: { count: 2 }\n  app: { depends_on: [ws, db] }\n  db: {}\ngroups:\n  desk: { members: [ws] }\nprovision:\n  - { ansible: site.yml, groups: { clients: [ws] } }\n",
+        );
+        let list = |v: &Value| v.as_sequence().unwrap().iter().filter_map(Value::as_str).map(str::to_owned).collect::<Vec<_>>();
+        assert_eq!(list(&doc["machines"]["app"]["depends_on"]), ["ws-01", "ws-02", "db"]);
+        assert_eq!(list(&doc["groups"]["desk"]["members"]), ["ws-01", "ws-02"]);
+        assert_eq!(list(&doc["provision"][0]["groups"]["clients"]), ["ws-01", "ws-02"]);
+    }
+
+    #[test]
+    fn a_gateway_or_a_switch_is_one_machine() {
+        for field in ["gateway", "switch"] {
+            let (_, refused) = expanded(&format!("networks:\n  lan: {{ {field}: rt }}\nmachines:\n  rt: {{ count: 2 }}\n"));
+            let p = refused.unwrap_err();
+            assert_eq!((p.code, p.path.as_str()), (Code::InvalidValue, format!("networks.lan.{field}").as_str()));
+            assert_eq!(p.reason, format!("`rt` has a count; a {field} is one machine"));
+        }
+        let (_, fine) = expanded("networks:\n  lan: { gateway: rt }\nmachines:\n  rt: {}\n  ws: { count: 2 }\n");
+        assert_eq!(fine.unwrap()["ws"].len(), 2);
+    }
+
+    #[test]
+    fn a_count_is_2_to_99_on_a_machine_that_isnt_the_access_one() {
+        let refused = |yaml: &str| expanded(yaml).1.unwrap_err().reason;
+        assert_eq!(refused("machines:\n  ws: { count: 1 }\n"), "2 to 99 (one machine needs no count)");
+        assert_eq!(refused("machines:\n  ws: { count: 100 }\n"), "2 to 99 (one machine needs no count)");
+        assert_eq!(refused("machines:\n  ws: { count: two }\n"), "a number of machines, 2 to 99");
+        assert_eq!(
+            refused("machines:\n  me: { count: 2, access: true }\n"),
+            "the access machine is one machine; leave `count` out"
+        );
+        assert_eq!(expanded("machines:\n  ws: { count: 99 }\n").1.unwrap()["ws"].len(), 99);
+        assert_eq!(expanded("machines:\n  ws: { count: ~ }\n").1.unwrap().len(), 0);
+    }
+}

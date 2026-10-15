@@ -251,6 +251,14 @@ machines:
     }
 
     #[test]
+    fn a_vlan_the_lan_lacks_keeps_its_name_for_validation_to_report() {
+        let yaml = format!("{OFFICE}  pc3: {{ networks: {{ office.vlan30: 10, servers.vlan10: 11 }}, docker: {{ image: alpine:3.20 }} }}\n");
+        let s = flatten(raw(&yaml)).unwrap();
+        let names: Vec<&String> = s.machines["pc3"].networks.keys().collect();
+        assert_eq!(names, ["office.vlan30", "servers.vlan10"]);
+    }
+
+    #[test]
     fn the_lan_stays_when_a_machine_joins_it_directly() {
         let yaml = OFFICE
             .replace("cidr: 10.10.0.0/16", "cidr: 10.10.0.0/24")
@@ -259,6 +267,7 @@ machines:
             + "  printer: { networks: { office: 10 }, docker: { image: alpine:3.20 } }\n";
         let s = flatten(raw(&yaml)).unwrap();
         assert!(s.networks.contains_key("office"));
+        assert_eq!(s.networks["office"].vlans.len(), 0, "the LAN joined directly is a plain network");
         assert!(s.reach.iter().any(|r| r.from == "office" && r.to == "servers"));
     }
 

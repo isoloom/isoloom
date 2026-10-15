@@ -318,3 +318,66 @@ impl fmt::Display for Known<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::syntax::{Code, FieldPath};
+
+    #[test]
+    fn a_specs_problems_read_one_after_the_other() {
+        let problems = vec![
+            Problem::new(Code::MissingField, FieldPath::new("version"), "a spec says its format's version"),
+            Problem::new(Code::UnknownField, FieldPath::new("nme"), "`nme` isn't a field here"),
+        ];
+        let invalid = Error::Invalid {
+            file: "isoloom.yaml".into(),
+            problems,
+        };
+        assert_eq!(
+            invalid.to_string(),
+            "error[missing-field] version\n  a spec says its format's version\nerror[unknown-field] nme\n  `nme` isn't a field here"
+        );
+    }
+
+    #[test]
+    fn a_missing_profile_lists_the_profiles_there_are() {
+        let missing = |known: &[&str]| Error::NoProfile {
+            name: "c".into(),
+            folder: PathBuf::from("/lab/profiles"),
+            known: known.iter().map(|k| (*k).to_owned()).collect(),
+        };
+        assert_eq!(missing(&[]).to_string(), "no profile `c` (no profiles in /lab/profiles)");
+        assert_eq!(missing(&["a", "b"]).to_string(), "no profile `c` (profiles here: a, b)");
+    }
+
+    #[test]
+    fn a_profiles_problems_read_one_per_line() {
+        let problems = vec![
+            ProfileProblem::Input {
+                profile: "p".into(),
+                input: "A".into(),
+            },
+            ProfileProblem::Input {
+                profile: "p".into(),
+                input: "B".into(),
+            },
+        ];
+        assert_eq!(
+            Error::ProfileMismatch { problems }.to_string(),
+            "profile `p`: input `A` isn't one of the spec's `inputs`\nprofile `p`: input `B` isn't one of the spec's `inputs`"
+        );
+    }
+
+    #[test]
+    fn several_sources_of_one_file_are_named_together() {
+        assert_eq!(
+            Error::FileSources(vec!["source", "input"]).to_string(),
+            "`source` and `input` are both given: keep one source"
+        );
+        assert_eq!(
+            Error::FileSources(vec!["source", "content", "input"]).to_string(),
+            "`source` and `content` and `input` are all given: keep one source"
+        );
+    }
+}

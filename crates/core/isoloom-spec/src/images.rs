@@ -313,6 +313,69 @@ mod tests {
     use super::*;
     use crate::model::KNOWN_OS;
 
+    /// A table with Debian 12's box and an access machine of each form.
+    const TABLE: &str = "os:\n  debian@12: { vagrant: my-org/debian-12 }\naccess: { docker: kalilinux/kali-rolling, vm: debian }\n";
+
+    #[test]
+    fn a_table_holds_each_os_by_its_image_table_name() {
+        let table = Table::parse(TABLE).unwrap();
+        assert_eq!(table.os.keys().collect::<Vec<_>>(), ["debian-12"]);
+        assert_eq!(table.os["debian-12"].vagrant.as_deref(), Some("my-org/debian-12"));
+        let access = table.access.unwrap();
+        assert_eq!(
+            (access.docker.as_deref(), access.vm.as_deref()),
+            (Some("kalilinux/kali-rolling"), Some("debian-12"))
+        );
+        assert!(
+            Table::parse("access: { vm: windows-95 }")
+                .unwrap_err()
+                .to_string()
+                .contains("unknown OS `windows-95`")
+        );
+    }
+
+    #[test]
+    fn a_table_gives_vms_their_image_unless_the_spec_does() {
+        let table = Table::parse(TABLE).unwrap();
+        let spec = crate::testing::model(&crate::testing::lab(
+            "machines:\n  a: { networks: { lan: 10 }, vm: { os: debian@12 } }\n  b: { networks: { lan: 11 }, vm: { os: debian@12, image: { vagrant: own/box } } }\n  c: { networks: { lan: 12 }, vm: { os: debian@13 } }\n",
+        ))
+        .unwrap();
+        let applied = table.apply(&spec);
+        let vagrant = |m: &str| applied.machines[m].vm.as_ref().and_then(|v| v.image.as_ref()).and_then(|i| i.vagrant.clone());
+        assert_eq!(vagrant("a").as_deref(), Some("my-org/debian-12"));
+        assert_eq!(vagrant("b").as_deref(), Some("own/box"));
+        assert_eq!(applied.machines["c"].vm.as_ref().and_then(|v| v.image.clone()), None);
+    }
+
+    #[test]
+    fn a_table_supplies_the_access_machine_in_both_forms() {
+        let table = Table::parse(TABLE).unwrap();
+        let spec = crate::testing::model(&crate::testing::lab("machines:\n  user: { networks: { lan: 10 }, access: true }\n")).unwrap();
+        let user = &table.apply(&spec).machines["user"];
+        assert!(user.supplied);
+        assert_eq!(user.docker.as_ref().and_then(|d| d.image.as_deref()), Some("kalilinux/kali-rolling"));
+        let vm = user.vm.as_ref().unwrap();
+        assert_eq!(
+            (vm.os.as_str(), vm.image.as_ref().and_then(|i| i.vagrant.as_deref())),
+            ("debian-12", Some("my-org/debian-12"))
+        );
+        let own = crate::testing::model(&crate::testing::lab(
+            "machines:\n  user: { networks: { lan: 10 }, access: true, docker: { image: mine } }\n",
+        ))
+        .unwrap();
+        let kept = &table.apply(&own).machines["user"];
+        assert_eq!(kept.docker.as_ref().and_then(|d| d.image.as_deref()), Some("mine"));
+    }
+
+    #[test]
+    fn a_windows_box_answers_winrm_as_its_image_says() {
+        let declared: VmImpl = serde_yaml_ng::from_str("os: windows-server-2022\nimage: { winrm: ssl }\n").unwrap();
+        assert_eq!(winrm(&declared), crate::model::Winrm::Ssl);
+        let plain: VmImpl = serde_yaml_ng::from_str("os: windows-server-2022\n").unwrap();
+        assert_eq!(winrm(&plain), crate::model::Winrm::Plaintext);
+    }
+
     #[test]
     fn every_os_name_has_a_vagrant_box() {
         for os in KNOWN_OS {
