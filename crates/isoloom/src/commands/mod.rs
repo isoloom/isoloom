@@ -9,7 +9,6 @@ pub mod capture;
 pub mod chart;
 pub mod check;
 pub mod connect;
-pub mod coverage;
 pub mod defaults;
 pub mod docs;
 pub mod doctor;
@@ -64,7 +63,6 @@ pub fn run(command: Command) -> Res<ExitCode> {
         Command::Chart(a) => chart::run(&a),
         Command::Schema(a) => schema::run(&a),
         Command::Import(i) => import::run(i),
-        Command::Coverage(a) => coverage::run(&a),
         Command::Docs(a) => Ok(docs::run(&a)),
     }
 }

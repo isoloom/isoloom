@@ -89,13 +89,10 @@ one in [Targets](docs/targets.md).
 
 - [Getting started](docs/getting-started.md): install, a first spec, run, test, down.
 - [Targets](docs/targets.md): what each target builds, what the host needs, its limits.
-- [Spec reference](docs/spec.md): every field, generated from the schema, with the targets that
-  render or refuse it.
+- [Spec reference](docs/spec.md): every field, generated from the schema.
 - [Secrets](docs/secrets.md): stores, delivery per target, and what never happens.
 - [Storage](docs/storage.md): volumes (shared, persistent, external, `subpath`), `tmpfs` and data
   disks, and how each target handles them.
-- [Coverage](docs/COVERAGE.md): everything each output format can do, and whether Isoloom
-  produces it (`isoloom coverage`).
 - [The `esxi` target](docs/esxi.md), [cloud modules](docs/cloud-modules.md): variables and
   outputs of the generated Terraform modules.
 - [JSON output](docs/json.md) and [the registry](docs/registry.md), for tools that drive
@@ -117,7 +114,7 @@ isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
 
 | Crate | Holds |
 |---|---|
-| `isoloom-spec` | The model, parsing and loading, normalization, validation, the JSON schema, profiles |
+| `isoloom-spec` | The model, parsing and loading, normalization, validation, the JSON schema and the spec reference, profiles |
 | `isoloom-plan` | The target-neutral plan, the checks, requirements and refusal |
 | `isoloom-render` | The `Backend` trait and the pieces every backend shares |
 | `isoloom-compose` | The Compose backend: `docker`, `hosted`, and the Compose file of the Docker-on-a-VM targets |
@@ -127,7 +124,6 @@ isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
 | `isoloom-external` | The `external` backend |
 | `isoloom-targets` | Every backend behind one call, refusals, the resolved snapshot |
 | `isoloom-import` | Drafting a spec from Compose, Vagrant and Terraform files |
-| `isoloom-coverage` | The coverage map and the generated spec reference |
 | `isoloom-runtime` | Running environments: the registry, host readiness, secrets' stores, events, reports |
 | `isoloom` | The command line |
 
@@ -142,7 +138,7 @@ isoloom-runtime = { git = "https://github.com/isoloom/isoloom", tag = "vX.Y.Z" }
     JSON events and errors, with an `Emitter`) and `tool`.
 
   Every other public item (the spec's `clones`, `groups`, `vlans`, `images`, `schema`, `shell`;
-  `isoloom-render`, the backends, `isoloom-import`, `isoloom-coverage`,
+  `isoloom-render`, the backends, `isoloom-import`,
   `isoloom_runtime::report` and `isoloom_runtime::secrets`) is internal: public for the command
   line, and may change in any release. Up to 0.10 the `isoloom-core` crate re-exported the
   supported surface; it is gone, and each item is used from the crate that holds it

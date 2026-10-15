@@ -1,1 +1,0 @@
-# Resource types of registry.terraform.io/hashicorp/http 3.6.2

@@ -15,7 +15,7 @@ Terraform modules and run them with `terraform`, so Terraform is one of the tool
   environments are meant to be created, tested and torn down; a cloud module can shut its
   machines down after a while (`auto_stop_minutes`).
 - **The full provider schemas.** Every argument of every resource is yours to set. Isoloom writes
-  what a portable spec needs; [Coverage](../COVERAGE.md) lists every resource type of each
+  what a portable spec needs; Coverage lists every resource type of each
   provider it targets and what it does with it.
 - **Modules and reuse,** a registry of them, and a language (HCL with expressions, `for_each`,
   `count`) for composing them.

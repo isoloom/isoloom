@@ -10,11 +10,6 @@ use std::path::{Path, PathBuf};
 /// Lines of code a source file may have.
 const MAX_CODE_LINES: usize = 400;
 
-/// Files still over the limit in `isoloom-coverage`, which the coverage units are rewriting in
-/// parallel. The list shrinks as those units land: a file leaves it once it is under the limit,
-/// and the test fails while a listed file is already under it.
-const COVERAGE_OVER_THE_LIMIT: &[&str] = &[];
-
 /// The workspace's `crates` directory.
 fn crates_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -82,21 +77,12 @@ fn source_files_stay_under_the_size_limit() {
     assert!(sizes.len() > 50, "only {} source files found", sizes.len());
     let over: Vec<String> = sizes
         .iter()
-        .filter(|(rel, lines)| *lines > MAX_CODE_LINES && !COVERAGE_OVER_THE_LIMIT.contains(&rel.as_str()))
+        .filter(|(_, lines)| *lines > MAX_CODE_LINES)
         .map(|(rel, lines)| {
             format!("crates/{rel} has {lines} lines of code (over {MAX_CODE_LINES}): split it into submodules, or move its tests to a tests.rs")
         })
         .collect();
     assert!(over.is_empty(), "{}", over.join("\n"));
-    for rel in COVERAGE_OVER_THE_LIMIT {
-        let size = sizes.iter().find(|(r, _)| r == rel);
-        assert!(size.is_some(), "COVERAGE_OVER_THE_LIMIT names crates/{rel}, which isn't there");
-        let lines = size.map_or(0, |(_, l)| *l);
-        assert!(
-            lines > MAX_CODE_LINES,
-            "crates/{rel} is down to {lines} lines: remove it from COVERAGE_OVER_THE_LIMIT"
-        );
-    }
 }
 
 #[test]

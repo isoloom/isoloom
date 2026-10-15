@@ -1,2 +1,0 @@
-# Resource types of terraform.io/builtin/terraform built-in
-terraform_data

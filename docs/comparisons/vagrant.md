@@ -9,7 +9,7 @@ of the tools Isoloom drives.
 
 - **Anything Ruby can say.** A Vagrantfile is a Ruby program: loops, conditionals, plugins, the
   full provider and provisioner settings. Isoloom writes the settings a portable spec needs;
-  [Coverage](../COVERAGE.md#vagrant) lists each setting and what Isoloom does with it.
+  Coverage lists each setting and what Isoloom does with it.
 - **Its ecosystem.** Many boxes, plugins for providers and for everything around them, and years
   of answers online.
 - **The daily VM workflow.** `vagrant ssh`, `vagrant suspend`, snapshots, synced folders of your

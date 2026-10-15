@@ -1,6 +1,6 @@
 //! Drafts an `isoloom.yml` from a Compose file. What Compose says that the format can express
-//! goes into the draft; everything else becomes a note, with the coverage table's verdict
-//! (belongs in the image, not expressible yet, by design...), so nothing is dropped silently.
+//! goes into the draft; everything else becomes a note (belongs in the image, not expressible
+//! yet, left out...), so nothing is dropped silently.
 
 mod keys;
 mod lenient;
@@ -14,8 +14,7 @@ use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
 
 pub use super::label;
-use super::{Draft, ImportError, NoteKind, Notes};
-use crate::coverage::{Support, compose};
+use super::{Draft, ImportError, LEFT_OUT, NoteKind, Notes};
 use lenient::{Duplicate, lenient_yaml};
 use networks::Networks;
 use values::{PortKey, VolumeMount, flat, str_of, volume_mount};
@@ -40,22 +39,6 @@ struct Machine {
     dockerfile: Option<String>,
     target: Option<String>,
     args: Vec<(String, String)>,
-}
-
-/// The coverage verdict for a Compose key path, as a note kind and text.
-fn verdict(path: &str) -> Option<(NoteKind, String)> {
-    let (_, s) = compose::format().rows.into_iter().find(|(k, _)| *k == path)?;
-    let kind = match s {
-        Support::Emitted { .. } => NoteKind::Written,
-        // Isoloom writes the key for some uses; the source's use is the part it doesn't cover.
-        Support::Partial { gap, .. } => return Some((NoteKind::NotYet, gap.to_string())),
-        Support::Equivalent { .. } => NoteKind::Equivalent,
-        Support::InImage { .. } => NoteKind::InImage,
-        Support::NotPortable { .. } => NoteKind::ByDesign,
-        Support::Tooling { .. } => NoteKind::Tooling,
-        Support::Planned { .. } | Support::Unclassified => NoteKind::NotYet,
-    };
-    Some((kind, s.note()))
 }
 
 /// A service being read: its Compose name, where its notes go, and its keys.
@@ -129,16 +112,14 @@ fn note_duplicates(notes: &mut Notes, dups: Vec<Duplicate>) {
     }
 }
 
-/// The top-level keys besides the ones read: the coverage table's verdict.
+/// The top-level keys besides the ones read: left out.
 fn note_top_level(notes: &mut Notes, root: &Mapping) {
     for (k, _) in root {
         let k = k.as_str().unwrap_or_default();
         if matches!(k, "name" | "services" | "networks" | "volumes") || k.starts_with("x-") {
             continue;
         }
-        if let Some((kind, text)) = verdict(k) {
-            notes.add(k, kind, text);
-        }
+        notes.add(k, NoteKind::Changed, LEFT_OUT);
     }
 }
 

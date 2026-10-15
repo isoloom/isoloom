@@ -246,8 +246,8 @@ fn terraform_for_each_machines_through_their_network_interfaces() {
     assert_eq!(spec.machines["srv02"].networks["lab-private"], 22);
     assert_eq!(spec.machines["srv02"].resources.unwrap().memory_mb, Some(8192), "t3.large");
     assert_eq!(spec.machines["dc01"].vm.as_ref().unwrap().os, "windows-server-2019");
-    assert!(has(&d, NoteKind::ByDesign, "resource aws_s3_bucket", "managed services"));
-    assert!(has(&d, NoteKind::Equivalent, "resource aws_vpc", "builds itself"));
+    assert!(has(&d, NoteKind::Changed, "resource aws_s3_bucket", "not read by the import: left out"));
+    assert!(has(&d, NoteKind::Changed, "resource aws_vpc", "not read by the import: left out"));
 }
 
 #[test]

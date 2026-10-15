@@ -1,5 +1,0 @@
-# Resource types of registry.terraform.io/hashicorp/tls 4.4.1
-tls_cert_request
-tls_locally_signed_cert
-tls_private_key
-tls_self_signed_cert

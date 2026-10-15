@@ -197,7 +197,7 @@ what Isoloom does with the feature: `Emitted`, `Partial`, `Equivalent`, `InImage
 4. Extend `crates/isoloom-coverage/tests/coverage.rs`: the rows are exactly the definition's
    features, and the features marked as written match what the generators write for the
    committed examples.
-5. Regenerate `docs/COVERAGE.md`. [ADR 0005](docs/adr/0005-coverage-methodology.md) has the rules.
+5. Regenerate `docs/COVERAGE.md`. 
 
 ## Quality gates and lints
 

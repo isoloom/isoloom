@@ -7,10 +7,9 @@ use indexmap::IndexMap;
 use indexmap::map::Entry;
 use serde_yaml_ng::Value;
 
-use super::super::{ImportError, NoteKind, Notes, label};
+use super::super::{ImportError, LEFT_OUT, NoteKind, Notes, label};
 use super::DEFAULT_NETWORK;
 use super::values::str_of;
-use super::verdict;
 use crate::validate::Cidr;
 
 /// Where re-addressed networks go: 10.88.<n>.0/24.
@@ -83,9 +82,7 @@ fn make(next_block: &mut u32, compose_name: &str, def: Option<&Value>, notes: &m
         if matches!(k, "ipam" | "internal") || k.starts_with("x-") {
             continue;
         }
-        if let Some((kind, text)) = verdict(&format!("networks.*.{k}")) {
-            notes.add(format!("{at}.{k}"), kind, text);
-        }
+        notes.add(format!("{at}.{k}"), NoteKind::Changed, LEFT_OUT);
     }
     let name = if compose_name == DEFAULT_NETWORK {
         "lab".to_string()

@@ -1,5 +1,6 @@
-//! The Isoloom spec: the model, parsing and loading, the schema, normalization (groups,
-//! clones, VLANs, profiles, instances, defaults, the image table) and validation.
+//! The Isoloom spec: the model, parsing and loading, the schema and the reference page read from
+//! it, normalization (groups, clones, VLANs, profiles, instances, defaults, the image table) and
+//! validation.
 
 pub mod addresses;
 pub mod appliance;
@@ -15,6 +16,7 @@ pub mod model;
 pub mod os;
 pub mod probe;
 pub mod profile;
+pub mod reference;
 pub mod renamed;
 pub mod schema;
 pub mod shell;

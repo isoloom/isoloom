@@ -211,7 +211,6 @@ isoloom exec MACHINE -- … # a command on one machine, or `all`
 isoloom capture MACHINE NETWORK   # tcpdump on its interface there
 isoloom down TARGET [DIR] # tear it down
 isoloom schema            # the JSON schema of isoloom.yml, for editors
-isoloom coverage          # what each output format can do, and what Isoloom produces
 isoloom docs --spec       # the spec reference (docs/spec.md), generated from the code
 ```
 
@@ -223,8 +222,6 @@ isoloom docs --spec       # the spec reference (docs/spec.md), generated from th
 - [Secrets](secrets.md): passwords and keys from a store, delivered as files, never written in
   a generated file.
 - [Storage](storage.md): volumes that are shared, kept or existing, `tmpfs`, and data disks.
-- [Coverage](COVERAGE.md): everything each output format can do and whether Isoloom
-  produces it.
 - [JSON output](json.md) and [the registry](registry.md), for tools that drive Isoloom.
 - The [examples](../examples): from a two-machine app and a segmented network to an Active
   Directory domain, Cisco routers and cloud services.

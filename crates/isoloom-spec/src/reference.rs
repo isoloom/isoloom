@@ -1,9 +1,8 @@
 //! The spec reference, `docs/spec.md`: every field of `isoloom.yml` read from its JSON schema
-//! (type, default, allowed values, limits, description), with what each output does with it
-//! read from the spec table. Both sources are the code itself, so the page can't drift: a test
-//! fails when the committed page differs from what `isoloom docs --spec` prints.
+//! (type, default, allowed values, limits, description, examples). The schema is the code
+//! itself, so the page can't drift: a test fails when the committed page differs from what
+//! `isoloom docs --spec` prints.
 
-mod example;
 mod markdown;
 mod text;
 
@@ -21,8 +20,8 @@ const MAX_DEPTH: usize = 10;
 /// One field of the spec as the reference shows it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Field {
-    /// Its path, the way the spec table names rows: `*` for a name the author chooses, `[]` for
-    /// the items of a list (`machines.*.ports[].port`).
+    /// Its path: `*` for a name the author chooses, `[]` for the items of a list
+    /// (`machines.*.ports[].port`).
     pub path: String,
     /// Its type in words (`string`, `list of mappings`, `map of name to integer`).
     pub kind: String,
@@ -40,7 +39,7 @@ pub struct Field {
     pub members: Vec<String>,
 }
 
-/// Every field of `schema` (the output of `isoloom_spec::schema::schema`), in the schema's
+/// Every field of `schema` (the output of [`crate::schema::schema`]), in the schema's
 /// order: a field, then the fields inside it.
 pub fn fields(schema: &Value) -> Vec<Field> {
     let empty = Map::new();

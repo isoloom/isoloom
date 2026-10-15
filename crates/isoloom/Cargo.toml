@@ -18,7 +18,6 @@ isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 isoloom-render.workspace = true
 isoloom-targets.workspace = true
-isoloom-coverage.workspace = true
 isoloom-import.workspace = true
 isoloom-runtime.workspace = true
 clap.workspace = true

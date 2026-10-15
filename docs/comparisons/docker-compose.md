@@ -11,7 +11,7 @@ work together: Isoloom is a way to get a Compose file, and other targets, from o
   to learn or install.
 - **The whole format.** Compose has options Isoloom doesn't write because they are tooling
   rather than the environment's behavior (`include`, `develop` and file watching, `annotations`,
-  extension fields). [Coverage](../COVERAGE.md#docker-compose) lists every key and what Isoloom
+  extension fields). Coverage lists every key and what Isoloom
   does with it.
 - **The inner loop.** `docker compose watch`, rebuilding one service, bind-mounting your source
   tree for live reload: Compose is built around a developer editing code. Isoloom builds and runs

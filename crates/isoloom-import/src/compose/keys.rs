@@ -3,11 +3,11 @@
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::super::{NoteKind, label};
+use super::super::{LEFT_OUT, NoteKind, label};
 use super::values::{
     VolumeMount, container_ports, cpus, env_entries, flat, input_name, memory_mb, other_protocols, published_ports, str_of, variables, volume_mount,
 };
-use super::{Import, Machine, Service, verdict};
+use super::{Import, Machine, Service};
 
 impl Import<'_> {
     /// One key of a service (networks were read before).
@@ -49,10 +49,7 @@ impl Import<'_> {
                 "values given at launch are `inputs`: list the ones the machine needs",
             ),
             _ if k.starts_with("x-") => self.notes.add(kat, NoteKind::Tooling, "extension field, ignored"),
-            _ => match verdict(&format!("services.*.{k}")) {
-                Some((kind, text)) => self.notes.add(kat, kind, text),
-                None => self.notes.add(kat, NoteKind::Changed, "not a Compose key Isoloom knows; ignored"),
-            },
+            _ => self.notes.add(kat, NoteKind::Changed, LEFT_OUT),
         }
     }
 

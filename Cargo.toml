@@ -20,7 +20,6 @@ isoloom-terraform = { path = "crates/isoloom-terraform" }
 isoloom-vagrant = { path = "crates/isoloom-vagrant" }
 isoloom-external = { path = "crates/isoloom-external" }
 isoloom-targets = { path = "crates/isoloom-targets" }
-isoloom-coverage = { path = "crates/isoloom-coverage" }
 isoloom-import = { path = "crates/isoloom-import" }
 isoloom-runtime = { path = "crates/isoloom-runtime" }
 serde = { version = "1", features = ["derive"] }

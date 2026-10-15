@@ -6,7 +6,6 @@ use std::net::Ipv4Addr;
 use indexmap::IndexMap;
 
 use crate::validate::Cidr;
-use isoloom_coverage as coverage;
 use isoloom_spec::{images, model, schema, validate};
 
 pub mod compose;
@@ -58,21 +57,18 @@ pub enum NoteKind {
     Equivalent,
     /// Deliberately not expressible.
     ByDesign,
-    /// Written by Isoloom itself when it generates.
-    Written,
     /// The source format's tooling; nothing to carry over.
     Tooling,
 }
 
 impl NoteKind {
     /// Every kind, in the order the notes are listed.
-    pub const ALL: [NoteKind; 7] = [
+    pub const ALL: [NoteKind; 6] = [
         NoteKind::Changed,
         NoteKind::InImage,
         NoteKind::NotYet,
         NoteKind::Equivalent,
         NoteKind::ByDesign,
-        NoteKind::Written,
         NoteKind::Tooling,
     ];
 
@@ -84,11 +80,14 @@ impl NoteKind {
             NoteKind::NotYet => "Not expressible yet",
             NoteKind::Equivalent => "Same effect another way",
             NoteKind::ByDesign => "Left out: not every target can do it",
-            NoteKind::Written => "Written by Isoloom when it generates",
             NoteKind::Tooling => "Tooling, nothing to carry over",
         }
     }
 }
+
+/// The note on something the source says that the import doesn't read: it is left out, never
+/// dropped silently.
+pub(crate) const LEFT_OUT: &str = "not read by the import: left out; carry it over by hand if the environment needs it";
 
 /// The notes an import collects as it reads, in the order it reads.
 #[derive(Default)]

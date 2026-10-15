@@ -1,3 +1,0 @@
-# Resource types of registry.terraform.io/hashicorp/local 2.9.1
-local_file
-local_sensitive_file

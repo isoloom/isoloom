@@ -16,5 +16,5 @@ bring an existing project in:
 - [Testcontainers](testcontainers.md)
 
 What each target builds and refuses is in [Targets](../targets.md), and what Isoloom produces of
-each format is in [Coverage](../COVERAGE.md). If a page here says something those two don't
+each format is in Coverage. If a page here says something those two don't
 back, the page is wrong: please open an issue.

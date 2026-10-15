@@ -1,7 +1,5 @@
-//! The provider versions every generated module requires: the versions the coverage tables were
-//! measured against (scripts/refresh-terraform.sh pins the same ones). `~> X.Y.Z` takes that
-//! version's patch releases only, so a module never runs on a provider whose schema the tables
-//! haven't seen. Bump a version here and in the script together, then refresh the tables.
+//! The provider versions every generated module requires. `~> X.Y.Z` takes that version's patch
+//! releases only, so a module never runs on a provider whose schema it wasn't written against.
 
 use super::module::Provider;
 

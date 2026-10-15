@@ -85,7 +85,7 @@ The first rename under this policy is a machine's `services:`, now `ports:`: the
   follow the rules above.
 - **Internal crates and items.** Only the supported surface listed in the
   [README](../README.md#using-the-library) is covered. Every other public item, and the crates
-  outside that list (`isoloom-render`, the backends, `isoloom-import`, `isoloom-coverage`), is
+  outside that list (`isoloom-render`, the backends, `isoloom-import`), is
   public for the command line only and may change in any release.
 - **Human-readable output.** Messages, tables and notes printed without `--json` may be
   reworded. Scripts should use `--json` and exit codes.

@@ -13,7 +13,6 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 RUSTDOCFLAGS=-Dwarnings cargo doc --workspace --no-deps
-cargo llvm-cov --workspace --summary-only     # per-crate floors: .github/coverage-floors.txt
 cargo machete                                 # no unused dependencies
 cargo deny check                              # advisories, licenses, bans, sources
 typos                                         # spelling; legitimate words go in _typos.toml
@@ -21,15 +20,14 @@ typos                                         # spelling; legitimate words go in
 # Every example with committed output is up to date.
 for e in examples/*/; do [ -d "$e.isoloom" ] && cargo run -q -p isoloom -- check "$e"; done
 
-# Regenerate every example and the coverage page: nothing may change unless the change is the point.
-cargo run -q -- coverage --markdown > docs/COVERAGE.md
+# Regenerate every example and the spec reference: nothing may change unless the change is the point.
 cargo run -q -- docs --spec > docs/spec.md
 git diff --exit-code examples docs
 ```
 
 When a change is meant to alter output, review the snapshot diffs with `cargo insta review`,
 commit the accepted snapshots and regenerated examples, and explain each kind of difference in
-the pull request. Coverage floors only go up: raise a crate's floor when you raise its coverage.
+the pull request.
 
 A change touching Compose, the plan or the runtime is also run for real:
 

@@ -2,7 +2,7 @@
 //! statically: `variable` defaults and `locals` are evaluated, `for_each` and `count` expanded,
 //! and references between resources followed (a VM to its network interface to its subnet).
 //! VMs and subnets of AWS, Azure, Google Cloud and Proxmox (bpg) become machines and networks;
-//! every other resource type gets the coverage table's verdict as a note.
+//! every other resource type is left out, with a note.
 
 mod eval;
 mod placement;
@@ -13,8 +13,7 @@ use std::net::Ipv4Addr;
 use indexmap::IndexMap;
 use serde_json::Value as Json;
 
-use super::{Draft, NoteKind, Notes, label};
-use crate::coverage::Support;
+use super::{Draft, LEFT_OUT, NoteKind, Notes, label};
 use crate::validate::{Cidr, PRIVATE};
 use eval::{instances, resolve};
 use placement::Placement;
@@ -312,32 +311,13 @@ const HANDLED: [&str; 11] = [
     "proxmox_vm",
 ];
 
-/// Every other resource type, once each: the coverage table's verdict.
+/// Every other resource type, once each: left out.
 fn other_resources(all: &[Instance], notes: &mut Notes) {
-    let cov = crate::coverage::terraform::formats();
     let mut seen = BTreeSet::new();
     for i in all {
         if HANDLED.contains(&i.kind.as_str()) || !seen.insert(i.kind.clone()) {
             continue;
         }
-        let row = format!("resource {}", i.kind);
-        let support = cov.iter().flat_map(|f| f.rows.iter()).find(|(k, _)| k == &row).map(|(_, s)| *s);
-        let (kind, text) = verdict(support);
-        notes.add(row, kind, text);
-    }
-}
-
-/// A resource type's coverage row as a note kind and text.
-fn verdict(support: Option<Support>) -> (NoteKind, String) {
-    match support {
-        Some(Support::NotPortable { why }) => (NoteKind::ByDesign, why.to_string()),
-        Some(Support::Tooling { note }) => (NoteKind::Tooling, note.to_string()),
-        // Networks, firewalls, addresses, disks: what Isoloom builds itself on that cloud.
-        Some(Support::Planned { .. } | Support::Emitted { .. } | Support::Partial { .. }) => (
-            NoteKind::Equivalent,
-            "part of what Isoloom builds itself for the environment (networks, firewalls, addresses, disks)".into(),
-        ),
-        Some(s) => (NoteKind::NotYet, s.note()),
-        None => (NoteKind::Tooling, "not a resource Isoloom knows: left out".into()),
+        notes.add(format!("resource {}", i.kind), NoteKind::Changed, LEFT_OUT);
     }
 }
