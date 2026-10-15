@@ -163,3 +163,43 @@ pub enum Expect {
     /// A word (`any`, `blocked`, `open`), or the text an `exec` output must contain.
     Text(String),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The check `yaml` describes.
+    fn check(yaml: &str) -> Result<Check, serde_yaml_ng::Error> {
+        serde_yaml_ng::from_str(yaml)
+    }
+
+    #[test]
+    fn a_script_or_a_declared_script_is_a_path_and_yaml_ones_are_playbooks() -> Result<(), serde_yaml_ng::Error> {
+        let read = |yaml| check(yaml).map(|c| (c.path().map(str::to_owned), c.is_playbook()));
+        assert_eq!(read("checks/login.sh")?, (Some("checks/login.sh".into()), false));
+        assert_eq!(read("checks/site.yml")?, (Some("checks/site.yml".into()), true));
+        assert_eq!(read("{ script: checks/site.yaml, from: web }")?, (Some("checks/site.yaml".into()), true));
+        assert_eq!(read("{ http: \"http://web/\" }")?, (None, false));
+        Ok(())
+    }
+
+    #[test]
+    fn a_check_of_another_shape_says_what_it_takes() {
+        let refusal = check("3").map(|_| ()).map_err(|e| e.to_string());
+        assert!(refusal.is_err_and(|e| e.ends_with("expected a script path, or a check with `http`, `tcp`, `exec` or `script`")));
+    }
+
+    #[test]
+    fn a_wait_is_seconds_or_a_duration_held_in_seconds() -> Result<(), serde_yaml_ng::Error> {
+        let wait = |yaml| {
+            check(yaml).map(|c| match c {
+                Check::Declared(d) => d.wait,
+                Check::Script(_) => None,
+            })
+        };
+        assert_eq!(wait("{ tcp: \"web:22\", wait: 90 }")?, Some(90));
+        assert_eq!(wait("{ tcp: \"web:22\", wait: 1m30s }")?, Some(90));
+        assert_eq!(wait("{ tcp: \"web:22\" }")?, None);
+        Ok(())
+    }
+}

@@ -137,3 +137,31 @@ pub struct NetworkBoot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The fields of boot `yaml` beyond its firmware format.
+    fn beyond(yaml: &str) -> Result<Vec<&'static str>, serde_yaml_ng::Error> {
+        Ok(serde_yaml_ng::from_str::<Boot>(yaml)?.beyond_firmware_format())
+    }
+
+    #[test]
+    fn uefi_and_its_format_are_all_vagrants_qemu_provider_boots() -> Result<(), serde_yaml_ng::Error> {
+        assert_eq!(beyond("{ firmware: uefi, firmware_format: qcow2 }")?, Vec::<&str>::new());
+        assert_eq!(
+            beyond("{ firmware: bios, kernel: /k, initrd: /i, cmdline: quiet, dtb: /d, loader: /l, nvram: /n, order: [hd] }")?,
+            ["firmware", "kernel", "initrd", "cmdline", "dtb", "loader", "nvram", "order"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_firmware_format_goes_by_the_name_a_spec_writes() -> Result<(), serde_yaml_ng::Error> {
+        for format in [FirmwareFormat::Raw, FirmwareFormat::Qcow2] {
+            assert_eq!(serde_yaml_ng::from_str::<FirmwareFormat>(format.id())?, format);
+        }
+        Ok(())
+    }
+}

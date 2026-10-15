@@ -79,3 +79,33 @@ impl Virtiofs {
 pub fn mapping_id(id: &str) -> bool {
     id.len() <= 64 && id.starts_with(|c: char| c.is_ascii_alphabetic()) && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_cache_goes_by_the_name_proxmox_takes() -> Result<(), serde_yaml_ng::Error> {
+        for cache in [VirtiofsCache::Auto, VirtiofsCache::Always, VirtiofsCache::Metadata, VirtiofsCache::Never] {
+            assert_eq!(serde_yaml_ng::from_str::<VirtiofsCache>(cache.id())?, cache);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn extended_attributes_pass_when_asked_for_or_acls_need_them() -> Result<(), serde_yaml_ng::Error> {
+        let mut read = Vec::new();
+        for yaml in ["{}", "{ xattr: true }", "{ acl: true }"] {
+            read.push(serde_yaml_ng::from_str::<Virtiofs>(yaml)?.exposes_xattr());
+        }
+        assert_eq!(read, [false, true, true]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_mapping_id_is_a_letter_then_up_to_63_letters_digits_dashes_or_underscores() {
+        let longest = format!("a{}", "b".repeat(63));
+        let ids = ["share-1_a", longest.as_str(), &format!("{longest}c"), "1share", "a b", "a.b"];
+        assert_eq!(ids.map(mapping_id), [true, true, false, false, false, false]);
+    }
+}

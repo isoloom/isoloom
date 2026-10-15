@@ -123,4 +123,44 @@ mod tests {
         assert!(Url::parse("http://[fd00::1/").is_none());
         assert!(Url::parse("http://[fd00::1]x/").is_none());
     }
+
+    #[test]
+    fn a_url_reads_into_its_scheme_host_port_and_path() {
+        assert_eq!(
+            Url::parse("https://web:8443/health?x=1"),
+            Some(Url {
+                https: true,
+                host: Host::Literal("web".into()),
+                port: Some(8443),
+                path: "/health?x=1".into(),
+            })
+        );
+        assert_eq!(Url::parse("http://web").map(|u| (u.https, u.port, u.path)), Some((false, None, "/".to_owned())));
+    }
+
+    #[test]
+    fn a_host_is_one_plain_name_and_a_port_is_1_or_more() {
+        for bad in [
+            "http:///x",
+            "http://a b/",
+            "http://a'b/",
+            "http://a\"b/",
+            "http://user@web/",
+            "http://web:0/",
+            "ftp://web/",
+        ] {
+            assert_eq!(Url::parse(bad), None, "{bad}");
+        }
+        assert_eq!(Url::parse("http://web:1/").and_then(|u| u.port), Some(1));
+    }
+
+    #[test]
+    fn windows_vms_and_appliances_run_no_checks() -> Result<(), String> {
+        let spec = crate::testing::model(&crate::testing::lab(
+            "machines:\n  web: { docker: { image: nginx } }\n  box: { vm: { os: debian@12 } }\n  dc: { vm: { os: windows-server@2022 } }\n  fw: { docker: { appliance: cisco-iol } }\n",
+        ))?;
+        let can: Vec<(&str, bool)> = spec.machines.iter().map(|(n, m)| (n.as_str(), can_run_checks(m))).collect();
+        assert_eq!(can, [("web", true), ("box", true), ("dc", false), ("fw", false)]);
+        Ok(())
+    }
 }

@@ -150,6 +150,36 @@ fn a_schema_that_refers_to_itself_stops() {
         "$defs": { "X": { "anyOf": [{ "$ref": "#/$defs/X" }, { "type": "string" }] } }
     });
     assert_eq!(fields(&alternatives).len(), 1);
+    // A list of itself: its type in words stops at the depth the walk does.
+    let lists = json!({
+        "properties": { "x": { "$ref": "#/$defs/X" } },
+        "$defs": { "X": { "type": "array", "items": { "$ref": "#/$defs/X" } } }
+    });
+    assert_eq!(fields(&lists)[0].kind, format!("list of {}values", "lists of ".repeat(MAX_DEPTH - 2)));
+}
+
+#[test]
+fn a_closed_set_nested_past_the_walks_depth_is_not_listed() {
+    let allowed = |wrappers: usize| {
+        let nested = (0..wrappers).fold(json!({ "const": "a" }), |inner, _| json!({ "anyOf": [inner] }));
+        fields(&json!({ "properties": { "x": nested } }))[0].allowed.clone()
+    };
+    assert_eq!(allowed(MAX_DEPTH), [("a".to_owned(), String::new())]);
+    assert_eq!(allowed(MAX_DEPTH + 1), Vec::<(String, String)>::new());
+}
+
+#[test]
+fn a_closed_set_of_fractions_is_numbers() {
+    let numbers = json!({ "properties": { "loss": { "enum": [0.5, 1.5] }, "level": { "enum": [1, 2] } } });
+    let kinds: Vec<String> = fields(&numbers).into_iter().map(|f| f.kind).collect();
+    assert_eq!(kinds, ["number", "integer"]);
+}
+
+#[test]
+fn a_null_or_empty_text_default_is_not_shown() {
+    let defaults = json!({ "properties": { "a": { "default": null }, "b": { "default": "" }, "c": { "default": 0 } } });
+    let shown: Vec<Option<String>> = fields(&defaults).into_iter().map(|f| f.default).collect();
+    assert_eq!(shown, [None, None, Some("0".to_owned())]);
 }
 
 #[test]
@@ -157,4 +187,5 @@ fn headings_get_github_anchors() {
     assert_eq!(slug("From the spec's side"), "from-the-specs-side");
     assert_eq!(slug("`machines.*.vm.os`"), "machinesvmos");
     assert_eq!(slug("Top level"), "top-level");
+    assert_eq!(slug("`ip_forward` and `rate-limit`"), "ip_forward-and-rate-limit");
 }

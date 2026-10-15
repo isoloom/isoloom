@@ -232,3 +232,16 @@ pub const ULIMITS: &[&str] = &[
     "sigpending",
     "stack",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_ulimit_is_one_value_for_both_or_a_soft_and_a_hard_one() -> Result<(), serde_yaml_ng::Error> {
+        let limits = |yaml| serde_yaml_ng::from_str::<Ulimit>(yaml).map(|u| (u.soft(), u.hard()));
+        assert_eq!(limits("65536")?, (65_536, 65_536));
+        assert_eq!(limits("{ soft: 1024, hard: 4096 }")?, (1024, 4096));
+        Ok(())
+    }
+}

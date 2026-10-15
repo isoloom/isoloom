@@ -59,3 +59,81 @@ pub fn effective(spec: &Spec) -> Vec<Target> {
         None => possible,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::{lab, model};
+
+    /// The lab with these machines (each a YAML flow mapping, by name).
+    fn machines(list: &[(&str, &str)]) -> Result<Spec, String> {
+        let lines: Vec<String> = list.iter().map(|(name, m)| format!("  {name}: {m}")).collect();
+        model(&lab(&format!("machines:\n{}\n", lines.join("\n"))))
+    }
+
+    const DOCKER: &str = "{ docker: { image: nginx } }";
+    const VM: &str = "{ vm: { os: debian@12 } }";
+    const BOTH: &str = "{ docker: { image: nginx }, vm: { os: debian@12 } }";
+    const LXC: &str = "{ docker: { image: nginx, lxc: true } }";
+    const ACCESS: &str = "{ access: true }";
+
+    #[test]
+    fn a_machine_is_missing_when_it_lacks_what_the_shape_needs() -> Result<(), String> {
+        let spec = machines(&[("web", DOCKER), ("win", VM), ("ct", LXC), ("me", ACCESS)])?;
+        assert_eq!(missing(&spec, Shape::Docker), ["win"], "the access machine never counts");
+        assert_eq!(missing(&spec, Shape::Vm), ["web", "ct"]);
+        assert_eq!(missing(&spec, Shape::Either), Vec::<String>::new());
+        assert_eq!(missing(&spec, Shape::VmOrLxc), ["web"], "an LXC container or a VM");
+        assert_eq!(missing(&spec, Shape::External), ["web", "win", "ct"]);
+        assert_eq!(missing(&spec, Shape::Cloud), Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn containers_alone_run_on_the_docker_targets() -> Result<(), String> {
+        use Target::{CloudDocker, Docker, DockerVm, Hosted, Kubernetes};
+        assert_eq!(
+            derive(&machines(&[("web", DOCKER), ("me", ACCESS)])?),
+            [Docker, Hosted, DockerVm, CloudDocker, Kubernetes]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn machines_with_both_run_everywhere_but_hybrid() -> Result<(), String> {
+        use Target::{CloudDocker, CloudVm, Docker, DockerVm, Esxi, Hosted, Kubernetes, Proxmox, Vagrant};
+        let spec = machines(&[("web", BOTH)])?;
+        assert!(!mixed(&spec), "a machine that can be either mixes nothing");
+        assert_eq!(
+            derive(&spec),
+            [Docker, Hosted, DockerVm, CloudDocker, Kubernetes, Vagrant, Proxmox, Esxi, CloudVm]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_container_beside_a_vm_only_machine_runs_on_hybrid_alone() -> Result<(), String> {
+        let spec = machines(&[("web", DOCKER), ("win", VM)])?;
+        assert!(mixed(&spec));
+        assert_eq!(derive(&spec), [Target::Hybrid]);
+        assert!(!mixed(&machines(&[("web", DOCKER)])?), "containers alone mix nothing");
+        Ok(())
+    }
+
+    #[test]
+    fn cloud_services_run_on_their_own_target_and_no_machines_nowhere() -> Result<(), String> {
+        let cloud = model("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n")?;
+        assert_eq!(derive(&cloud), [Target::CloudServices]);
+        assert_eq!(derive(&model(&lab(""))?), Vec::<Target>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn targets_narrow_what_the_machines_allow() -> Result<(), String> {
+        let mut spec = machines(&[("web", DOCKER)])?;
+        assert_eq!(effective(&spec), derive(&spec), "without `targets:`, every possible one");
+        spec.targets = Some(vec![Target::Kubernetes, Target::Vagrant]);
+        assert_eq!(effective(&spec), [Target::Kubernetes], "a wanted target the machines rule out stays out");
+        Ok(())
+    }
+}

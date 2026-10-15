@@ -136,3 +136,39 @@ pub fn slug(heading: &str) -> String {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn a_field_with_fields_of_its_own_and_each_machine_implementation_open_a_section() {
+        let all = fields(&json!({
+            "properties": {
+                "version": { "type": "integer" },
+                "versions": { "type": "array", "items": { "type": "integer" } },
+                "machines": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "properties": { "os": { "type": "string" }, "docker": { "properties": { "image": { "type": "string" } } } }
+                    }
+                }
+            }
+        }));
+        let read: Vec<(String, Vec<&str>)> = sections(&all)
+            .into_iter()
+            .map(|(title, members)| (title, members.iter().map(|f| f.path.as_str()).collect()))
+            .collect();
+        assert_eq!(
+            read,
+            [
+                (String::new(), vec!["version", "versions"]),
+                ("machines".to_owned(), vec!["machines", "machines.*.os"]),
+                ("machines.*.docker".to_owned(), vec!["machines.*.docker", "machines.*.docker.image"]),
+            ],
+            "`versions` isn't inside `version`"
+        );
+    }
+}

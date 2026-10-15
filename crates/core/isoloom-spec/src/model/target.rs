@@ -117,3 +117,17 @@ impl Shape {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_shape_names_the_keys_a_refusal_quotes() {
+        let quoted = [Shape::Docker, Shape::Vm, Shape::Either, Shape::VmOrLxc, Shape::External, Shape::Cloud].map(|s| format!("`{}`", s.key()));
+        assert_eq!(
+            quoted,
+            ["`docker`", "`vm`", "`docker` or `vm`", "`docker.lxc` or `vm`", "`external`", "`cloud`"]
+        );
+    }
+}

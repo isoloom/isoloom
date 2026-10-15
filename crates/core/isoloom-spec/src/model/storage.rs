@@ -198,3 +198,41 @@ impl Filesystem {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Why `yaml` doesn't read as a `T`.
+    fn refusal<T: serde::de::DeserializeOwned>(yaml: &str) -> String {
+        serde_yaml_ng::from_str::<T>(yaml).map(|_| ()).err().map(|e| e.to_string()).unwrap_or_default()
+    }
+
+    #[test]
+    fn a_mount_is_a_path_or_a_folder_of_a_shared_volume() -> Result<(), serde_yaml_ng::Error> {
+        let whole: Mount = serde_yaml_ng::from_str("/srv")?;
+        assert_eq!((whole.path(), whole.subpath()), ("/srv", None));
+        let part: Mount = serde_yaml_ng::from_str("{ path: /srv/www, subpath: www }")?;
+        assert_eq!((part.path(), part.subpath()), ("/srv/www", Some("www")));
+        assert!(refusal::<Mount>("3").ends_with("expected an absolute path, or `{ path, subpath }`"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_tmpfs_is_a_path_or_one_with_its_size_and_mode() -> Result<(), serde_yaml_ng::Error> {
+        let bare: Tmpfs = serde_yaml_ng::from_str("/run")?;
+        assert_eq!((bare.path(), bare.size(), bare.mode()), ("/run", None, None));
+        let sized: Tmpfs = serde_yaml_ng::from_str("{ path: /tmp, size: 64m, mode: \"1777\" }")?;
+        assert_eq!((sized.path(), sized.size(), sized.mode()), ("/tmp", Some("64m"), Some("1777")));
+        assert!(refusal::<Tmpfs>("3").ends_with("expected an absolute path, or `{ path, size, mode }`"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_filesystem_goes_by_the_name_a_spec_writes() -> Result<(), serde_yaml_ng::Error> {
+        for fs in [Filesystem::Ext4, Filesystem::Xfs, Filesystem::Ntfs, Filesystem::Raw] {
+            assert_eq!(serde_yaml_ng::from_str::<Filesystem>(fs.id())?, fs);
+        }
+        Ok(())
+    }
+}

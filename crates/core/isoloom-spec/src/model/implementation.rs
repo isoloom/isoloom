@@ -306,3 +306,13 @@ pub const KNOWN_OS: &[&str] = &[
     "windows-server-2022",
     "windows-server-2025",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_the_reboot_step_restarts_the_machine() {
+        assert_eq!([is_reboot("reboot"), is_reboot("provision/reboot.sh")], [true, false]);
+    }
+}

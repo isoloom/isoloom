@@ -75,4 +75,12 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn each_os_gets_its_own_image() {
+        let name = |os| container_image(os).and_then(|image| image.split_once('@')).map(|(name, _)| name);
+        assert_eq!(name("alpine-3.19"), Some("alpine:3.19"));
+        assert_eq!(name("kali"), Some("kalilinux/kali-rolling"));
+        assert_eq!(container_image("windows-11"), None);
+    }
 }

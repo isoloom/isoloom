@@ -82,4 +82,13 @@ mod tests {
         assert_eq!((unset.mode_or_default(), unset.sets_owner_or_mode()), ("0644", false));
         assert!(serde_yaml_ng::from_str::<MachineFile>("{ path: /a, mode: [1] }").is_err());
     }
+
+    #[test]
+    fn an_owner_or_a_mode_is_set_by_any_one_of_them() -> Result<(), serde_yaml_ng::Error> {
+        for field in ["uid: 1000", "gid: 1000", "mode: \"0600\""] {
+            let f: MachineFile = serde_yaml_ng::from_str(&format!("{{ path: /a, content: x, {field} }}"))?;
+            assert!(f.sets_owner_or_mode(), "{field}");
+        }
+        Ok(())
+    }
 }

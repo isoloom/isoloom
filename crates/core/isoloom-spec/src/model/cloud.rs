@@ -135,3 +135,52 @@ impl CloudProvider {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn a_variable_takes_an_input_when_it_is_exactly_one() {
+        assert_eq!(CloudServices::input_of(&json!(" {{ inputs.PLAYER_IP }} ")), Some("PLAYER_IP"));
+        assert_eq!(CloudServices::input_of(&json!("{{ inputs.PLAYER_IP }}/32")), None);
+        assert_eq!(CloudServices::input_of(&json!(3)), None);
+    }
+
+    /// A module variable holding inputs at every depth, beside other placeholders.
+    fn variable() -> serde_json::Value {
+        json!({
+            "allow": ["{{ inputs.PLAYER_IP }}/32", 22],
+            "name": "{{inputs.TEAM}}-{{ inputs.PLAYER_IP }}",
+            "other": "{{ cloud.outputs.url }} {{ inputs.TEAM",
+        })
+    }
+
+    #[test]
+    fn inputs_are_found_at_any_depth_in_order() {
+        assert_eq!(CloudServices::inputs_in(&variable()), ["PLAYER_IP", "TEAM", "PLAYER_IP"]);
+    }
+
+    #[test]
+    fn inputs_are_filled_and_everything_else_stays_as_written() {
+        let filled = CloudServices::fill_inputs(&variable(), &mut |name| (name == "PLAYER_IP").then(|| "198.51.100.7".to_owned()));
+        assert_eq!(
+            filled,
+            json!({
+                "allow": ["198.51.100.7/32", 22],
+                "name": "{{inputs.TEAM}}-198.51.100.7",
+                "other": "{{ cloud.outputs.url }} {{ inputs.TEAM",
+            })
+        );
+    }
+
+    #[test]
+    fn a_cloud_goes_by_the_name_a_spec_writes() -> Result<(), serde_yaml_ng::Error> {
+        for cloud in [CloudProvider::Aws, CloudProvider::Azure, CloudProvider::Gcp] {
+            assert_eq!(serde_yaml_ng::from_str::<CloudProvider>(cloud.id())?, cloud);
+        }
+        Ok(())
+    }
+}

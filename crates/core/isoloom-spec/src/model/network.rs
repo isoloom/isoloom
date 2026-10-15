@@ -166,3 +166,33 @@ pub struct Reach {
     #[serde(default)]
     pub ports: Vec<u16>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_external_or_a_bridged_network_is_outside_the_environment() -> Result<(), serde_yaml_ng::Error> {
+        let outside = |yaml| serde_yaml_ng::from_str::<Network>(yaml).map(|n| n.is_outside());
+        assert!(!outside("{ cidr: 10.0.0.0/24 }")?);
+        assert!(outside("{ cidr: 10.0.0.0/24, external: corp }")?);
+        assert!(outside("{ cidr: 10.0.0.0/24, bridged: { interface: eth0 } }")?);
+        Ok(())
+    }
+
+    #[test]
+    fn netem_takes_the_delay_its_jitter_the_loss_and_the_rate() {
+        let tc = Tc {
+            delay: Some("50ms".into()),
+            jitter: Some("5ms".into()),
+            loss: Some(0.5),
+            rate: Some("10mbit".into()),
+        };
+        assert_eq!(tc.netem(), "delay 50ms 5ms loss 0.5% rate 10mbit");
+        let jitter_alone = Tc {
+            jitter: Some("5ms".into()),
+            ..Tc::default()
+        };
+        assert_eq!(jitter_alone.netem(), "", "a jitter goes with a delay");
+    }
+}

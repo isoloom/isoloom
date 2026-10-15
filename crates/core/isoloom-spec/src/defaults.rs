@@ -369,3 +369,172 @@ pub fn builtin() -> Value {
     top.insert(Value::String("cloud".into()), Value::Mapping(cloud));
     Value::Mapping(top)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+
+    use super::*;
+
+    /// A test's outcome: a failed step is its report.
+    type Outcome = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    /// A fresh, empty folder for test `name`.
+    fn empty(name: &str) -> std::io::Result<PathBuf> {
+        let dir = std::env::temp_dir().join(format!("isoloom-defaults-{}-{name}", std::process::id()));
+        if dir.exists() {
+            std::fs::remove_dir_all(&dir)?;
+        }
+        std::fs::create_dir_all(&dir)?;
+        Ok(dir)
+    }
+
+    /// A host with these environment variables.
+    fn host(vars: &[(&str, &str)]) -> Host {
+        Host::new(vars.iter().map(|(k, v)| (OsString::from(k), OsString::from(v))))
+    }
+
+    /// The region `d` gives `cloud`.
+    fn region<'d>(d: &'d Defaults, cloud: &str) -> Option<&'d str> {
+        d.cloud.get(cloud)?.region.as_deref()
+    }
+
+    #[test]
+    fn the_users_file_is_in_isoloom_home() {
+        assert_eq!(user_file(&host(&[("ISOLOOM_HOME", "/srv/iso")])), PathBuf::from("/srv/iso/defaults.yml"));
+    }
+
+    #[test]
+    fn layers_merge_in_order_and_each_leaf_names_the_last_that_set_it() -> Outcome {
+        let home = empty("layers-home")?;
+        let project = empty("layers-project")?;
+        std::fs::write(home.join("defaults.yml"), "cloud: { aws: { region: from-user }, gcp: { region: from-user } }\n")?;
+        std::fs::write(project.join(PROJECT_FILE), "cloud: { aws: { region: from-project } }\n")?;
+        let home_text = home.to_string_lossy().into_owned();
+        let sets = ["defaults.vagrant.provider=libvirt".to_owned(), "machines.web.os=alpine".to_owned()];
+        let resolved = load(&Sources {
+            project: &project,
+            images_file: None,
+            profile: None,
+            sets: &sets,
+            host: host(&[("ISOLOOM_HOME", &home_text), ("ISOLOOM_CLOUD__AZURE__REGION", "from-env")]),
+        })?;
+        let d = &resolved.defaults;
+        assert_eq!(region(d, "aws"), Some("from-project"));
+        assert_eq!(region(d, "gcp"), Some("from-user"), "a file that sets one region leaves the others alone");
+        assert_eq!(region(d, "azure"), Some("from-env"));
+        assert_eq!(d.vagrant.provider.as_deref(), Some("libvirt"));
+        let user = format!("user file {}", home.join("defaults.yml").display());
+        let sources: Vec<(&str, &str)> = resolved.sources.iter().map(|(k, s)| (k.as_str(), s.as_str())).collect();
+        assert_eq!(
+            sources,
+            [
+                ("cloud.gcp.region", user.as_str()),
+                ("cloud.aws.region", &format!("project file {}", project.join(PROJECT_FILE).display())),
+                ("cloud.azure.region", "environment ISOLOOM_CLOUD__AZURE__REGION"),
+                ("vagrant.provider", "-s defaults.vagrant.provider=libvirt"),
+            ],
+            "a `-s` without the `defaults.` prefix is the spec's, not a layer"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_layer_file_that_cant_be_read_is_an_error_unlike_a_missing_one() -> Outcome {
+        let project = empty("unreadable")?;
+        let sources = |folder| Sources {
+            project: folder,
+            images_file: None,
+            profile: None,
+            sets: &[],
+            host: host(&[("ISOLOOM_HOME", "/nonexistent/isoloom")]),
+        };
+        assert_eq!(load(&sources(&project))?.defaults, Defaults::default(), "no file, no layer");
+        std::fs::create_dir(project.join(PROJECT_FILE))?;
+        assert!(matches!(load(&sources(&project)), Err(Error::Read { path, .. }) if path == project.join(PROJECT_FILE)));
+        Ok(())
+    }
+
+    #[test]
+    fn only_the_defaults_sections_are_read_from_the_environment() {
+        let vars = [
+            ("ISOLOOM_VAGRANT__PROVIDER", "qemu"),
+            ("ISOLOOM_HOME", "/x"),
+            ("PATH", "/bin"),
+            ("ISOLOOM_IMAGES__ACCESS__VM", "kali"),
+        ];
+        assert_eq!(
+            from_env(vars.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))),
+            [
+                ("images.access.vm".to_owned(), "kali".to_owned()),
+                ("vagrant.provider".to_owned(), "qemu".to_owned())
+            ]
+        );
+    }
+
+    #[test]
+    fn a_set_is_a_dotted_key_then_its_value() {
+        assert!(matches!(parse_set("a.b=c=d"), Ok(("a.b", "c=d"))));
+        assert!(matches!(parse_set("a.b"), Err(Error::SetShape { .. })));
+        for s in ["=1", "a..b=1", ".a=1"] {
+            assert!(matches!(parse_set(s), Err(Error::SetKey { .. })), "{s}");
+        }
+    }
+
+    #[test]
+    fn an_empty_mapping_is_a_leaf_of_its_own() -> Outcome {
+        let v: Value = serde_yaml_ng::from_str("cloud: { aws: {} }\nvagrant: { provider: qemu }\n")?;
+        assert_eq!(leaves(&v, ""), ["cloud.aws", "vagrant.provider"]);
+        Ok(())
+    }
+
+    /// A cloud module whose region defaults to `region`, between two other variables.
+    fn module(region: &str) -> String {
+        format!(
+            "variable \"zone\" {{\n  default = \"a\"\n}}\nvariable \"region\" {{\n  type    = string\n  default = \"{region}\"\n}}\nvariable \"size\" {{\n  default = \"s\"\n}}\n"
+        )
+    }
+
+    #[test]
+    fn a_region_replaces_only_the_region_variables_default() {
+        assert_eq!(set_region(&module("eu-west-3"), "eu-north-1"), module("eu-north-1"));
+        assert_eq!(
+            set_region("variable \"zone\" {}\n", "eu-north-1"),
+            "variable \"zone\" {}\n",
+            "no region, no change"
+        );
+    }
+
+    #[test]
+    fn regions_reach_each_clouds_module_and_nothing_else() {
+        let file = |path: &str| GeneratedFile {
+            path: path.to_owned(),
+            contents: module("old"),
+        };
+        let d = Defaults {
+            cloud: [("aws".to_owned(), Cloud { region: Some("new".into()) })].into_iter().collect(),
+            ..Defaults::default()
+        };
+        let paths = [
+            ".isoloom/cloud-vm/aws/main.tf",
+            ".isoloom-2/cloud-docker/aws/main.tf",
+            ".isoloom/cloud-vm/gcp/main.tf",
+            ".isoloom/cloud-vm/aws/variables.tf",
+            ".isoloom/vagrant/aws/main.tf",
+            ".isoloom/cloud-vm/aws/extra/main.tf",
+        ];
+        let regions: Vec<bool> = apply_to_files(paths.iter().map(|p| file(p)).collect(), &d)
+            .iter()
+            .map(|f| f.contents == module("new"))
+            .collect();
+        assert_eq!(regions, [true, true, false, false, false, false]);
+    }
+
+    #[test]
+    fn the_built_in_layer_holds_every_clouds_region() -> Outcome {
+        let d: Defaults = serde_yaml_ng::from_value(builtin())?;
+        let regions: Vec<(&str, &str)> = d.cloud.iter().filter_map(|(c, r)| Some((c.as_str(), r.region.as_deref()?))).collect();
+        assert_eq!(regions, BUILTIN_REGIONS);
+        Ok(())
+    }
+}

@@ -370,3 +370,63 @@ pub(crate) fn scalars<'de, D: serde::Deserializer<'de>>(d: D) -> Result<IndexMap
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A machine read from its YAML.
+    fn machine(yaml: &str) -> Result<Machine, serde_yaml_ng::Error> {
+        serde_yaml_ng::from_str(yaml)
+    }
+
+    #[test]
+    fn architectures_and_protocols_go_by_the_names_a_spec_writes() -> Result<(), serde_yaml_ng::Error> {
+        for arch in [Arch::Amd64, Arch::Arm64] {
+            assert_eq!(serde_yaml_ng::from_str::<Arch>(arch.id())?, arch);
+            assert_eq!(arch.docker_platform(), format!("linux/{}", arch.id()));
+        }
+        for protocol in [Protocol::Tcp, Protocol::Udp] {
+            assert_eq!(serde_yaml_ng::from_str::<Protocol>(protocol.id())?, protocol);
+        }
+        assert_eq!([Protocol::Tcp.is_tcp(), Protocol::Udp.is_tcp()], [true, false]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_port_is_labelled_by_its_name_or_number_and_udp_where_tcp_shares_it() -> Result<(), serde_yaml_ng::Error> {
+        let m = machine(
+            "ports:
+  - { port: 80 }
+  - { port: 69, protocol: udp }
+  - { port: 53, name: dns }
+  - { port: 53, name: dns, protocol: udp }
+  - { port: 161, name: snmp, protocol: udp }
+",
+        )?;
+        let labels: Vec<String> = m.ports.iter().map(|p| m.port_label(p)).collect();
+        assert_eq!(labels, ["80", "69-udp", "dns", "dns-udp", "snmp"]);
+        Ok(())
+    }
+
+    #[test]
+    fn readiness_waits_on_tcp_ports_that_answer_or_a_healthcheck() -> Result<(), serde_yaml_ng::Error> {
+        let m = machine("ports: [{ port: 80 }, { port: 53, protocol: udp }, { port: 4444, dormant: true }]\n")?;
+        assert_eq!(m.ready_ports(), [80]);
+        assert!(m.has_readiness());
+        let udp = machine("ports: [{ port: 53, protocol: udp }]\n")?;
+        assert!(!udp.has_readiness(), "nothing to probe");
+        assert!(machine("ports: [{ port: 53, protocol: udp }]\nhealthcheck: { test: dig }\n")?.has_readiness());
+        Ok(())
+    }
+
+    #[test]
+    fn environment_values_are_texts_numbers_or_booleans_read_as_text() -> Result<(), serde_yaml_ng::Error> {
+        let m = machine("environment: { MODE: prod, WORKERS: 4, DEBUG: false }\n")?;
+        let read: Vec<(&str, &str)> = m.environment.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        assert_eq!(read, [("MODE", "prod"), ("WORKERS", "4"), ("DEBUG", "false")]);
+        let list = machine("environment: { HOSTS: [a, b] }\n").map(|_| ()).map_err(|e| e.to_string());
+        assert!(list.is_err_and(|e| e.contains("`HOSTS`: a text, a number or a boolean")));
+        Ok(())
+    }
+}

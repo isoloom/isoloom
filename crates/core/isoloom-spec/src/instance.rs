@@ -102,3 +102,89 @@ pub fn relocate(path: &str, contents: &str, n: u8) -> (String, String) {
     };
     (path, contents.replace(".isoloom/", &format!("{dir}/")))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::{lab, model};
+
+    /// A web machine publishing port 80 on the host's `publish`, on the lab's network.
+    fn web(publish: u16) -> Result<Spec, String> {
+        model(&lab(&format!(
+            "machines:\n  web:\n    docker: {{ image: nginx }}\n    networks: {{ lan: 10 }}\n    ports: [{{ port: 80, publish: {publish} }}]\n"
+        )))
+    }
+
+    #[test]
+    fn an_instance_writes_to_its_own_folder() {
+        assert_eq!(output_dir(None), ".isoloom");
+        assert_eq!(output_dir(Some(3)), ".isoloom-3");
+    }
+
+    #[test]
+    fn instances_are_numbered_1_to_99() -> Result<(), String> {
+        let spec = web(8080)?;
+        for n in [0, 100] {
+            assert!(matches!(apply(&spec, n), Err(Error::InstanceNumber(m)) if m == n), "instance {n}");
+        }
+        for n in [1, 99] {
+            assert_eq!(apply(&spec, n).map(|s| s.name).ok(), Some(format!("t-{n}")), "instance {n}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_name_with_its_suffix_holds_55_characters() -> Result<(), String> {
+        let mut spec = web(8080)?;
+        spec.name = "a".repeat(53);
+        assert_eq!(apply(&spec, 1).map(|s| s.name.len()).ok(), Some(55));
+        spec.name = "a".repeat(54);
+        assert!(matches!(apply(&spec, 1), Err(Error::InstanceName(name)) if name.len() == 56));
+        Ok(())
+    }
+
+    #[test]
+    fn docker_blocks_move_by_the_instance_in_the_second_octet() -> Result<(), String> {
+        let copy = apply(&web(8080)?, 2).map_err(|e| e.to_string())?;
+        assert_eq!(copy.networks["lan"].docker, Some(NetworkDocker { cidr: "10.2.0.0/24".into() }));
+        assert_eq!(copy.networks["lan"].cidr, "10.0.0.0/24", "the machines keep the addresses the spec writes");
+        Ok(())
+    }
+
+    #[test]
+    fn published_ports_move_100_per_instance() -> Result<(), String> {
+        let copy = apply(&web(8080)?, 3).map_err(|e| e.to_string())?;
+        assert_eq!(copy.machines["web"].ports[0].publish, Some(8380));
+        assert_eq!(copy.machines["web"].ports[0].port, 80, "the machine's own port stays");
+        assert!(matches!(
+            apply(&web(65_500)?, 1),
+            Err(Error::InstancePort { machine, port: 65_500, instance: 1 }) if machine == "web"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn ipv6_blocks_move_by_the_instance_in_the_third_group() -> Result<(), String> {
+        let spec = |cidr: &str| {
+            model(&format!(
+                "version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.0.0.0/24, ipv6: {{ cidr: \"{cidr}\" }} }}\nmachines: {{}}\n"
+            ))
+        };
+        let copy = apply(&spec("fd00:20::/64")?, 2).map_err(|e| e.to_string())?;
+        assert_eq!(copy.networks["lan"].ipv6.as_ref().map(|v6| v6.cidr.as_str()), Some("fd00:20:2::/64"));
+        assert!(matches!(
+            apply(&spec("fdff:ffff:ffff::/64")?, 1),
+            Err(Error::InstanceIpv6 { network, instance: 1, .. }) if network == "lan"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn generated_files_and_the_paths_they_hold_move_to_the_instances_folder() {
+        assert_eq!(
+            relocate(".isoloom/compose.yml", "env_file: .isoloom/web.env", 2),
+            (".isoloom-2/compose.yml".to_owned(), "env_file: .isoloom-2/web.env".to_owned())
+        );
+        assert_eq!(relocate("README.md", "plain", 2), ("README.md".to_owned(), "plain".to_owned()));
+    }
+}

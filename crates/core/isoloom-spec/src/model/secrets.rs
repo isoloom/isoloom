@@ -169,3 +169,63 @@ impl MachineSecret {
 pub fn secret_variable(name: &str) -> String {
     format!("ISOLOOM_SECRET_{}", name.to_ascii_uppercase().replace('-', "_"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_source_names_its_store_and_what_the_store_is_asked_for() -> Result<(), serde_yaml_ng::Error> {
+        let mut read = Vec::new();
+        for yaml in [
+            "{ env: DB_PASSWORD }",
+            "{ file: ~/db.txt }",
+            "{ vault: \"secret/app#db\" }",
+            "{ sops: \"s.enc.yaml#db.pw\" }",
+        ] {
+            let source: SecretSource = serde_yaml_ng::from_str(yaml)?;
+            read.push((source.store(), source.reference().to_owned()));
+        }
+        let input = SecretSource::Input { input: "FLAG".into() };
+        read.push((input.store(), input.reference().to_owned()));
+        let expected = [
+            ("env", "DB_PASSWORD"),
+            ("file", "~/db.txt"),
+            ("vault", "secret/app#db"),
+            ("sops", "s.enc.yaml#db.pw"),
+            ("input", "FLAG"),
+        ];
+        assert_eq!(read, expected.map(|(s, r)| (s, r.to_owned())));
+        Ok(())
+    }
+
+    #[test]
+    fn a_drive_path_is_a_letter_a_colon_and_a_rooted_path() {
+        let read: Vec<bool> = ["C:\\app\\db", "d:/app", "C:\\", "C:app\\db", "1:\\app", "/run/db"]
+            .iter()
+            .map(|p| is_drive_path(p))
+            .collect();
+        assert_eq!(read, [true, true, false, false, false, false]);
+    }
+
+    #[test]
+    fn a_secret_goes_to_its_target_or_under_run_secrets() -> Result<(), serde_yaml_ng::Error> {
+        let mut paths = Vec::new();
+        for yaml in [
+            "db",
+            "{ source: db, target: /etc/db.pw }",
+            "{ source: db, target: \"C:\\\\app\\\\db\" }",
+            "{ source: db, target: db.pw }",
+            "{ source: db }",
+        ] {
+            paths.push(serde_yaml_ng::from_str::<MachineSecret>(yaml)?.path());
+        }
+        assert_eq!(paths, ["/run/secrets/db", "/etc/db.pw", "C:\\app\\db", "/run/secrets/db.pw", "/run/secrets/db"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_secret_is_handed_over_in_a_variable_of_its_name() {
+        assert_eq!(secret_variable("db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
+    }
+}
