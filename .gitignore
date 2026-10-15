@@ -12,3 +12,6 @@
 # outputs are generated, never committed (the characterization snapshots hold the examples').
 .isoloom/
 .isoloom-*/
+
+# Python bytecode (tools/verify/runner, when run outside its image).
+__pycache__/
