@@ -2,7 +2,7 @@
 
     python3 runner --tree DIR --out DIR --baseline FILE [--update]
 
-scripts/verify.sh starts it; it is not meant to run outside the image. It writes into --out:
+`cargo xtask verify` starts it; it is not meant to run outside the image. It writes into --out:
 results.jsonl (a line per file and validator: file, validator, status, message, rule, and for
 a failure whether the baseline knows it), new.jsonl (the failures it doesn't), stale.jsonl
 (baseline entries nothing matched), summary.txt, and with --update, baseline.json.

@@ -1,5 +1,5 @@
 # Only what the image is built from goes to Docker: the runner and the baseline are handed
-# to each run (see scripts/verify.sh).
+# to each run (see `cargo xtask verify`).
 *
 !Dockerfile
 !requirements.txt

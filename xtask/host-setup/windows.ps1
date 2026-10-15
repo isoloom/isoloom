@@ -1,16 +1,17 @@
 <#
-Prepares a Windows host for scripts/check-all.sh (its windows host) and for the Windows host
+Prepares a Windows host for `cargo xtask check-all` (its windows host) and for the Windows host
 proof: git, the Visual Studio 2022 Build Tools with the C++ workload, Rust with the MSVC toolchain
 (rustfmt, clippy) and cargo-machete (the launcher's `pnpm quality` runs it), Node 24 and pnpm for
 the launcher, then Vagrant, Terraform and PowerShell 7 for the real-target runs, and long paths
 turned on. Everything comes from winget, except cargo-machete (cargo install).
 
-Run it once, as an administrator, in Windows PowerShell:
+Run it once, as an administrator, in Windows PowerShell (`cargo xtask host-setup` runs it once
+Rust is there):
 
-  powershell -ExecutionPolicy Bypass -File windows-host-setup.ps1             install what is missing
-  powershell -ExecutionPolicy Bypass -File windows-host-setup.ps1 -CheckOnly  report only
+  powershell -ExecutionPolicy Bypass -File xtask\host-setup\windows.ps1             install what is missing
+  powershell -ExecutionPolicy Bypass -File xtask\host-setup\windows.ps1 -CheckOnly  report only
 
-What is there already is left alone, so running it again changes nothing. check-all.sh reaches
+What is there already is left alone, so running it again changes nothing. check-all reaches
 the host over the OpenSSH server (Settings > System > Optional features), with a key in
 C:\ProgramData\ssh\administrators_authorized_keys for an administrator account.
 #>

@@ -1,0 +1,4 @@
+# `cargo xtask <task>`: the development tasks (check-all, verify, generate-all, dev-link,
+# host-setup, quality), in Rust so they run the same on macOS, Linux and Windows.
+[alias]
+xtask = "run --quiet --package xtask --"
