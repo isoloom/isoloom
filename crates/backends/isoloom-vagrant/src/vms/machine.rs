@@ -20,12 +20,12 @@ use crate::vagrantfile;
 
 /// Lab machine `name`'s VM, and the check runner it uploads, if it has checks. Nothing when it
 /// has no Vagrant box (refused before rendering).
-pub fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
+pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let env = ctx.env;
     let mp = env.machines.get(name)?;
     let vm = env.spec().machines.get(name)?.vm.as_ref()?;
     let image = images::vagrant(vm)?;
-    let os = if images::is_windows(&vm.os) { Os::Windows } else { Os::Linux };
+    let os = Os::of(mp);
     let link = ctx.links.get(name).unwrap_or(&Link::None);
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
     define(r, name, |r| {
@@ -41,17 +41,17 @@ pub fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         for p in &mp.ports {
             r.call(vagrantfile::forwarded_port("m", p.port, p.publish, p.protocol));
         }
-        providers::blocks(r, &guest(env, name, &image, link, os));
+        providers::blocks(r, &guest(env, name, mp, &image, link));
         transport::provisioners(r, env, name, os);
         if let Some(g) = group {
             checks::provisioner(r, name, g);
         }
     });
-    group.map(|g| checks::runner(env, ctx.dir, name, &Position::Machine(name.to_string()), g))
+    group.map(|g| checks::runner(env, ctx.dir, name, &Position::Machine(name.to_owned()), g))
 }
 
 /// `config.vm.define "<name>" do |m| ... end`, after a blank line.
-pub fn define(r: &mut Ruby, name: &str, body: impl FnOnce(&mut Ruby)) {
+pub(crate) fn define(r: &mut Ruby, name: &str, body: impl FnOnce(&mut Ruby)) {
     r.blank();
     r.block(Call::new("config.vm.define").arg(Value::str(name)), "m", body);
 }
@@ -79,7 +79,7 @@ fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, name: &str, os: Os) {
 /// LAN) or a libvirt network without DHCP, named after the environment. On an IPv6 network,
 /// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
 /// provider's VM gets its IPv6 address from the set-up steps.
-pub fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
+pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
     let netname = format!("isoloom-{}-{net}", env.name);
     let mut call = Call::new("m.vm.network")
         .arg(Value::str("private_network"))
@@ -90,7 +90,7 @@ pub fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr)
     // Every VM on the network carries its network boot: libvirt creates the network with the
     // options of the first VM that comes up on it.
     call = boot::network(call, isoloom_plan::boot::network_boots(&env.machines).get(net));
-    if let Some(v6) = &env.networks[net].ipv6 {
+    if let Some(v6) = env.networks.get(net).and_then(|n| n.ipv6.as_ref()) {
         call = call
             .kw("libvirt__guest_ipv6", Value::str("yes"))
             .kw("libvirt__ipv6_address", Value::str(&v6.gateway.to_string()))
@@ -100,14 +100,11 @@ pub fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr)
 }
 
 /// The machine as its providers see it.
-fn guest<'a>(env: &'a Environment, name: &str, image: &'a VagrantBox, link: &'a Link, os: Os) -> Guest<'a> {
-    let mp: &MachinePlan = &env.machines[name];
+fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a VagrantBox, link: &'a Link) -> Guest<'a> {
+    let os = Os::of(mp);
     // No cloud-init on Windows: its lab address is set from PowerShell.
-    let windows_address = mp
-        .addresses
-        .first()
-        .filter(|_| os == Os::Windows)
-        .map(|(net, ip)| (*ip, Cidr::parse(&env.networks[net].cidr).map_or(24, |c| c.len)));
+    let prefix = |net: &str| env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(24, |c| c.len);
+    let windows_address = mp.addresses.first().filter(|_| os == Os::Windows).map(|(net, ip)| (*ip, prefix(net)));
     let hyperv = HyperV {
         env: &env.name,
         boxed: image.hyperv.clone(),

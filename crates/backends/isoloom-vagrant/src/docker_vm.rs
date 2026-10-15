@@ -11,20 +11,19 @@
 //! - Published ports: the VM forwards them from the host's loopback.
 //! - On a Proxmox server: `.isoloom/docker-vm/proxmox/main.tf` (Terraform, bpg/proxmox), one
 //!   VM on the uplink bridge, the same set-up over SSH as `cloud-docker`'s Docker host.
-//! - ESXi: the vagrant-vmware-esxi provider reads the host from ESXI_HOSTNAME, ESXI_USERNAME
-//!   and ESXI_PASSWORD (and the datastore from ESXI_DATASTORE).
+//! - ESXi: the vagrant-vmware-esxi provider reads the host from `ESXI_HOSTNAME`,
+//!   `ESXI_USERNAME` and `ESXI_PASSWORD` (and the datastore from `ESXI_DATASTORE`).
 //!
 //! This is the Vagrant side of the target; `isoloom-targets` puts it together with the
 //! `docker` target's Compose file (first) and the Proxmox module, and refuses what the Compose
 //! file can't run: its capabilities are Compose's.
-
-use std::fmt::Write as _;
 
 use isoloom_plan::checks::{Position, Probe};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container as docker;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 
+use crate::docker_host;
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 
@@ -34,15 +33,14 @@ const COMPOSE: &str = ".isoloom/docker/compose.yml";
 /// The derived-checks switch, read from the host's environment when Vagrant runs.
 const DERIVED: &str = "ENV.fetch(\"ISOLOOM_DERIVED\", \"1\")";
 
-/// The CPUs and memory (MB) of the VM: every container's at once, plus Docker's own 1 GB; at
-/// least 2 CPUs (at most 16) and 2 GB.
+/// The CPUs and memory (MB) of the VM: the containers' host's, at least 2 GB.
 fn host_size(env: &Environment) -> (u32, u32) {
-    let containers = env.machines.values().filter(|m| m.shape == MachineShape::Container);
-    let (cpus, mem) = containers.fold((0u32, 1024u32), |(c, m), x| (c + x.size.cpus.unwrap_or(1), m + x.size.memory_mb.unwrap_or(512)));
-    (cpus.clamp(2, 16), mem.max(2048))
+    let size = docker_host::Size::of(env);
+    (size.cpus, size.memory_mb.max(2048))
 }
 
 /// `.isoloom/docker-vm/Vagrantfile`: the VM, Docker, then the Compose file up and its checks.
+#[must_use]
 pub fn vagrantfile(env: &Environment) -> GeneratedFile {
     let mut r = Ruby::new();
     r.text(&header("#"));
@@ -51,7 +49,7 @@ pub fn vagrantfile(env: &Environment) -> GeneratedFile {
     ));
     r.blank();
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
-    r.text(crate::vagrant::PROJECT_RB);
+    r.text(crate::vms::PROJECT_RB);
     vagrantfile::inputs(&mut r, &env.spec().inputs);
     r.blank();
     r.block("Vagrant.configure(\"2\")", "config", |r| configure(r, env));
@@ -100,10 +98,10 @@ fn configure(r: &mut Ruby, env: &Environment) {
 /// libvirt), named `label` where the provider shows a name.
 fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32)) {
     let provider = |name: &str| Call::new("config.vm.provider").arg(Value::str(name));
-    let named = |r: &mut Ruby| {
-        r.assign("v.name", Value::str(label));
-        r.assign("v.cpus", cpus);
-        r.assign("v.memory", mem);
+    let named = |v: &mut Ruby| {
+        v.assign("v.name", Value::str(label));
+        v.assign("v.cpus", cpus);
+        v.assign("v.memory", mem);
     };
     r.block(provider("virtualbox"), "v", named);
     r.block(provider("vmware_desktop"), "v", |r| {
@@ -128,11 +126,7 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32)) {
 /// The size and placement on an ESXi host (vagrant-vmware-esxi), the host from the environment.
 fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
     r.block(Call::new("config.vm.provider").arg(Value::str("vmware_esxi")), "v", |r| {
-        r.assign("v.esxi_hostname", Value::raw("ENV.fetch(\"ESXI_HOSTNAME\", \"\")"));
-        r.assign("v.esxi_hostport", Value::raw("ENV.fetch(\"ESXI_HOSTPORT\", \"22\").to_i"));
-        r.assign("v.esxi_username", Value::raw("ENV.fetch(\"ESXI_USERNAME\", \"root\")"));
-        r.assign("v.esxi_password", Value::str("env:ESXI_PASSWORD"));
-        r.assign_if("v.esxi_disk_store", Value::raw("ENV[\"ESXI_DATASTORE\"]"), "ENV[\"ESXI_DATASTORE\"]");
+        vagrantfile::esxi_host(r);
         r.assign(
             "v.esxi_virtual_network",
             Value::array([Value::raw("ENV.fetch(\"ESXI_VIRTUAL_NETWORK\", \"VM Network\").split(\",\").first.strip")]),
@@ -158,7 +152,7 @@ fn environment(r: &mut Ruby, env: &Environment) {
 
 /// Checks on demand: every runner of the Compose `check` profile (one per position), then the
 /// `exec` checks piped into their machines; the derived checks switched off with
-/// ISOLOOM_DERIVED=0 on the host.
+/// `ISOLOOM_DERIVED=0` on the host.
 fn checks(r: &mut Ruby, env: &Environment) {
     if env.checks.is_empty() {
         return;
@@ -189,12 +183,14 @@ fn exec_runs(env: &Environment) -> String {
             machines.push(m);
         }
     }
-    machines.iter().fold(String::new(), |mut s, m| {
-        let _ = write!(
-            s,
-            "docker compose -f {COMPOSE} exec -T {m} sh -s < .isoloom/docker/checks/{} || failed=1; ",
-            docker::exec_runner(m)
-        );
-        s
-    })
+    let runs: Vec<String> = machines
+        .iter()
+        .map(|m| {
+            format!(
+                "docker compose -f {COMPOSE} exec -T {m} sh -s < .isoloom/docker/checks/{} || failed=1; ",
+                docker::exec_runner(m)
+            )
+        })
+        .collect();
+    runs.concat()
 }

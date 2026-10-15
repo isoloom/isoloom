@@ -11,14 +11,12 @@
       "isoloom-plan": 2,
       "isoloom-render": 5,
       "isoloom-spec": 16,
-      "isoloom-targets": 35,
-      "isoloom-vagrant": 1
+      "isoloom-targets": 35
     },
     "clippy/as_conversions": {
       "isoloom-import": 2,
       "isoloom-spec": 4,
-      "isoloom-targets": 2,
-      "isoloom-vagrant": 1
+      "isoloom-targets": 2
     },
     "clippy/doc_markdown": {
       "isoloom": 1,
@@ -27,8 +25,7 @@
       "isoloom-plan": 1,
       "isoloom-render": 3,
       "isoloom-spec": 14,
-      "isoloom-targets": 2,
-      "isoloom-vagrant": 10
+      "isoloom-targets": 2
     },
     "clippy/indexing_slicing": {
       "isoloom-import": 13,
@@ -36,8 +33,7 @@
       "isoloom-plan": 19,
       "isoloom-render": 19,
       "isoloom-spec": 39,
-      "isoloom-targets": 14,
-      "isoloom-vagrant": 9
+      "isoloom-targets": 14
     },
     "clippy/let_underscore_must_use": {
       "isoloom": 10,
@@ -45,8 +41,7 @@
       "isoloom-plan": 5,
       "isoloom-render": 85,
       "isoloom-spec": 16,
-      "isoloom-targets": 32,
-      "isoloom-vagrant": 5
+      "isoloom-targets": 32
     },
     "clippy/missing_errors_doc": {
       "isoloom-import": 3,
@@ -54,8 +49,7 @@
       "isoloom-plan": 1,
       "isoloom-render": 6,
       "isoloom-spec": 24,
-      "isoloom-targets": 7,
-      "isoloom-vagrant": 4
+      "isoloom-targets": 7
     },
     "clippy/must_use_candidate": {
       "isoloom-import": 2,
@@ -63,8 +57,7 @@
       "isoloom-plan": 78,
       "isoloom-render": 104,
       "isoloom-spec": 123,
-      "isoloom-targets": 11,
-      "isoloom-vagrant": 20
+      "isoloom-targets": 11
     },
     "clippy/print_stderr": {
       "isoloom": 7
@@ -76,8 +69,7 @@
       "isoloom-plan": 6,
       "isoloom-render": 7,
       "isoloom-spec": 47,
-      "isoloom-targets": 33,
-      "isoloom-vagrant": 3
+      "isoloom-targets": 33
     },
     "clippy/similar_names": {
       "isoloom-plan": 2,
@@ -90,8 +82,7 @@
       "isoloom-plan": 39,
       "isoloom-render": 40,
       "isoloom-spec": 112,
-      "isoloom-targets": 40,
-      "isoloom-vagrant": 12
+      "isoloom-targets": 40
     },
     "clippy/string_slice": {
       "isoloom": 2,
@@ -100,8 +91,7 @@
       "isoloom-plan": 3,
       "isoloom-render": 10,
       "isoloom-spec": 28,
-      "isoloom-targets": 51,
-      "isoloom-vagrant": 3
+      "isoloom-targets": 51
     },
     "dup/clone": {
       "isoloom": 7,
@@ -111,8 +101,7 @@
       "isoloom-render": 2,
       "isoloom-spec": 6,
       "isoloom-targets": 14,
-      "isoloom-terraform": 23,
-      "isoloom-vagrant": 4
+      "isoloom-terraform": 23
     },
     "exception/expect": {
       "isoloom-spec": 11,
@@ -128,8 +117,7 @@
       "isoloom-import": 14,
       "isoloom-plan": 1,
       "isoloom-render": 2,
-      "isoloom-spec": 2,
-      "isoloom-vagrant": 42
+      "isoloom-spec": 2
     }
   }
 }

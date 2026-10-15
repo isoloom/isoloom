@@ -8,7 +8,7 @@ use isoloom_spec::validate::Cidr;
 use crate::ruby::{Call, Ruby, Value};
 
 /// The VM's public networks, one per bridged network it joins.
-pub fn networks(r: &mut Ruby, env: &Environment, mp: &MachinePlan) {
+pub(crate) fn networks(r: &mut Ruby, env: &Environment, mp: &MachinePlan) {
     for (net, address) in &mp.outside {
         let Some(Join::Bridged(b)) = env.outside.get(net).map(|n| &n.join) else {
             continue;
@@ -30,7 +30,7 @@ pub fn networks(r: &mut Ruby, env: &Environment, mp: &MachinePlan) {
 /// Why a VM can't have its bridged networks on Vagrant, if it can't: Vagrant's public network
 /// takes no netmask (a fixed address is in a /24) and tags no VLAN, and a Windows guest's
 /// addresses are set by Isoloom's own steps, which don't cover a bridged interface yet.
-pub fn refusal(env: &Environment, name: &str, mp: &MachinePlan) -> Option<String> {
+pub(crate) fn refusal(env: &Environment, name: &str, mp: &MachinePlan) -> Option<String> {
     for (net, address) in &mp.outside {
         let Some(n) = env.outside.get(net) else { continue };
         let Join::Bridged(b) = &n.join else { continue };
@@ -53,7 +53,7 @@ pub fn refusal(env: &Environment, name: &str, mp: &MachinePlan) -> Option<String
 /// Why the environment's bridged networks can't run under Vagrant's `provider`, if it has any:
 /// QEMU links VMs through sockets, Hyper-V puts each network on a private switch of Isoloom's,
 /// and libvirt bridges a device (`dev`) Isoloom doesn't name yet.
-pub fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
+pub(crate) fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
     let (net, _) = env.outside.iter().find(|(_, n)| matches!(n.join, Join::Bridged(_)))?;
     Some(format!("network `{net}`: bridged networks under Vagrant's {provider} provider come later"))
 }

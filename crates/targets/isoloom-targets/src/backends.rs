@@ -8,7 +8,7 @@ use isoloom_kubernetes::KubernetesBackend;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{CloudServicesBackend, CloudVmBackend, EsxiBackend, ProxmoxBackend};
-use isoloom_vagrant::vagrant::VagrantBackend;
+use isoloom_vagrant::VagrantBackend;
 
 pub use crate::composite::{CloudDockerBackend, DockerVmBackend, HybridBackend};
 

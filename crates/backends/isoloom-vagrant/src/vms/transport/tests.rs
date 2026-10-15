@@ -1,13 +1,11 @@
 //! The transport's unit tests: which provisioners each planned step becomes.
 
-use std::fmt::Write as _;
-
 use isoloom_plan::Environment;
 use isoloom_plan::lifecycle::Step;
-use isoloom_spec::model::Target;
 
 use super::{Os, provisioners, step_provisioners};
 use crate::ruby::Ruby;
+use crate::testing::environment;
 
 const SPEC: &str = r"
 version: 1
@@ -34,9 +32,13 @@ machines:
 ";
 
 fn env() -> Environment {
+    environment(SPEC)
+}
+
+#[test]
+fn the_test_spec_is_valid() {
     let spec = isoloom_spec::parse(SPEC).expect("the test spec parses");
-    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-    Environment::build(&spec, Target::Vagrant, None)
+    assert_eq!(isoloom_spec::validate(&spec), Vec::new());
 }
 
 /// What `write` writes, as the Vagrantfile has it.
@@ -80,7 +82,8 @@ fn the_default_route_comes_once_provisioned() {
     let default = s.find("name: \"default route\"").expect("the default route");
     assert!(playbook < default, "{s}");
     assert_eq!(s.matches("ip route replace default via 10.85.0.1").count(), 1, "{s}");
-    assert!(s[default..].contains("systemctl enable isoloom-routes.service"), "kept across reboots: {s}");
+    let after_default = s.get(default..).unwrap_or_default();
+    assert!(after_default.contains("systemctl enable isoloom-routes.service"), "kept across reboots: {s}");
 }
 
 #[test]
@@ -100,7 +103,10 @@ fn a_reboot_is_vagrants_own_between_a_mark_and_its_check() {
 fn inputs_come_from_the_hosts_environment_into_the_file_the_steps_read() {
     let env = env();
     let s = text(|r| provisioners(r, &env, "app", Os::Linux));
-    let inputs = &s[s.find("name: \"inputs\"").expect("an inputs step")..];
+    let inputs = s
+        .split_once("name: \"inputs\"")
+        .map(|(_, rest)| format!("name: \"inputs\"{rest}"))
+        .expect("an inputs step");
     assert!(
         inputs.starts_with("name: \"inputs\", env: INPUTS.slice(\"TOKEN\"), inline: <<~'SH'\n"),
         "{inputs}"
@@ -115,15 +121,13 @@ fn inputs_come_from_the_hosts_environment_into_the_file_the_steps_read() {
 #[test]
 fn the_inputs_file_quotes_every_value() {
     let s = text(|r| provisioners(r, &env(), "app", Os::Linux));
-    let start = s.find("umask 077").expect("the inputs script");
-    let script: String = s[start..]
+    let (_, from_umask) = s.split_once("umask 077").expect("the inputs script");
+    let lines: Vec<String> = format!("umask 077{from_umask}")
         .lines()
         .take(3)
-        .fold(String::new(), |mut s, l| {
-            let _ = writeln!(s, "{}", l.trim_start());
-            s
-        })
-        .replace("/tmp/isoloom-inputs.env", "\"$OUT\"");
+        .map(|l| format!("{}\n", l.trim_start()))
+        .collect();
+    let script = lines.concat().replace("/tmp/isoloom-inputs.env", "\"$OUT\"");
     let dir = std::env::temp_dir().join(format!("isoloom-inputs-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("a temporary folder");
     let out = dir.join("inputs.env");
@@ -136,7 +140,7 @@ fn the_inputs_file_quotes_every_value() {
         .status()
         .expect("sh runs");
     let read = std::fs::read_to_string(dir.join("inputs.env.read")).unwrap_or_default();
-    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
     assert!(status.success());
     assert_eq!(read, tricky);
 }

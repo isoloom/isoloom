@@ -8,16 +8,14 @@ use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::Winrm;
 use isoloom_spec::windows::Tpm;
 
+use super::provider::Provider;
 use crate::ruby::{Call, Ruby, Value};
-
-/// The providers with a virtual TPM, as Vagrant names them.
-const WITH_TPM: [&str; 3] = ["virtualbox", "libvirt", "hyperv"];
 
 /// How Vagrant reaches a Windows box: over WinRM (`transport`, as the box answers it), or over
 /// OpenSSH when the box says `winssh`. Either way the box's own `vagrant` account, and the RDP
 /// port the box forwards to every interface of the host turned off (publish a service to reach
 /// one, on the loopback).
-pub fn communicator(r: &mut Ruby, winrm: Option<Winrm>) {
+pub(crate) fn communicator(r: &mut Ruby, winrm: Option<Winrm>) {
     r.call(
         Call::new("m.vm.network")
             .arg(Value::str("forwarded_port"))
@@ -61,7 +59,7 @@ fn over_winssh(r: &mut Ruby) {
 
 /// The guest OS ESXi registers a Windows VM as (its `guestOS`), so it offers the right virtual
 /// hardware and tools; a Linux box keeps the one it was built with.
-pub fn esxi_guestos(os: &str) -> Option<&'static str> {
+pub(crate) fn esxi_guestos(os: &str) -> Option<&'static str> {
     Some(match os {
         "windows-10" => "windows9-64",
         "windows-11" => "windows11-64",
@@ -76,22 +74,22 @@ pub fn esxi_guestos(os: &str) -> Option<&'static str> {
 }
 
 /// libvirt's emulated TPM 2.0 (swtpm on the host), on the CRB interface Windows 11 expects.
-pub fn libvirt_tpm(r: &mut Ruby) {
+pub(crate) fn libvirt_tpm(r: &mut Ruby) {
     r.assign("v.tpm_type", Value::str("emulator"));
     r.assign("v.tpm_model", Value::str("tpm-crb"));
     r.assign("v.tpm_version", Value::str("2.0"));
 }
 
 /// VirtualBox's TPM 2.0 (VirtualBox 7 and later), through `modifyvm`.
-pub fn virtualbox_tpm(r: &mut Ruby) {
+pub(crate) fn virtualbox_tpm(r: &mut Ruby) {
     let args = ["modifyvm", ":id", "--tpm-type", "2.0"].map(|a| if a == ":id" { Value::sym("id") } else { Value::str(a) });
     r.call(Call::new("v.customize").arg(Value::array(args)));
 }
 
 /// Why `provider` can't run this environment's VMs, if it can't: a machine that requires a TPM
 /// on a provider that gives none.
-pub fn tpm_refusal(env: &Environment, provider: &str) -> Option<String> {
-    if WITH_TPM.contains(&provider) {
+pub(crate) fn tpm_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
+    if provider.has_tpm() {
         return None;
     }
     let (name, _) = env
@@ -99,7 +97,8 @@ pub fn tpm_refusal(env: &Environment, provider: &str) -> Option<String> {
         .iter()
         .find(|(_, mp)| mp.shape == MachineShape::Vm && mp.tpm == Some(Tpm::Required))?;
     Some(format!(
-        "machine `{name}` asks for a virtual TPM (`vm.tpm: true`): Vagrant's {provider} provider gives none (VirtualBox, libvirt and Hyper-V do)"
+        "machine `{name}` asks for a virtual TPM (`vm.tpm: true`): Vagrant's {} provider gives none (VirtualBox, libvirt and Hyper-V do)",
+        provider.id()
     ))
 }
 

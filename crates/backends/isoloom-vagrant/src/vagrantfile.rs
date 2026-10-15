@@ -10,13 +10,13 @@ use isoloom_spec::model::Protocol;
 use crate::ruby::{Call, Ruby, Value};
 
 /// `<var>.vm.provision "shell", name: <name>`: a shell provisioner, its script still to add.
-pub fn shell(var: &str, name: &str) -> Call {
+pub(crate) fn shell(var: &str, name: &str) -> Call {
     Call::new(format!("{var}.vm.provision")).arg(Value::str("shell")).kw("name", Value::str(name))
 }
 
 /// The values given at launch, read from the host's environment (empty when unset), as the
 /// `INPUTS` hash provisioners pass on. Nothing when the environment has none.
-pub fn inputs(r: &mut Ruby, inputs: &[String]) {
+pub(crate) fn inputs(r: &mut Ruby, inputs: &[String]) {
     if inputs.is_empty() {
         return;
     }
@@ -26,16 +26,16 @@ pub fn inputs(r: &mut Ruby, inputs: &[String]) {
 }
 
 /// A tool that can't reach the machines itself (macOS keeps third-party tools off the local
-/// network) sets ISOLOOM_SSH_PROXY_COMMAND, e.g. "/usr/bin/nc %h %p", and Vagrant's SSH goes
+/// network) sets `ISOLOOM_SSH_PROXY_COMMAND`, e.g. "/usr/bin/nc %h %p", and Vagrant's SSH goes
 /// through it. Unset: Vagrant connects directly.
-pub fn ssh_proxy(r: &mut Ruby, var: &str) {
+pub(crate) fn ssh_proxy(r: &mut Ruby, var: &str) {
     let proxy = "ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"]";
     r.assign_if(&format!("{var}.ssh.proxy_command"), Value::raw(proxy), proxy);
 }
 
 /// libvirt names a domain `<prefix><machine>`, the prefix defaulting to the folder's name: the
 /// environment's name keeps two environments' domains apart.
-pub fn libvirt_prefix(r: &mut Ruby, var: &str, env: &str) {
+pub(crate) fn libvirt_prefix(r: &mut Ruby, var: &str, env: &str) {
     r.block(Call::new(format!("{var}.vm.provider")).arg(Value::str("libvirt")), "v", |r| {
         r.assign("v.default_prefix", Value::str(&format!("{env}_")));
     });
@@ -43,7 +43,7 @@ pub fn libvirt_prefix(r: &mut Ruby, var: &str, env: &str) {
 
 /// A port forwarded from the host's loopback: `guest` in the VM to `host` on this machine. UDP
 /// says so (vagrant-libvirt skips those, with a warning; `isoloom run` repeats it).
-pub fn forwarded_port(var: &str, guest: u16, host: u16, protocol: Protocol) -> Call {
+pub(crate) fn forwarded_port(var: &str, guest: u16, host: u16, protocol: Protocol) -> Call {
     let call = Call::new(format!("{var}.vm.network"))
         .arg(Value::str("forwarded_port"))
         .kw("guest", guest)
@@ -59,14 +59,24 @@ pub fn forwarded_port(var: &str, guest: u16, host: u16, protocol: Protocol) -> C
 
 /// The spec's constraints (proxy, mirrors, NTP) as the VM's first provisioner, rendered by the
 /// plan's [`Step::Prelude`]. Nothing when the spec has none.
-pub fn prelude(r: &mut Ruby, env: &Environment, var: &str) {
+pub(crate) fn prelude(r: &mut Ruby, env: &Environment, var: &str) {
     if let Some(sh) = steps::linux(env, "", &Step::Prelude) {
         r.call(shell(var, "constraints").kw("inline", Value::str(&sh)));
     }
 }
 
+/// The ESXi host a VM goes on (vagrant-vmware-esxi), from the host's environment:
+/// `ESXI_HOSTNAME`, `ESXI_HOSTPORT`, `ESXI_USERNAME`, `ESXI_PASSWORD` and `ESXI_DATASTORE`.
+pub(crate) fn esxi_host(r: &mut Ruby) {
+    r.assign("v.esxi_hostname", Value::raw("ENV.fetch(\"ESXI_HOSTNAME\", \"\")"));
+    r.assign("v.esxi_hostport", Value::raw("ENV.fetch(\"ESXI_HOSTPORT\", \"22\").to_i"));
+    r.assign("v.esxi_username", Value::raw("ENV.fetch(\"ESXI_USERNAME\", \"root\")"));
+    r.assign("v.esxi_password", Value::str("env:ESXI_PASSWORD"));
+    r.assign_if("v.esxi_disk_store", Value::raw("ENV[\"ESXI_DATASTORE\"]"), "ENV[\"ESXI_DATASTORE\"]");
+}
+
 /// Docker from Docker's own install script, unless the box has it.
-pub fn install_docker(r: &mut Ruby, var: &str) {
+pub(crate) fn install_docker(r: &mut Ruby, var: &str) {
     r.call(shell(var, "docker").kw("inline", Value::str(steps::INSTALL_DOCKER)));
 }
 

@@ -8,7 +8,7 @@ use isoloom_spec::images;
 use isoloom_spec::model::{Machine, is_reboot};
 
 /// Why Vagrant can't render `env`, if it can't: the first machine it can't build.
-pub fn refusal(env: &Environment) -> Option<String> {
+pub(crate) fn refusal(env: &Environment) -> Option<String> {
     let spec = env.spec();
     env.machines
         .iter()
@@ -35,7 +35,7 @@ fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
 
 /// What a Windows machine can't have on Vagrant yet.
 fn windows(env: &Environment, name: &str, m: &Machine) -> Option<String> {
-    let mp = &env.machines[name];
+    let mp = env.machines.get(name)?;
     if name.len() > 15 {
         return Some(format!("machine `{name}`: Windows computer names are at most 15 characters"));
     }
@@ -47,7 +47,7 @@ fn windows(env: &Environment, name: &str, m: &Machine) -> Option<String> {
     if mp.default_gateway.is_some() || mp.is_gateway {
         return Some(format!("machine `{name}`: a gateway machine's routes on Windows come later"));
     }
-    if mp.addresses.keys().any(|n| !env.networks[n].internet) {
+    if mp.addresses.keys().any(|n| env.networks.get(n).is_some_and(|p| !p.internet)) {
         return Some(format!("machine `{name}`: `internet: false` on Windows comes later"));
     }
     if !mp.volumes.is_empty() {

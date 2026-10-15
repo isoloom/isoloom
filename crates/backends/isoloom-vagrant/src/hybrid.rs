@@ -19,17 +19,19 @@
 mod host;
 
 use isoloom_plan::{Capabilities, Environment, Feature};
-use isoloom_render::backend::{Files, RenderError, as_target};
+use isoloom_render::backend::Files;
 use isoloom_render::container::HybridContainers;
 use isoloom_spec::model::{Spec, Target};
 
-use crate::vagrant::{self, Layout};
+use crate::error::Result;
+use crate::vms::{self, Layout};
 
 const DIR: &str = "hybrid";
 
 /// What the hybrid target can render. The VM side's controller runs provisioning and every
 /// kind of check. Gateways, volumes shared across containers and VMs, VMs waiting for containers
 /// and network appliances aren't wired yet.
+#[must_use]
 pub fn capabilities() -> Capabilities {
     Capabilities::of([
         Feature::EnvironmentProvisioning,
@@ -58,10 +60,16 @@ pub fn capabilities() -> Capabilities {
 /// The Vagrantfile (the VMs, then the containers' host) and the checks next to it, with the
 /// containers' Compose file (`containers`) second. The environment was checked against
 /// [`capabilities`] first.
-pub fn render(env: &Environment, containers: HybridContainers) -> Result<Files, RenderError> {
+///
+/// # Errors
+///
+/// [`Error`](crate::Error) when the VMs need what Vagrant can't build (a machine with no box,
+/// a step it can't run), or a network the containers are on isn't a block of addresses; each
+/// reported as the `hybrid` target's.
+pub fn render(env: &Environment, containers: HybridContainers) -> Result<Files> {
     let host = host::block(env, &containers)?;
     let layout = Layout { dir: DIR, extra: &host };
-    let mut files = vagrant::generate_in(&vms_only(env.spec()), &layout).map_err(|e| as_target(e, Target::Hybrid))?;
+    let mut files = vms::render_spec_in(&vms_only(env.spec()), &layout).map_err(|e| e.on(Target::Hybrid))?;
     files.insert(1.min(files.len()), containers.file);
     Ok(files)
 }

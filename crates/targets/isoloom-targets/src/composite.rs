@@ -96,7 +96,7 @@ impl Backend for HybridBackend {
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         backend::check(Target::Hybrid, env, &self.capabilities())?;
         let containers = isoloom_compose::hybrid::render(env)?;
-        hybrid::render(env, containers)
+        Ok(hybrid::render(env, containers)?)
     }
 
     /// The plan's refusal; else, since the VMs are still the `vagrant` generator's, what it

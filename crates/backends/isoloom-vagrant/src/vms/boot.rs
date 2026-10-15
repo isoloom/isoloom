@@ -8,11 +8,12 @@
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::{Boot, Firmware, NetworkBoot, VmImage};
 
+use super::provider::Provider;
 use crate::ruby::{Call, Ruby, Value};
 
 /// Where Vagrant gets the box: a URL as written, a box file in the project from the project's
 /// folder (the Vagrantfile sits two levels below it), and the box server to look it up on.
-pub fn source(r: &mut Ruby, image: Option<&VmImage>) {
+pub(crate) fn source(r: &mut Ruby, image: Option<&VmImage>) {
     let Some(i) = image else { return };
     if let Some(u) = &i.box_url {
         let url = if u.contains("://") {
@@ -30,7 +31,7 @@ pub fn source(r: &mut Ruby, image: Option<&VmImage>) {
 /// The libvirt domain's own boot, in the provider's block (`v`): the kernel booted directly
 /// with its initrd, command line and device tree, the UEFI firmware and its variables, then
 /// the boot devices in order (each `v.boot` call adds one to `boot_order`).
-pub fn libvirt(r: &mut Ruby, b: &Boot) {
+pub(crate) fn libvirt(r: &mut Ruby, b: &Boot) {
     let paths = [
         ("v.kernel", &b.kernel),
         ("v.initrd", &b.initrd),
@@ -50,7 +51,7 @@ pub fn libvirt(r: &mut Ruby, b: &Boot) {
 }
 
 /// QEMU's own boot: the format of its UEFI firmware files.
-pub fn qemu(r: &mut Ruby, b: &Boot) {
+pub(crate) fn qemu(r: &mut Ruby, b: &Boot) {
     if let Some(f) = b.firmware_format {
         r.assign("v.firmware_format", Value::str(f.id()));
     }
@@ -58,7 +59,7 @@ pub fn qemu(r: &mut Ruby, b: &Boot) {
 
 /// A private network's libvirt options for the network boot it serves: DHCP on (a booting
 /// machine asks it for the boot file), the TFTP folder, and the file with its server.
-pub fn network(call: Call, served: Option<&NetworkBoot>) -> Call {
+pub(crate) fn network(call: Call, served: Option<&NetworkBoot>) -> Call {
     let Some(n) = served else {
         return call.kw("libvirt__dhcp_enabled", false);
     };
@@ -78,16 +79,16 @@ pub fn network(call: Call, served: Option<&NetworkBoot>) -> Call {
 /// Why `provider` can't boot a machine of `env` its own way, if it can't. libvirt boots every
 /// field; QEMU sets the firmware's format only (it boots the box's disk through its own
 /// firmware); the other providers boot the box as it is.
-pub fn refusal(env: &Environment, provider: &str) -> Option<String> {
+pub(crate) fn refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
     let (name, b) = env
         .machines
         .iter()
         .filter(|(_, mp)| mp.shape == MachineShape::Vm)
         .find_map(|(n, mp)| Some((n, mp.boot.as_ref()?)))?;
     match provider {
-        "libvirt" => (b.firmware == Some(Firmware::Uefi) && b.loader.is_none())
+        Provider::Libvirt => (b.firmware == Some(Firmware::Uefi) && b.loader.is_none())
             .then(|| format!("machine `{name}` sets `vm.boot.firmware: uefi`: libvirt boots UEFI from the firmware file in `vm.boot.loader`; give it")),
-        "qemu" => {
+        Provider::Qemu => {
             let beyond = b.beyond_firmware_format();
             (!beyond.is_empty()).then(|| {
                 format!(
@@ -97,34 +98,41 @@ pub fn refusal(env: &Environment, provider: &str) -> Option<String> {
             })
         }
         other => Some(format!(
-            "machine `{name}` boots its own way (`vm.boot`): Vagrant's {other} provider boots the box as it is; the libvirt provider boots it"
+            "machine `{name}` boots its own way (`vm.boot`): Vagrant's {} provider boots the box as it is; the libvirt provider boots it",
+            other.id()
         )),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use isoloom_spec::model::Target;
-
     use super::*;
+    use crate::testing::environment;
 
     fn env(boot: &str) -> Environment {
-        let spec = isoloom_spec::parse(&format!(
+        environment(&format!(
             "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, vm: {{ os: debian@12, provision: [s.sh], boot: {boot} }} }}\n"
         ))
-        .unwrap();
-        Environment::build(&spec, Target::Vagrant, None)
     }
 
     #[test]
-    fn libvirt_boots_everything_qemu_the_firmware_format_and_the_others_nothing() {
+    fn libvirt_boots_a_kernel_and_qemu_only_the_firmware_format() {
         let kernel = env("{ kernel: /boot/vmlinuz, firmware_format: raw }");
-        assert_eq!(refusal(&kernel, "libvirt"), None);
-        let qemu = refusal(&kernel, "qemu").unwrap();
+        assert_eq!(refusal(&kernel, Provider::Libvirt), None);
+        let qemu = refusal(&kernel, Provider::Qemu).unwrap_or_default();
         assert!(qemu.contains("`vm.boot.kernel`") && !qemu.contains("firmware_format`:"), "{qemu}");
-        assert_eq!(refusal(&env("{ firmware_format: qcow2, firmware: uefi }"), "qemu"), None);
-        assert!(refusal(&env("{ firmware: uefi }"), "libvirt").unwrap().contains("`vm.boot.loader`"));
-        let vbox = refusal(&kernel, "virtualbox").unwrap();
+        assert_eq!(refusal(&env("{ firmware_format: qcow2, firmware: uefi }"), Provider::Qemu), None);
+    }
+
+    #[test]
+    fn libvirt_boots_uefi_from_the_loader_it_is_given() {
+        let uefi = refusal(&env("{ firmware: uefi }"), Provider::Libvirt).unwrap_or_default();
+        assert!(uefi.contains("`vm.boot.loader`"), "{uefi}");
+    }
+
+    #[test]
+    fn the_other_providers_boot_the_box_as_it_is() {
+        let vbox = refusal(&env("{ kernel: /boot/vmlinuz }"), Provider::VirtualBox).unwrap_or_default();
         assert!(vbox.contains("virtualbox provider boots the box as it is"), "{vbox}");
     }
 

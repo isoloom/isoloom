@@ -8,6 +8,7 @@ use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
 use isoloom_render::inventory::{self, Access};
+use isoloom_render::router;
 use isoloom_render::{CONTROLLER_BOX, GeneratedFile, ansible_runs, boot, controller_box, controller_size};
 use isoloom_spec::images::HyperVBox;
 use isoloom_spec::validate::Cidr;
@@ -18,7 +19,6 @@ use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{Os, shell, step_provisioners};
 use super::{CONTROLLER, Ctx, TOOL_SHELL, checks};
-use crate::router;
 use crate::ruby::{Ruby, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
@@ -79,7 +79,7 @@ fn networks(r: &mut Ruby, env: &Environment, at: impl Fn(Cidr) -> Ipv4Addr) {
 
 /// The router VM: on every network it routes, at its last address, forwarding with the
 /// `reach` rules (and impairing links with `tc`).
-pub fn router_vm(r: &mut Ruby, ctx: &Ctx) {
+pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
     let env = ctx.env;
     let Some(routed) = &env.router else { return };
     let link = ctx.links.get(router::NAME).unwrap_or(&Link::None);
@@ -110,7 +110,7 @@ pub fn router_vm(r: &mut Ruby, ctx: &Ctx) {
 
 /// The tools: `shell` is a Debian VM on every network at the tool's address, with the usual
 /// observation tools, outside the environment's contract; the others have no VM form.
-pub fn tools(r: &mut Ruby, ctx: &Ctx) {
+pub(crate) fn tools(r: &mut Ruby, ctx: &Ctx) {
     for (i, (name, tool)) in ctx.env.spec().tools.iter().enumerate() {
         r.blank();
         if name == "shell" {
@@ -152,7 +152,7 @@ const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add
 /// started after every machine. It writes the inventory, runs the environment's playbooks, then
 /// halts unless the spec keeps it running; it runs the checks standing on every network on
 /// demand (their runner is returned).
-pub fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
+pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let env = ctx.env;
     let (bx, version) = controller_box(env.spec());
     let (cpus, mem, disk) = controller_size(env.spec());

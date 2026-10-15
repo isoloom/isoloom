@@ -22,12 +22,7 @@ const PROFILE: &str = "check";
 pub(crate) fn services(env: &Environment, services: &mut IndexMap<String, Service>) -> Vec<GeneratedFile> {
     let spec = env.spec();
     let default_pos = checks::default_position(spec);
-    let host = |h: &Host, _: &Position| -> String {
-        match h {
-            Host::Machine { name, network } => env.probe_address(name, network),
-            Host::Literal(literal) => literal.clone(),
-        }
-    };
+    let host = |h: &Host, _: &Position| isoloom_render::checks::address_of(env, h);
     let run_script = |path: &str| format!("cd /isoloom/project && sh {path}");
     let render = Render {
         host: &host,

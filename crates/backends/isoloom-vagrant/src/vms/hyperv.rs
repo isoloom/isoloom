@@ -15,8 +15,6 @@
 //!
 //! The Ruby doing the work is `IsoloomHyperV` ([`HYPERV_RB`]), in every Vagrantfile's preamble.
 
-use std::fmt::Write as _;
-
 use std::net::Ipv4Addr;
 
 use isoloom_plan::{Environment, MachineShape};
@@ -27,46 +25,47 @@ use isoloom_spec::windows::Tpm;
 
 use super::providers::Size;
 use crate::ruby::{Call, Ruby, Value};
+use crate::stable_hash;
 
 /// The Ruby that gives VMs their networks on Hyper-V (`vagrant_hyperv.rb`): `HYPERV_SWITCH`
 /// and the `IsoloomHyperV` module the triggers call.
-pub const HYPERV_RB: &str = include_str!("../vagrant_hyperv.rb");
+pub(crate) const HYPERV_RB: &str = include_str!("../vagrant_hyperv.rb");
 
 /// How a VM runs under Vagrant's Hyper-V provider.
 #[derive(Debug, Clone)]
-pub struct HyperV<'a> {
+pub(crate) struct HyperV<'a> {
     /// The environment's name (its networks' switches are named after it).
-    pub env: &'a str,
+    pub(crate) env: &'a str,
     /// The box Hyper-V boots.
-    pub boxed: HyperVBox,
+    pub(crate) boxed: HyperVBox,
     /// Its adapters on the networks, in order.
-    pub nics: Vec<Nic<'a>>,
+    pub(crate) nics: Vec<Nic<'a>>,
     /// Whether it runs Windows (its addresses set through WMI, not `ip`).
-    pub windows: bool,
+    pub(crate) windows: bool,
     /// Nested virtualization (`nested_virtualization`): the VM runs VMs of its own.
-    pub nested: bool,
+    pub(crate) nested: bool,
     /// Its published ports (guest, host): not forwarded on Hyper-V, so a warning says where.
-    pub published: Vec<(u16, u16)>,
+    pub(crate) published: Vec<(u16, u16)>,
     /// Its virtual TPM, enabled before it starts.
-    pub tpm: Option<Tpm>,
+    pub(crate) tpm: Option<Tpm>,
 }
 
 /// A VM's adapter on one network, and its address there.
 #[derive(Debug, Clone, Copy)]
-pub struct Nic<'a> {
+pub(crate) struct Nic<'a> {
     /// The network.
-    pub net: &'a str,
+    pub(crate) net: &'a str,
     /// The VM's address on it.
-    pub ip: Ipv4Addr,
+    pub(crate) ip: Ipv4Addr,
     /// The network's prefix length.
-    pub len: u8,
+    pub(crate) len: u8,
     /// The network's mask (Windows' WMI takes a mask).
-    pub mask: Ipv4Addr,
+    pub(crate) mask: Ipv4Addr,
 }
 
 impl<'a> Nic<'a> {
     /// The adapter on `net` at `ip`.
-    pub fn on(env: &Environment, net: &'a str, ip: Ipv4Addr) -> Nic<'a> {
+    pub(crate) fn on(env: &Environment, net: &'a str, ip: Ipv4Addr) -> Nic<'a> {
         Nic {
             net,
             ip,
@@ -78,7 +77,7 @@ impl<'a> Nic<'a> {
 
 impl<'a> HyperV<'a> {
     /// Isoloom's own Debian VMs (router, tool shell) at these addresses: Debian 12's Hyper-V box.
-    pub fn helper(env: &'a Environment, at: impl IntoIterator<Item = (&'a str, Ipv4Addr)>) -> Self {
+    pub(crate) fn helper(env: &'a Environment, at: impl IntoIterator<Item = (&'a str, Ipv4Addr)>) -> Self {
         HyperV {
             env: &env.name,
             boxed: HyperVBox::Other {
@@ -106,14 +105,9 @@ impl<'a> HyperV<'a> {
 
 /// The MAC address of a VM's adapter on a network under Hyper-V: locally administered, stable
 /// for the VM and the network, so the guest finds the adapter whatever it names it.
-pub fn mac(vm: &str, net: &str) -> [u8; 6] {
-    // FNV-1a: stable across builds and platforms (unlike std's hasher).
-    let mut h: u32 = 0x811c_9dc5;
-    for b in format!("{vm}/{net}").bytes() {
-        h = (h ^ u32::from(b)).wrapping_mul(0x0100_0193);
-    }
-    let b = h.to_be_bytes();
-    [0x02, 0x15, b[0], b[1], b[2], b[3]]
+fn mac(vm: &str, net: &str) -> [u8; 6] {
+    let [a, b, c, d] = stable_hash::of(&format!("{vm}/{net}")).to_be_bytes();
+    [0x02, 0x15, a, b, c, d]
 }
 
 /// A MAC address written with `sep` between its bytes, in capitals when `upper` (Hyper-V's
@@ -124,7 +118,7 @@ fn mac_text(mac: [u8; 6], sep: &str, upper: bool) -> String {
 }
 
 /// The VM `vm_name`'s Hyper-V provider block, then the triggers that give it its networks there.
-pub fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
+pub(crate) fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
     r.block(Call::new("m.vm.provider").arg(Value::str("hyperv")), "v, o", |r| {
         match &hv.boxed {
             HyperVBox::Main => {}
@@ -142,7 +136,7 @@ pub fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
         r.assign("v.memory", size.mem);
         r.assign("v.linked_clone", true);
         if hv.nested {
-            super::nested::switch(r, "hyperv");
+            super::nested::switch(r, super::provider::Provider::HyperV);
         }
         // Hyper-V reads only `bridge` here: the switch of the VM's first adapter.
         let first = Call::new("o.vm.network").arg(Value::str("private_network"));
@@ -196,7 +190,7 @@ fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
                 } else {
                     (linux_addresses(vm_name, &hv.nics), "SH")
                 };
-                r.heredoc_line(format_args!("IsoloomHyperV.address(machine, <<~'{tag}')"), tag, &script);
+                r.heredoc_argument("IsoloomHyperV.address(machine, ", ")", tag, &script);
             }
             if !hv.published.is_empty() {
                 let ports = Value::array(hv.published.iter().map(|(g, h)| Value::array([Value::from(*g), Value::from(*h)])));
@@ -223,10 +217,8 @@ const LAB_NET_AT_BOOT: &str = "if [ -d /run/systemd/system ]; then\n  cat > /etc
 /// boot, and now.
 fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
     let macs: Vec<String> = nics.iter().map(|n| mac_text(mac(vm_name, n.net), ":", false)).collect();
-    let lines = nics.iter().zip(&macs).fold(String::new(), |mut s, (n, m)| {
-        let _ = writeln!(s, "lab {m} {}/{} || rc=1", n.ip, n.len);
-        s
-    });
+    let lines: Vec<String> = nics.iter().zip(&macs).map(|(n, m)| format!("lab {m} {}/{} || rc=1\n", n.ip, n.len)).collect();
+    let lines = lines.concat();
     let unmanaged = macs.iter().map(|m| format!("mac:{m}")).collect::<Vec<_>>().join(";");
     format!(
         "set -e\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/lab-net.sh <<'NET'\n{LAB_NET}{lines}exit $rc\nNET\nchmod +x /etc/isoloom/lab-net.sh\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf\nfi\n{LAB_NET_AT_BOOT}/etc/isoloom/lab-net.sh\n"
@@ -256,7 +248,7 @@ fn windows_addresses(vm_name: &str, nics: &[Nic]) -> String {
 
 /// Why this environment's VMs can't all boot on Hyper-V, if they can't: the first machine whose
 /// OS has no known Hyper-V box and whose spec gives none.
-pub fn refusal(env: &Environment) -> Option<String> {
+pub(crate) fn refusal(env: &Environment) -> Option<String> {
     let spec = env.spec();
     env.machines.iter().filter(|(_, mp)| mp.shape == MachineShape::Vm).find_map(|(name, _)| {
         let vm = spec.machines.get(name)?.vm.as_ref()?;

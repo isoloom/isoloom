@@ -4,6 +4,7 @@
 
 pub mod backend;
 pub mod boot;
+pub mod checks;
 pub mod constraints;
 pub mod container;
 pub mod disks;

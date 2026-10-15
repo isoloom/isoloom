@@ -12,7 +12,7 @@ fix commit.
 - Typed errors: ok (`Error` in `error.rs` with `#[source]`, mapped once into `RenderError`; `start_plan` no longer returns a `String` error).
 - No hidden state: ok.
 - Determinism: ok (ordered maps throughout; `rendering_twice_gives_the_same_files`).
-- One way to do each thing: ok (Compose's `$$` escaping is `interpolation::literal`, once; service names are built in `names`; render's container helpers are used from `isoloom-render`, no longer re-exported).
+- One way to do each thing: ok (Compose's `$$` escaping is `interpolation::literal`, once; service names are built in `names`; where a probe reaches a machine is `isoloom_render::checks::address_of`, shared with the VM backends; render's container helpers are used from `isoloom-render`, no longer re-exported).
 
 ## 3b principles
 - Names, one vocabulary, no stutter: ok (`ComposeBackend` keeps its name beside the `Backend` trait it implements and the registry's other backends; the dissolved `docker` grab-bag became `layout`, `labels`, `names`, `images` and `start`).

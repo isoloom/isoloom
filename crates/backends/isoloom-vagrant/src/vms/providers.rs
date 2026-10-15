@@ -5,31 +5,30 @@ use std::net::Ipv4Addr;
 
 use isoloom_spec::images;
 use isoloom_spec::model::{Arch, Boot};
-
 use isoloom_spec::windows::Tpm;
 
-use super::boot;
 use super::hyperv::{self, HyperV};
-use super::nested;
+use super::provider::Provider;
 use super::qemu::{HubPort, Link};
-use super::windows;
+use super::{boot, nested, windows};
 use crate::ruby::{Call, Ruby, Value};
+use crate::vagrantfile;
 
 /// A VM's size: CPUs, memory (MB), and the disk (GB) when set. The disk is a minimum: a box
 /// whose disk is already bigger keeps it (no provider shrinks a disk).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Size {
-    pub cpus: u32,
-    pub mem: u32,
-    pub disk: Option<u32>,
+pub(crate) struct Size {
+    pub(crate) cpus: u32,
+    pub(crate) mem: u32,
+    pub(crate) disk: Option<u32>,
 }
 
 impl Size {
     /// Isoloom's own small VMs (router, tool shell): the box's disk.
-    pub const HELPER: Size = Size { cpus: 1, mem: 512, disk: None };
+    pub(crate) const HELPER: Size = Size { cpus: 1, mem: 512, disk: None };
 
     /// A planned size, the spec's defaults filling what it leaves out.
-    pub fn of(s: isoloom_plan::Size, cpus: u32, mem: u32) -> Size {
+    pub(crate) fn of(s: isoloom_plan::Size, cpus: u32, mem: u32) -> Size {
         Size {
             cpus: s.cpus.unwrap_or(cpus),
             mem: s.memory_mb.unwrap_or(mem),
@@ -40,22 +39,22 @@ impl Size {
 
 /// How a VM runs under Vagrant's QEMU provider.
 #[derive(Debug, Clone)]
-pub struct Qemu<'a> {
+pub(crate) struct Qemu<'a> {
     /// The libvirt-format box QEMU boots instead of the main one.
-    pub boxed: Option<&'a str>,
+    pub(crate) boxed: Option<&'a str>,
     /// The main box, which QEMU boots when `boxed` is `None`.
-    pub main: &'a str,
+    pub(crate) main: &'a str,
     /// The machine's CPU; `None` for Isoloom's own VMs, which run on the host's.
-    pub arch: Option<Arch>,
+    pub(crate) arch: Option<Arch>,
     /// Its link on its private network.
-    pub link: &'a Link,
+    pub(crate) link: &'a Link,
     /// A Windows machine's lab address and prefix length (no cloud-init to set it).
-    pub windows_address: Option<(Ipv4Addr, u8)>,
+    pub(crate) windows_address: Option<(Ipv4Addr, u8)>,
 }
 
 impl<'a> Qemu<'a> {
     /// Isoloom's own Debian VMs (router, controller, tool shell): the host's CPU.
-    pub fn helper(link: &'a Link) -> Self {
+    pub(crate) fn helper(link: &'a Link) -> Self {
         Qemu {
             boxed: Some(images::QEMU_DEBIAN_12),
             main: images::QEMU_DEBIAN_12,
@@ -68,37 +67,37 @@ impl<'a> Qemu<'a> {
 
 /// One VM, as its providers see it.
 #[derive(Debug, Clone)]
-pub struct Guest<'a> {
+pub(crate) struct Guest<'a> {
     /// Its display name.
-    pub label: String,
+    pub(crate) label: String,
     /// Its name on ESXi and Hyper-V (`<env>-<machine>`).
-    pub vm_name: String,
+    pub(crate) vm_name: String,
     /// Its size.
-    pub size: Size,
+    pub(crate) size: Size,
     /// The networks it is on, in order.
-    pub nets: Vec<&'a str>,
+    pub(crate) nets: Vec<&'a str>,
     /// The box libvirt uses instead of the main one, if any.
-    pub libvirt_box: Option<&'a str>,
+    pub(crate) libvirt_box: Option<&'a str>,
     /// How it boots, when not the way its box does (libvirt and QEMU).
-    pub boot: Option<&'a Boot>,
+    pub(crate) boot: Option<&'a Boot>,
     /// How QEMU runs it.
-    pub qemu: Qemu<'a>,
+    pub(crate) qemu: Qemu<'a>,
     /// How Hyper-V runs it.
-    pub hyperv: HyperV<'a>,
+    pub(crate) hyperv: HyperV<'a>,
     /// Its virtual TPM, where the provider gives one (VirtualBox, libvirt; Hyper-V's is in
     /// `hyperv`).
-    pub tpm: Option<Tpm>,
+    pub(crate) tpm: Option<Tpm>,
     /// The guest OS ESXi registers it as, when its box's own isn't enough (Windows).
-    pub esxi_guestos: Option<&'static str>,
+    pub(crate) esxi_guestos: Option<&'static str>,
     /// Whether it runs VMs of its own (`nested_virtualization`).
-    pub nested: bool,
+    pub(crate) nested: bool,
     /// Its data disks, `(name, GB)`, in order.
-    pub disks: Vec<(&'a str, u32)>,
+    pub(crate) disks: Vec<(&'a str, u32)>,
 }
 
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
 /// resize the box's disk).
-pub fn blocks(r: &mut Ruby, g: &Guest) {
+pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
     if let Some(d) = g.size.disk {
         r.call(
             Call::new("m.vm.disk")
@@ -117,22 +116,22 @@ pub fn blocks(r: &mut Ruby, g: &Guest) {
                 .kw("size", Value::str(&format!("{gb}GB"))),
         );
     }
-    desktop(r, "virtualbox", g, true, |r| {
+    desktop(r, Provider::VirtualBox, g, true, |r| {
         if g.tpm.is_some() {
             windows::virtualbox_tpm(r);
         }
     });
     vmware(r, g);
-    desktop(r, "parallels", g, true, |_| {});
-    desktop(r, "utm", g, false, |_| {});
-    r.block(provider("qemu"), "v, o", |r| {
+    desktop(r, Provider::Parallels, g, true, |_| {});
+    desktop(r, Provider::Utm, g, false, |_| {});
+    r.block(provider(Provider::Qemu), "v, o", |r| {
         qemu(r, g.size, &g.qemu);
         g.boot.into_iter().for_each(|b| boot::qemu(r, b));
     });
     if let Link::Hub(h) = g.qemu.link {
         hub_triggers(r, h);
     }
-    r.block(provider("vmware_esxi"), "v", |r| esxi(r, g));
+    r.block(provider(Provider::VmwareEsxi), "v", |r| esxi(r, g));
     libvirt(r, g);
     hyperv::block(r, &g.vm_name, g.size, &g.hyperv);
     if g.nested {
@@ -140,14 +139,15 @@ pub fn blocks(r: &mut Ruby, g: &Guest) {
     }
 }
 
-fn provider(name: &str) -> Call {
-    Call::new("m.vm.provider").arg(Value::str(name))
+/// `m.vm.provider "<id>"`: the head of a provider's block.
+fn provider(p: Provider<'_>) -> Call {
+    Call::new("m.vm.provider").arg(Value::str(p.id()))
 }
 
 /// VirtualBox, Parallels and UTM: a name, CPUs and memory (and linked clones where offered),
 /// then what only that provider sets (`more`).
-fn desktop(r: &mut Ruby, name: &str, g: &Guest, linked_clone: bool, more: impl FnOnce(&mut Ruby)) {
-    r.block(provider(name), "v", |r| {
+fn desktop(r: &mut Ruby, p: Provider<'_>, g: &Guest, linked_clone: bool, more: impl FnOnce(&mut Ruby)) {
+    r.block(provider(p), "v", |r| {
         r.assign("v.name", Value::str(&g.label));
         if linked_clone {
             r.assign("v.linked_clone", true);
@@ -156,24 +156,25 @@ fn desktop(r: &mut Ruby, name: &str, g: &Guest, linked_clone: bool, more: impl F
         r.assign("v.memory", g.size.mem);
         more(r);
         if g.nested {
-            nested::switch(r, name);
+            nested::switch(r, p);
         }
     });
 }
 
+/// VMware Workstation and Fusion: a display name, CPUs and memory, in the VM's `.vmx`.
 fn vmware(r: &mut Ruby, g: &Guest) {
-    r.block(provider("vmware_desktop"), "v", |r| {
+    r.block(provider(Provider::VmwareDesktop), "v", |r| {
         r.assign("v.vmx[\"displayName\"]", Value::str(&g.label));
         r.assign("v.vmx[\"numvcpus\"]", Value::str(&g.size.cpus.to_string()));
         r.assign("v.vmx[\"memsize\"]", Value::str(&g.size.mem.to_string()));
         if g.nested {
-            nested::switch(r, "vmware_desktop");
+            nested::switch(r, Provider::VmwareDesktop);
         }
     });
 }
 
 /// The CPU architecture as QEMU and libvirt name it.
-pub fn qemu_arch(a: Arch) -> &'static str {
+pub(crate) fn qemu_arch(a: Arch) -> &'static str {
     match a {
         Arch::Amd64 => "x86_64",
         Arch::Arm64 => "aarch64",
@@ -184,7 +185,7 @@ pub fn qemu_arch(a: Arch) -> &'static str {
 /// does; Isoloom's own VMs take the host's.
 fn libvirt(r: &mut Ruby, g: &Guest) {
     let params = if g.libvirt_box.is_some() { "v, o" } else { "v" };
-    r.block(provider("libvirt"), params, |r| {
+    r.block(provider(Provider::Libvirt), params, |r| {
         if let Some(b) = g.libvirt_box {
             r.assign("o.vm.box", Value::str(b));
         }
@@ -201,7 +202,7 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
         }
         g.boot.into_iter().for_each(|b| boot::libvirt(r, b));
         if g.nested {
-            nested::switch(r, "libvirt");
+            nested::switch(r, Provider::Libvirt);
         }
         for (_, gb) in &g.disks {
             r.call(Call::new("v.storage").arg(Value::sym("file")).kw("size", Value::str(&format!("{gb}G"))));
@@ -310,11 +311,7 @@ fn windows_lab_address(ip: Ipv4Addr, len: u8) -> String {
 /// The vagrant-vmware-esxi provider: the host from the ESXI_* variables, a port group per NIC.
 fn esxi(r: &mut Ruby, g: &Guest) {
     let nets = Value::array(g.nets.iter().map(|n| Value::str(n)));
-    r.assign("v.esxi_hostname", Value::raw("ENV.fetch(\"ESXI_HOSTNAME\", \"\")"));
-    r.assign("v.esxi_hostport", Value::raw("ENV.fetch(\"ESXI_HOSTPORT\", \"22\").to_i"));
-    r.assign("v.esxi_username", Value::raw("ENV.fetch(\"ESXI_USERNAME\", \"root\")"));
-    r.assign("v.esxi_password", Value::str("env:ESXI_PASSWORD"));
-    r.assign_if("v.esxi_disk_store", Value::raw("ENV[\"ESXI_DATASTORE\"]"), "ENV[\"ESXI_DATASTORE\"]");
+    vagrantfile::esxi_host(r);
     r.assign("v.esxi_virtual_network", Value::raw(format!("esxi_networks({nets})")));
     r.assign("v.guest_name", Value::str(&g.vm_name));
     if let Some(os) = g.esxi_guestos {
@@ -326,7 +323,7 @@ fn esxi(r: &mut Ruby, g: &Guest) {
         r.assign("v.guest_boot_disk_size", d);
     }
     if g.nested {
-        nested::switch(r, "vmware_esxi");
+        nested::switch(r, Provider::VmwareEsxi);
     }
     if !g.disks.is_empty() {
         r.assign("v.guest_storage", Value::array(g.disks.iter().map(|(_, gb)| Value::from(*gb))));

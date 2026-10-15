@@ -15,7 +15,7 @@
 use std::net::Ipv4Addr;
 
 use isoloom_plan::lifecycle::Step;
-use isoloom_plan::{Environment, Route};
+use isoloom_plan::{Environment, MachinePlan, Route};
 use isoloom_render::{boot, steps};
 
 use crate::ruby::{Call, Ruby, Value};
@@ -23,15 +23,22 @@ use crate::vagrantfile;
 
 /// The operating system family of a VM: which rendering of a step it runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Os {
+pub(crate) enum Os {
     /// Shell, as root, over SSH.
     Linux,
     /// PowerShell, over WinRM.
     Windows,
 }
 
+impl Os {
+    /// The family of a planned machine.
+    pub(crate) fn of(plan: &MachinePlan) -> Os {
+        if plan.is_windows() { Os::Windows } else { Os::Linux }
+    }
+}
+
 /// The `vm.provision` lines of lab machine `machine`, from its planned steps.
-pub fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: Os) {
+pub(crate) fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: Os) {
     let Some(mp) = env.machines.get(machine) else { return };
     let mut default: Option<(Vec<Route>, Ipv4Addr)> = None;
     for step in &mp.lifecycle {
@@ -57,7 +64,7 @@ pub fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: Os) {
 const FORWARDING: &str = "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom-forwarding.conf && sysctl -q -p /etc/sysctl.d/90-isoloom-forwarding.conf";
 
 /// The provisioners of one step, `machine` being a lab machine or one of Isoloom's own VMs.
-pub fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &Step, os: Os) {
+pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &Step, os: Os) {
     match (os, step) {
         (_, Step::Project) => {
             r.call(Call::new("m.vm.provision").arg(Value::str("isoloom_project")).kw("name", Value::str("project")));
@@ -127,7 +134,7 @@ fn label(step: &Step) -> String {
 }
 
 /// `m.vm.provision "shell", name: ..., inline: ...`.
-pub fn shell(r: &mut Ruby, name: &str, script: &str) {
+pub(crate) fn shell(r: &mut Ruby, name: &str, script: &str) {
     r.script(vagrantfile::shell("m", name), "inline", script);
 }
 
@@ -163,21 +170,18 @@ fn reboot(r: &mut Ruby) {
 /// A step whose effect a reboot forgets, applied now and at every boot.
 fn persisted(r: &mut Ruby, env: &Environment, machine: &str, step: &Step) {
     let Some(script) = steps::linux(env, machine, step) else { return };
-    let (name, what, on_link_up): (&str, &str, bool) = match step {
-        Step::Routes { .. } => ("routes", ROUTES, true),
-        Step::Trunks => ("trunks", "802.1Q interfaces of the isoloom trunks", true),
-        Step::Ipv6 { .. } => ("ipv6", "IPv6 addresses and routes on the isoloom networks", true),
-        Step::MoreAddresses { .. } => ("addresses", "The machine's further addresses on the isoloom networks", true),
-        _ => ("tc", "Link impairment (networks.*.tc) on this machine's interfaces", false),
-    };
-    let after: &[&str] = match name {
-        "routes" | "addresses" => &["trunks"],
-        "ipv6" => &["routes"],
-        _ => &[],
+    // Its boot unit: name, what it does, whether it waits for the links, what it comes after.
+    let (name, what, on_link_up, after): (&str, &str, bool, &[&str]) = match step {
+        Step::Routes { .. } => ("routes", ROUTES, true, &["trunks"]),
+        Step::Trunks => ("trunks", "802.1Q interfaces of the isoloom trunks", true, &[]),
+        Step::Ipv6 { .. } => ("ipv6", "IPv6 addresses and routes on the isoloom networks", true, &["routes"]),
+        Step::MoreAddresses { .. } => ("addresses", "The machine's further addresses on the isoloom networks", true, &["trunks"]),
+        _ => ("tc", "Link impairment (networks.*.tc) on this machine's interfaces", false, &[]),
     };
     shell(r, &label(step), &boot::at_boot(name, what, &script, on_link_up, after));
 }
 
+/// What the routes' boot unit does.
 const ROUTES: &str = "Routes to the other isoloom networks";
 
 /// Once provisioned, the routes again with the default route through the gateway.
@@ -197,11 +201,7 @@ fn wait_for(r: &mut Ruby, env: &Environment, machine: &str, dep: &str, ports: &[
         .get(dep)
         .and_then(|m| m.vm.as_ref())
         .is_some_and(|vm| isoloom_spec::images::is_windows(&vm.os));
-    let target = if windows {
-        env.address_for(machine, dep).to_string()
-    } else {
-        dep.to_string()
-    };
+    let target = if windows { env.address_for(machine, dep).to_string() } else { dep.to_owned() };
     let step = Step::WaitFor {
         machine: target,
         ports: ports.to_vec(),

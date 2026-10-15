@@ -16,34 +16,38 @@
 //! - On QEMU (vagrant-qemu), a machine boots its libvirt-format box with its own CPU, emulated
 //!   when the host's is another (x86 Windows on an Apple Silicon Mac: slow, so longer timeouts).
 //!   Without root, two VMs on a network link as a socket listen/connect pair, and any other
-//!   number through a hub (a QEMU process with no machine), each VM on one network;
-//!   [`qemu_refusal`] says when a spec doesn't fit. A disk size grows the box's disk, never
-//!   below the box's own.
-//! - On UTM (vagrant_utm), a VM gets no private network; [`utm_refusal`] refuses a spec whose
-//!   VMs are on one.
+//!   number through a hub (a QEMU process with no machine), each VM on one network; the QEMU
+//!   provider's refusal ([`provider`]) says when a spec doesn't fit. A disk size grows the
+//!   box's disk, never below the box's own.
+//! - On UTM (`vagrant_utm`), a VM gets no private network; the UTM provider's refusal
+//!   ([`provider`]) refuses a spec whose VMs are on one.
 //! - On Hyper-V, Vagrant puts a VM's adapters on one switch and sets no address: each network
 //!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
-//!   guest ([`hyperv`]); [`hyperv_refusal`] says when a machine has no Hyper-V box.
+//!   guest ([`hyperv`]); the Hyper-V provider's refusal ([`provider`]) says when a machine has no
+//!   Hyper-V box.
 
 mod boot;
 mod bridged;
 mod checks;
-mod helpers;
-pub mod hyperv;
-mod limits;
+mod hyperv;
+pub(crate) mod limits;
 mod machine;
 mod nested;
+mod own;
+pub(crate) mod provider;
 mod providers;
 mod qemu;
-pub mod transport;
+mod transport;
 mod windows;
 
 use indexmap::IndexMap;
-use isoloom_plan::{Capabilities, Environment, Feature, MachineShape};
-use isoloom_render::backend::{self, Backend, Files, RenderError};
-use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
+use isoloom_plan::{Environment, MachineShape};
+use isoloom_render::backend::Files;
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 use isoloom_spec::model::{Spec, Target};
 
+use crate::backend::capabilities;
+use crate::error::{Error, Result};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
 
@@ -59,80 +63,21 @@ const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
 /// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`; on Windows
 /// unpacked by PowerShell (`untar.ps1`, as `IsoloomProject::UNTAR_PS1`). Every Vagrantfile
 /// Isoloom writes carries it, after `ROOT`.
-pub const PROJECT_RB: &str = concat!(
+pub(crate) const PROJECT_RB: &str = concat!(
     include_str!("vagrant_project.rb"),
     "\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n",
     include_str!("../../../core/isoloom-render/src/untar.ps1"),
     "PS1\n"
 );
 
-/// What Vagrant can render: a controller VM runs the environment's playbooks and the Ansible
-/// checks, every check runs where its machine stands (a VM), and a machine can route a network
-/// (its `gateway`). No network appliances (they are wired the way Docker attaches networks).
-pub fn capabilities() -> Capabilities {
-    Capabilities::of([
-        Feature::EnvironmentProvisioning,
-        Feature::PlaybookChecks,
-        Feature::ExecWithoutContainer,
-        Feature::Gateways,
-        Feature::MachineAliases,
-        Feature::Ulimits,
-        Feature::TrafficControl,
-        Feature::Ipv6,
-        Feature::BridgedNetworks,
-        // Given on VirtualBox, libvirt and Hyper-V; `provider_refusal` refuses the others.
-        Feature::Tpm,
-        // Delivered by `isoloom run` over the machine's SSH, owners included.
-        Feature::Secrets,
-        Feature::SecretOwners,
-        Feature::MachineProcess,
-        // The libvirt provider boots it; `provider_refusal` says which providers can't.
-        Feature::OwnBoot,
-        Feature::NestedVirtualization,
-        // No DNS of its own: each VM's hosts file carries the names under the zone's domain.
-        Feature::PrivateDns,
-        // Each VM's set-up adds them on the interface of its primary address, on every provider.
-        Feature::VmMoreAddresses,
-        Feature::DataDisks,
-        Feature::RawDisks,
-        Feature::TmpfsModes,
-    ])
-}
-
-/// The `vagrant` target's backend.
-#[derive(Debug, Clone, Copy)]
-pub struct VagrantBackend;
-
-impl Backend for VagrantBackend {
-    fn target(&self) -> Target {
-        Target::Vagrant
-    }
-
-    fn capabilities(&self) -> Capabilities {
-        capabilities()
-    }
-
-    fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        render(env)
-    }
-
-    /// The plan's requirements against the capabilities, then the machines Vagrant can't build,
-    /// without rendering.
-    fn refusal(&self, env: &Environment) -> Option<String> {
-        isoloom_plan::refusal(&env.requirements, &capabilities())
-            .map(|r| r.to_string())
-            .or_else(|| limits::refusal(env))
-    }
-}
-
 /// Where a Vagrantfile goes and what it carries besides the environment's VMs: `hybrid` writes
 /// its VMs to `.isoloom/hybrid/`, with its Docker host as one more `config.vm.define` block.
 #[derive(Debug, Clone, Copy)]
-pub struct Layout<'a> {
+pub(crate) struct Layout<'a> {
     /// The folder under `.isoloom/`.
-    pub dir: &'a str,
+    pub(crate) dir: &'a str,
     /// Ruby added at the end of the `configure` block (complete statements, indented for it).
-    pub extra: &'a str,
+    pub(crate) extra: &'a str,
 }
 
 /// What rendering the VMs needs at hand.
@@ -147,19 +92,32 @@ struct Ctx<'a> {
 }
 
 /// The Vagrantfile of `env` and the check runners it uploads.
-pub fn render(env: &Environment) -> Result<Files, RenderError> {
+pub(crate) fn render(env: &Environment) -> Result<Files> {
     render_in(env, &Layout { dir: DIR, extra: "" })
 }
 
+/// The VMs of `spec` (the `vagrant` target's plan of it) into `layout`: the `hybrid` target's.
+pub(crate) fn render_spec_in(spec: &Spec, layout: &Layout) -> Result<Files> {
+    render_in(&Environment::build(spec, Target::Vagrant, None), layout)
+}
+
 /// [`render`], into `layout`.
-pub fn render_in(env: &Environment, layout: &Layout) -> Result<Files, RenderError> {
-    backend::check(Target::Vagrant, env, &capabilities())?;
-    if let Some(what) = limits::refusal(env) {
-        return Err(GenerateError::Unsupported { target: Target::Vagrant, what }.into());
+fn render_in(env: &Environment, layout: &Layout) -> Result<Files> {
+    if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &capabilities()) {
+        return Err(Error::Refused {
+            target: Target::Vagrant,
+            refusal,
+        });
+    }
+    if let Some(reason) = limits::refusal(env) {
+        return Err(Error::Unsupported {
+            target: Target::Vagrant,
+            reason,
+        });
     }
     let in_their_place = checks::in_their_place(env);
     let checks = checks::Checks::of(env, &in_their_place);
-    let with_controller = env.controller.is_some() || !checks.controller.is_empty();
+    let with_controller = with_controller(env, &checks);
     let links = qemu::links(env, with_controller);
     let ctx = Ctx {
         env,
@@ -173,13 +131,17 @@ pub fn render_in(env: &Environment, layout: &Layout) -> Result<Files, RenderErro
     let mut runners = Vec::new();
     r.block("Vagrant.configure(\"2\")", "config", |r| {
         settings(r, env);
-        helpers::router_vm(r, &ctx);
-        for name in env.start_order.iter().filter(|n| env.machines[*n].shape == MachineShape::Vm) {
+        own::router_vm(r, &ctx);
+        let vms = env
+            .start_order
+            .iter()
+            .filter(|n| env.machines.get(*n).is_some_and(|m| m.shape == MachineShape::Vm));
+        for name in vms {
             runners.extend(machine::vm(r, &ctx, name));
         }
-        helpers::tools(r, &ctx);
+        own::tools(r, &ctx);
         if with_controller {
-            runners.extend(helpers::controller_vm(r, &ctx));
+            runners.extend(own::controller_vm(r, &ctx));
         }
         r.text(layout.extra);
     });
@@ -235,7 +197,7 @@ fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu:
     r.blank();
 }
 
-/// ESXi's port groups: ESXI_VIRTUAL_NETWORK lists the management network's, then one per
+/// ESXi's port groups: `ESXI_VIRTUAL_NETWORK` lists the management network's, then one per
 /// network in order.
 fn esxi(r: &mut Ruby, env: &Environment) {
     let names = env.networks.keys().cloned().collect::<Vec<_>>().join(", ");
@@ -263,77 +225,14 @@ fn settings(r: &mut Ruby, env: &Environment) {
     vagrantfile::libvirt_prefix(r, "config", &env.name);
 }
 
-/// The files of the `vagrant` target for `spec`, through its plan, into `layout` (the hybrid
-/// target renders its VMs with it).
-pub fn generate_in(spec: &Spec, layout: &Layout) -> Result<Vec<GeneratedFile>, GenerateError> {
-    render_in(&Environment::build(spec, Target::Vagrant, None), layout).map_err(GenerateError::from)
+/// Whether the Vagrantfile has a controller: to run the environment's playbooks, or checks.
+fn with_controller(env: &Environment, checks: &checks::Checks<'_>) -> bool {
+    env.controller.is_some() || !checks.controller.is_empty()
 }
 
-/// Why this environment's VMs can't all have their networks under Vagrant's QEMU provider, if
-/// they can't (`refusal_on` asks it for `qemu`).
-pub fn qemu_refusal(spec: &Spec) -> Option<String> {
-    let env = Environment::build(spec, Target::Vagrant, None);
-    let in_their_place = checks::in_their_place(&env);
-    let checks = checks::Checks::of(&env, &in_their_place);
-    let with_controller = env.controller.is_some() || !checks.controller.is_empty();
-    qemu::refusal(qemu::links(&env, with_controller)).or_else(|| bridged::provider_refusal(&env, "QEMU"))
-}
-
-/// Why this environment's VMs can't all have their networks under Vagrant's UTM provider, if
-/// they can't: vagrant_utm (0.1.6) sets up no private network (it only forwards ports to the
-/// VM's shared network), so a VM on one of the spec's networks would silently have none.
-/// `refusal_on` asks it for `utm`.
-pub fn utm_refusal(spec: &Spec) -> Option<String> {
-    let env = Environment::build(spec, Target::Vagrant, None);
-    let in_their_place = checks::in_their_place(&env);
-    let checks = checks::Checks::of(&env, &in_their_place);
-    let with_controller = env.controller.is_some() || !checks.controller.is_empty();
-    let (name, _) = qemu::links(&env, with_controller).into_iter().find(|(_, l)| *l != qemu::Link::None)?;
-    Some(format!(
-        "`{name}` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
-    ))
-}
-
-/// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's,
-/// Parallels' and UTM's plugins attach none. `refusal_on` asks it for them.
-pub fn disk_refusal(spec: &Spec, provider: &str) -> Option<String> {
-    if !matches!(provider, "qemu" | "parallels" | "utm") {
-        return None;
-    }
-    let (name, _) = spec.machines.iter().find(|(_, m)| m.vm.is_some() && !m.disks.is_empty())?;
-    Some(format!(
-        "machine `{name}` has data disks (`disks`), which the `{provider}` provider doesn't attach"
-    ))
-}
-
-/// Why this environment's VMs can't all boot under Vagrant's Hyper-V provider, if they can't:
-/// a machine whose OS has no known Hyper-V box and whose spec gives none (`vm.image.hyperv`).
-/// `refusal_on` asks it for `hyperv`.
-pub fn hyperv_refusal(spec: &Spec) -> Option<String> {
-    let env = Environment::build(spec, Target::Vagrant, None);
-    hyperv::refusal(&env).or_else(|| bridged::provider_refusal(&env, "Hyper-V"))
-}
-
-/// Why this environment can't run under Vagrant's libvirt provider, if it can't: a bridged
-/// network (`refusal_on` asks it for `libvirt`).
-pub fn libvirt_refusal(spec: &Spec) -> Option<String> {
-    bridged::provider_refusal(&Environment::build(spec, Target::Vagrant, None), "libvirt")
-}
-
-/// Why this environment's VMs can't all run under Vagrant's `provider` (as `vagrant up
-/// --provider` names it), if they can't: a machine requiring a TPM the provider doesn't give,
-/// then QEMU's and UTM's networks, Hyper-V's boxes and libvirt's bridged networks, then a
-/// machine's own boot, which only libvirt (and QEMU, for UEFI's format) boots. `refusal_on`
-/// asks it.
-pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
-    let env = Environment::build(spec, Target::Vagrant, None);
-    windows::tpm_refusal(&env, provider)
-        .or_else(|| match provider {
-            "qemu" => qemu_refusal(spec),
-            "utm" => utm_refusal(spec),
-            "hyperv" => hyperv_refusal(spec),
-            "libvirt" => libvirt_refusal(spec),
-            _ => None,
-        })
-        .or_else(|| boot::refusal(&env, provider))
+/// Each VM's link under QEMU, the controller included when the environment has one.
+fn qemu_links(env: &Environment) -> IndexMap<String, qemu::Link> {
+    let in_their_place = checks::in_their_place(env);
+    let checks = checks::Checks::of(env, &in_their_place);
+    qemu::links(env, with_controller(env, &checks))
 }

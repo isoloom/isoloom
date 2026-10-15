@@ -10,7 +10,7 @@ const NO_SCRIPT: &str = "echo 'scripts need the project on the machine; the exte
 
 /// Each runner: its path in the target's folder (`checks/<machine>.sh`) and its script.
 pub(crate) fn runners(env: &Environment) -> Vec<(String, String)> {
-    let host = |h: &Host, _: &Position| reach(env, h);
+    let host = |h: &Host, _: &Position| isoloom_render::checks::address_of(env, h);
     let no_script = |_: &str| NO_SCRIPT.to_owned();
     let render = Render {
         host: &host,
@@ -29,14 +29,6 @@ pub(crate) fn runners(env: &Environment) -> Vec<(String, String)> {
             (!probes.is_empty()).then(|| (format!("checks/{m}.sh"), checks::script(&pos, &probes, &render)))
         })
         .collect()
-}
-
-/// A probe's host as the existing hosts reach it: a machine at its address on the network.
-fn reach(env: &Environment, host: &Host) -> String {
-    match host {
-        Host::Machine { name, network } => env.probe_address(name, network),
-        Host::Literal(literal) => literal.clone(),
-    }
 }
 
 #[cfg(test)]

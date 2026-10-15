@@ -11,7 +11,7 @@ and its fix commit.
 - Typed errors: ok (`Error` in `error.rs`, mapped once into the backend's `RenderError`).
 - No hidden state: ok (no globals, no `set_var`, no `unsafe`).
 - Determinism: ok (ordered maps throughout; `rendering_twice_gives_the_same_files`).
-- One way to do each thing: ok (the inventory, the check scripts and where a probe reaches a machine (`Environment::probe_address`) come from `isoloom-render` and `isoloom-plan`; no copy).
+- One way to do each thing: ok (the inventory, the check scripts and where a probe reaches a machine (`isoloom_render::checks::address_of`) come from `isoloom-render` and `isoloom-plan`; no copy).
 
 ## 3b principles
 - Names, one vocabulary, no stutter: ok (`ExternalBackend`, `endpoints`, `checks`; the target's words).

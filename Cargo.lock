@@ -744,6 +744,8 @@ dependencies = [
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
+ "proptest",
+ "thiserror",
 ]
 
 [[package]]

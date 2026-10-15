@@ -20,7 +20,6 @@ pub use isoloom_spec::validate::docker_cidrs;
 use isoloom_plan::checks;
 use isoloom_render::{address, router, start_order};
 use isoloom_spec::{groups, images, instance, model, targets, validate};
-use isoloom_vagrant::vagrant;
 
 /// The network appliances' management network (see `docker.appliance`).
 pub const APPLIANCE_MGMT_CIDR: &str = isoloom_spec::appliance::MGMT_CIDR;
@@ -185,7 +184,7 @@ pub fn cloud_refusals(spec: &Spec, target: Target) -> Option<(Vec<&'static str>,
 /// it does.
 pub fn refusal_on(spec: &Spec, target: Target, provider: Option<&str>) -> Option<String> {
     refusal(spec, target).or_else(|| match (target, provider) {
-        (Target::Vagrant, Some(p)) => vagrant::provider_refusal(spec, p).or_else(|| vagrant::disk_refusal(spec, p)),
+        (Target::Vagrant, Some(p)) => isoloom_vagrant::provider_refusal(spec, p).or_else(|| isoloom_vagrant::disk_refusal(spec, p)),
         _ => None,
     })
 }

@@ -13,9 +13,11 @@ isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 isoloom-render.workspace = true
 indexmap.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+proptest.workspace = true
 
 [lints]
 workspace = true
