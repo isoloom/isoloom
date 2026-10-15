@@ -12,8 +12,8 @@
 # Each workspace of a consumer whose committed Cargo.lock pins Isoloom by git gets a
 # `.cargo/config.toml` with:
 #   - a [patch."https://github.com/isoloom/isoloom"] entry per Isoloom crate the workspace depends
-#     on directly, pointing at crates/<name> here (the others follow through the path dependencies
-#     inside this workspace);
+#     on directly, pointing at its folder here (crates/<group>/<name>; the others follow through
+#     the path dependencies inside this workspace);
 #   - a `resolver.lockfile-path` to a lockfile of its own, seeded from the committed one, so the
 #     committed Cargo.lock keeps the git pin.
 # Cargo reads `.cargo/config.toml` in the folder it runs from and its parents. So the workspace at
@@ -73,8 +73,20 @@ direct_isoloom_crates() {
   ' "$1" | sort
 }
 
+# The folder of this checkout's crate $1 (crates/<group>/<name>, or crates/<name>), if it has one.
+local_crate_dir() {
+  local manifest
+  for manifest in "$isoloom_dir"/crates/*/"$1"/Cargo.toml "$isoloom_dir/crates/$1/Cargo.toml"; do
+    if grep -q "^name = \"$1\"$" "$manifest" 2>/dev/null; then
+      dirname "$manifest"
+      return 0
+    fi
+  done
+  return 1
+}
+
 has_local_crate() {
-  grep -q "^name = \"$1\"$" "$isoloom_dir/crates/$1/Cargo.toml" 2>/dev/null
+  local_crate_dir "$1" >/dev/null
 }
 
 exclude_file() {
@@ -147,7 +159,7 @@ write_config() {
     echo "# The Isoloom crates this workspace pins by git come from the local checkout instead."
     echo "[patch.\"$GIT_URL\"]"
     for crate in "$@"; do
-      echo "$crate = { path = \"$isoloom_dir/crates/$crate\" }"
+      echo "$crate = { path = \"$(local_crate_dir "$crate")\" }"
     done
     echo
     echo "# The linked resolution has its own lockfile, so the committed Cargo.lock keeps the git pin."

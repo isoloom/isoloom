@@ -1,6 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
+members = [
+  "crates/core/*",
+  "crates/backends/*",
+  "crates/tools/*",
+  "crates/targets/*",
+  "crates/cli/*",
+  "crates/isoloom-runtime",
+]
 
 [workspace.package]
 version = "0.10.1"
@@ -11,18 +18,18 @@ license = "Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-isoloom-spec = { path = "crates/isoloom-spec" }
-isoloom-plan = { path = "crates/isoloom-plan" }
-isoloom-render = { path = "crates/isoloom-render" }
-isoloom-compose = { path = "crates/isoloom-compose" }
-isoloom-kubernetes = { path = "crates/isoloom-kubernetes" }
-isoloom-terraform = { path = "crates/isoloom-terraform" }
-isoloom-vagrant = { path = "crates/isoloom-vagrant" }
-isoloom-external = { path = "crates/isoloom-external" }
-isoloom-targets = { path = "crates/isoloom-targets" }
-isoloom-import = { path = "crates/isoloom-import" }
+isoloom-spec = { path = "crates/core/isoloom-spec" }
+isoloom-plan = { path = "crates/core/isoloom-plan" }
+isoloom-render = { path = "crates/core/isoloom-render" }
+isoloom-compose = { path = "crates/backends/isoloom-compose" }
+isoloom-kubernetes = { path = "crates/backends/isoloom-kubernetes" }
+isoloom-terraform = { path = "crates/backends/isoloom-terraform" }
+isoloom-vagrant = { path = "crates/backends/isoloom-vagrant" }
+isoloom-ansible = { path = "crates/backends/isoloom-ansible" }
+isoloom-targets = { path = "crates/targets/isoloom-targets" }
+isoloom-import = { path = "crates/tools/isoloom-import" }
 isoloom-runtime = { path = "crates/isoloom-runtime" }
-isoloom-manifest = { path = "crates/isoloom-manifest" }
+isoloom-manifest = { path = "crates/core/isoloom-manifest" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"

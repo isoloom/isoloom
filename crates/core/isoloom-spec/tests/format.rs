@@ -1,0 +1,274 @@
+//! The format against its three examples: they parse, validate, and get exactly the
+//! targets their shapes allow.
+
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
+
+use std::path::Path;
+
+use isoloom_spec::{Target, derive, effective, load, parse, totals, validate};
+
+fn example(name: &str) -> isoloom_spec::Spec {
+    load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name)).expect("example parses")
+}
+
+fn ids(targets: Vec<Target>) -> Vec<&'static str> {
+    targets.into_iter().map(Target::id).collect()
+}
+
+const ALL: [&str; 9] = [
+    "docker",
+    "hosted",
+    "docker-vm",
+    "cloud-docker",
+    "kubernetes",
+    "vagrant",
+    "proxmox",
+    "esxi",
+    "cloud-vm",
+];
+const VM_OR_HYBRID: [&str; 5] = ["hybrid", "vagrant", "proxmox", "esxi", "cloud-vm"];
+
+#[test]
+fn supplier_portal_runs_everywhere() {
+    let r = example("supplier-portal-api");
+    assert_eq!(validate(&r), vec![]);
+    assert_eq!(ids(derive(&r)), ALL);
+}
+
+#[test]
+fn pivot_dmz_runs_everywhere_and_the_access_machine_needs_no_container() {
+    let r = example("pivot-dmz");
+    assert_eq!(validate(&r), vec![]);
+    assert_eq!(ids(derive(&r)), ALL);
+}
+
+#[test]
+fn ad_range_is_vm_only_even_with_one_container_ready_machine() {
+    let r = example("corp-ad-basics");
+    assert_eq!(validate(&r), vec![]);
+    // web01 could be a container, but dc01 and ws01 can't: VMs, or hybrid with web01 a container.
+    assert_eq!(ids(derive(&r)), VM_OR_HYBRID);
+    let t = totals(&r);
+    // dc01 and the two workstations (`count: 2`) at 4 GB, web01 and the access machine at 1 GB.
+    assert_eq!((t.machines, t.memory_mb), (5, 4096 * 3 + 1024 * 2));
+}
+
+fn problems(yaml: &str) -> Vec<String> {
+    validate(&parse(yaml).expect("parses")).into_iter().map(|p| p.to_string()).collect()
+}
+
+const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n";
+
+#[test]
+fn asking_for_an_impossible_target_names_the_machines() {
+    let p = problems(&format!(
+        "{BASE}targets: [docker]\nmachines:\n  dc: {{ networks: {{ lab: 5 }}, ports: [{{ port: 389 }}], vm: {{ os: windows-server@2022, provision: [p.ps1] }} }}\n"
+    ));
+    assert_eq!(p, ["targets[0]: `docker` needs a `docker:` implementation on every machine; missing on: dc"]);
+}
+
+#[test]
+fn narrowing_targets_keeps_only_those() {
+    let r = parse(&format!("{BASE}targets: [docker, vagrant]\nmachines:\n  a: {{ networks: {{ lab: 5 }}, docker: {{ image: nginx }}, vm: {{ os: debian@12, provision: [p.sh] }} }}\n")).unwrap();
+    assert_eq!(ids(effective(&r)), ["docker", "vagrant"]);
+}
+
+#[test]
+fn addresses_and_networks_are_checked() {
+    let p = problems(
+        "version: 1\nname: t\nnetworks:\n  a: { cidr: 8.8.8.0/24 }\n  b: { cidr: 10.1.0.0/24 }\n  c: { cidr: 10.1.0.0/25 }\nmachines:\n  x: { networks: { b: 1 }, docker: { image: nginx } }\n  y: { networks: { b: 7, nope: 3 }, docker: { image: nginx } }\n  z: { networks: { b: 7 }, docker: { image: nginx } }\n",
+    );
+    assert!(p.iter().any(|m| m.starts_with("networks.a.cidr: use a private block")), "{p:?}");
+    assert!(p.iter().any(|m| m == "networks.c.cidr: overlaps network `b`"), "{p:?}");
+    assert!(p.iter().any(|m| m.starts_with("machines.x.networks.b: 1 isn't a usable address")), "{p:?}");
+    assert!(p.iter().any(|m| m == "machines.y.networks.nope: no network named `nope`"), "{p:?}");
+    assert!(p.iter().any(|m| m == "machines.z.networks.b: address .7 is already used by `y`"), "{p:?}");
+}
+
+#[test]
+fn dependencies_must_exist_have_services_and_not_loop() {
+    let p = problems(&format!(
+        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, ports: [{{ port: 1 }}], depends_on: [b], docker: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, ports: [{{ port: 2 }}], depends_on: [a], docker: {{ image: x }} }}\n  c: {{ networks: {{ lab: 7 }}, depends_on: [ghost], docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m == "machines: depends_on forms a cycle: a -> b -> a"), "{p:?}");
+    assert!(p.iter().any(|m| m == "machines.c.depends_on[0]: no machine named `ghost`"), "{p:?}");
+}
+
+#[test]
+fn inputs_reach_only_machines_that_declare_them() {
+    let p = problems(&format!(
+        "{BASE}inputs: [TOKEN]\nmachines:\n  a: {{ networks: {{ lab: 5 }}, inputs: [SECRET], docker: {{ image: x }} }}\n"
+    ));
+    assert_eq!(p, ["machines.a.inputs[0]: `SECRET` isn't declared in the spec's `inputs`"]);
+}
+
+#[test]
+fn unknown_fields_are_rejected() {
+    let e = parse(&format!(
+        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, flag: x, docker: {{ image: x }} }}\n"
+    ))
+    .unwrap_err()
+    .to_string();
+    assert!(e.contains("unknown field `flag`"), "{e}");
+}
+
+#[test]
+fn a_machine_needs_an_implementation_unless_it_is_the_access_machine() {
+    let p = problems(&format!(
+        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }} }}\n  u: {{ access: true, networks: {{ lab: 6 }} }}\n"
+    ));
+    assert!(
+        p.contains(&"machines.a: give the machine at least one implementation: `docker:` and/or `vm:` (or an `os:`, a VM of that OS)".to_string()),
+        "{p:?}"
+    );
+    assert!(!p.iter().any(|m| m.starts_with("machines.u")), "{p:?}");
+}
+
+#[test]
+fn spec_file_is_isoloom_yml_or_yaml_but_not_both() {
+    let dir = std::env::temp_dir().join(format!("isoloom-find-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    assert!(matches!(isoloom_spec::find(&dir), Err(isoloom_spec::LoadError::NotFound(_))));
+    std::fs::write(dir.join("isoloom.yaml"), "x").unwrap();
+    assert!(isoloom_spec::find(&dir).unwrap().ends_with("isoloom.yaml"));
+    std::fs::write(dir.join("isoloom.yml"), "x").unwrap();
+    assert!(matches!(isoloom_spec::find(&dir), Err(isoloom_spec::LoadError::Ambiguous(_))));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn the_last_address_is_reserved_for_the_router() {
+    let p = problems(&format!("{BASE}machines:\n  a: {{ networks: {{ lab: 254 }}, docker: {{ image: x }} }}\n"));
+    assert!(p.iter().any(|m| m.starts_with("machines.a.networks.lab: 254 isn't a usable address")), "{p:?}");
+}
+
+#[test]
+fn edge_firewall_validates() {
+    let r = example("edge-firewall");
+    assert_eq!(validate(&r), vec![]);
+    assert_eq!(ids(derive(&r)), ALL);
+}
+
+#[test]
+fn a_gateway_is_a_machine_on_the_network_at_the_gateway_address() {
+    let base = |nets: &str, fw: &str| {
+        format!(
+            "version: 1\nname: t\nnetworks:\n{nets}\nmachines:\n  fw: {{ networks: {fw}, docker: {{ image: a }} }}\n  web: {{ networks: {{ dmz: 10 }}, docker: {{ image: a }} }}\n"
+        )
+    };
+    let ok = base("  out: { cidr: 10.1.0.0/24 }\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }", "{ out: 2, dmz: 1 }");
+    assert_eq!(problems(&ok), Vec::<String>::new());
+
+    let unknown = base("  dmz: { cidr: 10.1.1.0/24, gateway: nope }", "{ dmz: 2 }");
+    assert!(
+        problems(&unknown)
+            .iter()
+            .any(|p| p.starts_with("networks.dmz.gateway: no machine named `nope`"))
+    );
+
+    let detached = base("  out: { cidr: 10.1.0.0/24 }\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }", "{ out: 2 }");
+    assert!(problems(&detached).iter().any(|p| p.contains("attach `fw` to `dmz` at the gateway address")));
+
+    let wrong_octet = base("  dmz: { cidr: 10.1.1.0/24, gateway: fw }", "{ dmz: 5 }");
+    assert!(problems(&wrong_octet).iter().any(|p| p.contains("takes the gateway address: use 1")));
+
+    // Only the gateway may take .1.
+    let squatter = "version: 1\nname: t\nnetworks:\n  a: { cidr: 10.1.0.0/24 }\nmachines:\n  m: { networks: { a: 1 }, docker: { image: a } }\n";
+    assert!(problems(squatter).iter().any(|p| p.contains("isn't a usable address")));
+}
+
+#[test]
+fn machines_behind_a_gateway_start_after_it() {
+    let looped = "version: 1\nname: t\nnetworks:\n  dmz: { cidr: 10.1.1.0/24, gateway: fw }\nmachines:\n  fw: { networks: { dmz: 1 }, depends_on: [web], docker: { image: a } }\n  web: { networks: { dmz: 10 }, ports: [{ port: 80 }], docker: { image: a } }\n";
+    assert!(problems(looped).iter().any(|p| p.contains("cycle: fw -> web -> fw")));
+}
+
+#[test]
+fn volumes_are_absolute_paths_named_in_kebab_case() {
+    let p = problems(&format!(
+        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, volumes: {{ data: /data, Bad: /x, rel: data/x, twice: /data/, spaced: \"/var/my data\", coloned: \"/var/a:b\" }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m.starts_with("machines.a.volumes.Bad: volume names are kebab-case")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("`data/x` isn't a safe absolute path")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("`/data/` is already a volume")), "{p:?}");
+    // Spaces and ':' corrupt the Docker short mount syntax and the provisioners' `mkdir -p`.
+    assert!(p.iter().any(|m| m.contains("`/var/my data` isn't a safe absolute path")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("`/var/a:b` isn't a safe absolute path")), "{p:?}");
+}
+
+#[test]
+fn names_leave_room_for_the_kubernetes_affixes() {
+    // The name becomes `isoloom-<name>` (namespace): 56 characters overflows the 63-char label.
+    let long = "a".repeat(56);
+    let p = problems(&format!(
+        "version: 1\nname: {long}\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  a: {{ networks: {{ lab: 5 }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m.contains("name: at most 55 characters")), "{p:?}");
+
+    // A 54-char machine name overflows `<name>-published`; a machine+volume pair overflows the claim.
+    let m54 = "m".repeat(54);
+    let v60 = "v".repeat(63);
+    let p = problems(&format!(
+        "{BASE}machines:\n  {m54}: {{ networks: {{ lab: 5 }}, docker: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, volumes: {{ {v60}: /data }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m.contains("at most 53 characters")), "{p:?}");
+    assert!(p.iter().any(|m| m.contains("at most 62 characters")), "{p:?}");
+    // A volume name that fits the claim but not its seed init container (`seed-<volume>`).
+    let v59 = "v".repeat(59);
+    let p = problems(&format!(
+        "{BASE}machines:\n  b: {{ networks: {{ lab: 6 }}, volumes: {{ {v59}: /data }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.iter().any(|m| m.contains("at most 58 characters")), "{p:?}");
+    let v58 = "v".repeat(58);
+    let p = problems(&format!(
+        "{BASE}machines:\n  b: {{ networks: {{ lab: 6 }}, volumes: {{ {v58}: /data }}, docker: {{ image: x }} }}\n"
+    ));
+    assert!(p.is_empty(), "{p:?}");
+}
+
+/// A container can be small (a Go service capped at 64 MB); a VM needs room to boot.
+#[test]
+fn the_size_floor_is_a_vms() {
+    let spec = |impls: &str| {
+        format!(
+            "version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  svc:\n    networks: {{ lan: 10 }}\n    resources: {{ cpus: 1, memory_mb: 64 }}\n{impls}"
+        )
+    };
+    assert_eq!(problems(&spec("    docker: { image: nginx }\n")), [] as [std::string::String; 0]);
+    let both = problems(&spec("    docker: { image: nginx }\n    vm: { os: debian@12, provision: [x.sh] }\n"));
+    assert!(both.iter().any(|p| p.contains("too small for a VM")), "{both:?}");
+    let tiny = problems(&spec("    docker: { image: nginx }\n").replace("memory_mb: 64", "memory_mb: 8"));
+    assert!(tiny.iter().any(|p| p.contains("at least 1 cpu and 16 MB")), "{tiny:?}");
+}
+
+/// Cloud-services variables take any value, and `{{ inputs.NAME }}` a declared launch-time input.
+#[test]
+fn cloud_vars_are_typed_and_can_take_inputs() {
+    let base = "version: 1\nname: t\ncloud:\n  provider: aws\n  terraform: tf\n";
+    let ok = parse(&format!(
+        "{base}  vars: {{ enabled: true, count: 3, ips: [\"10.0.0.1/32\"], cidr: \"{{{{ inputs.CLIENT_CIDR }}}}\" }}\ninputs: [CLIENT_CIDR]\n"
+    ))
+    .expect("parses");
+    let vars = &ok.cloud.as_ref().unwrap().vars;
+    assert_eq!(vars["enabled"], serde_json::json!(true));
+    assert_eq!(vars["ips"], serde_json::json!(["10.0.0.1/32"]));
+    assert_eq!(isoloom_spec::CloudServices::input_of(&vars["cidr"]), Some("CLIENT_CIDR"));
+    assert!(validate(&ok).is_empty(), "{:?}", validate(&ok));
+    // At any depth, inside a string too.
+    let nested = parse(&format!(
+        "{base}  vars: {{ allow: [\"{{{{ inputs.IP }}}}/32\", {{ v: \"{{{{inputs.NOPE}}}}\" }}] }}\ninputs: [IP]\n"
+    ))
+    .unwrap();
+    let allow = &nested.cloud.as_ref().unwrap().vars["allow"];
+    assert_eq!(isoloom_spec::CloudServices::inputs_in(allow), ["IP", "NOPE"]);
+    let filled = isoloom_spec::CloudServices::fill_inputs(allow, &mut |n| (n == "IP").then(|| "203.0.113.7".to_string()));
+    assert_eq!(filled, serde_json::json!(["203.0.113.7/32", { "v": "{{inputs.NOPE}}" }]));
+    assert!(validate(&nested).iter().any(|p| p.to_string().contains("`NOPE` isn't declared")));
+    // Other placeholders stay as written.
+    let other = serde_json::json!("{{ cloud.outputs.x }} and {{ inputs.IP }}");
+    assert_eq!(isoloom_spec::CloudServices::inputs_in(&other), ["IP"]);
+    let filled = isoloom_spec::CloudServices::fill_inputs(&other, &mut |_| Some("1".into()));
+    assert_eq!(filled, serde_json::json!("{{ cloud.outputs.x }} and 1"));
+    let undeclared = parse(&format!("{base}  vars: {{ cidr: \"{{{{ inputs.NOPE }}}}\" }}\n")).unwrap();
+    assert!(validate(&undeclared).iter().any(|p| p.to_string().contains("`NOPE` isn't declared")));
+}

@@ -42,3 +42,9 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
   - **Library:** `isoloom_targets::qemu_refusal` is gone (use `refusal_on(spec, Target::Vagrant, Some("qemu"))`), and so are `isoloom_spec::warnings` and `isoloom_spec::renamed`.
 - **The hand-written docs are gone until the Phase 7 rewrite** (the last versions are in git history before this phase): `docs/` getting-started, targets, secrets, storage, esxi, cloud-modules, json, registry, real-targets and stability; the ADRs (`docs/adr/`), the comparisons (`docs/comparisons/`), `rfcs/`, `ARCHITECTURE.md` and `CHANGELOG.md`. `docs/` keeps the generated `spec.md` and `events.schema.json`. CONTRIBUTING, SECURITY and CODE_OF_CONDUCT live in `.github/`.
 - **Stale pointers left on purpose for later units:** the lifecycle commands' `--json` help still names `docs/json.md`, the runtime's events doc comments too, and the disabled workflows and `scripts/real-targets/` name `docs/real-targets.md` and `CHANGELOG`; they go with the runtime and the xtask move.
+
+## Phase 1b: Isoloom's structure
+- **The repository layout:** the crates sit in groups under `crates/`: `core/` (`isoloom-spec`, `isoloom-plan`, `isoloom-render`, `isoloom-manifest`), `backends/` (`isoloom-compose`, `isoloom-kubernetes`, `isoloom-vagrant`, `isoloom-terraform`, `isoloom-ansible`), `tools/` (`isoloom-import`), `targets/` (`isoloom-targets`) and `cli/` (`isoloom`).
+- **The `isoloom-external` crate is now `isoloom-ansible`** (Rust: `isoloom_ansible::ExternalBackend`). The target it renders is still called `external`.
+- **`rust-toolchain.toml` pins Rust 1.99.0** with rustfmt, clippy and the Linux and Windows MSVC targets; rustup installs it on first use.
+- **Stale pointers left on purpose for the Phase 7 rewrite:** README's crate table still names `isoloom-external`, and `.github/CONTRIBUTING.md` still says `crates/*/src` and `crates/isoloom-spec/tests/code_size.rs`.

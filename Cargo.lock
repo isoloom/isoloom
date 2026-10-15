@@ -441,6 +441,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "isoloom-ansible"
+version = "0.10.1"
+dependencies = [
+ "isoloom-plan",
+ "isoloom-render",
+ "isoloom-spec",
+ "serde_json",
+]
+
+[[package]]
 name = "isoloom-compose"
 version = "0.10.1"
 dependencies = [
@@ -452,16 +462,6 @@ dependencies = [
  "isoloom-spec",
  "serde",
  "serde_yaml_ng",
-]
-
-[[package]]
-name = "isoloom-external"
-version = "0.10.1"
-dependencies = [
- "isoloom-plan",
- "isoloom-render",
- "isoloom-spec",
- "serde_json",
 ]
 
 [[package]]
@@ -562,8 +562,8 @@ name = "isoloom-targets"
 version = "0.10.1"
 dependencies = [
  "indexmap",
+ "isoloom-ansible",
  "isoloom-compose",
- "isoloom-external",
  "isoloom-import",
  "isoloom-kubernetes",
  "isoloom-manifest",
