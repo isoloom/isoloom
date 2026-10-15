@@ -1,6 +1,7 @@
 //! Isoloom's Kubernetes backend: the environment's containers on a Kubernetes cluster, in
 //! `.isoloom/kubernetes/` (plain manifests, applied through kustomize so the project's scripts
-//! travel as a `ConfigMap`), and a Helm chart of the same objects, written from typed objects.
+//! travel as a `ConfigMap`, read from the chart's copies), and a Helm chart of the same objects,
+//! written from typed objects.
 //!
 //! - A namespace per environment; each machine a Deployment (one replica) with its hostname,
 //!   and a Service named after it when it serves, so names resolve as on every other target.

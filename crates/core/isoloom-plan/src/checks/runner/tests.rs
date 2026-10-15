@@ -2,7 +2,7 @@ use isoloom_spec::probe::Url;
 use proptest::prelude::*;
 
 use super::super::{HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect};
-use super::{Host, Line, Render, parse_line, script};
+use super::{Host, Line, Render, looks_expanded, parse_line, script, single_quoted, with_directives};
 
 /// Text a tool may print before a runner's line: anything without the runner's marker.
 fn prefix() -> impl Strategy<Value = String> {
@@ -38,10 +38,44 @@ proptest! {
     }
 
     #[test]
+    fn a_quoted_text_is_read_back_whole(text in "\\PC{0,30}") {
+        prop_assert_eq!(single_quoted(&isoloom_spec::shell::quote(&text)).join("'"), text);
+    }
+
+    #[test]
     fn any_line_reads_without_a_panic(line in "\\PC{0,60}") {
         let _line = parse_line(&line);
     }
 }
+
+#[test]
+fn single_quoted_parts_are_read_as_sh_reads_them() {
+    let exec = r"_exec 'sh -c '\''echo $x'\''' 'ok'";
+    assert_eq!(single_quoted(exec), ["sh -c ", "echo $x", "", "ok"]);
+    assert_eq!(single_quoted(r#"fail 'n' "it's $out" \'$y"#), ["n"], "double quotes and escapes hold none");
+    assert_eq!(single_quoted("echo 'unclosed $x"), ["unclosed $x"]);
+}
+
+#[test]
+fn what_shellcheck_reads_as_an_expansion_is_found() {
+    for text in ["$x", "a ${b}", "$(c)", "$1", "`d`", "x``y`z`"] {
+        assert!(looks_expanded(text), "{text}");
+    }
+    for text in ["%s", "$", "a $ b", "``", "one ` only", "$-x"] {
+        assert!(!looks_expanded(text), "{text}");
+    }
+}
+
+#[test]
+fn a_line_quoting_an_expansion_gets_its_directive_and_others_none() {
+    let lines = "if _retry 0 _exec 'echo $HOME' ''; then pass 'n'; fi\n  pass 'plain'\n";
+    assert_eq!(with_directives(lines), format!("{DIRECTIVE}{lines}"));
+    let indented = with_directives("  pass '`id`'\n");
+    assert_eq!(indented, format!("  {DIRECTIVE}  pass '`id`'\n"));
+}
+
+/// The line before a check that single-quotes what looks like an expansion.
+const DIRECTIVE: &str = "# shellcheck disable=SC2016 # the check's own text, quoted as written\n";
 
 #[test]
 fn a_fail_line_without_a_reason_has_an_empty_one() {
@@ -186,9 +220,11 @@ fn a_runner_with_every_kind_of_check_is_valid_sh() {
 #[test]
 fn an_http_check_compares_the_status_says_what_came_and_follows_when_asked() {
     let plain = lines(check("site", 30, http("http://web/a$b", HttpExpect::Status(200), HttpRequest::default())));
+    // `$b` single-quoted reads as an expansion to shellcheck: the line says it is meant.
     assert_eq!(
         plain,
-        "if _retry 30 _http_is 'http://web/a$b' 200; then pass 'site'; else fail 'site' \"expected HTTP 200 from http://web/a\\$b, got $(_http 'http://web/a$b')\"; fi\n"
+        DIRECTIVE.to_owned()
+            + "if _retry 30 _http_is 'http://web/a$b' 200; then pass 'site'; else fail 'site' \"expected HTTP 200 from http://web/a\\$b, got $(_http 'http://web/a$b')\"; fi\n"
     );
     let follow = HttpRequest {
         follow: true,

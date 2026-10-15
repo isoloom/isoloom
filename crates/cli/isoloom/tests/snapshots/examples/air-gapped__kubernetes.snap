@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ kubernetes
@@ -53,6 +54,7 @@ _http() {
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $U, for its /dev/tcp
     c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
   fi
   echo "${c:-000}"
@@ -74,7 +76,9 @@ _http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
-  else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H and $P, for its /dev/tcp
+    H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
 }
 # _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
@@ -85,12 +89,13 @@ _tcp_read() {
   if command -v nc >/dev/null 2>&1; then
     { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
   else
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $L, for its /dev/tcp
     H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
   fi
   p=$!
   while :; do
     if grep -qF -- "$4" "$f"; then r=0; break; fi
-    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    if [ $i -ge 5 ] || ! kill -0 $p 2>/dev/null; then break; fi
     sleep 1; i=$((i+1))
   done
   [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
@@ -139,6 +144,7 @@ _http() {
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $U, for its /dev/tcp
     c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
   fi
   echo "${c:-000}"
@@ -160,7 +166,9 @@ _http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
-  else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H and $P, for its /dev/tcp
+    H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
 }
 # _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
@@ -171,12 +179,13 @@ _tcp_read() {
   if command -v nc >/dev/null 2>&1; then
     { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
   else
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $L, for its /dev/tcp
     H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
   fi
   p=$!
   while :; do
     if grep -qF -- "$4" "$f"; then r=0; break; fi
-    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    if [ $i -ge 5 ] || ! kill -0 $p 2>/dev/null; then break; fi
     sleep 1; i=$((i+1))
   done
   [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
@@ -591,6 +600,7 @@ _http() {
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $U, for its /dev/tcp
     c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
   fi
   echo "${c:-000}"
@@ -612,7 +622,9 @@ _http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
-  else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H and $P, for its /dev/tcp
+    H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
 }
 # _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
@@ -623,12 +635,13 @@ _tcp_read() {
   if command -v nc >/dev/null 2>&1; then
     { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
   else
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $L, for its /dev/tcp
     H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
   fi
   p=$!
   while :; do
     if grep -qF -- "$4" "$f"; then r=0; break; fi
-    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    if [ $i -ge 5 ] || ! kill -0 $p 2>/dev/null; then break; fi
     sleep 1; i=$((i+1))
   done
   [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
@@ -661,7 +674,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
 # The environment's checks, one Job per position. Run after the environment (or `isoloom test kubernetes`):
 #   kubectl -n isoloom-air-gapped delete job isoloom-check-store isoloom-check-app --ignore-not-found
-#   kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes/checks | kubectl apply -f -
+#   kubectl apply -k .isoloom/kubernetes/checks
 #   kubectl -n isoloom-air-gapped wait --for=condition=complete job --all --timeout=300s; kubectl -n isoloom-air-gapped logs -l isoloom.com/check
 apiVersion: batch/v1
 kind: Job
@@ -756,6 +769,7 @@ _http() {
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $U, for its /dev/tcp
     c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
   fi
   echo "${c:-000}"
@@ -777,7 +791,9 @@ _http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
-  else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H and $P, for its /dev/tcp
+    H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
 }
 # _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
@@ -788,12 +804,13 @@ _tcp_read() {
   if command -v nc >/dev/null 2>&1; then
     { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
   else
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $L, for its /dev/tcp
     H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
   fi
   p=$!
   while :; do
     if grep -qF -- "$4" "$f"; then r=0; break; fi
-    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    if [ $i -ge 5 ] || ! kill -0 $p 2>/dev/null; then break; fi
     sleep 1; i=$((i+1))
   done
   [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
@@ -824,7 +841,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 ## .isoloom/kubernetes/environment.yaml
 # Generated by isoloom from isoloom.yml. Don't edit: change isoloom.yml and run
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
-# Start:  kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -
+# Start:  kubectl apply -k .isoloom/kubernetes
 #         kubectl -n isoloom-air-gapped wait --for=condition=Available deployment --all --timeout=600s
 # Stop:   kubectl delete namespace isoloom-air-gapped
 

@@ -271,7 +271,7 @@ fn the_windows_extractor_unpacks_the_archive() -> Outcome {
         .status()
         .unwrap();
     assert!(st.success());
-    let ps1 = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core/isoloom-render/src/untar.ps1");
+    let ps1 = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core/isoloom-render/src/powershell/untar.ps1");
     for (name, strip) in [("ruby", 0), ("host", 1)] {
         let dest = dir.join(format!("{name}-out"));
         let script = format!(

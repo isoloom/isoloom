@@ -37,7 +37,7 @@ fn terraform_runs_on_a_copy_of_the_module() -> Outcome {
     for f in ["up.sh", "down.sh", "outputs.sh"] {
         let text = script(&s, f)?;
         assert!(
-            text.contains("[ ! -f \"$here/isoloom-instance\" ] || export TF_VAR_isoloom_instance=\"$(cat \"$here/isoloom-instance\")\"\n"),
+            text.contains("  TF_VAR_isoloom_instance=\"$(cat \"$here/isoloom-instance\")\"\n  export TF_VAR_isoloom_instance\n"),
             "{f}: {text}"
         );
     }

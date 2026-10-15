@@ -1,10 +1,11 @@
 //! The kustomizations: the environment's (its manifests, and the project's scripts as a
-//! `ConfigMap` read from the project at apply time) and the checks' (their runners). Typed, so
-//! the command line reads back which project files the chart copies ([`project_scripts`]).
+//! `ConfigMap` read from the chart's copies, inside the kustomization's folder) and the checks'
+//! (their runners). Typed, so the command line reads back which project files to copy
+//! ([`project_scripts`]).
 
 use serde::{Deserialize, Serialize};
 
-use crate::layout::ROOT;
+use crate::layout::PROJECT_COPIES;
 
 /// A `kustomization.yaml`, the fields Isoloom writes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,22 +78,20 @@ pub(crate) fn key(path: &str) -> String {
 }
 
 /// The environment's kustomization: its manifests, and the project's `scripts` (paths from the
-/// project folder) as the [`SCRIPTS`] `ConfigMap`.
+/// project folder) as the [`SCRIPTS`] `ConfigMap`, read from their copies in [`PROJECT_COPIES`].
 pub(crate) fn environment(namespace: &str, scripts: &[String]) -> Kustomization {
-    let files = scripts.iter().map(|f| format!("{}={ROOT}/{f}", key(f))).collect();
+    let files = scripts.iter().map(|f| format!("{}={PROJECT_COPIES}/{f}", key(f))).collect();
     Kustomization::new(namespace, "environment.yaml", SCRIPTS, files)
 }
 
-/// The project's scripts an environment's kustomization reads, as (`ConfigMap` key, path from the
-/// project folder).
-pub(crate) fn project_scripts(kustomization: &str) -> Result<Vec<(String, String)>, serde_yaml_ng::Error> {
+/// The project's scripts an environment's kustomization reads, as paths from the project folder.
+pub(crate) fn project_scripts(kustomization: &str) -> Result<Vec<String>, serde_yaml_ng::Error> {
     let k: Kustomization = serde_yaml_ng::from_str(kustomization)?;
     let files = k.config_map_generator.into_iter().filter(|g| g.name == SCRIPTS).flat_map(|g| g.files);
     Ok(files
         .filter_map(|f| {
-            let (key, path) = f.split_once('=')?;
-            let path = path.strip_prefix(ROOT)?.strip_prefix('/')?;
-            Some((key.to_owned(), path.to_owned()))
+            let (_, copy) = f.split_once('=')?;
+            Some(copy.strip_prefix(PROJECT_COPIES)?.strip_prefix('/')?.to_owned())
         })
         .collect())
 }
@@ -102,18 +101,23 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
+    use crate::layout::{CHART, CHART_PROJECT_FILES};
 
     #[test]
     fn the_scripts_read_back_are_those_written() {
         let scripts = vec!["build/cache/seed.sh".to_owned(), "checks/up.sh".to_owned()];
         let text = serde_yaml_ng::to_string(&environment("isoloom-x", &scripts)).unwrap();
+        assert_eq!(project_scripts(&text).unwrap(), scripts);
+    }
+
+    #[test]
+    fn the_scripts_are_read_from_inside_the_kustomization_folder() {
+        let k = environment("isoloom-x", &["build/cache/seed.sh".to_owned()]);
         assert_eq!(
-            project_scripts(&text).unwrap(),
-            [
-                ("build__cache__seed.sh".to_owned(), "build/cache/seed.sh".to_owned()),
-                ("checks__up.sh".to_owned(), "checks/up.sh".to_owned())
-            ]
+            k.config_map_generator[0].files,
+            ["build__cache__seed.sh=chart/files/project/build/cache/seed.sh"]
         );
+        assert_eq!(PROJECT_COPIES, format!("{CHART}/{CHART_PROJECT_FILES}"), "where the chart has them");
     }
 
     #[test]
@@ -121,15 +125,14 @@ mod tests {
         let k = environment("isoloom-x", &[]);
         assert!(k.generator_options.is_none() && k.config_map_generator.is_empty());
         let text = serde_yaml_ng::to_string(&k).unwrap();
-        assert_eq!(project_scripts(&text).unwrap(), Vec::<(String, String)>::new());
+        assert_eq!(project_scripts(&text).unwrap(), Vec::<String>::new());
     }
 
     proptest! {
         #[test]
         fn any_scripts_read_back_are_those_written(scripts in prop::collection::vec("[a-z0-9_.-]{1,8}(/[a-z0-9_.-]{1,8}){0,2}", 0..4)) {
             let text = serde_yaml_ng::to_string(&environment("isoloom-x", &scripts)).expect("writes");
-            let expected: Vec<(String, String)> = scripts.iter().map(|s| (key(s), s.clone())).collect();
-            prop_assert_eq!(project_scripts(&text).expect("reads"), expected);
+            prop_assert_eq!(project_scripts(&text).expect("reads"), scripts);
         }
     }
 }

@@ -145,7 +145,9 @@ fn the_controller_retries_unreachable_hosts_from_the_retry_file() -> Outcome {
             text.contains("export ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry"),
             "{path}"
         );
-        assert!(text.contains("--limit @$_isoloom_retry"), "{path}");
+        // Added to the command's arguments once (HCL escapes its quotes).
+        let limit = "set -- \"$@\" --limit \"@$_isoloom_retry\"";
+        assert!(text.replace("\\\"", "\"").contains(limit), "{path}");
         assert!(text.contains("run_play ansible-playbook -i /etc/isoloom/inventory.ini"), "{path}");
     }
     Ok(())

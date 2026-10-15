@@ -12,11 +12,13 @@ use isoloom_spec::shell;
 const COPY: &str = "mkdir -p \"$module\"\nfind \"$module\" -type f \\( -name '*.tf' -o -name '*.tf.json' -o -name '*.tfvars' -o -name '*.tfvars.json' \\) -exec rm -f {} +\ntar -C \"$src\" -cf - --exclude=.terraform --exclude='*.tfstate' --exclude='*.tfstate.*' . | tar -C \"$module\" -xf -\n";
 
 /// A `before` step, from the copy: as itself when executable (its shebang), else with `sh`.
-const STEP: &str = "export ISOLOOM_PROJECT=\"$(cd ../.. && pwd)\"\nstep() { echo \"isoloom: before: $1\" >&2; if [ -x \"$ISOLOOM_PROJECT/$1\" ]; then (cd \"$module\" && \"$ISOLOOM_PROJECT/$1\"); else (cd \"$module\" && sh \"$ISOLOOM_PROJECT/$1\"); fi; }\n";
+const STEP: &str = "ISOLOOM_PROJECT=\"$(cd ../.. && pwd)\"\nexport ISOLOOM_PROJECT\nstep() { echo \"isoloom: before: $1\" >&2; if [ -x \"$ISOLOOM_PROJECT/$1\" ]; then (cd \"$module\" && \"$ISOLOOM_PROJECT/$1\"); else (cd \"$module\" && sh \"$ISOLOOM_PROJECT/$1\"); fi; }\n";
 
 /// The name of this deployment (`isoloom run` writes it): the module can tag what it creates
-/// with it (`var.isoloom_instance`), so `down` lists what is left with that tag.
-const TAG: &str = "[ ! -f \"$here/isoloom-instance\" ] || export TF_VAR_isoloom_instance=\"$(cat \"$here/isoloom-instance\")\"\n";
+/// with it (`var.isoloom_instance`), so `down` lists what is left with that tag. Assigned, then
+/// exported: `export X="$(cat …)"` would hide a failing `cat` from `set -e`.
+const TAG: &str =
+    "if [ -f \"$here/isoloom-instance\" ]; then\n  TF_VAR_isoloom_instance=\"$(cat \"$here/isoloom-instance\")\"\n  export TF_VAR_isoloom_instance\nfi\n";
 
 /// While it applies, `deploying` holds the script's process id (`isoloom status` reads it).
 pub(crate) const MARKER: &str = "echo $$ > \"$here/deploying\"\ntrap 'rm -f \"$here/deploying\"' EXIT\n";

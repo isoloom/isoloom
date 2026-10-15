@@ -108,7 +108,7 @@ impl fmt::Display for Usage<'_> {
         let (env, ns) = (self.env, self.namespace);
         writeln!(
             f,
-            "# Start:  kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -\n#         kubectl -n {ns} wait --for=condition=Available deployment --all --timeout=600s\n# Stop:   kubectl delete namespace {ns}"
+            "# Start:  kubectl apply -k .isoloom/kubernetes\n#         kubectl -n {ns} wait --for=condition=Available deployment --all --timeout=600s\n# Stop:   kubectl delete namespace {ns}"
         )?;
         let builds: Vec<String> = Machine::all(env).iter().filter_map(Machine::build_command).collect();
         if !builds.is_empty() {
@@ -136,7 +136,7 @@ impl fmt::Display for Usage<'_> {
 fn kustomization(r: &Rendered) -> Result<String> {
     let mut out = generated();
     if !r.scripts.is_empty() {
-        out.push_str("# The project's scripts the pods run (init jobs, checks), read from the project at apply time.\n");
+        out.push_str("# The project's scripts the pods run (init jobs, checks), from the chart's copies (`isoloom generate` writes them).\n");
     }
     out.push_str(&document(&kustomize::environment(&r.namespace, &r.scripts))?);
     Ok(out)

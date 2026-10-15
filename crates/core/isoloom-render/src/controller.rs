@@ -73,7 +73,7 @@ fn vars(step: &Provision) -> String {
 /// slow and the environment's playbooks re-run across many imported plays), a fan-out across
 /// hosts (the default 5 forks are too few for a multi-DC range), SSH steps pipelined (a no-op
 /// over WinRM).
-const ENVIRONMENT: &str = "export PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False \
+const ENVIRONMENT: &str = "export PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False \
 ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
 ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200";
 
@@ -177,14 +177,14 @@ run_play() {
   _isoloom_n=1
   rm -f "$_isoloom_retry"
   while :; do
-    { "$@" $_isoloom_limit && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
+    { "$@" && echo 0 > "$_isoloom_rcf" || echo $? > "$_isoloom_rcf"; } 2>&1 | tee "$_isoloom_log"
     _isoloom_rc=$(cat "$_isoloom_rcf")
     [ "$_isoloom_rc" -ne 0 ] || break
     _isoloom_hosts=$(play_hosts "$_isoloom_log")
     _isoloom_real=$(_isoloom_kind "$_isoloom_hosts" real)
     _isoloom_gone=$(_isoloom_kind "$_isoloom_hosts" unreachable)
     _isoloom_cut=$(_isoloom_kind "$_isoloom_hosts" cut)
-    _isoloom_again=$(echo $_isoloom_gone $_isoloom_cut)
+    _isoloom_again="$_isoloom_gone${_isoloom_gone:+${_isoloom_cut:+ }}$_isoloom_cut"
     if [ -n "$_isoloom_real" ]; then
       echo "isoloom: $_isoloom_name: a task failed on $_isoloom_real: not retried"
       break
@@ -197,8 +197,8 @@ run_play() {
       echo "isoloom: $_isoloom_name: still unreachable after $_isoloom_n runs: $_isoloom_again; giving up"
       break
     fi
-    printf '%s\n' $_isoloom_again > "$_isoloom_retry"
-    _isoloom_limit="--limit @$_isoloom_retry"
+    echo "$_isoloom_again" | tr ' ' '\n' > "$_isoloom_retry"
+    if [ -z "$_isoloom_limit" ]; then set -- "$@" --limit "@$_isoloom_retry"; _isoloom_limit=1; fi
     _isoloom_n=$((_isoloom_n + 1))
     if [ -n "$_isoloom_gone" ]; then
       _isoloom_wait=$((4 * _isoloom_pause))

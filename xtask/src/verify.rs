@@ -22,6 +22,10 @@
 //! filled it. `VERIFY_JOBS` and `VERIFY_TERRAFORM_JOBS` go to the runner; `ISOLOOM` to
 //! generate-all.
 //!
+//! The container may use `ISOLOOM_VERIFY_CPUS` CPUs (`docker run --cpus`, default 4), so a run
+//! leaves a shared machine the rest, and its runner checks as many files at once
+//! (`VERIFY_JOBS`, when unset).
+//!
 //! Exit status: 0 when every failure is in the baseline, 1 when some aren't, 2 when the run
 //! itself failed.
 
@@ -160,20 +164,16 @@ fn run_image(image: &str, tree: &Path, root: &Path, out: &Path, update: bool) ->
     input.into_inner()?;
     let id = process::output(Command::new("docker").args(["image", "inspect", "-f", "{{.Id}}", image]))?;
     let cache = std::env::var("VERIFY_CACHE").unwrap_or_else(|_| "isoloom-verify-cache".into());
-    let script = "set -u; mkdir -p /work /out; tar -xf - -C /work --no-same-owner --warning=no-unknown-keyword || exit 2; code=0; \
-                  python3 /work/verify/runner --tree /work/tree --out /out --baseline /work/verify/baseline.json $1 >&2 || code=$?; \
-                  tar -cf - -C /out .; exit $code";
+    let jobs = std::env::var("VERIFY_JOBS").ok();
+    let container = Container {
+        image,
+        id: id.trim(),
+        cache: &cache,
+        cpus: cpus(std::env::var("ISOLOOM_VERIFY_CPUS").ok().as_deref())?,
+        jobs: jobs.as_deref(),
+    };
     let mut docker = Command::new("docker");
-    docker.args(["run", "--rm", "-i", "--platform", "linux/amd64", "-v", &format!("{cache}:/cache")]);
-    docker.args([
-        "-e",
-        "VERIFY_JOBS",
-        "-e",
-        "VERIFY_TERRAFORM_JOBS",
-        "-e",
-        &format!("VERIFY_IMAGE={image} {}", id.trim()),
-    ]);
-    docker.args([image, "sh", "-c", script, "verify", if update { "--update" } else { "" }]);
+    docker.args(run_args(&container, update));
     docker.stdin(File::open(work.join("in.tar"))?).stdout(File::create(work.join("out.tar"))?);
     let status = docker.status()?;
     // What the runner wrote comes back whole or not at all: no summary is the failure `finish`
@@ -182,6 +182,59 @@ fn run_image(image: &str, tree: &Path, root: &Path, out: &Path, update: bool) ->
         tar::Archive::new(results).unpack(out).ok();
     }
     Ok(status.code().unwrap_or(2))
+}
+
+/// The CPUs the container may use when `ISOLOOM_VERIFY_CPUS` doesn't say: enough for the
+/// validators to run side by side, while a shared machine keeps the rest.
+const DEFAULT_CPUS: u16 = 4;
+
+/// The CPUs the container may use: `setting` (`ISOLOOM_VERIFY_CPUS`), a whole number from 1, or
+/// [`DEFAULT_CPUS`] when it is unset or blank.
+fn cpus(setting: Option<&str>) -> Res<u16> {
+    match setting.map(str::trim) {
+        None | Some("") => Ok(DEFAULT_CPUS),
+        Some(s) => s
+            .parse::<u16>()
+            .ok()
+            .filter(|n| *n > 0)
+            .ok_or_else(|| format!("ISOLOOM_VERIFY_CPUS is `{s}`: give a whole number of CPUs, from 1").into()),
+    }
+}
+
+/// How the validators' container runs.
+struct Container<'a> {
+    /// The image, by its tag.
+    image: &'a str,
+    /// The image's id, which the baseline records.
+    id: &'a str,
+    /// The named volume holding the tools' caches.
+    cache: &'a str,
+    /// The CPUs it may use (`docker run --cpus`).
+    cpus: u16,
+    /// The runner's validators at once: `VERIFY_JOBS` as set, else one per CPU.
+    jobs: Option<&'a str>,
+}
+
+/// `docker run`'s arguments: the container capped at its CPUs, its runner told as many jobs
+/// (unless `VERIFY_JOBS` says otherwise: the container sees every CPU of the machine), the tree
+/// on its standard input and the results on its standard output.
+fn run_args(c: &Container, update: bool) -> Vec<String> {
+    let script = "set -u; mkdir -p /work /out; tar -xf - -C /work --no-same-owner --warning=no-unknown-keyword || exit 2; code=0; \
+                  python3 /work/verify/runner --tree /work/tree --out /out --baseline /work/verify/baseline.json $1 >&2 || code=$?; \
+                  tar -cf - -C /out .; exit $code";
+    let jobs = c.jobs.map_or_else(|| c.cpus.to_string(), ToOwned::to_owned);
+    let mut args: Vec<String> = ["run", "--rm", "-i", "--platform", "linux/amd64", "--cpus"].map(String::from).into();
+    args.push(c.cpus.to_string());
+    args.extend(["-v".to_owned(), format!("{}:/cache", c.cache)]);
+    for env in [
+        format!("VERIFY_JOBS={jobs}"),
+        "VERIFY_TERRAFORM_JOBS".to_owned(),
+        format!("VERIFY_IMAGE={} {}", c.image, c.id),
+    ] {
+        args.extend(["-e".to_owned(), env]);
+    }
+    args.extend([c.image, "sh", "-c", script, "verify", if update { "--update" } else { "" }].map(String::from));
+    args
 }
 
 /// Prints the summary, updates the baseline when asked, and turns the runner's status into ours.
@@ -203,6 +256,52 @@ fn finish(out: &Path, root: &Path, update: bool, status: i32) -> Res<ExitCode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn container(jobs: Option<&str>) -> Vec<String> {
+        let c = Container {
+            image: "isoloom-verify:1",
+            id: "sha256:ab",
+            cache: "the-cache",
+            cpus: 4,
+            jobs,
+        };
+        run_args(&c, false)
+    }
+
+    /// Whether `args` holds `flag` followed by `value`.
+    fn has(args: &[String], flag: &str, value: &str) -> bool {
+        args.windows(2).any(|w| w[0] == flag && w[1] == value)
+    }
+
+    #[test]
+    fn the_container_is_capped_at_its_cpus_and_runs_as_many_jobs() {
+        let args = container(None);
+        assert!(has(&args, "--cpus", "4"), "{args:?}");
+        assert!(has(&args, "-e", "VERIFY_JOBS=4"), "{args:?}");
+        assert!(has(&args, "-e", "VERIFY_TERRAFORM_JOBS"), "passed through: {args:?}");
+        assert!(has(&args, "-v", "the-cache:/cache"), "{args:?}");
+        assert!(has(&args, "-e", "VERIFY_IMAGE=isoloom-verify:1 sha256:ab"), "{args:?}");
+        let image = args.iter().position(|a| a == "isoloom-verify:1").unwrap();
+        assert!(args.iter().position(|a| a == "--cpus").unwrap() < image, "an option of docker run");
+        assert_eq!(args.last().map(String::as_str), Some(""), "no --update");
+    }
+
+    #[test]
+    fn verify_jobs_as_set_wins_over_the_cpus() {
+        let args = container(Some("2"));
+        assert!(has(&args, "-e", "VERIFY_JOBS=2") && has(&args, "--cpus", "4"), "{args:?}");
+    }
+
+    #[test]
+    fn the_cpus_are_a_whole_number_from_one_four_by_default() {
+        assert_eq!(cpus(None).unwrap(), 4);
+        assert_eq!(cpus(Some(" ")).unwrap(), 4);
+        assert_eq!(cpus(Some("8")).unwrap(), 8);
+        for wrong in ["0", "1.5", "-2", "all"] {
+            let e = cpus(Some(wrong)).unwrap_err().to_string();
+            assert!(e.contains(&format!("`{wrong}`")), "{e}");
+        }
+    }
 
     #[test]
     fn cksum_is_posix_cksum() {

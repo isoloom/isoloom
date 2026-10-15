@@ -117,7 +117,7 @@ fn with_image_values(object: &Manifest) -> Manifest {
 /// The project's scripts, from the chart's copies (a missing one fails the install, naming it).
 fn scripts(scripts: &[String]) -> Result<String> {
     let data = scripts.iter().map(|f| {
-        let path = format!("{CHART_PROJECT_FILES}/{}", key(f));
+        let path = format!("{CHART_PROJECT_FILES}/{f}");
         let missing = go_string(&format!("{path} is missing: run isoloom generate"));
         (key(f), Text::Helm(format!("required {missing} (.Files.Get {}) | b64enc", go_string(&path))))
     });

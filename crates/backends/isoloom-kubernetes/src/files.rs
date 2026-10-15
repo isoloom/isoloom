@@ -4,8 +4,8 @@
 //! `emptyDir` at its path (`subPath`), leaving the rest of the folder as the image has it.
 //!
 //! The text written in the spec is the machine's own `ConfigMap` (`<machine>-files`, key
-//! `file-<n>`); a project file comes from the project's `ConfigMap` (the scripts', read from the
-//! project at apply time, copied into the chart).
+//! `file-<n>`); a project file comes from the project's `ConfigMap` (the scripts', read from
+//! their copies in the chart).
 
 use indexmap::IndexMap;
 use isoloom_render::container::PROBE_IMAGE;

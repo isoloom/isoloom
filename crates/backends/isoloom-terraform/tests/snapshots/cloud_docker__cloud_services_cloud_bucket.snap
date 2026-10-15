@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom-terraform/tests/cloud_docker.rs
+source: crates/backends/isoloom-terraform/tests/cloud_docker.rs
+assertion_line: 71
 expression: all
 ---
 ==> .isoloom/cloud-services/terraform.tfvars.json
@@ -16,7 +17,10 @@ set -eu
 cd "$(dirname "$0")"
 here="$(pwd)"
 export TF_DATA_DIR="$here/.terraform"
-[ ! -f "$here/isoloom-instance" ] || export TF_VAR_isoloom_instance="$(cat "$here/isoloom-instance")"
+if [ -f "$here/isoloom-instance" ]; then
+  TF_VAR_isoloom_instance="$(cat "$here/isoloom-instance")"
+  export TF_VAR_isoloom_instance
+fi
 src='../../terraform'
 module="$here/module"
 echo $$ > "$here/deploying"
@@ -38,7 +42,10 @@ set -eu
 cd "$(dirname "$0")"
 here="$(pwd)"
 export TF_DATA_DIR="$here/.terraform"
-[ ! -f "$here/isoloom-instance" ] || export TF_VAR_isoloom_instance="$(cat "$here/isoloom-instance")"
+if [ -f "$here/isoloom-instance" ]; then
+  TF_VAR_isoloom_instance="$(cat "$here/isoloom-instance")"
+  export TF_VAR_isoloom_instance
+fi
 src='../../terraform'
 module="$here/module"
 if [ ! -d "$module" ]; then
@@ -60,7 +67,10 @@ set -eu
 cd "$(dirname "$0")"
 here="$(pwd)"
 export TF_DATA_DIR="$here/.terraform"
-[ ! -f "$here/isoloom-instance" ] || export TF_VAR_isoloom_instance="$(cat "$here/isoloom-instance")"
+if [ -f "$here/isoloom-instance" ]; then
+  TF_VAR_isoloom_instance="$(cat "$here/isoloom-instance")"
+  export TF_VAR_isoloom_instance
+fi
 src='../../terraform'
 module="$here/module"
 [ -d "$module" ] || module="$src"

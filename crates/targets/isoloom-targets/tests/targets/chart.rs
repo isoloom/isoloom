@@ -51,7 +51,8 @@ fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() -> Outcome {
     let scripts = file(&files, "chart/templates/scripts.yaml")?;
     assert!(scripts.contains("build__cache__seed.sh: '{{ required"), "{scripts}");
     let copies = project_copies(&files, &dir).unwrap();
-    let seed = copies.iter().find(|f| f.path.ends_with("chart/files/project/build__cache__seed.sh")).unwrap();
+    // At its path in the project, where the kustomization reads it too.
+    let seed = copies.iter().find(|f| f.path.ends_with("chart/files/project/build/cache/seed.sh")).unwrap();
     assert_eq!(seed.contents, std::fs::read_to_string(dir.join("build/cache/seed.sh")).unwrap());
     assert_eq!(copies.len(), 2, "the init job and the check script");
 
@@ -63,7 +64,9 @@ fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() -> Outcome {
 #[test]
 fn a_missing_script_is_left_to_validate() -> Outcome {
     let (dir, files) = kubernetes("pivot-dmz")?;
-    assert!(project_copies(&files, &dir).unwrap().is_empty(), "its scripts aren't part of the example");
+    assert_eq!(project_copies(&files, &dir).unwrap().len(), 2, "its two check scripts");
+    let elsewhere = dir.join("a folder without the scripts");
+    assert_eq!(project_copies(&files, &elsewhere).unwrap().len(), 0, "the scripts it lacks are left out");
     Ok(())
 }
 

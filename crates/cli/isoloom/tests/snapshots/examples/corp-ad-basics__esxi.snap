@@ -31,6 +31,7 @@ _http() {
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $U, for its /dev/tcp
     c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
   fi
   echo "${c:-000}"
@@ -52,7 +53,9 @@ _http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
-  else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H and $P, for its /dev/tcp
+    H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
 }
 # _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
@@ -63,12 +66,13 @@ _tcp_read() {
   if command -v nc >/dev/null 2>&1; then
     { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
   else
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $L, for its /dev/tcp
     H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
   fi
   p=$!
   while :; do
     if grep -qF -- "$4" "$f"; then r=0; break; fi
-    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    if [ $i -ge 5 ] || ! kill -0 $p 2>/dev/null; then break; fi
     sleep 1; i=$((i+1))
   done
   [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
@@ -135,6 +139,7 @@ _http() {
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $U, for its /dev/tcp
     c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
   fi
   echo "${c:-000}"
@@ -156,7 +161,9 @@ _http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
-  else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H and $P, for its /dev/tcp
+    H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
 }
 # _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
@@ -167,12 +174,13 @@ _tcp_read() {
   if command -v nc >/dev/null 2>&1; then
     { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
   else
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $L, for its /dev/tcp
     H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
   fi
   p=$!
   while :; do
     if grep -qF -- "$4" "$f"; then r=0; break; fi
-    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    if [ $i -ge 5 ] || ! kill -0 $p 2>/dev/null; then break; fi
     sleep 1; i=$((i+1))
   done
   [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
@@ -745,7 +753,7 @@ resource "terraform_data" "isoloom_controller" {
       "sudo sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini dc01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''dc01 not ready'\\''; exit 1; }; sleep 10; done'",
       "sudo sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini ws-01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''ws-01 not ready'\\''; exit 1; }; sleep 10; done'",
       "sudo sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini ws-02 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''ws-02 not ready'\\''; exit 1; }; sleep 10; done'",
-      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\nmkdir -p /tmp/isoloom-retry\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\n_isoloom_attempts=4\n_isoloom_transient='\\''send_input failed|the pipe has been ended|winrmtransporterror|winrmoperationtimeouterror|read timeout|bad http response returned from server|(kerberos|ntlm|credssp).*500|remote end closed connection|connection reset by peer|connection refused|connection aborted|broken pipe|timed out|failed to connect to the host via ssh|shared connection to .* closed'\\''\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nplay_hosts() {\n  awk -v transient=\"$_isoloom_transient\" '\\''\n    function commit() {\n      if (pending != \"\") { if (pending_real) real[pending] = 1; else cut[pending] = 1 }\n      pending = \"\"\n    }\n    { gsub(/\\033\\[[0-9;]*m/, \"\") }\n    /^\\.\\.\\.ignoring/ { pending = \"\"; next }\n    { commit() }\n    /^(fatal|failed): \\[/ && !/UNREACHABLE!/ {\n      pending = $0\n      sub(/^(fatal|failed): \\[/, \"\", pending)\n      sub(/\\].*/, \"\", pending)\n      sub(/ -> .*/, \"\", pending)\n      pending_real = (tolower($0) !~ transient)\n      next\n    }\n    /^PLAY RECAP/ { recap = 1; next }\n    recap && / : ok=/ {\n      for (i = 2; i <= NF; i++) {\n        split($i, kv, \"=\")\n        if (kv[1] == \"failed\" && kv[2] > 0) failed[$1] = 1\n        if (kv[1] == \"unreachable\" && kv[2] > 0) unreachable[$1] = 1\n      }\n    }\n    END {\n      commit()\n      for (h in failed) print ((h in real || !(h in cut)) ? \"real \" : \"cut \") h\n      for (h in unreachable) if (!(h in failed)) print \"unreachable \" h\n    }\n  '\\'' \"$1\" | sort\n}\n_isoloom_kind() {\n  echo \"$1\" | awk -v k=\"$2\" '\\''$1 == k { printf \"%s%s\", s, $2; s = \" \" }'\\''\n}\nrun_play() {\n  # The playbook is the last argument; Ansible names its retry file after it.\n  for _isoloom_book; do :; done\n  _isoloom_name=$(basename \"$_isoloom_book\")\n  _isoloom_retry=$${ANSIBLE_RETRY_FILES_SAVE_PATH:-/tmp/isoloom-retry}/$${_isoloom_name%.*}.retry\n  _isoloom_limit=\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  _isoloom_n=1\n  rm -f \"$_isoloom_retry\"\n  while :; do\n    { \"$@\" $_isoloom_limit && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    [ \"$_isoloom_rc\" -ne 0 ] || break\n    _isoloom_hosts=$(play_hosts \"$_isoloom_log\")\n    _isoloom_real=$(_isoloom_kind \"$_isoloom_hosts\" real)\n    _isoloom_gone=$(_isoloom_kind \"$_isoloom_hosts\" unreachable)\n    _isoloom_cut=$(_isoloom_kind \"$_isoloom_hosts\" cut)\n    _isoloom_again=$(echo $_isoloom_gone $_isoloom_cut)\n    if [ -n \"$_isoloom_real\" ]; then\n      echo \"isoloom: $_isoloom_name: a task failed on $_isoloom_real: not retried\"\n      break\n    fi\n    if [ -z \"$_isoloom_again\" ]; then\n      echo \"isoloom: $_isoloom_name failed (exit $_isoloom_rc) with no unreachable host or dropped connection: not retried\"\n      break\n    fi\n    if [ \"$_isoloom_n\" -ge \"$_isoloom_attempts\" ]; then\n      echo \"isoloom: $_isoloom_name: still unreachable after $_isoloom_n runs: $_isoloom_again; giving up\"\n      break\n    fi\n    printf '\\''%s\\n'\\'' $_isoloom_again > \"$_isoloom_retry\"\n    _isoloom_limit=\"--limit @$_isoloom_retry\"\n    _isoloom_n=$((_isoloom_n + 1))\n    if [ -n \"$_isoloom_gone\" ]; then\n      _isoloom_wait=$((4 * _isoloom_pause))\n      echo \"isoloom: $_isoloom_name: unreachable: $_isoloom_again; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)\"\n    else\n      _isoloom_wait=$((2 * _isoloom_pause))\n      echo \"isoloom: $_isoloom_name: the play was cut by a dropped connection on $_isoloom_cut; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)\"\n    fi\n    sleep \"$_isoloom_wait\"\n  done\n  rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n  [ \"$_isoloom_rc\" -ne 0 ] || rm -f \"$_isoloom_retry\"\n  return \"$_isoloom_rc\"\n}\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ad-domain.yml\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ad-join.yml\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ws.yml'",
+      "sudo sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\nmkdir -p /tmp/isoloom-retry\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\n_isoloom_attempts=4\n_isoloom_transient='\\''send_input failed|the pipe has been ended|winrmtransporterror|winrmoperationtimeouterror|read timeout|bad http response returned from server|(kerberos|ntlm|credssp).*500|remote end closed connection|connection reset by peer|connection refused|connection aborted|broken pipe|timed out|failed to connect to the host via ssh|shared connection to .* closed'\\''\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nplay_hosts() {\n  awk -v transient=\"$_isoloom_transient\" '\\''\n    function commit() {\n      if (pending != \"\") { if (pending_real) real[pending] = 1; else cut[pending] = 1 }\n      pending = \"\"\n    }\n    { gsub(/\\033\\[[0-9;]*m/, \"\") }\n    /^\\.\\.\\.ignoring/ { pending = \"\"; next }\n    { commit() }\n    /^(fatal|failed): \\[/ && !/UNREACHABLE!/ {\n      pending = $0\n      sub(/^(fatal|failed): \\[/, \"\", pending)\n      sub(/\\].*/, \"\", pending)\n      sub(/ -> .*/, \"\", pending)\n      pending_real = (tolower($0) !~ transient)\n      next\n    }\n    /^PLAY RECAP/ { recap = 1; next }\n    recap && / : ok=/ {\n      for (i = 2; i <= NF; i++) {\n        split($i, kv, \"=\")\n        if (kv[1] == \"failed\" && kv[2] > 0) failed[$1] = 1\n        if (kv[1] == \"unreachable\" && kv[2] > 0) unreachable[$1] = 1\n      }\n    }\n    END {\n      commit()\n      for (h in failed) print ((h in real || !(h in cut)) ? \"real \" : \"cut \") h\n      for (h in unreachable) if (!(h in failed)) print \"unreachable \" h\n    }\n  '\\'' \"$1\" | sort\n}\n_isoloom_kind() {\n  echo \"$1\" | awk -v k=\"$2\" '\\''$1 == k { printf \"%s%s\", s, $2; s = \" \" }'\\''\n}\nrun_play() {\n  # The playbook is the last argument; Ansible names its retry file after it.\n  for _isoloom_book; do :; done\n  _isoloom_name=$(basename \"$_isoloom_book\")\n  _isoloom_retry=$${ANSIBLE_RETRY_FILES_SAVE_PATH:-/tmp/isoloom-retry}/$${_isoloom_name%.*}.retry\n  _isoloom_limit=\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  _isoloom_n=1\n  rm -f \"$_isoloom_retry\"\n  while :; do\n    { \"$@\" && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    [ \"$_isoloom_rc\" -ne 0 ] || break\n    _isoloom_hosts=$(play_hosts \"$_isoloom_log\")\n    _isoloom_real=$(_isoloom_kind \"$_isoloom_hosts\" real)\n    _isoloom_gone=$(_isoloom_kind \"$_isoloom_hosts\" unreachable)\n    _isoloom_cut=$(_isoloom_kind \"$_isoloom_hosts\" cut)\n    _isoloom_again=\"$_isoloom_gone$${_isoloom_gone:+$${_isoloom_cut:+ }}$_isoloom_cut\"\n    if [ -n \"$_isoloom_real\" ]; then\n      echo \"isoloom: $_isoloom_name: a task failed on $_isoloom_real: not retried\"\n      break\n    fi\n    if [ -z \"$_isoloom_again\" ]; then\n      echo \"isoloom: $_isoloom_name failed (exit $_isoloom_rc) with no unreachable host or dropped connection: not retried\"\n      break\n    fi\n    if [ \"$_isoloom_n\" -ge \"$_isoloom_attempts\" ]; then\n      echo \"isoloom: $_isoloom_name: still unreachable after $_isoloom_n runs: $_isoloom_again; giving up\"\n      break\n    fi\n    echo \"$_isoloom_again\" | tr '\\'' '\\'' '\\''\\n'\\'' > \"$_isoloom_retry\"\n    if [ -z \"$_isoloom_limit\" ]; then set -- \"$@\" --limit \"@$_isoloom_retry\"; _isoloom_limit=1; fi\n    _isoloom_n=$((_isoloom_n + 1))\n    if [ -n \"$_isoloom_gone\" ]; then\n      _isoloom_wait=$((4 * _isoloom_pause))\n      echo \"isoloom: $_isoloom_name: unreachable: $_isoloom_again; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)\"\n    else\n      _isoloom_wait=$((2 * _isoloom_pause))\n      echo \"isoloom: $_isoloom_name: the play was cut by a dropped connection on $_isoloom_cut; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)\"\n    fi\n    sleep \"$_isoloom_wait\"\n  done\n  rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n  [ \"$_isoloom_rc\" -ne 0 ] || rm -f \"$_isoloom_retry\"\n  return \"$_isoloom_rc\"\n}\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ad-domain.yml\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ad-join.yml\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ws.yml'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }

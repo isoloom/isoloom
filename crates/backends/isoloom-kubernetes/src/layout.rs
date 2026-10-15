@@ -7,10 +7,12 @@ use isoloom_render::OUTPUT_DIR;
 pub(crate) const DIR: &str = "kubernetes";
 /// Where the chart is, under the target's folder.
 pub(crate) const CHART: &str = "chart";
-/// Where the chart's copies of the project's scripts go, under the chart.
+/// Where the chart's copies of the project's scripts go, under the chart, each at its path in
+/// the project.
 pub(crate) const CHART_PROJECT_FILES: &str = "files/project";
-/// From `.isoloom/kubernetes/` back to the project folder.
-pub(crate) const ROOT: &str = "../..";
+/// The same copies from the target's folder, where the environment's kustomization reads them:
+/// inside its own folder, as kustomize's default load restrictor requires.
+pub(crate) const PROJECT_COPIES: &str = "chart/files/project";
 
 /// Where a file of the target goes, from the project folder.
 pub(crate) fn output(path: &str) -> String {

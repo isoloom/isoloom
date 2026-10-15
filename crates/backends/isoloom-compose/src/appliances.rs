@@ -38,8 +38,11 @@ use isoloom_spec::vlans;
 /// Isoloom's management network for appliances, outside the environment (no `reach`, no checks).
 pub(crate) const MGMT_NETWORK: &str = "isoloom-mgmt";
 
-/// The Dockerfile of the Dynamips container Isoloom builds.
-const DYNAMIPS_DOCKERFILE: &str = "# Dynamips, the Cisco 7200 emulator (Ubuntu's package, in its default sources); the IOS\n# image is the user's.\nFROM ubuntu:24.04\nRUN apt-get update && apt-get install -y --no-install-recommends dynamips iproute2 && rm -rf /var/lib/apt/lists/*\n";
+/// The Dockerfile of the Dynamips container Isoloom builds. The packages are pinned to Ubuntu
+/// 24.04's versions (hadolint's DL3008): `dynamips` as released, `iproute2` to its release's
+/// series (`6.1.0-1ubuntu6*`, the newest match), so its security updates still land and the
+/// pin never names a version the archive has dropped.
+const DYNAMIPS_DOCKERFILE: &str = "# Dynamips, the Cisco 7200 emulator (Ubuntu's package, in its default sources), pinned to\n# Ubuntu 24.04's versions; the IOS image is the user's.\nFROM ubuntu:24.04\nRUN apt-get update && apt-get install -y --no-install-recommends dynamips=0.2.14-1build4 'iproute2=6.1.0-1ubuntu6*' && rm -rf /var/lib/apt/lists/*\n";
 
 /// The appliance machines, in spec order.
 pub(crate) fn appliances(spec: &Spec) -> Vec<(&String, &Machine, Appliance)> {

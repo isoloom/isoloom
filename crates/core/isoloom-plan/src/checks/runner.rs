@@ -34,7 +34,7 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
         if c.derived {
             s.push_str("if [ \"${ISOLOOM_DERIVED:-1}\" != 0 ]; then\n");
         }
-        s.push_str(&check_lines(c, position, r));
+        s.push_str(&with_directives(&check_lines(c, position, r)));
         if c.derived {
             s.push_str("fi\n");
         }
@@ -71,6 +71,59 @@ fn check_lines(c: &Resolved, position: &Position, r: &Render) -> String {
             None => format!("fail {n} \"Ansible checks don't run from this position\"\n"),
         },
     }
+}
+
+/// The directive shellcheck needs on the line before each of `lines` that single-quotes what
+/// looks like an expansion (a `$name`, `$(`, `${` or a backticked text): the spec's own text (an
+/// `exec` command, a header, the text to find), quoted on purpose so this script never expands
+/// it; only an `exec` command's own shell does.
+fn with_directives(lines: &str) -> String {
+    lines
+        .lines()
+        .map(|line| {
+            if single_quoted(line).into_iter().any(looks_expanded) {
+                let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+                format!("{indent}# shellcheck disable=SC2016 # the check's own text, quoted as written\n{line}\n")
+            } else {
+                format!("{line}\n")
+            }
+        })
+        .collect()
+}
+
+/// The single-quoted parts of an sh line, outside double quotes (`'a'\\''b'` is `a`, then `b`).
+fn single_quoted(line: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let (mut rest, mut double) = (line, false);
+    while let Some((i, c)) = rest.char_indices().find(|&(_, c)| matches!(c, '\'' | '"' | '\\')) {
+        let after = rest.get(i + 1..).unwrap_or_default();
+        rest = match c {
+            '\\' => after.get(after.chars().next().map_or(0, char::len_utf8)..).unwrap_or_default(),
+            '"' => {
+                double = !double;
+                after
+            }
+            _ if double => after,
+            _ => {
+                let end = after.find('\'').unwrap_or(after.len());
+                parts.push(after.get(..end).unwrap_or_default());
+                after.get(end + 1..).unwrap_or_default()
+            }
+        };
+    }
+    parts
+}
+
+/// Whether shellcheck reads `text`, single-quoted, as an expansion meant to happen (SC2016):
+/// `$` before a name, a digit, `{` or `(`, or a backticked text.
+fn looks_expanded(text: &str) -> bool {
+    let dollar = text
+        .split('$')
+        .skip(1)
+        .any(|after| after.starts_with(|c: char| c.is_ascii_alphanumeric() || matches!(c, '_' | '{' | '(')));
+    // What follows each backtick; all but the last part are between two of them.
+    let after: Vec<&str> = text.split('`').skip(1).collect();
+    dollar || after.split_last().is_some_and(|(_, between)| between.iter().any(|t| !t.is_empty()))
 }
 
 /// An HTTP check beyond a GET and its status (a method, headers, a body, text to find), with
@@ -185,6 +238,7 @@ _http() {
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
     h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $U, for its /dev/tcp
     c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
   fi
   echo "${c:-000}"
@@ -206,7 +260,9 @@ _http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
 # _tcp HOST PORT -> 0 when it connects (nc, else bash).
 _tcp() {
   if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
-  else H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H and $P, for its /dev/tcp
+    H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
   fi
 }
 # _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
@@ -217,12 +273,13 @@ _tcp_read() {
   if command -v nc >/dev/null 2>&1; then
     { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
   else
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $L, for its /dev/tcp
     H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
   fi
   p=$!
   while :; do
     if grep -qF -- "$4" "$f"; then r=0; break; fi
-    [ $i -lt 5 ] && kill -0 $p 2>/dev/null || break
+    if [ $i -ge 5 ] || ! kill -0 $p 2>/dev/null; then break; fi
     sleep 1; i=$((i+1))
   done
   [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
