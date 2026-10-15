@@ -16,6 +16,8 @@
 # provider config validation, so no plugin is needed to parse the generated Vagrantfiles.
 
 ARG BASE=debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+# Global: the image stage patches Vagrant's files, which are under its version.
+ARG VAGRANT_VERSION=2.4.9
 
 # ---- Downloads, each checked against its pinned SHA-256 --------------------------------------
 FROM ${BASE} AS fetch
@@ -114,7 +116,7 @@ RUN get "https://github.com/canonical/cloud-init/archive/refs/tags/${CLOUD_INIT_
     tar -xzf c.tgz --strip-components=1 -C /out "cloud-init-${CLOUD_INIT_VERSION}/cloudinit"; rm c.tgz; \
     printf 'UPSTREAM_VERSION = "%s"\nDOWNSTREAM_VERSION = "@DOWNSTREAM_VERSION@"\n' "$CLOUD_INIT_VERSION" > /out/cloudinit/meson_versions.py
 
-ARG VAGRANT_VERSION=2.4.9
+ARG VAGRANT_VERSION
 ARG VAGRANT_SHA256=42d830d05e6e9e647f8a5c854d9f5295e319dac74edd37d54b97b4f29cbbd70d
 RUN get "https://releases.hashicorp.com/vagrant/${VAGRANT_VERSION}/vagrant_${VAGRANT_VERSION}-1_amd64.deb" "$VAGRANT_SHA256" vagrant.deb
 
@@ -137,15 +139,24 @@ RUN printf '%s\n' '#!/opt/venv/bin/python3' 'import sys' 'from cloudinit.cmd imp
 # ---- The image -------------------------------------------------------------------------------
 FROM ${BASE}
 SHELL ["/bin/sh", "-eu", "-c"]
+ARG VAGRANT_VERSION
 # python3 for the runner, Ansible and cloud-init; libssl for pwsh (which runs without ICU, see
 # DOTNET_SYSTEM_GLOBALIZATION_INVARIANT); git, which ansible-lint uses to list files.
 RUN apt-get update; \
     apt-get install -y --no-install-recommends ca-certificates python3 libssl3t64 git; \
     rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/*
+# Vagrant takes itself for WSL when the kernel's /proc/version says "microsoft", as it does
+# under Docker Desktop on Windows (WSL 2), and then refuses to start without access to Windows.
+# The container never is WSL in that sense: the check is turned off, and the build fails if
+# Vagrant's code no longer reads as expected.
 RUN --mount=type=bind,from=fetch,source=/dl/vagrant.deb,target=/tmp/vagrant.deb \
     dpkg -i /tmp/vagrant.deb >/dev/null; \
     rm -rf /opt/vagrant/embedded/share/doc /opt/vagrant/embedded/share/man /opt/vagrant/embedded/include; \
-    find /opt/vagrant/embedded/lib -name '*.a' -delete
+    find /opt/vagrant/embedded/lib -name '*.a' -delete; \
+    f=/opt/vagrant/embedded/gems/gems/vagrant-${VAGRANT_VERSION}/lib/vagrant/util/platform.rb; \
+    grep -q 'if osversion.downcase.include?("microsoft")' "$f"; \
+    sed -i 's/if osversion.downcase.include?("microsoft")/if false \&\& osversion.downcase.include?("microsoft")/' "$f"; \
+    grep -q 'if false && osversion' "$f"
 COPY --from=fetch /out/bin/ /usr/local/bin/
 COPY --from=fetch /out/cli-plugins/ /usr/local/lib/docker/cli-plugins/
 COPY --from=fetch /out/tflint/ /opt/tflint/
