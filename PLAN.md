@@ -13,7 +13,7 @@ Working document for the local rebuild. It is squashed away with the history at 
 | **Phase 2: manifest** | `isoloom-manifest` crate and docker `run.json` landed (`defe7a65`). |
 | **Phase 2: syntax** | **Approved by the maintainer** (`plan/phase2/spec.md`, including the flag via `files:` with `input:`). Implementation is next. |
 | **Track C: Proxmox 9.2** | Proven: a real apply, serve, check and destroy. |
-| **Track C: ESXi 8.0U3e** | VMs are created and destroyed through `josenk/esxi` and `vagrant-vmware-esxi` (SSH + ovftool). The free licence refuses every vSphere API write. Guest networking waits on Fusion's promiscuous mode (a maintainer step). |
+| **Track C: ESXi 8.0U3e** | Proven with promiscuous mode on: nested DHCP works, the launcher's Vagrant self-test passes, and Isoloom's `esxi` Terraform module serves and passes its check (finishing from a container). Two fixes are queued for Phase 3 (the controller box on ESXi; guest SSH moving to the runner). |
 | **Launcher standard (0.6)** | Ratchet, lints, reorg and repository-root grouping landed (`0560c78`). 1,724 violations remain outside `runtime/`, fixed by area in parallel. |
 | **Test hosts** | jarvis (Linux) and karen (Windows) are offline until the end of 2026-10-15. Meanwhile Linux uses `check-all --hosts linux-docker`, and Windows uses clippy on `x86_64-pc-windows-msvc`. The real Windows and Linux legs are queued below and run as soon as the hosts are back. |
 | **Websites** | Kept separate. The isoloom.com rebuild banner is live. Standard (0.7): next. |
@@ -543,6 +543,10 @@ Each step means: lowered generation passes the snapshots and `verify`, then a ma
      - `destroy` leaves the SDN zone and bridge pending, because the "apply SDN" resource is destroyed before its zone; it needs the provider's finalizer ordering.
      - The module defaults to `node = "pve"`, while the launcher's Test connection uses the first node. A server with another node name passes the test and then fails the launch. Default to the discovered node, or make it required.
      - A router whose guest agent can't install (no DNS or internet) hangs `apply` for 15 minutes. Fail fast with a reason.
+   - **ESXi findings from the real smoke test** (`esxi-lab`, 2026-10-15), to fix in this phase:
+     - **The Vagrant controller on `vmware_esxi` never reports its address,** because the `generic/alpine319` box's VMware Tools don't report one, and `vagrant up` times out. Decided: use `bento/debian-12` for the controller on `vmware_esxi`, as on ARM.
+     - **Terraform `esxi` can't finish natively on macOS.** The generated `terraform_data` step makes Terraform SSH to the router's DHCP address, which Local Network Privacy blocks. The container can reach it, but has no Linux `ovftool`. Decided: guest SSH steps move out of Terraform into runner manifest steps (`ssh.run` through the runner's relay or `nc`, as the launcher already does for Vagrant). Terraform keeps only the infrastructure. This also makes the step host-neutral.
+     - **With promiscuous mode on,** the router gets its uplink by DHCP. The fallback that reported the lab-side address (10.80.0.254) must still turn into a clear failure, not a wrong output.
 4. **Secrets conversion and native checks** for these targets only:
    - Compose secrets;
    - Vagrant host environment;
