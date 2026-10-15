@@ -59,13 +59,23 @@ fn is_the_fixture(mut generated: Manifest, name: &str) -> Outcome {
 
 #[test]
 fn the_flag_portal_spec_writes_the_shared_docker_fixture() -> Outcome {
-    is_the_fixture(run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker)?, ".isoloom/docker/run.json")?, "docker.run.json")
+    is_the_fixture(
+        run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker)?, ".isoloom/docker/run.json")?,
+        "docker.run.json",
+    )
 }
 
 #[test]
 fn the_solo_web_example_writes_the_shared_proxmox_fixture() -> Outcome {
-    let solo_web = examples(Target::Proxmox)?.into_iter().find(|(name, _)| name == "solo-web").ok_or("no solo-web")?.1;
-    is_the_fixture(run_json(&generate(&solo_web, Target::Proxmox)?, ".isoloom/proxmox/run.json")?, "proxmox.run.json")
+    let solo_web = examples(Target::Proxmox)?
+        .into_iter()
+        .find(|(name, _)| name == "solo-web")
+        .ok_or("no solo-web")?
+        .1;
+    is_the_fixture(
+        run_json(&generate(&solo_web, Target::Proxmox)?, ".isoloom/proxmox/run.json")?,
+        "proxmox.run.json",
+    )
 }
 
 #[test]
