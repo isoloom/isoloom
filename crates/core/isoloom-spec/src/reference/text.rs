@@ -26,7 +26,7 @@ pub(super) fn kind(w: &Walker, node: &Value, depth: usize) -> String {
     if depth >= MAX_DEPTH {
         return "value".to_owned();
     }
-    if closed(w, node).is_some() {
+    if closed(w, node, depth).is_some() {
         return closed_kind(w, node, depth).to_owned();
     }
     let alternatives = variants(node);
@@ -84,8 +84,9 @@ fn plural(kind: &str) -> String {
 }
 
 /// The values of a closed set, each with its meaning: an `enum`, a `const`, or alternatives
-/// that are all closed. `None` when the node accepts other values.
-fn closed(w: &Walker, node: &Value) -> Option<Vec<(String, String)>> {
+/// that are all closed. `None` when the node accepts other values, or alternatives nest past
+/// [`MAX_DEPTH`] (a schema that holds itself).
+fn closed(w: &Walker, node: &Value, depth: usize) -> Option<Vec<(String, String)>> {
     let node = w.resolve(node);
     let meaning = node.get("description").and_then(Value::as_str).map(prose).unwrap_or_default();
     if let Some(values) = node.get("enum").and_then(Value::as_array) {
@@ -95,19 +96,19 @@ fn closed(w: &Walker, node: &Value) -> Option<Vec<(String, String)>> {
         return Some(vec![(plain(c), meaning)]);
     }
     let alternatives = variants(node);
-    if alternatives.is_empty() {
+    if alternatives.is_empty() || depth >= MAX_DEPTH {
         return None;
     }
     let mut all = Vec::new();
     for v in alternatives {
-        all.extend(closed(w, v)?);
+        all.extend(closed(w, v, depth + 1)?);
     }
     Some(all)
 }
 
 /// The values the node accepts, when they are a closed set.
 pub(super) fn allowed(w: &Walker, node: &Value) -> Vec<(String, String)> {
-    closed(w, node).unwrap_or_default()
+    closed(w, node, 0).unwrap_or_default()
 }
 
 /// The ranges and patterns the node enforces, beyond its type.

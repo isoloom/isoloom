@@ -144,6 +144,12 @@ fn a_schema_that_refers_to_itself_stops() {
     assert_eq!(field(&all, "b").kind, "value");
     let alias = json!({ "properties": { "x": { "$ref": "#/$defs/X" } }, "$defs": { "X": { "$ref": "#/$defs/X" } } });
     assert_eq!(fields(&alias)[0].kind, "value");
+    // Alternatives that hold themselves: the walk through them stops too.
+    let alternatives = json!({
+        "properties": { "x": { "$ref": "#/$defs/X" } },
+        "$defs": { "X": { "anyOf": [{ "$ref": "#/$defs/X" }, { "type": "string" }] } }
+    });
+    assert_eq!(fields(&alternatives).len(), 1);
 }
 
 #[test]
