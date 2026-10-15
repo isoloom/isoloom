@@ -21,6 +21,11 @@
 //! The SSH hosts' settings come from the environment, else from the hosts file
 //! (`~/.isoloom-lab/hosts.env`, or the one `ISOLOOM_HOSTS_ENV` names; see [`settings`]).
 //!
+//! Isothrum and the launcher pin Isoloom and Isothrum commits by git, which GitHub hasn't got
+//! (local `main` isn't pushed): before a run that copies either, each SSH host's mirrors of this
+//! machine's Isoloom and Isothrum `main` are brought up to date, in its home, and its git sends the
+//! GitHub URLs there ([`mirrors`]).
+//!
 //! The other hosts run the platform gates (the tests, and the launcher's `pnpm check`) on a copy
 //! of the working trees as git sees them: tracked and new files, without the ignored ones. A
 //! consumer linked by `cargo xtask dev-link` stays linked in the copy. Each host runs its part
@@ -46,6 +51,7 @@ mod collect;
 mod docker;
 mod gates;
 mod hosts;
+mod mirrors;
 mod pack;
 mod protocol;
 mod remote;

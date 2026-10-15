@@ -13,6 +13,7 @@ use std::process::Command;
 use super::checkout::{self, Folder};
 use super::collect::{Collector, Sink};
 use super::hosts::repos_arg;
+use super::mirrors;
 use super::pack::{self, Copy};
 use super::settings::SshHost;
 use super::{Repo, Run, Status};
@@ -25,7 +26,8 @@ fn win_dir(win: &SshHost) -> &str {
     win.dir.as_deref().unwrap_or(WIN_DIR)
 }
 
-fn ssh(host: &SshHost) -> Command {
+/// `ssh` to `host`, never asking for anything.
+pub(super) fn ssh(host: &SshHost) -> Command {
     let mut c = Command::new("ssh");
     c.args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=30"]);
     c.args(host.port_args("-p")).arg(host.target());
@@ -34,7 +36,7 @@ fn ssh(host: &SshHost) -> Command {
 
 /// A PowerShell script run on the Windows host, encoded (UTF-16LE in base64), so that neither
 /// cmd nor PowerShell quoting applies.
-fn win_ps(win: &SshHost, script: &str) -> Command {
+pub(super) fn win_ps(win: &SshHost, script: &str) -> Command {
     let full = format!("$ProgressPreference = 'SilentlyContinue'; {script}");
     let utf16: Vec<u8> = full.encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut c = ssh(win);
@@ -87,6 +89,15 @@ pub(super) fn linux(run: &Run, out: &mut Collector) {
         Ok(home) => home.trim().to_owned(),
         Err(_) => return out.host_failed(Status::Unreachable, "not reachable (set ISOLOOM_LINUX_USER and authorize the key)"),
     };
+    if mirrors::needed(&run.repos) {
+        match mirrors::sync_linux(run, &home) {
+            Ok(note) => out.line(&note),
+            Err(e) => {
+                out.line(&e.to_string());
+                return out.host_failed(Status::Fail, "syncing the Isoloom and Isothrum mirrors failed (see linux.log)");
+            }
+        }
+    }
     let root = host.dir.clone().unwrap_or_else(|| format!("{home}/isoloom-check-all"));
     let folder = checkout::remote_folder(&root, &checkouts(run));
     out.line(&format!("copies and build folders: {folder}"));
@@ -107,7 +118,7 @@ pub(super) fn linux(run: &Run, out: &mut Collector) {
     }
     let src = format!("{folder}/src");
     let leg = format!(
-        ". \"$HOME/.cargo/env\" 2>/dev/null; cd '{src}/isoloom' && CARGO_BUILD_JOBS={} CARGO_TARGET_DIR='{folder}/target/isoloom' \
+        ". \"$HOME/.cargo/env\" 2>/dev/null; cd '{src}/isoloom' && CARGO_NET_GIT_FETCH_WITH_CLI=true CARGO_BUILD_JOBS={} CARGO_TARGET_DIR='{folder}/target/isoloom' \
          cargo xtask check-all --leg linux --profile platform --repos {} --isoloom '{src}/isoloom' --isothrum '{src}/isothrum' \
          --launcher '{src}/cyber-ctf-launcher' --target-root '{folder}/target'",
         host.jobs,
@@ -141,6 +152,15 @@ pub(super) fn windows(run: &Run, out: &mut Collector) {
     if process::quiet(&mut win_ps(win, &mark)).is_err() {
         return out.host_failed(Status::Unreachable, "not reachable (set ISOLOOM_WIN_USER and authorize the key)");
     }
+    if mirrors::needed(&run.repos) {
+        match mirrors::sync_windows(run) {
+            Ok(note) => out.line(&note),
+            Err(e) => {
+                out.line(&e.to_string());
+                return out.host_failed(Status::Fail, "syncing the Isoloom and Isothrum mirrors failed (see windows.log)");
+            }
+        }
+    }
     for repo in shipped(run) {
         if let Err(e) = copy_windows(run, out, repo, dir) {
             out.line(&e.to_string());
@@ -150,7 +170,8 @@ pub(super) fn windows(run: &Run, out: &mut Collector) {
     let src = format!("{dir}/src");
     let leg = format!(
         "[Console]::OutputEncoding = [Text.Encoding]::UTF8; $OutputEncoding = [Text.Encoding]::UTF8; \
-         $env:CARGO_BUILD_JOBS = '{}'; $env:CARGO_TARGET_DIR = '{dir}/target/isoloom'; Set-Location '{src}/isoloom'; \
+         $env:CARGO_NET_GIT_FETCH_WITH_CLI = 'true'; $env:CARGO_BUILD_JOBS = '{}'; $env:CARGO_TARGET_DIR = '{dir}/target/isoloom'; \
+         Set-Location '{src}/isoloom'; \
          & cargo xtask check-all --leg windows --profile platform --repos {} --isoloom '{src}/isoloom' --isothrum '{src}/isothrum' \
          --launcher '{src}/cyber-ctf-launcher' --target-root '{dir}/target'",
         win.jobs,

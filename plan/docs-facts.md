@@ -200,3 +200,6 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 
 ## Phase 1c: the spec and the run manifest
 - **Run manifest schema:** the descriptions name environment variables as code (`` `ISOLOOM_PUBLISH_FIXED` ``, `` `TF_DATA_DIR` ``); the rules are unchanged.
+
+## Test hosts: the pinned commits
+- **`cargo xtask check-all`, SSH hosts:** before a run that copies Isothrum or the launcher, each SSH host (`linux`, `windows`) gets a bare mirror of this machine's Isoloom and Isothrum `main` in its home (`~/isoloom-mirrors/<repo>.git`, fetched from a git bundle each run), its global git config rewrites `https://github.com/isoloom/<repo>` to it (`url.file://<mirror>.insteadOf`, any other rewrite of that URL removed), and its legs run Cargo with `CARGO_NET_GIT_FETCH_WITH_CLI=true`. The host log says which `main` each mirror got. It replaces `~/.isoloom-lab/windows-vm/sync-mirrors.sh` (and its `C:/isoloom-mirrors`).
