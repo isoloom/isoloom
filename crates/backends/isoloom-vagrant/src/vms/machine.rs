@@ -119,8 +119,15 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
         windows: os == Os::Windows,
         nested: mp.hardware.nested_virtualization,
-        published: mp.ports.iter().map(|p| (p.port, p.publish)).collect(),
+        // Windows' port proxy relays TCP only.
+        published: mp
+            .ports
+            .iter()
+            .filter(|p| p.protocol != isoloom_spec::model::Protocol::Udp)
+            .map(|p| (p.port, p.publish))
+            .collect(),
         tpm: mp.tpm,
+        keeps_hostname: false,
     };
     Guest {
         label: super::label(env, name),

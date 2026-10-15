@@ -9,9 +9,10 @@
 //! - before `StartInstance`: an adapter per network with a fixed MAC ([`mac`]), connected there,
 //!   and the virtual TPM (`vm.tpm`, or Windows 11's own) enabled with a key protector of the host;
 //! - after `WaitForIPAddress`: the machine's addresses set in the guest, found by MAC (a
-//!   boot-time script on Linux, a static address through WMI on Windows), and a warning saying
-//!   where the published ports are (Hyper-V forwards none);
-//! - after `DeleteVM`: the networks' switches no VM uses any more, removed.
+//!   boot-time script on Linux, a static address through WMI on Windows), and its published
+//!   ports relayed from this host's 127.0.0.1 to its address (Hyper-V forwards none; Windows'
+//!   port proxy does, set again at every start since the address may change);
+//! - after `DeleteVM`: those relays removed, and the networks' switches no VM uses any more.
 //!
 //! The Ruby doing the work is `IsoloomHyperV` ([`HYPERV_RB`]), in every Vagrantfile's preamble.
 
@@ -44,10 +45,13 @@ pub(crate) struct HyperV<'a> {
     pub(crate) windows: bool,
     /// Nested virtualization (`nested_virtualization`): the VM runs VMs of its own.
     pub(crate) nested: bool,
-    /// Its published ports (guest, host): not forwarded on Hyper-V, so a warning says where.
+    /// Its published ports (guest, host): relayed from this host's 127.0.0.1 to the VM.
     pub(crate) published: Vec<(u16, u16)>,
     /// Its virtual TPM, enabled before it starts.
     pub(crate) tpm: Option<Tpm>,
+    /// Whether Vagrant leaves its hostname alone: Alpine's hostname step restarts every interface
+    /// (`ifdown -a; ifup -a`), which on Hyper-V's DHCP switch closed the SSH session it ran in.
+    pub(crate) keeps_hostname: bool,
 }
 
 /// A VM's adapter on one network, and its address there.
@@ -89,6 +93,7 @@ impl<'a> HyperV<'a> {
             nested: false,
             published: Vec::new(),
             tpm: None,
+            keeps_hostname: false,
         }
     }
 
@@ -138,6 +143,10 @@ pub(crate) fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
         if hv.nested {
             super::nested::switch(r, super::provider::Provider::HyperV);
         }
+        if hv.keeps_hostname {
+            r.comment("Alpine sets a hostname by restarting every interface: SSH to it drops on Hyper-V.");
+            r.assign("o.vm.hostname", Value::raw("nil"));
+        }
         // Hyper-V reads only `bridge` here: the switch of the VM's first adapter.
         let first = Call::new("o.vm.network").arg(Value::str("private_network"));
         r.call(first.kw("bridge", Value::raw("HYPERV_SWITCH")));
@@ -155,8 +164,8 @@ fn trigger(r: &mut Ruby, when: &str, action: &str, body: impl FnOnce(&mut Ruby))
 }
 
 /// The switches before Vagrant picks the first adapter's, the adapters before the VM starts,
-/// its addresses once it answers (and where its published ports are), the switches gone with
-/// the last VM.
+/// its addresses and its ports' relays once it answers, the relays gone with the VM and the
+/// switches with the last one.
 fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
     let switches = hv.switches();
     trigger(r, "before", "Configure", |r| {
@@ -193,16 +202,27 @@ fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
                 r.heredoc_argument("IsoloomHyperV.address(machine, ", ")", tag, &script);
             }
             if !hv.published.is_empty() {
-                let ports = Value::array(hv.published.iter().map(|(g, h)| Value::array([Value::from(*g), Value::from(*h)])));
-                r.line(format_args!("IsoloomHyperV.ports(machine, {ports})"));
+                r.line(format_args!("IsoloomHyperV.ports(machine, {})", published(hv)));
             }
         });
     });
+    let mut after_delete = Vec::new();
+    if !hv.published.is_empty() {
+        after_delete.push(format!("IsoloomHyperV.unports({})", published(hv)));
+    }
     if !hv.nics.is_empty() {
+        after_delete.push(format!("IsoloomHyperV.prune({switches})"));
+    }
+    if !after_delete.is_empty() {
         trigger(r, "after", "DeleteVM", |r| {
-            r.line(format_args!("t.ruby {{ |_, _| IsoloomHyperV.prune({switches}) }}"));
+            r.line(format_args!("t.ruby {{ |_, _| {} }}", after_delete.join("; ")));
         });
     }
+}
+
+/// A VM's published ports, `[[guest, host], …]`.
+fn published(hv: &HyperV) -> Value {
+    Value::array(hv.published.iter().map(|(g, h)| Value::array([Value::from(*g), Value::from(*h)])))
 }
 
 /// The script that sets a Linux VM's addresses at boot (`/etc/isoloom/lab-net.sh`): each

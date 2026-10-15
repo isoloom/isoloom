@@ -532,7 +532,9 @@
           "id": "suspend",
           "argv": [
             "vagrant",
-            "suspend"
+            "suspend",
+            "dc01",
+            "ws01"
           ],
           "timeout_s": 1800
         }

@@ -141,3 +141,17 @@ fn libvirts_own_boxes_are_pinned_to_an_architecture() -> Outcome {
     assert!(file.contains("o.vm.box_architecture = :auto"), "the controller takes the host's");
     Ok(())
 }
+
+/// Hyper-V forwards no ports: each published TCP port is relayed from 127.0.0.1 to the VM at every
+/// start, and the relay goes with the VM. Alpine's controller keeps its hostname there: setting
+/// one restarts every interface, which closed the SSH session setting it.
+#[test]
+fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
+    let file = vagrantfile("solo-web")?;
+    assert!(file.contains("IsoloomHyperV.ports(machine, [[80, "), "the relay at start");
+    assert!(file.contains("IsoloomHyperV.unports([[80, "), "the relay gone with the VM");
+    let controller = file.split("config.vm.define \"isoloom-controller\"").nth(1).ok_or("no controller")?;
+    let hyperv = controller.split("provider \"hyperv\" do |v, o|").nth(1).ok_or("no hyperv block")?;
+    assert!(hyperv.split("\n    end").next().unwrap_or_default().contains("o.vm.hostname = nil"));
+    Ok(())
+}

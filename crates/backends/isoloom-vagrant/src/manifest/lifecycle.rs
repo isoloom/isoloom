@@ -66,13 +66,19 @@ pub(super) fn lifecycle(env: &Environment, shape: &Shape) -> Result<Lifecycle> {
     ];
     up.extend(park_controller(env, shape, false)?);
     let resume = resume(env, shape, virtualbox)?;
-    let park = |verb: &str| -> Result<Option<Vec<Step>>> { Ok(Some(vec![run(verb, vagrant_argv(&[verb])?, PARK_TIMEOUT_S)?])) };
+    let park = |verb: &str, vms: &[&str]| -> Result<Option<Vec<Step>>> {
+        let args: Vec<&str> = std::iter::once(verb).chain(vms.iter().copied()).collect();
+        Ok(Some(vec![run(verb, vagrant_argv(&args)?, PARK_TIMEOUT_S)?]))
+    };
+    // Suspended: the VMs that run while the lab does, not a halted controller (Hyper-V refuses to
+    // suspend a VM that is off, and the whole park failed).
+    let suspended = running(env, shape);
     Ok(Lifecycle {
         up: NonEmpty::new(up, "lifecycle.up")?,
         down: NonEmpty::new(down()?, "lifecycle.down")?,
         park: Some(Park {
-            pause: park("suspend")?,
-            shutdown: park("halt")?,
+            pause: park("suspend", &suspended)?,
+            shutdown: park("halt", &[])?,
         }),
         resume,
         provision: Some(provision(env, shape)?),

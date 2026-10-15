@@ -120,6 +120,13 @@ fn the_controller_is_infra_halted_after_up_but_not_on_qemu() -> Outcome {
     assert!(up.verdict.as_deref().is_some_and(|v| v.starts_with("fatal:")));
     let resume = serde_json::to_string(&m.lifecycle.resume).unwrap();
     assert!(resume.contains("\"dc01\",\"ws01\"") && !resume.contains("isoloom-controller"), "{resume}");
+    // A pause suspends what runs, not the halted controller (Hyper-V refuses to suspend a VM
+    // that is off).
+    let pause = serde_json::to_string(&m.lifecycle.park.as_ref().unwrap().pause).unwrap();
+    assert!(
+        pause.contains("\"suspend\",\"dc01\",\"ws01\"") && !pause.contains("isoloom-controller"),
+        "{pause}"
+    );
     Ok(())
 }
 

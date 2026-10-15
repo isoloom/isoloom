@@ -504,7 +504,8 @@
           "id": "suspend",
           "argv": [
             "vagrant",
-            "suspend"
+            "suspend",
+            "web"
           ],
           "timeout_s": 1800
         }

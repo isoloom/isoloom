@@ -190,8 +190,9 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other
     // providers gets Debian's instead.
     guest.libvirt_box = (bx == CONTROLLER_BOX).then_some(CONTROLLER_BOX);
-    // Its box (Alpine's, or the spec's own) boots on Hyper-V as it is.
+    // Its box (Alpine's, or the spec's own) boots on Hyper-V as it is; Alpine's keeps its hostname.
     guest.hyperv.boxed = HyperVBox::Main;
+    guest.hyperv.keeps_hostname = bx == CONTROLLER_BOX;
     // On ESXi, the default box's VMware Tools never report an address: Debian's instead.
     guest.esxi_box = (bx == CONTROLLER_BOX).then_some(HELPER_BOX);
     let mut steps = vec![Step::Prelude];

@@ -328,7 +328,9 @@ PS1
 # - each VM has an adapter there with a fixed MAC, attached before every start (Vagrant has
 #   just connected them all to the first switch), and its address set in the guest once it
 #   answers (a boot-time unit on Linux, a static address on Windows);
-# - published ports aren't forwarded to the host (Hyper-V can't): a warning says where they are.
+# - published ports aren't forwarded to the host (Hyper-V can't): Windows' port proxy relays each
+#   one (TCP) from 127.0.0.1 to the VM's address, set at every start (the address may change)
+#   and removed with the VM.
 HYPERV_SWITCH = ENV.fetch("ISOLOOM_HYPERV_SWITCH", "Default Switch")
 module IsoloomHyperV
   def self.fail!(message)
@@ -382,10 +384,23 @@ module IsoloomHyperV
     machine.communicate.sudo(script)
   end
 
-  # Hyper-V forwards no ports: where the published ones (guest => host) are instead.
+  # Hyper-V forwards no ports: each published one (guest => host) relayed from this host's
+  # 127.0.0.1 to the VM's address by Windows' port proxy (TCP; the IP Helper service), set again
+  # at every start since the address may change.
   def self.ports(machine, ports)
-    ip = (machine.ssh_info || {})[:host] || "the VM's address"
-    machine.ui.warn("Hyper-V forwards no ports to this host: " + ports.map { |guest, host| "127.0.0.1:#{host} isn't there, use #{ip}:#{guest}" }.join("; "))
+    ip = (machine.ssh_info || {})[:host]
+    fail!("#{machine.name} has no address to relay its ports to") unless ip
+    ps(ports.map { |guest, host|
+      "netsh interface portproxy delete v4tov4 listenaddress=127.0.0.1 listenport=#{host} | Out-Null; " \
+      "netsh interface portproxy add v4tov4 listenaddress=127.0.0.1 listenport=#{host} connectaddress=#{ip} connectport=#{guest} | Out-Null; " \
+      "if ($LASTEXITCODE -ne 0) { throw 'netsh interface portproxy add failed for 127.0.0.1:#{host}' }"
+    }.join("; "))
+    machine.ui.info("Hyper-V: " + ports.map { |guest, host| "127.0.0.1:#{host} relayed to #{ip}:#{guest}" }.join("; "))
+  end
+
+  # After a VM is deleted: its ports' relays.
+  def self.unports(ports)
+    ps(ports.map { |_, host| "netsh interface portproxy delete v4tov4 listenaddress=127.0.0.1 listenport=#{host} | Out-Null" }.join("; ") + "; $global:LASTEXITCODE = 0")
   end
 
   # After a VM is deleted: the networks' switches no VM uses any more.
@@ -829,7 +844,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-hello-stack-app"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[80, 8080]]); IsoloomHyperV.prune(["isoloom-hello-stack-app"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "for l in '10.60.0.20 cache'; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
@@ -941,6 +956,8 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
+      # Alpine sets a hostname by restarting every interface: SSH to it drops on Hyper-V.
+      o.vm.hostname = nil
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
