@@ -104,9 +104,6 @@ fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
     c.resources = limits(m);
     crate::gpus::apply(m.plan.hardware.gpus.as_ref(), &mut c);
     c.volume_mounts = mounts.to_vec();
-    if process::runs_scripts(m) {
-        c.volume_mounts.push(VolumeMount::at("scripts", SCRIPTS_DIR));
-    }
     c.volume_devices = storage::devices(m);
     c
 }
@@ -267,13 +264,12 @@ fn beside_owners(m: &Machine) -> Option<Affinity> {
     })
 }
 
-/// The pod's volumes: its claims, the project's scripts (for its `init:` jobs and `before`
-/// steps), Isoloom's
-/// probe, then its memory-backed mounts.
+/// The pod's volumes: its claims, the project's scripts (for its `setup` jobs and its files),
+/// Isoloom's probe, then its memory-backed mounts.
 fn volumes(m: &Machine) -> Vec<Volume> {
     let volume = |name: String, source| Volume { name, source };
     let mut out = storage::pod_volumes(m);
-    if !m.init().is_empty() || files::reads_project(m) || process::runs_scripts(m) {
+    if !m.init().is_empty() || files::reads_project(m) {
         out.push(volume("scripts".into(), scripts_volume()));
     }
     out.extend(files::volumes(m));

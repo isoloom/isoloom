@@ -1,6 +1,5 @@
 //! A machine's own process in its container: its command as the container's `args` (the
-//! image's entrypoint runs it), its working directory, its `before` scripts in front of the
-//! command, and its readiness: Isoloom's port probe and the machine's own healthcheck.
+//! image's entrypoint runs it), its working directory, and its readiness: Isoloom's port probe and the machine's own healthcheck.
 //!
 //! A command healthcheck joins the port probe in one `exec` probe. A page is an `httpGet`
 //! probe; the port probe then comes first, as the startup probe (the readiness probe only starts
@@ -10,33 +9,19 @@ use isoloom_plan::process::{DEFAULT_INTERVAL, DEFAULT_RETRIES};
 use isoloom_plan::{Health, HealthTest};
 use isoloom_render::container::PROBE_DIR;
 
-use crate::kustomize::key;
 use crate::machine::Machine;
 use crate::objects::{Container, Exec, HttpGet, Probe};
 
 /// Where the project's scripts are, in a container running them.
 pub(crate) const SCRIPTS_DIR: &str = "/isoloom/scripts";
 
-/// The command, the working directory and the `before` scripts on the machine's container: a
-/// shell runs the scripts in order, then hands over to the command (`exec`).
+/// The command and the working directory on the machine's container.
 pub(crate) fn apply(m: &Machine, c: &mut Container) {
     let p = &m.plan.process;
     if let Some(command) = &p.command {
         c.args = command.argv();
     }
     c.working_dir.clone_from(&p.working_dir);
-    if p.before.is_empty() {
-        return;
-    }
-    let mut steps: Vec<String> = vec!["set -e".into()];
-    steps.extend(p.before.iter().map(|s| format!("sh {SCRIPTS_DIR}/{}", key(s))));
-    steps.push("exec \"$@\"".into());
-    c.command = vec!["/bin/sh".into(), "-c".into(), steps.join("; "), "isoloom-before".into()];
-}
-
-/// Whether the container runs the project's scripts (`before` ones).
-pub(crate) fn runs_scripts(m: &Machine) -> bool {
-    !m.plan.process.before.is_empty()
 }
 
 /// Everything the machine's readiness checks, as one shell line for Isoloom's busybox: its

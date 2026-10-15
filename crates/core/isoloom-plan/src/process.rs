@@ -1,5 +1,5 @@
 //! What a machine runs and when it is healthy, resolved once for every target: its command,
-//! the directory it runs in, the steps before it, and its healthcheck with every pace in
+//! the directory it runs in, and its healthcheck with every pace in
 //! seconds (Kubernetes counts in seconds; Compose and the VM scripts are given the same).
 
 use isoloom_spec::model::{CommandLine, Healthcheck, Machine, seconds};
@@ -18,10 +18,8 @@ pub const DEFAULT_START_PERIOD: u32 = 10;
 pub struct Process {
     /// Its own command, instead of the image's.
     pub command: Option<CommandLine>,
-    /// Where the command, the `before` steps and the healthcheck run.
+    /// Where the command and the healthcheck run (`command.cwd`).
     pub working_dir: Option<String>,
-    /// The scripts run before the command at every start, from the project folder.
-    pub before: Vec<String>,
     /// When it is healthy, beside its services' ports answering.
     pub health: Option<Health>,
 }
@@ -32,7 +30,6 @@ impl Process {
         Process {
             command: m.command.clone(),
             working_dir: m.working_dir.clone(),
-            before: m.before.clone(),
             health: m.healthcheck.as_ref().and_then(Health::of),
         }
     }
@@ -40,7 +37,7 @@ impl Process {
     /// Whether the spec sets any of it.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.command.is_none() && self.working_dir.is_none() && self.before.is_empty() && self.health.is_none()
+        self.command.is_none() && self.working_dir.is_none() && self.health.is_none()
     }
 }
 

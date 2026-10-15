@@ -87,7 +87,7 @@ pub enum Step {
     },
     /// Waits for `isoloom run` to deliver its secrets, then puts each file in place, now and at
     /// every boot (see [`crate::SecretFile`]). Before anything that may read one: the
-    /// `provision` steps, the `before` steps and the command.
+    /// app's steps, its command and its `setup` scripts.
     Secrets,
     /// Waits until a machine it depends on answers.
     WaitFor {
@@ -105,11 +105,6 @@ pub enum Step {
     },
     /// Restarts the machine; the steps after it run once it is back.
     Reboot,
-    /// Its `before` scripts, run now and at every boot before its command.
-    Before {
-        /// The scripts, from the project folder.
-        paths: Vec<String>,
-    },
     /// Its own command, run as a service from now on (see [`crate::Process`]).
     Command,
     /// Its `setup` scripts, run once with its service up, as root from the project folder.
@@ -206,9 +201,6 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
         (!ports.is_empty()).then(|| Step::WaitFor { machine: dep.clone(), ports })
     }));
     steps.extend(runs(m));
-    if !m.before.is_empty() {
-        steps.push(Step::Before { paths: m.before.clone() });
-    }
     if m.command.is_some() {
         steps.push(Step::Command);
     }
@@ -305,9 +297,9 @@ fn shared_volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Step> {
 
 fn runs(m: &Machine) -> Vec<Step> {
     let Some(vm) = &m.vm else { return Vec::new() };
-    // Kept on disk when a reboot comes, and for the command and `before` steps, which read
+    // Kept on disk when a reboot comes, and for the command, which reads
     // them again at every boot.
-    let persist = vm.provision.iter().any(|s| is_reboot(s)) || m.command.is_some() || !m.before.is_empty();
+    let persist = vm.provision.iter().any(|s| is_reboot(s)) || m.command.is_some();
     let mut steps = Vec::new();
     if !m.inputs.is_empty() {
         steps.push(Step::Inputs { persist });

@@ -57,8 +57,8 @@ pub enum Feature {
     ExistingHostFiles,
     /// A virtual TPM 2.0 in a VM.
     Tpm,
-    /// A process Isoloom starts on the machine: its own `command`, `before` steps, `working_dir`
-    /// or `healthcheck`.
+    /// A process Isoloom starts on the machine: its own `command` (with its `cwd`) or
+    /// `healthcheck`.
     MachineProcess,
     /// A VM booting its own way (`vm.boot`): a kernel, firmware, boot order or network boot.
     OwnBoot,
@@ -195,7 +195,7 @@ pub enum Requirement {
         /// The first machine that does.
         machine: String,
     },
-    /// A machine sets its own process (`command`, `working_dir`, `before`, `healthcheck`).
+    /// A machine sets its own process (`command`, `healthcheck`).
     MachineProcess {
         /// The first machine that does.
         machine: String,
@@ -307,8 +307,7 @@ impl Requirement {
 
 /// Why a target without [`Feature::MachineProcess`] refuses a machine's own process: only
 /// `external` lacks it, and its hosts already run what they run.
-const OWN_PROCESS: &str =
-    "sets its own process (`command`, `working_dir`, `before` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it";
+const OWN_PROCESS: &str = "sets its own process (`command` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it";
 
 /// Why an `exec` check needs a container where it stands.
 const IN_A_CONTAINER: &str = "needs `from:` a machine with its own container (it runs inside it)";

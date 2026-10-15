@@ -1,5 +1,5 @@
-//! A machine's own process on its Compose service: its command, its working directory, its
-//! `before` scripts in front of the command, and its healthcheck beside the port probe.
+//! A machine's own process on its Compose service: its command, its working directory, and its
+//! healthcheck beside the port probe.
 
 use isoloom_plan::process::{DEFAULT_INTERVAL, DEFAULT_RETRIES, DEFAULT_START_PERIOD, DEFAULT_TIMEOUT};
 use isoloom_plan::{Health, MachinePlan};
@@ -8,31 +8,15 @@ use isoloom_spec::model::Machine;
 
 use crate::file::{Healthcheck, Seconds, Service};
 use crate::interpolation::literal;
-use crate::layout::{ROOT, file_name};
 
-/// Where a machine sees its `before` scripts.
-const BEFORE_DIR: &str = "/isoloom/before";
-
-/// The command (the image's entrypoint runs it), the working directory, and the `before`
-/// scripts: a shell entrypoint runs them in order, then hands over to the command (`exec`), so
-/// the command is the machine's process as the image's would be.
+/// The command (the image's entrypoint runs it) and the working directory, so the command is
+/// the machine's process as the image's would be.
 pub(super) fn apply(mp: &MachinePlan, svc: &mut Service) {
     let p = &mp.process;
     if let Some(c) = &p.command {
         svc.command = c.argv().iter().map(|a| literal(a)).collect();
     }
     svc.working_dir.clone_from(&p.working_dir);
-    if p.before.is_empty() {
-        return;
-    }
-    let mut steps: Vec<String> = vec!["set -e".into()];
-    for (i, script) in p.before.iter().enumerate() {
-        let inside = format!("{BEFORE_DIR}/{}-{}", i + 1, file_name(script));
-        steps.push(format!("sh {inside}"));
-        svc.volumes.push(format!("{ROOT}/{script}:{inside}:ro").into());
-    }
-    steps.push("exec \"$$@\"".into());
-    svc.entrypoint = vec!["/bin/sh".into(), "-c".into(), steps.join("; "), "isoloom-before".into()];
 }
 
 /// The healthcheck of a machine: Isoloom's port probe and its own healthcheck, both run by

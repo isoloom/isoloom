@@ -67,7 +67,6 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Reboot => Some(format!("{}(sleep 2 && reboot) >/dev/null 2>&1 &\n", record_boot())),
         Step::Egress => Some(network::egress(env)),
         Step::Tc => network::tc(env, machine),
-        Step::Before { paths } => process::before(env, machine, paths),
         Step::Command => process::command(env, machine),
         Step::Setup { paths } => process::setup(env, machine, paths),
         Step::Ready => Some(format!(
@@ -103,7 +102,6 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             "Set-Location {WINDOWS_PROJECT_DIR}; & powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
             powershell::quote(path)
         )),
-        Step::Before { paths } => process::windows_before(env, machine, paths),
         Step::Command => process::windows_command(env, machine),
         Step::Setup { paths } => Some(process::windows_setup(paths)),
         Step::Ready => Some(format!(

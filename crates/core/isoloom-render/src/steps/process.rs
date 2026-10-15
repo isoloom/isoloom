@@ -1,4 +1,4 @@
-//! A VM's own process: its `before` scripts and its command as services kept across restarts
+//! A VM's own process: its command as a service kept across restarts
 //! ([`boot::service`]), and its healthcheck tried in the `Ready` step, on Linux and Windows.
 //! Each runs where the machine's process runs (its working directory, by default the project
 //! folder) with its environment and its inputs, as a container's process would.
@@ -36,30 +36,12 @@ fn scripts(paths: &[String]) -> String {
         .concat()
 }
 
-/// The `before` scripts, run in order now (a failure fails the set-up) and at every boot,
-/// before the command.
-pub(super) fn before(env: &Environment, machine: &str, paths: &[String]) -> Option<String> {
-    let mp = env.machines.get(machine)?;
-    let script = format!("set -e\n{}{}", prelude(env, machine, mp), scripts(paths));
-    Some(boot::service(
-        "before",
-        "The machine's before steps, ahead of its command",
-        &script,
-        Kind::Once,
-        &secrets_first(mp),
-    ))
-}
-
-/// The command, as a service restarted when it fails, after the `before` scripts.
+/// The command, as a service restarted when it fails, after its secrets are in place.
 pub(super) fn command(env: &Environment, machine: &str) -> Option<String> {
     let mp = env.machines.get(machine)?;
     let line = mp.process.command.as_ref()?.argv().iter().map(|a| quote(a)).collect::<Vec<_>>().join(" ");
     let script = format!("{}exec {line}\n", prelude(env, machine, mp));
-    let mut after = secrets_first(mp);
-    if !mp.process.before.is_empty() {
-        after.push("before");
-    }
-    Some(boot::service("command", "The machine's own command", &script, Kind::Daemon, &after))
+    Some(boot::service("command", "The machine's own command", &script, Kind::Daemon, &secrets_first(mp)))
 }
 
 /// Marks a machine's `setup` scripts as run: they run once, not at every provisioning.
@@ -93,7 +75,7 @@ pub(super) fn windows_setup(paths: &[String]) -> String {
     )
 }
 
-/// At boot, a machine's secrets are back in place before its `before` steps and command run.
+/// At boot, a machine's secrets are back in place before its command runs.
 fn secrets_first(mp: &MachinePlan) -> Vec<&'static str> {
     if mp.secrets.is_empty() { Vec::new() } else { vec![secrets::PLACE_SERVICE] }
 }
@@ -158,42 +140,11 @@ fn windows_dir(mp: &MachinePlan) -> String {
     powershell::quote(mp.process.working_dir.as_deref().unwrap_or(WINDOWS_PROJECT_DIR))
 }
 
-/// The `before` scripts on Windows: `before.ps1`, run now; the command's task runs it first at
-/// every boot, or a startup task of its own when there is no command.
-pub(super) fn windows_before(env: &Environment, machine: &str, paths: &[String]) -> Option<String> {
-    let mp = env.machines.get(machine)?;
-    let mut lines = windows_secrets_first(mp);
-    lines.push(format!(
-        "New-Item -ItemType Directory -Force {d} | Out-Null; Set-Location {d}",
-        d = windows_dir(mp)
-    ));
-    lines.extend(paths.iter().map(|p| {
-        format!(
-            "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-            powershell::quote(&format!("{WINDOWS_PROJECT_DIR}\\{}", p.replace('/', "\\")))
-        )
-    }));
-    let run = format!(
-        "{}; & powershell -NoProfile -ExecutionPolicy Bypass -File {WINDOWS_PROJECT_DIR}\\before.ps1; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-        windows_script("before", &lines)
-    );
-    // With no command, the `before` scripts need a startup task of their own.
-    let task = mp.process.command.is_none().then(|| format!("; {}", startup_task("before")));
-    Some(run + &task.unwrap_or_default())
-}
-
-/// The command on Windows: a startup task (as SYSTEM) running `command.ps1`, after `before.ps1`.
+/// The command on Windows: a startup task (as SYSTEM) running `command.ps1`, its secrets placed
+/// first.
 pub(super) fn windows_command(env: &Environment, machine: &str) -> Option<String> {
     let mp = env.machines.get(machine)?;
-    let mut lines = Vec::new();
-    if mp.process.before.is_empty() {
-        lines.extend(windows_secrets_first(mp));
-    } else {
-        // `before.ps1` places the secrets first.
-        lines.push(format!(
-            "& powershell -NoProfile -ExecutionPolicy Bypass -File {WINDOWS_PROJECT_DIR}\\before.ps1"
-        ));
-    }
+    let mut lines = windows_secrets_first(mp);
     lines.push(format!(
         "New-Item -ItemType Directory -Force {d} | Out-Null; Set-Location {d}",
         d = windows_dir(mp)

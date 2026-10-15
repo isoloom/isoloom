@@ -17,13 +17,13 @@ pub fn step(m: &Machine) -> Option<Step> {
     (!m.files.is_empty()).then(|| Step::Files { files: m.files.clone() })
 }
 
-/// Whether a VM's steps read the project: it runs scripts of its own (or `before` ones), or
+/// Whether a VM's steps read the project: it runs scripts of its own (its app's or `setup`), or
 /// copies a file from it.
 /// A target that ships the project only when it is read asks this.
 #[must_use]
 pub fn reads_project(lifecycle: &[Step]) -> bool {
     lifecycle.iter().any(|s| match s {
-        Step::Run { .. } | Step::Before { .. } | Step::Setup { .. } => true,
+        Step::Run { .. } | Step::Setup { .. } => true,
         Step::Files { files } => files.iter().any(|f| f.source.is_some()),
         _ => false,
     })
