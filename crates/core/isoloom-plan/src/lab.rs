@@ -385,6 +385,17 @@ mod tests {
     }
 
     #[test]
+    fn a_secret_no_machine_gets_is_a_problem_unless_a_catalogue_service_may_read_it() {
+        let paths = |machines: &str| -> Vec<String> {
+            let lab = testing::lab(&format!("version: 1\nname: t\nsecrets: {{ db: {{ env: DB }} }}\nmachines:\n{machines}"));
+            lab.problems().iter().map(|p| p.path.to_string()).collect()
+        };
+        assert!(paths("  web: { app: { image: nginx } }\n").contains(&"secrets.db".to_owned()));
+        let with_service = paths("  db: { os: debian@12, service: postgres }\n");
+        assert!(!with_service.iter().any(|p| p.starts_with("secrets.")), "{with_service:?}");
+    }
+
+    #[test]
     fn a_copy_step_takes_a_file_inside_the_project_that_exists() {
         let dir = std::env::temp_dir().join(format!("isoloom-plan-copy-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("site")).expect("a project folder");
