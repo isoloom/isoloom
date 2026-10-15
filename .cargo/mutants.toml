@@ -4,3 +4,7 @@
 # original (an equivalent mutant): then it is listed here, matched by the name `cargo mutants
 # --list` shows, with the reason it is equivalent. Nothing else goes here.
 exclude_re = []
+
+# The copies each mutant is built in leave out what git ignores: build folders, and the fuzz
+# corpora a running `cargo xtask fuzz` is still writing.
+gitignore = true

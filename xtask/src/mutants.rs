@@ -41,6 +41,8 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     let mut clean = true;
     for krate in &crates {
         let out = repo::target_dir(&root).join("mutants").join(krate);
+        // cargo-mutants makes `mutants.out` in this folder, not the folder itself.
+        std::fs::create_dir_all(&out)?;
         let mut cmd = process::cargo(&root);
         cmd.args(["mutants", "--package", krate, "--jobs", &a.jobs.to_string(), "--output"]).arg(&out);
         let caught = process::passed(&mut cmd)?;
