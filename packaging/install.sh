@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs the isoloom binary from the GitHub releases (macOS, Linux).
-#   curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/install.sh | sh
 # ISOLOOM_VERSION=v0.6.0 picks a release (default: the latest); ISOLOOM_INSTALL_DIR the folder
 # (default: ~/.local/bin).
 set -eu

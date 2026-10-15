@@ -54,7 +54,7 @@ In scope:
   value written into a generated file.
 - **The command line.** `isoloom` itself: command or code injection through a spec, a profile
   or a project file, path traversal outside the project, unsafe handling of credentials or of
-  `~/.isoloom/`, and the install script (`install.sh`) and release binaries.
+  `~/.isoloom/`, and the install script (`packaging/install.sh`) and release binaries.
 - **The runtime.** What Isoloom does while an environment runs: reading secrets from their
   stores and delivering them to machines, the commands it runs over SSH, WinRM or the target's
   tool, and the registry (`~/.isoloom/status.yml`).

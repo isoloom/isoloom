@@ -57,7 +57,7 @@ isoloom run vagrant            # the same environment, one VM per machine
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/install.sh | sh
 ```
 
 Release binaries for macOS, Linux and Windows are on the

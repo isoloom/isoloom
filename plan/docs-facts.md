@@ -117,3 +117,4 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 
 ## Phase 1c: the 3d tooling
 - **`cargo xtask verify`:** the copy of a project made to evaluate a module's cloud-config leaves Terraform's own files out (`.terraform*`), so another module's `terraform init` running at the same time no longer breaks the copy.
+- **The install script moved to `packaging/install.sh`:** `curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/install.sh | sh`; the GitHub Action runs it from there.

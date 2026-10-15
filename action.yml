@@ -17,7 +17,7 @@ runs:
         ISOLOOM_VERSION: ${{ inputs.version }}
         ISOLOOM_INSTALL_DIR: ${{ runner.temp }}/isoloom-bin
       run: |
-        sh "${{ github.action_path }}/install.sh"
+        sh "${{ github.action_path }}/packaging/install.sh"
         echo "$ISOLOOM_INSTALL_DIR" >> "$GITHUB_PATH"
     - name: Install isoloom (Windows)
       if: runner.os == 'Windows'
