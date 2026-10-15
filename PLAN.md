@@ -39,10 +39,10 @@ Every worker stopped mid-step. Their state is safe in their worktrees. To resume
 | 1c plan + render (`a753fa47995a027b7`) | `isoloom-1c-core2` (1 ahead) | **plan's review is closed and landed** (`fb53ba54`); the final check-all was running | the last check-all, then done |
 | Phase 3 Vagrant (`a19a8c03a200ce0c7`) | `isoloom-vagrant-b` (`tmp/vagrant-hyperv`, 1 ahead); launcher `cyber-ctf-launcher-wt/vagrant` (1 ahead) | Hyper-V on karen (up/status/check pass); landing two Isoloom Hyper-V Vagrantfile fixes; the launcher step rebased on `b4ba5c5`, Mac VirtualBox run through the launcher under way | land the Hyper-V fixes, finish karen's park/resume/down, the launcher Mac run, land the launcher step |
 | Phase 3 Server (`ab3309f1e356f5806`) | `isoloom-server` (2 ahead); Isothrum `isothrum-wt/server` | ESXi through the runner works; making the additive manifest change (`provider_timeout_s`, `${host.<machine>}`) on top of the rename | land it, rerun ESXi, record tier evidence |
-| Phase 5a verify (`a86b1bccb663441c3`) | `isoloom-5a-verify` (1 ahead) | the shellcheck/kustomize/hadolint fixes and the verify CPU cap (`ISOLOOM_VERIFY_CPUS`) | finish check-all, land |
+| Phase 5a verify (`a86b1bccb663441c3`) | `isoloom-5a-verify` (1 ahead) | the shellcheck/kustomize/hadolint fixes and the verify CPU cap (`ISOLOOM_VERIFY_CPUS`); stopped on the *session* limit (resets 00:30) | finish check-all on both hosts, land |
 | Phase 6a tf-test (`a3f179567b157182b`) | `isoloom-6a-tftest` (5 changed files) | writing suites (edge-firewall on AWS); a helper was writing the cloud-docker suites | finish the suites, land |
 | Phase 6b matrix (`a33676fb13a1fef95`) | `isoloom-6b-matrix` (2 ahead) | extending the `uses` logic and the matrix rows | finish, land |
-| Isothrum 1c (`abf4a43ac2afc7507`) | `isothrum-wt/1c`, `isothrum-wt/1c-crates`; `isoloom-isothrum-gates` (1 ahead) | the tooling and lint set; the compiler pins move to Isoloom `d7f83f2c`+; the runner refactor (both drivers landed) | continue |
+| Isothrum 1c (`abf4a43ac2afc7507`) | `isothrum-wt/1c` | **still running.** Steps 1–3 landed (`isothrum@5c39819`, `isoloom@edb4af0f`): the tooling, compiler/WASM/CLI at zero, all pins on `d7f83f2c`, Windows playbooks from the controller | the runner to zero, then check-all on mac, linux and windows |
 
 Also pending: the launcher's next pin bump adapts to the rename (`plan/phase2/api-migration.md` items 11–20).
 
