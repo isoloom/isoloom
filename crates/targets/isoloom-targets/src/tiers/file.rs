@@ -52,14 +52,28 @@ struct RunFile {
     note: Option<String>,
 }
 
-/// Whether a real run passed.
+/// Whether a real run passed: only a whole cycle that passed proves a host OS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RunResult {
-    /// It came up and its checks passed.
+    /// The whole cycle ran (up, its checks, down) and passed.
     Pass,
-    /// It didn't.
+    /// Part of the cycle ran and passed; its note says which part, and what is still to run.
+    Partial,
+    /// It didn't pass.
     Fail,
+}
+
+impl RunResult {
+    /// The result as `tiers.json` writes it: `pass`, `partial` or `fail`.
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            RunResult::Pass => "pass",
+            RunResult::Partial => "partial",
+            RunResult::Fail => "fail",
+        }
+    }
 }
 
 /// A calendar day, `YYYY-MM-DD`; days order as their text does.

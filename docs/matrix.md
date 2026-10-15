@@ -30,7 +30,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `hybrid` | 2 | linux, macos, windows | validated only |
 | `vagrant/virtualbox` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-15); tier 1 pending: linux, windows |
 | `vagrant/vmware_desktop` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
-| `vagrant/hyperv` | 2 | windows | validated only; tier 1 pending: windows |
+| `vagrant/hyperv` | 2 | windows | real runs: partial windows (karen, 2026-10-15); tier 1 pending: windows |
 | `vagrant/parallels` | 2 | macos | validated only; tier 1 pending: macos |
 | `vagrant/libvirt` | 1 | linux | real runs: linux (friday, 2026-10-15) |
 | `vagrant/qemu` | 2 | linux, macos | validated only; tier 1 pending: linux, macos |

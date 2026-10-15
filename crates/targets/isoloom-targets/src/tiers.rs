@@ -5,7 +5,7 @@
 //! that prove it. The tier itself is never written down: it is worked out from the runs, so it
 //! can't claim more than they show.
 //!
-//! - **Tier 1:** the latest run on every host OS the entry exists on passed.
+//! - **Tier 1:** the latest run on every host OS the entry exists on passed, the whole cycle.
 //! - **Tier 2:** generated, and checked by the official validators (`cargo xtask verify`).
 //! - **Tier 3:** experimental.
 //!
@@ -196,7 +196,7 @@ impl TierEntry {
                     "host": r.host,
                     "os": os_id(r.os),
                     "date": r.date.as_str(),
-                    "result": if r.result == RunResult::Pass { "pass" } else { "fail" },
+                    "result": r.result.id(),
                     "server": r.server,
                     "note": r.note,
                 })
@@ -217,11 +217,16 @@ impl TierEntry {
     }
 }
 
-/// A run in a line: `macos (mac, pve-lab, 2026-10-15)`, `failed` when it did.
+/// A run in a line: `macos (mac, pve-lab, 2026-10-15)`, after `failed` or `partial` when it
+/// was.
 fn shown(run: &Run) -> String {
     let server = run.server.as_deref().map(|s| format!(", {s}")).unwrap_or_default();
-    let failed = if run.result == RunResult::Fail { "failed " } else { "" };
-    format!("{failed}{} ({}{server}, {})", os_id(run.os), run.host, run.date)
+    let how = match run.result {
+        RunResult::Pass => "",
+        RunResult::Partial => "partial ",
+        RunResult::Fail => "failed ",
+    };
+    format!("{how}{} ({}{server}, {})", os_id(run.os), run.host, run.date)
 }
 
 /// A host OS by the name `tiers.json` and the run manifest write it with.

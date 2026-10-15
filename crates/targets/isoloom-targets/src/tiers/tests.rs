@@ -52,6 +52,15 @@ fn a_later_failing_run_on_a_host_os_takes_tier_1_back() {
 }
 
 #[test]
+fn a_partial_run_is_evidence_but_proves_no_host_os() {
+    let partial = r#"{ "host": "karen", "date": "2026-10-15", "result": "partial", "note": "up and checks" }"#;
+    let hyperv = one("vagrant/hyperv", 1, r#"["windows"]"#, partial).unwrap();
+    assert_eq!(hyperv.tier(), Tier::Two);
+    assert_eq!(hyperv.evidence(), "real runs: partial windows (karen, 2026-10-15); tier 1 pending: windows");
+    assert_eq!(hyperv.json()["runs"][0]["result"], "partial");
+}
+
+#[test]
 fn an_entry_without_runs_is_validated_only_and_one_not_aiming_for_tier_1_has_nothing_pending() {
     let aws = one("cloud-vm/aws", 1, EVERY_OS, "").unwrap();
     assert_eq!(aws.evidence(), "validated only; tier 1 pending: linux, macos, windows");

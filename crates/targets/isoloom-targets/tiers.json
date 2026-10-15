@@ -218,7 +218,14 @@
       "exists_on": [
         "windows"
       ],
-      "runs": []
+      "runs": [
+        {
+          "host": "karen",
+          "date": "2026-10-15",
+          "result": "partial",
+          "note": "up, status and checks; park, resume and down pending"
+        }
+      ]
     },
     {
       "entry": "vagrant/parallels",
@@ -239,7 +246,7 @@
           "host": "friday",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "Vagrant 2.4.9 with vagrant-libvirt 0.12.2 on Debian 13"
+          "note": "the full cycle, with Vagrant 2.4.9 and vagrant-libvirt 0.12.2 on Debian 13"
         }
       ]
     },
@@ -275,6 +282,13 @@
           "result": "pass",
           "server": "esxi-lab",
           "note": "ESXi 8.0U3e with promiscuous mode on: nested DHCP and the launcher's Vagrant self-test"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "esxi-lab",
+          "note": "through the Isothrum runner"
         }
       ]
     },
@@ -293,6 +307,13 @@
           "result": "pass",
           "server": "pve-lab",
           "note": "Proxmox VE 9.2: a generated lab applied, served, passed its check and was destroyed (Terraform in a container)"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "pve-lab",
+          "note": "up, status, checks and down through the Isothrum runner and the launcher"
         }
       ]
     },

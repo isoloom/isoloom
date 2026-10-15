@@ -3,7 +3,8 @@
 //!
 //! The entry is a target, or a target and its provider or cloud (`docker`, `vagrant/libvirt`,
 //! `cloud-vm/aws`); the host is one of the list's `hosts` (`mac`, `jarvis`, `karen`, `friday`), or
-//! a new one with `--os`; the result is `pass` or `fail`. The run is dated today (UTC) unless
+//! a new one with `--os`; the result is `pass` (the whole cycle passed: it proves the host's OS),
+//! `partial` (part of it passed; `--note` says which) or `fail`. The run is dated today (UTC) unless
 //! `--date` says otherwise. The list is written back in the form it is kept in, and
 //! `docs/matrix.md`, which shows the tiers, is generated again.
 
@@ -42,7 +43,7 @@ struct Record {
     entry: String,
     /// The host that ran the tools, as the list's `hosts` names it (`mac`, `jarvis`, `karen`).
     host: String,
-    /// Whether the run came up and its checks passed.
+    /// `pass` (the whole cycle passed), `partial` (part of it, said in `--note`) or `fail`.
     result: RunResult,
     /// The day it ran, `YYYY-MM-DD` (default: today, UTC).
     #[arg(long)]
@@ -61,9 +62,11 @@ struct Record {
 /// A run's result.
 #[derive(Clone, Copy, clap::ValueEnum)]
 enum RunResult {
-    /// It came up and its checks passed.
+    /// The whole cycle ran (up, its checks, down) and passed: it proves the host's OS.
     Pass,
-    /// It didn't.
+    /// Part of the cycle ran and passed (say which with `--note`): evidence, not proof.
+    Partial,
+    /// It didn't pass.
     Fail,
 }
 
@@ -112,6 +115,7 @@ fn written(doc: &Value) -> Res<String> {
 fn result_id(r: RunResult) -> &'static str {
     match r {
         RunResult::Pass => "pass",
+        RunResult::Partial => "partial",
         RunResult::Fail => "fail",
     }
 }
