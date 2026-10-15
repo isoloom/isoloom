@@ -1,0 +1,5 @@
+{
+  "code": "ready_not_up",
+  "message": "ready[1]: `ps` isn't a step of lifecycle.up; `step_ok` names an up step",
+  "schema": false
+}

@@ -1,0 +1,5 @@
+{
+  "code": "field",
+  "message": "lifecycle.up: the list is empty: it needs at least one",
+  "schema": true
+}

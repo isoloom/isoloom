@@ -1,0 +1,174 @@
+//! What the types can't say on their own because it spans fields: the driver and its identity,
+//! unique step ids, references to steps, machines and published ports, and placeholders that
+//! name something the manifest declares.
+
+use std::collections::BTreeSet;
+
+use crate::lifecycle::Condition;
+use crate::machine::Protocol;
+use crate::outputs::OutputSource;
+use crate::slots::Delivery;
+use crate::template::Placeholder;
+use crate::{Manifest, ManifestError, StepSelection};
+
+impl Manifest {
+    /// Checks what spans fields; the first problem found, if any.
+    pub fn validate(&self) -> Result<(), ManifestError> {
+        if self.hosts.is_empty() {
+            return Err(ManifestError::NoHosts);
+        }
+        if self.identity.driver() != self.driver {
+            return Err(ManifestError::DriverIdentity {
+                driver: self.driver.id(),
+                identity: self.identity.driver().id(),
+            });
+        }
+        self.unique_steps()?;
+        self.deliveries()?;
+        self.ready_conditions()?;
+        self.machine_references()?;
+        self.placeholders()
+    }
+
+    fn unique_steps(&self) -> Result<(), ManifestError> {
+        for (list, steps) in self.step_lists() {
+            let mut seen = BTreeSet::new();
+            if let Some(dup) = steps.iter().find(|s| !seen.insert(&s.id)) {
+                return Err(ManifestError::DuplicateStep { list, id: dup.id.to_string() });
+            }
+        }
+        Ok(())
+    }
+
+    fn deliveries(&self) -> Result<(), ManifestError> {
+        let lists = self.step_lists();
+        let ids: BTreeSet<&str> = lists.iter().flat_map(|(_, steps)| steps.iter().map(|s| s.id.as_str())).collect();
+        let params = self.params.iter().enumerate().map(|(i, p)| (format!("params[{i}]"), p.deliver.as_slice()));
+        let slots = self.secrets.iter().enumerate().map(|(i, s)| (format!("secrets[{i}]"), s.deliver.as_slice()));
+        for (at, deliveries) in params.chain(slots) {
+            for (j, d) in deliveries.iter().enumerate() {
+                let at = format!("{at}.deliver[{j}]");
+                let named: Vec<&str> = match d {
+                    Delivery::Env {
+                        steps: StepSelection::Only(steps),
+                        ..
+                    } => steps.iter().map(crate::StepId::as_str).collect(),
+                    Delivery::Guest {
+                        during_step: Some(step),
+                        machine,
+                        ..
+                    } => {
+                        self.machine_exists(&at, machine.as_str())?;
+                        vec![step.as_str()]
+                    }
+                    Delivery::Guest { machine, .. } => {
+                        self.machine_exists(&at, machine.as_str())?;
+                        Vec::new()
+                    }
+                    _ => Vec::new(),
+                };
+                if let Some(missing) = named.into_iter().find(|s| !ids.contains(s)) {
+                    return Err(ManifestError::UnknownStep { at, step: missing.to_string() });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn ready_conditions(&self) -> Result<(), ManifestError> {
+        for (index, c) in self.ready.iter().enumerate() {
+            match c {
+                Condition::StepOk { step, .. } if !self.lifecycle.up.iter().any(|s| &s.id == step) => {
+                    return Err(ManifestError::ReadyNotUp { index, step: step.to_string() });
+                }
+                Condition::MachinesRunning { machines } => {
+                    for m in machines {
+                        self.machine_exists(&format!("ready[{index}]"), m.as_str())?;
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn machine_references(&self) -> Result<(), ManifestError> {
+        let mut seen = BTreeSet::new();
+        if let Some(dup) = self.machines.iter().find(|m| !seen.insert(&m.name)) {
+            return Err(ManifestError::DuplicateMachine { name: dup.name.to_string() });
+        }
+        for (i, m) in self.machines.iter().enumerate() {
+            if let Some(of) = &m.of {
+                self.machine_exists(&format!("machines[{i}].of"), of.as_str())?;
+            }
+        }
+        for (i, s) in self.secrets.iter().enumerate() {
+            for m in &s.machines {
+                self.machine_exists(&format!("secrets[{i}].machines"), m.as_str())?;
+            }
+        }
+        for (i, o) in self.outputs.iter().enumerate() {
+            if let OutputSource::PublishedPort { machine, port, protocol } = &o.from {
+                self.published(&format!("outputs[{i}].from"), machine.as_str(), port.get(), *protocol)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn placeholders(&self) -> Result<(), ManifestError> {
+        for (at, template) in self.templates() {
+            for p in template.placeholders() {
+                match p {
+                    Placeholder::Published { machine, port, protocol } => self.published(&at, machine.as_str(), port.get(), *protocol)?,
+                    Placeholder::Param(name) if !self.params.iter().any(|x| &x.name == name) => {
+                        return Err(ManifestError::UnknownParam { at, name: name.to_string() });
+                    }
+                    Placeholder::Output(name) if !self.outputs.iter().any(|x| &x.name == name) => {
+                        return Err(ManifestError::UnknownOutput { at, name: name.to_string() });
+                    }
+                    Placeholder::Value if !(at.starts_with("outputs[") && at.ends_with("].format")) => {
+                        return Err(out_of_place(at, "value", "an output's `format`"));
+                    }
+                    Placeholder::Machine if !at.starts_with("lifecycle.provision.machine[") => {
+                        return Err(out_of_place(at, "machine", "the steps of `lifecycle.provision.machine`"));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn machine_exists(&self, at: &str, machine: &str) -> Result<(), ManifestError> {
+        if self.machines.iter().any(|m| m.name.as_str() == machine) {
+            Ok(())
+        } else {
+            Err(ManifestError::UnknownMachine {
+                at: at.to_string(),
+                machine: machine.to_string(),
+            })
+        }
+    }
+
+    /// Whether `machine` publishes `port` over `protocol`.
+    fn published(&self, at: &str, machine: &str, port: u16, protocol: Protocol) -> Result<(), ManifestError> {
+        let found = self
+            .machines
+            .iter()
+            .filter(|m| m.name.as_str() == machine)
+            .flat_map(|m| &m.ports)
+            .any(|p| p.port.get() == port && p.protocol == protocol && p.publish.is_some());
+        if found {
+            return Ok(());
+        }
+        let udp = if protocol == Protocol::Udp { ".udp" } else { "" };
+        Err(ManifestError::UnknownPublished {
+            at: at.to_string(),
+            port: format!("{machine}.{port}{udp}"),
+        })
+    }
+}
+
+fn out_of_place(at: String, root: &'static str, only: &'static str) -> ManifestError {
+    ManifestError::PlaceholderOutOfPlace { at, root, only }
+}

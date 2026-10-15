@@ -22,6 +22,7 @@ isoloom-external = { path = "crates/isoloom-external" }
 isoloom-targets = { path = "crates/isoloom-targets" }
 isoloom-import = { path = "crates/isoloom-import" }
 isoloom-runtime = { path = "crates/isoloom-runtime" }
+isoloom-manifest = { path = "crates/isoloom-manifest" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"
@@ -32,6 +33,8 @@ hcl-rs = "0.19"
 thiserror = "2"
 insta = { version = "1", features = ["yaml"] }
 proptest = { version = "1", default-features = false, features = ["std"] }
+serde_path_to_error = "0.1"
+jsonschema = { version = "0.58", default-features = false }
 
 # Every crate inherits these (`[lints] workspace = true`); see CONTRIBUTING.md. Every lint is at
 # "deny": a new exception is a local `#[allow]` with a one-line reason, never an entry here.
