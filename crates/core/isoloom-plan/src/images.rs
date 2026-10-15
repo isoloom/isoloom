@@ -106,6 +106,22 @@ mod tests {
     }
 
     #[test]
+    fn a_built_image_is_tagged_locally_and_never_pulled_through_a_mirror() {
+        let spec = crate::testing::spec(
+            "version: 1\nname: lab\nmachines:\n  web: { app: { image: nginx } }\n  own: { app: { build: web } }\n  gen: { os: debian@12, app: { steps: [{ packages: [curl] }] } }\nconstraints: { registries: { docker.io: m.corp/hub } }\n",
+        );
+        let images = super::Images::of(&spec);
+        assert_eq!(images.pull("nginx"), "m.corp/hub/library/nginx");
+        assert_eq!(images.pull("isoloom/lab-own"), "isoloom/lab-own");
+        assert_eq!(images.pull("isoloom/lab-gen"), "isoloom/lab-gen");
+        assert_eq!(images.pull("isoloom/lab-web"), "m.corp/hub/isoloom/lab-web", "not built: pulled like any other");
+        assert_eq!(super::tag_of(&spec, "own", None), "isoloom/lab-own");
+        assert_eq!(super::tag_of(&spec, "web", Some("nginx")), "nginx");
+        let none = crate::testing::spec("version: 1\nname: lab\nmachines:\n  web: { app: { image: nginx } }\n");
+        assert_eq!(super::Images::of(&none).pull("nginx"), "nginx");
+    }
+
+    #[test]
     fn docker_hubs_other_names_and_a_registry_with_a_port_are_registries() {
         let c = mirrors(&[("docker.io", "m/hub"), ("localhost:5000", "m/local")]);
         assert_eq!(rewrite_image(&c, "index.docker.io/library/redis"), "m/hub/library/redis");

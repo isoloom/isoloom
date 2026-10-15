@@ -220,3 +220,48 @@ fn checks_group_by_position_the_default_first_then_machines_in_order() {
         ]
     );
 }
+
+#[test]
+fn a_request_is_plain_with_nothing_beyond_a_get_and_its_status() {
+    assert!(HttpRequest::default().is_plain());
+    assert!(
+        HttpRequest {
+            follow: true,
+            ..HttpRequest::default()
+        }
+        .is_plain(),
+        "following redirects is still a GET"
+    );
+    let one_more = [
+        HttpRequest {
+            method: Some("POST".into()),
+            ..HttpRequest::default()
+        },
+        HttpRequest {
+            headers: vec![("A".into(), "1".into())],
+            ..HttpRequest::default()
+        },
+        HttpRequest {
+            body: Some(String::new()),
+            ..HttpRequest::default()
+        },
+        HttpRequest {
+            contains: Some("ok".into()),
+            ..HttpRequest::default()
+        },
+    ];
+    for r in one_more {
+        assert!(!r.is_plain(), "{r:?}");
+    }
+}
+
+#[test]
+fn checks_from_the_networks_have_a_group_beside_the_access_machines() {
+    // A Windows access machine runs no checks: what the spec implies is checked from the networks.
+    let s = testing::spec(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  user: { access: true, os: windows@11, networks: { lan: 5 } }\n  web: { networks: { lan: 10 }, os: windows-server@2022, ports: { site: 80 } }\nchecks: [checks/a.sh]\n",
+    );
+    let planned = plan(&s);
+    let groups: Vec<(Position, usize)> = by_position(&s, &planned).into_iter().map(|(p, cs)| (p, cs.len())).collect();
+    assert_eq!(groups, [(Position::Machine("user".into()), 1), (Position::Networks, 1)]);
+}

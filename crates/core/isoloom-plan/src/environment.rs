@@ -618,6 +618,112 @@ mod tests {
         assert_eq!(env.probe_address("ghost", "v4"), "ghost");
     }
 
+    /// `web` has both forms, `img` only an image, `vm` only a VM (a reboot), `ct` is an LXC
+    /// container on Proxmox, `user` is supplied; `data` is shared by `vm` and `both`.
+    const SHAPES: &str = "version: 1
+name: t
+networks: { a: { cidr: 10.1.0.0/24, ipv6: { cidr: \"fd00:1::/64\" } }, b: { cidr: 10.2.0.0/24, ipv6: { cidr: \"fd00:2::/64\" } } }
+reach: [{ from: a, to: b }]
+volumes: { data: { owner: vm } }
+machines:
+  both: { networks: { a: 10 }, os: debian@12, app: { image: nginx, steps: [{ run: a.sh }] }, volumes: { data: /d, own: /o } }
+  img: { networks: { a: 11 }, app: { image: nginx } }
+  vm: { networks: { b: 12 }, os: debian@12, app: { steps: [{ run: a.sh }, reboot] }, volumes: { data: /d } }
+  ct: { networks: { a: 13 }, app: { image: alpine } }
+  win: { networks: { a: 14 }, os: windows-server@2022 }
+  user: { access: true, networks: { a: 5 } }
+overrides:
+  proxmox: { machines: { ct: { lxc: true } } }
+  vagrant: { machines: { win: { winrm: ssl } } }
+";
+
+    fn shapes(target: Target) -> Vec<(String, super::MachineShape)> {
+        testing::environment(SHAPES, target)
+            .machines
+            .iter()
+            .map(|(n, m)| (n.clone(), m.shape))
+            .collect()
+    }
+
+    fn shape_of(target: Target, machine: &str) -> Option<super::MachineShape> {
+        shapes(target).into_iter().find(|(n, _)| n == machine).map(|(_, s)| s)
+    }
+
+    #[test]
+    fn each_target_produces_a_machine_in_the_form_it_runs() {
+        use super::MachineShape::{Container, External, Supplied, Vm};
+        for t in [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker, Target::Kubernetes] {
+            assert_eq!(shape_of(t, "both"), Some(Container), "{t:?}");
+            assert_eq!(shape_of(t, "user"), Some(Supplied), "{t:?}");
+        }
+        assert_eq!(shape_of(Target::Hybrid, "both"), Some(Container), "a container where it has one");
+        assert_eq!(shape_of(Target::Hybrid, "vm"), Some(Vm));
+        assert_eq!(shape_of(Target::Proxmox, "ct"), Some(Container), "an LXC container");
+        assert_eq!(shape_of(Target::Proxmox, "both"), Some(Vm));
+        assert_eq!(shape_of(Target::Vagrant, "both"), Some(Vm));
+        assert_eq!(shape_of(Target::External, "both"), Some(External));
+    }
+
+    #[test]
+    fn a_vm_has_set_up_steps_and_a_container_none() {
+        let env = testing::environment(SHAPES, Target::Hybrid);
+        let steps = |m: &str| env.machines.get(m).map_or(0, |p| p.lifecycle.len());
+        assert!(steps("vm") > 0);
+        assert_eq!(steps("both"), 0);
+    }
+
+    #[test]
+    fn a_cloud_routes_ipv6_itself_and_the_other_vm_targets_through_the_router() {
+        let routes6 = |t: Target| {
+            testing::environment(SHAPES, t)
+                .machines
+                .get("both")
+                .map(|m| m.routes6.len())
+                .unwrap_or_default()
+        };
+        assert_eq!(routes6(Target::Vagrant), 1);
+        assert_eq!(routes6(Target::CloudVm), 0);
+        let cloud = testing::environment(SHAPES, Target::CloudVm);
+        let ipv6_routes = cloud.machines.get("both").and_then(|m| {
+            m.lifecycle.iter().find_map(|s| match s {
+                crate::Step::Ipv6 { routes, .. } => Some(routes.len()),
+                _ => None,
+            })
+        });
+        assert_eq!(ipv6_routes, Some(0));
+    }
+
+    #[test]
+    fn a_shared_volume_names_its_owner_and_users_and_an_own_one_is_the_machines() {
+        let env = testing::environment(SHAPES, Target::Vagrant);
+        let both = env.machines.get("both").map(|m| m.volumes.clone()).unwrap_or_default();
+        let kinds: Vec<(&str, &super::VolumeKind)> = both.iter().map(|v| (v.name.as_str(), &v.kind)).collect();
+        assert_eq!(
+            kinds,
+            [
+                (
+                    "data",
+                    &super::VolumeKind::Shared {
+                        owner: "vm".into(),
+                        users: vec!["both".into(), "vm".into()]
+                    }
+                ),
+                ("own", &super::VolumeKind::Own)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_windows_vm_answers_winrm_its_way() {
+        let env = testing::environment(SHAPES, Target::Vagrant);
+        let win = env.machines.get("win").expect("planned");
+        assert!(win.is_windows() && !win.winssh);
+        assert_eq!(win.winrm, Some(isoloom_spec::model::Winrm::Ssl));
+        let vm = env.machines.get("vm").expect("planned");
+        assert!(!vm.is_windows() && vm.winrm.is_none());
+        assert!(super::on_docker(Target::Docker) && super::on_docker(Target::Hosted) && !super::on_docker(Target::DockerVm));
+    }
+
     #[test]
     fn only_playbooks_need_a_controller() {
         let lab = testing::lab(
