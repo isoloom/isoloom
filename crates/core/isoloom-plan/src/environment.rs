@@ -595,6 +595,29 @@ mod tests {
     }
 
     #[test]
+    fn settings_are_empty_until_one_is_set() {
+        assert!(super::Settings::default().is_empty());
+        let mut s = super::Settings::default();
+        s.sysctls.insert("net.ipv4.ip_forward".into(), "1".into());
+        assert!(!s.is_empty());
+        let mut u = super::Settings::default();
+        u.environment.insert("A".into(), "1".into());
+        assert!(!u.is_empty());
+    }
+
+    #[test]
+    fn a_probe_reaches_a_machine_at_its_address_else_by_name() {
+        let env = testing::environment(
+            "version: 1\nname: t\nnetworks:\n  v4: { cidr: 10.9.0.0/24 }\n  v6: { cidr: 10.8.0.0/24, ipv6: { cidr: \"fd00:8::/64\", only: true } }\n  auto: { cidr: 10.7.0.0/24, ipv6: { cidr: \"fd00:7::/64\", only: true, addresses: auto } }\nmachines:\n  web: { networks: { v4: 10, v6: 10, auto: 10 }, app: { image: nginx } }\n",
+            Target::Kubernetes,
+        );
+        assert_eq!(env.probe_address("web", "v4"), "10.9.0.10");
+        assert_eq!(env.probe_address("web", "v6"), "fd00:8::10");
+        assert_eq!(env.probe_address("web", "auto"), "web");
+        assert_eq!(env.probe_address("ghost", "v4"), "ghost");
+    }
+
+    #[test]
     fn only_playbooks_need_a_controller() {
         let lab = testing::lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.sh]\n",

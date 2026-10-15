@@ -332,3 +332,6 @@ pub fn has_extension(path: &str, extension: &str) -> bool {
 fn windows(m: &Machine) -> bool {
     m.vm.as_ref().is_some_and(|vm| isoloom_spec::images::is_windows(&vm.os))
 }
+
+#[cfg(test)]
+mod tests;

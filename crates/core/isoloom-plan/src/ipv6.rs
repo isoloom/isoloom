@@ -167,6 +167,7 @@ pub fn requirements(spec: &Spec) -> Vec<Requirement> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lifecycle::Step;
 
     fn spec() -> Spec {
         crate::testing::spec(
@@ -182,6 +183,48 @@ machines:
   y: { networks: { b: 20, c: 5 }, app: { image: alpine } }
 ",
         )
+    }
+
+    #[test]
+    fn only_an_ipv6_only_network_carries_no_ipv4() {
+        let s = crate::testing::spec(
+            "version: 1\nname: v6\nnetworks:\n  a: { cidr: 10.1.0.0/24, ipv6: { cidr: \"fd00:1::/64\", only: true } }\n  b: { cidr: 10.2.0.0/24, ipv6: { cidr: \"fd00:2::/64\" } }\nmachines: {}\n",
+        );
+        assert!(only(&s, "a") && !only(&s, "b") && !only(&s, "nowhere"));
+        let plan = network(&s, "a").expect("an IPv6 side");
+        assert_eq!(
+            (plan.cidr.as_str(), plan.gateway.to_string(), plan.only),
+            ("fd00:1::/64", "fd00:1::1".to_owned(), true)
+        );
+        assert_eq!(network(&spec(), "c"), None);
+        let kinds: Vec<Requirement> = requirements(&s);
+        assert_eq!(
+            kinds,
+            [Requirement::Ipv6 { network: "a".into() }, Requirement::Ipv6Only { network: "a".into() }]
+        );
+        assert_eq!(requirements(&spec()).last(), Some(&Requirement::Ipv6Auto { network: "b".into() }));
+    }
+
+    #[test]
+    fn a_cloud_keeps_the_addresses_and_drops_the_routes() {
+        let mut steps = vec![
+            Step::Ipv6 {
+                addresses: Vec::new(),
+                routes: routes(&spec(), &spec().machines["x"]),
+            },
+            Step::Ready,
+        ];
+        cloud_routes(&mut steps);
+        assert_eq!(
+            steps,
+            [
+                Step::Ipv6 {
+                    addresses: Vec::new(),
+                    routes: Vec::new()
+                },
+                Step::Ready
+            ]
+        );
     }
 
     #[test]

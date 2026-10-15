@@ -312,3 +312,6 @@ pub fn by_position<'a>(spec: &Spec, checks: &'a [Resolved]) -> Vec<(Position, Ve
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests;

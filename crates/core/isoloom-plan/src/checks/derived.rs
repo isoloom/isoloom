@@ -167,3 +167,6 @@ fn answers(host: Host, svc: &Port) -> Probe {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

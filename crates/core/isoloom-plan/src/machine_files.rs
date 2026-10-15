@@ -77,6 +77,7 @@ pub(crate) fn no_existing_host_files(f: &mut fmt::Formatter<'_>, machine: &str) 
 mod tests {
     use isoloom_spec::model::Target;
 
+    use super::reads_project;
     use crate::environment::Environment;
     use crate::lifecycle::Step;
     use crate::requirements::Requirement;
@@ -101,6 +102,19 @@ overrides:
 
     fn env(target: Target) -> Environment {
         testing::planned(&testing::valid(SPEC), target)
+    }
+
+    #[test]
+    fn a_vm_reads_the_project_for_its_scripts_and_its_files_from_it_only() {
+        let steps = |yaml: &str| {
+            let env = testing::environment(&format!("version: 1\nname: t\nmachines:\n  a: {{ os: debian@12, {yaml} }}\n"), Target::Vagrant);
+            env.machines.get("a").map(|m| m.lifecycle.clone()).unwrap_or_default()
+        };
+        assert!(!reads_project(&steps("files: [{ path: /a, content: x }]")));
+        assert!(reads_project(&steps("files: [{ path: /a, source: conf/a }]")));
+        assert!(reads_project(&steps("app: { steps: [{ run: a.sh }] }")));
+        assert!(reads_project(&steps("setup: [s.sh]")));
+        assert!(!reads_project(&steps("command: [sleep, '9']")));
     }
 
     #[test]

@@ -94,3 +94,84 @@ fn vm_steps(name: &str, m: &syntax::Machine) -> Vec<Problem> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing;
+
+    /// `img` (an image only), `vm` (steps a container can't run), `both` (both forms, with a
+    /// `copy` step), `ct` (an LXC container on Proxmox, an image only), `user` (supplied).
+    const LAB: &str = "version: 1
+name: t
+machines:
+  img: { app: { image: nginx } }
+  vm: { os: debian@12, app: { steps: [{ run: a.sh }, reboot] } }
+  both: { os: debian@12, app: { steps: [{ copy: { from: f, to: /f } }, { run: a.sh }] } }
+  ct: { app: { image: alpine } }
+  user: { access: true }
+overrides:
+  proxmox: { machines: { ct: { lxc: true } } }
+  external: { machines: { vm: { ssh: { address: 192.0.2.1 } } } }
+";
+
+    /// What `target` refuses, as (path, code).
+    fn refused_on(target: Target) -> Vec<String> {
+        of(testing::lab(LAB).source(), target).iter().map(|p| p.path.to_string()).collect()
+    }
+
+    #[test]
+    fn a_container_target_refuses_what_has_no_container_form() {
+        assert_eq!(refused_on(Target::Docker), ["machines.vm.app.steps[1]"]);
+    }
+
+    #[test]
+    fn a_vm_target_refuses_what_has_no_vm_form_and_the_vm_steps_it_doesnt_run_yet() {
+        assert_eq!(
+            refused_on(Target::Vagrant),
+            ["machines.img.app.image", "machines.both.app.steps[0]", "machines.ct.app.image"]
+        );
+    }
+
+    #[test]
+    fn proxmox_runs_an_lxc_machine_as_its_container_form() {
+        assert_eq!(refused_on(Target::Proxmox), ["machines.img.app.image", "machines.both.app.steps[0]"]);
+    }
+
+    #[test]
+    fn hybrid_refuses_only_a_machine_with_neither_form_and_runs_a_vm_only_where_it_must() {
+        let l = testing::lab(
+            "version: 1\nname: t\nmachines:\n  web: { app: { image: nginx } }\n  db: { os: windows-server@2022, app: { steps: [{ packages: [x] }] } }\n  svc: { os: debian@12, service: postgres }\n",
+        );
+        let found: Vec<String> = of(l.source(), Target::Hybrid).iter().map(|p| p.path.to_string()).collect();
+        assert_eq!(found, ["machines.db.app.steps[0]", "machines.svc.service"]);
+        assert_eq!(
+            refused_on(Target::Hybrid),
+            Vec::<String>::new(),
+            "both has a container form: no VM steps to refuse"
+        );
+    }
+
+    #[test]
+    fn external_needs_a_host_for_every_machine_but_the_supplied_one() {
+        let found = of(testing::lab(LAB).source(), Target::External);
+        let paths: Vec<&str> = found.iter().map(|p| p.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                "overrides.external.machines.img",
+                "overrides.external.machines.both",
+                "machines.both.app.steps[0]",
+                "overrides.external.machines.ct"
+            ]
+        );
+        assert!(found.iter().all(|p| p.code == Code::Refused));
+    }
+
+    #[test]
+    fn a_cloud_services_lab_refuses_nothing() {
+        let l = testing::lab("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n");
+        assert_eq!(of(l.source(), Target::CloudServices), []);
+        assert_eq!(forms(l.source(), Target::Vagrant), []);
+    }
+}

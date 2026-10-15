@@ -201,7 +201,52 @@ mod tests {
             ("networks.lab.docker.cidr", "overrides.docker.networks.lab.cidr"),
             ("volumes.data.virtiofs.cache", "overrides.proxmox.volumes.data.virtiofs.cache"),
             ("controller.image.vagrant", "overrides.vagrant.controller"),
+            ("networks.lab.docker", "overrides.docker.networks.lab"),
+            ("networks.lab.external", "overrides.docker.networks.lab.external"),
+            ("networks.lab.cidr", "networks.lab.cidr"),
+            ("volumes.data.external", "overrides.docker.volumes.data.external"),
+            ("volumes.data.persistent", "volumes.data.persistent"),
+            ("machines.web.docker.idle", "machines.web.os"),
+            ("machines.web.docker.args.X", "machines.web.app.build"),
+            ("machines.web.docker.generated", "machines.web.app"),
+            ("machines.web.vm", "machines.web.os"),
+            ("machines.web.vm.boot", "machines.web.hardware.boot"),
+            ("machines.web.vm.boot.network", "machines.web.hardware.boot.network"),
+            ("machines.web.vm.provision[2]", "machines.web.app.steps[2]"),
+            ("machines.web.vm.setup", "machines.web.app"),
+            ("machines.web.vm.image", "overrides.vagrant.machines.web"),
+            ("machines.web.vm.image.vagrant_version", "overrides.vagrant.machines.web.box_version"),
+            ("machines.web.vm.image.qemu", "overrides.vagrant.machines.web.boxes.qemu"),
+            ("machines.web.vm.image.winrm", "overrides.vagrant.machines.web.winrm"),
+            ("machines.web.vm.image.proxmox", "overrides.proxmox.machines.web.image"),
+            ("machines.web.gpus", "machines.web.hardware.gpus"),
+            ("machines.web.external.address", "overrides.external.machines.web.ssh"),
+            ("machines.web.more_addresses.lan", "machines.web.networks.lan"),
+            ("machines.web.environment.A", "machines.web.environment.A"),
             ("checks[2].from", "checks[2].from"),
+        ] {
+            assert_eq!(t.path(lowered).as_str(), written, "{lowered}");
+        }
+    }
+
+    #[test]
+    fn lowering_records_a_machines_ports_vm_steps_setup_and_inputs() {
+        let lab = crate::testing::lab(
+            "version: 1\nname: t\ninputs: { A: { sensitive: false }, B: {} }\nmachines:\n  web:\n    os: debian@12\n    ports: { site: 80, admin: 8080 }\n    environment: { X: x, A: { input: A } }\n    setup: [s.sh, t.sh]\n    app: { steps: [{ packages: [curl] }, { run: a.sh }, { copy: { from: f, to: /f } }, reboot] }\n",
+        );
+        let mut t = Trail::default();
+        if let Some(m) = lab.source().machines.get("web") {
+            t.machine("web", m);
+        }
+        t.inputs(lab.source());
+        for (lowered, written) in [
+            ("machines.web.ports[1].publish", "machines.web.ports.admin.publish"),
+            ("machines.web.vm.provision[0]", "machines.web.app.steps[1]"),
+            ("machines.web.vm.provision[1]", "machines.web.app.steps[3]"),
+            ("machines.web.docker.init[1]", "machines.web.setup[1]"),
+            ("machines.web.inputs[0]", "machines.web.environment.A"),
+            ("inputs[1]", "inputs.B"),
+            ("secrets.input-b", "inputs.B"),
         ] {
             assert_eq!(t.path(lowered).as_str(), written, "{lowered}");
         }

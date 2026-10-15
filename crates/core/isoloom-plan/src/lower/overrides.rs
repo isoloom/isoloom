@@ -125,3 +125,6 @@ pub(super) fn vm_image(source: &syntax::Spec, name: &str) -> Option<VmImage> {
     }
     (image != VmImage::default()).then_some(image)
 }
+
+#[cfg(test)]
+mod tests;

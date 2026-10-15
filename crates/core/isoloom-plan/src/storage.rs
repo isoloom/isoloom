@@ -144,6 +144,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_volume_lives_with_the_environment_past_it_or_already_exists() {
+        let spec = crate::testing::lab(
+            "version: 1\nname: t\nvolumes: { keep: { persistent: true }, old: {}, tmp: {} }\nmachines:\n  m: { app: { image: x }, volumes: { keep: /k, old: /o, tmp: /t, own: /w }, tmpfs: [{ path: /run/x, mode: '1777' }] }\noverrides: { docker: { volumes: { old: { external: data-1 } } } }\n",
+        )
+        .for_target(isoloom_spec::model::Target::Docker);
+        assert_eq!(lifetime(&spec, "keep"), Lifetime::Persistent);
+        assert_eq!(lifetime(&spec, "old"), Lifetime::External { name: "data-1".into() });
+        assert_eq!(lifetime(&spec, "tmp"), Lifetime::Environment);
+        assert_eq!(lifetime(&spec, "own"), Lifetime::Environment);
+        assert_eq!(
+            requirements(&spec),
+            [
+                Requirement::PersistentVolume { volume: "keep".into() },
+                Requirement::ExternalVolume { volume: "old".into() },
+                Requirement::TmpfsModes { machine: "m".into() }
+            ]
+        );
+    }
+
+    #[test]
     fn a_disk_takes_its_os_default_filesystem_and_a_key_of_its_machine() {
         let spec = crate::testing::spec(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db: { networks: { lan: 10 }, os: debian@12, disks: { data: { size_gb: 5, mount: /data }, blk: { size_gb: 1, fs: raw } } }\n  win: { networks: { lan: 11 }, os: windows-server@2022, disks: { logs: { size_gb: 2, mount: 'E:' } } }\n",
@@ -154,5 +174,8 @@ mod tests {
         assert_eq!(disks("win", &spec.machines["win"])[0].fs, Filesystem::Ntfs);
         let kinds: Vec<_> = requirements(&spec).iter().map(Requirement::feature).collect();
         assert_eq!(kinds, [crate::Feature::DataDisks, crate::Feature::RawDisks]);
+        let formatted =
+            crate::testing::spec("version: 1\nname: t\nmachines:\n  db: { os: debian@12, disks: { data: { size_gb: 5, mount: /data, fs: xfs } } }\n");
+        assert_eq!(requirements(&formatted), [Requirement::DataDisks { machine: "db".into() }]);
     }
 }

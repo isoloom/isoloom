@@ -209,3 +209,16 @@ fn a_healthcheck_page_on_a_named_port_takes_its_number() {
     let page = l.spec.machines["web"].healthcheck.as_ref().and_then(|h| h.http.clone()).expect("a page");
     assert_eq!((page.port, page.path.as_str()), (8000, "/health"));
 }
+
+#[test]
+fn a_dns_server_named_by_machine_is_its_address_on_a_network_both_share() {
+    let lab = crate::testing::lab(
+        "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  dns: { networks: { a: 53, b: 53 }, app: { image: coredns } }\n  pc: { networks: { b: 10 }, dns: { servers: [dns, 9.9.9.9] }, app: { image: x } }\n  far: { networks: { a: 11 }, dns: { servers: [pc] }, app: { image: x } }\n",
+    );
+    let l = lower(lab.source(), Scope::Lab);
+    let servers = |m: &str| l.spec.machines[m].dns.as_ref().map(|d| d.servers.clone()).unwrap_or_default();
+    assert_eq!(servers("pc"), ["10.2.0.53", "9.9.9.9"]);
+    assert_eq!(servers("far"), ["pc"], "they share no network: the name stays");
+    let docker = lower(lab.source(), Scope::Target(Target::Docker));
+    assert!(docker.spec.machines["pc"].dns.as_ref().is_some_and(|d| d.servers[0] != "dns"));
+}
