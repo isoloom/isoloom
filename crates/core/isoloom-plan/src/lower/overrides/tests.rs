@@ -88,6 +88,7 @@ fn a_group_holds_the_members_of_the_groups_it_names_but_stops_at_a_loop() {
     .clone();
     assert!(member(&s, "x", "m", 0) && member(&s, "y", "m", 0));
     assert!(!member(&s, "x", "n", 0) && !member(&s, "x", "m", 8) && !member(&s, "nowhere", "m", 0));
+    assert!(member(&s, "y", "m", 7) && !member(&s, "y", "m", 8), "groups nest eight deep at most");
 }
 
 #[test]
@@ -106,4 +107,14 @@ fn each_cloud_gives_the_machine_its_image() {
         vm_image(&testing::lab("version: 1\nname: t\nmachines:\n  m: { os: debian@12 }\n").source().clone(), "m"),
         None
     );
+}
+
+#[test]
+fn a_clone_takes_its_own_counted_machines_entry_not_anothers() {
+    let s = testing::lab("version: 1\nname: t\nmachines:\n  w: { os: debian@12, count: 2 }\n  v: { os: debian@12, count: 2 }\noverrides: { vagrant: { machines: { w: { box: example/w } } } }\n")
+        .source()
+        .clone();
+    let vagrant = s.overrides.vagrant.as_ref().expect("vagrant overrides");
+    assert!(for_machine(&s, &vagrant.machines, "w-02").is_some());
+    assert!(for_machine(&s, &vagrant.machines, "v-01").is_none());
 }

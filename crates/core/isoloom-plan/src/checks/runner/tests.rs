@@ -334,3 +334,17 @@ fn exec_scripts_and_playbooks_run_where_the_target_says() {
         "{nowhere}"
     );
 }
+
+#[test]
+fn a_head_request_is_curls_own_only_when_following_redirects() {
+    let head = |follow: bool| {
+        let request = HttpRequest {
+            method: Some("head".into()),
+            follow,
+            ..HttpRequest::default()
+        };
+        lines(check("h", 30, http("http://web/", HttpExpect::Status(200), request)))
+    };
+    assert!(head(false).contains("_req 200 '' -X 'HEAD' 'http://web/'"), "{}", head(false));
+    assert!(head(true).contains("_req 200 '' -L --max-redirs 5 -I 'http://web/'"), "{}", head(true));
+}
