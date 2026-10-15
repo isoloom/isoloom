@@ -18,9 +18,13 @@
 //! its own folder. Their paths go to the repository's `.git/info/exclude`: local, never
 //! committed, and shared by every branch and worktree, so they stay there after an unlink
 //! (another worktree may still be linked). Running link or unlink again gives the same result.
+//!
+//! `relock` brings a consumer's committed Cargo.lock up to date with the Isoloom commits its
+//! manifests pin, fetched from this checkout instead of GitHub ([`relock`]).
 
 mod config;
 mod lockfile;
+mod relock;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -41,19 +45,22 @@ pub(crate) enum Action {
     Unlink,
     /// Say which consumers are linked, and to what.
     Status,
+    /// Update the consumers' committed Cargo.lock to the Isoloom commits their manifests pin,
+    /// fetched from this checkout instead of GitHub.
+    Relock,
 }
 
 /// The arguments of `cargo xtask dev-link`.
 #[derive(clap::Args)]
 pub(crate) struct Args {
-    /// link, unlink or status.
+    /// link, unlink, status or relock.
     #[arg(value_enum)]
     action: Action,
     /// The consumers' checkouts (default: Isothrum and the launcher next to the main checkout).
     consumers: Vec<PathBuf>,
 }
 
-/// Links, unlinks or reports each consumer; fails when one couldn't be linked.
+/// Links, unlinks, reports or relocks each consumer; fails when one couldn't be.
 pub(crate) fn run(a: &Args) -> ExitCode {
     let root = repo::root();
     let consumers = if a.consumers.is_empty() {
@@ -77,6 +84,7 @@ pub(crate) fn run(a: &Args) -> ExitCode {
             Action::Link => ok &= report(link(&root, &c)),
             Action::Unlink => ok &= report(config::unlink(&c).map(|()| vec!["git pins (not linked)".into()])),
             Action::Status => ok &= report(Ok(config::status(&c))),
+            Action::Relock => ok &= report(workspaces(&c).and_then(|list| relock::relock(&root, &c, &list))),
         }
     }
     if ok { ExitCode::SUCCESS } else { ExitCode::FAILURE }
