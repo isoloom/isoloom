@@ -508,4 +508,4 @@ locals {
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
-## .isoloom/resolved.json: identical in the `docker` snapshot
+## .isoloom/resolved.json: identical in the `vagrant` snapshot

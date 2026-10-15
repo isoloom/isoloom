@@ -206,4 +206,4 @@ ansible_become=true
   }
 }
 
-## .isoloom/resolved.json: identical in the `hybrid` snapshot
+## .isoloom/resolved.json: identical in the `vagrant` snapshot

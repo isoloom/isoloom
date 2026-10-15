@@ -1,7 +1,7 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 44
-expression: example(&name).spec()
+assertion_line: 62
+expression: example(&name).unwrap().spec()
 ---
 version: 1
 name: arm-vm
@@ -34,11 +34,7 @@ machines:
     depends_on: []
     volumes: {}
     access: false
-    docker:
-      image: ~
-      build: ~
-      init: []
-      idle: true
+    docker: ~
     vm:
       os: ubuntu-24.04
       provision:

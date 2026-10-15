@@ -210,6 +210,14 @@ fn tc_loss_over_100() {
 }
 
 #[test]
+fn tc_values_are_never_negative() {
+    assert_problem(&with_tc("{ delay: -5ms }"), "networks.lab.tc.delay", "can't be negative");
+    assert_problem(&with_tc("{ delay: 50ms, jitter: -1ms }"), "networks.lab.tc.jitter", "can't be negative");
+    assert_problem(&with_tc("{ rate: -10mbit }"), "networks.lab.tc.rate", "can't be negative");
+    assert_problem(&with_tc("{ loss: -1 }"), "networks.lab.tc.loss", "0 to 100");
+}
+
+#[test]
 fn tc_rate_not_a_rate() {
     assert_problem(&with_tc("{ rate: fast }"), "networks.lab.tc.rate", "isn't a rate like 10mbit");
 }

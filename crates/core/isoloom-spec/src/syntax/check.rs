@@ -90,6 +90,16 @@ fn step_file(at: &FieldPath, m: &Machine, step: &Step, out: &mut Problems) {
                     .fix("a playbook is `{ playbook: <file>.yml }`"),
             );
         }
+        Step::Playbook(p) if windows => {
+            out.push(
+                Problem::new(
+                    Code::InvalidValue,
+                    at.key("playbook"),
+                    format!("`{p}`: a playbook runs on a Linux machine; a Windows machine's steps are PowerShell scripts"),
+                )
+                .fix("`{ run: <script>.ps1 }`"),
+            );
+        }
         Step::Playbook(p) if !has_extension(p, "yml") && !has_extension(p, "yaml") => {
             out.push(Problem::new(
                 Code::InvalidValue,

@@ -3,7 +3,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 assertion_line: 219
 ---
 # isoloom targets
-✗ docker (machines.cache.app.steps[1]: a reboot needs a machine with its own kernel and boot: a container has neither)
+✗ docker (machines.web.command: its steps install services, but nothing keeps one running in a container)
 
 # isoloom generate --target docker (exit 1)
-· docker: machines.cache.app.steps[1]: a reboot needs a machine with its own kernel and boot: a container has neither
+· docker: machines.web.command: its steps install services, but nothing keeps one running in a container

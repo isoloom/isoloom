@@ -49,6 +49,13 @@ fn sensitive_values_stay_out_of_the_environment() {
 }
 
 #[test]
+fn a_windows_machine_has_no_playbook_step() {
+    let found =
+        problems("machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ run: dc.ps1 }, { playbook: site.yml }] }\n");
+    assert_eq!(found, [(Code::InvalidValue, "machines.dc.app.steps[1].playbook".to_owned())]);
+}
+
+#[test]
 fn an_input_keeps_its_name_in_the_environment() {
     let found = problems(
         "inputs: { API_URL: { sensitive: false } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    environment: { URL: { input: API_URL } }\n",

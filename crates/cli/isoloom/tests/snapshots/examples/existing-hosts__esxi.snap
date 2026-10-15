@@ -576,4 +576,4 @@ resource "local_file" "isoloom_project" {
   content  = join("", [for f in local.project_ignored : "${replace("${basename(local.root)}/${f}", "/[\\\\*?\\[]/", "\\$0")}\n"])
 }
 
-## .isoloom/resolved.json: identical in the `hybrid` snapshot
+## .isoloom/resolved.json: identical in the `vagrant` snapshot

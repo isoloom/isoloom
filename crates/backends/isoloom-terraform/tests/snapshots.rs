@@ -192,8 +192,9 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() -> Outco
 
 #[test]
 fn proxmox_refuses_what_its_windows_machines_cant_have_yet() -> Outcome {
-    let e = planned(&one_vm("os: windows-server@2022, app: { steps: [{ playbook: a.yml }] }")?, Target::Proxmox);
-    let why = ProxmoxBackend.refusal(&e).expect("refused");
+    // Validation refuses a playbook step on Windows; the backend still guards its own plan.
+    let yaml = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, os: windows-server@2022, app: { steps: [{ playbook: a.yml }] } }\n";
+    let why = testing::refusal(&ProxmoxBackend, yaml)?.expect("refused");
     assert!(why.starts_with("machine `w`: Windows provisioning steps are PowerShell scripts"), "{why}");
     Ok(())
 }

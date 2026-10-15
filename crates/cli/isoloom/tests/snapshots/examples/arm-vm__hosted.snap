@@ -3,21 +3,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 assertion_line: 219
 ---
 # isoloom targets
-✓ hosted
+✗ hosted (machines.box.command: its steps install services, but nothing keeps one running in a container)
 
-# isoloom generate --target hosted (exit 0)
-✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/exec-box.sh
-✓ .isoloom/docker/checks/box.sh
-✓ .isoloom/docker/build/box/Dockerfile
-✓ .isoloom/resolved.json
-
-## .isoloom/docker/build/box/Dockerfile: identical in the `docker` snapshot
-
-## .isoloom/docker/checks/box.sh: identical in the `docker` snapshot
-
-## .isoloom/docker/checks/exec-box.sh: identical in the `docker` snapshot
-
-## .isoloom/docker/compose.yml: identical in the `docker` snapshot
-
-## .isoloom/resolved.json: identical in the `docker` snapshot
+# isoloom generate --target hosted (exit 1)
+· hosted: machines.box.command: its steps install services, but nothing keeps one running in a container

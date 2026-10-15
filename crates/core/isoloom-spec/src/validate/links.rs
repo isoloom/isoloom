@@ -2,7 +2,7 @@
 //! Proxmox container a spec may ask for.
 
 use super::Problems;
-use super::networks::{RATES, measure};
+use super::networks::{RATES, measure, negative};
 use crate::model::Spec;
 
 /// The MTUs a target accepts: IPv4's smallest to the largest jumbo frame.
@@ -18,10 +18,12 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
         }
     }
     for (name, m) in &spec.machines {
-        if let Some(r) = &m.rate_limit
-            && !measure(r, RATES)
-        {
-            p.add(format!("machines.{name}.rate_limit"), format!("`{r}` isn't a rate like 10mbit or 512kbit"));
+        if let Some(r) = &m.rate_limit {
+            if negative(r) {
+                p.add(format!("machines.{name}.rate_limit"), format!("`{r}`: a rate can't be negative"));
+            } else if !measure(r, RATES) {
+                p.add(format!("machines.{name}.rate_limit"), format!("`{r}` isn't a rate like 10mbit or 512kbit"));
+            }
         }
         let Some(d) = m.docker.as_ref().filter(|d| d.lxc) else { continue };
         let at = format!("machines.{name}.docker.lxc");

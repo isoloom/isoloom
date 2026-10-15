@@ -1,7 +1,7 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 44
-expression: example(&name).spec()
+assertion_line: 62
+expression: example(&name).unwrap().spec()
 ---
 version: 1
 name: corp-ad-basics
@@ -68,8 +68,7 @@ machines:
     docker: ~
     vm:
       os: windows-server-2022
-      provision:
-        - provision/ad-domain.yml
+      provision: []
       image: ~
   ws-01:
     networks:
@@ -94,9 +93,7 @@ machines:
     docker: ~
     vm:
       os: windows-11
-      provision:
-        - provision/ad-join.yml
-        - provision/ws.yml
+      provision: []
       image: ~
   ws-02:
     networks:
@@ -121,9 +118,7 @@ machines:
     docker: ~
     vm:
       os: windows-11
-      provision:
-        - provision/ad-join.yml
-        - provision/ws.yml
+      provision: []
       image: ~
   web01:
     networks:
@@ -180,7 +175,25 @@ groups:
       - dc01
       - ws-01
       - ws-02
-provision: []
+provision:
+  - ansible: provision/ad-domain.yml
+    inventory: []
+    groups: {}
+    vars: {}
+    host_vars: {}
+    requirements: ~
+  - ansible: provision/ad-join.yml
+    inventory: []
+    groups: {}
+    vars: {}
+    host_vars: {}
+    requirements: ~
+  - ansible: provision/ws.yml
+    inventory: []
+    groups: {}
+    vars: {}
+    host_vars: {}
+    requirements: ~
 checks:
   - checks/domain-up.sh
   - checks/web01-reaches-dc01.sh

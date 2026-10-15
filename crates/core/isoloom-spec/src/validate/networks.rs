@@ -174,16 +174,29 @@ pub(super) fn measure(v: &str, units: &[&str]) -> bool {
 /// The units of a rate, as `tc` reads them.
 pub(super) const RATES: &[&str] = &["bit", "kbit", "mbit", "gbit", "bps", "kbps", "mbps", "gbps"];
 
-/// Each impairment value: times, a percentage, a rate.
+/// Whether `v` is a measure below zero (`-5ms`), which netem refuses when it runs.
+pub(super) fn negative(v: &str) -> bool {
+    v.trim_start().starts_with('-')
+}
+
+/// Each impairment value: times, a percentage, a rate; none below zero.
 fn tc_values(at: &str, tc: &Tc, p: &mut Problems) {
     const TIMES: &[&str] = &["ms", "s", "us"];
+    for (field, value) in [("delay", &tc.delay), ("jitter", &tc.jitter), ("rate", &tc.rate)] {
+        if let Some(v) = value
+            && negative(v)
+        {
+            p.add(format!("{at}.{field}"), format!("`{v}`: a {field} can't be negative"));
+        }
+    }
     if let Some(d) = &tc.delay
+        && !negative(d)
         && !measure(d, TIMES)
     {
         p.add(format!("{at}.delay"), format!("`{d}` isn't a time like 50ms or 1s"));
     }
     if let Some(j) = &tc.jitter {
-        if !measure(j, TIMES) {
+        if !negative(j) && !measure(j, TIMES) {
             p.add(format!("{at}.jitter"), format!("`{j}` isn't a time like 5ms"));
         }
         if tc.delay.is_none() {
@@ -196,6 +209,7 @@ fn tc_values(at: &str, tc: &Tc, p: &mut Problems) {
         p.add(format!("{at}.loss"), "a percentage, 0 to 100");
     }
     if let Some(r) = &tc.rate
+        && !negative(r)
         && !measure(r, RATES)
     {
         p.add(format!("{at}.rate"), format!("`{r}` isn't a rate like 10mbit or 512kbit"));

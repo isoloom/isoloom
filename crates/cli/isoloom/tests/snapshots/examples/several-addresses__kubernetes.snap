@@ -3,7 +3,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 assertion_line: 219
 ---
 # isoloom targets
-✗ kubernetes (machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app))
+✗ kubernetes (machines.web.command: its steps install services, but nothing keeps one running in a container)
 
 # isoloom generate --target kubernetes (exit 1)
-· kubernetes: machine `web` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)
+· kubernetes: machines.web.command: its steps install services, but nothing keeps one running in a container

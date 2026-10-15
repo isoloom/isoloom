@@ -26,10 +26,10 @@ fn problems(lab: &Lab) -> Vec<String> {
 }
 
 #[test]
-fn an_example_every_generator_refuses_is_refused_with_reasons() {
-    // corp-ad-basics: every generator refuses it (Windows provisioning with an Ansible playbook,
-    // no Proxmox image for Windows).
-    let spec = example("corp-ad-basics");
+fn a_lab_every_generator_refuses_is_refused_with_reasons() {
+    // Windows 11 narrowed to the clouds, where none has an image of it yet.
+    let spec =
+        lab("version: 1\nname: w\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\ntargets: [cloud-vm]\nmachines:\n  ws: { os: windows@11, networks: { lab: 10 } }\n");
     let (files, skipped) = generate_all(&spec);
     assert!(files.is_empty(), "{:?}", files.iter().map(|f| &f.path).collect::<Vec<_>>());
     assert_ne!(skipped, [] as [isoloom_targets::GenerateError; 0]);
@@ -37,12 +37,12 @@ fn an_example_every_generator_refuses_is_refused_with_reasons() {
 
 #[test]
 fn refusal_reports_what_a_generator_would_refuse() {
-    // A target can be possible by its machines' editions yet refused by its generator; `targets`
-    // used to show ✓ for those (Proxmox for a Windows lab whose steps are playbooks, or one with
-    // environment provisioning).
+    // A target can be possible by its machines' forms yet refused by its generator; `targets`
+    // used to show ✓ for those (the clouds for a Windows 11 workstation, which none has an
+    // image of yet).
     let ad = example("corp-ad-basics");
-    let why = isoloom_targets::refusal(&ad, Target::Proxmox).expect("Windows steps are PowerShell on Proxmox");
-    assert!(why.contains("PowerShell scripts"), "{why}");
+    let why = isoloom_targets::refusal(&ad, Target::CloudVm).expect("no cloud has a Windows 11 image");
+    assert!(why.contains("no AWS image for `windows-11`"), "{why}");
     // A Windows lab of PowerShell steps clones a template on Proxmox.
     let windows = example("windows-hello");
     assert_eq!(isoloom_targets::refusal(&windows, Target::Proxmox), None);
@@ -240,15 +240,9 @@ fn unsupported_features_are_refused_with_the_reason() {
             what: "machines.dc01.os: Windows has no container form in 1.0".into()
         })
     );
-    assert!(
-        matches!(generate(&ad, Target::Vagrant), Err(GenerateError::Unsupported { .. })),
-        "Windows has no local image yet"
-    );
-    assert!(
-        matches!(generate(&ad, Target::Proxmox), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("PowerShell scripts")),
-        "Windows steps on Proxmox are PowerShell scripts"
-    );
-    assert!(matches!(generate(&ad, Target::CloudVm), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("Windows steps are .ps1 scripts")));
+    // The domain's playbooks run from the controller: the VM targets generate it.
+    assert!(generate(&ad, Target::Vagrant).is_ok() && generate(&ad, Target::Proxmox).is_ok());
+    assert!(matches!(generate(&ad, Target::CloudVm), Err(GenerateError::Unsupported { ref what, .. }) if what.contains("no AWS image for `windows-11`")));
 }
 
 #[test]
