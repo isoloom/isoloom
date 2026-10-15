@@ -551,12 +551,13 @@ fn volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Volume> {
             subpath: mount.subpath().map(String::from),
             key: spec.volume_key(name, v),
             lifetime: storage::lifetime(spec, v),
+            // Only a shared volume of the spec's `volumes:` has an owner.
             kind: match spec.volume_owner(v) {
-                Some(owner) if spec.volumes.contains_key(v) => VolumeKind::Shared {
+                Some(owner) => VolumeKind::Shared {
                     owner: owner.to_owned(),
                     users: spec.volume_users(v).into_iter().map(String::from).collect(),
                 },
-                _ => VolumeKind::Own,
+                None => VolumeKind::Own,
             },
         })
         .collect()
