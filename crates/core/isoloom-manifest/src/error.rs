@@ -6,7 +6,7 @@ use crate::provenance::SUPPORTED_VERSION;
 /// Why a manifest, or one of its values, was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
-pub enum ManifestError {
+pub enum Error {
     /// The text isn't JSON.
     #[error("the manifest isn't JSON (line {line}, column {column}): {reason}; generate it again")]
     Syntax {
@@ -156,6 +156,9 @@ pub enum ManifestError {
     /// A Vagrant-style native name that is neither a Compose service nor a VM.
     #[error("`native` names a Compose `service`, or a `vagrant` machine with its `vm_names`, not both")]
     NativeShape,
+    /// A UDP port marked `http` or `tls`.
+    #[error("a UDP port speaks neither HTTP nor TLS, which run over TCP: set `protocol` to `tcp`, or `http` and `tls` to false")]
+    PortProtocol,
     /// No host operating system for the target.
     #[error("hosts is empty: name the host operating systems the target runs from (`linux`, `macos`, `windows`)")]
     NoHosts,
@@ -250,48 +253,49 @@ pub enum ManifestError {
 }
 
 /// What reading or building a manifest returns.
-pub type Result<T, E = ManifestError> = std::result::Result<T, E>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-impl ManifestError {
+impl Error {
     /// A stable code for the error, the same in Isoloom and the runner (`shell_program`).
     #[must_use]
     pub fn code(&self) -> &'static str {
         match self {
-            ManifestError::Syntax { .. } => "syntax",
-            ManifestError::Version { .. } => "version",
-            ManifestError::Field { .. } => "field",
-            ManifestError::Pattern { .. } => "pattern",
-            ManifestError::OutOfRange { .. } => "out_of_range",
-            ManifestError::ShellProgram { .. } => "shell_program",
-            ManifestError::ProgramNotBare { .. } => "program_not_bare",
-            ManifestError::EmptyArgv => "empty_argv",
-            ManifestError::NoHostArgv => "no_host_argv",
-            ManifestError::SecretPlaceholder { .. } => "secret_placeholder",
-            ManifestError::UnknownPlaceholder { .. } => "unknown_placeholder",
-            ManifestError::LoneDollar { .. } => "lone_dollar",
-            ManifestError::UnclosedPlaceholder { .. } => "unclosed_placeholder",
-            ManifestError::EmptyPath => "empty_path",
-            ManifestError::AbsolutePath { .. } => "absolute_path",
-            ManifestError::Backslash { .. } => "backslash",
-            ManifestError::ParentPath { .. } => "parent_path",
-            ManifestError::RelativeGuestPath { .. } => "relative_guest_path",
-            ManifestError::Cidr { .. } => "cidr",
-            ManifestError::Empty { .. } => "empty",
-            ManifestError::MixedWildcard => "mixed_wildcard",
-            ManifestError::StepShape { .. } => "step_shape",
-            ManifestError::NativeShape => "native_shape",
-            ManifestError::NoHosts => "no_hosts",
-            ManifestError::DriverIdentity { .. } => "driver_identity",
-            ManifestError::DuplicateStep { .. } => "duplicate_step",
-            ManifestError::UnknownStep { .. } => "unknown_step",
-            ManifestError::ReadyNotUp { .. } => "ready_not_up",
-            ManifestError::DuplicateMachine { .. } => "duplicate_machine",
-            ManifestError::DuplicatePort { .. } => "duplicate_port",
-            ManifestError::UnknownMachine { .. } => "unknown_machine",
-            ManifestError::UnknownPublished { .. } => "unknown_published",
-            ManifestError::UnknownParam { .. } => "unknown_param",
-            ManifestError::UnknownOutput { .. } => "unknown_output",
-            ManifestError::PlaceholderOutOfPlace { .. } => "placeholder_out_of_place",
+            Error::Syntax { .. } => "syntax",
+            Error::Version { .. } => "version",
+            Error::Field { .. } => "field",
+            Error::Pattern { .. } => "pattern",
+            Error::OutOfRange { .. } => "out_of_range",
+            Error::ShellProgram { .. } => "shell_program",
+            Error::ProgramNotBare { .. } => "program_not_bare",
+            Error::EmptyArgv => "empty_argv",
+            Error::NoHostArgv => "no_host_argv",
+            Error::SecretPlaceholder { .. } => "secret_placeholder",
+            Error::UnknownPlaceholder { .. } => "unknown_placeholder",
+            Error::LoneDollar { .. } => "lone_dollar",
+            Error::UnclosedPlaceholder { .. } => "unclosed_placeholder",
+            Error::EmptyPath => "empty_path",
+            Error::AbsolutePath { .. } => "absolute_path",
+            Error::Backslash { .. } => "backslash",
+            Error::ParentPath { .. } => "parent_path",
+            Error::RelativeGuestPath { .. } => "relative_guest_path",
+            Error::Cidr { .. } => "cidr",
+            Error::Empty { .. } => "empty",
+            Error::MixedWildcard => "mixed_wildcard",
+            Error::StepShape { .. } => "step_shape",
+            Error::NativeShape => "native_shape",
+            Error::PortProtocol => "port_protocol",
+            Error::NoHosts => "no_hosts",
+            Error::DriverIdentity { .. } => "driver_identity",
+            Error::DuplicateStep { .. } => "duplicate_step",
+            Error::UnknownStep { .. } => "unknown_step",
+            Error::ReadyNotUp { .. } => "ready_not_up",
+            Error::DuplicateMachine { .. } => "duplicate_machine",
+            Error::DuplicatePort { .. } => "duplicate_port",
+            Error::UnknownMachine { .. } => "unknown_machine",
+            Error::UnknownPublished { .. } => "unknown_published",
+            Error::UnknownParam { .. } => "unknown_param",
+            Error::UnknownOutput { .. } => "unknown_output",
+            Error::PlaceholderOutOfPlace { .. } => "placeholder_out_of_place",
         }
     }
 }

@@ -9,7 +9,7 @@ use std::str::FromStr;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::{ManifestError, Result};
+use crate::{Error, Result};
 
 /// A newtype over `String` that holds only values `$check` accepts; `$pattern` is the same rule
 /// as a JSON Schema pattern, `$rule` as a reader would fix the value.
@@ -25,7 +25,7 @@ macro_rules! pattern_type {
             ///
             /// # Errors
             ///
-            /// [`ManifestError::Pattern`], naming the value and the rule it breaks.
+            /// [`Error::Pattern`], naming the value and the rule it breaks.
             pub fn parse(value: &str) -> Result<$ty> {
                 $ty::try_from(value.to_owned())
             }
@@ -38,14 +38,14 @@ macro_rules! pattern_type {
         }
 
         impl TryFrom<String> for $ty {
-            type Error = ManifestError;
+            type Error = Error;
 
             fn try_from(value: String) -> Result<$ty> {
                 let check: fn(&str) -> bool = $check;
                 if check(&value) {
                     Ok($ty(value))
                 } else {
-                    Err(ManifestError::Pattern { what: $what, value, rule: $rule })
+                    Err(Error::Pattern { what: $what, value, rule: $rule })
                 }
             }
         }
@@ -57,7 +57,7 @@ macro_rules! pattern_type {
         }
 
         impl FromStr for $ty {
-            type Err = ManifestError;
+            type Err = Error;
 
             fn from_str(value: &str) -> Result<$ty> {
                 $ty::parse(value)
@@ -98,12 +98,22 @@ pattern_type!(
 );
 
 pattern_type!(
-    /// The name of a machine, a network, a volume, a port or a check runner.
+    /// The name of a machine, a network, a volume or a check runner.
     Name,
     "name",
     "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
     "a letter or digit, then letters, digits, `_`, `.` or `-` (`web`, `isoloom-check-db`)",
     |v| first_then(v, |c| c.is_ascii_alphanumeric(), |c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+);
+
+pattern_type!(
+    /// A port's name, unique on its machine (`portal`, `dns-udp`), as the spec's `ports:` key. It
+    /// has no dot, so `${published.<machine>.<port>}` reads one way only.
+    PortName,
+    "port name",
+    "^[a-z][a-z0-9-]{0,30}$",
+    "a lowercase letter, then up to 30 lowercase letters, digits or `-` (`portal`, `dns-udp`)",
+    |v| v.len() <= 31 && first_then(v, |c| c.is_ascii_lowercase(), |c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 );
 
 pattern_type!(
@@ -225,6 +235,18 @@ mod tests {
         assert!(SnakeName::parse("web_portal").is_ok());
         assert!(SnakeName::parse("web-portal").is_err());
         assert!(OsName::parse("alpine-3.19").is_ok());
+    }
+
+    #[test]
+    fn a_port_name_is_short_lowercase_and_has_no_dot() {
+        let longest = format!("p{}", "0".repeat(30));
+        for ok in ["portal", "dns-udp", "a", longest.as_str()] {
+            assert!(PortName::parse(ok).is_ok(), "{ok}");
+        }
+        let too_long = format!("p{}", "0".repeat(31));
+        for bad in ["", "Portal", "1st", "-a", "a.b", "a_b", too_long.as_str()] {
+            assert!(PortName::parse(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

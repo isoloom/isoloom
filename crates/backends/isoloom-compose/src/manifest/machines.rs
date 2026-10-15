@@ -6,7 +6,9 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::num::NonZeroU16;
 
-use isoloom_manifest::{GuestPath, Machine, ManifestError, Name, Native, Placeholder, Port, Protocol, Publish, PublishMode, Resources, Role, Template, Volume};
+use isoloom_manifest::{
+    Error as ManifestError, GuestPath, Machine, Name, Native, Placeholder, Port, PortKind, PortName, Publish, PublishMode, Resources, Role, Template, Volume,
+};
 use isoloom_plan::checks::{self, Position};
 use isoloom_plan::{Environment, Lifetime, MachinePlan};
 use isoloom_render::run_manifest::{addresses, arch, port};
@@ -188,11 +190,9 @@ fn tool_port(tool: &model::Tool) -> Result<Option<Port>> {
         return Ok(None);
     };
     Ok(Some(Port {
-        name: Name::parse(TOOL_PORT)?,
+        name: PortName::parse(TOOL_PORT)?,
         port,
-        protocol: Protocol::Tcp,
-        http: false,
-        tls: false,
+        kind: PortKind::Tcp,
         publish: Some(Publish {
             mode: PublishMode::Fixed,
             preferred: NonZeroU16::new(publish),
@@ -203,7 +203,7 @@ fn tool_port(tool: &model::Tool) -> Result<Option<Port>> {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_manifest::ManifestError;
+    use isoloom_manifest::Error as ManifestError;
     use isoloom_spec::model::Target;
 
     use crate::error::Error;

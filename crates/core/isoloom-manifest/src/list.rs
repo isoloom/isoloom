@@ -8,7 +8,7 @@ use serde::de::{self, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::names::StepId;
-use crate::{ManifestError, Result};
+use crate::{Error, Result};
 
 /// A list with at least one item.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -19,13 +19,9 @@ impl<T> NonEmpty<T> {
     ///
     /// # Errors
     ///
-    /// [`ManifestError::Empty`] naming `what`, when `items` is empty.
+    /// [`Error::Empty`] naming `what`, when `items` is empty.
     pub fn new(items: Vec<T>, what: &'static str) -> Result<NonEmpty<T>> {
-        if items.is_empty() {
-            Err(ManifestError::Empty { what })
-        } else {
-            Ok(NonEmpty(items))
-        }
+        if items.is_empty() { Err(Error::Empty { what }) } else { Ok(NonEmpty(items)) }
     }
 
     /// A list of one.
@@ -126,7 +122,7 @@ impl<'de> Visitor<'de> for SelectionVisitor {
         }
         match (every, ids.is_empty()) {
             (true, true) => Ok(StepSelection::Every),
-            (true, false) => Err(de::Error::custom(ManifestError::MixedWildcard)),
+            (true, false) => Err(de::Error::custom(Error::MixedWildcard)),
             (false, _) => NonEmpty::new(ids, "the steps").map(StepSelection::Only).map_err(de::Error::custom),
         }
     }

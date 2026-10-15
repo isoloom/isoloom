@@ -4,7 +4,7 @@
 
 use std::sync::OnceLock;
 
-use isoloom_manifest::{EnvName, Name, Part, PathTemplate, Placeholder, Program, RelPath, RunVar, SnakeName, Template};
+use isoloom_manifest::{EnvName, Name, Part, PathTemplate, Placeholder, PortName, Program, RelPath, RunVar, SnakeName, Template};
 use proptest::prelude::*;
 use serde_json::{Value, json};
 
@@ -50,6 +50,10 @@ fn grammar_soup() -> impl Strategy<Value = String> {
         Just("published.web.80"),
         Just("published.dns.53.udp"),
         Just("published.a.b.65535"),
+        Just("published.web.site"),
+        Just("published.a.b.c"),
+        Just("published.web.Site"),
+        Just("published.dns.dns_udp"),
         Just("published.web.0"),
         Just("published.web.65536"),
         Just("secrets.FLAG"),
@@ -77,11 +81,21 @@ fn placeholder() -> impl Strategy<Value = Placeholder> {
         Just(Placeholder::Value),
         "[A-Z_][A-Z0-9_]{0,8}".prop_filter_map("a param's name", |n| EnvName::parse(&n).ok().map(Placeholder::Param)),
         "[a-z][a-z0-9_]{0,8}".prop_filter_map("an output's name", |n| SnakeName::parse(&n).ok().map(Placeholder::Output)),
-        ("[a-z][a-z0-9.-]{0,6}", "[a-z][a-z0-9-]{0,30}").prop_filter_map("a machine and a port", |(m, port)| Some(Placeholder::Published {
-            machine: Name::parse(&m).ok()?,
-            port: Name::parse(&port).ok()?,
-        })),
+        published(),
     ]
+}
+
+/// `${published.<machine>.<port>}` with any machine and port the types hold. Half the ports are
+/// drawn from more than a port's name allows (dots, capitals, `_`, long names), so a name the
+/// type lets through that the grammar can't read back is found.
+fn published() -> impl Strategy<Value = Placeholder> {
+    let port = prop_oneof!["[a-z][a-z0-9-]{0,30}", "[A-Za-z0-9][A-Za-z0-9_.-]{0,32}"];
+    ("[A-Za-z0-9][A-Za-z0-9_.-]{0,12}", port).prop_filter_map("a machine and a port the types hold", |(m, port)| {
+        Some(Placeholder::Published {
+            machine: Name::parse(&m).ok()?,
+            port: PortName::parse(&port).ok()?,
+        })
+    })
 }
 
 fn part() -> impl Strategy<Value = Part> {
@@ -96,6 +110,12 @@ fn segment() -> impl Strategy<Value = String> {
 const SHELLS: [&str; 8] = ["sh", "bash", "cmd", "powershell", "pwsh", "env", "sudo", "python3"];
 
 proptest! {
+    #[test]
+    fn a_published_port_reads_back_as_the_machine_and_port_it_names(p in published()) {
+        let written = format!("${{{p}}}");
+        prop_assert_eq!(Template::parse(&written).unwrap(), Template::from(p));
+    }
+
     #[test]
     fn a_template_writes_back_to_itself(parts in prop::collection::vec(part(), 0..6)) {
         let t = Template::from_parts(parts);

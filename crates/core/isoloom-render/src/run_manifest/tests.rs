@@ -2,8 +2,8 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::num::{NonZeroU16, NonZeroU32};
 
 use isoloom_manifest::{
-    Action, Arch, Argv, Check, CheckKind, Failure, GeneratorName, HostArgv, Machine, Name, OutputRole, OutputSource, Part, Placeholder, Port, Protocol,
-    PublishMode, Role, Run, Template, ToolName, When,
+    Action, Arch, Argv, Check, CheckKind, Failure, GeneratorName, HostArgv, Machine, Name, OutputRole, OutputSource, Part, Placeholder, Port, PortKind,
+    PortName, PublishMode, Role, Run, Template, ToolName, When,
 };
 use isoloom_plan::PublishedPort;
 use isoloom_plan::checks::{Host, HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect, Url};
@@ -167,11 +167,7 @@ fn a_published_port_is_fixed_or_ephemeral_at_the_host_address() {
     let ephemeral = port("site", &model_port(80, model::Protocol::Tcp, true), &[published(false)], &host).unwrap();
     assert_eq!(ephemeral.publish.map(|x| x.mode), Some(PublishMode::Ephemeral));
     let dns = port("dns", &model_port(53, model::Protocol::Udp, false), &[published(true)], &host).unwrap();
-    assert_eq!(
-        (dns.protocol, dns.http, dns.publish),
-        (Protocol::Udp, false, None),
-        "another port's publish isn't its"
-    );
+    assert_eq!((dns.kind, dns.publish), (PortKind::Udp, None), "another port's publish isn't its");
     assert!(port("site", &model_port(0, model::Protocol::Tcp, false), &[], &host).is_err());
 }
 
@@ -192,13 +188,11 @@ fn machine(name: &str, role: Role, ports: Vec<Port>) -> Machine {
     }
 }
 
-fn lab_port(name: &str, number: u16, protocol: Protocol, (http, tls): (bool, bool), published: bool) -> Port {
+fn lab_port(name: &str, number: u16, kind: PortKind, published: bool) -> Port {
     Port {
-        name: Name::parse(name).unwrap(),
+        name: PortName::parse(name).unwrap(),
         port: NonZeroU16::new(number).unwrap(),
-        protocol,
-        http,
-        tls,
+        kind,
         publish: published.then_some(isoloom_manifest::Publish {
             mode: PublishMode::Ephemeral,
             preferred: None,
@@ -213,18 +207,18 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
         "web",
         Role::Target,
         vec![
-            lab_port("site", 443, Protocol::Tcp, (true, true), true),
-            lab_port("plain", 80, Protocol::Tcp, (true, false), true),
-            lab_port("dns", 53, Protocol::Udp, (false, false), true),
-            lab_port("inner", 9000, Protocol::Tcp, (false, false), false),
+            lab_port("site", 443, PortKind::Https, true),
+            lab_port("plain", 80, PortKind::Http, true),
+            lab_port("dns", 53, PortKind::Udp, true),
+            lab_port("inner", 9000, PortKind::Tcp, false),
         ],
     );
-    let job = machine("web-init-1", Role::Job, vec![lab_port("x", 1, Protocol::Tcp, (false, false), true)]);
+    let job = machine("web-init-1", Role::Job, vec![lab_port("x", 1, PortKind::Tcp, true)]);
     let shown = [
         web,
         job,
-        machine("kali", Role::Access, vec![lab_port("vnc", 5900, Protocol::Tcp, (false, false), true)]),
-        machine("shell", Role::Tool, vec![lab_port("ttyd", 7681, Protocol::Tcp, (true, false), true)]),
+        machine("kali", Role::Access, vec![lab_port("vnc", 5900, PortKind::Tcp, true)]),
+        machine("shell", Role::Tool, vec![lab_port("ttyd", 7681, PortKind::Http, true)]),
     ];
     let out = outputs(&shown).unwrap();
     let names: Vec<String> = out.iter().map(|o| o.name.to_string()).collect();
@@ -237,7 +231,7 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
     assert_eq!(out[2].description.as_deref(), Some("web's dns (port 53/udp)."));
     assert_eq!(out[0].description.as_deref(), Some("web's site (port 443)."));
     assert!(matches!(&out[3].from, OutputSource::PublishedPort { machine, port } if machine.to_string() == "kali" && port.to_string() == "vnc"));
-    let odd = machine("my-box", Role::Target, vec![lab_port("a-b", 1, Protocol::Tcp, (false, false), true)]);
+    let odd = machine("my-box", Role::Target, vec![lab_port("a-b", 1, PortKind::Tcp, true)]);
     assert_eq!(outputs(&[odd]).unwrap()[0].name.to_string(), "my_box_a_b");
     assert_eq!(Template::from_parts([Part::Placeholder(Placeholder::Value)]).to_string(), "${value}");
 }
@@ -247,10 +241,7 @@ fn a_server_lab_shows_its_published_ports_at_the_host_it_names() {
     let web = machine(
         "web",
         Role::Target,
-        vec![
-            lab_port("site", 80, Protocol::Tcp, (true, false), true),
-            lab_port("dns", 53, Protocol::Udp, (false, false), true),
-        ],
+        vec![lab_port("site", 80, PortKind::Http, true), lab_port("dns", 53, PortKind::Udp, true)],
     );
     let router: Template = "${outputs.ip}".parse().unwrap();
     let out = outputs_at(&[web], &router).unwrap();

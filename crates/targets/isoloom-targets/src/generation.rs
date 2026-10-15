@@ -120,7 +120,7 @@ fn run_manifest(
     target: Target,
     mut manifest: isoloom_manifest::Manifest,
 ) -> std::result::Result<GeneratedFile, GenerateError> {
-    let refused = |e: isoloom_manifest::ManifestError| GenerateError::Unsupported {
+    let refused = |e: isoloom_manifest::Error| GenerateError::Unsupported {
         target,
         what: format!("the run manifest: {e}"),
     };

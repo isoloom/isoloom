@@ -51,3 +51,9 @@ From the spec unit, for every consumer (Isothrum's runner and compiler, the laun
 14. **Gone, unused outside the crate:** `addresses`, `model::from_yaml` (now the crate's own test helper), `os::{fill_vm, canonical}`, `groups::expand_shared` (`groups::expand` is the authored spec's), `model::Ipv6Addresses::is_static`.
 15. **`model::SecretMount.mode`** is an `Option<syntax::Mode>` (`.bits()` gives the `u32`), written `"0440"` as before.
 16. **Changed shape, same meaning:** `clones::expand`, `groups::expand` and `vlans::flatten` refuse with a placed `syntax::Problem` (was a `"path: reason"` string); `syntax::NoForm::refusal(machine)` is the `refused` problem a target reports.
+
+## Phase 1c, `isoloom-manifest` (the 1c-spec unit)
+
+17. **One error for the crate, `isoloom_manifest::Error`** (was `ManifestError`), with `isoloom_manifest::Result<T>`. Variants and `code()` are unchanged, plus `Error::PortProtocol` (`port_protocol`). Each `X::parse(&str)` has `FromStr` and `TryFrom<String>` beside it.
+18. **`PortName`** (`[a-z][a-z0-9-]{0,30}`, the spec's rule) is the type of `Port.name`, `OutputSource::PublishedPort.port` and `Placeholder::Published.port` (was `Name`). A port's name has no dot, so `${published.a.b.c}` reads one way only: machine `a.b`, port `c`. `${published.<machine>.80}` and capitals or `_` in a port's name are refused (`unknown_placeholder`); the schema's template pattern says the same.
+19. **`Port.kind: PortKind`** (`Tcp`, `Udp`, `Http`, `Https`, `Tls`, as the spec's `protocol:`) replaces `Port.protocol`, `Port.http` and `Port.tls`. `kind.transport()`, `kind.http()` and `kind.tls()` give the old values, and `PortKind::from_parts(protocol, http, tls)` builds one. The JSON is unchanged (`protocol`, `http`, `tls`); a UDP port with `http` or `tls` is refused (`port_protocol`). `Port`, `PortKind`, `Protocol`, `Publish` and `PublishMode` live in the crate's `port` module, re-exported at the root as before.

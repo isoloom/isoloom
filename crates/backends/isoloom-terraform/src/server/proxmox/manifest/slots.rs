@@ -7,7 +7,8 @@
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    CheckRunner, Delivery, EnvName, Identifier, ManifestError, Name, NonEmpty, Param, SecretSlot, SetBy, SlotKind, SnakeName, StepId, StepSelection, TfVarShape,
+    CheckRunner, Delivery, EnvName, Error as ManifestError, Identifier, Name, NonEmpty, Param, SecretSlot, SetBy, SlotKind, SnakeName, StepId, StepSelection,
+    TfVarShape,
 };
 use isoloom_plan::Environment;
 

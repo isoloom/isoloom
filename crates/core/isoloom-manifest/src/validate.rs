@@ -8,25 +8,25 @@ use crate::lifecycle::Condition;
 use crate::outputs::OutputSource;
 use crate::slots::Delivery;
 use crate::template::Placeholder;
-use crate::{Manifest, ManifestError, Result, StepSelection};
+use crate::{Error, Manifest, Result, StepSelection};
 
 impl Manifest {
     /// Checks what spans fields; the first problem found, if any.
     ///
     /// # Errors
     ///
-    /// The first of: [`ManifestError::NoHosts`], [`ManifestError::DriverIdentity`] (an identity
-    /// for another driver), [`ManifestError::DuplicateStep`], [`ManifestError::UnknownStep`] (a
-    /// delivery's step), [`ManifestError::ReadyNotUp`], [`ManifestError::DuplicateMachine`],
-    /// [`ManifestError::DuplicatePort`], [`ManifestError::UnknownMachine`],
-    /// [`ManifestError::UnknownPublished`], [`ManifestError::UnknownParam`],
-    /// [`ManifestError::UnknownOutput`] and [`ManifestError::PlaceholderOutOfPlace`].
+    /// The first of: [`Error::NoHosts`], [`Error::DriverIdentity`] (an identity
+    /// for another driver), [`Error::DuplicateStep`], [`Error::UnknownStep`] (a
+    /// delivery's step), [`Error::ReadyNotUp`], [`Error::DuplicateMachine`],
+    /// [`Error::DuplicatePort`], [`Error::UnknownMachine`],
+    /// [`Error::UnknownPublished`], [`Error::UnknownParam`],
+    /// [`Error::UnknownOutput`] and [`Error::PlaceholderOutOfPlace`].
     pub fn validate(&self) -> Result<()> {
         if self.hosts.is_empty() {
-            return Err(ManifestError::NoHosts);
+            return Err(Error::NoHosts);
         }
         if self.identity.driver() != self.driver {
-            return Err(ManifestError::DriverIdentity {
+            return Err(Error::DriverIdentity {
                 driver: self.driver.id(),
                 identity: self.identity.driver().id(),
             });
@@ -42,7 +42,7 @@ impl Manifest {
         for (list, steps) in self.step_lists() {
             let mut seen = BTreeSet::new();
             if let Some(dup) = steps.iter().find(|s| !seen.insert(&s.id)) {
-                return Err(ManifestError::DuplicateStep { list, id: dup.id.to_string() });
+                return Err(Error::DuplicateStep { list, id: dup.id.to_string() });
             }
         }
         Ok(())
@@ -76,7 +76,7 @@ impl Manifest {
                     _ => Vec::new(),
                 };
                 if let Some(missing) = named.into_iter().find(|s| !ids.contains(s)) {
-                    return Err(ManifestError::UnknownStep { at, step: missing.to_owned() });
+                    return Err(Error::UnknownStep { at, step: missing.to_owned() });
                 }
             }
         }
@@ -87,7 +87,7 @@ impl Manifest {
         for (index, c) in self.ready.iter().enumerate() {
             match c {
                 Condition::StepOk { step, .. } if !self.lifecycle.up.iter().any(|s| &s.id == step) => {
-                    return Err(ManifestError::ReadyNotUp { index, step: step.to_string() });
+                    return Err(Error::ReadyNotUp { index, step: step.to_string() });
                 }
                 Condition::MachinesRunning { machines } => {
                     for m in machines {
@@ -103,12 +103,12 @@ impl Manifest {
     fn machine_references(&self) -> Result<()> {
         let mut seen = BTreeSet::new();
         if let Some(dup) = self.machines.iter().find(|m| !seen.insert(&m.name)) {
-            return Err(ManifestError::DuplicateMachine { name: dup.name.to_string() });
+            return Err(Error::DuplicateMachine { name: dup.name.to_string() });
         }
         for m in &self.machines {
             let mut names = BTreeSet::new();
             if let Some(dup) = m.ports.iter().find(|p| !names.insert(&p.name)) {
-                return Err(ManifestError::DuplicatePort {
+                return Err(Error::DuplicatePort {
                     machine: m.name.to_string(),
                     port: dup.name.to_string(),
                 });
@@ -138,10 +138,10 @@ impl Manifest {
                 match p {
                     Placeholder::Published { machine, port } => self.published(&at, machine.as_str(), port.as_str())?,
                     Placeholder::Param(name) if !self.params.iter().any(|x| &x.name == name) => {
-                        return Err(ManifestError::UnknownParam { at, name: name.to_string() });
+                        return Err(Error::UnknownParam { at, name: name.to_string() });
                     }
                     Placeholder::Output(name) if !self.outputs.iter().any(|x| &x.name == name) => {
-                        return Err(ManifestError::UnknownOutput { at, name: name.to_string() });
+                        return Err(Error::UnknownOutput { at, name: name.to_string() });
                     }
                     Placeholder::Value if !(at.starts_with("outputs[") && at.ends_with("].format")) => {
                         return Err(out_of_place(at, "value", "an output's `format`"));
@@ -160,7 +160,7 @@ impl Manifest {
         if self.machines.iter().any(|m| m.name.as_str() == machine) {
             Ok(())
         } else {
-            Err(ManifestError::UnknownMachine {
+            Err(Error::UnknownMachine {
                 at: at.to_owned(),
                 machine: machine.to_owned(),
             })
@@ -178,15 +178,15 @@ impl Manifest {
         if found {
             return Ok(());
         }
-        Err(ManifestError::UnknownPublished {
+        Err(Error::UnknownPublished {
             at: at.to_owned(),
             port: format!("{machine}.{port}"),
         })
     }
 }
 
-fn out_of_place(at: String, root: &'static str, only: &'static str) -> ManifestError {
-    ManifestError::PlaceholderOutOfPlace { at, root, only }
+fn out_of_place(at: String, root: &'static str, only: &'static str) -> Error {
+    Error::PlaceholderOutOfPlace { at, root, only }
 }
 
 #[cfg(test)]

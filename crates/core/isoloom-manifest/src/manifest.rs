@@ -12,7 +12,7 @@ use crate::machine::{Machine, Network};
 use crate::outputs::{Checks, Output};
 use crate::provenance::{Generator, Lab, ManifestVersion, SUPPORTED_VERSION};
 use crate::slots::{Param, SecretSlot};
-use crate::{ManifestError, Result};
+use crate::{Error, Result};
 
 /// A run manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -70,20 +70,20 @@ pub struct Manifest {
 ///
 /// # Errors
 ///
-/// The first problem found: [`ManifestError::Syntax`] for text that isn't JSON,
-/// [`ManifestError::Version`] for another version of the contract, [`ManifestError::Field`] for a
+/// The first problem found: [`Error::Syntax`] for text that isn't JSON,
+/// [`Error::Version`] for another version of the contract, [`Error::Field`] for a
 /// value the types refuse (its path and reason), else what [`Manifest::validate`] finds.
 pub fn parse(text: &str) -> Result<Manifest> {
-    let value: serde_json::Value = serde_json::from_str(text).map_err(|e| ManifestError::Syntax {
+    let value: serde_json::Value = serde_json::from_str(text).map_err(|e| Error::Syntax {
         line: e.line(),
         column: e.column(),
         reason: e.to_string(),
     })?;
     // The version first: another version's manifest fails on it, not on a field it renamed.
     if let Some(found) = value.get("manifest_version").filter(|v| **v != SUPPORTED_VERSION) {
-        return Err(ManifestError::Version { found: found.to_string() });
+        return Err(Error::Version { found: found.to_string() });
     }
-    let manifest: Manifest = serde_path_to_error::deserialize(value).map_err(|e| ManifestError::Field {
+    let manifest: Manifest = serde_path_to_error::deserialize(value).map_err(|e| Error::Field {
         path: e.path().to_string(),
         reason: e.into_inner().to_string(),
     })?;
@@ -95,14 +95,12 @@ pub fn parse(text: &str) -> Result<Manifest> {
 ///
 /// # Errors
 ///
-/// [`ManifestError::Field`] at `.` if JSON can't hold it, which no value of these types does.
+/// [`Error::Field`] at `.` if JSON can't hold it, which no value of these types does.
 pub fn to_json(manifest: &Manifest) -> Result<String> {
-    serde_json::to_string_pretty(manifest)
-        .map(|text| text + "\n")
-        .map_err(|e| ManifestError::Field {
-            path: ".".into(),
-            reason: e.to_string(),
-        })
+    serde_json::to_string_pretty(manifest).map(|text| text + "\n").map_err(|e| Error::Field {
+        path: ".".into(),
+        reason: e.to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -113,7 +111,7 @@ mod tests {
     fn a_manifest_crosses_threads() {
         fn shared<T: Send + Sync>() {}
         shared::<Manifest>();
-        shared::<ManifestError>();
+        shared::<Error>();
     }
 
     #[test]
@@ -122,7 +120,7 @@ mod tests {
         assert_eq!(err.code(), "version");
         assert_eq!(parse("{ not json").unwrap_err().code(), "syntax");
         let field = parse(r#"{ "manifest_version": 0 }"#).unwrap_err();
-        assert!(matches!(&field, ManifestError::Field { path, .. } if path == "."), "{field}");
+        assert!(matches!(&field, Error::Field { path, .. } if path == "."), "{field}");
     }
 
     #[test]

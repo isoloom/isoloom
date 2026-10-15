@@ -8,8 +8,9 @@ use std::net::IpAddr;
 use std::num::{NonZeroU16, NonZeroU32};
 
 use isoloom_manifest::{
-    Action, Arch, Argv, Check, CheckKind, Cidr, Generator, GeneratorName, HostArgv, Lab, LabName, Machine, ManifestError, Name, Network, Output, OutputRole,
-    OutputSource, Part, Placeholder, Port, Program, Protocol, Publish, PublishMode, Role, SnakeName, Step, StepId, Template, Tool, ToolName, Version, When,
+    Action, Arch, Argv, Check, CheckKind, Cidr, Error as ManifestError, Generator, GeneratorName, HostArgv, Lab, LabName, Machine, Name, Network, Output,
+    OutputRole, OutputSource, Part, Placeholder, Port, PortKind, PortName, Program, Protocol, Publish, PublishMode, Role, SnakeName, Step, StepId, Template,
+    Tool, ToolName, Version, When,
 };
 use isoloom_plan::checks::{Probe, Resolved};
 use isoloom_plan::{Environment, MachinePlan, PublishedPort};
@@ -183,16 +184,14 @@ pub fn port(label: &str, p: &model::Port, published: &[PublishedPort], address: 
         address: Some(address.clone()),
     });
     Ok(Port {
-        name: Name::parse(label)?,
+        name: PortName::parse(label)?,
         port: NonZeroU16::new(p.port).ok_or(ManifestError::OutOfRange {
             what: "a port",
             value: 0,
             min: 1,
             max: 65535,
         })?,
-        protocol: protocol(p.protocol),
-        http: p.http,
-        tls: p.tls,
+        kind: PortKind::from_parts(protocol(p.protocol), p.http, p.tls)?,
         publish,
     })
 }
@@ -225,12 +224,12 @@ fn output(m: &Machine, p: &Port, host: &Template) -> Result<Output, ManifestErro
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
         .collect();
-    let (role, scheme, after) = match (p.http, p.tls) {
-        (true, true) => (OutputRole::Entry, "https://", "/"),
-        (true, false) => (OutputRole::Entry, "http://", "/"),
-        (false, _) => (OutputRole::Info, "", ""),
+    let (role, scheme, after) = match p.kind {
+        PortKind::Https => (OutputRole::Entry, "https://", "/"),
+        PortKind::Http => (OutputRole::Entry, "http://", "/"),
+        PortKind::Tcp | PortKind::Udp | PortKind::Tls => (OutputRole::Info, "", ""),
     };
-    let port = if p.protocol == Protocol::Udp {
+    let port = if p.kind == PortKind::Udp {
         format!("{}/udp", p.port)
     } else {
         p.port.to_string()

@@ -36,7 +36,7 @@ pub enum Error {
         target: Target,
         /// What the manifest's types refused.
         #[source]
-        source: isoloom_manifest::ManifestError,
+        source: isoloom_manifest::Error,
     },
 }
 

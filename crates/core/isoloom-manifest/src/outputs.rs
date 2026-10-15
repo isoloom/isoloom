@@ -4,7 +4,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::names::{Identifier, Name, SnakeName};
+use crate::names::{Identifier, Name, PortName, SnakeName};
 use crate::step::Step;
 use crate::template::Template;
 
@@ -33,7 +33,7 @@ pub enum OutputSource {
         /// The machine.
         machine: Name,
         /// The port's name.
-        port: Name,
+        port: PortName,
     },
     /// A Terraform output of the module.
     TerraformOutput {

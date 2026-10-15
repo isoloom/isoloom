@@ -10,7 +10,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::template::{Part, Placeholder, RunVar, Template};
-use crate::{ManifestError, Result};
+use crate::{Error, Result};
 
 /// The JSON Schema form of the rules a relative path follows (`[^\u0000]+` checks the rest).
 const RELATIVE: &str = "^(?![/\\\\])(?![A-Za-z]:)(?![\\s\\S]*\\\\)(?!(?:[\\s\\S]*/)?\\.\\.(?:/|$))";
@@ -18,19 +18,19 @@ const RELATIVE: &str = "^(?![/\\\\])(?![A-Za-z]:)(?![\\s\\S]*\\\\)(?!(?:[\\s\\S]
 /// Checks the rules of a relative path on `text` (placeholders already stood in for): `shown` is
 /// what the error shows.
 fn check_relative(text: &str, shown: &str) -> Result<()> {
-    let refused = |make: fn(String) -> ManifestError| Err(make(shown.to_owned()));
+    let refused = |make: fn(String) -> Error| Err(make(shown.to_owned()));
     if text.is_empty() {
-        return Err(ManifestError::EmptyPath);
+        return Err(Error::EmptyPath);
     }
     if text.contains('\\') {
-        return refused(|path| ManifestError::Backslash { path });
+        return refused(|path| Error::Backslash { path });
     }
     let drive = matches!(text.as_bytes(), [letter, b':', ..] if letter.is_ascii_alphabetic());
     if text.starts_with('/') || drive {
-        return refused(|path| ManifestError::AbsolutePath { path });
+        return refused(|path| Error::AbsolutePath { path });
     }
     if text.split('/').any(|segment| segment == "..") {
-        return refused(|path| ManifestError::ParentPath { path });
+        return refused(|path| Error::ParentPath { path });
     }
     Ok(())
 }
@@ -45,12 +45,12 @@ impl RelPath {
     ///
     /// # Errors
     ///
-    /// [`ManifestError::Pattern`] for a NUL character, [`ManifestError::EmptyPath`],
-    /// [`ManifestError::Backslash`], [`ManifestError::AbsolutePath`] (a `/` or a drive first) and
-    /// [`ManifestError::ParentPath`] (a `..` segment).
+    /// [`Error::Pattern`] for a NUL character, [`Error::EmptyPath`],
+    /// [`Error::Backslash`], [`Error::AbsolutePath`] (a `/` or a drive first) and
+    /// [`Error::ParentPath`] (a `..` segment).
     pub fn parse(path: &str) -> Result<RelPath> {
         if path.contains('\0') {
-            return Err(ManifestError::Pattern {
+            return Err(Error::Pattern {
                 what: "path",
                 value: path.escape_default().to_string(),
                 rule: "a path holds no NUL character",
@@ -68,7 +68,7 @@ impl RelPath {
 }
 
 impl FromStr for RelPath {
-    type Err = ManifestError;
+    type Err = Error;
 
     fn from_str(path: &str) -> Result<RelPath> {
         RelPath::parse(path)
@@ -157,7 +157,7 @@ impl PathTemplate {
 }
 
 impl FromStr for PathTemplate {
-    type Err = ManifestError;
+    type Err = Error;
 
     fn from_str(text: &str) -> Result<PathTemplate> {
         PathTemplate::parse(text)
@@ -204,13 +204,13 @@ impl GuestPath {
     ///
     /// # Errors
     ///
-    /// [`ManifestError::RelativeGuestPath`] when it doesn't start with `/` or holds a NUL
+    /// [`Error::RelativeGuestPath`] when it doesn't start with `/` or holds a NUL
     /// character.
     pub fn parse(path: &str) -> Result<GuestPath> {
         if path.starts_with('/') && !path.contains('\0') {
             Ok(GuestPath(path.to_owned()))
         } else {
-            Err(ManifestError::RelativeGuestPath {
+            Err(Error::RelativeGuestPath {
                 path: path.escape_default().to_string(),
             })
         }
@@ -224,7 +224,7 @@ impl GuestPath {
 }
 
 impl FromStr for GuestPath {
-    type Err = ManifestError;
+    type Err = Error;
 
     fn from_str(path: &str) -> Result<GuestPath> {
         GuestPath::parse(path)

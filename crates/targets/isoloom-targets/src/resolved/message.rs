@@ -1,7 +1,7 @@
 //! The spec's `message`, its `{{ path }}` placeholders filled from the resolved snapshot, as it
 //! reads on the target the environment runs on, and as the run manifest holds it.
 
-use isoloom_manifest::{Name, Part, Placeholder, Template};
+use isoloom_manifest::{Name, Part, Placeholder, PortName, Template};
 use isoloom_plan::Lab;
 use isoloom_spec::model::Target;
 use serde_json::Value;
@@ -197,7 +197,7 @@ fn published(snapshot: &Value, path: &str) -> Option<Vec<Part>> {
     port.get("published").filter(|p| !p.is_null())?;
     let host = Part::Placeholder(Placeholder::Published {
         machine: Name::parse(m).ok()?,
-        port: Name::parse(name).ok()?,
+        port: PortName::parse(name).ok()?,
     });
     if *field == "published" {
         return Some(vec![host]);

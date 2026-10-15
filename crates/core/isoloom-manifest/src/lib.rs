@@ -6,8 +6,9 @@
 //! and secrets (names and destinations, never values).
 //!
 //! The types parse, they don't validate: a [`Manifest`] that parsed holds no shell as a program,
-//! no `${secrets.…}` placeholder, no absolute or climbing path and no other version than 0.
-//! [`Manifest::validate`] then checks what spans fields (step references, machines, placeholders).
+//! no `${secrets.…}` placeholder, no absolute or climbing path, no port name with a dot, no UDP
+//! port that speaks HTTP and no other version than 0. [`Manifest::validate`] then checks what
+//! spans fields (step references, machines, placeholders).
 //! The JSON Schema ([`schema`]) is generated from the types and committed at
 //! `schemas/run-manifest-v0.schema.json`; the fixtures under `fixtures/` are shared with the
 //! runner, which tests against the same files.
@@ -29,7 +30,7 @@
 //! // A template can't hold a secret: it reaches a tool only through its slot.
 //! let refused = "--flag=${secrets.FLAG}".parse::<Template>().unwrap_err();
 //! assert_eq!(refused.code(), "secret_placeholder");
-//! # Ok::<(), isoloom_manifest::ManifestError>(())
+//! # Ok::<(), isoloom_manifest::Error>(())
 //! ```
 
 mod argv;
@@ -42,6 +43,7 @@ mod manifest;
 mod names;
 mod outputs;
 mod path;
+mod port;
 mod provenance;
 mod schema;
 mod slots;
@@ -51,17 +53,18 @@ mod validate;
 mod walk;
 
 pub use argv::{Argv, HostArgv, PerHostArgv, Program};
-pub use error::{ManifestError, Result};
+pub use error::{Error, Result};
 pub use identity::{
     Cloud, ComposeIdentity, Driver, Elevation, HostOs, Identity, Provider, StateOwner, Target, TerraformIdentity, Tool, VagrantIdentity, VagrantProvider,
 };
 pub use lifecycle::{Condition, Expiry, ExpiryUnit, Lifecycle, Park, Provision, ReadyGrammar, Recovery, Retries};
 pub use list::{NonEmpty, StepSelection};
-pub use machine::{Arch, Cidr, Machine, Native, Network, Port, Protocol, Publish, PublishMode, Resources, Role, Volume};
+pub use machine::{Arch, Cidr, Machine, Native, Network, Resources, Role, Volume};
 pub use manifest::{Manifest, parse, to_json};
-pub use names::{EnvName, Identifier, LabName, Name, OsName, PinnedImage, SnakeName, StepId, ToolName, Version};
+pub use names::{EnvName, Identifier, LabName, Name, OsName, PinnedImage, PortName, SnakeName, StepId, ToolName, Version};
 pub use outputs::{Check, CheckKind, CheckProtocol, CheckRunner, Checks, Output, OutputRole, OutputSource};
 pub use path::{GuestPath, PathTemplate, RelPath};
+pub use port::{Port, PortKind, Protocol, Publish, PublishMode};
 pub use provenance::{Generator, GeneratorName, Instance, Lab, ManifestVersion, SUPPORTED_VERSION};
 pub use schema::{SCHEMA_URL, schema};
 pub use slots::{Delivery, Param, SecretSlot, SecretSource, SetBy, SlotKind, StateFileFormat, Store, TfVarShape, Transport};

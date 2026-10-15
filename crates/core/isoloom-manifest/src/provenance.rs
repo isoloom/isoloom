@@ -9,7 +9,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::names::{LabName, Version};
 use crate::template::Template;
-use crate::{ManifestError, Result};
+use crate::{Error, Result};
 
 /// The manifest version this crate reads and writes.
 pub const SUPPORTED_VERSION: u64 = 0;
@@ -30,7 +30,7 @@ impl<'de> Deserialize<'de> for ManifestVersion {
         if found == SUPPORTED_VERSION {
             Ok(ManifestVersion)
         } else {
-            Err(serde::de::Error::custom(ManifestError::Version { found: found.to_string() }))
+            Err(serde::de::Error::custom(Error::Version { found: found.to_string() }))
         }
     }
 }
@@ -73,12 +73,12 @@ impl Instance {
     ///
     /// # Errors
     ///
-    /// [`ManifestError::OutOfRange`] for 0 or over 99.
+    /// [`Error::OutOfRange`] for 0 or over 99.
     pub fn new(n: u8) -> Result<Instance> {
         if (1..=99).contains(&n) {
             Ok(Instance(n))
         } else {
-            Err(ManifestError::OutOfRange {
+            Err(Error::OutOfRange {
                 what: "an instance",
                 value: n.into(),
                 min: 1,
@@ -95,7 +95,7 @@ impl Instance {
 }
 
 impl TryFrom<u8> for Instance {
-    type Error = ManifestError;
+    type Error = Error;
 
     fn try_from(n: u8) -> Result<Instance> {
         Instance::new(n)

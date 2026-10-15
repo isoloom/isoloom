@@ -20,7 +20,8 @@ mod steps;
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    Checks, Driver, HostOs, Identity, Manifest, ManifestError, ManifestVersion, PinnedImage, RelPath, SCHEMA_URL, StateOwner, TerraformIdentity, Tool, Version,
+    Checks, Driver, Error as ManifestError, HostOs, Identity, Manifest, ManifestVersion, PinnedImage, RelPath, SCHEMA_URL, StateOwner, TerraformIdentity, Tool,
+    Version,
 };
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{argv, generator, lab, tool};

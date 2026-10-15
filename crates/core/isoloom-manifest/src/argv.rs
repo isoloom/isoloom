@@ -11,7 +11,7 @@ use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::template::Template;
-use crate::{ManifestError, Result};
+use crate::{Error, Result};
 
 /// Programs that would run code given as an argument (shells, interpreters, privilege and
 /// environment wrappers), refused whatever their case and with or without `.exe`.
@@ -52,18 +52,18 @@ impl Program {
     ///
     /// # Errors
     ///
-    /// [`ManifestError::ProgramNotBare`] for a path, an option, a placeholder or anything but a
-    /// tool's name; [`ManifestError::ShellProgram`] for a shell or an interpreter.
+    /// [`Error::ProgramNotBare`] for a path, an option, a placeholder or anything but a
+    /// tool's name; [`Error::ShellProgram`] for a shell or an interpreter.
     pub fn parse(name: &str) -> Result<Program> {
         let mut chars = name.chars();
         let bare = chars.next().is_some_and(|c| c.is_ascii_alphabetic()) && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'));
         if !bare {
-            return Err(ManifestError::ProgramNotBare { program: name.to_owned() });
+            return Err(Error::ProgramNotBare { program: name.to_owned() });
         }
         let lower = name.to_ascii_lowercase();
         let stem = lower.strip_suffix(".exe").unwrap_or(&lower);
         if SHELLS.contains(&stem) {
-            return Err(ManifestError::ShellProgram { program: name.to_owned() });
+            return Err(Error::ShellProgram { program: name.to_owned() });
         }
         Ok(Program(name.to_owned()))
     }
@@ -76,7 +76,7 @@ impl Program {
 }
 
 impl FromStr for Program {
-    type Err = ManifestError;
+    type Err = Error;
 
     fn from_str(name: &str) -> Result<Program> {
         Program::parse(name)
@@ -189,7 +189,7 @@ impl<'de> Visitor<'de> for ArgvVisitor {
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Argv, A::Error> {
-        let program: Program = seq.next_element()?.ok_or_else(|| de::Error::custom(ManifestError::EmptyArgv))?;
+        let program: Program = seq.next_element()?.ok_or_else(|| de::Error::custom(Error::EmptyArgv))?;
         let mut args = Vec::new();
         while let Some(arg) = seq.next_element()? {
             args.push(arg);
@@ -277,7 +277,7 @@ impl<'de> Visitor<'de> for HostArgvVisitor {
             .iter()
             .all(|a| a.is_none())
         {
-            return Err(de::Error::custom(ManifestError::NoHostArgv));
+            return Err(de::Error::custom(Error::NoHostArgv));
         }
         Ok(HostArgv::PerHost(per_host))
     }

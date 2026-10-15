@@ -11,7 +11,7 @@ use crate::list::NonEmpty;
 use crate::names::{Name, SnakeName, StepId};
 use crate::step::Step;
 use crate::template::Template;
-use crate::{ManifestError, Result};
+use crate::{Error, Result};
 
 /// How a run can be parked: absent, it can't (Terraform runs are created or destroyed); a mode
 /// absent inside it is refused.
@@ -131,12 +131,12 @@ impl Retries {
     ///
     /// # Errors
     ///
-    /// [`ManifestError::OutOfRange`] over 3.
+    /// [`Error::OutOfRange`] over 3.
     pub fn new(count: u8) -> Result<Retries> {
         if count <= 3 {
             Ok(Retries(count))
         } else {
-            Err(ManifestError::OutOfRange {
+            Err(Error::OutOfRange {
                 what: "a retry count",
                 value: count.into(),
                 min: 0,
@@ -153,7 +153,7 @@ impl Retries {
 }
 
 impl TryFrom<u8> for Retries {
-    type Error = ManifestError;
+    type Error = Error;
 
     fn try_from(count: u8) -> Result<Retries> {
         Retries::new(count)

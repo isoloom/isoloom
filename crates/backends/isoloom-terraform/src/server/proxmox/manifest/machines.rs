@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 
 use isoloom_manifest::{
-    Machine, ManifestError, Name, Network, OsName, Output, OutputRole, OutputSource, Part, Placeholder, PublishMode, Role, RunVar, SnakeName, Template,
+    Error as ManifestError, Machine, Name, Network, OsName, Output, OutputRole, OutputSource, Part, Placeholder, PublishMode, Role, RunVar, SnakeName, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_render::router;

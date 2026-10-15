@@ -9,8 +9,8 @@ use std::str::FromStr;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::names::{EnvName, Name, SnakeName};
-use crate::{ManifestError, Result};
+use crate::names::{EnvName, Name, PortName, SnakeName};
+use crate::{Error, Result};
 
 /// A value the runner knows about the run itself (`${run.…}`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -76,7 +76,7 @@ pub enum Placeholder {
         /// The machine.
         machine: Name,
         /// The port's name.
-        port: Name,
+        port: PortName,
     },
     /// `${machine}`: the machine of a `lifecycle.provision.machine` step.
     Machine,
@@ -89,9 +89,9 @@ impl Placeholder {
     fn parse(inner: &str, template: &str) -> Result<Placeholder> {
         let trimmed = inner.trim();
         if trimmed == "secrets" || trimmed.starts_with("secrets.") {
-            return Err(ManifestError::SecretPlaceholder { template: template.to_owned() });
+            return Err(Error::SecretPlaceholder { template: template.to_owned() });
         }
-        let unknown = || ManifestError::UnknownPlaceholder {
+        let unknown = || Error::UnknownPlaceholder {
             template: template.to_owned(),
             placeholder: inner.to_owned(),
         };
@@ -133,7 +133,7 @@ fn published(rest: &str) -> Option<Placeholder> {
     let (machine, port) = rest.rsplit_once('.')?;
     Some(Placeholder::Published {
         machine: Name::parse(machine).ok()?,
-        port: Name::parse(port).ok()?,
+        port: PortName::parse(port).ok()?,
     })
 }
 
@@ -173,10 +173,10 @@ impl Template {
     ///
     /// # Errors
     ///
-    /// [`ManifestError::LoneDollar`] for a `$` that starts no placeholder (a literal one is
-    /// `$$`), [`ManifestError::UnclosedPlaceholder`] for a `${` without its `}`,
-    /// [`ManifestError::SecretPlaceholder`] for `${secrets.…}`, and
-    /// [`ManifestError::UnknownPlaceholder`] for a root or a name outside the grammar.
+    /// [`Error::LoneDollar`] for a `$` that starts no placeholder (a literal one is
+    /// `$$`), [`Error::UnclosedPlaceholder`] for a `${` without its `}`,
+    /// [`Error::SecretPlaceholder`] for `${secrets.…}`, and
+    /// [`Error::UnknownPlaceholder`] for a root or a name outside the grammar.
     pub fn parse(text: &str) -> Result<Template> {
         let mut parts = Vec::new();
         let mut literal = String::new();
@@ -189,10 +189,10 @@ impl Template {
                 continue;
             }
             let Some(open) = after.strip_prefix('{') else {
-                return Err(ManifestError::LoneDollar { template: text.to_owned() });
+                return Err(Error::LoneDollar { template: text.to_owned() });
             };
             let Some((inner, next)) = open.split_once('}') else {
-                return Err(ManifestError::UnclosedPlaceholder { template: text.to_owned() });
+                return Err(Error::UnclosedPlaceholder { template: text.to_owned() });
             };
             parts.push(Part::Text(std::mem::take(&mut literal)));
             parts.push(Part::Placeholder(Placeholder::parse(inner, text)?));
@@ -238,7 +238,7 @@ impl Template {
 }
 
 impl FromStr for Template {
-    type Err = ManifestError;
+    type Err = Error;
 
     fn from_str(text: &str) -> Result<Template> {
         Template::parse(text)
@@ -283,7 +283,7 @@ pub(crate) fn grammar() -> String {
         "run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts|ssh_public_key|slot)",
         "params\\.[A-Za-z_][A-Za-z0-9_]*",
         "outputs\\.[a-z][a-z0-9_]*",
-        "published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[A-Za-z0-9][A-Za-z0-9_-]*",
+        "published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[a-z][a-z0-9-]{0,30}",
         "machine",
         "value",
     ];

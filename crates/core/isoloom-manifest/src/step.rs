@@ -12,7 +12,7 @@ use crate::identity::{HostOs, Provider};
 use crate::names::{EnvName, SnakeName, StepId};
 use crate::path::RelPath;
 use crate::template::Template;
-use crate::{ManifestError, Result};
+use crate::{Error, Result};
 
 /// A driver primitive: a read-then-act sequence one argv can't express (list, then remove what
 /// was listed). The manifest's documentation fixes each action's native commands.
@@ -224,10 +224,10 @@ struct StepFields {
 }
 
 impl TryFrom<StepFields> for Step {
-    type Error = ManifestError;
+    type Error = Error;
 
     fn try_from(f: StepFields) -> Result<Step> {
-        let shape = |reason| ManifestError::StepShape { id: f.id.to_string(), reason };
+        let shape = |reason| Error::StepShape { id: f.id.to_string(), reason };
         let run = match (f.argv, f.action) {
             (Some(_), Some(_)) => return Err(shape("it has both `argv` and `action`: keep one")),
             (None, None) => return Err(shape("it has neither `argv` nor `action`: give one")),

@@ -5,7 +5,6 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::net::IpAddr;
-use std::num::NonZeroU16;
 use std::str::FromStr;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
@@ -14,19 +13,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::identity::Provider;
 use crate::names::{Name, OsName};
 use crate::path::GuestPath;
+use crate::port::Port;
 use crate::template::Template;
-use crate::{ManifestError, Result};
-
-/// A port's transport protocol.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Protocol {
-    /// TCP.
-    #[default]
-    Tcp,
-    /// UDP.
-    Udp,
-}
+use crate::{Error, Result};
 
 /// A machine's CPU architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -68,10 +57,10 @@ impl Cidr {
     ///
     /// # Errors
     ///
-    /// [`ManifestError::Cidr`] when it isn't an address, a `/` and a prefix length that fits the
+    /// [`Error::Cidr`] when it isn't an address, a `/` and a prefix length that fits the
     /// address (at most 32 for IPv4, 128 for IPv6).
     pub fn parse(text: &str) -> Result<Cidr> {
-        let err = || ManifestError::Cidr { value: text.to_owned() };
+        let err = || Error::Cidr { value: text.to_owned() };
         let (address, prefix) = text.split_once('/').ok_or_else(err)?;
         let address: IpAddr = address.parse().map_err(|_| err())?;
         let prefix: u8 = prefix.parse().map_err(|_| err())?;
@@ -84,7 +73,7 @@ impl Cidr {
 }
 
 impl FromStr for Cidr {
-    type Err = ManifestError;
+    type Err = Error;
 
     fn from_str(text: &str) -> Result<Cidr> {
         Cidr::parse(text)
@@ -220,7 +209,7 @@ impl<'de> Deserialize<'de> for Native {
                 vagrant,
                 vm_names: vm_names.unwrap_or_default(),
             }),
-            _ => Err(serde::de::Error::custom(ManifestError::NativeShape)),
+            _ => Err(serde::de::Error::custom(Error::NativeShape)),
         }
     }
 }
@@ -247,51 +236,6 @@ pub struct Volume {
     /// Its name where the target creates it (`${run.name}_web-ctf`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native: Option<Template>,
-}
-
-/// How a port is published on the host.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum PublishMode {
-    /// Always `preferred`.
-    Fixed,
-    /// A free port, unless `ISOLOOM_PUBLISH_FIXED` is set; the runner pins it at the first start.
-    Ephemeral,
-}
-
-/// A port published on the host.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Publish {
-    /// Fixed or ephemeral.
-    pub mode: PublishMode,
-    /// The host port asked for (`publish:` in the spec).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub preferred: Option<NonZeroU16>,
-    /// The host address it listens on.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub address: Option<Template>,
-}
-
-/// A port a machine answers on.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Port {
-    /// Its name in the spec (`portal`): unique on its machine, how placeholders and outputs
-    /// name it (`${published.web.portal}`).
-    pub name: Name,
-    /// The machine's port.
-    pub port: NonZeroU16,
-    /// TCP or UDP.
-    pub protocol: Protocol,
-    /// It speaks HTTP.
-    pub http: bool,
-    /// It speaks TLS.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub tls: bool,
-    /// Published on the host, and how.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub publish: Option<Publish>,
 }
 
 /// A machine the target creates.

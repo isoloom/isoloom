@@ -1,6 +1,6 @@
 //! Why a Vagrantfile isn't rendered, and how a backend reports it.
 
-use isoloom_manifest::ManifestError;
+use isoloom_manifest::Error as ManifestError;
 use isoloom_plan::Refusal;
 use isoloom_render::Error as RenderError;
 use isoloom_spec::model::Target;
