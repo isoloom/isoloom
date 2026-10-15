@@ -397,6 +397,10 @@ Each step means: lowered generation passes the snapshots and `verify`, then a ma
 1. **Local:** `vagrant` (VirtualBox, Hyper-V, VMware, QEMU/libvirt) and `docker-vm`.
 2. **Server:** `proxmox` (Terraform) and the Vagrant ESXi provider, with the launcher's `connection_env` contract. The Vagrant Proxmox provider is Tier 2.
 3. **Cloud:** `cloud-vm`, `cloud-docker` and `cloud-services`, AWS first and then the other clouds.
+   - **Proxmox bugs found by the real smoke test** on `pve-lab` (2026-10-15), to fix in this phase:
+     - `destroy` leaves the SDN zone and bridge pending, because the "apply SDN" resource is destroyed before its zone; it needs the provider's finalizer ordering.
+     - The module defaults to `node = "pve"`, while the launcher's Test connection uses the first node. A server with another node name passes the test and then fails the launch. Default to the discovered node, or make it required.
+     - A router whose guest agent can't install (no DNS or internet) hangs `apply` for 15 minutes. Fail fast with a reason.
 4. **Secrets conversion and native checks** for these targets only:
    - Compose secrets;
    - Vagrant host environment;
@@ -453,7 +457,12 @@ Decided on 2026-10-15:
 - The launcher is integrated from Phase 2.
 - There is a manual-only cross-platform workflow.
 - Track C infrastructure:
-  - Proxmox and ESXi run as VMs inside VMware on the Mac, as done before (nested virtualization).
+  - **Proxmox VE 9.2 (`pve-lab`)** runs in VMware Fusion at `172.16.1.10`. It is proven: a generated lab applied, served and passed its check, then was destroyed.
+    - Credentials are in `~/.isoloom-lab/proxmox.env`.
+    - Terraform runs in Docker (`~/.isoloom-lab/bin/pve-tf`), because macOS Local Network privacy blocks provider binaries started from the agent session.
+    - Lab VMs use the internal NAT bridge `vmbr1`.
+    - It's stopped when idle.
+  - **ESXi 8.0U3e** runs as a VM in VMware Fusion (installing).
   - **Windows host:** `florianamette@10.0.0.40` (`karen`) over SSH key, with Windows 11, 16 GB RAM, Hyper-V, Rust MSVC, Node 24 and Docker. It gives the Windows host proof and Hyper-V.
   - **Linux host:** `florianamette@10.0.0.10` (`jarvis`) over SSH key, with Debian 13, 46 GB RAM, KVM, libvirt, Docker and Vagrant. It gives the Linux host proof, and real Vagrant runs on libvirt and QEMU.
   - Cloud accounts come later.
