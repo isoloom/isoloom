@@ -27,6 +27,14 @@ const UP_TIMEOUT_S: u32 = 21_600;
 const PARK_TIMEOUT_S: u32 = 1800;
 /// Halting the controller alone.
 const CONTROLLER_HALT_S: u32 = 300;
+/// Reading every VM's state: Vagrant answers from its own records on the local providers.
+const STATUS_TIMEOUT_S: u32 = 25;
+/// On ESXi, `vagrant status` asks the host once per VM (41 s for two, measured on `esxi-lab`
+/// from macOS through the runner's relay): this much for the read, plus [`ESXI_STATUS_PER_VM_S`]
+/// a VM.
+const ESXI_STATUS_BASE_S: u32 = 60;
+/// What each VM adds to a status read on ESXi.
+const ESXI_STATUS_PER_VM_S: u32 = 30;
 
 /// What a failed start's output says when it tripped over a previous run's leftovers, not over
 /// the lab (VirtualBox's names taken, a lock, a record on another provider).
@@ -68,8 +76,18 @@ pub(super) fn lifecycle(env: &Environment, shape: &Shape) -> Result<Lifecycle> {
         }),
         resume,
         provision: Some(provision(env, shape)?),
-        status: run("status", vagrant_argv(&["status", "--machine-readable"])?, 25)?,
+        status: status(shape)?,
     })
+}
+
+/// `vagrant status --machine-readable`, with more time on ESXi for each of the lab's VMs.
+fn status(shape: &Shape) -> Result<Step> {
+    let mut s = run("status", vagrant_argv(&["status", "--machine-readable"])?, STATUS_TIMEOUT_S)?;
+    let vms = u32::try_from(shape.defines.len()).unwrap_or(u32::MAX);
+    let esxi = ESXI_STATUS_PER_VM_S.saturating_mul(vms).saturating_add(ESXI_STATUS_BASE_S);
+    s.provider_timeout_s
+        .insert(Provider::VmwareEsxi, NonZeroU32::new(esxi).unwrap_or(NonZeroU32::MIN));
+    Ok(s)
 }
 
 /// `vagrant up --provider ${run.provider}`, whose success means every VM booted and ran its

@@ -78,6 +78,10 @@ pub enum Placeholder {
         /// The port's name.
         port: PortName,
     },
+    /// `${host.<machine>}`: where the machine's published ports answer, as the driver reports it
+    /// (this computer's loopback when they are forwarded to it; the machine's own address on a
+    /// provider that forwards nothing, ESXi).
+    Host(Name),
     /// `${machine}`: the machine of a `lifecycle.provision.machine` step.
     Machine,
     /// `${value}`: an output's raw value, in its `format`.
@@ -107,6 +111,9 @@ impl Placeholder {
         if let Some(rest) = inner.strip_prefix("published.") {
             return published(rest).ok_or_else(unknown);
         }
+        if let Some(machine) = inner.strip_prefix("host.") {
+            return Name::parse(machine).map(Placeholder::Host).map_err(|_| unknown());
+        }
         match inner {
             "machine" => Ok(Placeholder::Machine),
             "value" => Ok(Placeholder::Value),
@@ -122,6 +129,7 @@ impl Placeholder {
             Placeholder::Param(_) => "params",
             Placeholder::Output(_) => "outputs",
             Placeholder::Published { .. } => "published",
+            Placeholder::Host(_) => "host",
             Placeholder::Machine => "machine",
             Placeholder::Value => "value",
         }
@@ -144,6 +152,7 @@ impl Display for Placeholder {
             Placeholder::Param(n) => write!(f, "params.{n}"),
             Placeholder::Output(n) => write!(f, "outputs.{n}"),
             Placeholder::Published { machine, port } => write!(f, "published.{machine}.{port}"),
+            Placeholder::Host(machine) => write!(f, "host.{machine}"),
             Placeholder::Machine => f.write_str("machine"),
             Placeholder::Value => f.write_str("value"),
         }
@@ -284,6 +293,7 @@ pub(crate) fn grammar() -> String {
         "params\\.[A-Za-z_][A-Za-z0-9_]*",
         "outputs\\.[a-z][a-z0-9_]*",
         "published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[a-z][a-z0-9-]{0,30}",
+        "host\\.[A-Za-z0-9][A-Za-z0-9_.-]*",
         "machine",
         "value",
     ];
@@ -297,7 +307,7 @@ impl JsonSchema for Template {
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
         json_schema!({
-            "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `run.ssh_public_key`, `run.slot` (the run's slot on its server, 1 to 99), `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
+            "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `run.ssh_public_key`, `run.slot` (the run's slot on its server, 1 to 99), `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `host.<machine>` (where the machine's published ports answer, as the driver reports it), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
             "type": "string",
             "pattern": grammar(),
         })
@@ -338,7 +348,16 @@ mod tests {
     fn malformed_templates_say_why() {
         assert_eq!(Template::parse("$5").unwrap_err().code(), "lone_dollar");
         assert_eq!(Template::parse("${run.name").unwrap_err().code(), "unclosed_placeholder");
-        for unknown in ["${run.title}", "${env.HOME}", "${published.web}", "${published.web.-x}", "${outputs.Web}"] {
+        for unknown in [
+            "${run.title}",
+            "${env.HOME}",
+            "${published.web}",
+            "${published.web.-x}",
+            "${outputs.Web}",
+            "${host}",
+            "${host.}",
+            "${host.-web}",
+        ] {
             assert_eq!(Template::parse(unknown).unwrap_err().code(), "unknown_placeholder", "{unknown}");
         }
     }
@@ -350,6 +369,7 @@ mod tests {
             ("${params.REGION}", "params"),
             ("${outputs.web_site}", "outputs"),
             ("${published.web.site}", "published"),
+            ("${host.web}", "host"),
             ("${machine}", "machine"),
             ("${value}", "value"),
         ] {

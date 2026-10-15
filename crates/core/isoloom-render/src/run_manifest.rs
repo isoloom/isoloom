@@ -212,10 +212,26 @@ pub fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
 ///
 /// Fails on an output name the manifest refuses.
 pub fn outputs_at(machines: &[Machine], host: &Template) -> Result<Vec<Output>, ManifestError> {
+    outputs_with(machines, |_| host.clone())
+}
+
+/// [`outputs`], each shown at the host the driver reports for its machine (`${host.<machine>}`):
+/// the loopback with the forwarded port, or, where the provider forwards nothing (ESXi), the
+/// machine's own address with its own port.
+///
+/// # Errors
+///
+/// Fails on an output name the manifest refuses.
+pub fn outputs_on_their_hosts(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
+    outputs_with(machines, |m| Template::from(Placeholder::Host(m.name.clone())))
+}
+
+/// [`outputs`], machine `m`'s shown at `host(m)`.
+fn outputs_with(machines: &[Machine], host: impl Fn(&Machine) -> Template) -> Result<Vec<Output>, ManifestError> {
     let shown = machines.iter().filter(|m| matches!(m.role, Role::Target | Role::Access | Role::Tool));
     shown
         .flat_map(|m| m.ports.iter().filter(|p| p.publish.is_some()).map(move |p| (m, p)))
-        .map(|(m, p)| output(m, p, host))
+        .map(|(m, p)| output(m, p, &host(m)))
         .collect()
 }
 

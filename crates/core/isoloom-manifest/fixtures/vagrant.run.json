@@ -697,7 +697,10 @@
         "status",
         "--machine-readable"
       ],
-      "timeout_s": 25
+      "timeout_s": 25,
+      "provider_timeout_s": {
+        "vmware_esxi": 150
+      }
     }
   },
   "ready": [

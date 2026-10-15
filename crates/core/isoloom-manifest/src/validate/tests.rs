@@ -109,6 +109,18 @@ fn a_machine_reference_names_a_machine() {
 }
 
 #[test]
+fn a_host_placeholder_names_a_machine() {
+    // `${host.<machine>}`: where the driver says the machine's published ports answer.
+    assert_eq!(read(|d| d["outputs"][0]["format"] = json!("http://${host.web}:${value}/")), Ok(()));
+    let err = read(|d| d["outputs"][0]["format"] = json!("http://${host.db}:${value}/")).unwrap_err();
+    assert!(
+        matches!(&err, Error::UnknownMachine { at, machine } if at == "outputs[0].format" && machine == "db"),
+        "{err}"
+    );
+    assert_eq!(refused(|d| d["lab"]["message"] = json!("at ${host.db}")), "unknown_machine");
+}
+
+#[test]
 fn an_output_reads_a_published_port() {
     assert_eq!(refused(|d| d["outputs"][0]["from"]["port"] = json!("admin")), "unknown_published");
     // A declared port that isn't published has no host port to read.

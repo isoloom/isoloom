@@ -594,7 +594,10 @@
         "status",
         "--machine-readable"
       ],
-      "timeout_s": 25
+      "timeout_s": 25,
+      "provider_timeout_s": {
+        "vmware_esxi": 120
+      }
     }
   },
   "ready": [
@@ -616,7 +619,7 @@
       "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
-      "format": "http://127.0.0.1:${value}/",
+      "format": "http://${host.web}:${value}/",
       "from": {
         "kind": "published_port",
         "machine": "web",

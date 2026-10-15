@@ -243,9 +243,9 @@
       "maximum": 99
     },
     "Template": {
-      "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `run.ssh_public_key`, `run.slot` (the run's slot on its server, 1 to 99), `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
+      "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `run.ssh_public_key`, `run.slot` (the run's slot on its server, 1 to 99), `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `host.<machine>` (where the machine's published ports answer, as the driver reports it), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
       "type": "string",
-      "pattern": "^(?:[^$]|\\$\\$|\\$\\{(?:run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts|ssh_public_key|slot)|params\\.[A-Za-z_][A-Za-z0-9_]*|outputs\\.[a-z][a-z0-9_]*|published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[a-z][a-z0-9-]{0,30}|machine|value)\\})*$"
+      "pattern": "^(?:[^$]|\\$\\$|\\$\\{(?:run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts|ssh_public_key|slot)|params\\.[A-Za-z_][A-Za-z0-9_]*|outputs\\.[a-z][a-z0-9_]*|published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[a-z][a-z0-9-]{0,30}|host\\.[A-Za-z0-9][A-Za-z0-9_.-]*|machine|value)\\})*$"
     },
     "Target": {
       "oneOf": [
@@ -1810,6 +1810,15 @@
           "format": "uint32",
           "minimum": 1,
           "description": "How long it may run, in seconds."
+        },
+        "provider_timeout_s": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 1
+          },
+          "description": "How long it may run on these Vagrant providers, in seconds, in place of `timeout_s` there only (`{\"vmware_esxi\": 120}`)."
         },
         "when": {
           "$ref": "#/$defs/When",

@@ -9,7 +9,10 @@ use isoloom_plan::PublishedPort;
 use isoloom_plan::checks::{Host, HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect, Url};
 use isoloom_spec::model::{self, Target};
 
-use super::{act, addresses, arch, argv, check, cleanup, generator, lab, networks, noted, outputs, outputs_at, port, program, run, timeout_s, tolerated, tool};
+use super::{
+    act, addresses, arch, argv, check, cleanup, generator, lab, networks, noted, outputs, outputs_at, outputs_on_their_hosts, port, program, run, timeout_s,
+    tolerated, tool,
+};
 use crate::testing;
 
 fn resolved(name: &str, wait: u32) -> Resolved {
@@ -234,6 +237,15 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
     let odd = machine("my-box", Role::Target, vec![lab_port("a-b", 1, PortKind::Tcp, true)]);
     assert_eq!(outputs(&[odd]).unwrap()[0].name.to_string(), "my_box_a_b");
     assert_eq!(Template::from_parts([Part::Placeholder(Placeholder::Value)]).to_string(), "${value}");
+}
+
+#[test]
+fn a_vm_lab_shows_each_published_port_at_its_machines_host() {
+    let web = machine("web", Role::Target, vec![lab_port("site", 80, PortKind::Http, true)]);
+    let kali = machine("kali", Role::Access, vec![lab_port("vnc", 5900, PortKind::Tcp, true)]);
+    let out = outputs_on_their_hosts(&[web, kali]).unwrap();
+    let formats: Vec<String> = out.iter().map(|o| o.format.as_ref().map(ToString::to_string).unwrap_or_default()).collect();
+    assert_eq!(formats, ["http://${host.web}:${value}/", "${host.kali}:${value}"]);
 }
 
 #[test]

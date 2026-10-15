@@ -1,5 +1,5 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
 ✓ vagrant
@@ -1921,7 +1921,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
         "status",
         "--machine-readable"
       ],
-      "timeout_s": 25
+      "timeout_s": 25,
+      "provider_timeout_s": {
+        "vmware_esxi": 180
+      }
     }
   },
   "ready": [

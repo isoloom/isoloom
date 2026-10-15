@@ -119,6 +119,9 @@ pub struct Step {
     pub stdin: Option<RelPath>,
     /// How long it may run.
     pub timeout_s: Option<NonZeroU32>,
+    /// How long it may run on these Vagrant providers, in place of `timeout_s` (only there): a
+    /// provider whose tool is slower (`vmware_esxi` asks the ESXi host once per VM).
+    pub provider_timeout_s: BTreeMap<Provider, NonZeroU32>,
     /// When it runs.
     pub when: When,
     /// What its failure does.
@@ -153,6 +156,7 @@ impl Step {
             env: BTreeMap::new(),
             stdin: None,
             timeout_s: None,
+            provider_timeout_s: BTreeMap::new(),
             when: When::IfOk,
             failure: Failure::Fail,
             hosts: BTreeSet::new(),
@@ -204,6 +208,10 @@ struct StepFields {
     /// How long it may run, in seconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     timeout_s: Option<NonZeroU32>,
+    /// How long it may run on these Vagrant providers, in seconds, in place of `timeout_s`
+    /// there only (`{"vmware_esxi": 120}`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    provider_timeout_s: BTreeMap<Provider, NonZeroU32>,
     /// `if_ok` (default): skipped once a step of the operation failed. `always`: a clean-up that
     /// runs anyway.
     #[serde(default, skip_serializing_if = "is_default")]
@@ -243,6 +251,7 @@ impl TryFrom<StepFields> for Step {
             env: f.env,
             stdin: f.stdin,
             timeout_s: f.timeout_s,
+            provider_timeout_s: f.provider_timeout_s,
             when: f.when,
             failure: f.failure,
             hosts: f.hosts,
@@ -268,6 +277,7 @@ impl From<Step> for StepFields {
             env: s.env,
             stdin: s.stdin,
             timeout_s: s.timeout_s,
+            provider_timeout_s: s.provider_timeout_s,
             when: s.when,
             failure: s.failure,
             hosts: s.hosts,
@@ -293,6 +303,20 @@ mod tests {
             back,
             r#"{"id":"rm","action":"compose.remove_containers","with":{"service":"x"},"failure":"tolerate"}"#
         );
+    }
+
+    #[test]
+    fn a_provider_may_have_its_own_time_limit() {
+        let text = r#"{"id":"status","argv":["vagrant","status"],"timeout_s":25,"provider_timeout_s":{"vmware_esxi":120}}"#;
+        let s: Step = serde_json::from_str(text).unwrap();
+        assert_eq!(s.provider_timeout_s.get(&Provider::VmwareEsxi).map(|t| t.get()), Some(120));
+        assert_eq!(serde_json::to_string(&s).unwrap(), text);
+        // Left out when no provider has one.
+        let plain: Step = serde_json::from_str(r#"{"id":"status","argv":["vagrant","status"]}"#).unwrap();
+        assert!(plain.provider_timeout_s.is_empty());
+        assert!(!serde_json::to_string(&plain).unwrap().contains("provider_timeout_s"));
+        assert!(serde_json::from_str::<Step>(r#"{"id":"s","argv":["v"],"provider_timeout_s":{"vmware_esxi":0}}"#).is_err());
+        assert!(serde_json::from_str::<Step>(r#"{"id":"s","argv":["v"],"provider_timeout_s":{"esx":60}}"#).is_err());
     }
 
     #[test]

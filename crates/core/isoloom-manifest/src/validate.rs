@@ -137,6 +137,7 @@ impl Manifest {
             for p in template.placeholders() {
                 match p {
                     Placeholder::Published { machine, port } => self.published(&at, machine.as_str(), port.as_str())?,
+                    Placeholder::Host(machine) => self.machine_exists(&at, machine.as_str())?,
                     Placeholder::Param(name) if !self.params.iter().any(|x| &x.name == name) => {
                         return Err(Error::UnknownParam { at, name: name.to_string() });
                     }
