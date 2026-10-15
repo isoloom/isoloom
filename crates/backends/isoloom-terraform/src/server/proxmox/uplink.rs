@@ -47,9 +47,5 @@ pub(super) fn checked(what: &str, own: &[String]) -> Block {
         .with_text(format!(
             "` within {AGENT_WAIT}: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
         ));
-    let postcondition = Block::builder("postcondition")
-        .add_attribute(("condition", condition))
-        .add_attribute(("error_message", message.into_expression()))
-        .build();
-    Block::builder("lifecycle").add_block(postcondition).build()
+    crate::server::router::postcondition(condition, message)
 }

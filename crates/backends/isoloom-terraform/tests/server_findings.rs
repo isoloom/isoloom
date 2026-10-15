@@ -21,12 +21,12 @@ fn esxi(name: &str) -> Outcome<String> {
     Ok(file(&EsxiBackend.render(&env)?, "esxi/main.tf")?.to_owned())
 }
 
-/// The block of `tf` that starts with `head`, up to the next top-level block.
-fn block<'a>(tf: &'a str, head: &str) -> &'a str {
-    let start = tf.find(head).unwrap_or(tf.len());
-    let rest = &tf[start..];
-    let end = rest.find("\n}\n").map_or(rest.len(), |e| e + 3);
-    &rest[..end]
+/// The block of `tf` that starts with `head`, up to the next top-level block (empty when there
+/// is none).
+fn block(tf: &str, head: &str) -> String {
+    let Some((_, rest)) = tf.split_once(head) else { return String::new() };
+    let body = rest.split_once("\n}\n").map_or(rest, |(b, _)| b);
+    format!("{head}{body}\n}}\n")
 }
 
 #[test]

@@ -1,7 +1,8 @@
-//! The run manifest the `docker` target writes (`.isoloom/docker/run.json`): the design's
-//! flag-portal spec writes the shared fixture the runner tests against, check runners get the
-//! time their waits need, and only `docker` and `vagrant` write one. Every example's manifest, on
-//! both, parses and matches the schema, and leaves the runner no slot it may skip.
+//! The run manifests the targets write (`.isoloom/<target>/run.json`): the design's flag-portal
+//! spec and the solo-web example write the shared docker and proxmox fixtures the runner tests
+//! against, check runners get the time their waits need, and only `docker`, `vagrant` and
+//! `proxmox` write one. Every example's manifest, on each, parses and matches the schema, and
+//! leaves the runner no slot it may skip.
 
 use std::path::{Path, PathBuf};
 
@@ -47,15 +48,24 @@ fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core/isoloom-manifest/fixtures").join(name)
 }
 
-#[test]
-fn the_flag_portal_spec_writes_the_shared_docker_fixture() -> Outcome {
-    let mut generated = run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker).unwrap(), ".isoloom/docker/run.json")?;
-    let mut fixture = isoloom_manifest::parse(&std::fs::read_to_string(fixture("docker.run.json")).unwrap()).unwrap();
-    // A release changes the version, not the contract.
-    generated.generator.version = Version::parse("0.0.0").unwrap();
-    fixture.generator.version = Version::parse("0.0.0").unwrap();
+/// `generated` is the shared fixture `name`: a release changes the version, not the contract.
+fn is_the_fixture(mut generated: Manifest, name: &str) -> Outcome {
+    let mut fixture = isoloom_manifest::parse(&std::fs::read_to_string(fixture(name))?)?;
+    generated.generator.version = Version::parse("0.0.0")?;
+    fixture.generator.version = Version::parse("0.0.0")?;
     assert_eq!(generated, fixture);
     Ok(())
+}
+
+#[test]
+fn the_flag_portal_spec_writes_the_shared_docker_fixture() -> Outcome {
+    is_the_fixture(run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker)?, ".isoloom/docker/run.json")?, "docker.run.json")
+}
+
+#[test]
+fn the_solo_web_example_writes_the_shared_proxmox_fixture() -> Outcome {
+    let solo_web = examples(Target::Proxmox)?.into_iter().find(|(name, _)| name == "solo-web").ok_or("no solo-web")?.1;
+    is_the_fixture(run_json(&generate(&solo_web, Target::Proxmox)?, ".isoloom/proxmox/run.json")?, "proxmox.run.json")
 }
 
 #[test]
@@ -90,9 +100,10 @@ fn the_message_leaves_published_ports_to_the_runner() -> Outcome {
 
 /// The targets that write a run manifest, where they write it, and how many examples each
 /// generates at least.
-const WRITERS: [(Target, &str, usize); 2] = [
+const WRITERS: [(Target, &str, usize); 3] = [
     (Target::Docker, ".isoloom/docker/run.json", 15),
     (Target::Vagrant, ".isoloom/vagrant/run.json", 10),
+    (Target::Proxmox, ".isoloom/proxmox/run.json", 10),
 ];
 
 /// Every example `target` generates.
@@ -181,7 +192,7 @@ fn every_examples_manifest_parses_and_matches_the_schema() -> Outcome {
 }
 
 #[test]
-fn only_docker_and_vagrant_write_a_run_manifest_for_now() -> Outcome {
+fn only_docker_vagrant_and_proxmox_write_a_run_manifest_for_now() -> Outcome {
     let spec = lab(FLAG_PORTAL)?;
     for target in [Target::Hosted, Target::DockerVm, Target::Kubernetes] {
         let files = generate(&spec, target).unwrap_or_default();

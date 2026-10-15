@@ -67,11 +67,11 @@ pub(super) fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError>
     let router_at = |net: &str| IpAddr::V4(router::address(env.spec(), net));
     out.push(machine(ROUTER, Role::Infra, by_network(env, router_at)?)?);
     if controller::needed(env) {
-        let at = |net: &str| {
+        let controller_at = |net: &str| {
             let c = env.networks.get(net).and_then(|n| SpecCidr::parse(&n.cidr));
             c.map_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), |c| IpAddr::V4(c.controller()))
         };
-        out.push(machine(CONTROLLER, Role::Infra, by_network(env, at)?)?);
+        out.push(machine(CONTROLLER, Role::Infra, by_network(env, controller_at)?)?);
     }
     Ok(out)
 }

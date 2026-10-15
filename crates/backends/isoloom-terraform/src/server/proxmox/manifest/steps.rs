@@ -51,8 +51,8 @@ fn output(name: &str) -> Result<Template, ManifestError> {
 /// folder in the run's state folder, no prompt, and the values the runner gives the module (its
 /// slot on the server, its key).
 fn terraform(step: &str, args: Vec<Template>, timeout: u32, note: &str) -> Result<Step, ManifestError> {
-    let argv = HostArgv::Every(Argv::new(Program::parse("terraform")?, args));
-    let mut s = noted(run(step, argv, timeout)?, note);
+    let command = HostArgv::Every(Argv::new(Program::parse("terraform")?, args));
+    let mut s = noted(run(step, command, timeout)?, note);
     let env: [(&str, Template); 6] = [
         ("TF_DATA_DIR", run_var("", RunVar::StateDir, "/.terraform")),
         ("TF_IN_AUTOMATION", Template::text("1")),

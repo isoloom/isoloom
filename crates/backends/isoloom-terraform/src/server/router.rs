@@ -6,7 +6,7 @@
 
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
-use isoloom_render::hcl_builder::{Expression, Module, Template, object, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, Template, object, reference, string};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
@@ -48,6 +48,16 @@ pub(crate) fn ruleset(env: &Environment) -> String {
     format!(
         "flush ruleset\ntable inet isoloom {{\n  chain forward {{\n    type filter hook forward priority 0; policy drop;\n{forward}  }}\n  chain prerouting {{\n    type nat hook prerouting priority -100;\n{dnat}  }}\n  chain postrouting {{\n    type nat hook postrouting priority 100;\n    ip saddr {lab} ip daddr != {lab} masquerade\n  }}\n}}\n"
     )
+}
+
+/// The `lifecycle` block failing the apply with `message` unless `condition` holds: what a VM
+/// reported of its uplink (its address).
+pub(crate) fn postcondition(condition: Expression, message: Template) -> Block {
+    let check = Block::builder("postcondition")
+        .add_attribute(("condition", condition))
+        .add_attribute(("error_message", message.into_expression()))
+        .build();
+    Block::builder("lifecycle").add_block(check).build()
 }
 
 /// Whether the router is the machine's default gateway: unless a bridged LAN's DHCP gives it its

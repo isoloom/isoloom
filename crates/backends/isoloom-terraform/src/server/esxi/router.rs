@@ -83,11 +83,7 @@ fn uplink_checked(env: &Environment) -> Block {
     let message = Template::text("The router got no address on its uplink port group `")
         .with_expr(reference("var.uplink_port_group"))
         .with_text("`: it has no DHCP (VMware Tools then reports a lab address). Give it an uplink with DHCP and internet (`uplink_port_group`; on a nested ESXi, promiscuous mode on).");
-    let postcondition = Block::builder("postcondition")
-        .add_attribute(("condition", condition))
-        .add_attribute(("error_message", message.into_expression()))
-        .build();
-    Block::builder("lifecycle").add_block(postcondition).build()
+    crate::server::router::postcondition(condition, message)
 }
 
 /// The outputs: Proxmox's, from the router's uplink address.
