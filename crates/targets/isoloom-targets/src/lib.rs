@@ -140,13 +140,19 @@ pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
             skipped.push(GenerateError::NoGenerator(target));
             continue;
         }
-        match generate(lab, target) {
+        match target_files(lab, target, None) {
             Ok(f) => {
+                let first = files.is_empty();
                 // Outputs share files (docker-vm runs the Compose file): each once.
                 for file in f {
                     if !files.iter().any(|x: &GeneratedFile| x.path == file.path) {
                         files.push(file);
                     }
+                }
+                // The resolved snapshot is the same for every target (it asks each target
+                // whether it refuses the lab): written once, after the first target's files.
+                if first {
+                    files.push(resolved::file(lab));
                 }
             }
             Err(e) => skipped.push(e),

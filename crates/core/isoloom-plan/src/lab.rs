@@ -3,7 +3,9 @@
 //! run it, and validates it: the authored spec's own checks, then those of its lowered form, each
 //! problem reported at the field the author wrote.
 
+use std::borrow::Cow;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use isoloom_spec::images::Table;
 use isoloom_spec::model::{self, Target};
@@ -16,6 +18,37 @@ use crate::lower::{Lowered, Scope, lower};
 pub struct Lab {
     source: syntax::Spec,
     images: Table,
+    memo: Memo,
+}
+
+/// [`Scope::Lab`], then one scope per target of [`Target::ALL`].
+const SCOPES: usize = Target::ALL.len() + 1;
+
+/// What a lab works out from its spec, once each: generating reads them many times (the
+/// resolved snapshot asks every target's refusal, for each target generated). Neither depends on
+/// the image table, so [`Lab::with_images`] keeps them.
+#[derive(Debug, Clone, Default)]
+struct Memo {
+    /// The spec lowered for each scope, before the image table: the lab's, then each target's.
+    lowered: [OnceLock<Lowered>; SCOPES],
+    /// [`Lab::problems`].
+    problems: OnceLock<Problems>,
+}
+
+impl PartialEq for Memo {
+    /// A memo is no part of a lab's value: two labs of the same spec are equal, whatever each
+    /// has worked out so far.
+    fn eq(&self, _: &Memo) -> bool {
+        true
+    }
+}
+
+/// The memo's slot of `scope`.
+fn slot(scope: Scope) -> Option<usize> {
+    match scope {
+        Scope::Lab => Some(0),
+        Scope::Target(t) => Target::ALL.iter().position(|x| *x == t).map(|i| i + 1),
+    }
 }
 
 impl Lab {
@@ -25,6 +58,7 @@ impl Lab {
         Lab {
             source,
             images: Table::default(),
+            memo: Memo::default(),
         }
     }
 
@@ -54,21 +88,29 @@ impl Lab {
     /// The spec lowered for `scope`, the image table applied.
     #[must_use]
     pub fn lowered(&self, scope: Scope) -> Lowered {
-        let mut l = lower(&self.source, scope);
+        let mut l = self.raw(scope).into_owned();
         l.spec = self.images.apply(&l.spec);
         l
+    }
+
+    /// The spec lowered for `scope` before the image table, lowered once.
+    fn raw(&self, scope: Scope) -> Cow<'_, Lowered> {
+        match slot(scope).and_then(|i| self.memo.lowered.get(i)) {
+            Some(cell) => Cow::Borrowed(cell.get_or_init(|| lower(&self.source, scope))),
+            None => Cow::Owned(lower(&self.source, scope)),
+        }
     }
 
     /// The spec as `target` runs it.
     #[must_use]
     pub fn for_target(&self, target: Target) -> model::Spec {
-        self.lowered(Scope::Target(target)).spec
+        self.images.apply(&self.raw(Scope::Target(target)).spec)
     }
 
     /// The spec as the lab itself: every form, no target's own facts.
     #[must_use]
     pub fn spec(&self) -> model::Spec {
-        self.lowered(Scope::Lab).spec
+        self.images.apply(&self.raw(Scope::Lab).spec)
     }
 
     /// The targets every machine has the form for, narrowed by the spec's `targets:`.
@@ -93,26 +135,31 @@ impl Lab {
     /// for, or a VM step it doesn't render yet, as a `refused` problem at the field.
     #[must_use]
     pub fn refusal(&self, target: Target) -> Option<Problem> {
-        let mut refusals = self.lowered(Scope::Target(target)).refusals;
-        (!refusals.is_empty()).then(|| self.place(refusals.remove(0)))
+        let first = self.raw(Scope::Target(target)).refusals.first().cloned();
+        first.map(|p| self.place(p))
     }
 
     /// The spec's problems: its own, then its lowered form's at the fields the author wrote, in
     /// file order.
     #[must_use]
     pub fn problems(&self) -> Problems {
+        self.memo.problems.get_or_init(|| self.find_problems()).clone()
+    }
+
+    /// [`Lab::problems`], worked out.
+    fn find_problems(&self) -> Problems {
         let mut out = syntax::check(&self.source);
-        let lowered = lower(&self.source, Scope::Lab);
+        let lowered = self.raw(Scope::Lab);
         let model: Vec<Problem> = isoloom_spec::validate(&lowered.spec)
             .iter()
             .map(|p| translated(&lowered, p))
             .filter(|p| !follows_from(&out, p, &self.source))
             .collect();
-        add(&mut out, lowered.problems.into_iter().chain(model));
+        add(&mut out, lowered.problems.iter().cloned().chain(model));
         // What only a target's overrides set (an existing network or volume) is checked once
         // lowered for that target.
         for (key, target) in override_targets(&self.source.overrides) {
-            let on_target = lower(&self.source, Scope::Target(target));
+            let on_target = self.raw(Scope::Target(target));
             let found: Vec<Problem> = isoloom_spec::validate(&on_target.spec)
                 .iter()
                 .map(|p| under_overrides_of(key, translated(&on_target, p)))
@@ -127,7 +174,7 @@ impl Lab {
     #[must_use]
     pub fn problems_with_files(&self, dir: &Path) -> Problems {
         let mut out = self.problems();
-        let lowered = lower(&self.source, Scope::Lab);
+        let lowered = self.raw(Scope::Lab);
         add(
             &mut out,
             isoloom_spec::validate_files(&lowered.spec, dir).iter().map(|p| translated(&lowered, p)),
