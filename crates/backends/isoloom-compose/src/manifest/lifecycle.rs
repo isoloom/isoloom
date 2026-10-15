@@ -1,10 +1,9 @@
 //! The operations of a Compose run, when it counts as ready, and how a start that tripped over a
 //! previous run's leftovers is retried.
 
-use std::num::NonZeroU32;
-
-use isoloom_manifest::{Action, Argv, Condition, Failure, HostArgv, Lifecycle, NonEmpty, Park, Recovery, Retries, Step, StepId, Template, When};
+use isoloom_manifest::{Action, Argv, Condition, HostArgv, Lifecycle, NonEmpty, Park, Recovery, Retries, Step, StepId, Template, When};
 use isoloom_plan::{Environment, Lifetime, MachineShape};
+use isoloom_render::run_manifest::{cleanup, noted, tolerated};
 
 use super::machines::Member;
 use super::{compose, in_project, program};
@@ -16,26 +15,12 @@ const WAIT_TIMEOUT: &str = "600";
 
 /// A step running `argv` for at most `timeout_s`.
 fn run(id: &str, argv: HostArgv, timeout_s: u32) -> Result<Step> {
-    let mut s = Step::argv(StepId::parse(id)?, argv);
-    s.timeout_s = NonZeroU32::new(timeout_s);
-    Ok(s)
+    Ok(isoloom_render::run_manifest::run(id, argv, timeout_s)?)
 }
 
 /// A step running `action`.
 fn act(id: &str, action: Action) -> Result<Step> {
-    Ok(Step::action(StepId::parse(id)?, action))
-}
-
-/// A clean-up: it runs whatever happened before it, and its failure is only logged.
-fn cleanup(mut s: Step) -> Step {
-    s.when = When::Always;
-    s.failure = Failure::Tolerate;
-    s
-}
-
-fn noted(mut s: Step, note: &str) -> Step {
-    s.note = Some(note.to_owned());
-    s
+    Ok(isoloom_render::run_manifest::act(id, action)?)
 }
 
 /// The id of the step that runs a leaf `init:` job.
@@ -81,11 +66,6 @@ fn up(plan: &StartPlan, members: &[Member]) -> Result<Vec<Step>> {
         steps.push(noted(run(&job_step(job), compose(&attached)?, 600)?, &note));
     }
     Ok(steps)
-}
-
-fn tolerated(mut s: Step) -> Step {
-    s.failure = Failure::Tolerate;
-    s
 }
 
 /// Remove everything, the check runners included; the volumes the spec keeps survive (`down`

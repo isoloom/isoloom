@@ -17,6 +17,7 @@
 //!   [`more_addresses`].
 //! - **The containers' shared parts:** [`container`]; where a check reaches its host:
 //!   [`checks`].
+//! - **The run manifest's pieces** every target's `run.json` is built from: [`run_manifest`].
 //!
 //! Everything here is a pure function of the plan: no I/O, no clock, no environment.
 //!
@@ -48,6 +49,7 @@ mod output;
 pub mod powershell;
 pub mod project;
 pub mod ruby;
+pub mod run_manifest;
 pub mod secrets;
 pub mod steps;
 #[cfg(test)]

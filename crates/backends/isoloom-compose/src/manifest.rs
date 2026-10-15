@@ -12,10 +12,11 @@ mod slots;
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    Argv, Checks, Cidr, ComposeIdentity, Driver, Generator, GeneratorName, HostArgv, HostOs, Identity, Lab, LabName, Manifest, ManifestVersion, Name, Network,
-    NonEmpty, PathTemplate, Placeholder, Program, RelPath, RunVar, SCHEMA_URL, Template, Tool, ToolName, Version,
+    Argv, Checks, ComposeIdentity, Driver, HostArgv, HostOs, Identity, Manifest, ManifestVersion, NonEmpty, PathTemplate, Placeholder, Program, RelPath,
+    RunVar, SCHEMA_URL, Template, Tool, Version,
 };
 use isoloom_plan::Environment;
+use isoloom_render::run_manifest;
 
 use crate::error::Result;
 use crate::file::ComposeFile;
@@ -36,15 +37,8 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
     Ok(Manifest {
         schema: Some(SCHEMA_URL.to_owned()),
         manifest_version: ManifestVersion,
-        generator: Generator {
-            name: GeneratorName::Isoloom,
-            version: Version::parse(env!("CARGO_PKG_VERSION"))?,
-        },
-        lab: Lab {
-            name: LabName::parse(&env.name)?,
-            instance: env.instance.map(isoloom_manifest::Instance::new).transpose()?,
-            message: None,
-        },
+        generator: run_manifest::generator()?,
+        lab: run_manifest::lab(env)?,
         target: isoloom_manifest::Target::Docker,
         cloud: None,
         driver: Driver::Compose,
@@ -53,8 +47,8 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
         identity: identity()?,
         params: slots::params(&machines, &runners.derived)?,
         secrets: slots::slots(env, &members, &plan)?,
-        networks: networks(env)?,
-        outputs: machines::outputs(&machines)?,
+        networks: run_manifest::networks(env, in_project)?,
+        outputs: run_manifest::outputs(&machines)?,
         machines,
         lifecycle: lifecycle::lifecycle(env, &plan, &members)?,
         ready: lifecycle::ready(&plan, &members)?,
@@ -86,7 +80,7 @@ fn compose(args: &[&str]) -> Result<HostArgv> {
 }
 
 fn program(name: &str) -> Result<Program> {
-    Ok(Program::parse(name)?)
+    Ok(run_manifest::program(name)?)
 }
 
 /// `${run.state_dir}/ports.yml`.
@@ -135,37 +129,16 @@ fn compose_min_version() -> Result<Version> {
 
 /// Docker's engine and Compose v2, at the version the run needs ([`compose_min_version`]).
 fn tools() -> Result<Vec<Tool>> {
-    let probe = |args: &[&str]| -> Result<HostArgv> { Ok(HostArgv::Every(Argv::new(program("docker")?, args.iter().map(|a| Template::text(a)).collect()))) };
+    let probe = |args: &[&str]| -> Result<HostArgv> { Ok(run_manifest::argv("docker", args)?) };
     let tool = |name: &str, check: HostArgv, min: Option<Version>| -> Result<Tool> {
-        Ok(Tool {
-            name: ToolName::parse(name)?,
-            probe: check,
-            min_version: min,
-            container: None,
-            container_hosts: BTreeSet::new(),
-            hosts: BTreeSet::new(),
-            providers: BTreeSet::new(),
-        })
+        let mut t = run_manifest::tool(name, check)?;
+        t.min_version = min;
+        Ok(t)
     };
     Ok(vec![
         tool("docker", probe(&["info", "--format", "{{.ServerVersion}}"])?, None)?,
         tool("docker-compose", probe(&["compose", "version", "--short"])?, Some(compose_min_version()?))?,
     ])
-}
-
-/// The lab's networks, on their Docker blocks, under the project's name.
-fn networks(env: &Environment) -> Result<Vec<Network>> {
-    env.networks
-        .iter()
-        .map(|(name, n)| {
-            Ok(Network {
-                name: Name::parse(name)?,
-                cidr: Cidr::parse(&n.cidr)?,
-                internet: n.internet,
-                native: Some(in_project(name)),
-            })
-        })
-        .collect()
 }
 
 #[cfg(test)]

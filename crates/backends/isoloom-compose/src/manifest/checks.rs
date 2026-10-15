@@ -5,9 +5,10 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use isoloom_manifest::{Action, Check, CheckKind, CheckRunner, Failure, Name, RelPath, SnakeName, Step, StepId, Template};
+use isoloom_manifest::{Action, CheckRunner, Failure, Name, RelPath, SnakeName, Step, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Position, Probe, Resolved};
+use isoloom_render::run_manifest::{check, timeout_s};
 
 use isoloom_render::container::exec_runner;
 
@@ -16,24 +17,12 @@ use crate::error::Result;
 use crate::file::ComposeFile;
 use crate::names::{STAND_IN, check_runner_service, routes_service};
 
-/// What a check runner's step may add to its checks' waits: the probes' own time (curl and nc
-/// cap a probe at 5 to 10 s) per check, and the runner's start.
-const PER_CHECK_S: u32 = 15;
-const START_S: u32 = 60;
-
 /// The runners, and the steps that read `ISOLOOM_DERIVED`.
 pub(super) struct Runners {
     /// The runners, position by position.
     pub(super) runners: Vec<CheckRunner>,
     /// The `compose run` steps, which pass `ISOLOOM_DERIVED` to their runner.
     pub(super) derived: Vec<StepId>,
-}
-
-/// The time limit of a runner of `checks`: their waits, plus 15 s each, plus 60 s.
-pub(super) fn timeout_s(checks: &[&Resolved]) -> u32 {
-    let waits: u32 = checks.iter().map(|c| c.wait).sum();
-    let count = u32::try_from(checks.len()).unwrap_or(u32::MAX);
-    waits.saturating_add(count.saturating_mul(PER_CHECK_S)).saturating_add(START_S)
 }
 
 /// Every position's runners, in the order `isoloom test` runs them.
@@ -92,22 +81,6 @@ fn exec_runner_of(pos: &Position, machine: &str, execs: &[&Resolved]) -> Result<
 
 fn arg(name: &str) -> Result<SnakeName> {
     Ok(SnakeName::parse(name)?)
-}
-
-fn check(c: &Resolved) -> Check {
-    let kind = match c.probe {
-        Probe::Http { .. } => CheckKind::Http,
-        Probe::Tcp { .. } => CheckKind::Tcp,
-        Probe::Exec { .. } => CheckKind::Exec,
-        Probe::Script { .. } => CheckKind::Script,
-        Probe::Playbook { .. } => CheckKind::Playbook,
-    };
-    Check {
-        name: c.name.clone(),
-        kind,
-        wait_s: c.wait,
-        derived: c.derived,
-    }
 }
 
 /// Before the runners: the stand-in for a supplied access machine, and its routes, when the

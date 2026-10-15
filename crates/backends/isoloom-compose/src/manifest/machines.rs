@@ -6,12 +6,10 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::num::NonZeroU16;
 
-use isoloom_manifest::{
-    Arch, GuestPath, Machine, ManifestError, Name, Native, Output, OutputRole, OutputSource, Part, Placeholder, Port, Protocol, Publish, PublishMode,
-    Resources, Role, SnakeName, Template, Volume,
-};
+use isoloom_manifest::{GuestPath, Machine, ManifestError, Name, Native, Placeholder, Port, Protocol, Publish, PublishMode, Resources, Role, Template, Volume};
 use isoloom_plan::checks::{self, Position};
-use isoloom_plan::{Environment, Lifetime, MachinePlan, PublishedPort};
+use isoloom_plan::{Environment, Lifetime, MachinePlan};
+use isoloom_render::run_manifest::{addresses, arch, port};
 use isoloom_render::{router, trunks};
 use isoloom_spec::model;
 
@@ -132,7 +130,12 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Mac
         });
         out.addresses = addresses(mp)?;
         out.volumes = volumes(mp)?;
-        out.ports = m.ports.iter().map(|p| port(&m.port_label(p), p, &mp.ports)).collect::<Result<_, _>>()?;
+        let address = publish_address()?;
+        out.ports = m
+            .ports
+            .iter()
+            .map(|p| port(&m.port_label(p), p, &mp.ports, &address))
+            .collect::<Result<_, _>>()?;
     } else if member.name == STAND_IN {
         // It stands in at the addresses of the machine its hostname names.
         let stood_for = file.services.get(STAND_IN).and_then(|s| s.hostname.as_deref());
@@ -146,28 +149,6 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Mac
         out.ports = tool_port(tool)?.into_iter().collect();
     }
     Ok(out)
-}
-
-fn arch(a: model::Arch) -> Arch {
-    match a {
-        model::Arch::Amd64 => Arch::Amd64,
-        model::Arch::Arm64 => Arch::Arm64,
-    }
-}
-
-fn protocol(p: model::Protocol) -> Protocol {
-    if p.is_tcp() { Protocol::Tcp } else { Protocol::Udp }
-}
-
-/// Its address on each network: IPv4 where it has one, else IPv6.
-fn addresses(mp: &MachinePlan) -> Result<BTreeMap<Name, IpAddr>> {
-    let v4 = mp.addresses.iter().map(|(n, a)| (n, IpAddr::V4(*a)));
-    let v6 = mp
-        .addresses6
-        .iter()
-        .filter(|(n, _)| !mp.addresses.contains_key(*n))
-        .map(|(n, a)| (n, IpAddr::V6(*a)));
-    v4.chain(v6).map(|(n, a)| Ok((Name::parse(n)?, a))).collect()
 }
 
 /// Its named volumes and data disks, by their names in the spec.
@@ -198,36 +179,6 @@ fn publish_address() -> Result<Template> {
     Ok(Template::from(Placeholder::Param(name)))
 }
 
-/// A port of the lab's, named `label` (the spec's name).
-fn port(label: &str, p: &model::Port, published: &[PublishedPort]) -> Result<Port> {
-    let publish = published
-        .iter()
-        .find(|x| x.name == label)
-        .map(|x| {
-            Ok::<_, Error>(Publish {
-                mode: if x.fixed { PublishMode::Fixed } else { PublishMode::Ephemeral },
-                preferred: NonZeroU16::new(x.publish),
-                address: Some(publish_address()?),
-            })
-        })
-        .transpose()?;
-    Ok(Port {
-        name: Name::parse(label)?,
-        port: NonZeroU16::new(p.port).ok_or_else(|| {
-            Error::from(ManifestError::OutOfRange {
-                what: "a port",
-                value: 0,
-                min: 1,
-                max: 65535,
-            })
-        })?,
-        protocol: protocol(p.protocol),
-        http: p.http,
-        tls: p.tls,
-        publish,
-    })
-}
-
 /// The name of a tool's port (its web UI).
 const TOOL_PORT: &str = "web";
 
@@ -248,49 +199,6 @@ fn tool_port(tool: &model::Tool) -> Result<Option<Port>> {
             address: Some(publish_address()?),
         }),
     }))
-}
-
-/// An output per published port of the lab's machines and tools: an HTTP port is an entry (the
-/// Open button), the others information; each shown at the host's loopback.
-pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>> {
-    let shown = machines.iter().filter(|m| matches!(m.role, Role::Target | Role::Access | Role::Tool));
-    shown
-        .flat_map(|m| m.ports.iter().filter(|p| p.publish.is_some()).map(move |p| (m, p)))
-        .map(|(m, p)| output(m, p))
-        .collect()
-}
-
-fn output(m: &Machine, p: &Port) -> Result<Output> {
-    let snake: String = format!("{}_{}", m.name, p.name)
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
-        .collect();
-    let (role, before, after) = match (p.http, p.tls) {
-        (true, true) => (OutputRole::Entry, "https://127.0.0.1:", "/"),
-        (true, false) => (OutputRole::Entry, "http://127.0.0.1:", "/"),
-        (false, _) => (OutputRole::Info, "127.0.0.1:", ""),
-    };
-    let port = if p.protocol == Protocol::Udp {
-        format!("{}/udp", p.port)
-    } else {
-        p.port.to_string()
-    };
-    let what = format!("{}'s {} (port {port})", m.name, p.name);
-    Ok(Output {
-        name: SnakeName::parse(&snake)?,
-        description: Some(format!("{what}.")),
-        role,
-        sensitive: false,
-        format: Some(Template::from_parts([
-            Part::Text(before.into()),
-            Part::Placeholder(Placeholder::Value),
-            Part::Text(after.into()),
-        ])),
-        from: OutputSource::PublishedPort {
-            machine: m.name.clone(),
-            port: p.name.clone(),
-        },
-    })
 }
 
 #[cfg(test)]
